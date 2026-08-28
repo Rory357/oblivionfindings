@@ -10,7 +10,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { submitEmarMutation } from '@/lib/emar-offline';
+import {
+    emarMutationWasAccepted,
+    submitEmarMutation,
+} from '@/lib/emar-offline';
 import {
     emptyMedicationScanCapture,
     hasVerifiedMedicationScan,
@@ -18,10 +21,20 @@ import {
     type MedicationScanCapture,
     type MedicationScanVerification,
 } from '@/lib/medication-scan';
+import { normalizeMedicationStockQuantityInput } from '@/pages/emar/medication-stock-governance';
 import axios from 'axios';
 import { AlertCircle, CheckCircle, Package, Plus } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+
+import {
+    createScheduledStockCountReplayState,
+    prepareScheduledStockCountCompletionReplayState,
+    prepareScheduledStockCountReplayState,
+    type ScheduledStockCountCompletePayload,
+    type ScheduledStockCountCreatePayload,
+    type ScheduledStockCountReplayState,
+} from './scheduled-stock-count-request';
 
 interface StockCount {
     id: number;
@@ -77,6 +90,13 @@ export default function ScheduledStockCounts({
     const [scanCapture, setScanCapture] = useState<MedicationScanCapture>(
         emptyMedicationScanCapture(),
     );
+    const [initialCreateReplay] = useState(() =>
+        createScheduledStockCountReplayState(),
+    );
+    const createReplay = useRef(initialCreateReplay);
+    const completionReplays = useRef(
+        new Map<number, ScheduledStockCountReplayState>(),
+    );
 
     const loadCounts = useCallback(async () => {
         setLoading(true);
@@ -95,32 +115,58 @@ export default function ScheduledStockCounts({
     useEffect(() => {
         if (open) {
             loadCounts();
+        } else {
+            createReplay.current = createScheduledStockCountReplayState();
+            completionReplays.current.clear();
         }
     }, [open, loadCounts]);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
+        const expectedQuantity = newExpectedQty.trim()
+            ? normalizeMedicationStockQuantityInput(newExpectedQty)
+            : null;
+        if (newExpectedQty.trim() && expectedQuantity === null) {
+            toast.error(
+                'Expected quantity must be a non-negative number with no more than two decimal places.',
+            );
+            return;
+        }
+
+        const initialPayload: ScheduledStockCountCreatePayload = {
+            scheduled_date: newDate,
+            scheduled_time: newTime || null,
+            expected_quantity: expectedQuantity,
+            notes: newNotes || null,
+            client_request_uuid: createReplay.current.uuid,
+        };
+        createReplay.current = prepareScheduledStockCountReplayState(
+            createReplay.current,
+            { clientId, medicationId },
+            initialPayload,
+        );
+        const payload = {
+            ...initialPayload,
+            client_request_uuid: createReplay.current.uuid,
+        };
+
         try {
             const result = await submitEmarMutation(
                 `/api/medications/clients/${clientId}/medications/${medicationId}/scheduled-counts`,
+                payload,
                 {
-                    scheduled_date: newDate,
-                    scheduled_time: newTime || null,
-                    expected_quantity: newExpectedQty
-                        ? parseInt(newExpectedQty, 10)
-                        : null,
-                    notes: newNotes || null,
-                },
-                {
-                    allowQueueWhenOffline: false,
+                    allowQueueWhenOffline: !controlledDrug,
                     successMessage: 'Scheduled stock count created.',
+                    queuedMessage:
+                        'Scheduled stock count saved offline and will sync automatically when the device reconnects.',
                 },
             );
 
-            if (result.status === 'conflict') {
+            if (!emarMutationWasAccepted(result.status)) {
                 return;
             }
 
+            createReplay.current = createScheduledStockCountReplayState();
             setShowAddForm(false);
             setNewDate('');
             setNewTime('');
@@ -140,7 +186,15 @@ export default function ScheduledStockCounts({
 
     const handleComplete = async (countId: number) => {
         try {
-            const actualQuantity = parseInt(actualQty, 10);
+            const normalizedActualQuantity =
+                normalizeMedicationStockQuantityInput(actualQty);
+            if (normalizedActualQuantity === null) {
+                toast.error(
+                    'Actual quantity must be a non-negative number with no more than two decimal places.',
+                );
+                return;
+            }
+            const actualQuantity = Number(normalizedActualQuantity);
             const witnessValue =
                 controlledDrug && witnessId ? parseInt(witnessId, 10) : null;
 
@@ -151,24 +205,42 @@ export default function ScheduledStockCounts({
                 return;
             }
 
+            const initialReplay =
+                completionReplays.current.get(countId) ??
+                createScheduledStockCountReplayState();
+            const initialPayload: ScheduledStockCountCompletePayload = {
+                actual_quantity: normalizedActualQuantity,
+                notes: completeNotes || null,
+                witnessed_by: witnessValue,
+                ...toMedicationScanPayload(scanCapture),
+                client_request_uuid: initialReplay.uuid,
+            };
+            const replay = prepareScheduledStockCountCompletionReplayState(
+                initialReplay,
+                { clientId, medicationId, countId },
+                initialPayload,
+            );
+            completionReplays.current.set(countId, replay);
+
             const result = await submitEmarMutation(
                 `/api/medications/clients/${clientId}/scheduled-counts/${countId}/complete`,
                 {
-                    actual_quantity: actualQuantity,
-                    notes: completeNotes || null,
-                    witnessed_by: witnessValue,
-                    ...toMedicationScanPayload(scanCapture),
+                    ...initialPayload,
+                    client_request_uuid: replay.uuid,
                 },
                 {
+                    allowQueueWhenOffline: !controlledDrug,
                     successMessage: 'Stock count completed.',
                     queuedMessage:
                         'Stock count saved offline and will sync automatically when the device reconnects.',
                 },
             );
 
-            if (result.status === 'conflict') {
+            if (!emarMutationWasAccepted(result.status)) {
                 return;
             }
+
+            completionReplays.current.delete(countId);
 
             if (result.status === 'queued') {
                 setCounts((current) =>
@@ -316,6 +388,8 @@ export default function ScheduledStockCounts({
                             <Input
                                 type="number"
                                 min="0"
+                                step="0.01"
+                                inputMode="decimal"
                                 value={newExpectedQty}
                                 onChange={(e) =>
                                     setNewExpectedQty(e.target.value)
@@ -458,6 +532,8 @@ export default function ScheduledStockCounts({
                                                     <Input
                                                         type="number"
                                                         min="0"
+                                                        step="0.01"
+                                                        inputMode="decimal"
                                                         value={actualQty}
                                                         onChange={(e) =>
                                                             setActualQty(

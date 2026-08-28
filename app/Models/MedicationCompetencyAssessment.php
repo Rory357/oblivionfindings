@@ -84,30 +84,44 @@ class MedicationCompetencyAssessment extends Model
     public function scopeActive($query)
     {
         return $query->where('status', 'passed')
+            ->whereColumn('assessor_id', '!=', 'user_id')
+            ->whereNotNull('assessor_declared_at')
+            ->whereNotNull('staff_acknowledged_at')
             ->whereNotNull('expiry_date')
             ->where('expiry_date', '>=', now()->toDateString());
     }
 
     public function scopeExpired($query)
     {
-        return $query->where('expiry_date', '<', now()->toDateString());
+        return $query->where(function ($expired): void {
+            $expired->where('status', 'expired')
+                ->orWhere('expiry_date', '<', now()->toDateString());
+        });
     }
 
     public function scopeExpiringSoon($query, int $days = 30)
     {
         return $query->where('status', 'passed')
+            ->whereColumn('assessor_id', '!=', 'user_id')
+            ->whereNotNull('assessor_declared_at')
+            ->whereNotNull('staff_acknowledged_at')
             ->whereBetween('expiry_date', [now()->toDateString(), now()->addDays($days)->toDateString()]);
     }
 
     public function isExpired(): bool
     {
-        return $this->expiry_date !== null
-            && $this->expiry_date->copy()->endOfDay()->isPast();
+        return $this->status === 'expired'
+            || ($this->expiry_date !== null
+                && $this->expiry_date->copy()->endOfDay()->isPast());
     }
 
     public function isPassed(): bool
     {
         return $this->status === 'passed'
+            && $this->assessor_id !== null
+            && (int) $this->assessor_id !== (int) $this->user_id
+            && $this->assessor_declared_at !== null
+            && $this->staff_acknowledged_at !== null
             && $this->expiry_date !== null
             && ! $this->isExpired();
     }

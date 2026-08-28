@@ -13,17 +13,23 @@ use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CombinedReportController extends Controller
 {
+    public function __construct(
+        private readonly MedicationGovernanceScopeService $medicationScope,
+    ) {}
+
     public function show(Request $request, string $report)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('reports.viewAny'), 403);
 
-        $payload = $this->reportPayload($report);
+        $payload = $this->reportPayload($report, $user);
         abort_unless($payload !== null, 404);
 
         return inertia('reports/combined', $payload);
@@ -34,7 +40,7 @@ class CombinedReportController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('reports.viewAny'), 403);
 
-        $payload = $this->reportPayload($report);
+        $payload = $this->reportPayload($report, $user);
         abort_unless($payload !== null, 404);
 
         $filename = sprintf(
@@ -100,26 +106,47 @@ class CombinedReportController extends Controller
     /**
      * @return array<string, mixed>|null
      */
-    private function reportPayload(string $key): ?array
+    private function reportPayload(string $key, User $user): ?array
     {
         $definition = collect(self::definitions())->firstWhere('key', $key);
-        if (!is_array($definition)) {
+        if (! is_array($definition)) {
             return null;
         }
 
         $now = now();
         $from7 = $now->copy()->subDays(7)->startOfDay();
         $from30 = $now->copy()->subDays(30)->startOfDay();
+        $medicationSiteIds = $this->medicationScope->reportSiteIds($user);
+        $canViewControlled = $user->canDo(
+            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+        );
+        if (! $canViewControlled) {
+            $definition['modules'] = collect($definition['modules'] ?? [])
+                ->reject(fn (string $module): bool => $module === 'controlled_drug_discrepancies')
+                ->values()
+                ->all();
+        }
 
         if ($key === 'care-quality') {
+            $administrations = $this->medicationAdministrationQuery(
+                $user,
+                $medicationSiteIds,
+            );
             $metrics = [
                 ['label' => 'Open incidents', 'value' => ClientIncident::query()->whereIn('status', ['submitted', 'reviewed'])->count()],
                 ['label' => 'High severity incidents (30d)', 'value' => ClientIncident::query()->where('occurred_at', '>=', $from30)->where('severity', 'high')->count()],
                 ['label' => 'Open safeguarding concerns', 'value' => SafeguardingConcern::query()->where('status', '!=', 'closed')->count()],
-                ['label' => 'Medication exceptions (7d)', 'value' => ClientMedicationAdministration::query()->where('administered_at', '>=', $from7)->whereIn('status', ['missed', 'withheld', 'refused'])->count()],
-                ['label' => 'Open controlled discrepancies', 'value' => ClientControlledDrugDiscrepancy::query()->where('status', 'open')->count()],
+                ['label' => 'Medication exceptions (7d)', 'value' => (clone $administrations)->where('administered_at', '>=', $from7)->whereIn('status', ['missed', 'withheld', 'refused'])->count()],
                 ['label' => 'Completed shifts (7d)', 'value' => Shift::query()->where('starts_at', '>=', $from7)->where('status', 'completed')->count()],
             ];
+            if ($canViewControlled) {
+                array_splice($metrics, 4, 0, [[
+                    'label' => 'Open controlled discrepancies',
+                    'value' => $this->controlledDiscrepancyQuery($user, $medicationSiteIds)
+                        ->where('status', 'open')
+                        ->count(),
+                ]]);
+            }
             $sections = [
                 [
                     'title' => 'Recent Incidents',
@@ -139,7 +166,7 @@ class CombinedReportController extends Controller
                                 (string) ($i->status ?? ''),
                                 (string) ($i->type ?? ''),
                             ],
-                            'href' => '/incidents/' . $i->id,
+                            'href' => '/incidents/'.$i->id,
                         ])
                         ->values()
                         ->all(),
@@ -147,7 +174,7 @@ class CombinedReportController extends Controller
                 [
                     'title' => 'Recent Medication Exceptions',
                     'columns' => ['ID', 'Administered At', 'Client ID', 'Status', 'Reason'],
-                    'rows' => ClientMedicationAdministration::query()
+                    'rows' => (clone $administrations)
                         ->whereIn('status', ['missed', 'withheld', 'refused'])
                         ->select(['id', 'administered_at', 'client_id', 'status', 'reason'])
                         ->latest('administered_at')
@@ -185,7 +212,7 @@ class CombinedReportController extends Controller
                                 (string) ($s->status ?? ''),
                                 (string) ($s->assigned_to_user_id ?? ''),
                             ],
-                            'href' => '/safeguarding/' . $s->id,
+                            'href' => '/safeguarding/'.$s->id,
                         ])
                         ->values()
                         ->all(),
@@ -220,7 +247,7 @@ class CombinedReportController extends Controller
                                 (string) ($s->user_id ?? ''),
                                 (string) ($s->status ?? ''),
                             ],
-                            'href' => '/shifts/' . $s->id,
+                            'href' => '/shifts/'.$s->id,
                         ])
                         ->values()
                         ->all(),
@@ -244,7 +271,7 @@ class CombinedReportController extends Controller
                                 (string) ($t->shift_id ?? ''),
                                 (string) ($t->status ?? ''),
                             ],
-                            'href' => '/timesheets/' . $t->id . '/edit',
+                            'href' => '/timesheets/'.$t->id.'/edit',
                         ])
                         ->values()
                         ->all(),
@@ -267,26 +294,30 @@ class CombinedReportController extends Controller
                                 (string) ($u->role ?? ''),
                                 optional($u->created_at)->toDateTimeString() ?? '',
                             ],
-                            'href' => '/staff/' . $u->id,
+                            'href' => '/staff/'.$u->id,
                         ])
                         ->values()
                         ->all(),
                 ],
             ];
         } else {
+            $generalAuditActivity = $this->generalAuditActivityQuery();
             $metrics = [
-                ['label' => 'Audit events (7d)', 'value' => AuditLog::query()->where('created_at', '>=', $from7)->count()],
+                ['label' => 'Audit events (7d)', 'value' => (clone $generalAuditActivity)->where('created_at', '>=', $from7)->count()],
                 ['label' => 'Overdue asset inspections', 'value' => Asset::query()->where('requires_inspection', true)->whereNotNull('inspection_due_at')->where('inspection_due_at', '<', $now->toDateString())->count()],
                 ['label' => 'Overdue maintenance', 'value' => Asset::query()->where('requires_maintenance', true)->whereNotNull('maintenance_due_at')->where('maintenance_due_at', '<', $now->toDateString())->count()],
                 ['label' => 'Open safeguarding concerns', 'value' => SafeguardingConcern::query()->where('status', '!=', 'closed')->count()],
                 ['label' => 'Overdue privacy requests', 'value' => DataSubjectRequest::query()->overdue()->count()],
-                ['label' => 'Break-glass accesses (7d)', 'value' => ClientBreakGlassAccess::query()->where('created_at', '>=', $from7)->count()],
+                ['label' => 'Break-glass accesses (7d)', 'value' => ClientBreakGlassAccess::query()
+                    ->whereHas('client', fn (Builder $client): Builder => $client->whereIn('site_id', $medicationSiteIds))
+                    ->where('created_at', '>=', $from7)
+                    ->count()],
             ];
             $sections = [
                 [
                     'title' => 'Recent Audit Events',
                     'columns' => ['ID', 'Created At', 'Action', 'User ID', 'Client ID', 'IP Address'],
-                    'rows' => AuditLog::query()
+                    'rows' => (clone $generalAuditActivity)
                         ->select(['id', 'created_at', 'action', 'user_id', 'client_id', 'ip_address'])
                         ->latest('created_at')
                         ->limit(25)
@@ -336,7 +367,7 @@ class CombinedReportController extends Controller
                                 optional($a->maintenance_due_at)->toDateString() ?? '',
                                 (string) ($a->status ?? ''),
                             ],
-                            'href' => '/assets/' . $a->id,
+                            'href' => '/assets/'.$a->id,
                         ])
                         ->values()
                         ->all(),
@@ -360,7 +391,7 @@ class CombinedReportController extends Controller
                                 optional($d->extended_due_date)->toDateString() ?? '',
                                 (string) ($d->assigned_to_user_id ?? ''),
                             ],
-                            'href' => '/privacy/requests/' . $d->id,
+                            'href' => '/privacy/requests/'.$d->id,
                         ])
                         ->values()
                         ->all(),
@@ -374,5 +405,66 @@ class CombinedReportController extends Controller
             'metrics' => $metrics,
             'sections' => $sections ?? [],
         ];
+    }
+
+    /** @param array<int, int> $siteIds */
+    private function medicationAdministrationQuery(User $user, array $siteIds): Builder
+    {
+        $query = ClientMedicationAdministration::query()->effectiveClinicalEvidence();
+        $this->medicationScope->scopeCanonicalClientMedicationRows(
+            $query,
+            $siteIds,
+            allowNullMedication: false,
+        );
+        if (! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
+            $this->medicationScope->scopeWithoutControlledMedicationRows($query);
+        }
+
+        return $query;
+    }
+
+    /** @param array<int, int> $siteIds */
+    private function controlledDiscrepancyQuery(User $user, array $siteIds): Builder
+    {
+        $this->medicationScope->reportSiteIds($user, controlled: true);
+        $query = ClientControlledDrugDiscrepancy::query();
+        $this->medicationScope->scopeCanonicalClientMedicationRows(
+            $query,
+            $siteIds,
+            allowNullMedication: false,
+        );
+
+        return $query;
+    }
+
+    private function generalAuditActivityQuery(): Builder
+    {
+        $query = AuditLog::query();
+        $this->excludeMedicationAuditFamilies($query);
+
+        return $query;
+    }
+
+    private function excludeMedicationAuditFamilies(Builder $query): void
+    {
+        $query->where(function (Builder $nonMedication): void {
+            $nonMedication->whereNull('auditable_type')
+                ->orWhere(function (Builder $typed): void {
+                    $typed->where('auditable_type', 'not like', '%Medication%')
+                        ->where('auditable_type', 'not like', '%ControlledDrug%');
+                });
+        })->where(function (Builder $nonMedicationAction): void {
+            $nonMedicationAction->whereNull('action')
+                ->orWhere(function (Builder $action): void {
+                    $action->where('action', 'not like', 'medication%')
+                        ->where('action', 'not like', 'meds.%')
+                        ->where('action', 'not like', 'emar.%')
+                        ->where('action', 'not like', 'clientmedication%')
+                        ->where('action', 'not like', 'clientcontrolleddrug%')
+                        ->where('action', 'not like', 'controlled_drug%')
+                        ->where('action', 'not like', 'cd.%')
+                        ->where('action', 'not like', 'cd\_%');
+                });
+        });
     }
 }

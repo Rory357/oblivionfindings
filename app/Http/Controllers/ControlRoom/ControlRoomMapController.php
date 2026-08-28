@@ -10,6 +10,7 @@ use App\Models\AssetGeofence;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomDeviceVisibilityService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,6 +31,7 @@ class ControlRoomMapController extends Controller
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
+        private readonly ControlRoomAlertAccessService $alertAccess,
         private readonly ControlRoomDeviceVisibilityService $projectionVisibility,
         private readonly SecurityDevicesAccessService $deviceAccess,
         private readonly TrackingWorkspacePresenter $trackingPresenter,
@@ -330,6 +332,7 @@ class ControlRoomMapController extends Controller
         }
 
         $this->siteAccess->applyAlertSiteScopeForSiteIds($query, $siteIds);
+        $this->alertAccess->applyControlledMedicationContentScope($query, $user);
 
         return $query;
     }

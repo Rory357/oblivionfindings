@@ -56,6 +56,7 @@ export interface RoundSummary {
     started_by: string | null;
     completed_at: string | null;
     completed_by: string | null;
+    can_complete: boolean;
     cells: RoundCell[];
 }
 
@@ -73,6 +74,8 @@ export interface RoundTemplate {
     window_minutes: number;
     days_of_week: number[]; // ISO 1-7 (Mon-Sun); [] = every day
     active: boolean;
+    retired_at: string | null;
+    retired_by: string | null;
     site_id: number | null;
     site_name?: string | null;
     service_context_id: number | null;
@@ -127,6 +130,7 @@ export interface RoundProgress {
 export interface GuidedRound {
     can_record: boolean;
     can_start: boolean;
+    can_complete: boolean;
     round: {
         id: number;
         name: string;

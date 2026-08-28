@@ -16,13 +16,19 @@ use App\Services\AuditLogger;
 use App\Services\CoverageRoleService;
 use App\Services\EnhancedMarService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
+use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MedicationIncidentIntegrationService;
+use App\Services\MedicationRuleService;
 use App\Services\MedicationScanVerificationService;
 use App\Services\ShiftOperationalSnapshotService;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -31,13 +37,18 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class ResidentTransportJourneyService
 {
+    private const OFFLINE_CAPTURE_FUTURE_SKEW_MINUTES = 5;
+
     public function __construct(
         private readonly ResidentTransportJourneyScope $scope,
         private readonly CoverageRoleService $coverageRoles,
         private readonly ShiftOperationalSnapshotService $snapshots,
         private readonly MedicationScanVerificationService $scanVerification,
         private readonly ControlledMedicationTransportWitnessService $transportWitnesses,
+        private readonly MedicationGovernanceScopeService $medicationGovernance,
+        private readonly MedicationAdministratorCompetencyPolicy $administratorCompetency,
         private readonly EnhancedMarService $emar,
+        private readonly MedicationRuleService $medicationRules,
         private readonly MedicationIncidentIntegrationService $incidents,
     ) {}
 
@@ -49,6 +60,166 @@ class ResidentTransportJourneyService
     private function assertCanAdministerMedication(User $actor): void
     {
         abort_unless($actor->canDo('medications.administer.record'), 403);
+    }
+
+    /** @return Collection<int, User> */
+    private function lockCurrentFleetMedicationUsers(
+        User $actor,
+        int $siteId,
+        string $actorPermission,
+        int|array|null $authorizationUserIds = null,
+        ?CarbonInterface $presenceEffectiveAt = null,
+        array $additionalPresenceShiftIds = [],
+        ?Collection $lockedPresenceShifts = null,
+    ): Collection {
+        $userIds = [(int) $actor->id];
+        foreach ((array) $authorizationUserIds as $authorizationUserId) {
+            if (is_numeric($authorizationUserId) && (int) $authorizationUserId > 0) {
+                $userIds[] = (int) $authorizationUserId;
+            }
+        }
+        $userIds = array_values(array_unique($userIds));
+        sort($userIds, SORT_NUMERIC);
+        $presenceEffectiveAt ??= now();
+        $lockedPresenceShifts ??= $this->transportWitnesses->lockPresenceShiftsAtSite(
+            $userIds,
+            $siteId,
+            $presenceEffectiveAt,
+            $additionalPresenceShiftIds,
+        );
+        $lockedUsers = $this->medicationGovernance->lockControlledWitnessUsers($userIds);
+        $profiles = $this->medicationGovernance->lockCurrentStaffProfiles(
+            $lockedUsers,
+            $userIds,
+        );
+        $lockedUsers->each(function (User $user) use ($profiles): void {
+            $user->setRelation('hrEmployeeProfile', $profiles->get((int) $user->id));
+        });
+        $this->medicationGovernance->lockCurrentMedicationSite($siteId);
+        $lockedUsers->each(function (User $user) use ($lockedPresenceShifts, $presenceEffectiveAt): void {
+            $user->setRelation('controlledMedicationPresenceShifts', $lockedPresenceShifts);
+            $user->setRelation('controlledMedicationPresenceEffectiveAt', $presenceEffectiveAt);
+        });
+
+        /** @var User|null $lockedActor */
+        $lockedActor = $lockedUsers->get((int) $actor->id);
+        abort_unless($lockedActor?->canDo($actorPermission), 403);
+        $actorHasGlobalFleetScope = $lockedActor->canDo('fleet.manage');
+        abort_unless(collect($userIds)->every(function (int $userId) use (
+            $actor,
+            $actorHasGlobalFleetScope,
+            $profiles,
+            $siteId,
+        ): bool {
+            if ($userId === (int) $actor->id && $actorHasGlobalFleetScope) {
+                return true;
+            }
+
+            $profile = $profiles->get($userId);
+
+            return (int) $profile?->primary_site_id === $siteId
+                || collect($profile?->secondary_site_ids ?? [])->contains(
+                    fn (mixed $candidate): bool => (int) $candidate === $siteId,
+                );
+        }), 404);
+
+        return $lockedUsers;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function validateFleetWitnessInput(array $data): void
+    {
+        if ($data['queued_offline'] ?? false) {
+            throw ValidationException::withMessages([
+                'witness_credential' => 'Authenticated second-checker acceptance must be completed online.',
+            ]);
+        }
+        if (empty($data['witnessed_by_user_id'])) {
+            throw ValidationException::withMessages([
+                'witnessed_by_user_id' => 'A second authorised checker is required.',
+            ]);
+        }
+        if (blank($data['witness_credential'] ?? null)) {
+            throw ValidationException::withMessages([
+                'witness_credential' => 'The witness must enter their password or PIN.',
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>|null
+     */
+    private function packingAttestation(
+        User $actor,
+        Client $resident,
+        ClientMedication $medication,
+        array $payload,
+        string $attestationState,
+        Collection $lockedUsers,
+    ): ?array {
+        if (! $medication->requiresWitness()) {
+            return null;
+        }
+
+        if ($attestationState === 'unavailable') {
+            if (! empty($payload['witnessed_by_user_id']) || filled($payload['witness_credential'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'witnessed_by_user_id' => 'Do not name a second checker when recording that no checker was available.',
+                ]);
+            }
+
+            return null;
+        }
+
+        if ($payload['queued_offline'] ?? false) {
+            throw ValidationException::withMessages([
+                'witness_credential' => 'Authenticated second-checker '.($attestationState === 'refused' ? 'refusal' : 'acceptance').' must be completed online.',
+            ]);
+        }
+        if (empty($payload['witnessed_by_user_id'])) {
+            throw ValidationException::withMessages([
+                'witnessed_by_user_id' => $attestationState === 'refused'
+                    ? 'Select the second checker who declined to attest.'
+                    : 'Select the second checker who is present for packing.',
+            ]);
+        }
+
+        return $this->transportWitnesses->authenticate(
+            $actor,
+            (int) $resident->site_id,
+            (int) $payload['witnessed_by_user_id'],
+            (string) ($payload['witness_credential'] ?? ''),
+            $this->lockedPresenceEffectiveAt($actor),
+            witnessErrorKey: 'witnessed_by_user_id',
+            lockedUsers: $lockedUsers,
+            lockedPresenceShifts: $this->lockedPresenceShifts($actor),
+        );
+    }
+
+    private function lockedPresenceEffectiveAt(User $actor): CarbonInterface
+    {
+        $effectiveAt = $actor->relationLoaded('controlledMedicationPresenceEffectiveAt')
+            ? $actor->getRelation('controlledMedicationPresenceEffectiveAt')
+            : null;
+        if (! $effectiveAt instanceof CarbonInterface) {
+            throw new \LogicException('Fleet medication presence time was not frozen before authorization Users.');
+        }
+
+        return $effectiveAt;
+    }
+
+    /** @return Collection<int, Shift> */
+    private function lockedPresenceShifts(User $actor): Collection
+    {
+        $shifts = $actor->relationLoaded('controlledMedicationPresenceShifts')
+            ? $actor->getRelation('controlledMedicationPresenceShifts')
+            : null;
+        if (! $shifts instanceof Collection) {
+            throw new \LogicException('Fleet medication presence Shifts were not frozen before authorization Users.');
+        }
+
+        return $shifts;
     }
 
     /**
@@ -86,19 +257,24 @@ class ResidentTransportJourneyService
 
         try {
             return DB::transaction(function () use ($actor, $data, $requestUuid, $requestHash): array {
-                if ($event = $this->replayedEvent($actor, $requestUuid, 'created', $requestHash)) {
-                    return [
-                        'transport' => $this->scope->transportFor($actor, (int) $event->transport_id),
-                        'replayed' => true,
-                    ];
-                }
-
-                [$resident, $shift] = $this->resolveCreateResidentAndShift($actor, $data);
+                [$presenceEffectiveAt, $lockedPresenceShifts, $lockedPresenceResident] = $this->prelockCreateMedicationPresenceShifts(
+                    $actor,
+                    $data,
+                );
+                [$resident, $shift] = $this->resolveCreateResidentAndShift(
+                    $actor,
+                    $data,
+                    $lockedPresenceShifts,
+                    $lockedPresenceResident,
+                );
                 $site = Site::query()
                     ->active()
                     ->notArchived()
                     ->whereKey($resident->site_id)
-                    ->lockForUpdate()
+                    ->when(
+                        empty($data['medications']),
+                        fn (Builder $query): Builder => $query->lockForUpdate(),
+                    )
                     ->firstOrFail();
                 $asset = $this->scope->vehicleForSite(
                     (int) $data['asset_id'],
@@ -116,6 +292,47 @@ class ResidentTransportJourneyService
                     $data['medications'] ?? [],
                     true,
                 );
+                $medicationPayloads = array_values($data['medications'] ?? []);
+                $lockedUsers = null;
+                if ($medications !== []) {
+                    $witnessIds = collect($medicationPayloads)
+                        ->pluck('witnessed_by_user_id')
+                        ->filter(fn ($userId): bool => is_numeric($userId) && (int) $userId > 0)
+                        ->map(fn ($userId): int => (int) $userId)
+                        ->all();
+                    $lockedUsers = $this->lockCurrentFleetMedicationUsers(
+                        $actor,
+                        (int) $resident->site_id,
+                        'fleet.medication.manage',
+                        $witnessIds,
+                        $presenceEffectiveAt,
+                        $shift ? [(int) $shift->id] : [],
+                        $lockedPresenceShifts,
+                    );
+                    /** @var User $actor */
+                    $actor = $lockedUsers->get((int) $actor->id);
+                }
+
+                if ($event = $this->replayedEvent($actor, $requestUuid, 'created', $requestHash)) {
+                    foreach ($medications as $index => $prepared) {
+                        $this->packingAttestation(
+                            $actor,
+                            $resident,
+                            $prepared['medication'],
+                            $medicationPayloads[$index],
+                            (string) ($medicationPayloads[$index]['attestation_state'] ?? 'accepted'),
+                            $lockedUsers,
+                        );
+                    }
+
+                    abort_unless((int) $event->client_id === (int) $resident->id, 409);
+
+                    return [
+                        'transport' => $this->scope->transportFor($actor, (int) $event->transport_id),
+                        'replayed' => true,
+                    ];
+                }
+
                 $snapshot = $shift
                     ? $this->snapshots->snapshotForShift($shift, $actor)
                     : $this->snapshots->snapshotForClient(
@@ -135,7 +352,7 @@ class ResidentTransportJourneyService
                     'resident_id' => $resident->id,
                     'resident_name' => $this->residentName($resident),
                     'transport_type' => $data['transport_type'],
-                    'pickup_location' => $data['pickup_location'] ?: ($shift?->location),
+                    'pickup_location' => ($data['pickup_location'] ?? null) ?: $shift?->location,
                     'dropoff_location' => $data['dropoff_location'] ?? null,
                     'departed_at' => $data['departed_at'],
                     'passengers_count' => $data['passengers_count'] ?? 1,
@@ -163,9 +380,10 @@ class ResidentTransportJourneyService
                         $resident,
                         $actor,
                         $prepared,
-                        $data['medications'][$index],
+                        $medicationPayloads[$index],
                         (string) Str::uuid(),
                         $requestUuid,
+                        lockedUsers: $lockedUsers,
                     );
                 }
 
@@ -184,11 +402,59 @@ class ResidentTransportJourneyService
                 return ['transport' => $transport, 'replayed' => false];
             }, 3);
         } catch (UniqueConstraintViolationException $exception) {
-            return DB::transaction(function () use ($actor, $requestUuid, $requestHash, $exception): array {
+            return DB::transaction(function () use ($actor, $data, $requestUuid, $requestHash, $exception): array {
+                [$presenceEffectiveAt, $lockedPresenceShifts, $lockedPresenceResident] = $this->prelockCreateMedicationPresenceShifts(
+                    $actor,
+                    $data,
+                );
+                [$resident, $shift] = $this->resolveCreateResidentAndShift(
+                    $actor,
+                    $data,
+                    $lockedPresenceShifts,
+                    $lockedPresenceResident,
+                );
+                $medications = $this->resolveMedicationPayloads(
+                    $resident,
+                    $data['medications'] ?? [],
+                    true,
+                );
+                $medicationPayloads = array_values($data['medications'] ?? []);
+                $lockedUsers = null;
+                if ($medications !== []) {
+                    $witnessIds = collect($medicationPayloads)
+                        ->pluck('witnessed_by_user_id')
+                        ->filter(fn ($userId): bool => is_numeric($userId) && (int) $userId > 0)
+                        ->map(fn ($userId): int => (int) $userId)
+                        ->all();
+                    $lockedUsers = $this->lockCurrentFleetMedicationUsers(
+                        $actor,
+                        (int) $resident->site_id,
+                        'fleet.medication.manage',
+                        $witnessIds,
+                        $presenceEffectiveAt,
+                        $shift ? [(int) $shift->id] : [],
+                        $lockedPresenceShifts,
+                    );
+                    /** @var User $actor */
+                    $actor = $lockedUsers->get((int) $actor->id);
+                    foreach ($medications as $index => $prepared) {
+                        $this->packingAttestation(
+                            $actor,
+                            $resident,
+                            $prepared['medication'],
+                            $medicationPayloads[$index],
+                            (string) ($medicationPayloads[$index]['attestation_state'] ?? 'accepted'),
+                            $lockedUsers,
+                        );
+                    }
+                }
+
                 $event = $this->replayedEvent($actor, $requestUuid, 'created', $requestHash);
                 if (! $event) {
                     throw $exception;
                 }
+
+                abort_unless((int) $event->client_id === (int) $resident->id, 409);
 
                 return [
                     'transport' => $this->scope->transportFor($actor, (int) $event->transport_id),
@@ -354,12 +620,45 @@ class ResidentTransportJourneyService
             'attestation_reason_hash' => hash('sha256', (string) ($data['attestation_reason'] ?? '')),
             'notes_hash' => hash('sha256', (string) ($data['notes'] ?? '')),
             'scan_code_hash' => hash('sha256', (string) ($data['scan_code'] ?? '')),
+            ...$this->normalizedOfflineProvenanceForFingerprint($data),
         ]);
 
         return DB::transaction(function () use ($actor, $transportId, $data, $attestationState, $action, $requestUuid, $requestHash): array {
             $transport = $this->scope->transportFor($actor, $transportId, true);
+            abort_unless((int) ($data['client_id'] ?? 0) === (int) $transport->resident_id, 404);
+            $resident = $this->scope->clientFor($actor, (int) $transport->resident_id, true);
+            $prepared = $this->resolveMedicationPayload(
+                $resident,
+                $data,
+                true,
+                $attestationState === 'accepted',
+            );
+            /** @var ClientMedication $medication */
+            $medication = $prepared['medication'];
+            $lockedUsers = $this->lockCurrentFleetMedicationUsers(
+                $actor,
+                (int) $resident->site_id,
+                'fleet.medication.manage',
+                is_numeric($data['witnessed_by_user_id'] ?? null)
+                    ? (int) $data['witnessed_by_user_id']
+                    : null,
+            );
+            /** @var User $actor */
+            $actor = $lockedUsers->get((int) $actor->id);
+
             if ($event = $this->replayedEvent($actor, $requestUuid, $action, $requestHash)) {
                 abort_unless((int) $event->transport_id === $transport->id, 409);
+                if ($attestationState !== 'accepted') {
+                    abort_unless($medication->requiresWitness(), 409, 'This medication does not require a packing attestation.');
+                }
+                $this->packingAttestation(
+                    $actor,
+                    $resident,
+                    $medication,
+                    $data,
+                    $attestationState,
+                    $lockedUsers,
+                );
 
                 return [
                     'log' => $event->medication_transit_log_id
@@ -371,14 +670,6 @@ class ResidentTransportJourneyService
             }
 
             abort_unless($transport->status === 'in_progress', 409, 'Medication can only be packed for an active journey.');
-            abort_unless((int) ($data['client_id'] ?? 0) === (int) $transport->resident_id, 404);
-            $resident = $this->scope->clientFor($actor, (int) $transport->resident_id, true);
-            $prepared = $this->resolveMedicationPayload(
-                $resident,
-                $data,
-                true,
-                $attestationState === 'accepted',
-            );
 
             if ($attestationState !== 'accepted') {
                 $this->recordPackingNonAcceptance(
@@ -391,6 +682,7 @@ class ResidentTransportJourneyService
                     $action,
                     $requestUuid,
                     $requestHash,
+                    $lockedUsers,
                 );
 
                 return [
@@ -415,6 +707,7 @@ class ResidentTransportJourneyService
                 $requestUuid,
                 null,
                 $requestHash,
+                $lockedUsers,
             );
 
             return ['log' => $log, 'replayed' => false, 'attestation_state' => 'accepted'];
@@ -465,6 +758,47 @@ class ResidentTransportJourneyService
             $transport = $this->scope->transportFor($actor, (int) $transportId, true);
             $log = $this->scope->medicationTransitLogFor($actor, $logId, true);
 
+            $resident = $this->scope->clientFor($actor, (int) $transport->resident_id, true);
+            $medication = ClientMedication::query()
+                ->whereKey($log->medication_id)
+                ->where('client_id', $resident->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $medication->setRelation('client', $resident);
+            abort_unless(
+                (int) $log->client_id === (int) $resident->id
+                    && (int) $log->site_id === (int) $resident->site_id
+                    && (int) $transport->site_id === (int) $resident->site_id,
+                404,
+            );
+            abort_unless(
+                $log->witness_required || $log->is_controlled_drug,
+                409,
+                'This packing record does not require a second checker.',
+            );
+            $this->validateFleetWitnessInput($data);
+
+            $lockedUsers = $this->lockCurrentFleetMedicationUsers(
+                $actor,
+                (int) $resident->site_id,
+                'fleet.medication.manage',
+                is_numeric($data['witnessed_by_user_id'] ?? null)
+                    ? (int) $data['witnessed_by_user_id']
+                    : null,
+            );
+            /** @var User $actor */
+            $actor = $lockedUsers->get((int) $actor->id);
+
+            $attestation = $this->transportWitnesses->authenticate(
+                $actor,
+                (int) $resident->site_id,
+                (int) ($data['witnessed_by_user_id'] ?? 0),
+                (string) ($data['witness_credential'] ?? ''),
+                $this->lockedPresenceEffectiveAt($actor),
+                witnessErrorKey: 'witnessed_by_user_id',
+                lockedUsers: $lockedUsers,
+                lockedPresenceShifts: $this->lockedPresenceShifts($actor),
+            );
             if ($event = $this->replayedEvent(
                 $actor,
                 $requestUuid,
@@ -480,37 +814,12 @@ class ResidentTransportJourneyService
                 return ['log' => $log->fresh(), 'replayed' => true];
             }
 
-            abort_unless(
-                $log->witness_required || $log->is_controlled_drug,
-                409,
-                'This packing record does not require a second checker.',
-            );
             if (blank($data['correction_reason'] ?? null)) {
                 throw ValidationException::withMessages([
                     'correction_reason' => 'Explain why the packing attestation is being corrected.',
                 ]);
             }
 
-            $resident = $this->scope->clientFor($actor, (int) $transport->resident_id, true);
-            $medication = ClientMedication::query()
-                ->whereKey($log->medication_id)
-                ->where('client_id', $resident->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-            abort_unless(
-                (int) $log->client_id === (int) $resident->id
-                    && (int) $log->site_id === (int) $resident->site_id
-                    && (int) $transport->site_id === (int) $resident->site_id,
-                404,
-            );
-
-            $attestation = $this->transportWitnesses->authenticate(
-                $actor,
-                (int) $resident->site_id,
-                (int) ($data['witnessed_by_user_id'] ?? 0),
-                (string) ($data['witness_credential'] ?? ''),
-                now(),
-            );
             /** @var User $witness */
             $witness = $attestation['witness'];
             if ((int) $log->packed_witnessed_by_user_id === (int) $witness->id) {
@@ -584,12 +893,18 @@ class ResidentTransportJourneyService
      */
     private function resolveMedicationCustody(User $actor, int $logId, array $data, string $action): array
     {
+        if ($action === 'medication_administered') {
+            $data['quantity_administered'] = $this->requiredAdministrationQuantity($data);
+        }
+
         $requestUuid = $this->requestUuid($data);
         $requestHash = $this->requestHash($action, [
             'log_id' => $logId,
             'witnessed_by_user_id' => $data['witnessed_by_user_id'] ?? null,
+            'quantity_administered' => $data['quantity_administered'] ?? null,
             'notes_hash' => hash('sha256', (string) ($data['notes'] ?? '')),
             'scan_code_hash' => hash('sha256', (string) ($data['scan_code'] ?? '')),
+            ...$this->normalizedOfflineProvenanceForFingerprint($data),
         ]);
 
         return DB::transaction(function () use ($actor, $logId, $data, $action, $requestUuid, $requestHash): array {
@@ -598,37 +913,6 @@ class ResidentTransportJourneyService
             $transport = $this->scope->transportFor($actor, (int) $transportId, true);
             $log = $this->scope->medicationTransitLogFor($actor, $logId, true);
 
-            if ($event = $this->replayedEvent($actor, $requestUuid, $action, $requestHash)) {
-                abort_unless((int) $event->transport_id === $transport->id && (int) $event->medication_transit_log_id === $log->id, 409);
-
-                if ($action === 'medication_administered') {
-                    $resident = $this->scope->clientFor($actor, (int) $transport->resident_id, true);
-                    $medication = ClientMedication::query()
-                        ->whereKey($log->medication_id)
-                        ->where('client_id', $resident->id)
-                        ->lockForUpdate()
-                        ->firstOrFail();
-                    abort_unless(
-                        (int) $log->client_id === (int) $resident->id
-                            && (int) $log->site_id === (int) $resident->site_id
-                            && (int) $transport->site_id === (int) $resident->site_id,
-                        404,
-                    );
-                    abort_if(
-                        ($log->is_controlled_drug || $medication->controlled_drug)
-                            && ! $actor->canDo('medications.controlled.record'),
-                        403,
-                    );
-                }
-
-                return ['log' => $log->fresh(), 'replayed' => true];
-            }
-
-            abort_unless($transport->status === 'in_progress', 409, 'Medication custody can only be resolved during an active journey.');
-            if ($log->administered_at || $log->returned_to_house_at) {
-                throw new ConflictHttpException('This medication custody record has already been resolved.');
-            }
-
             $resident = $this->scope->clientFor($actor, (int) $transport->resident_id, true);
             $medication = ClientMedication::query()
                 ->whereKey($log->medication_id)
@@ -636,6 +920,109 @@ class ResidentTransportJourneyService
                 ->lockForUpdate()
                 ->firstOrFail();
             abort_unless((int) $log->site_id === (int) $resident->site_id, 404);
+            $actionAt = $this->medicationCustodyActionAt($transport, $data);
+            $lockedPresenceShifts = null;
+            $presenceShift = null;
+            if ($action === 'medication_administered') {
+                $presenceUserIds = [(int) $actor->id];
+                if (is_numeric($data['witnessed_by_user_id'] ?? null) && (int) $data['witnessed_by_user_id'] > 0) {
+                    $presenceUserIds[] = (int) $data['witnessed_by_user_id'];
+                }
+                $lockedPresenceShifts = $this->transportWitnesses->lockPresenceShiftsAtSite(
+                    $presenceUserIds,
+                    (int) $resident->site_id,
+                    $actionAt,
+                    $transport->shift_id ? [(int) $transport->shift_id] : [],
+                );
+                $presenceShift = $this->historicalMedicationAdministrationShiftFromLockedSet(
+                    $transport,
+                    $resident,
+                    $actor,
+                    $lockedPresenceShifts,
+                );
+            }
+            $requiresWitness = $action === 'medication_administered'
+                && (
+                    $log->witness_required
+                    || $medication->requiresWitness()
+                    || ($this->medicationRules->requirementsFor($medication, true)['requires_countersign'] ?? false)
+                );
+            $lockedUsers = $this->lockCurrentFleetMedicationUsers(
+                $actor,
+                (int) $resident->site_id,
+                $action === 'medication_administered'
+                    ? 'medications.administer.record'
+                    : 'fleet.medication.manage',
+                $requiresWitness && is_numeric($data['witnessed_by_user_id'] ?? null)
+                    ? (int) $data['witnessed_by_user_id']
+                    : null,
+                $actionAt,
+                $transport->shift_id ? [(int) $transport->shift_id] : [],
+                $lockedPresenceShifts,
+            );
+            /** @var User $actor */
+            $actor = $lockedUsers->get((int) $actor->id);
+            abort_if(
+                $action === 'medication_administered'
+                && ($log->is_controlled_drug || $medication->controlled_drug)
+                && ! $actor->canDo('medications.controlled.record'),
+                403,
+            );
+            if ($action === 'medication_administered') {
+                $this->assertHistoricalMedicationAdministrationPresence(
+                    $transport,
+                    $resident,
+                    $actor,
+                    $actionAt,
+                    $presenceShift,
+                );
+                $competency = $this->administratorCompetency->evaluate(
+                    $actor,
+                    (int) $resident->site_id,
+                    $actionAt,
+                    true,
+                );
+                if (! $competency['allowed']) {
+                    throw ValidationException::withMessages([
+                        'medication' => 'You cannot administer this medication — '.$competency['message'],
+                    ]);
+                }
+            }
+
+            $replayedEvent = $this->replayedEvent($actor, $requestUuid, $action, $requestHash);
+            if ($replayedEvent) {
+                abort_unless(
+                    (int) $replayedEvent->transport_id === $transport->id
+                    && (int) $replayedEvent->medication_transit_log_id === $log->id,
+                    409,
+                );
+            }
+
+            if (! $replayedEvent) {
+                abort_unless($transport->status === 'in_progress', 409, 'Medication custody can only be resolved during an active journey.');
+            }
+            if (! $replayedEvent && ($log->administered_at || $log->returned_to_house_at)) {
+                throw new ConflictHttpException('This medication custody record has already been resolved.');
+            }
+
+            if ($replayedEvent) {
+                if ($requiresWitness) {
+                    $this->validateFleetWitnessInput($data);
+                    $this->transportWitnesses->authenticate(
+                        $actor,
+                        (int) $resident->site_id,
+                        (int) $data['witnessed_by_user_id'],
+                        (string) $data['witness_credential'],
+                        $actionAt,
+                        witnessErrorKey: 'witnessed_by_user_id',
+                        lockedUsers: $lockedUsers,
+                        lockedPresenceShifts: $this->lockedPresenceShifts($actor),
+                    );
+                }
+
+                return ['log' => $log->fresh(), 'replayed' => true];
+            }
+
             if (
                 $action === 'medication_administered'
                 && $this->governedPackingAttestationGaps(
@@ -655,28 +1042,17 @@ class ResidentTransportJourneyService
                 abort_unless((int) $log->medication_order_version === (int) $medication->version, 409, 'The medication order changed after packing. Return this medication to the house for reconciliation.');
                 abort_unless($log->medication_order_version_id === null || $this->currentOrderVersion($medication)?->id === $log->medication_order_version_id, 409, 'The medication order changed after packing. Return this medication to the house for reconciliation.');
                 abort_unless($medication->isAdministrable(), 409, 'This medication order is no longer authorised for administration.');
-                if ($log->witness_required || $medication->requiresWitness()) {
-                    if ($data['queued_offline'] ?? false) {
-                        throw ValidationException::withMessages([
-                            'witness_credential' => 'Authenticated second-checker acceptance must be completed online.',
-                        ]);
-                    }
-                    if (empty($data['witnessed_by_user_id'])) {
-                        throw ValidationException::withMessages([
-                            'witnessed_by_user_id' => 'A second authorised checker is required.',
-                        ]);
-                    }
-                    if (blank($data['witness_credential'] ?? null)) {
-                        throw ValidationException::withMessages([
-                            'witness_credential' => 'The witness must enter their password or PIN.',
-                        ]);
-                    }
+                if ($requiresWitness) {
+                    $this->validateFleetWitnessInput($data);
                     $witnessAttestation = $this->transportWitnesses->authenticate(
                         $actor,
                         (int) $resident->site_id,
                         (int) ($data['witnessed_by_user_id'] ?? 0),
                         (string) ($data['witness_credential'] ?? ''),
-                        now(),
+                        $actionAt,
+                        witnessErrorKey: 'witnessed_by_user_id',
+                        lockedUsers: $lockedUsers,
+                        lockedPresenceShifts: $this->lockedPresenceShifts($actor),
                     );
                     $witness = $witnessAttestation['witness'];
                 }
@@ -686,16 +1062,22 @@ class ResidentTransportJourneyService
                     $medication,
                     [
                         'status' => 'given',
-                        'administered_at' => now()->toIso8601String(),
+                        'administered_at' => $actionAt->toIso8601String(),
                         'dose_given' => $medication->dosage ?: $medication->name,
                         'notes' => $data['notes'] ?? null,
                         'client_request_uuid' => $requestUuid,
                         'witnessed_by' => $witness?->id,
                         'witness_credential' => $data['witness_credential'] ?? null,
-                        'quantity_administered' => 1,
+                        'quantity_administered' => $data['quantity_administered'],
+                        'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                        'origin_device_id' => $data['origin_device_id'] ?? null,
+                        'queued_offline' => (bool) ($data['queued_offline'] ?? false),
                     ],
                     $actor->id,
                     $transport->shift_id ? (int) $transport->shift_id : null,
+                    $actor->canDo('medications.controlled.view'),
+                    prelockedPresenceShifts: $this->lockedPresenceShifts($actor),
+                    prelockedPresenceEffectiveAt: $this->lockedPresenceEffectiveAt($actor),
                 );
                 if (! ($emarResult['success'] ?? false)) {
                     if (($emarResult['status'] ?? null) === 403) {
@@ -724,7 +1106,7 @@ class ResidentTransportJourneyService
                 ])->save();
             } else {
                 $log->forceFill([
-                    'returned_to_house_at' => now(),
+                    'returned_to_house_at' => $actionAt,
                     'returned_by_user_id' => $actor->id,
                     'notes' => $data['notes'] ?? $log->notes,
                 ])->save();
@@ -738,6 +1120,9 @@ class ResidentTransportJourneyService
                 $requestUuid,
                 [
                     'request_hash' => $requestHash,
+                    ...($action === 'medication_administered' ? [
+                        'quantity_administered' => $data['quantity_administered'],
+                    ] : []),
                     'scan_source' => $scanAudit['scan_source'],
                     'scan_match_source' => $scanAudit['scan_match_source'],
                     'entered_code_suffix' => $scanAudit['scan_code_suffix'],
@@ -767,6 +1152,9 @@ class ResidentTransportJourneyService
                 'medication_order_version_id' => $log->medication_order_version_id,
                 'medication_administration_id' => $administration?->id,
                 'request_uuid' => $requestUuid,
+                ...($action === 'medication_administered' ? [
+                    'quantity_administered' => $data['quantity_administered'],
+                ] : []),
                 'scan_source' => $scanAudit['scan_source'],
                 'scan_match_source' => $scanAudit['scan_match_source'],
                 'entered_code_suffix' => $scanAudit['scan_code_suffix'],
@@ -785,20 +1173,116 @@ class ResidentTransportJourneyService
     }
 
     /**
+     * Prove the actor was the canonical journey worker at the clinical capture
+     * time. Current RBAC/employment/Site authority is checked separately at
+     * server-now before this historical assignment check.
+     */
+    private function assertHistoricalMedicationAdministrationPresence(
+        FleetResidentTransport $transport,
+        Client $resident,
+        User $actor,
+        CarbonInterface $actionAt,
+        ?Shift $shift,
+    ): void {
+        abort_unless(
+            (int) $transport->driver_user_id === (int) $actor->id
+                && (int) $transport->resident_id === (int) $resident->id
+                && (int) $transport->site_id === (int) $resident->site_id,
+            403,
+            'The medication capture is not assigned to the current journey worker.',
+        );
+
+        if ($transport->shift_id) {
+            abort_unless($shift, 403, 'The medication capture is not assigned to the journey shift.');
+
+            // Once a Shift has actually started, its actual interval is the
+            // authority. Scheduled bounds are the explicit fallback for legacy
+            // transports whose Shift did not record actual timestamps.
+            $actualStartsAt = $this->storageInstant($shift, 'actual_starts_at');
+            $startsAt = $actualStartsAt ?? $this->storageInstant($shift, 'starts_at');
+            $endsAt = $actualStartsAt !== null
+                ? $this->storageInstant($shift, 'actual_ends_at')
+                : $this->storageInstant($shift, 'ends_at');
+            abort_unless(
+                $startsAt
+                    && $actionAt->greaterThanOrEqualTo($startsAt)
+                    && ($endsAt === null || $actionAt->lessThanOrEqualTo($endsAt)),
+                403,
+                'The medication capture falls outside the assigned journey shift.',
+            );
+
+            return;
+        }
+
+        // A shiftless journey has no separate rostering record. Its immutable
+        // driver assignment and departure/arrival interval are the only native
+        // historical presence evidence; missing bounds fail closed.
+        $departedAt = $this->storageInstant($transport, 'departed_at');
+        $arrivedAt = $this->storageInstant($transport, 'arrived_at');
+        abort_unless(
+            $departedAt
+                && $actionAt->greaterThanOrEqualTo($departedAt)
+                && ($arrivedAt === null || $actionAt->lessThanOrEqualTo($arrivedAt)),
+            403,
+            'The medication capture falls outside the journey interval.',
+        );
+    }
+
+    /** Resolve the canonical journey Shift from the complete pre-User lock set. */
+    private function historicalMedicationAdministrationShiftFromLockedSet(
+        FleetResidentTransport $transport,
+        Client $resident,
+        User $actor,
+        Collection $lockedPresenceShifts,
+    ): ?Shift {
+        if (! $transport->shift_id) {
+            return null;
+        }
+
+        /** @var Shift|null $shift */
+        $shift = $lockedPresenceShifts->get((int) $transport->shift_id);
+        abort_unless(
+            $shift instanceof Shift
+                && (int) $shift->user_id === (int) $actor->id
+                && (int) $shift->client_id === (int) $resident->id
+                && (int) ($shift->site_id ?: $resident->site_id) === (int) $resident->site_id
+                && $shift->status !== 'cancelled',
+            404,
+        );
+
+        return $shift;
+    }
+
+    /**
      * @return array{0: Client, 1: ?Shift}
      */
-    private function resolveCreateResidentAndShift(User $actor, array $data): array
-    {
+    private function resolveCreateResidentAndShift(
+        User $actor,
+        array $data,
+        ?Collection $lockedPresenceShifts = null,
+        ?Client $lockedPresenceResident = null,
+    ): array {
         $shift = null;
         if (! empty($data['shift_id'])) {
-            $shift = $this->scope->shiftFor($actor, (int) $data['shift_id'], true);
+            $shift = $lockedPresenceShifts?->get((int) $data['shift_id']);
+            if (! $shift instanceof Shift) {
+                $shift = $this->scope->shiftFor($actor, (int) $data['shift_id'], true);
+            }
+            abort_unless(in_array(
+                (int) ($shift->site_id ?: $shift->client?->site_id),
+                $this->scope->accessibleSiteIds($actor),
+                true,
+            ), 404);
             $shift->load(['client:id,first_name,last_name,site_id,service_context_id', 'staff:id,name', 'serviceContext:id,name']);
             abort_unless($shift->client_id && $shift->client, 404);
             if (! empty($data['client_id'])) {
                 abort_unless((int) $data['client_id'] === (int) $shift->client_id, 404);
             }
 
-            $resident = $this->scope->clientFor($actor, (int) $shift->client_id, true);
+            $resident = $lockedPresenceResident instanceof Client
+                ? $lockedPresenceResident
+                : $this->scope->clientFor($actor, (int) $shift->client_id, true);
+            abort_unless((int) $resident->id === (int) $shift->client_id, 404);
             abort_unless((int) ($shift->site_id ?: $resident->site_id) === (int) $resident->site_id, 404);
             abort_unless((int) $shift->user_id === (int) $actor->id, 404);
 
@@ -822,6 +1306,65 @@ class ResidentTransportJourneyService
         }
 
         return [$matches->first(), null];
+    }
+
+    /**
+     * @return array{0: CarbonInterface, 1: Collection<int, Shift>|null, 2: Client|null}
+     */
+    private function prelockCreateMedicationPresenceShifts(User $actor, array $data): array
+    {
+        $effectiveAt = now();
+        if (empty($data['medications']) || empty($data['shift_id'])) {
+            return [$effectiveAt, null, null];
+        }
+
+        // This is an identity/scope snapshot only. The returned Shift is never
+        // trusted for mutation; the complete main+witness candidate union is
+        // the first locking Shift query below and is revalidated afterwards.
+        $shiftSnapshot = $this->scope->shiftFor($actor, (int) $data['shift_id']);
+        abort_unless($shiftSnapshot->client_id, 404);
+        $resident = $this->scope->clientFor($actor, (int) $shiftSnapshot->client_id, true);
+        $siteId = (int) ($shiftSnapshot->site_id ?: $resident->site_id);
+        abort_unless($siteId > 0, 404);
+
+        $medicationIds = collect((array) ($data['medications'] ?? []))
+            ->pluck('medication_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->sort()
+            ->values();
+        $lockedMedicationIds = ClientMedication::query()
+            ->where('client_id', $resident->id)
+            ->whereIn('id', $medicationIds->all())
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id);
+        abort_unless(
+            $medicationIds->isNotEmpty()
+                && $lockedMedicationIds->count() === $medicationIds->count(),
+            404,
+        );
+
+        $userIds = [(int) $actor->id];
+        foreach ((array) ($data['medications'] ?? []) as $payload) {
+            if (is_numeric($payload['witnessed_by_user_id'] ?? null)
+                && (int) $payload['witnessed_by_user_id'] > 0) {
+                $userIds[] = (int) $payload['witnessed_by_user_id'];
+            }
+        }
+
+        return [
+            $effectiveAt,
+            $this->transportWitnesses->lockPresenceShiftsAtSite(
+                array_values(array_unique($userIds)),
+                $siteId,
+                $effectiveAt,
+                [(int) $shiftSnapshot->id],
+            ),
+            $resident,
+        ];
     }
 
     private function resolveBooking(User $actor, array $data, int $assetId, int $siteId): ?FleetVehicleBooking
@@ -928,12 +1471,24 @@ class ResidentTransportJourneyService
         string $action,
         string $requestUuid,
         string $requestHash,
+        ?Collection $lockedUsers = null,
     ): void {
         /** @var ClientMedication $medication */
         $medication = $prepared['medication'];
         /** @var MedicationOrderVersion|null $orderVersion */
         $orderVersion = $prepared['order_version'];
         abort_unless($medication->requiresWitness(), 409, 'This medication does not require a packing attestation.');
+
+        $lockedUsers ??= $this->lockCurrentFleetMedicationUsers(
+            $actor,
+            (int) $resident->site_id,
+            'fleet.medication.manage',
+            is_numeric($payload['witnessed_by_user_id'] ?? null)
+                ? (int) $payload['witnessed_by_user_id']
+                : null,
+        );
+        /** @var User $actor */
+        $actor = $lockedUsers->get((int) $actor->id);
 
         $reason = trim((string) ($payload['attestation_reason'] ?? ''));
         if ($reason === '') {
@@ -942,32 +1497,16 @@ class ResidentTransportJourneyService
             ]);
         }
 
-        $attestation = null;
-        $witness = null;
-        if ($attestationState === 'refused') {
-            if ($payload['queued_offline'] ?? false) {
-                throw ValidationException::withMessages([
-                    'witness_credential' => 'Authenticated second-checker refusal must be completed online.',
-                ]);
-            }
-            if (empty($payload['witnessed_by_user_id'])) {
-                throw ValidationException::withMessages([
-                    'witnessed_by_user_id' => 'Select the second checker who declined to attest.',
-                ]);
-            }
-            $attestation = $this->transportWitnesses->authenticate(
-                $actor,
-                (int) $resident->site_id,
-                (int) $payload['witnessed_by_user_id'],
-                (string) ($payload['witness_credential'] ?? ''),
-                now(),
-            );
-            $witness = $attestation['witness'];
-        } elseif (! empty($payload['witnessed_by_user_id']) || filled($payload['witness_credential'] ?? null)) {
-            throw ValidationException::withMessages([
-                'witnessed_by_user_id' => 'Do not name a second checker when recording that no checker was available.',
-            ]);
-        }
+        $attestation = $this->packingAttestation(
+            $actor,
+            $resident,
+            $medication,
+            $payload,
+            $attestationState,
+            $lockedUsers,
+        );
+        /** @var User|null $witness */
+        $witness = $attestation['witness'] ?? null;
 
         $subjectDigest = $this->medicationCustodyDigest($transport, null, $medication, $actor->id);
         $transport->forceFill(['version' => ((int) $transport->version) + 1])->save();
@@ -1022,6 +1561,7 @@ class ResidentTransportJourneyService
         string $requestUuid,
         ?string $parentRequestUuid = null,
         ?string $requestHashOverride = null,
+        ?Collection $lockedUsers = null,
     ): FleetMedicationTransitLog {
         /** @var ClientMedication $medication */
         $medication = $prepared['medication'];
@@ -1040,33 +1580,31 @@ class ResidentTransportJourneyService
             'scan_code_hash' => hash('sha256', (string) ($payload['scan_code'] ?? '')),
         ]);
 
-        $attestation = null;
-        $witness = null;
-        if ($medication->requiresWitness()) {
-            if ($payload['queued_offline'] ?? false) {
-                throw ValidationException::withMessages([
-                    'witness_credential' => 'Authenticated second-checker acceptance must be completed online.',
-                ]);
-            }
-            if (($payload['attestation_state'] ?? 'accepted') !== 'accepted') {
-                throw ValidationException::withMessages([
-                    'attestation_state' => 'An authenticated second checker must accept before this medication is packed.',
-                ]);
-            }
-            if (empty($payload['witnessed_by_user_id'])) {
-                throw ValidationException::withMessages([
-                    'witnessed_by_user_id' => 'Select the second checker who is present for packing.',
-                ]);
-            }
-            $attestation = $this->transportWitnesses->authenticate(
-                $actor,
-                (int) $resident->site_id,
-                (int) $payload['witnessed_by_user_id'],
-                (string) ($payload['witness_credential'] ?? ''),
-                now(),
-            );
-            $witness = $attestation['witness'];
+        $lockedUsers ??= $this->lockCurrentFleetMedicationUsers(
+            $actor,
+            (int) $resident->site_id,
+            'fleet.medication.manage',
+            is_numeric($payload['witnessed_by_user_id'] ?? null)
+                ? (int) $payload['witnessed_by_user_id']
+                : null,
+        );
+        /** @var User $actor */
+        $actor = $lockedUsers->get((int) $actor->id);
+        if (($payload['attestation_state'] ?? 'accepted') !== 'accepted') {
+            throw ValidationException::withMessages([
+                'attestation_state' => 'An authenticated second checker must accept before this medication is packed.',
+            ]);
         }
+        $attestation = $this->packingAttestation(
+            $actor,
+            $resident,
+            $medication,
+            $payload,
+            'accepted',
+            $lockedUsers,
+        );
+        /** @var User|null $witness */
+        $witness = $attestation['witness'] ?? null;
 
         $log = FleetMedicationTransitLog::query()->create([
             'transport_id' => $transport->id,
@@ -1084,7 +1622,7 @@ class ResidentTransportJourneyService
             'packed_witnessed_at' => $attestation['witnessed_at'] ?? null,
             'packing_witness_method' => $attestation['method'] ?? null,
             'packed_by_user_id' => $actor->id,
-            'packed_at' => now(),
+            'packed_at' => $this->medicationCustodyActionAt($transport, $payload),
             'notes' => $payload['notes'] ?? null,
         ]);
         $transport->forceFill(['version' => ((int) $transport->version) + 1])->save();
@@ -1352,6 +1890,125 @@ class ResidentTransportJourneyService
             'action' => $action,
             'payload' => $payload,
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    }
+
+    /** @return array{captured_offline_at: ?string, origin_device_id: ?string, queued_offline: true}|array{} */
+    private function normalizedOfflineProvenanceForFingerprint(array $payload): array
+    {
+        if (! ($payload['queued_offline'] ?? false)) {
+            return [];
+        }
+
+        $capturedAt = null;
+        if (filled($payload['captured_offline_at'] ?? null)) {
+            try {
+                $capturedAt = Carbon::parse((string) $payload['captured_offline_at'])
+                    ->utc()
+                    ->toISOString();
+            } catch (\Throwable) {
+                throw ValidationException::withMessages([
+                    'captured_offline_at' => 'The offline capture time is invalid.',
+                ]);
+            }
+        }
+
+        return [
+            'captured_offline_at' => $capturedAt,
+            'origin_device_id' => filled($payload['origin_device_id'] ?? null)
+                ? trim((string) $payload['origin_device_id'])
+                : null,
+            'queued_offline' => true,
+        ];
+    }
+
+    private function requiredAdministrationQuantity(array $payload): string
+    {
+        if (
+            ! array_key_exists('quantity_administered', $payload)
+            || (
+                ! is_int($payload['quantity_administered'])
+                && ! is_float($payload['quantity_administered'])
+                && ! is_string($payload['quantity_administered'])
+            )
+        ) {
+            throw ValidationException::withMessages([
+                'quantity_administered' => 'Record how many units were given.',
+            ]);
+        }
+
+        try {
+            $quantity = MedicationStockQuantity::normalizeMovement($payload['quantity_administered']);
+        } catch (\InvalidArgumentException) {
+            throw ValidationException::withMessages([
+                'quantity_administered' => 'Quantity administered must use no more than two decimal places and must not exceed '
+                    .MedicationStockQuantity::DECIMAL_10_2_MAX.'.',
+            ]);
+        }
+
+        if (! MedicationStockQuantity::greaterThan($quantity, 0)) {
+            throw ValidationException::withMessages([
+                'quantity_administered' => 'Quantity administered must be greater than zero.',
+            ]);
+        }
+
+        return $quantity;
+    }
+
+    private function medicationCustodyActionAt(
+        FleetResidentTransport $transport,
+        array $payload,
+    ): CarbonInterface {
+        // Shift/administration timestamps are persisted at whole-second
+        // precision. Normalize before the first presence lock so the nested
+        // EnhancedMar call reparses the exact same boundary and cannot discover
+        // a new Shift after the authorization User set is already held.
+        $receivedAt = now()->utc()->setMicrosecond(0);
+        if (! ($payload['queued_offline'] ?? false)) {
+            return $receivedAt;
+        }
+
+        if (! filled($payload['captured_offline_at'] ?? null)) {
+            throw ValidationException::withMessages([
+                'captured_offline_at' => 'The offline capture time is required.',
+            ]);
+        }
+
+        try {
+            $capturedAt = Carbon::parse((string) $payload['captured_offline_at'])
+                ->utc()
+                ->setMicrosecond(0);
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'captured_offline_at' => 'The offline capture time is invalid.',
+            ]);
+        }
+
+        $journeyStart = $this->storageInstant($transport, 'departed_at')
+            ?? $this->storageInstant($transport, 'created_at');
+        if ($journeyStart && $capturedAt->lt($journeyStart)) {
+            throw ValidationException::withMessages([
+                'captured_offline_at' => 'The offline medication action predates this active journey.',
+            ]);
+        }
+        if ($capturedAt->gt($receivedAt->copy()->addMinutes(self::OFFLINE_CAPTURE_FUTURE_SKEW_MINUTES))) {
+            throw ValidationException::withMessages([
+                'captured_offline_at' => 'The offline medication action time is too far ahead of the server clock. Correct the device clock and retry.',
+            ]);
+        }
+
+        return $capturedAt;
+    }
+
+    private function storageInstant(Model $model, string $attribute): ?Carbon
+    {
+        $raw = $model->getRawOriginal($attribute);
+        if (! filled($raw)) {
+            return null;
+        }
+
+        return $raw instanceof \DateTimeInterface
+            ? Carbon::instance($raw)->copy()->utc()
+            : Carbon::parse((string) $raw, config('app.timezone', 'UTC'));
     }
 
     /** @return array{captured_offline_at?: mixed, origin_device_id?: mixed, queued_offline?: bool} */

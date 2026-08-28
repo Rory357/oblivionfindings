@@ -41,6 +41,10 @@ import { useState } from 'react';
 
 export type ViewTimesheetRow = {
     id: number;
+    can_mutate?: boolean;
+    can_approve?: boolean;
+    can_edit?: boolean;
+    attendance_session_id?: number | null;
     work_date: string;
     starts_at: string;
     ends_at: string;

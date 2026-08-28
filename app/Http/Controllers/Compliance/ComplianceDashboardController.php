@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ClientIncident;
 use App\Models\User;
 use App\Services\Compliance\ComplianceMetricsService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 
@@ -54,6 +55,9 @@ class ComplianceDashboardController extends Controller
                 'viewControlRoom' => $canViewControlRoom,
                 'viewAudit' => $user->canDo('audit.viewAny'),
                 'viewReports' => $user->canDo('reports.viewAny'),
+                'viewControlledMedication' => $user->canDo(
+                    MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+                ),
             ],
             // Reference data for the create/record/respond wizards — only sent to users
             // who can actually manage obligations (the wizards are manage-gated).

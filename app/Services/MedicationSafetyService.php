@@ -5,10 +5,8 @@ namespace App\Services;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\MedicationAllergy;
-use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationInteraction;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
 
 class MedicationSafetyService
 {
@@ -30,7 +28,8 @@ class MedicationSafetyService
         Client $client,
         ClientMedication $medication,
         ?Carbon $adminTime = null,
-        ?string $doseGiven = null
+        ?string $doseGiven = null,
+        bool $includeControlled = false,
     ): array {
         $adminTime = $adminTime ?? now();
         $warnings = [];
@@ -39,7 +38,7 @@ class MedicationSafetyService
         $blockReason = null;
 
         // 1. Check if medication is active
-        if (!$medication->isActive()) {
+        if (! $medication->isActive()) {
             $state = $medication->state;
             $blocked = true;
             $blockReason = "Medication is currently {$state}. Cannot administer.";
@@ -48,6 +47,7 @@ class MedicationSafetyService
                 'severity' => 'danger',
                 'message' => $blockReason,
             ];
+
             return $this->compileSafetyResult($warnings, $alerts, $blocked, $blockReason);
         }
 
@@ -57,7 +57,7 @@ class MedicationSafetyService
             foreach ($allergyCheck['matches'] as $allergy) {
                 $severity = $allergy->severity === 'life_threatening' ? 'danger' : 'warning';
                 $blocked = $blocked || $allergy->isSevere();
-                
+
                 $warning = [
                     'type' => 'allergy',
                     'severity' => $severity,
@@ -68,12 +68,12 @@ class MedicationSafetyService
                         'severity' => $allergy->severity,
                     ],
                 ];
-                
+
                 if ($allergy->isSevere()) {
                     $warning['message'] .= ' - ADMINISTRATION BLOCKED';
                     $blockReason = "Severe allergy to {$allergy->allergen} detected";
                 }
-                
+
                 $warnings[] = $warning;
             }
         }
@@ -82,15 +82,20 @@ class MedicationSafetyService
         $duplicateCheck = $this->checkDuplicates($client, $medication);
         if ($duplicateCheck['has_duplicate']) {
             foreach ($duplicateCheck['duplicates'] as $duplicate) {
+                $concealCounterpart = $duplicate->controlled_drug && ! $includeControlled;
                 $warnings[] = [
                     'type' => 'duplicate',
                     'severity' => 'caution',
-                    'message' => "Similar medication active: {$duplicate->name} ({$duplicate->formatted_dose})",
-                    'details' => [
-                        'medication_id' => $duplicate->id,
-                        'name' => $duplicate->name,
-                        'dose' => $duplicate->formatted_dose,
-                    ],
+                    'message' => $concealCounterpart
+                        ? 'Similar controlled medication is active. Review with an authorised controlled-medication colleague.'
+                        : "Similar medication active: {$duplicate->name} ({$duplicate->formatted_dose})",
+                    'details' => $concealCounterpart
+                        ? ['controlled_counterpart' => true]
+                        : [
+                            'medication_id' => $duplicate->id,
+                            'name' => $duplicate->name,
+                            'dose' => $duplicate->formatted_dose,
+                        ],
                 ];
             }
         }
@@ -98,28 +103,38 @@ class MedicationSafetyService
         // 4. Check for drug interactions
         $interactionCheck = $this->checkInteractions($client, $medication);
         if ($interactionCheck['has_interaction']) {
-            foreach ($interactionCheck['interactions'] as $interaction) {
-                $severity = $interaction->severity === 'contraindicated' ? 'danger' : 
+            foreach ($interactionCheck['interactions'] as $match) {
+                $interaction = $match['interaction'];
+                $counterpart = $match['medication'];
+                $concealCounterpart = $counterpart->controlled_drug && ! $includeControlled;
+                $severity = $interaction->severity === 'contraindicated' ? 'danger' :
                     ($interaction->severity === 'major' ? 'warning' : 'caution');
-                
+
                 $blocked = $blocked || $interaction->severity === 'contraindicated';
-                
+
                 $warning = [
                     'type' => 'interaction',
                     'severity' => $severity,
-                    'message' => "Drug Interaction: {$interaction->medication_a} + {$interaction->medication_b}",
-                    'details' => [
-                        'severity' => $interaction->severity,
-                        'description' => $interaction->description,
-                        'management' => $interaction->management,
-                    ],
+                    'message' => $concealCounterpart
+                        ? 'Drug interaction detected with a controlled medication.'
+                        : "Drug Interaction: {$interaction->medication_a} + {$interaction->medication_b}",
+                    'details' => $concealCounterpart
+                        ? [
+                            'severity' => $interaction->severity,
+                            'controlled_counterpart' => true,
+                        ]
+                        : [
+                            'severity' => $interaction->severity,
+                            'description' => $interaction->description,
+                            'management' => $interaction->management,
+                        ],
                 ];
-                
+
                 if ($interaction->severity === 'contraindicated') {
                     $warning['message'] .= ' - CONTRAINDICATED';
-                    $blockReason = "Contraindicated drug interaction detected";
+                    $blockReason = 'Contraindicated drug interaction detected';
                 }
-                
+
                 $warnings[] = $warning;
             }
         }
@@ -260,14 +275,15 @@ class MedicationSafetyService
 
         foreach ($activeMeds as $med) {
             $otherName = strtolower($med->name);
-            
+
             // Direct name match or significant overlap
             similar_text($medicationName, $otherName, $similarity);
-            
-            if ($similarity > 70 || 
-                str_contains($medicationName, $otherName) || 
+
+            if ($similarity > 70 ||
+                str_contains($medicationName, $otherName) ||
                 str_contains($otherName, $medicationName)) {
                 $duplicates[] = $med;
+
                 continue;
             }
 
@@ -281,7 +297,7 @@ class MedicationSafetyService
             foreach ($drugClasses as $class => $alternatives) {
                 $medInClass = in_array($medicationName, array_merge([$class], $alternatives));
                 $otherInClass = in_array($otherName, array_merge([$class], $alternatives));
-                
+
                 if ($medInClass && $otherInClass) {
                     $duplicates[] = $med;
                     break;
@@ -304,22 +320,26 @@ class MedicationSafetyService
         $otherMeds = ClientMedication::where('client_id', $client->id)
             ->where('id', '!=', $medication->id)
             ->active()
-            ->pluck('name')
-            ->toArray();
+            ->get(['id', 'name', 'controlled_drug']);
 
         $interactions = [];
 
         foreach ($otherMeds as $otherMed) {
-            $interaction = MedicationInteraction::checkInteraction($medication->name, $otherMed);
+            $interaction = MedicationInteraction::checkInteraction($medication->name, $otherMed->name);
             if ($interaction) {
-                $interactions[] = $interaction;
+                $interactions[] = [
+                    'interaction' => $interaction,
+                    'medication' => $otherMed,
+                ];
             }
         }
 
         // Sort by severity (contraindicated first)
         usort($interactions, function ($a, $b) {
             $severityOrder = ['contraindicated' => 0, 'major' => 1, 'moderate' => 2, 'minor' => 3];
-            return ($severityOrder[$a->severity] ?? 4) <=> ($severityOrder[$b->severity] ?? 4);
+
+            return ($severityOrder[$a['interaction']->severity] ?? 4)
+                <=> ($severityOrder[$b['interaction']->severity] ?? 4);
         });
 
         return [
@@ -333,7 +353,7 @@ class MedicationSafetyService
      */
     public function checkPrnLimits(ClientMedication $medication): array
     {
-        if (!$medication->is_prn || !$medication->max_per_day) {
+        if (! $medication->is_prn || ! $medication->max_per_day) {
             return [
                 'blocked' => false,
                 'near_limit' => false,
@@ -344,7 +364,7 @@ class MedicationSafetyService
 
         $count24h = $medication->prnCountLast24Hours;
         $maxPerDay = (int) filter_var($medication->max_per_day, FILTER_SANITIZE_NUMBER_INT);
-        
+
         if ($maxPerDay <= 0) {
             return [
                 'blocked' => false,
@@ -395,11 +415,13 @@ class MedicationSafetyService
      */
     public function getPrnHistory(ClientMedication $medication, int $hours = 24): array
     {
-        if (!$medication->is_prn) {
+        if (! $medication->is_prn) {
             return [];
         }
 
         $history = $medication->administrations()
+            ->effectiveClinicalEvidence()
+            ->where('client_id', $medication->client_id)
             ->where('status', 'given')
             ->where('administered_at', '>=', now()->subHours($hours))
             ->with('administeredBy:id,name')
@@ -445,7 +467,7 @@ class MedicationSafetyService
         }
 
         return [
-            'safe' => !$blocked && $safetyLevel !== 'danger',
+            'safe' => ! $blocked && $safetyLevel !== 'danger',
             'blocked' => $blocked,
             'block_reason' => $blockReason,
             'safety_level' => $safetyLevel,
@@ -453,7 +475,7 @@ class MedicationSafetyService
             'warnings' => $warnings,
             'alerts' => $alerts,
             'warning_count' => count($warnings),
-            'can_proceed' => !$blocked,
+            'can_proceed' => ! $blocked,
             'requires_acknowledgment' => $blocked || $safetyLevel === 'danger' || $safetyLevel === 'warning',
         ];
     }
@@ -465,7 +487,7 @@ class MedicationSafetyService
     public function validateDoseAgainstPrescribed(ClientMedication $medication, string $doseGiven): ?array
     {
         // Extract numeric value from dose_given string
-        if (!preg_match('/(\d+(?:\.\d+)?)/', $doseGiven, $matches)) {
+        if (! preg_match('/(\d+(?:\.\d+)?)/', $doseGiven, $matches)) {
             return null; // Cannot parse numeric value
         }
 
@@ -480,6 +502,7 @@ class MedicationSafetyService
 
         if ($givenNumeric > $threshold) {
             $percentOver = round((($givenNumeric - $prescribedAmount) / $prescribedAmount) * 100, 1);
+
             return [
                 'type' => 'dose_exceeds_prescribed',
                 'severity' => 'warning',
@@ -514,11 +537,13 @@ class MedicationSafetyService
 
         // Find the most recent administration
         $lastAdmin = $medication->administrations()
+            ->effectiveClinicalEvidence()
+            ->where('client_id', $medication->client_id)
             ->where('status', 'given')
             ->orderByDesc('administered_at')
             ->first();
 
-        if (!$lastAdmin || !$lastAdmin->administered_at) {
+        if (! $lastAdmin || ! $lastAdmin->administered_at) {
             return [
                 'blocked' => false,
                 'message' => null,
@@ -573,11 +598,11 @@ class MedicationSafetyService
             'diff_minutes' => $diffMinutes,
             'window_start' => $scheduledTime->copy()->subMinutes($windowBeforeMinutes)->toIso8601String(),
             'window_end' => $scheduledTime->copy()->addMinutes($windowAfterMinutes)->toIso8601String(),
-            'requires_reason' => !$withinWindow,
-            'message' => $withinWindow 
+            'requires_reason' => ! $withinWindow,
+            'message' => $withinWindow
                 ? 'Within acceptable time window'
-                : ($diffMinutes < 0 
-                    ? "Too early by " . abs($diffMinutes) . " minutes"
+                : ($diffMinutes < 0
+                    ? 'Too early by '.abs($diffMinutes).' minutes'
                     : "Late by {$diffMinutes} minutes"),
         ];
     }

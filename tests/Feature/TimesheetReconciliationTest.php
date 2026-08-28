@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrTimeEntry;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -217,7 +219,7 @@ class TimesheetReconciliationTest extends TestCase
         $this->assertSame('blocked', $timesheet->reconciliation_status);
     }
 
-    public function test_attendance_sync_does_not_mutate_approved_timesheet_operational_fields(): void
+    public function test_approved_timesheet_blocks_attendance_projection_before_any_close_write(): void
     {
         $this->travelTo(now()->setTime(17, 0));
 
@@ -254,16 +256,6 @@ class TimesheetReconciliationTest extends TestCase
             'approved_by' => $this->admin->id,
         ])->saveQuietly();
 
-        $timesheet->refresh();
-
-        $original = $timesheet->only([
-            'starts_at',
-            'ends_at',
-            'break_minutes',
-            'attendance_session_id',
-            'status',
-        ]);
-
         $session = HrAttendanceSession::query()->create([
             'user_id' => $this->staff->id,
             'shift_id' => $shift->id,
@@ -273,6 +265,11 @@ class TimesheetReconciliationTest extends TestCase
             'source' => 'manual',
             'created_by' => $this->staff->id,
         ]);
+        $timesheet->forceFill(['attendance_session_id' => $session->id])->saveQuietly();
+        $timesheet->refresh();
+
+        $original = $timesheet->getAttributes();
+        $sessionOriginal = $session->fresh()->getAttributes();
 
         $this->actingAs($this->staff)
             ->post('/attendance/clock-out', [
@@ -281,17 +278,99 @@ class TimesheetReconciliationTest extends TestCase
                 'force' => true,
                 'override_reason' => 'Reconciliation sync regression test.',
             ])
-            ->assertSessionHas('success');
+            ->assertSessionHasErrors(['clock_out']);
 
         $timesheet->refresh();
+        $session->refresh();
 
-        $this->assertSame($original['status'], $timesheet->status);
-        $this->assertSame($original['attendance_session_id'], $timesheet->attendance_session_id);
-        $this->assertTrue($timesheet->starts_at->equalTo($original['starts_at']));
-        $this->assertTrue($timesheet->ends_at->equalTo($original['ends_at']));
-        $this->assertSame($original['break_minutes'], $timesheet->break_minutes);
-        $this->assertSame('clear', $timesheet->reconciliation_status);
-        $this->assertSame('none', $timesheet->reconciliation_severity);
+        $this->assertSame($original, $timesheet->getAttributes());
+        $this->assertSame($sessionOriginal, $session->getAttributes());
+        $this->assertFalse(HrTimeEntry::query()->where('attendance_session_id', $session->id)->exists());
+        $this->assertNull($timesheet->reconciliation_status);
+        $this->assertNull($timesheet->reconciliation_severity);
+        $this->assertFalse(AuditLog::query()
+            ->where('action', 'attendance.clockOut.payrollFollowUp')
+            ->where('auditable_id', $session->id)
+            ->exists());
+    }
+
+    public function test_payroll_linked_timesheet_blocks_the_whole_attendance_clock_out_transaction(): void
+    {
+        $this->travelTo(now()->setTime(17, 0));
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
+            'starts_at' => now()->setTime(9, 0),
+            'ends_at' => now()->setTime(17, 0),
+            'actual_starts_at' => now()->setTime(9, 0),
+            'status' => 'in_progress',
+            'started_by' => $this->staff->id,
+            'created_by' => $this->staff->id,
+        ]);
+        $session = HrAttendanceSession::query()->create([
+            'user_id' => $this->staff->id,
+            'shift_id' => $shift->id,
+            'site_id' => $this->site->id,
+            'clock_in_at' => now()->setTime(9, 0),
+            'status' => 'open',
+            'source' => 'manual',
+            'created_by' => $this->staff->id,
+        ]);
+        $entry = HrTimeEntry::query()->create([
+            'user_id' => $this->staff->id,
+            'shift_id' => $shift->id,
+            'attendance_session_id' => $session->id,
+            'site_id' => $this->site->id,
+            'client_id' => $this->client->id,
+            'entry_date' => $session->clock_in_at->copy()
+                ->setTimezone(config('app.worker_timezone', config('app.timezone', 'UTC')))
+                ->toDateString(),
+            'clock_in' => $session->clock_in_at,
+            'entry_type' => 'clock',
+            'status' => 'active',
+            'source_type' => 'attendance',
+            'source_id' => $session->id,
+            'created_by' => $this->staff->id,
+        ]);
+        $timesheet = Timesheet::query()->create([
+            'user_id' => $this->staff->id,
+            'client_id' => $this->client->id,
+            'shift_id' => $shift->id,
+            'attendance_session_id' => $session->id,
+            'hr_time_entry_id' => $entry->id,
+            'shift_site_id' => $this->site->id,
+            'work_date' => $entry->entry_date,
+            'starts_at' => $session->clock_in_at,
+            'ends_at' => now(),
+            'break_minutes' => 0,
+            'status' => 'draft',
+            'created_by' => $this->staff->id,
+        ]);
+        $timesheet->forceFill([
+            'status' => 'approved',
+            'payroll_reference' => 'hr-payroll-run:locked-regression',
+        ])->saveQuietly();
+
+        $sessionBefore = $session->fresh()->getAttributes();
+        $shiftBefore = $shift->fresh()->getAttributes();
+        $entryBefore = $entry->fresh()->getAttributes();
+        $timesheetBefore = $timesheet->fresh()->getAttributes();
+
+        $this->actingAs($this->staff)
+            ->post('/attendance/clock-out', [
+                'session_id' => $session->id,
+                'break_minutes' => 0,
+                'force' => true,
+                'override_reason' => 'Payroll-lock transaction regression.',
+            ])
+            ->assertSessionHasErrors(['clock_out']);
+
+        $this->assertSame($sessionBefore, $session->fresh()->getAttributes());
+        $this->assertSame($shiftBefore, $shift->fresh()->getAttributes());
+        $this->assertSame($entryBefore, $entry->fresh()->getAttributes());
+        $this->assertSame($timesheetBefore, $timesheet->fresh()->getAttributes());
     }
 
     /**

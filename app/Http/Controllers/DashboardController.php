@@ -3,18 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrDepartment;
+use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationStock;
 use App\Models\IncidentFollowup;
+use App\Models\MedicationDashboardAlert;
+use App\Models\MedicationReview;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationTimelineVisibilityService;
 use App\Services\WorkstreamService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -59,11 +67,11 @@ class DashboardController extends Controller
 
         // Dashboard filters (used mainly for staff workflow)
         $range = (string) ($request->query('range') ?? 'week'); // today|week
-        if (!in_array($range, ['today', 'week'], true)) {
+        if (! in_array($range, ['today', 'week'], true)) {
             $range = 'week';
         }
         $status = $request->query('status'); // scheduled|in_progress|completed|cancelled|all
-        if ($status && !in_array($status, ['scheduled', 'in_progress', 'completed', 'cancelled', 'all'], true)) {
+        if ($status && ! in_array($status, ['scheduled', 'in_progress', 'completed', 'cancelled', 'all'], true)) {
             $status = null;
         }
         $clientId = $request->query('client_id');
@@ -102,16 +110,18 @@ class DashboardController extends Controller
         // Staff/admin
         $assignedClients = $user->assignedClients()->get(['clients.id', 'first_name', 'last_name', 'status']);
 
-        $upcomingEvents = TimelineEvent::query()
+        $upcomingEventsQuery = TimelineEvent::query()
             ->where('actor_user_id', $user->id)
             ->whereBetween('occurred_at', [$today, $weekEnd])
             ->orderBy('occurred_at')
             ->with(['client:id,first_name,last_name', 'site:id,name'])
-            ->limit(config('dashboard.max_upcoming_events', 200))
-            ->get();
+            ->limit(config('dashboard.max_upcoming_events', 200));
+        app(MedicationTimelineVisibilityService::class)
+            ->applyVisibleScope($upcomingEventsQuery, $user);
+        $upcomingEvents = $upcomingEventsQuery->get();
 
         $todayShifts = Shift::query()
-            ->when(!$user->canDo('shifts.manageAny'), fn($q) => $q
+            ->when(! $user->canDo('shifts.manageAny'), fn ($q) => $q
                 ->where('user_id', $user->id)
                 ->visibleToFrontline())
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
@@ -124,7 +134,7 @@ class DashboardController extends Controller
         $upcomingShifts = collect();
         if ($range === 'week') {
             $upcomingShifts = Shift::query()
-                ->when(!$user->canDo('shifts.manageAny'), fn($q) => $q
+                ->when(! $user->canDo('shifts.manageAny'), fn ($q) => $q
                     ->where('user_id', $user->id)
                     ->visibleToFrontline())
                 ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
@@ -137,7 +147,7 @@ class DashboardController extends Controller
         }
 
         $todayTimesheets = Timesheet::query()
-            ->when(!$user->canDo('timesheets.manageAny'), fn($q) => $q->where('user_id', $user->id))
+            ->when(! $user->canDo('timesheets.manageAny'), fn ($q) => $q->where('user_id', $user->id))
             ->whereDate('work_date', $today->toDateString())
             ->orderByDesc('created_at')
             ->with('client:id,first_name,last_name')
@@ -165,13 +175,13 @@ class DashboardController extends Controller
         $driver = DB::connection()->getDriverName();
         $shiftHoursExpr = $driver === 'sqlite'
             ? "SUM((strftime('%s', ends_at) - strftime('%s', starts_at)) / 3600.0)"
-            : "SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)) / 60";
+            : 'SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)) / 60';
         $timesheetHoursExpr = $driver === 'sqlite'
             ? "SUM(((strftime('%s', ends_at) - strftime('%s', starts_at)) / 60.0 - COALESCE(break_minutes, 0)) / 60.0)"
             : 'SUM((TIMESTAMPDIFF(MINUTE, starts_at, ends_at) - COALESCE(break_minutes, 0)))/60';
 
         $shiftScope = Shift::query()
-            ->when(!$user->canDo('shifts.manageAny'), fn ($q) => $q
+            ->when(! $user->canDo('shifts.manageAny'), fn ($q) => $q
                 ->where('user_id', $user->id)
                 ->visibleToFrontline());
 
@@ -226,7 +236,7 @@ class DashboardController extends Controller
             ->values();
 
         $timesheetScope = Timesheet::query()
-            ->when(!$user->canDo('timesheets.manageAny'), fn ($q) => $q->where('user_id', $user->id));
+            ->when(! $user->canDo('timesheets.manageAny'), fn ($q) => $q->where('user_id', $user->id));
 
         $timesheetByStatus = (clone $timesheetScope)
             ->select('status', DB::raw('COUNT(*) as c'))
@@ -259,7 +269,7 @@ class DashboardController extends Controller
             $incidentStart30 = (clone $today)->subDays(config('dashboard.incident_history_days', 30));
 
             $incidentQuery = ClientIncident::query()->whereBetween('occurred_at', [$incidentStart, $tomorrow]);
-            if ($user->canDo('incidents.viewAssigned') && !$user->canDo('incidents.viewAny')) {
+            if ($user->canDo('incidents.viewAssigned') && ! $user->canDo('incidents.viewAny')) {
                 $assignedIds = $user->assignedClients()->pluck('clients.id')->values();
                 $incidentQuery->whereIn('client_id', $assignedIds);
             }
@@ -274,7 +284,7 @@ class DashboardController extends Controller
                 ->values();
 
             $incidentQuery30 = ClientIncident::query()->whereBetween('occurred_at', [$incidentStart30, $tomorrow]);
-            if ($user->canDo('incidents.viewAssigned') && !$user->canDo('incidents.viewAny')) {
+            if ($user->canDo('incidents.viewAssigned') && ! $user->canDo('incidents.viewAny')) {
                 $assignedIds = $user->assignedClients()->pluck('clients.id')->values();
                 $incidentQuery30->whereIn('client_id', $assignedIds);
             }
@@ -333,7 +343,7 @@ class DashboardController extends Controller
             $mode = 'manager';
         }
         // HR Admin override - if user primarily has HR permissions
-        if ($user->canDo('hr.analytics.view') && !$user->canDo('shifts.manageAny')) {
+        if ($user->canDo('hr.analytics.view') && ! $user->canDo('shifts.manageAny')) {
             $mode = 'hr_admin';
         }
 
@@ -343,10 +353,10 @@ class DashboardController extends Controller
         $hrWidgets = null;
         if ($mode !== 'staff' && ($user->canDo('hr.leave.viewAny') || $user->canDo('hr.performance.view') || $user->canDo('hr.compliance.view'))) {
             $hrWidgets = [
-                'pending_leave' => \App\Domain\Hr\Models\HrLeaveRequest::where('status', 'pending')->count(),
-                'expiring_compliance' => \App\Domain\Hr\Models\HrStaffComplianceStatus::where('status', 'expiring_soon')->count(),
-                'pending_signatures' => \App\Domain\Hr\Models\HrDocumentSignature::where('signer_user_id', $user->id)->where('status', 'pending')->count(),
-                'due_attestations' => \App\Domain\Hr\Models\HrPolicy::where('is_active', true)
+                'pending_leave' => HrLeaveRequest::where('status', 'pending')->count(),
+                'expiring_compliance' => HrStaffComplianceStatus::where('status', 'expiring_soon')->count(),
+                'pending_signatures' => HrDocumentSignature::where('signer_user_id', $user->id)->where('status', 'pending')->count(),
+                'due_attestations' => HrPolicy::where('is_active', true)
                     ->where('requires_attestation', true)
                     ->whereDoesntHave('attestations', fn ($q) => $q->where('user_id', $user->id))
                     ->count(),
@@ -460,19 +470,52 @@ class DashboardController extends Controller
         // eMAR widget
         $emarWidgets = null;
         if ($user->canDo('medications.view')) {
-            $todayAdmins = \App\Models\ClientMedicationAdministration::whereDate('scheduled_for', $today)
-                ->orWhereDate('administered_at', $today)
+            $medicationScope = app(MedicationGovernanceScopeService::class);
+            $canViewControlled = $user->canDo('medications.controlled.view');
+            $siteIds = $medicationScope->readerSiteIds(
+                $user,
+                MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            );
+            $todayAdminQuery = ClientMedicationAdministration::query()
+                ->effectiveClinicalEvidence()
+                ->where(function ($query) use ($today): void {
+                    $query->whereDate('scheduled_for', $today)
+                        ->orWhereDate('administered_at', $today);
+                });
+            $todayAdminQuery = $medicationScope
+                ->scopeCanonicalClientMedicationRows($todayAdminQuery, $siteIds, false);
+            if (! $canViewControlled) {
+                $medicationScope->scopeWithoutControlledMedicationRows($todayAdminQuery);
+            }
+            $todayAdmins = $todayAdminQuery
                 ->selectRaw("COUNT(*) as total, SUM(CASE WHEN status='given' THEN 1 ELSE 0 END) as given")
                 ->first();
+            $alertQuery = $medicationScope->scopeCanonicalClientMedicationRows(
+                MedicationDashboardAlert::query()->where('status', 'active'),
+                $siteIds,
+            );
+            if (! $canViewControlled) {
+                $alertQuery->whereNotIn('alert_type', [
+                    'controlled_discrepancy',
+                    'controlled_overdue_check',
+                    'controlled_loss',
+                ]);
+                $medicationScope->scopeWithoutControlledMedicationRows($alertQuery);
+            }
             $emarTotal = (int) ($todayAdmins->total ?? 0);
             $emarGiven = (int) ($todayAdmins->given ?? 0);
             $emarWidgets = [
                 'adminRate' => $emarTotal > 0 ? round(($emarGiven / $emarTotal) * 100, 1) : 0,
                 'pending' => $emarTotal - $emarGiven,
-                'activeAlerts' => \App\Models\MedicationDashboardAlert::where('status', 'active')->count(),
-                'overdueReviews' => \App\Models\MedicationReview::where('status', 'scheduled')
-                    ->where('scheduled_date', '<', $today->toDateString())->count(),
-                'lowStock' => \App\Models\ClientMedicationStock::whereHas('medication', fn ($q) => $q->where('state', 'active')->where('active', true))
+                'activeAlerts' => $alertQuery->count(),
+                'overdueReviews' => MedicationReview::where('status', 'scheduled')
+                    ->whereHas('client', fn ($query) => $query->whereIn('site_id', $siteIds))
+                    ->where('scheduled_date', '<', $today->toDateString())
+                    ->count(),
+                'lowStock' => ClientMedicationStock::whereHas('medication', fn ($query) => $query
+                    ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
+                    ->active()
+                    ->when(! $canViewControlled, fn ($medication) => $medication->where('controlled_drug', false)))
                     ->whereNotNull('reorder_level')->whereColumn('on_hand', '<=', 'reorder_level')->count(),
             ];
         }

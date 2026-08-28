@@ -97,12 +97,14 @@ describe('transport medication payload contract', () => {
 
         expect(
             buildAdministerMedicationPayload({
+                quantityAdministered: ' 0.25 ',
                 witnessedByUserId: '18',
                 witnessCredential: ' witness-secret ',
                 notes: 'Given during transit.',
                 scan: idleScan,
             }),
         ).toEqual({
+            quantity_administered: '0.25',
             witnessed_by_user_id: 18,
             witness_credential: 'witness-secret',
             notes: 'Given during transit.',
@@ -167,8 +169,11 @@ describe('transport medication wizard family', () => {
                 name: 'Record transport administration',
             }),
         ).toHaveAccessibleDescription(
-            'Complete witness and verification checks, then review before recording this administration.',
+            'Record the amount given, complete witness and verification checks, then review this administration.',
         );
+        expect(
+            screen.getByRole('spinbutton', { name: 'Units given' }),
+        ).toBeRequired();
         administered.unmount();
 
         const correction = render(

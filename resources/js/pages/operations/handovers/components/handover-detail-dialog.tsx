@@ -277,7 +277,14 @@ export function HandoverDetailDialog({
     if (!handover) return null;
     const h = handover;
     const out = h.outgoing_staff;
-    const inc = h.incoming_staff;
+    const submittedRecipient = h.submitted_incoming_staff ?? null;
+    const currentAcknowledgementAssignee =
+        h.current_incoming_staff ??
+        (h.status === 'draft' ? h.incoming_staff : null);
+    const inc = currentAcknowledgementAssignee;
+    const immutableRecipientEvidence = Boolean(
+        h.status !== 'draft' && submittedRecipient,
+    );
     const note = lockNote(h);
 
     return (
@@ -383,6 +390,28 @@ export function HandoverDetailDialog({
                             <MoodChip mood={h.client_mood} />
                         </span>
                     </div>
+
+                    {immutableRecipientEvidence ? (
+                        <div className="grid gap-2 rounded-xl border border-border bg-muted/20 px-4 py-3 text-[12px] sm:grid-cols-2">
+                            <div>
+                                <div className="font-semibold text-muted-foreground">
+                                    Submitted recipient
+                                </div>
+                                <div className="mt-0.5 font-medium">
+                                    {submittedRecipient?.name ?? 'Not recorded'}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="font-semibold text-muted-foreground">
+                                    Current acknowledgement assignee
+                                </div>
+                                <div className="mt-0.5 font-medium">
+                                    {currentAcknowledgementAssignee?.name ??
+                                        'No worker currently assigned'}
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
 
                     {emarLens ? (
                         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-[11.5px] text-muted-foreground">

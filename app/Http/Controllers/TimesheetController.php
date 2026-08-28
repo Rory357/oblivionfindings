@@ -38,7 +38,7 @@ class TimesheetController extends Controller
             ])
             ->where('status', 'submitted')
             ->orderByDesc('submitted_at')
-            ->tap(fn ($query) => $this->siteAccess()->applyTimesheetScope($query, $auth, $this->timesheetBypassPermissions()))
+            ->tap(fn ($query) => $this->siteAccess()->applyTimesheetScope($query, $auth, []))
             ->paginate(25)
             ->withQueryString();
 
@@ -129,7 +129,7 @@ class TimesheetController extends Controller
 
         $timesheets = Timesheet::query()
             ->whereIn('id', $data['ids'])
-            ->tap(fn ($query) => $this->siteAccess()->applyTimesheetScope($query, $auth, $this->timesheetBypassPermissions()))
+            ->tap(fn ($query) => $this->siteAccess()->applyTimesheetScope($query, $auth, []))
             ->get();
 
         abort_if($timesheets->count() !== count($data['ids']), 403, 'You are not authorized to approve timesheets for one or more selected sites.');
@@ -162,7 +162,7 @@ class TimesheetController extends Controller
 
         $timesheets = Timesheet::query()
             ->whereIn('id', $data['ids'])
-            ->tap(fn ($query) => $this->siteAccess()->applyTimesheetScope($query, $auth, $this->timesheetBypassPermissions()))
+            ->tap(fn ($query) => $this->siteAccess()->applyTimesheetScope($query, $auth, []))
             ->get();
 
         abort_if($timesheets->count() !== count($data['ids']), 403, 'You are not authorized to return timesheets for one or more selected sites.');
@@ -195,7 +195,7 @@ class TimesheetController extends Controller
 
         $timesheets = Timesheet::query()
             ->whereIn('id', $data['ids'])
-            ->tap(fn ($query) => $this->siteAccess()->applyTimesheetScope($query, $auth, $this->timesheetBypassPermissions()))
+            ->tap(fn ($query) => $this->siteAccess()->applyTimesheetScope($query, $auth, []))
             ->get();
 
         abort_if($timesheets->count() !== count($data['ids']), 403, 'You are not authorized to reject timesheets for one or more selected sites.');
@@ -242,7 +242,7 @@ class TimesheetController extends Controller
             ->with($rowEagerLoads)
             ->orderByDesc('work_date');
 
-        $this->siteAccess()->applyTimesheetScope($q, $auth, $this->timesheetBypassPermissions());
+        $this->siteAccess()->applyTimesheetScope($q, $auth, $this->timesheetReadBypassPermissions());
 
         // Scope to "own only" unless the user has manageAny OR is reviewing the
         // Pending tab as an approver (the Pending tab IS the approval queue —
@@ -292,7 +292,7 @@ class TimesheetController extends Controller
         $viewId = (int) ($request->query('view') ?: $request->query('edit'));
         if ($viewId && ! $timesheets->getCollection()->contains(fn (Timesheet $ts) => (int) $ts->id === $viewId)) {
             $extraQuery = Timesheet::query()->with($rowEagerLoads)->whereKey($viewId);
-            $this->siteAccess()->applyTimesheetScope($extraQuery, $auth, $this->timesheetBypassPermissions());
+            $this->siteAccess()->applyTimesheetScope($extraQuery, $auth, $this->timesheetReadBypassPermissions());
             $extra = $extraQuery->first();
 
             $visible = $extra && (
@@ -306,7 +306,17 @@ class TimesheetController extends Controller
             }
         }
 
-        $timesheets = $timesheets->through(fn (Timesheet $ts) => $this->serializeTimesheetRow($ts));
+        $mutableTimesheetIds = Timesheet::query()
+            ->whereIn('id', $timesheets->getCollection()->pluck('id'))
+            ->tap(fn ($query) => $this->siteAccess()->applyTimesheetScope($query, $auth, []))
+            ->pluck('id')
+            ->mapWithKeys(fn ($id): array => [(int) $id => true]);
+
+        $timesheets = $timesheets->through(fn (Timesheet $ts) => $this->serializeTimesheetRow(
+            $ts,
+            $mutableTimesheetIds->has((int) $ts->id),
+            $canApprove,
+        ));
 
         // Single scoped status histogram shared by the tab strip and the hero
         // summary — replaces the ~18 per-status COUNT queries these two used to
@@ -321,17 +331,17 @@ class TimesheetController extends Controller
         $heroSummary = $this->computeHeroSummary($auth, $statusCounts, $from, $to);
 
         // Clients / sites / shifts for the Create dialog and filters.
-        $clientScope = $this->siteAccess()->applyClientScope(Client::query(), $auth, $this->timesheetBypassPermissions());
+        $clientScope = $this->siteAccess()->applyClientScope(Client::query(), $auth, []);
         $clients = $clientScope->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
 
         $staff = $canApprove
-            ? $this->siteAccess()->applyStaffScope(User::staff(), $auth, $this->timesheetBypassPermissions())
+            ? $this->siteAccess()->applyStaffScope(User::staff(), $auth, [])
                 ->orderBy('name')
                 ->get(['id', 'name', 'email'])
             : [];
 
         $sites = $this->siteAccess()
-            ->applySiteScope(Site::query(), $auth, $this->timesheetBypassPermissions())
+            ->applySiteScope(Site::query(), $auth, [])
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -372,12 +382,18 @@ class TimesheetController extends Controller
      *
      * @return array<string, mixed>
      */
-    protected function serializeTimesheetRow(Timesheet $ts): array
-    {
+    protected function serializeTimesheetRow(
+        Timesheet $ts,
+        bool $canMutate = false,
+        bool $canReview = false,
+    ): array {
         $data = $ts->toArray();
         $data['total_hours'] = (float) $ts->total_hours;
         $data['client_allocations'] = $ts->effectiveClientAllocations()->all();
         $data['allocation_method'] = $ts->dominantAllocationMethod();
+        $data['can_mutate'] = $canMutate;
+        $data['can_approve'] = $canMutate && $canReview;
+        $data['can_edit'] = $canMutate && $ts->attendance_session_id === null;
 
         // Task progress — pulled from the linked shift's tasks when present.
         $tasksTotal = 0;
@@ -405,7 +421,7 @@ class TimesheetController extends Controller
     protected function scopedStatusCounts(User $auth): array
     {
         $base = Timesheet::query();
-        $this->siteAccess()->applyTimesheetScope($base, $auth, $this->timesheetBypassPermissions());
+        $this->siteAccess()->applyTimesheetScope($base, $auth, $this->timesheetReadBypassPermissions());
 
         if (! $auth->canDo('timesheets.manageAny')) {
             $base->where('user_id', $auth->id);
@@ -431,7 +447,7 @@ class TimesheetController extends Controller
         $statuses = ['draft', 'submitted', 'returned', 'approved', 'rejected', 'paid'];
 
         $archivedBase = Timesheet::query();
-        $this->siteAccess()->applyTimesheetScope($archivedBase, $auth, $this->timesheetBypassPermissions());
+        $this->siteAccess()->applyTimesheetScope($archivedBase, $auth, $this->timesheetReadBypassPermissions());
 
         if (! $auth->canDo('timesheets.manageAny')) {
             $archivedBase->where('user_id', $auth->id);
@@ -484,7 +500,7 @@ class TimesheetController extends Controller
     protected function computeHeroSummary(User $auth, array $statusCounts, ?string $from = null, ?string $to = null): array
     {
         $base = Timesheet::query();
-        $this->siteAccess()->applyTimesheetScope($base, $auth, $this->timesheetBypassPermissions());
+        $this->siteAccess()->applyTimesheetScope($base, $auth, $this->timesheetReadBypassPermissions());
 
         if (! $auth->canDo('timesheets.manageAny')) {
             $base->where('user_id', $auth->id);
@@ -529,7 +545,7 @@ class TimesheetController extends Controller
             'hours_this_week' => $hoursThisWeek,
             'hours_target' => max($hoursTarget, 0.1),
             'next_payroll_date' => now()->next(Carbon::FRIDAY)->format('d M'),
-            'sites_count' => $this->siteAccess()->applySiteScope(Site::query(), $auth, $this->timesheetBypassPermissions())->count(),
+            'sites_count' => $this->siteAccess()->applySiteScope(Site::query(), $auth, $this->timesheetReadBypassPermissions())->count(),
             'regions_count' => 1,
             'rostered_today' => Shift::query()->whereDate('starts_at', today())->count(),
             'staff_on_shift' => Shift::query()->whereDate('starts_at', today())->where('status', 'in_progress')->count(),
@@ -558,8 +574,9 @@ class TimesheetController extends Controller
             ->when(! $auth->canDo('timesheets.manageAny'), fn ($q) => $q->where('user_id', $auth->id))
             ->whereNotIn('status', ['cancelled'])
             ->orderBy('starts_at')
-            ->limit(60)
-            ->get();
+            ->limit(60);
+        $this->siteAccess()->applyShiftScope($shifts, $auth, []);
+        $shifts = $shifts->get();
 
         // Drop shifts that already have a timesheet for the same user.
         $existing = Timesheet::query()
@@ -644,8 +661,13 @@ class TimesheetController extends Controller
         ]);
 
         return response()->json([
-            'timesheet' => $this->serializeTimesheetRow($timesheet),
-            'can_approve' => $this->canReviewTimesheets($auth),
+            'timesheet' => $this->serializeTimesheetRow(
+                $timesheet,
+                $this->canMutateTimesheet($auth, $timesheet),
+                $this->canReviewTimesheets($auth),
+            ),
+            'can_approve' => $this->canReviewTimesheets($auth)
+                && $this->canMutateTimesheet($auth, $timesheet),
         ]);
     }
 
@@ -705,7 +727,7 @@ class TimesheetController extends Controller
             $this->siteAccess()->assertCanAccessShift(
                 $auth,
                 $linkedShift,
-                $this->timesheetBypassPermissions(),
+                [],
                 'You are not authorized to create timesheets for that site.',
             );
             if (! $auth->canDo('timesheets.manageAny') && $linkedShift->user_id !== $auth->id) {
@@ -740,7 +762,14 @@ class TimesheetController extends Controller
             $this->siteAccess()->assertCanAccessClientId(
                 $auth,
                 (int) $data['client_id'],
-                $this->timesheetBypassPermissions(),
+                [],
+                'You are not authorized to create timesheets for that site.',
+            );
+        } elseif (($data['site_id'] ?? null) !== null) {
+            $this->siteAccess()->assertCanAccessSiteId(
+                $auth,
+                (int) $data['site_id'],
+                [],
                 'You are not authorized to create timesheets for that site.',
             );
         }
@@ -862,7 +891,7 @@ class TimesheetController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('timesheets.manageAny'), 403);
-        $this->assertCanAccessTimesheet($auth, $timesheet);
+        $this->assertCanMutateTimesheet($auth, $timesheet);
 
         $data = $request->validate([
             'reason' => ['nullable', 'string', 'max:255'],
@@ -887,7 +916,7 @@ class TimesheetController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('timesheets.manageAny'), 403);
-        $this->assertCanAccessTimesheet($auth, $timesheet);
+        $this->assertCanMutateTimesheet($auth, $timesheet);
 
         if (! $timesheet->archived_at) {
             return back()->with('success', 'Timesheet is already active.');
@@ -970,7 +999,7 @@ class TimesheetController extends Controller
             $this->siteAccess()->assertCanAccessClientId(
                 $auth,
                 (int) $data['client_id'],
-                $this->timesheetBypassPermissions(),
+                [],
                 'You are not authorized to assign that client to this timesheet.',
             );
         }
@@ -987,7 +1016,7 @@ class TimesheetController extends Controller
             $this->siteAccess()->assertCanAccessSiteId(
                 $auth,
                 $manualSiteId,
-                $this->timesheetBypassPermissions(),
+                [],
                 'You are not authorized to assign that site to this timesheet.',
             );
         }
@@ -1000,7 +1029,7 @@ class TimesheetController extends Controller
             ? $timesheet->site_id
             : ($snapshot['site_id'] ?? $manualSiteId);
 
-        $result = $this->timesheetApprovals()->updateEditable($timesheet, [
+        $result = $this->timesheetApprovals()->updateEditable($timesheet, $auth, [
             'client_id' => $data['client_id'],
             'activity_type' => $clearingManualClient ? $manualActivityType : $timesheet->activity_type,
             'site_id' => $canonicalSiteId,
@@ -1051,7 +1080,7 @@ class TimesheetController extends Controller
             abort(403);
         }
 
-        $this->assertCanAccessTimesheet($auth, $timesheet);
+        $this->assertCanMutateTimesheet($auth, $timesheet);
 
         abort_unless(in_array($timesheet->status, ['draft', 'returned'], true), 403);
 
@@ -1106,7 +1135,7 @@ class TimesheetController extends Controller
             abort(403);
         }
 
-        $this->assertCanAccessTimesheet($auth, $timesheet);
+        $this->assertCanMutateTimesheet($auth, $timesheet);
 
         if (! in_array($timesheet->status, ['draft', 'returned'], true)) {
             return back()->with('error', 'Only draft or returned timesheets can be resubmitted.');
@@ -1160,7 +1189,7 @@ class TimesheetController extends Controller
             $this->siteAccess()->assertCanAccessClientId(
                 $auth,
                 (int) $data['client_id'],
-                $this->timesheetBypassPermissions(),
+                [],
                 'You are not authorized to assign that client to this timesheet.',
             );
         }
@@ -1177,7 +1206,7 @@ class TimesheetController extends Controller
             $this->siteAccess()->assertCanAccessSiteId(
                 $auth,
                 $manualSiteId,
-                $this->timesheetBypassPermissions(),
+                [],
                 'You are not authorized to assign that site to this timesheet.',
             );
         }
@@ -1238,7 +1267,7 @@ class TimesheetController extends Controller
     {
         $auth = $request->user();
         abort_unless($this->canReviewTimesheets($auth), 403);
-        $this->assertCanAccessTimesheet($auth, $timesheet);
+        $this->assertCanMutateTimesheet($auth, $timesheet);
 
         $data = $request->validate([
             'decision_notes' => ['nullable', 'string', 'max:5000'],
@@ -1274,7 +1303,7 @@ class TimesheetController extends Controller
         $auth = $request->user();
         abort_unless($this->canReviewTimesheets($auth), 403);
         abort_unless($timesheet->status === 'submitted', 403);
-        $this->assertCanAccessTimesheet($auth, $timesheet);
+        $this->assertCanMutateTimesheet($auth, $timesheet);
 
         if ($timesheet->is_payroll_segment_complete || $timesheet->payroll_reference) {
             return back()->with('error', 'Payroll-linked timesheets cannot be rejected after export preparation.');
@@ -1309,7 +1338,7 @@ class TimesheetController extends Controller
         $auth = $request->user();
         abort_unless($this->canReviewTimesheets($auth), 403);
         abort_unless($timesheet->status === 'submitted', 403);
-        $this->assertCanAccessTimesheet($auth, $timesheet);
+        $this->assertCanMutateTimesheet($auth, $timesheet);
 
         if ($timesheet->is_payroll_segment_complete || $timesheet->payroll_reference) {
             return back()->with('error', 'Payroll-linked timesheets cannot be returned after export preparation.');
@@ -1487,17 +1516,17 @@ class TimesheetController extends Controller
     /**
      * @return array<int, string>
      */
-    protected function timesheetBypassPermissions(): array
+    protected function timesheetReadBypassPermissions(): array
     {
         return ['reports.viewAny'];
     }
 
-    protected function assertCanAccessTimesheet(User $auth, Timesheet $timesheet): void
+    protected function assertCanMutateTimesheet(User $auth, Timesheet $timesheet): void
     {
         $this->siteAccess()->assertCanAccessTimesheet(
             $auth,
             $timesheet,
-            $this->timesheetBypassPermissions(),
+            [],
             'You are not authorized to access timesheets for this site.',
         );
     }
@@ -1510,7 +1539,12 @@ class TimesheetController extends Controller
             abort(403);
         }
 
-        $this->assertCanAccessTimesheet($auth, $timesheet);
+        $this->siteAccess()->assertCanAccessTimesheet(
+            $auth,
+            $timesheet,
+            $this->timesheetReadBypassPermissions(),
+            'You are not authorized to access timesheets for this site.',
+        );
     }
 
     protected function assertCanEditTimesheet(User $auth, Timesheet $timesheet): void
@@ -1521,6 +1555,14 @@ class TimesheetController extends Controller
             abort(403);
         }
 
-        $this->assertCanAccessTimesheet($auth, $timesheet);
+        $this->assertCanMutateTimesheet($auth, $timesheet);
+    }
+
+    protected function canMutateTimesheet(User $auth, Timesheet $timesheet): bool
+    {
+        $query = Timesheet::query()->whereKey($timesheet->id);
+        $this->siteAccess()->applyTimesheetScope($query, $auth, []);
+
+        return $query->exists();
     }
 }

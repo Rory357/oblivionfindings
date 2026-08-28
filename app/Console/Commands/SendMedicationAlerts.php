@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
-use App\Models\ClientMedication;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationRound;
 use App\Models\User;
@@ -13,7 +13,9 @@ use App\Notifications\MedicationOverdueNotification;
 use App\Notifications\MedicationRefusalClusterNotification;
 use App\Notifications\MedicationStockLowNotification;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
+use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -51,6 +53,7 @@ class SendMedicationAlerts extends Command
         $medications = ClientMedication::query()
             ->active()
             ->where('is_prn', false)
+            ->whereHas('client', fn ($client) => $client->whereNotNull('site_id'))
             ->where(function ($query) {
                 $query->whereNotNull('dose_times')
                     ->orWhereNotNull('frequency');
@@ -76,6 +79,7 @@ class SendMedicationAlerts extends Command
 
                     [$slotStartUtc, $slotEndUtc] = $scheduleService->utcSlotWindow($scheduledFor);
                     $hasAdministration = ClientMedicationAdministration::query()
+                        ->effectiveClinicalEvidence()
                         ->where('client_id', $client->id)
                         ->where('client_medication_id', $medication->id)
                         ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
@@ -87,7 +91,11 @@ class SendMedicationAlerts extends Command
 
                     $round = $this->roundForSlot($medication, $scheduledFor, $scheduleService);
                     $staff = $round?->assignedTo;
-                    if (! $staff) {
+                    if (! $staff || ! $this->canReceiveMedicationEvidence(
+                        $staff,
+                        (int) $client->site_id,
+                        (bool) $medication->controlled_drug,
+                    )) {
                         continue;
                     }
 
@@ -130,10 +138,9 @@ class SendMedicationAlerts extends Command
         return MedicationRound::query()
             ->whereDate('round_date', $scheduledFor->toDateString())
             ->whereNotNull('assigned_to')
+            ->whereNotNull('site_id')
+            ->where('site_id', $client->site_id)
             ->with('assignedTo')
-            ->when($client->site_id, fn ($query) => $query->where(function ($scope) use ($client) {
-                $scope->whereNull('site_id')->orWhere('site_id', $client->site_id);
-            }))
             ->when($client->service_context_id, fn ($query) => $query->where(function ($scope) use ($client) {
                 $scope->whereNull('service_context_id')->orWhere('service_context_id', $client->service_context_id);
             }))
@@ -174,6 +181,7 @@ class SendMedicationAlerts extends Command
 
         if ($lowStocks->isEmpty()) {
             $this->info('No low stock alerts to send.');
+
             return;
         }
 
@@ -191,10 +199,12 @@ class SendMedicationAlerts extends Command
             ->filter(fn (User $user) => $user->canDo('medications.view'))
             ->map(fn (User $user) => [
                 'user' => $user,
-                // Empty = unrestricted (manager/no site profile); otherwise the
-                // set of sites this user may see.
-                'sites' => $siteAccess->accessibleSiteIds($user, ['medications.reports.export', 'reports.viewAny']),
+                'sites' => $siteAccess->accessibleSiteIds(
+                    $user,
+                    MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+                ),
             ])
+            ->filter(fn (array $entry) => $entry['sites'] !== [])
             ->values();
 
         $count = 0;
@@ -203,19 +213,21 @@ class SendMedicationAlerts extends Command
             $client = $stock->medication?->client;
             $clientName = $client ? trim($client->first_name.' '.$client->last_name) : 'Unknown client';
             $stockSiteId = $client?->site_id;
+            $isControlled = (bool) $stock->medication?->controlled_drug;
 
             foreach ($recipients as $entry) {
-                // Site-scope: a site-restricted recipient only hears about stock
-                // for a client at one of their sites; org-wide recipients (empty
-                // set) hear everything.
-                if ($entry['sites'] !== [] && $stockSiteId !== null && ! in_array((int) $stockSiteId, $entry['sites'], true)) {
+                if ($stockSiteId === null || ! in_array((int) $stockSiteId, $entry['sites'], true)) {
+                    continue;
+                }
+
+                if ($isControlled && ! $entry['user']->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
                     continue;
                 }
 
                 $entry['user']->notify(new MedicationStockLowNotification(
                     medication: $medicationName,
                     clientName: $clientName,
-                    count: (int) $stock->on_hand,
+                    count: MedicationStockQuantity::display($stock->on_hand ?? 0),
                     unit: $stock->unit ?? 'units',
                     reorderLevel: (int) $stock->reorder_level,
                 ));
@@ -244,7 +256,7 @@ class SendMedicationAlerts extends Command
         $count = 0;
         foreach ($expiringAssessments as $assessment) {
             $user = $assessment->user;
-            if (!$user) {
+            if (! $user) {
                 continue;
             }
 
@@ -267,36 +279,63 @@ class SendMedicationAlerts extends Command
     {
         $this->info('Checking for medication refusal clusters...');
 
-        $clusters = ClientMedicationAdministration::where('status', 'refused')
+        $clusters = ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
+            ->where('status', 'refused')
             ->where('scheduled_for', '>=', now()->subDays(7))
             ->select('client_id', 'client_medication_id', DB::raw('COUNT(*) as refusal_count'))
             ->groupBy('client_id', 'client_medication_id')
             ->having('refusal_count', '>=', 3)
+            ->tap(fn ($query) => app(MedicationGovernanceScopeService::class)
+                ->scopeCanonicalClientMedicationRows($query, null, false))
             ->get();
 
         if ($clusters->isEmpty()) {
             $this->info('No refusal clusters detected.');
+
             return;
         }
 
         // Notify team leaders (users with team_leader role)
+        $siteAccess = app(UserSiteAccessService::class);
         $teamLeaders = User::whereHas('roles', function ($q) {
             $q->where('slug', 'team-leader')
                 ->orWhere('name', 'Team Leader');
-        })->get();
+        })->get()
+            ->filter(fn (User $leader) => $leader->canDo('medications.view'))
+            ->map(fn (User $leader) => [
+                'user' => $leader,
+                'sites' => $siteAccess->accessibleSiteIds(
+                    $leader,
+                    MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+                ),
+            ])
+            ->filter(fn (array $entry) => $entry['sites'] !== [])
+            ->values();
 
         $count = 0;
         foreach ($clusters as $cluster) {
-            $medication = \App\Models\ClientMedication::with('client')->find($cluster->client_medication_id);
-            if (!$medication) {
+            $medication = ClientMedication::with('client')
+                ->whereKey($cluster->client_medication_id)
+                ->where('client_id', $cluster->client_id)
+                ->first();
+            $siteId = $medication?->client?->site_id;
+            if (! $medication || $siteId === null) {
                 continue;
             }
 
             $clientName = $medication->client?->full_name ?? 'Unknown client';
             $medicationName = $medication->name ?? 'Unknown medication';
 
-            foreach ($teamLeaders as $leader) {
-                $leader->notify(new MedicationRefusalClusterNotification(
+            foreach ($teamLeaders as $entry) {
+                if (! in_array((int) $siteId, $entry['sites'], true)) {
+                    continue;
+                }
+                if ($medication->controlled_drug
+                    && ! $entry['user']->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
+                    continue;
+                }
+                $entry['user']->notify(new MedicationRefusalClusterNotification(
                     clientName: $clientName,
                     medication: $medicationName,
                     count: (int) $cluster->refusal_count,
@@ -307,5 +346,24 @@ class SendMedicationAlerts extends Command
         }
 
         $this->info("Sent refusal cluster alerts for {$count} medication/client combinations.");
+    }
+
+    private function canReceiveMedicationEvidence(User $recipient, int $siteId, bool $controlled): bool
+    {
+        if ($siteId <= 0 || ! $recipient->canDo('medications.view')) {
+            return false;
+        }
+        if ($controlled && ! $recipient->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
+            return false;
+        }
+
+        return in_array(
+            $siteId,
+            app(UserSiteAccessService::class)->accessibleSiteIds(
+                $recipient,
+                MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+            ),
+            true,
+        );
     }
 }

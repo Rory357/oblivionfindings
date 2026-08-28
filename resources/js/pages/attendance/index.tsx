@@ -94,7 +94,12 @@ import {
     type Session,
 } from './components/shared';
 
-type AttendanceHandover = Handover & { incoming: boolean };
+type AttendanceHandover = Handover & {
+    /** True only for the worker currently authorised to acknowledge. */
+    incoming: boolean;
+    /** Immutable submit-time recipient evidence; may differ after reassignment. */
+    submitted_recipient: boolean;
+};
 
 type Props = {
     sessions: Session[];
@@ -573,6 +578,13 @@ function HandoversList({
                                 ...(h.tasks_pending ?? []),
                             ];
                             const pendingRow = h.status === 'submitted';
+                            const currentAssignee =
+                                h.current_incoming_staff ?? null;
+                            const submittedRecipient =
+                                h.submitted_incoming_staff ?? null;
+                            const recipientChanged =
+                                submittedRecipient &&
+                                submittedRecipient.id !== currentAssignee?.id;
                             return (
                                 <li
                                     key={h.id}
@@ -611,8 +623,8 @@ function HandoversList({
                                                 )}{' '}
                                                 →{' '}
                                                 {personName(
-                                                    h.incoming_staff,
-                                                    'Left open',
+                                                    currentAssignee,
+                                                    'No current assignee',
                                                 )}{' '}
                                                 · {clientName(h.client)}
                                             </span>
@@ -634,6 +646,15 @@ function HandoversList({
                                                     Acknowledged
                                                 </StatusPill>
                                             )}
+                                            {recipientChanged ? (
+                                                <span className="text-xs text-muted-foreground">
+                                                    Submitted recipient:{' '}
+                                                    {personName(
+                                                        submittedRecipient,
+                                                        'Not recorded',
+                                                    )}
+                                                </span>
+                                            ) : null}
                                         </div>
                                         <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
                                             {h.handover_notes}

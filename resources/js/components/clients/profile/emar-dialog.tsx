@@ -24,6 +24,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    createMedicationMutationReplayState,
+    prepareMedicationMutationReplayState,
+} from '@/lib/emar-offline';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
@@ -37,7 +41,7 @@ import {
     X,
     XCircle,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 export type EmarMedication = {
@@ -132,6 +136,7 @@ export function EmarRecordDialog({
     const [witnessCredential, setWitnessCredential] = useState('');
     const [notes, setNotes] = useState('');
     const [busy, setBusy] = useState(false);
+    const administrationReplay = useRef(createMedicationMutationReplayState());
 
     useEffect(() => {
         if (open) {
@@ -146,6 +151,8 @@ export function EmarRecordDialog({
             setWitnessCredential('');
             setNotes('');
             setBusy(false);
+            administrationReplay.current =
+                createMedicationMutationReplayState();
         }
     }, [open, initialMedicationId]);
 
@@ -211,25 +218,45 @@ export function EmarRecordDialog({
             toast.error('Enter the witness password or PIN.');
             return;
         }
+        const initialPayload = {
+            status: outcome,
+            reason_code: needsReason ? reasonCode : undefined,
+            reason: isPrn && outcome === 'given' ? prnReason.trim() : undefined,
+            administered_at: administeredAt
+                ? new Date(administeredAt).toISOString()
+                : undefined,
+            witnessed_by: needsWitness ? parseInt(witnessedBy, 10) : undefined,
+            witness_credential: needsWitness ? witnessCredential : undefined,
+            notes: notes.trim() || undefined,
+            client_request_uuid: administrationReplay.current.uuid,
+        };
+        const {
+            witness_credential: _witnessCredential,
+            client_request_uuid: _clientRequestUuid,
+            ...materialPayload
+        } = initialPayload;
+        administrationReplay.current = prepareMedicationMutationReplayState(
+            administrationReplay.current,
+            {
+                client_id: clientId,
+                client_medication_id: medication.id,
+                ...materialPayload,
+            },
+        );
+        const payload = {
+            ...initialPayload,
+            client_request_uuid: administrationReplay.current.uuid,
+        };
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            toast.error(
+                'Reconnect before signing this witnessed medication action. Witness credentials are never saved on this device.',
+            );
+            return;
+        }
         setBusy(true);
         router.post(
             `/operations/clients/${clientId}/medical/medications/${medication.id}/administrations`,
-            {
-                status: outcome,
-                reason_code: needsReason ? reasonCode : undefined,
-                reason:
-                    isPrn && outcome === 'given' ? prnReason.trim() : undefined,
-                administered_at: administeredAt
-                    ? new Date(administeredAt).toISOString()
-                    : undefined,
-                witnessed_by: needsWitness
-                    ? parseInt(witnessedBy, 10)
-                    : undefined,
-                witness_credential: needsWitness
-                    ? witnessCredential
-                    : undefined,
-                notes: notes.trim() || undefined,
-            },
+            payload,
             {
                 preserveScroll: true,
                 onSuccess: (page) => {
@@ -243,6 +270,8 @@ export function EmarRecordDialog({
                     toast.success(
                         `${medication.name} · ${OUTCOMES.find((o) => o.value === outcome)?.label ?? 'Recorded'} — signed`,
                     );
+                    administrationReplay.current =
+                        createMedicationMutationReplayState();
                     onClose();
                 },
                 onError: (errors) => {

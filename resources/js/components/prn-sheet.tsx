@@ -9,7 +9,7 @@ import {
     Shield,
     Zap,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import DictateButton from '@/components/dictate-button';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +25,12 @@ import {
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
-import { submitOffline } from '@/lib/offline-queue';
+import {
+    emarMutationWasAccepted,
+    submitEmarMutation,
+} from '@/lib/emar-offline';
+import { applyFormRequestErrors } from '@/lib/form-request-errors';
+import { createOfflineRequestUuid } from '@/lib/offline-queue';
 
 /* -------------------------------------------------------------------------- */
 /*  PR 13 — PRN (as-needed meds) quick flow                                   */
@@ -133,6 +138,11 @@ export default function PrnSheet({
     const [search, setSearch] = useState('');
     const [reasonChoice, setReasonChoice] = useState<string | null>(null);
     const [reasonText, setReasonText] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const submissionReplay = useRef({
+        uuid: createOfflineRequestUuid(),
+        fingerprint: null as string | null,
+    });
     const offlineQueue = useOfflineQueueState();
     const { online } = offlineQueue;
     const queuedPrnMedicationIds = useMemo(() => {
@@ -181,6 +191,10 @@ export default function PrnSheet({
             setReasonText('');
             form.reset();
             form.clearErrors();
+            submissionReplay.current = {
+                uuid: createOfflineRequestUuid(),
+                fingerprint: null,
+            };
         }
         // We intentionally do not depend on `form` — Inertia's useForm object
         // identity changes every render and would loop us.
@@ -231,7 +245,7 @@ export default function PrnSheet({
         form.clearErrors();
     }
 
-    function submit() {
+    async function submit() {
         if (!selected) return;
         if (effectiveReason.length === 0) return;
 
@@ -242,48 +256,65 @@ export default function PrnSheet({
             dose_given: form.data.dose_given,
             notes: form.data.notes,
         };
+        const materialFingerprint = JSON.stringify(basePayload);
+        if (
+            submissionReplay.current.fingerprint !== null &&
+            submissionReplay.current.fingerprint !== materialFingerprint
+        ) {
+            submissionReplay.current.uuid = createOfflineRequestUuid();
+        }
+        submissionReplay.current.fingerprint = materialFingerprint;
+        const payload = {
+            ...basePayload,
+            client_request_uuid: submissionReplay.current.uuid,
+        };
 
-        // PR 26 — when the device is offline, queue the PRN locally and
-        // close the sheet with a calm "saved on this device" toast instead
-        // of letting Inertia fail the request. The queue replays through
-        // this same endpoint on reconnect, and the server dedupes on
-        // `client_request_uuid` so a lost ACK doesn't double-record.
-        if (typeof navigator !== 'undefined' && !navigator.onLine) {
-            void submitOffline({
+        setSubmitting(true);
+        form.clearErrors();
+        try {
+            const result = await submitEmarMutation(url, payload, {
                 action: 'prn',
-                url,
-                payload: basePayload,
+                allowQueueWhenOffline: !(
+                    selected.requires_witness || selected.is_controlled
+                ),
+                successMessage: 'PRN administration recorded.',
                 queuedMessage:
                     'PRN saved on this device — we\u2019ll send it when you\u2019re back online.',
-            }).then(() => {
-                // Refresh the page props so `given_last_24h` etc. stay accurate
-                // once the queued record lands. This is a no-op while offline.
+            });
+            if (!emarMutationWasAccepted(result.status)) return;
+
+            if (result.status === 'queued') {
                 router.reload({
                     only: ['prnMedications'],
                     preserveScroll: true,
                 });
-                onOpenChange(false);
-            });
-            return;
+            }
+            submissionReplay.current = {
+                uuid: createOfflineRequestUuid(),
+                fingerprint: null,
+            };
+            onOpenChange(false);
+        } catch (error) {
+            applyFormRequestErrors(
+                error,
+                (field, message) =>
+                    (form.setError as (key: string, value: string) => void)(
+                        field,
+                        message,
+                    ),
+                'Could not record this PRN dose.',
+            );
+        } finally {
+            setSubmitting(false);
         }
-
-        form.transform((data) => ({
-            ...data,
-            reason: effectiveReason,
-        }));
-
-        form.post(url, {
-            preserveScroll: true,
-            onSuccess: () => {
-                // flash-toaster renders the success toast on the next prop
-                // tick; we just need to close the sheet.
-                onOpenChange(false);
-            },
-        });
     }
 
     const canSubmit =
-        !!selected && effectiveReason.length > 0 && !form.processing;
+        !!selected &&
+        !selected.requires_witness &&
+        !selected.is_controlled &&
+        effectiveReason.length > 0 &&
+        !submitting;
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -348,7 +379,7 @@ export default function PrnSheet({
                         notes={form.data.notes}
                         onNotesChange={(v) => form.setData('notes', v)}
                         onSubmit={submit}
-                        submitting={form.processing}
+                        submitting={submitting}
                         canSubmit={canSubmit}
                         error={
                             form.errors.reason ||
@@ -765,7 +796,7 @@ function RecordStep({
 
             {/* Sticky action bar */}
             <div className="border-t bg-background px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
-                {offline && (
+                {offline && !med.requires_witness && !med.is_controlled && (
                     <p className="mb-2 rounded-md border border-status-info/30 bg-status-info-bg px-3 py-2 text-center text-xs text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
                         Will send when you&rsquo;re back online.
                     </p>
@@ -789,7 +820,9 @@ function RecordStep({
                 </Button>
                 {!canSubmit && !submitting && (
                     <p className="mt-2 text-center text-xs text-muted-foreground">
-                        Pick a reason to continue.
+                        {med.requires_witness || med.is_controlled
+                            ? 'Use the full MAR to record this witnessed dose.'
+                            : 'Pick a reason to continue.'}
                     </p>
                 )}
             </div>

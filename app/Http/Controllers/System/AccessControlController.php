@@ -7,8 +7,11 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserInvitation;
+use App\Services\AuthorizationEvidenceLockService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class AccessControlController extends Controller
@@ -34,7 +37,7 @@ class AccessControlController extends Controller
         $roles = Role::withCount('users')
             ->byLevel()
             ->get()
-            ->map(fn($role) => [
+            ->map(fn ($role) => [
                 'id' => $role->id,
                 'name' => $role->name,
                 'label' => $role->label,
@@ -64,7 +67,7 @@ class AccessControlController extends Controller
             ->byLevel()
             ->withCount(['users', 'permissions'])
             ->get()
-            ->map(fn($role) => [
+            ->map(fn ($role) => [
                 'id' => $role->id,
                 'name' => $role->name,
                 'label' => $role->label,
@@ -81,7 +84,7 @@ class AccessControlController extends Controller
             ->byLevel()
             ->withCount(['users', 'permissions'])
             ->get()
-            ->map(fn($role) => [
+            ->map(fn ($role) => [
                 'id' => $role->id,
                 'name' => $role->name,
                 'label' => $role->label,
@@ -123,18 +126,19 @@ class AccessControlController extends Controller
             'name.regex' => 'Role key must be lowercase letters, numbers, or underscores.',
         ]);
 
-        $role = Role::create([
-            'name' => $data['name'],
-            'label' => $data['label'],
-            'description' => $data['description'] ?? null,
-            'level' => $data['level'],
-            'type' => 'custom',
-        ]);
-
-        if (!empty($data['permission_keys'])) {
-            $permissionIds = Permission::whereIn('key', $data['permission_keys'])->pluck('id');
+        $permissionIds = Permission::whereIn('key', $data['permission_keys'] ?? [])->pluck('id')->all();
+        $actorId = (int) $user->id;
+        DB::transaction(function () use ($actorId, $data, $permissionIds): void {
+            $this->lockAccessActor($actorId);
+            $role = Role::query()->create([
+                'name' => $data['name'],
+                'label' => $data['label'],
+                'description' => $data['description'] ?? null,
+                'level' => $data['level'],
+                'type' => 'custom',
+            ]);
             $role->permissions()->sync($permissionIds);
-        }
+        });
 
         return redirect()->back()->with('success', 'Role created successfully.');
     }
@@ -155,18 +159,27 @@ class AccessControlController extends Controller
             'permission_keys.*' => ['string', Rule::exists('permissions', 'key')],
         ]);
 
-        // Only allow label/description update for custom roles
-        if ($role->isCustom()) {
-            $role->update([
-                'label' => $data['label'] ?? $role->label,
-                'description' => $data['description'] ?? $role->description,
-            ]);
-        }
+        $permissionIds = isset($data['permission_keys'])
+            ? Permission::whereIn('key', $data['permission_keys'])->pluck('id')->all()
+            : null;
+        $actorId = (int) $user->id;
+        $roleId = (int) $role->id;
+        DB::transaction(function () use ($actorId, $data, $permissionIds, $roleId): void {
+            $this->lockAccessActor($actorId, [$roleId]);
+            $lockedRole = app(AuthorizationEvidenceLockService::class)->lockRoleMutex($roleId);
 
-        if (isset($data['permission_keys'])) {
-            $permissionIds = Permission::whereIn('key', $data['permission_keys'])->pluck('id');
-            $role->permissions()->sync($permissionIds);
-        }
+            // Only allow label/description update for custom roles
+            if ($lockedRole->isCustom()) {
+                $lockedRole->update([
+                    'label' => $data['label'] ?? $lockedRole->label,
+                    'description' => $data['description'] ?? $lockedRole->description,
+                ]);
+            }
+
+            if ($permissionIds !== null) {
+                $lockedRole->permissions()->sync($permissionIds);
+            }
+        });
 
         return redirect()->back()->with('success', 'Role updated successfully.');
     }
@@ -184,16 +197,26 @@ class AccessControlController extends Controller
             'label' => ['required', 'string', 'max:80'],
         ]);
 
-        $newRole = Role::create([
-            'name' => $data['name'],
-            'label' => $data['label'],
-            'description' => $role->description,
-            'level' => $role->level,
-            'type' => 'custom',
-        ]);
-
-        // Copy permissions
-        $newRole->permissions()->sync($role->permissions->pluck('id'));
+        $actorId = (int) $user->id;
+        $roleId = (int) $role->id;
+        DB::transaction(function () use ($actorId, $data, $roleId): void {
+            $this->lockAccessActor($actorId, [$roleId]);
+            $sourceRole = app(AuthorizationEvidenceLockService::class)->lockRoleMutex($roleId);
+            $permissionIds = DB::table('role_permission')
+                ->where('role_id', $sourceRole->id)
+                ->orderBy('permission_id')
+                ->lockForUpdate()
+                ->pluck('permission_id')
+                ->all();
+            $newRole = Role::query()->create([
+                'name' => $data['name'],
+                'label' => $data['label'],
+                'description' => $sourceRole->description,
+                'level' => $sourceRole->level,
+                'type' => 'custom',
+            ]);
+            $newRole->permissions()->sync($permissionIds);
+        });
 
         return redirect()->back()->with('success', 'Role cloned successfully.');
     }
@@ -205,12 +228,16 @@ class AccessControlController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('settings.access.manage'), 403);
-
         abort_if($role->isSystem(), 403, 'System roles cannot be deleted.');
 
-        $role->delete();
-
-        return redirect()->back()->with('success', 'Role deleted successfully.');
+        // Physical deletion cascades through role_user. Acquiring Role first can
+        // therefore deadlock current-authorization readers that already hold an
+        // assignee pivot and are waiting for the Role mutex. Safe role retirement
+        // needs a separate lifecycle; this packet deliberately preserves custom
+        // roles instead of performing an unsafe cascade.
+        throw ValidationException::withMessages([
+            'role' => 'Role deletion is unavailable. Remove its assignments and leave the role unassigned.',
+        ]);
     }
 
     /**
@@ -232,7 +259,7 @@ class AccessControlController extends Controller
             ->select('role_id', 'permission_id')
             ->get()
             ->groupBy('role_id')
-            ->map(fn($items) => $items->pluck('permission_id')->toArray())
+            ->map(fn ($items) => $items->pluck('permission_id')->toArray())
             ->toArray();
 
         return Inertia::render('system/access/Matrix', [
@@ -255,11 +282,11 @@ class AccessControlController extends Controller
             ->whereNotNull('approved_at')
             ->orderBy('name')
             ->get()
-            ->map(fn($user) => [
+            ->map(fn ($user) => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'roles' => $user->roles->map(fn($r) => [
+                'roles' => $user->roles->map(fn ($r) => [
                     'id' => $r->id,
                     'name' => $r->name,
                     'label' => $r->label,
@@ -291,12 +318,53 @@ class AccessControlController extends Controller
             'role_ids.*' => ['integer', 'exists:roles,id'],
         ]);
 
-        $target->roles()->sync($data['role_ids']);
+        $actorId = (int) $user->id;
+        $targetId = (int) $target->id;
+        $roleIds = collect($data['role_ids'])
+            ->map(fn ($roleId): int => (int) $roleId)
+            ->filter(fn (int $roleId): bool => $roleId > 0)
+            ->unique()
+            ->sort()
+            ->values();
+        DB::transaction(function () use ($actorId, $roleIds, $targetId): void {
+            $lockedUsers = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+                [$actorId, $targetId],
+                ['settings.access.manage'],
+                $roleIds->all(),
+            );
+            /** @var User|null $lockedActor */
+            $lockedActor = $lockedUsers->get($actorId);
+            /** @var User|null $lockedTarget */
+            $lockedTarget = $lockedUsers->get($targetId);
+            abort_unless($lockedActor?->canDo('settings.access.manage'), 403);
+            abort_unless($lockedTarget, 404);
+            $lockedTarget->roles()->sync($roleIds->all());
 
-        // Update legacy role field
-        $primaryRole = $target->roles()->orderByDesc('level')->first();
-        $target->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
+            // Update legacy role field
+            $primaryRole = Role::query()
+                ->whereIn('id', $roleIds->all())
+                ->orderByDesc('level')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->first();
+            $lockedTarget->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
+        });
 
         return redirect()->back()->with('success', 'User roles updated successfully.');
+    }
+
+    /** @param list<int> $additionalRoleIds */
+    private function lockAccessActor(int $actorId, array $additionalRoleIds = []): User
+    {
+        $users = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+            [$actorId],
+            ['settings.access.manage'],
+            $additionalRoleIds,
+        );
+        /** @var User|null $actor */
+        $actor = $users->get($actorId);
+        abort_unless($actor?->canDo('settings.access.manage'), 403);
+
+        return $actor;
     }
 }

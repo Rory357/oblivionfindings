@@ -8,6 +8,7 @@ use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
 
@@ -22,6 +23,7 @@ class HandoverPresenter
     public function __construct(
         protected ShiftHandoverService $handoverService,
         protected UserSiteAccessService $siteAccess,
+        protected MedicationGovernanceScopeService $medicationGovernance,
     ) {}
 
     /**
@@ -30,11 +32,20 @@ class HandoverPresenter
      *
      * @return array<string, mixed>
      */
-    public function mapHandover(ShiftHandover $handover, User $auth): array
-    {
+    public function mapHandover(
+        ShiftHandover $handover,
+        User $auth,
+        bool $includeControlledMedication,
+    ): array {
         $currentIncomingStaff = $handover->incomingShift?->staff;
         $incomingUserId = $currentIncomingStaff?->id
             ?? ($handover->incoming_shift_id ? null : $handover->incoming_staff_id);
+        $submittedIncomingStaffId = in_array($handover->status, [
+            ShiftHandoverService::STATUS_SUBMITTED,
+            ShiftHandoverService::STATUS_ACKNOWLEDGED,
+        ], true) && (int) $handover->incoming_staff_id > 0
+            ? (int) $handover->incoming_staff_id
+            : null;
 
         $client = $handover->client;
         $site = $client?->site;
@@ -46,9 +57,11 @@ class HandoverPresenter
             'status' => $handover->status,
             'handover_notes' => $handover->handover_notes,
             'client_mood' => $handover->client_mood,
-            'medications_due' => $this->listToDisplayStrings($handover->medications_due),
-            'cd_verification' => $handover->cd_verification,
-            'cd_required' => (bool) $handover->cd_required,
+            'medications_due' => $includeControlledMedication
+                ? $this->listToDisplayStrings($handover->medications_due)
+                : [],
+            'cd_verification' => $includeControlledMedication ? $handover->cd_verification : null,
+            'cd_required' => $includeControlledMedication && (bool) $handover->cd_required,
             'version' => (int) $handover->version,
             'edit_lock' => $lockHolder ? [
                 'held_by_name' => $lockHolder->name,
@@ -77,6 +90,20 @@ class HandoverPresenter
                 'name' => $currentIncomingStaff?->name ?? $handover->incomingStaff?->name ?? 'Pending assignment',
                 'role' => $currentIncomingStaff?->role ?? $handover->incomingStaff?->role,
             ] : null,
+            // Immutable recipient snapshot bound when the handover was
+            // submitted. Reassignment never rewrites this evidence.
+            'submitted_incoming_staff' => $submittedIncomingStaffId ? [
+                'id' => $submittedIncomingStaffId,
+                'name' => $handover->incomingStaff?->name ?? "Staff record #{$submittedIncomingStaffId}",
+                'role' => $handover->incomingStaff?->role,
+            ] : null,
+            // Live assignee who currently holds acknowledgement authority for
+            // the bound incoming Shift.
+            'current_incoming_staff' => $currentIncomingStaff ? [
+                'id' => $currentIncomingStaff->id,
+                'name' => $currentIncomingStaff->name,
+                'role' => $currentIncomingStaff->role,
+            ] : null,
             'acknowledger' => $handover->acknowledger ? [
                 'id' => $handover->acknowledger->id,
                 'name' => $handover->acknowledger->name,
@@ -92,6 +119,24 @@ class HandoverPresenter
                 'days_left' => $edit['days_left'],
                 'age_days' => $edit['age_days'],
             ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function mapHandoverDetail(
+        ShiftHandover $handover,
+        User $auth,
+        bool $includeControlledMedication,
+    ): array {
+        return [
+            ...$this->mapHandover($handover, $auth, $includeControlledMedication),
+            'observations_summary' => $handover->observations_summary,
+            'submitter' => $handover->submitter ? [
+                'id' => $handover->submitter->id,
+                'name' => $handover->submitter->name,
+            ] : null,
         ];
     }
 
@@ -151,7 +196,10 @@ class HandoverPresenter
      */
     public function catalogue(User $auth): array
     {
-        $siteIds = $this->siteAccess->accessibleSiteIds($auth, ['reports.viewAny']);
+        $siteIds = $this->siteAccess->accessibleSiteIds(
+            $auth,
+            MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+        );
 
         $clients = Client::query()
             ->whereIn('site_id', $siteIds)
@@ -165,21 +213,47 @@ class HandoverPresenter
                 'site_id' => $c->site_id,
             ])->values();
 
+        $staffBySite = collect($siteIds)->mapWithKeys(
+            fn (int $siteId): array => [
+                (string) $siteId => $this->medicationGovernance
+                    ->staffPicker([$siteId])
+                    ->values()
+                    ->all(),
+            ],
+        )->all();
+        $staffIds = collect($staffBySite)->flatten(1)->pluck('id')->unique()->values();
         $staff = User::query()
-            ->tap(fn ($query) => $this->siteAccess->applyStaffScope($query, $auth, ['reports.viewAny']))
+            ->whereIn('id', $staffIds)
+            ->with('hrEmployeeProfile:id,user_id,primary_site_id,secondary_site_ids')
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'role'])
-            ->map(fn (User $u) => [
-                'id' => $u->id,
-                'name' => $u->name,
-                'email' => $u->email,
-                'role' => $u->role,
-            ])->values();
+            ->map(function (User $user) use ($siteIds): array {
+                $profile = $user->hrEmployeeProfile;
+
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'site_ids' => collect([
+                        $profile?->primary_site_id,
+                        ...($profile?->secondary_site_ids ?? []),
+                    ])->map(fn ($siteId) => (int) $siteId)
+                        ->intersect($siteIds)
+                        ->unique()
+                        ->values()
+                        ->all(),
+                ];
+            })->values();
 
         $sites = Site::query()->whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name'])
             ->map(fn (Site $s) => ['id' => $s->id, 'name' => $s->name])->values();
 
-        $serviceContexts = ServiceContext::query()->orderBy('name')->get(['id', 'name', 'type'])
+        $serviceContexts = ServiceContext::query()
+            ->availableToSites($siteIds)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'type', 'site_id'])
             ->map(fn (ServiceContext $s) => ['id' => $s->id, 'name' => $s->name, 'type' => $s->type])->values();
 
         // Shifts feed the wizard's outgoing/incoming selects + auto-next chain.
@@ -187,15 +261,20 @@ class HandoverPresenter
         // recent + upcoming window.
         $clientIds = $clients->pluck('id');
         $shifts = Shift::query()
-            ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth, ['reports.viewAny']))
+            ->tap(fn ($query) => $this->siteAccess->applyShiftScope(
+                $query,
+                $auth,
+                MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+            ))
             ->whereIn('client_id', $clientIds)
+            ->whereNotNull('site_id')
             ->whereNotNull('starts_at')
             ->whereNotIn('status', ['cancelled'])
             ->whereBetween('starts_at', [now()->subDays(30), now()->addDays(21)])
             ->with('staff:id,name,role')
             ->orderBy('starts_at')
             ->limit(800)
-            ->get(['id', 'client_id', 'site_id', 'user_id', 'service_context_id', 'shift_type', 'starts_at', 'ends_at', 'status'])
+            ->get(['id', 'client_id', 'site_id', 'user_id', 'service_context_id', 'shift_type', 'starts_at', 'ends_at', 'actual_ends_at', 'status'])
             ->map(fn (Shift $s) => [
                 'id' => $s->id,
                 'client_id' => $s->client_id,
@@ -203,18 +282,40 @@ class HandoverPresenter
                 'user_id' => $s->user_id,
                 'service_context_id' => $s->service_context_id,
                 'shift_type' => $s->shift_type,
+                'status' => $s->status,
                 'label' => $this->shiftLabel($s),
                 'starts_at' => optional($s->starts_at)->toISOString(),
                 'ends_at' => optional($s->ends_at)->toISOString(),
+                'actual_ends_at' => optional($s->actual_ends_at)->toISOString(),
                 'staff' => $s->staff ? ['id' => $s->staff->id, 'name' => $s->staff->name] : null,
             ])->values();
+
+        $canViewControlled = $auth->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
+        $canRecordControlled = $auth->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY);
+        $controlledWitnessesBySite = $canViewControlled && $canRecordControlled
+            ? collect($siteIds)->mapWithKeys(
+                fn (int $siteId): array => [
+                    (string) $siteId => $this->medicationGovernance
+                        ->controlledWitnessPicker([$siteId], (int) $auth->id)
+                        ->values()
+                        ->all(),
+                ],
+            )->all()
+            : [];
 
         return [
             'clients' => $clients,
             'staff' => $staff,
+            'staffBySite' => $staffBySite,
             'sites' => $sites,
             'serviceContexts' => $serviceContexts,
             'shifts' => $shifts,
+            'controlledWitnessesBySite' => $controlledWitnessesBySite,
+            'capabilities' => [
+                'view_controlled' => $canViewControlled,
+                'record_controlled' => $canRecordControlled,
+                'manage_any_shifts' => $auth->canDo('shifts.manageAny'),
+            ],
         ];
     }
 

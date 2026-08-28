@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MedicationRound extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'service_context_id',
@@ -108,23 +108,30 @@ class MedicationRound extends Model
 
     public function isOverdue(): bool
     {
-        if ($this->status !== 'pending') return false;
+        if ($this->status !== 'pending') {
+            return false;
+        }
         $scheduledAt = $this->round_date->copy()->setTimeFromTimeString($this->scheduled_time);
+
         return now()->gt($scheduledAt->addMinutes($this->window_minutes));
     }
 
     public function getCompletionPercentageAttribute(): float
     {
-        if ($this->total_medications === 0) return 0;
+        if ($this->total_medications === 0) {
+            return 0;
+        }
+
         return round(($this->administered_count / $this->total_medications) * 100, 1);
     }
 
     public function updateCounts(): void
     {
-        $this->administered_count = $this->administrations()->where('status', 'given')->count();
-        $this->refused_count = $this->administrations()->where('status', 'refused')->count();
-        $this->withheld_count = $this->administrations()->where('status', 'withheld')->count();
-        $this->missed_count = $this->administrations()->where('status', 'missed')->count();
+        $effectiveAdministrations = $this->administrations()->effectiveClinicalEvidence();
+        $this->administered_count = (clone $effectiveAdministrations)->where('status', 'given')->count();
+        $this->refused_count = (clone $effectiveAdministrations)->where('status', 'refused')->count();
+        $this->withheld_count = (clone $effectiveAdministrations)->where('status', 'withheld')->count();
+        $this->missed_count = (clone $effectiveAdministrations)->where('status', 'missed')->count();
         $this->save();
     }
 }

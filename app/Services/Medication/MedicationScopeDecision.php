@@ -10,9 +10,12 @@ use App\Models\MedicationPrescriberOrder;
 use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\User;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 
 final readonly class MedicationScopeDecision
 {
+    /** @param  Collection<int, Shift>|null  $lockedPresenceShifts */
     public function __construct(
         public User $performer,
         public ?Client $client,
@@ -23,6 +26,8 @@ final readonly class MedicationScopeDecision
         public ?MedicationRound $round = null,
         public ?ClientMedicationAdministration $administration = null,
         public ?MedicationPrescriberOrder $prescription = null,
+        public ?Collection $lockedPresenceShifts = null,
+        public ?CarbonInterface $lockedPresenceEffectiveAt = null,
     ) {}
 
     public function shiftId(): ?int

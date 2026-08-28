@@ -462,6 +462,8 @@ class ClientMedication extends Model
     public function getPrnLast24HoursAttribute(): Collection
     {
         return $this->administrations()
+            ->effectiveClinicalEvidence()
+            ->where('client_id', $this->client_id)
             ->where('status', 'given')
             ->where('administered_at', '>=', now()->subHours(24))
             ->orderByDesc('administered_at')
@@ -648,6 +650,7 @@ class ClientMedication extends Model
             'version_number' => ($this->version ?? 1) + 1,
             'name' => $this->name,
             'dosage' => $this->dosage,
+            'controlled_drug' => (bool) $this->controlled_drug,
             'state' => 'paused',
             'paused_at' => $this->paused_at,
             'change_reason' => 'Medication paused: '.$reason,
@@ -673,6 +676,7 @@ class ClientMedication extends Model
             'version_number' => ($this->version ?? 1) + 1,
             'name' => $this->name,
             'dosage' => $this->dosage,
+            'controlled_drug' => (bool) $this->controlled_drug,
             'state' => 'active',
             'change_reason' => 'Medication resumed',
             'changed_by' => $resumedBy,

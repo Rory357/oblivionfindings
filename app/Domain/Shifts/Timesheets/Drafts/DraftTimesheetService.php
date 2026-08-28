@@ -119,8 +119,13 @@ class DraftTimesheetService
         return ['success' => true, 'reason' => null, 'timesheet' => $timesheet->fresh() ?? $timesheet];
     }
 
-    public function fromAttendanceSession(HrAttendanceSession $session, int $actorId, array $data = []): ?Timesheet
-    {
+    public function fromAttendanceSession(
+        HrAttendanceSession $session,
+        int $actorId,
+        array $data = [],
+        ?Timesheet $lockedTimesheet = null,
+        bool $timesheetLockHeld = false,
+    ): ?Timesheet {
         if (! $session->clock_out_at) {
             return null;
         }
@@ -132,15 +137,18 @@ class DraftTimesheetService
             'shift.staff:id,name',
         ]);
 
-        $timesheet = Timesheet::query()
-            ->where('attendance_session_id', $session->id)
-            ->first();
-
-        if (! $timesheet && $session->shift_id) {
+        $timesheet = $lockedTimesheet;
+        if (! $timesheetLockHeld) {
             $timesheet = Timesheet::query()
-                ->where('shift_id', $session->shift_id)
-                ->where('user_id', $session->user_id)
+                ->where('attendance_session_id', $session->id)
                 ->first();
+
+            if (! $timesheet && $session->shift_id) {
+                $timesheet = Timesheet::query()
+                    ->where('shift_id', $session->shift_id)
+                    ->where('user_id', $session->user_id)
+                    ->first();
+            }
         }
 
         $clientId = $session->shift?->client_id ?? ($data['client_id'] ?? null);

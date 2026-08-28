@@ -17,7 +17,10 @@ use App\Models\MedicationReview;
 use App\Models\MedicationRound;
 use App\Models\MedicationSyringeDriver;
 use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -35,15 +38,40 @@ class MedicationOverviewService
     /** Severity rank for Action-centre ordering (lower = more urgent). */
     private const SEVERITY_RANK = ['critical' => 0, 'warning' => 1, 'info' => 2];
 
+    /** @var array<int, int>|null */
+    private ?array $readerClientIds = null;
+
+    /** @var array<int, int>|null */
+    private ?array $readerSiteIds = null;
+
+    private bool $includeControlled = true;
+
+    public function __construct(private readonly MedicationGovernanceScopeService $governanceScope) {}
+
     /**
      * Full Inertia payload for the merged eMAR home page.
      */
-    public function payload(?Carbon $date = null): array
+    public function payload(?Carbon $date = null, ?User $actor = null): array
     {
+        $this->includeControlled = $actor === null
+            || $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
+        if ($actor !== null) {
+            $this->readerSiteIds = $this->governanceScope->readerSiteIds(
+                $actor,
+                MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            );
+            $this->readerClientIds = Client::query()
+                ->whereIn('site_id', $this->readerSiteIds)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
         $date = ($date ?? today())->copy()->startOfDay();
 
         $stats = $this->stats($date);
         $trend = $this->trend($date);
+        $includeControlledErrors = $this->includeControlled;
 
         return [
             'date' => $date->toDateString(),
@@ -55,12 +83,12 @@ class MedicationOverviewService
             'complianceTrend' => $this->complianceTrend($trend),
             'outcomeBreakdown' => $this->outcomeBreakdown($stats),
             'codedNotGivenReasons' => $this->codedNotGivenReasons($date),
-            'actionCentre' => $this->actionCentre($date),
+            'actionCentre' => $this->actionCentre($date, $includeControlledErrors),
             'clientBoard' => $this->clientBoard($date),
             'inrWatch' => $this->inrWatch(),
             'syringeDrivers' => $this->syringeDrivers(),
             'reviewsDue' => $this->reviewsDue(),
-            'medicationErrors' => $this->medicationErrors($date),
+            'medicationErrors' => $this->medicationErrors($date, $includeControlledErrors),
             'overdueMedications' => $this->overdueMedications($date),
             'nextRound' => $this->nextRound($date),
             'recentActivity' => $this->recentActivity(),
@@ -73,6 +101,53 @@ class MedicationOverviewService
         ];
     }
 
+    /** @return array<int, int> */
+    private function allowedClientIds(): array
+    {
+        return $this->readerClientIds ??= Client::query()
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /** @return array<int, int> */
+    private function allowedSiteIds(): array
+    {
+        return $this->readerSiteIds ??= Client::query()
+            ->whereIn('id', $this->allowedClientIds())
+            ->pluck('site_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** @return Builder<*> */
+    private function canonicalMedicationRows(Builder $query, bool $allowNullMedication = false): Builder
+    {
+        return $this->governanceScope->scopeCanonicalClientMedicationRows(
+            $query,
+            $this->allowedSiteIds(),
+            $allowNullMedication,
+        );
+    }
+
+    /** @return Builder<ClientMedicationAdministration> */
+    private function effectiveAdministrationRows(Builder $query): Builder
+    {
+        $query = $this->canonicalMedicationRows(
+            $query->effectiveClinicalEvidence(),
+            false,
+        );
+
+        if (! $this->includeControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($query);
+        }
+
+        return $query;
+    }
+
     /**
      * Active medications across the clients with a chart, for the CD/stock modal
      * pickers. Flat list the frontend filters by selected client.
@@ -80,6 +155,7 @@ class MedicationOverviewService
     public function medicationOptions(): array
     {
         return ClientMedication::active()
+            ->whereIn('client_id', $this->allowedClientIds())
             ->orderBy('name')
             ->get(['id', 'client_id', 'name', 'dose_unit', 'controlled_drug'])
             ->map(fn ($med) => [
@@ -98,13 +174,7 @@ class MedicationOverviewService
      */
     public function witnesses(): array
     {
-        return User::staff()
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->filter(fn (User $user) => $user->canDo('medications.controlled.witness'))
-            ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
-            ->values()
-            ->all();
+        return $this->governanceScope->controlledWitnessPicker($this->allowedSiteIds())->all();
     }
 
     /**
@@ -114,6 +184,7 @@ class MedicationOverviewService
     public function clientOptions(): array
     {
         return Client::query()
+            ->whereIn('id', $this->allowedClientIds())
             ->whereHas('medications', fn ($q) => $q->active())
             ->with('site:id,name')
             ->orderBy('last_name')
@@ -130,8 +201,11 @@ class MedicationOverviewService
 
     public function stats(Carbon $date): array
     {
-        $admins = ClientMedicationAdministration::whereDate('scheduled_for', $date)
-            ->orWhereDate('administered_at', $date)
+        $admins = $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
+            ->whereIn('client_id', $this->allowedClientIds())
+            ->where(fn ($query) => $query
+                ->whereDate('scheduled_for', $date)
+                ->orWhereDate('administered_at', $date))
             ->selectRaw("
                 COUNT(*) as total,
                 SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given,
@@ -145,29 +219,46 @@ class MedicationOverviewService
         $given = (int) ($admins->given ?? 0);
         $pending = (int) ($admins->pending ?? 0);
 
-        $overdue = ClientMedicationAdministration::where('status', 'pending')
+        $overdue = $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
+            ->where('status', 'pending')
+            ->whereIn('client_id', $this->allowedClientIds())
             ->where('scheduled_for', '<', now()->subMinutes(60))
             ->whereDate('scheduled_for', $date)
             ->count();
 
-        $prnToday = ClientMedicationAdministration::whereDate('administered_at', $date)
+        $prnToday = $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
+            ->whereDate('administered_at', $date)
+            ->whereIn('client_id', $this->allowedClientIds())
             ->where('status', 'given')
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->count();
 
-        $cdDiscrepancies = ClientControlledDrugDiscrepancy::whereIn('status', ['open', 'under_review'])->count();
+        $cdDiscrepancies = $this->canonicalMedicationRows(ClientControlledDrugDiscrepancy::query())
+            ->whereIn('client_id', $this->allowedClientIds())
+            ->whereIn('status', ['open', 'under_review'])
+            ->count();
 
         $reviewsDue = MedicationReview::due()
+            ->whereIn('client_id', $this->allowedClientIds())
             ->whereDate('scheduled_date', '<=', $date->copy()->addDays(7)->toDateString())
             ->count();
 
-        $expiringCompetencies = MedicationCompetencyAssessment::where('status', 'passed')
+        $expiringCompetencies = $this->competencyAssessmentQuery()
+            ->where('status', 'passed')
             ->whereBetween('expiry_date', [today()->toDateString(), today()->copy()->addDays(30)->toDateString()])
             ->count();
 
-        $lowStock = ClientMedicationStock::whereHas('medication', fn ($q) => $q->active())->lowStock()->count();
-        $expiringStock = ClientMedicationStock::whereHas('medication', fn ($q) => $q->active())->expiringSoon()->count();
-        $expiredStock = ClientMedicationStock::whereHas('medication', fn ($q) => $q->active())->expired()->count();
+        $allowedClientIds = $this->allowedClientIds();
+        $stockForAllowedClients = fn () => ClientMedicationStock::whereHas(
+            'medication',
+            fn ($q) => $q
+                ->active()
+                ->whereIn('client_id', $allowedClientIds)
+                ->when(! $this->includeControlled, fn ($query) => $query->where('controlled_drug', false)),
+        );
+        $lowStock = $stockForAllowedClients()->lowStock()->count();
+        $expiringStock = $stockForAllowedClients()->expiringSoon()->count();
+        $expiredStock = $stockForAllowedClients()->expired()->count();
 
         $trend = $this->trend($date);
 
@@ -183,22 +274,32 @@ class MedicationOverviewService
             'overdue' => $overdue,
             'missed' => (int) ($admins->missed ?? 0),
             'prnToday' => $prnToday,
-            'controlledCount' => ClientMedication::active()->controlled()->count(),
-            'cdDue' => ClientMedication::active()->controlled()->count(),
+            'controlledCount' => ClientMedication::active()->controlled()->whereIn('client_id', $allowedClientIds)->count(),
+            'cdDue' => ClientMedication::active()->controlled()->whereIn('client_id', $allowedClientIds)->count(),
             'activeDiscrepancies' => $cdDiscrepancies,
             'reviewsDue' => $reviewsDue,
-            'overdueReviews' => MedicationReview::overdue()->count(),
+            'overdueReviews' => MedicationReview::overdue()->whereIn('client_id', $allowedClientIds)->count(),
             'competenciesExpiring' => $expiringCompetencies,
             'expiringCompetencies' => $expiringCompetencies,
             'stockAlerts' => $lowStock + $expiringStock + $expiredStock,
             'lowStock' => $lowStock,
             'expiringStock' => $expiringStock,
             'expiredStock' => $expiredStock,
-            'activeAlerts' => MedicationDashboardAlert::where('status', 'active')->count(),
-            'activeMedications' => ClientMedication::active()->count(),
-            'activeClients' => Client::whereHas('medications', fn ($q) => $q->active())->count(),
-            'roundsToday' => MedicationRound::forDate($date)->count(),
-            'roundsCompleted' => MedicationRound::forDate($date)->where('status', 'completed')->count(),
+            'activeAlerts' => $this->visibleAlertRows()
+                ->whereIn('client_id', $allowedClientIds)
+                ->where('status', 'active')
+                ->count(),
+            'activeMedications' => ClientMedication::active()
+                ->whereIn('client_id', $allowedClientIds)
+                ->when(! $this->includeControlled, fn ($query) => $query->where('controlled_drug', false))
+                ->count(),
+            'activeClients' => Client::whereIn('id', $allowedClientIds)
+                ->whereHas('medications', fn ($q) => $q
+                    ->active()
+                    ->when(! $this->includeControlled, fn ($query) => $query->where('controlled_drug', false)))
+                ->count(),
+            'roundsToday' => MedicationRound::forDate($date)->whereIn('site_id', $this->allowedSiteIds())->count(),
+            'roundsCompleted' => MedicationRound::forDate($date)->whereIn('site_id', $this->allowedSiteIds())->where('status', 'completed')->count(),
             'givenTrend' => array_map(fn ($d) => $d['given'], $trend),
         ];
     }
@@ -210,8 +311,11 @@ class MedicationOverviewService
         $trend = [];
         for ($i = 6; $i >= 0; $i--) {
             $day = $date->copy()->subDays($i);
-            $dayStats = ClientMedicationAdministration::whereDate('scheduled_for', $day)
-                ->orWhereDate('administered_at', $day)
+            $dayStats = $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
+                ->whereIn('client_id', $this->allowedClientIds())
+                ->where(fn ($query) => $query
+                    ->whereDate('scheduled_for', $day)
+                    ->orWhereDate('administered_at', $day))
                 ->selectRaw("
                     SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given,
                     SUM(CASE WHEN status = 'refused' THEN 1 ELSE 0 END) as refused,
@@ -270,7 +374,9 @@ class MedicationOverviewService
 
     public function codedNotGivenReasons(Carbon $date): array
     {
-        $counts = ClientMedicationAdministration::whereIn('status', ['refused', 'withheld', 'missed'])
+        $counts = $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
+            ->whereIn('status', ['refused', 'withheld', 'missed'])
+            ->whereIn('client_id', $this->allowedClientIds())
             ->whereNotNull('reason_code')
             ->whereDate('scheduled_for', '>=', $date->copy()->subDays(6)->toDateString())
             ->selectRaw('reason_code, COUNT(*) as c')
@@ -300,7 +406,7 @@ class MedicationOverviewService
      * Item shape: {id,type,category,code,severity,client,client_id,title,
      * status,summary,action,action_type,opened_at}.
      */
-    public function actionCentre(Carbon $date): array
+    public function actionCentre(Carbon $date, bool $includeControlledErrors = true): array
     {
         $items = collect()
             ->merge($this->overdueDoseItems($date))
@@ -309,7 +415,7 @@ class MedicationOverviewService
             ->merge($this->overdueReviewItems())
             ->merge($this->cdBalanceCheckItems($date))
             ->merge($this->stockItems())
-            ->merge($this->medicationErrorItems());
+            ->merge($this->medicationErrorItems($includeControlledErrors));
 
         return $items
             ->sortBy([
@@ -330,6 +436,7 @@ class MedicationOverviewService
             'severity' => 'critical',
             'client' => $this->clientName($admin->client),
             'client_id' => $admin->client_id,
+            'is_controlled' => (bool) $admin->medication?->controlled_drug,
             'title' => $this->clientName($admin->client).' — '.($admin->medication->name ?? 'Medication')
                 .($admin->medication->dosage ? ' '.$admin->medication->dosage : ''),
             'status' => 'Overdue',
@@ -344,7 +451,9 @@ class MedicationOverviewService
 
     private function cdDiscrepancyItems(): Collection
     {
-        return ClientControlledDrugDiscrepancy::whereIn('status', ['open', 'under_review'])
+        return $this->canonicalMedicationRows(ClientControlledDrugDiscrepancy::query())
+            ->whereIn('status', ['open', 'under_review'])
+            ->whereIn('client_id', $this->allowedClientIds())
             ->with(['client:id,first_name,last_name', 'medication:id,name'])
             ->latest('reported_at')
             ->limit(10)
@@ -397,6 +506,7 @@ class MedicationOverviewService
     private function overdueReviewItems(): Collection
     {
         return MedicationReview::overdue()
+            ->whereIn('client_id', $this->allowedClientIds())
             ->with('client:id,first_name,last_name')
             ->orderBy('scheduled_date')
             ->limit(10)
@@ -424,12 +534,14 @@ class MedicationOverviewService
     {
         // Active controlled meds whose latest balance-check CD entry is not today.
         $checkedTodayMedIds = ClientControlledDrugEntry::where('entry_type', 'balance_check')
+            ->whereIn('client_id', $this->allowedClientIds())
             ->whereDate('recorded_at', $date)
             ->pluck('client_medication_id')
             ->filter()
             ->all();
 
         return ClientMedication::active()->controlled()
+            ->whereIn('client_id', $this->allowedClientIds())
             ->whereNotIn('id', $checkedTodayMedIds)
             ->with('client:id,first_name,last_name,site_id', 'client.site:id,name')
             ->limit(8)
@@ -453,7 +565,13 @@ class MedicationOverviewService
 
     private function stockItems(): Collection
     {
-        return ClientMedicationStock::whereHas('medication', fn ($q) => $q->active())
+        return ClientMedicationStock::whereHas(
+            'medication',
+            fn ($q) => $q
+                ->active()
+                ->whereIn('client_id', $this->allowedClientIds())
+                ->when(! $this->includeControlled, fn ($query) => $query->where('controlled_drug', false)),
+        )
             ->where(function ($q) {
                 $q->whereColumn('on_hand', '<=', 'reorder_level')
                     ->orWhere('expiry_date', '<=', today()->copy()->addDays(30)->toDateString());
@@ -476,7 +594,7 @@ class MedicationOverviewService
                     'is_controlled' => (bool) $stock->medication?->controlled_drug,
                     'title' => ($stock->medication->name ?? 'Stock').' — '.($expired ? 'expired stock' : ($expiring ? 'expiring soon' : 'low stock')),
                     'status' => $expired ? 'Expired' : ($expiring ? 'Expiring' : 'Low stock'),
-                    'summary' => 'On hand '.(float) $stock->on_hand.($stock->unit ? ' '.$stock->unit : '')
+                    'summary' => 'On hand '.MedicationStockQuantity::display($stock->on_hand ?? 0).($stock->unit ? ' '.$stock->unit : '')
                         .($stock->expiry_date ? ' · expires '.$stock->expiry_date->format('j M') : ''),
                     'action' => 'Order',
                     'action_type' => 'stock',
@@ -485,10 +603,12 @@ class MedicationOverviewService
             });
     }
 
-    private function medicationErrorItems(): Collection
+    private function medicationErrorItems(bool $includeControlled): Collection
     {
-        return MedicationError::open()
-            ->with('client:id,first_name,last_name', 'medication:id,name')
+        return $this->medicationErrorRows($includeControlled)
+            ->open()
+            ->whereIn('client_id', $this->allowedClientIds())
+            ->with('client:id,first_name,last_name', 'medication:id,name,controlled_drug')
             ->latest('reported_at')
             ->limit(10)
             ->get()
@@ -500,6 +620,7 @@ class MedicationOverviewService
                 'severity' => in_array($error->severity, ['critical', 'major'], true) ? 'critical' : 'warning',
                 'client' => $this->clientName($error->client),
                 'client_id' => $error->client_id,
+                'is_controlled' => (bool) $error->medication?->controlled_drug,
                 'title' => $this->clientName($error->client).' — '.$this->errorTypeLabel($error->error_type),
                 'status' => ucfirst($error->status),
                 'summary' => Str::limit($error->description, 80),
@@ -542,6 +663,8 @@ class MedicationOverviewService
     public function syringeDrivers(): array
     {
         return MedicationSyringeDriver::running()
+            ->whereIn('client_id', $this->allowedClientIds())
+            ->whereIn('site_id', $this->allowedSiteIds())
             ->with('client:id,first_name,last_name', 'site:id,name', 'checks')
             ->orderBy('commenced_at')
             ->limit(8)
@@ -576,6 +699,7 @@ class MedicationOverviewService
     public function reviewsDue(): array
     {
         return MedicationReview::due()
+            ->whereIn('client_id', $this->allowedClientIds())
             ->with('client:id,first_name,last_name')
             ->whereDate('scheduled_date', '<=', today()->copy()->addDays(30)->toDateString())
             ->orderBy('scheduled_date')
@@ -599,11 +723,16 @@ class MedicationOverviewService
             ->all();
     }
 
-    public function medicationErrors(Carbon $date): array
+    public function medicationErrors(Carbon $date, bool $includeControlled = true): array
     {
-        $open = MedicationError::open()->count();
+        $open = $this->medicationErrorRows($includeControlled)
+            ->open()
+            ->whereIn('client_id', $this->allowedClientIds())
+            ->count();
 
-        $byType = MedicationError::open()
+        $byType = $this->medicationErrorRows($includeControlled)
+            ->open()
+            ->whereIn('client_id', $this->allowedClientIds())
             ->selectRaw('error_type, COUNT(*) as c')
             ->groupBy('error_type')
             ->pluck('c', 'error_type')
@@ -612,7 +741,8 @@ class MedicationOverviewService
             ->all();
 
         // 30-day daily trend of reported errors.
-        $reported = MedicationError::withTrashed()
+        $reported = $this->medicationErrorRows($includeControlled, true)
+            ->whereIn('client_id', $this->allowedClientIds())
             ->where('reported_at', '>=', $date->copy()->subDays(29)->startOfDay())
             ->get(['reported_at'])
             ->groupBy(fn ($e) => optional($e->reported_at)->toDateString());
@@ -630,6 +760,24 @@ class MedicationOverviewService
         ];
     }
 
+    /** @return Builder<MedicationError> */
+    private function medicationErrorRows(bool $includeControlled, bool $withTrashed = false): Builder
+    {
+        $query = MedicationError::query();
+
+        if ($withTrashed) {
+            $query->withTrashed();
+        }
+
+        $this->canonicalMedicationRows($query, true);
+
+        if (! $includeControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($query);
+        }
+
+        return $query;
+    }
+
     // ─── Client board ──────────────────────────────────────
 
     public function clientBoard(Carbon $date): array
@@ -637,13 +785,16 @@ class MedicationOverviewService
         $dateString = $date->toDateString();
 
         return Client::query()
+            ->whereIn('id', $this->allowedClientIds())
             ->select(['id', 'first_name', 'last_name', 'site_id'])
             ->with('site:id,name')
             ->withCount([
-                'medications as active_medications_count' => fn ($q) => $q->active(),
-                'medicationAdministrations as given_today' => fn ($q) => $q->whereDate('administered_at', $dateString)->where('status', 'given'),
-                'medicationAdministrations as pending_today' => fn ($q) => $q->whereDate('scheduled_for', $dateString)->where('status', 'pending'),
-                'medicationAdministrations as missed_today' => fn ($q) => $q->whereDate('scheduled_for', $dateString)->where('status', 'missed'),
+                'medications as active_medications_count' => fn ($q) => $q
+                    ->active()
+                    ->when(! $this->includeControlled, fn ($query) => $query->where('controlled_drug', false)),
+                'medicationAdministrations as given_today' => fn ($q) => $this->effectiveAdministrationRows($q)->whereDate('administered_at', $dateString)->where('status', 'given'),
+                'medicationAdministrations as pending_today' => fn ($q) => $this->effectiveAdministrationRows($q)->whereDate('scheduled_for', $dateString)->where('status', 'pending'),
+                'medicationAdministrations as missed_today' => fn ($q) => $this->effectiveAdministrationRows($q)->whereDate('scheduled_for', $dateString)->where('status', 'missed'),
             ])
             ->having('active_medications_count', '>', 0)
             ->orderBy('last_name')
@@ -677,7 +828,9 @@ class MedicationOverviewService
 
     public function overdueMedications(Carbon $date): Collection
     {
-        return ClientMedicationAdministration::where('status', 'pending')
+        return $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
+            ->where('status', 'pending')
+            ->whereIn('client_id', $this->allowedClientIds())
             ->where('scheduled_for', '<', now()->subMinutes(60))
             ->whereDate('scheduled_for', $date)
             ->with([
@@ -746,6 +899,7 @@ class MedicationOverviewService
     public function nextRound(Carbon $date)
     {
         return MedicationRound::where('status', 'pending')
+            ->whereIn('site_id', $this->allowedSiteIds())
             ->whereDate('round_date', $date)
             ->orderBy('scheduled_time')
             ->with('assignedTo:id,name')
@@ -754,11 +908,13 @@ class MedicationOverviewService
 
     public function recentActivity(): Collection
     {
-        return ClientMedicationAdministration::with([
-            'client:id,first_name,last_name',
-            'medication:id,client_id,name',
-            'administeredBy:id,name',
-        ])
+        return $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
+            ->with([
+                'client:id,first_name,last_name',
+                'medication:id,client_id,name',
+                'administeredBy:id,name',
+            ])
+            ->whereIn('client_id', $this->allowedClientIds())
             ->latest('administered_at')
             ->limit(20)
             ->get();
@@ -766,7 +922,9 @@ class MedicationOverviewService
 
     public function activeAlertsList(): Collection
     {
-        return MedicationDashboardAlert::active()
+        return $this->visibleAlertRows()
+            ->active()
+            ->whereIn('client_id', $this->allowedClientIds())
             ->with([
                 'client:id,first_name,last_name',
                 'medication' => fn ($query) => $query
@@ -778,14 +936,43 @@ class MedicationOverviewService
             ->get();
     }
 
+    /** @return Builder<MedicationDashboardAlert> */
+    private function visibleAlertRows(): Builder
+    {
+        $query = $this->canonicalMedicationRows(MedicationDashboardAlert::query(), true);
+
+        if (! $this->includeControlled) {
+            $query->where(function (Builder $types): void {
+                $types->whereNull('alert_type')
+                    ->orWhere('alert_type', 'not like', 'controlled%');
+            });
+            $this->governanceScope->scopeWithoutControlledMedicationRows($query);
+        }
+
+        return $query;
+    }
+
     public function complianceSnapshot(): array
     {
         return [
-            'competencyExpiring' => MedicationCompetencyAssessment::where('expiry_date', '<=', now()->addDays(30))->where('expiry_date', '>', now())->count(),
-            'competencyExpired' => MedicationCompetencyAssessment::where('expiry_date', '<', now())->count(),
-            'pendingReviews' => MedicationReview::where('status', 'scheduled')->where('scheduled_date', '<=', now())->count(),
-            'overdueReviews' => MedicationReview::where('status', 'overdue')->count(),
+            'competencyExpiring' => $this->competencyAssessmentQuery()->where('expiry_date', '<=', now()->addDays(30))->where('expiry_date', '>', now())->count(),
+            'competencyExpired' => $this->competencyAssessmentQuery()->where('expiry_date', '<', now())->count(),
+            'pendingReviews' => MedicationReview::whereIn('client_id', $this->allowedClientIds())->where('status', 'scheduled')->where('scheduled_date', '<=', now())->count(),
+            'overdueReviews' => MedicationReview::whereIn('client_id', $this->allowedClientIds())->where('status', 'overdue')->count(),
         ];
+    }
+
+    private function competencyAssessmentQuery(): Builder
+    {
+        $siteIds = $this->allowedSiteIds();
+
+        return MedicationCompetencyAssessment::query()
+            ->whereHas('user.hrEmployeeProfile', fn (Builder $profile) => $profile->where(function (Builder $site) use ($siteIds) {
+                $site->whereIn('primary_site_id', $siteIds);
+                foreach ($siteIds as $siteId) {
+                    $site->orWhereJsonContains('secondary_site_ids', $siteId);
+                }
+            }));
     }
 
     // ─── Helpers ───────────────────────────────────────────
@@ -793,8 +980,15 @@ class MedicationOverviewService
     /** Latest active INR record per client (newest first). */
     private function latestInrPerClient(): Collection
     {
-        return ClientInrRecord::active()
-            ->with('client:id,first_name,last_name')
+        $query = ClientInrRecord::active()
+            ->whereIn('client_id', $this->allowedClientIds())
+            ->with('client:id,first_name,last_name');
+        $this->canonicalMedicationRows($query, false);
+        if (! $this->includeControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($query);
+        }
+
+        return $query
             ->orderByDesc('tested_on')
             ->orderByDesc('id')
             ->get()

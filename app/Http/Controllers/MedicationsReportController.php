@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ServiceContext;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -14,15 +15,16 @@ class MedicationsReportController extends Controller
 {
     use SanitizesCsvOutput;
 
+    public function __construct(private readonly MedicationGovernanceScopeService $governanceScope) {}
+
     public function index(Request $request)
     {
-        // Access is permission-gated at the route level (reports.viewAny)
         $canViewControlled = $request->user()?->canDo('medications.controlled.view') ?? false;
-
         $filters = $request->validate([
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'client_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer'],
             'service_context_id' => ['nullable', 'integer'],
             'status' => ['nullable', 'in:given,refused,missed,withheld'],
             'discrepancy_status' => ['nullable', 'in:open,under_review,closed'],
@@ -34,8 +36,13 @@ class MedicationsReportController extends Controller
         $dateTo = isset($filters['date_to']) && $filters['date_to']
             ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
+        [$accessibleSiteIds, $readerSiteIds] = $this->readerSiteIds($request, $filters);
 
-        $admins = ClientMedicationAdministration::query()
+        $admins = $this->governanceScope->scopeCanonicalClientMedicationRows(
+            ClientMedicationAdministration::query()->effectiveClinicalEvidence(),
+            $readerSiteIds,
+            false,
+        )
             ->with([
                 'client:id,first_name,last_name',
                 'medication:id,client_id,name,is_prn,controlled_drug,deleted_at',
@@ -43,6 +50,9 @@ class MedicationsReportController extends Controller
                 'serviceContext:id,name,type',
             ])
             ->whereBetween('administered_at', [$dateFrom, $dateTo]);
+        if (! $canViewControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($admins);
+        }
 
         if (! empty($filters['client_id'])) {
             $admins->where('client_id', (int) $filters['client_id']);
@@ -88,7 +98,11 @@ class MedicationsReportController extends Controller
 
         $discrepancies = collect();
         if ($canViewControlled) {
-            $discQ = ClientControlledDrugDiscrepancy::query()
+            $discQ = $this->governanceScope->scopeCanonicalClientMedicationRows(
+                ClientControlledDrugDiscrepancy::query(),
+                $readerSiteIds,
+                false,
+            )
                 ->with([
                     'client:id,first_name,last_name',
                     'medication:id,client_id,name,controlled_drug',
@@ -143,6 +157,7 @@ class MedicationsReportController extends Controller
         }
 
         $clients = Client::query()
+            ->whereIn('site_id', $accessibleSiteIds)
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name'])
@@ -153,6 +168,10 @@ class MedicationsReportController extends Controller
             ->values();
 
         $serviceContexts = ServiceContext::query()
+            ->whereIn('id', Client::query()
+                ->whereIn('site_id', $accessibleSiteIds)
+                ->whereNotNull('service_context_id')
+                ->select('service_context_id'))
             ->where('is_active', true)
             ->orderBy('type')
             ->orderBy('name')
@@ -169,6 +188,7 @@ class MedicationsReportController extends Controller
                 'date_from' => $dateFrom->toDateString(),
                 'date_to' => $dateTo->toDateString(),
                 'client_id' => $filters['client_id'] ?? null,
+                'site_id' => $filters['site_id'] ?? null,
                 'service_context_id' => $filters['service_context_id'] ?? null,
                 'status' => $filters['status'] ?? null,
                 'discrepancy_status' => $filters['discrepancy_status'] ?? null,
@@ -183,10 +203,12 @@ class MedicationsReportController extends Controller
 
     public function exportMarCsv(Request $request)
     {
+        $canViewControlled = $request->user()?->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY) ?? false;
         $filters = $request->validate([
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'client_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer'],
             'service_context_id' => ['nullable', 'integer'],
             'status' => ['nullable', 'in:given,refused,missed,withheld'],
         ]);
@@ -197,8 +219,13 @@ class MedicationsReportController extends Controller
         $dateTo = isset($filters['date_to']) && $filters['date_to']
             ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
+        [, $readerSiteIds] = $this->readerSiteIds($request, $filters);
 
-        $q = ClientMedicationAdministration::query()
+        $q = $this->governanceScope->scopeCanonicalClientMedicationRows(
+            ClientMedicationAdministration::query()->effectiveClinicalEvidence(),
+            $readerSiteIds,
+            false,
+        )
             ->with([
                 'client:id,first_name,last_name',
                 'medication:id,client_id,name,is_prn,controlled_drug,deleted_at',
@@ -206,6 +233,9 @@ class MedicationsReportController extends Controller
                 'serviceContext:id,name,type',
             ])
             ->whereBetween('administered_at', [$dateFrom, $dateTo]);
+        if (! $canViewControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($q);
+        }
 
         if (! empty($filters['client_id'])) {
             $q->where('client_id', (int) $filters['client_id']);
@@ -266,6 +296,7 @@ class MedicationsReportController extends Controller
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'client_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer'],
             'service_context_id' => ['nullable', 'integer'],
             'discrepancy_status' => ['nullable', 'in:open,under_review,closed'],
         ]);
@@ -276,8 +307,13 @@ class MedicationsReportController extends Controller
         $dateTo = isset($filters['date_to']) && $filters['date_to']
             ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
+        [, $readerSiteIds] = $this->readerSiteIds($request, $filters, true);
 
-        $q = ClientControlledDrugDiscrepancy::query()
+        $q = $this->governanceScope->scopeCanonicalClientMedicationRows(
+            ClientControlledDrugDiscrepancy::query(),
+            $readerSiteIds,
+            false,
+        )
             ->with([
                 'client:id,first_name,last_name',
                 'medication:id,client_id,name,controlled_drug',
@@ -346,5 +382,30 @@ class MedicationsReportController extends Controller
         }, $filename, [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array{0: array<int, int>, 1: array<int, int>}
+     */
+    private function readerSiteIds(
+        Request $request,
+        array $filters,
+        bool $controlled = false,
+    ): array {
+        $actor = $request->user();
+        abort_unless($actor !== null, 403);
+
+        $siteId = isset($filters['site_id']) ? (int) $filters['site_id'] : null;
+        $clientId = isset($filters['client_id']) ? (int) $filters['client_id'] : null;
+        $accessibleSiteIds = $this->governanceScope->reportSiteIds($actor);
+        $readerSiteIds = $this->governanceScope->reportSiteIds(
+            $actor,
+            $siteId,
+            $clientId,
+            $controlled,
+        );
+
+        return [$accessibleSiteIds, $readerSiteIds];
     }
 }

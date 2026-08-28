@@ -16,6 +16,7 @@ class ControlRoomShiftHandoverService
         private readonly AlertWorklistQuery $worklist,
         private readonly ControlRoomHandoverScopeService $scope,
         private readonly ControlRoomPreparedHandoverSnapshotService $preparedSnapshots,
+        private readonly ControlRoomAlertAccessService $alertAccess,
     ) {}
 
     /**
@@ -102,18 +103,6 @@ class ControlRoomShiftHandoverService
                 ->sort()
                 ->values()
                 ->all();
-            $incomingVisibleIds = $this->scope
-                ->visibleActiveAlertIds($incomingLead, $requiredIds)
-                ->sort()
-                ->values()
-                ->all();
-
-            if ($incomingVisibleIds !== $requiredIds) {
-                throw ValidationException::withMessages([
-                    'incoming_lead_user_id' => 'Choose an incoming lead who can access every required handover alert.',
-                ]);
-            }
-
             $reviewedIds = collect($reviewedAlertIds)
                 ->map(fn ($id) => (int) $id)
                 ->unique()
@@ -164,6 +153,45 @@ class ControlRoomShiftHandoverService
                 ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
                 ->values()
                 ->all();
+            $pinnedNotes = $this->snapshotNotes(
+                $locked,
+                $actor,
+                fn ($query) => $query->where('is_pinned', true),
+            );
+            $followupNotes = $this->snapshotNotes(
+                $locked,
+                $actor,
+                fn ($query) => $query
+                    ->where('requires_followup', true)
+                    ->orderBy('followup_at'),
+            );
+            $noteAlertIds = collect([...$pinnedNotes, ...$followupNotes])
+                ->pluck('alert_id')
+                ->filter(fn ($id): bool => is_numeric($id))
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+            $snapshotAlertIds = collect($requiredIds)
+                ->merge($scope['carry_forward_alert_ids'])
+                ->merge($noteAlertIds)
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+            $incomingVisibleIds = $this->scope
+                ->visibleAlertIds($incomingLead, $snapshotAlertIds)
+                ->sort()
+                ->values()
+                ->all();
+
+            if ($incomingVisibleIds !== $snapshotAlertIds) {
+                throw ValidationException::withMessages([
+                    'incoming_lead_user_id' => 'Choose an incoming lead who can access every alert included in this handover.',
+                ]);
+            }
 
             $snapshot = [
                 'draft' => $draft,
@@ -199,16 +227,9 @@ class ControlRoomShiftHandoverService
                     'name' => $actor->name,
                 ],
                 'carry_forward_acknowledged_at' => $preparedAt->toIso8601String(),
-                'pinned_notes' => $this->snapshotNotes(
-                    $locked,
-                    fn ($query) => $query->where('is_pinned', true),
-                ),
-                'followup_notes' => $this->snapshotNotes(
-                    $locked,
-                    fn ($query) => $query
-                        ->where('requires_followup', true)
-                        ->orderBy('followup_at'),
-                ),
+                'note_alert_ids' => $noteAlertIds,
+                'pinned_notes' => $pinnedNotes,
+                'followup_notes' => $followupNotes,
             ];
 
             $locked->forceFill([
@@ -271,15 +292,22 @@ class ControlRoomShiftHandoverService
             }
 
             $snapshot = $this->preparedSnapshots->validated($locked);
-            $requiredIds = $snapshot['required_alert_ids'];
-            $visibleRequiredIds = $this->scope
-                ->visibleAlertIds($actor, $requiredIds)
+            $snapshotAlertIds = collect($snapshot['required_alert_ids'])
+                ->merge($snapshot['carry_forward_alert_ids'])
+                ->merge($snapshot['note_alert_ids'])
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
                 ->sort()
                 ->values()
                 ->all();
-            if ($visibleRequiredIds !== $requiredIds) {
+            $visibleSnapshotAlertIds = $this->scope
+                ->visibleAlertIds($actor, $snapshotAlertIds)
+                ->sort()
+                ->values()
+                ->all();
+            if ($visibleSnapshotAlertIds !== $snapshotAlertIds) {
                 throw ValidationException::withMessages([
-                    'handover' => 'Your current site access no longer covers every required handover alert. Ask the outgoing lead to choose an eligible incoming lead.',
+                    'handover' => 'Your current access no longer covers every alert included in this handover. Ask the outgoing lead to choose an eligible incoming lead.',
                 ]);
             }
 
@@ -436,16 +464,23 @@ class ControlRoomShiftHandoverService
     }
 
     /** @return list<array<string, mixed>> */
-    private function snapshotNotes(Shift $shift, callable $scope): array
+    private function snapshotNotes(Shift $shift, User $viewer, callable $scope): array
     {
         return OperatorNote::query()
             ->where('shift_id', $shift->id)
+            ->where(function ($notes) use ($viewer): void {
+                $notes->whereNull('alert_id')
+                    ->orWhereHas('alert', function ($alerts) use ($viewer): void {
+                        $this->alertAccess->applyReadableScope($alerts, $viewer);
+                    });
+            })
             ->tap($scope)
             ->with('user:id,name')
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (OperatorNote $note): array => [
                 'id' => $note->id,
+                'alert_id' => $note->alert_id === null ? null : (int) $note->alert_id,
                 'type' => $note->type,
                 'content' => $note->content,
                 'is_pinned' => $note->is_pinned,

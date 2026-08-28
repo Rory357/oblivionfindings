@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\UserLoginLog;
 use App\Services\AuditLogger;
+use App\Services\AuthorizationEvidenceLockService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Database\Eloquent\Builder;
@@ -238,16 +239,31 @@ class UsersController extends Controller
             'next_of_kin.is_emergency_contact' => ['boolean'],
         ]);
 
-        $newUser = DB::transaction(function () use ($data, $user): User {
-            $portalRoleName = $data['user_type'] === 'client' ? 'client' : 'next_of_kin';
-            $portalRole = Role::query()->where('name', $portalRoleName)->firstOrFail();
+        $portalRoleName = $data['user_type'] === 'client' ? 'client' : 'next_of_kin';
+        $portalRoleId = (int) Role::query()->where('name', $portalRoleName)->value('id');
+        abort_unless($portalRoleId > 0, 404);
+        $actorId = (int) $user->id;
+        $newUser = DB::transaction(function () use ($actorId, $data, $portalRoleId, $portalRoleName): User {
+            $lockedUsers = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+                [$actorId],
+                ['settings.access.manage', 'clients.create'],
+                [$portalRoleId],
+            );
+            /** @var User|null $actor */
+            $actor = $lockedUsers->get($actorId);
+            abort_unless(
+                $actor?->canDo('settings.access.manage') && $actor->canDo('clients.create'),
+                403,
+            );
+            $portalRole = app(AuthorizationEvidenceLockService::class)->lockRoleMutex($portalRoleId);
+            abort_unless((string) $portalRole->name === $portalRoleName, 409, 'The requested portal role changed. Please retry.');
             $newUser = User::create([
                 'name' => $data['name'],
                 'email' => $data['email'],
                 'password' => Hash::make($data['password']),
                 'role' => $portalRoleName,
                 'approved_at' => now(),
-                'approved_by' => $user->id,
+                'approved_by' => $actor->id,
             ]);
             $newUser->roles()->sync([$portalRole->id]);
 
@@ -272,7 +288,7 @@ class UsersController extends Controller
             }
 
             AuditLogger::log('user.created', $newUser, [
-                'created_by' => $user->id,
+                'created_by' => $actor->id,
                 'user_type' => $data['user_type'],
                 'role_ids' => [$portalRole->id],
             ]);
@@ -364,42 +380,61 @@ class UsersController extends Controller
             'role_ids.*' => ['integer', 'exists:roles,id'],
         ]);
 
-        $emailChanged = DB::transaction(function () use ($data, $employeeProfile, $target, $user): bool {
-            $target->fill([
-                'name' => $data['name'] ?? $target->name,
-                'email' => $data['email'] ?? $target->email,
+        $actorId = (int) $user->id;
+        $targetId = (int) $target->id;
+        $profileId = $employeeProfile?->id;
+        $roleIds = collect($data['role_ids'] ?? [])
+            ->map(fn ($roleId): int => (int) $roleId)
+            ->filter(fn (int $roleId): bool => $roleId > 0)
+            ->unique()
+            ->sort()
+            ->values();
+        $emailChanged = DB::transaction(function () use ($actorId, $data, $profileId, $roleIds, $targetId): bool {
+            [$lockedActor, $lockedTarget] = $this->lockSystemUserMutation($actorId, $targetId, $roleIds->all());
+            $lockedProfile = $profileId
+                ? $this->lockedAccessibleEmployeeProfileOrFail($lockedTarget, $lockedActor, (int) $profileId)
+                : null;
+            $lockedTarget->fill([
+                'name' => $data['name'] ?? $lockedTarget->name,
+                'email' => $data['email'] ?? $lockedTarget->email,
             ]);
-            $emailChanged = $target->isDirty('email');
+            $emailChanged = $lockedTarget->isDirty('email');
             if ($emailChanged) {
-                $target->email_verified_at = null;
+                $lockedTarget->email_verified_at = null;
             }
-            $target->save();
+            $lockedTarget->save();
 
-            if ($employeeProfile && array_key_exists('email', $data)) {
-                $employeeProfile->forceFill([
-                    'work_email' => $target->email,
-                    'updated_by' => $user->id,
+            if ($lockedProfile && array_key_exists('email', $data)) {
+                $lockedProfile->forceFill([
+                    'work_email' => $lockedTarget->email,
+                    'updated_by' => $lockedActor->id,
                 ])->save();
             }
 
             if (isset($data['role_ids'])) {
-                $target->roles()->sync($data['role_ids']);
-                $primaryRole = $target->roles()->orderByDesc('level')->first();
-                $target->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
+                $lockedTarget->roles()->sync($roleIds->all());
+                $primaryRole = Role::query()
+                    ->whereIn('id', $roleIds->all())
+                    ->orderByDesc('level')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->first();
+                $lockedTarget->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
             }
+
+            AuditLogger::log('user.updated', $lockedTarget, [
+                'changed_by' => $lockedActor->id,
+                'fields' => array_keys($data),
+                'role_ids' => $data['role_ids'] ?? null,
+            ]);
 
             return $emailChanged;
         });
+        $target->refresh();
 
         if ($emailChanged) {
             $target->sendEmailVerificationNotification();
         }
-
-        AuditLogger::log('user.updated', $target, [
-            'changed_by' => $user->id,
-            'fields' => array_keys($data),
-            'role_ids' => $data['role_ids'] ?? null,
-        ]);
 
         return redirect()->back()->with('success', 'User updated successfully.');
     }
@@ -421,12 +456,23 @@ class UsersController extends Controller
             ]);
         }
 
-        AuditLogger::log('user.deleted', $target, [
-            'deleted_by' => $user->id,
-        ]);
+        $actorId = (int) $user->id;
+        $targetId = (int) $target->id;
+        DB::transaction(function () use ($actorId, $targetId): void {
+            [$lockedActor, $lockedTarget] = $this->lockSystemUserMutation($actorId, $targetId);
+            abort_if($lockedActor->id === $lockedTarget->id, 403, 'You cannot delete your own account.');
+            if ($profileId = HrEmployeeProfile::withTrashed()->where('user_id', $targetId)->value('id')) {
+                $this->lockedAccessibleEmployeeProfileOrFail($lockedTarget, $lockedActor, (int) $profileId);
+                throw ValidationException::withMessages([
+                    'user' => 'Staff accounts must be offboarded in HR People so employment history and Site provenance are retained.',
+                ]);
+            }
 
-        // Delete user (cascade will handle role_user pivot)
-        $target->delete();
+            AuditLogger::log('user.deleted', $lockedTarget, [
+                'deleted_by' => $lockedActor->id,
+            ]);
+            $lockedTarget->delete();
+        });
 
         return redirect()->route('system.users.index')
             ->with('success', 'User deleted successfully.');
@@ -445,21 +491,37 @@ class UsersController extends Controller
             'role_ids.*' => ['integer', 'exists:roles,id'],
         ]);
 
-        $target->update([
-            'approved_at' => now(),
-            'approved_by' => $user->id,
-        ]);
+        $actorId = (int) $user->id;
+        $targetId = (int) $target->id;
+        $roleIds = collect($data['role_ids'] ?? [])
+            ->map(fn ($roleId): int => (int) $roleId)
+            ->filter(fn (int $roleId): bool => $roleId > 0)
+            ->unique()
+            ->sort()
+            ->values();
+        DB::transaction(function () use ($actorId, $roleIds, $targetId): void {
+            [$lockedActor, $lockedTarget] = $this->lockSystemUserMutation($actorId, $targetId, $roleIds->all());
+            $lockedTarget->forceFill([
+                'approved_at' => now(),
+                'approved_by' => $lockedActor->id,
+            ])->save();
 
-        if (! empty($data['role_ids'])) {
-            $target->roles()->sync($data['role_ids']);
-            $primaryRole = $target->roles()->orderByDesc('level')->first();
-            $target->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
-        }
+            if ($roleIds->isNotEmpty()) {
+                $lockedTarget->roles()->sync($roleIds->all());
+                $primaryRole = Role::query()
+                    ->whereIn('id', $roleIds->all())
+                    ->orderByDesc('level')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->first();
+                $lockedTarget->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
+            }
 
-        AuditLogger::log('user.approved', $target, [
-            'approved_by' => $user->id,
-            'role_ids' => $data['role_ids'] ?? [],
-        ]);
+            AuditLogger::log('user.approved', $lockedTarget, [
+                'approved_by' => $lockedActor->id,
+                'role_ids' => $roleIds->all(),
+            ]);
+        });
 
         return redirect()->back()->with('success', 'User approved successfully.');
     }
@@ -475,11 +537,20 @@ class UsersController extends Controller
         abort_if($user->id === $target->id, 403, 'You cannot suspend your own account.');
         $this->accessibleEmployeeProfileOrFail($target, $user);
 
-        $target->update(['approved_at' => null]);
-
-        AuditLogger::log('user.suspended', $target, [
-            'suspended_by' => $user->id,
-        ]);
+        $actorId = (int) $user->id;
+        $targetId = (int) $target->id;
+        $profileId = $this->accessibleEmployeeProfileOrFail($target, $user)?->id;
+        DB::transaction(function () use ($actorId, $profileId, $targetId): void {
+            [$lockedActor, $lockedTarget] = $this->lockSystemUserMutation($actorId, $targetId);
+            abort_if($lockedActor->id === $lockedTarget->id, 403, 'You cannot suspend your own account.');
+            if ($profileId) {
+                $this->lockedAccessibleEmployeeProfileOrFail($lockedTarget, $lockedActor, (int) $profileId);
+            }
+            $lockedTarget->update(['approved_at' => null]);
+            AuditLogger::log('user.suspended', $lockedTarget, [
+                'suspended_by' => $lockedActor->id,
+            ]);
+        });
 
         return redirect()->back()->with('success', 'User suspended successfully.');
     }
@@ -626,6 +697,44 @@ class UsersController extends Controller
         return $this->currentEmployeeProfiles($viewer)
             ->where('user_id', $target->id)
             ->firstOrFail();
+    }
+
+    /**
+     * @param  list<int>  $additionalRoleIds
+     * @return array{0: User, 1: User}
+     */
+    private function lockSystemUserMutation(
+        int $actorId,
+        int $targetId,
+        array $additionalRoleIds = [],
+    ): array {
+        $users = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+            [$actorId, $targetId],
+            ['settings.access.manage', 'sites.viewAll'],
+            $additionalRoleIds,
+        );
+        /** @var User|null $actor */
+        $actor = $users->get($actorId);
+        /** @var User|null $target */
+        $target = $users->get($targetId);
+        abort_unless($actor?->canDo('settings.access.manage'), 403);
+        abort_unless($target, 404);
+
+        return [$actor, $target];
+    }
+
+    private function lockedAccessibleEmployeeProfileOrFail(
+        User $target,
+        User $viewer,
+        int $profileId,
+    ): HrEmployeeProfile {
+        $profile = $this->scopeCurrentEmployeeProfiles(HrEmployeeProfile::query(), $viewer)
+            ->whereKey($profileId)
+            ->where('user_id', $target->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        return $profile;
     }
 
     /** @return array<string, mixed>|null */

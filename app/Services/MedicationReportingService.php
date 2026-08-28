@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
@@ -11,16 +12,66 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationDashboardAlert;
+use App\Models\MedicationError;
 use App\Models\MedicationOrderVersion;
 use App\Models\MedicationReview;
 use App\Models\MedicationSyringeDriver;
+use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MedicationReportingService
 {
+    use SanitizesCsvOutput;
+
+    public function __construct(
+        private MedicationGovernanceScopeService $governanceScope,
+    ) {}
+
+    /**
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query
+     * @param  array<int, int>|null  $siteIds
+     * @return Builder<TModel>
+     */
+    private function canonicalMedicationRows(
+        Builder $query,
+        ?array $siteIds,
+        bool $allowNullMedication = false,
+    ): Builder {
+        return $this->governanceScope->scopeCanonicalClientMedicationRows(
+            $query,
+            $this->failClosedSiteIds($siteIds),
+            $allowNullMedication,
+        );
+    }
+
+    /** @return array<int, int> */
+    private function failClosedSiteIds(?array $siteIds): array
+    {
+        return $siteIds ?? [];
+    }
+
+    /** @return Builder<ClientMedicationAdministration> */
+    private function effectiveAdministrationRows(?array $siteIds, bool $includeControlled = false): Builder
+    {
+        $query = $this->canonicalMedicationRows(
+            ClientMedicationAdministration::query()->effectiveClinicalEvidence(),
+            $siteIds,
+        );
+
+        if (! $includeControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($query);
+        }
+
+        return $query;
+    }
+
     /**
      * Generate MAR export for date range
      */
@@ -30,19 +81,22 @@ class MedicationReportingService
         ?Carbon $dateTo = null,
         ?int $serviceContextId = null,
         ?string $status = null,
-        ?string $careLevel = null
+        ?string $careLevel = null,
+        ?array $siteIds = null,
+        bool $includeControlled = false,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
-        $query = ClientMedicationAdministration::with([
-            'client:id,first_name,last_name,care_level',
-            'medication:id,name,dosage,controlled_drug,is_prn,route,form,pharmac_therapeutic_group,pharmac_subgroup,deleted_at',
-            'administeredBy:id,name',
-            'witnessedBy:id,name',
-            'serviceContext:id,name',
-            'shift:id,starts_at,ends_at',
-        ])
+        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)
+            ->with([
+                'client:id,first_name,last_name,care_level',
+                'medication:id,name,dosage,controlled_drug,is_prn,route,form,pharmac_therapeutic_group,pharmac_subgroup,deleted_at',
+                'administeredBy:id,name',
+                'witnessedBy:id,name',
+                'serviceContext:id,name',
+                'shift:id,starts_at,ends_at',
+            ])
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
 
         if ($clientId) {
@@ -115,12 +169,15 @@ class MedicationReportingService
         ?int $clientId = null,
         ?Carbon $dateFrom = null,
         ?Carbon $dateTo = null,
-        ?string $careLevel = null
+        ?string $careLevel = null,
+        ?array $siteIds = null,
+        bool $includeControlled = false,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
-        $query = ClientMedicationAdministration::whereHas('medication', fn ($q) => $q->where('is_prn', true))
+        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)
+            ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->where('status', 'given')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->with(['medication:id,name,max_per_day,client_id,pharmac_therapeutic_group,deleted_at', 'client:id,first_name,last_name,care_level']);
@@ -183,22 +240,22 @@ class MedicationReportingService
         ];
     }
 
-    public function reportRegularUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    public function reportRegularUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null, ?array $siteIds = null, bool $includeControlled = false): array
     {
-        return $this->reportMedicationUsageByType('regular', $clientId, $dateFrom, $dateTo, $careLevel);
+        return $this->reportMedicationUsageByType('regular', $clientId, $dateFrom, $dateTo, $careLevel, $siteIds, $includeControlled);
     }
 
-    public function reportShortCourseUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    public function reportShortCourseUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null, ?array $siteIds = null, bool $includeControlled = false): array
     {
-        return $this->reportMedicationUsageByType('short_course', $clientId, $dateFrom, $dateTo, $careLevel);
+        return $this->reportMedicationUsageByType('short_course', $clientId, $dateFrom, $dateTo, $careLevel, $siteIds, $includeControlled);
     }
 
-    private function reportMedicationUsageByType(string $type, ?int $clientId, ?Carbon $dateFrom, ?Carbon $dateTo, ?string $careLevel): array
+    private function reportMedicationUsageByType(string $type, ?int $clientId, ?Carbon $dateFrom, ?Carbon $dateTo, ?string $careLevel, ?array $siteIds = null, bool $includeControlled = false): array
     {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
-        $query = ClientMedicationAdministration::query()
+        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,dosage,is_prn,end_date,pharmac_therapeutic_group,pharmac_subgroup,deleted_at', 'administeredBy:id,name'])
             ->where('status', 'given')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
@@ -236,12 +293,12 @@ class MedicationReportingService
         ];
     }
 
-    public function reportObservationUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    public function reportObservationUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null, ?array $siteIds = null, bool $includeControlled = false): array
     {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
-        $observations = ClientMedicationAdministration::query()
+        $observations = $this->effectiveAdministrationRows($siteIds, $includeControlled)
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group,deleted_at'])
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->where(function ($query) {
@@ -270,7 +327,14 @@ class MedicationReportingService
                 'pharmac_therapeutic_group' => $a->medication?->pharmac_therapeutic_group,
             ]);
 
-        $inrs = ClientInrRecord::query()
+        $inrQuery = $this->canonicalMedicationRows(
+            ClientInrRecord::query(),
+            $siteIds,
+        );
+        if (! $includeControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($inrQuery);
+        }
+        $inrs = $inrQuery
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group'])
             ->whereBetween('tested_on', [$dateFrom->toDateString(), $dateTo->toDateString()])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
@@ -299,18 +363,42 @@ class MedicationReportingService
         ];
     }
 
-    public function reportSyringeDriverUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
-    {
+    public function reportSyringeDriverUsage(
+        ?int $clientId = null,
+        ?Carbon $dateFrom = null,
+        ?Carbon $dateTo = null,
+        ?string $careLevel = null,
+        ?array $siteIds = null,
+        bool $includeControlled = false,
+    ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
+        $siteIds = $this->failClosedSiteIds($siteIds);
 
         $drivers = MedicationSyringeDriver::query()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
             ->with(['client:id,first_name,last_name,care_level', 'commencedBy:id,name', 'completedBy:id,name'])
             ->whereBetween('commenced_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
             ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
             ->orderBy('commenced_at')
-            ->get();
+            ->get()
+            ->map(function (MedicationSyringeDriver $driver) use ($includeControlled): ?MedicationSyringeDriver {
+                $contents = $this->governanceScope->visibleSyringeDriverContents(
+                    $driver->client,
+                    $driver->contents ?? [],
+                    $includeControlled,
+                );
+                if ($contents === null) {
+                    return null;
+                }
+
+                $driver->setAttribute('contents', $contents);
+
+                return $driver;
+            })
+            ->filter()
+            ->values();
 
         return [
             'meta' => [
@@ -335,12 +423,14 @@ class MedicationReportingService
         ];
     }
 
-    public function reportChartReviews(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    public function reportChartReviews(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null, ?array $siteIds = null): array
     {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
+        $siteIds = $this->failClosedSiteIds($siteIds);
 
         $reviews = MedicationReview::query()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
             ->with('client:id,first_name,last_name,care_level,next_chart_review_date')
             ->where(function ($query) use ($dateFrom, $dateTo) {
                 $query->whereBetween('scheduled_date', [$dateFrom->toDateString(), $dateTo->toDateString()])
@@ -398,12 +488,15 @@ class MedicationReportingService
     public function reportMissedDoses(
         ?int $clientId = null,
         ?Carbon $dateFrom = null,
-        ?Carbon $dateTo = null
+        ?Carbon $dateTo = null,
+        ?array $siteIds = null,
+        bool $includeControlled = false,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
-        $query = ClientMedicationAdministration::where('status', 'missed')
+        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)
+            ->where('status', 'missed')
             ->whereBetween('scheduled_for', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->with(['medication:id,name,dosage,controlled_drug,high_risk,deleted_at', 'client:id,first_name,last_name']);
 
@@ -453,12 +546,15 @@ class MedicationReportingService
         ?int $clientId = null,
         ?Carbon $dateFrom = null,
         ?Carbon $dateTo = null,
-        int $lateThresholdMinutes = 30
+        int $lateThresholdMinutes = 30,
+        ?array $siteIds = null,
+        bool $includeControlled = false,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
-        $query = ClientMedicationAdministration::where('status', 'given')
+        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)
+            ->where('status', 'given')
             ->whereNotNull('scheduled_for')
             ->whereNotNull('administered_at')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
@@ -497,10 +593,14 @@ class MedicationReportingService
      */
     public function reportControlledDrugBalance(
         ?int $clientId = null,
-        ?int $medicationId = null
+        ?int $medicationId = null,
+        ?array $siteIds = null,
     ): array {
+        $siteIds = $this->failClosedSiteIds($siteIds);
+
         $query = ClientMedication::where('controlled_drug', true)
             ->active()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
             ->with(['stock', 'client:id,first_name,last_name']);
 
         if ($clientId) {
@@ -542,10 +642,10 @@ class MedicationReportingService
         if (! $stock || $stock->on_hand === null) {
             return 'unknown';
         }
-        if ($stock->on_hand === 0) {
+        if (MedicationStockQuantity::equals($stock->on_hand, 0)) {
             return 'out_of_stock';
         }
-        if ($stock->reorder_level && $stock->on_hand <= $stock->reorder_level) {
+        if ($stock->isLowStock()) {
             return 'low_stock';
         }
 
@@ -559,17 +659,22 @@ class MedicationReportingService
         ?int $clientId = null,
         ?string $status = null,
         ?Carbon $dateFrom = null,
-        ?Carbon $dateTo = null
+        ?Carbon $dateTo = null,
+        ?array $siteIds = null,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(90);
         $dateTo = $dateTo ?? now();
 
-        $query = ClientControlledDrugDiscrepancy::with([
-            'client:id,first_name,last_name',
-            'medication:id,name',
-            'reportedBy:id,name',
-            'resolvedBy:id,name',
-        ])
+        $query = $this->canonicalMedicationRows(
+            ClientControlledDrugDiscrepancy::query(),
+            $siteIds,
+        )
+            ->with([
+                'client:id,first_name,last_name',
+                'medication:id,name',
+                'reportedBy:id,name',
+                'resolvedBy:id,name',
+            ])
             ->whereBetween('reported_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
 
         if ($clientId) {
@@ -616,16 +721,27 @@ class MedicationReportingService
         ?int $clientId = null,
         ?int $medicationId = null,
         ?Carbon $dateFrom = null,
-        ?Carbon $dateTo = null
+        ?Carbon $dateTo = null,
+        ?array $siteIds = null,
+        bool $includeControlled = false,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(90);
         $dateTo = $dateTo ?? now();
 
-        $query = MedicationOrderVersion::with([
-            'client:id,first_name,last_name',
-            'medication:id,name',
-            'changedBy:id,name',
-        ])
+        $query = $this->canonicalMedicationRows(
+            MedicationOrderVersion::query(),
+            $siteIds,
+        );
+        if (! $includeControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($query);
+            $query->where('medication_order_versions.controlled_drug', false);
+        }
+        $query
+            ->with([
+                'client:id,first_name,last_name',
+                'medication:id,name',
+                'changedBy:id,name',
+            ])
             ->whereBetween('changed_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
 
         if ($clientId) {
@@ -664,26 +780,113 @@ class MedicationReportingService
     public function reportMedicationIncidents(
         ?int $clientId = null,
         ?Carbon $dateFrom = null,
-        ?Carbon $dateTo = null
+        ?Carbon $dateTo = null,
+        ?array $siteIds = null,
+        bool $includeControlled = false,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(90);
         $dateTo = $dateTo ?? now();
+        $siteIds = $this->failClosedSiteIds($siteIds);
 
         $query = ClientIncident::query()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
             ->whereBetween('occurred_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->with(['client:id,first_name,last_name']);
 
-        if (Schema::hasTable('client_incidents') && Schema::hasColumn('client_incidents', 'metadata')) {
-            $query->whereNotNull('metadata->medication_id');
+        $hasMedicationMetadata = Schema::hasTable('client_incidents')
+            && Schema::hasColumn('client_incidents', 'metadata');
+        if ($hasMedicationMetadata) {
+            $query->where(function (Builder $incidentQuery): void {
+                $incidentQuery
+                    ->whereNotNull('metadata->medication_id')
+                    ->orWhereExists(function ($errors): void {
+                        $errors
+                            ->selectRaw('1')
+                            ->from('medication_errors')
+                            ->whereColumn('medication_errors.client_incident_id', 'client_incidents.id')
+                            ->whereColumn('medication_errors.client_id', 'client_incidents.client_id')
+                            ->whereNotNull('medication_errors.client_medication_id')
+                            ->whereNull('medication_errors.deleted_at');
+                    });
+            });
         } else {
-            $query->whereIn('type', ['medication', 'controlled_drug']);
+            $query->whereIn('type', $includeControlled
+                ? ['medication', 'controlled_drug']
+                : ['medication']);
         }
 
         if ($clientId) {
             $query->where('client_id', $clientId);
         }
 
-        $incidents = $query->orderByDesc('occurred_at')->get();
+        $incidentRows = $query->orderByDesc('occurred_at')->get();
+        if ($hasMedicationMetadata) {
+            $linkedErrors = MedicationError::query()
+                ->whereIn('client_incident_id', $incidentRows->modelKeys())
+                ->orderBy('id')
+                ->get(['id', 'client_incident_id', 'client_id', 'client_medication_id'])
+                ->groupBy('client_incident_id');
+            $metadataMedicationIds = $incidentRows
+                ->map(fn (ClientIncident $incident) => data_get($incident->metadata, 'medication_id'))
+                ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+                ->map(fn ($id) => (int) $id);
+            $linkedMedicationIds = $linkedErrors
+                ->flatten(1)
+                ->pluck('client_medication_id')
+                ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+                ->map(fn ($id) => (int) $id);
+            $medicationIds = $metadataMedicationIds
+                ->merge($linkedMedicationIds)
+                ->unique()
+                ->values();
+            $medications = ClientMedication::withTrashed()
+                ->whereIn('id', $medicationIds)
+                ->get(['id', 'client_id', 'name', 'controlled_drug', 'deleted_at'])
+                ->keyBy(fn (ClientMedication $medication) => $medication->client_id.':'.$medication->id);
+
+            $incidents = $incidentRows
+                ->map(function (ClientIncident $incident) use ($includeControlled, $linkedErrors, $medications): ?array {
+                    $medicationId = data_get($incident->metadata, 'medication_id');
+                    if ($medicationId === null) {
+                        $errorRows = $linkedErrors->get($incident->id, collect());
+                        if ($errorRows->count() !== 1) {
+                            return null;
+                        }
+
+                        /** @var MedicationError $linkedError */
+                        $linkedError = $errorRows->first();
+                        if ((int) $linkedError->client_id !== (int) $incident->client_id
+                            || ! is_numeric($linkedError->client_medication_id)
+                            || (int) $linkedError->client_medication_id <= 0) {
+                            return null;
+                        }
+                        $medicationId = (int) $linkedError->client_medication_id;
+                    } elseif (! is_numeric($medicationId) || (int) $medicationId <= 0) {
+                        return null;
+                    }
+
+                    $medication = $medications->get($incident->client_id.':'.(int) $medicationId);
+                    if ($medication === null
+                        || (! $includeControlled && ($medication->controlled_drug || $incident->type === 'controlled_drug'))) {
+                        return null;
+                    }
+
+                    return [
+                        'incident' => $incident,
+                        'medication' => $medication,
+                        'medication_id' => (int) $medicationId,
+                    ];
+                })
+                ->filter()
+                ->values();
+        } else {
+            $incidents = $incidentRows
+                ->map(fn (ClientIncident $incident) => [
+                    'incident' => $incident,
+                    'medication' => null,
+                    'medication_id' => null,
+                ]);
+        }
 
         return [
             'meta' => [
@@ -691,25 +894,34 @@ class MedicationReportingService
                 'date_to' => $dateTo->toDateString(),
                 'total_incidents' => $incidents->count(),
             ],
-            'summary_by_category' => $incidents->groupBy('category')
+            'summary_by_category' => $incidents->groupBy(fn (array $row) => $row['incident']->category)
                 ->map(fn ($group) => [
                     'count' => $group->count(),
-                    'by_severity' => $group->groupBy('severity')->map->count(),
+                    'by_severity' => $group->groupBy(fn (array $row) => $row['incident']->severity)->map->count(),
                 ])
                 ->toArray(),
-            'records' => $incidents->map(fn ($i) => [
-                'id' => $i->id,
-                'occurred_at' => $i->occurred_at?->toIso8601String(),
-                'client' => $i->client ? trim("{$i->client->first_name} {$i->client->last_name}") : 'Unknown',
-                'category' => $i->category,
-                'severity' => $i->severity,
-                'title' => $i->title,
-                'medication_id' => $i->metadata['medication_id'] ?? null,
-                'medication_name' => $i->metadata['medication_name'] ?? $i->title,
-                'controlled_drug' => $i->metadata['controlled_drug'] ?? false,
-                'high_risk' => $i->metadata['high_risk'] ?? false,
-                'status' => $i->status,
-            ])->toArray(),
+            'records' => $incidents->map(function (array $row): array {
+                /** @var ClientIncident $incident */
+                $incident = $row['incident'];
+                /** @var ClientMedication|null $medication */
+                $medication = $row['medication'];
+
+                return [
+                    'id' => $incident->id,
+                    'occurred_at' => $incident->occurred_at?->toIso8601String(),
+                    'client' => $incident->client
+                        ? trim("{$incident->client->first_name} {$incident->client->last_name}")
+                        : 'Unknown',
+                    'category' => $incident->category,
+                    'severity' => $incident->severity,
+                    'title' => $incident->title,
+                    'medication_id' => $row['medication_id'],
+                    'medication_name' => $medication?->historicalDisplayName() ?? $incident->title,
+                    'controlled_drug' => (bool) $medication?->controlled_drug,
+                    'high_risk' => $incident->metadata['high_risk'] ?? false,
+                    'status' => $incident->status,
+                ];
+            })->toArray(),
         ];
     }
 
@@ -719,10 +931,13 @@ class MedicationReportingService
     public function generateAuditReport(
         ?int $clientId = null,
         ?Carbon $dateFrom = null,
-        ?Carbon $dateTo = null
+        ?Carbon $dateTo = null,
+        ?array $siteIds = null,
+        bool $includeControlled = false,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
+        $siteIds = $this->failClosedSiteIds($siteIds);
 
         return [
             'meta' => [
@@ -731,20 +946,22 @@ class MedicationReportingService
                 'date_to' => $dateTo->toDateString(),
                 'client_id' => $clientId,
             ],
-            'mar_summary' => $this->getMarSummary($clientId, $dateFrom, $dateTo),
-            'prn_summary' => $this->getPrnSummary($clientId, $dateFrom, $dateTo),
-            'controlled_summary' => $this->getControlledSummary($clientId, $dateFrom, $dateTo),
-            'safety_alerts' => $this->getSafetyAlerts($clientId, $dateFrom, $dateTo),
-            'compliance_metrics' => $this->getComplianceMetrics($clientId, $dateFrom, $dateTo),
+            'mar_summary' => $this->getMarSummary($clientId, $dateFrom, $dateTo, $siteIds, $includeControlled),
+            'prn_summary' => $this->getPrnSummary($clientId, $dateFrom, $dateTo, $siteIds, $includeControlled),
+            ...($includeControlled ? [
+                'controlled_summary' => $this->getControlledSummary($clientId, $dateFrom, $dateTo, $siteIds),
+            ] : []),
+            'safety_alerts' => $this->getSafetyAlerts($clientId, $dateFrom, $dateTo, $siteIds, $includeControlled),
+            'compliance_metrics' => $this->getComplianceMetrics($clientId, $dateFrom, $dateTo, $siteIds, $includeControlled),
         ];
     }
 
     /**
      * Get MAR summary for audit
      */
-    private function getMarSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo): array
+    private function getMarSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null, bool $includeControlled = false): array
     {
-        $query = ClientMedicationAdministration::whereBetween('administered_at', [
+        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)->whereBetween('administered_at', [
             $dateFrom->startOfDay(),
             $dateTo->endOfDay(),
         ]);
@@ -753,7 +970,22 @@ class MedicationReportingService
             $query->where('client_id', $clientId);
         }
 
-        $stats = $query->selectRaw('
+        $rawCorrections = $this->canonicalMedicationRows(
+            ClientMedicationAdministration::query(),
+            $siteIds,
+        );
+        if (! $includeControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($rawCorrections);
+        }
+        $rawCorrections
+            ->where('is_correction', true)
+            ->whereBetween('administered_at', [
+                $dateFrom->startOfDay(),
+                $dateTo->endOfDay(),
+            ])
+            ->when($clientId, fn ($corrections) => $corrections->where('client_id', $clientId));
+        $correctionsCount = $rawCorrections->count();
+        $stats = (clone $query)->selectRaw('
             status,
             COUNT(*) as count,
             AVG(late_minutes) as avg_late_minutes
@@ -769,16 +1001,17 @@ class MedicationReportingService
                 'percentage' => 0, // Calculated below
                 'avg_late_minutes' => round($s->avg_late_minutes ?? 0, 1),
             ])->toArray(),
-            'corrections_count' => $query->clone()->where('is_correction', true)->count(),
+            'corrections_count' => $correctionsCount,
         ];
     }
 
     /**
      * Get PRN summary for audit
      */
-    private function getPrnSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo): array
+    private function getPrnSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null, bool $includeControlled = false): array
     {
-        $query = ClientMedicationAdministration::whereHas('medication', fn ($q) => $q->where('is_prn', true))
+        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)
+            ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->where('status', 'given')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
 
@@ -799,9 +1032,12 @@ class MedicationReportingService
     /**
      * Get controlled drug summary for audit
      */
-    private function getControlledSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo): array
+    private function getControlledSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null): array
     {
-        $query = ClientControlledDrugEntry::whereBetween('recorded_at', [
+        $query = $this->canonicalMedicationRows(
+            ClientControlledDrugEntry::query(),
+            $siteIds,
+        )->whereBetween('recorded_at', [
             $dateFrom->startOfDay(),
             $dateTo->endOfDay(),
         ]);
@@ -816,7 +1052,10 @@ class MedicationReportingService
                 ->groupBy('entry_type')
                 ->pluck('count', 'entry_type')
                 ->toArray(),
-            'discrepancies' => ClientControlledDrugDiscrepancy::whereBetween('reported_at', [
+            'discrepancies' => $this->canonicalMedicationRows(
+                ClientControlledDrugDiscrepancy::query(),
+                $siteIds,
+            )->whereBetween('reported_at', [
                 $dateFrom->startOfDay(),
                 $dateTo->endOfDay(),
             ])
@@ -828,12 +1067,24 @@ class MedicationReportingService
     /**
      * Get safety alerts for audit
      */
-    private function getSafetyAlerts(?int $clientId, Carbon $dateFrom, Carbon $dateTo): array
+    private function getSafetyAlerts(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null, bool $includeControlled = false): array
     {
-        $query = MedicationDashboardAlert::whereBetween('created_at', [
+        $query = $this->canonicalMedicationRows(
+            MedicationDashboardAlert::query(),
+            $siteIds,
+            true,
+        )->whereBetween('created_at', [
             $dateFrom->startOfDay(),
             $dateTo->endOfDay(),
         ]);
+        if (! $includeControlled) {
+            $query->whereNotIn('alert_type', [
+                'controlled_discrepancy',
+                'controlled_overdue_check',
+                'controlled_loss',
+            ]);
+            $this->governanceScope->scopeWithoutControlledMedicationRows($query);
+        }
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -856,9 +1107,9 @@ class MedicationReportingService
     /**
      * Get compliance metrics
      */
-    private function getComplianceMetrics(?int $clientId, Carbon $dateFrom, Carbon $dateTo): array
+    private function getComplianceMetrics(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null, bool $includeControlled = false): array
     {
-        $adminQuery = ClientMedicationAdministration::whereBetween('administered_at', [
+        $adminQuery = $this->effectiveAdministrationRows($siteIds, $includeControlled)->whereBetween('administered_at', [
             $dateFrom->startOfDay(),
             $dateTo->endOfDay(),
         ]);
@@ -878,16 +1129,16 @@ class MedicationReportingService
         return [
             'on_time_percentage' => $total > 0 ? round(($onTime / $total) * 100, 1) : 0,
             'witness_compliance_percentage' => $controlledTotal > 0 ? round(($withWitness / $controlledTotal) * 100, 1) : 100,
-            'documentation_completeness' => $this->calculateDocumentationCompleteness($clientId, $dateFrom, $dateTo),
+            'documentation_completeness' => $this->calculateDocumentationCompleteness($clientId, $dateFrom, $dateTo, $siteIds, $includeControlled),
         ];
     }
 
     /**
      * Calculate documentation completeness
      */
-    private function calculateDocumentationCompleteness(?int $clientId, Carbon $dateFrom, Carbon $dateTo): float
+    private function calculateDocumentationCompleteness(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null, bool $includeControlled = false): float
     {
-        $query = ClientMedicationAdministration::whereBetween('administered_at', [
+        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)->whereBetween('administered_at', [
             $dateFrom->startOfDay(),
             $dateTo->endOfDay(),
         ]);
@@ -920,7 +1171,7 @@ class MedicationReportingService
             $out = fopen('php://output', 'w');
 
             if (empty($data['records'] ?? [])) {
-                fputcsv($out, ['No data available']);
+                $this->putCsv($out, ['No data available']);
                 fclose($out);
 
                 return;
@@ -928,11 +1179,11 @@ class MedicationReportingService
 
             // Headers from first record
             $headers = array_keys($data['records'][0]);
-            fputcsv($out, $headers);
+            $this->putCsv($out, $headers);
 
             // Data rows
             foreach ($data['records'] as $record) {
-                fputcsv($out, array_map(function ($value) {
+                $this->putCsv($out, array_map(function ($value) {
                     if (is_array($value)) {
                         return json_encode($value);
                     }

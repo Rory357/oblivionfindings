@@ -119,7 +119,7 @@ test('working a public holiday flags the timesheet and approval accrues an alter
 
     $entry = app(TimeTrackingService::class)->createManualEntry($this->hr, [
         'user_id' => $this->staff->id,
-        'client_id' => Client::factory()->create()->id,
+        'client_id' => Client::factory()->create(['site_id' => $this->site->id])->id,
         'clock_in' => '2026-02-06T09:00',
         'clock_out' => '2026-02-06T17:00',
         'break_minutes' => 30,
@@ -165,7 +165,7 @@ test('casual staff do not accrue alternative holidays', function () {
 
     $entry = app(TimeTrackingService::class)->createManualEntry($this->hr, [
         'user_id' => $this->staff->id,
-        'client_id' => Client::factory()->create()->id,
+        'client_id' => Client::factory()->create(['site_id' => $this->site->id])->id,
         'clock_in' => '2026-02-06T09:00',
         'clock_out' => '2026-02-06T13:00',
     ]);

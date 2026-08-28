@@ -26,7 +26,7 @@ class StoreRosterTemplateRequest extends FormRequest
             'template_type' => ['nullable', 'string', 'in:weekly,fortnightly,monthly'],
             'is_active' => ['nullable', 'boolean'],
             'template_shifts' => ['required', 'array', 'min:1'],
-            'template_shifts.*.client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'template_shifts.*.client_id' => ['required', 'integer', 'exists:clients,id'],
             'template_shifts.*.user_id' => ['nullable', 'integer', 'exists:users,id'],
             'template_shifts.*.service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
             'template_shifts.*.day_of_week' => ['required', 'integer', 'min:0', 'max:6'],

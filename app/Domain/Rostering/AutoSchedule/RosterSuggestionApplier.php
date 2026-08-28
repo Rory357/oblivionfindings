@@ -2,7 +2,9 @@
 
 namespace App\Domain\Rostering\AutoSchedule;
 
+use App\Domain\Hr\Services\AttendanceTimeEntryProjector;
 use App\Domain\Shifts\Lifecycle\ShiftLifecycleService;
+use App\Domain\Shifts\Lifecycle\ShiftLifecycleSource;
 use App\Models\RosterSuggestion;
 use App\Models\RosterSuggestionRun;
 use App\Models\Shift;
@@ -17,24 +19,21 @@ class RosterSuggestionApplier
     public function __construct(
         private readonly ShiftStaffEligibilityService $eligibility,
         private readonly ShiftLifecycleService $lifecycle,
-    ) {
-    }
+    ) {}
 
     public function applyOne(RosterSuggestion $suggestion, User $actor): RosterSuggestion
     {
         $validationException = null;
 
         $result = DB::transaction(function () use ($suggestion, $actor, &$validationException) {
+            app(AttendanceTimeEntryProjector::class)->lockApplicationPayrollMutex();
             $locked = RosterSuggestion::query()
                 ->with(['run', 'shift', 'candidate'])
                 ->lockForUpdate()
                 ->findOrFail($suggestion->id);
 
-            $this->lockAndAttachShift($locked);
-
             try {
                 $this->assertApplyable($locked);
-                $this->assertEligibilityStillValid($locked);
                 $this->applyLocked($locked, $actor);
             } catch (ValidationException $exception) {
                 $validationException = $exception;
@@ -59,6 +58,7 @@ class RosterSuggestionApplier
         ];
 
         DB::transaction(function () use ($run, $actor, &$results): void {
+            app(AttendanceTimeEntryProjector::class)->lockApplicationPayrollMutex();
             $suggestions = RosterSuggestion::query()
                 ->with(['run', 'shift', 'candidate'])
                 ->where('roster_suggestion_run_id', $run->id)
@@ -72,8 +72,11 @@ class RosterSuggestionApplier
                 return;
             }
 
-            $lockedShifts = $this->lockShiftsFor($suggestions);
-            $this->attachLockedShifts($suggestions, $lockedShifts);
+            // Identity snapshots only. ShiftLifecycleService must acquire each
+            // canonical Client before its Shift; pre-locking Shift rows here
+            // would invert that global assignment order.
+            $shiftSnapshots = $this->snapshotShiftsFor($suggestions);
+            $this->attachLockedShifts($suggestions, $shiftSnapshots);
             $results = $this->preflightAcceptedSuggestions($suggestions);
 
             if ($results['stale'] > 0 || $results['failed'] > 0) {
@@ -81,9 +84,8 @@ class RosterSuggestionApplier
             }
 
             foreach ($suggestions as $suggestion) {
-                $this->attachLockedShifts(collect([$suggestion]), $lockedShifts);
+                $this->attachLockedShifts(collect([$suggestion]), $shiftSnapshots);
                 $this->assertApplyable($suggestion);
-                $this->assertEligibilityStillValid($suggestion);
                 $this->applyLocked($suggestion, $actor);
                 $results['applied']++;
             }
@@ -99,8 +101,6 @@ class RosterSuggestionApplier
             return;
         }
 
-        $suggestion->forceFill(['status' => RosterSuggestion::STATUS_STALE])->save();
-
         throw ValidationException::withMessages([
             'suggestion' => 'This suggestion is stale: '.implode(' ', $eligibility->blocking_reasons),
         ]);
@@ -108,7 +108,16 @@ class RosterSuggestionApplier
 
     private function applyLocked(RosterSuggestion $suggestion, User $actor): void
     {
-        $this->lifecycle->assign($suggestion->shift, $actor, $suggestion->candidate);
+        $this->lifecycle->assign(
+            $suggestion->shift,
+            $actor,
+            $suggestion->candidate,
+            [
+                'override_acknowledged' => true,
+                'override_reason' => 'Applied roster suggestion after current eligibility recheck.',
+            ],
+            source: ShiftLifecycleSource::Bulk,
+        );
 
         $suggestion->forceFill([
             'status' => RosterSuggestion::STATUS_APPLIED,
@@ -121,28 +130,13 @@ class RosterSuggestionApplier
      * @param  Collection<int, RosterSuggestion>  $suggestions
      * @return Collection<int, Shift>
      */
-    private function lockShiftsFor(Collection $suggestions): Collection
+    private function snapshotShiftsFor(Collection $suggestions): Collection
     {
         return Shift::query()
             ->whereKey($suggestions->pluck('shift_id')->unique()->values()->all())
             ->orderBy('id')
-            ->lockForUpdate()
             ->get()
             ->keyBy('id');
-    }
-
-    private function lockAndAttachShift(RosterSuggestion $suggestion): void
-    {
-        $shift = Shift::query()
-            ->whereKey($suggestion->shift_id)
-            ->lockForUpdate()
-            ->first();
-
-        if ($shift) {
-            $suggestion->setRelation('shift', $shift);
-        } else {
-            $suggestion->unsetRelation('shift');
-        }
     }
 
     /**
@@ -177,7 +171,6 @@ class RosterSuggestionApplier
         foreach ($suggestions as $suggestion) {
             try {
                 if (isset($seenShiftIds[$suggestion->shift_id])) {
-                    $suggestion->forceFill(['status' => RosterSuggestion::STATUS_CONFLICTED])->save();
                     $results['stale']++;
 
                     continue;
@@ -186,7 +179,6 @@ class RosterSuggestionApplier
                 $seenShiftIds[$suggestion->shift_id] = true;
 
                 if ($this->overlapsAcceptedWindow($suggestion, $candidateWindows[$suggestion->candidate_user_id] ?? [])) {
-                    $suggestion->forceFill(['status' => RosterSuggestion::STATUS_CONFLICTED])->save();
                     $results['stale']++;
 
                     continue;
@@ -246,8 +238,6 @@ class RosterSuggestionApplier
         }
 
         if ($suggestion->run?->isExpired()) {
-            $suggestion->forceFill(['status' => RosterSuggestion::STATUS_STALE])->save();
-
             throw ValidationException::withMessages([
                 'suggestion' => 'This suggestion run has expired. Generate a fresh run before applying it.',
             ]);
@@ -266,8 +256,6 @@ class RosterSuggestionApplier
         }
 
         if ($suggestion->shift->user_id) {
-            $suggestion->forceFill(['status' => RosterSuggestion::STATUS_CONFLICTED])->save();
-
             throw ValidationException::withMessages([
                 'suggestion' => 'This shift has already been assigned.',
             ]);

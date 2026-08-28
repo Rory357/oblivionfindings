@@ -1,11 +1,16 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationRound;
 use App\Models\Permission;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
+use App\Support\EmarUrl;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +48,7 @@ it('emits a distinct medications_due row per in-window dose slot', function () {
     $startOfDay = Carbon::now($tz)->startOfDay();
     $iso0900 = $startOfDay->copy()->setTimeFromTimeString('09:00')->toIso8601String();
     $iso1300 = $startOfDay->copy()->setTimeFromTimeString('13:00')->toIso8601String();
+    $emarUrl = EmarUrl::mar($client->id, $startOfDay->toDateString());
 
     $this->actingAs($worker)
         ->get('/my-day')
@@ -62,7 +68,61 @@ it('emits a distinct medications_due row per in-window dose slot', function () {
             ->where('medications_due.1.id', $med->id.':'.$iso1300)
             ->where('medications_due.0.status', 'overdue')
             ->where('medications_due.1.status', 'upcoming')
+            ->where('can_open_emar', true)
+            ->where('medications_due.0.emar_url', $emarUrl)
         );
+})->group('my-day');
+
+it('keeps record-only workers on Meds Today without exposing a dead admin eMAR link', function () {
+    $worker = User::factory()->frontlineWorker()->create();
+    $recordPermission = Permission::query()->firstOrCreate(
+        ['key' => 'medications.administer.record'],
+        ['description' => 'medications.administer.record'],
+    );
+    $worker->permissionOverrides()->syncWithoutDetaching([
+        $recordPermission->id => ['allowed' => true],
+    ]);
+    $client = Client::factory()->create();
+    Shift::factory()->assignedToday($worker)->published()->create([
+        'client_id' => $client->id,
+    ]);
+    ClientMedication::factory()->create([
+        'client_id' => $client->id,
+        'name' => 'Paracetamol',
+        'dosage' => '500 mg',
+        'is_prn' => false,
+        'active' => true,
+        'state' => 'active',
+        'start_date' => '2026-05-01',
+        'end_date' => null,
+        'dose_times' => ['09:00'],
+    ]);
+    ClientMedication::factory()->create([
+        'client_id' => $client->id,
+        'name' => 'PRIVATE CONTROLLED MY DAY MEDICATION',
+        'dosage' => '5 mg',
+        'is_prn' => false,
+        'controlled_drug' => true,
+        'active' => true,
+        'state' => 'active',
+        'start_date' => '2026-05-01',
+        'end_date' => null,
+        'dose_times' => ['09:00'],
+    ]);
+
+    $response = $this->actingAs($worker)
+        ->get('/my-day')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('my-day/index')
+            ->has('medications_due', 1)
+            ->where('can_view_medications', true)
+            ->where('can_record_medications', true)
+            ->where('can_open_emar', false)
+            ->where('medications_due.0.can_record', true)
+            ->where('medications_due.0.emar_url', null)
+        );
+    expect($response->getContent())->not->toContain('PRIVATE CONTROLLED MY DAY MEDICATION');
 })->group('my-day');
 
 it('marks a My Day medication slot as given when an administration exists for that slot', function () {
@@ -160,18 +220,34 @@ it('matches every dose slot with a single administration query (no N+1)', functi
         ]);
     }
 
+    // Isolate the rail's batching contract from the independently cached
+    // navigation badge. A cold badge cache intentionally performs its own
+    // day-wide administration read before sharing the Inertia navigation prop.
+    Cache::put(
+        HandleInertiaRequests::medsOverdueBadgeCacheKey(
+            $worker->id,
+            Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
+        ),
+        0,
+        now()->addMinute(),
+    );
+
+    DB::flushQueryLog();
     DB::enableQueryLog();
 
-    $this->actingAs($worker)
-        ->get('/my-day')
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('medications_due', 6));
+    try {
+        $this->actingAs($worker)
+            ->get('/my-day')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->has('medications_due', 6));
 
-    $adminQueries = collect(DB::getQueryLog())
-        ->filter(fn ($entry) => str_contains($entry['query'], 'client_medication_administrations'))
-        ->count();
-
-    DB::disableQueryLog();
+        $adminQueries = collect(DB::getQueryLog())
+            ->filter(fn ($entry) => str_contains($entry['query'], 'client_medication_administrations'))
+            ->count();
+    } finally {
+        DB::disableQueryLog();
+        DB::flushQueryLog();
+    }
 
     expect($adminQueries)->toBe(1);
 })->group('my-day');
@@ -204,8 +280,102 @@ it('does not disclose shift medications without an exact medication capability',
             ->where('can_view_medications', false)
             ->where('can_record_medications', false)
             ->where('can_record_controlled_medications', false)
+            ->where('can_open_emar', false)
             ->where('active_round', null)
         );
+})->group('my-day');
+
+it('only serializes an active medication round with canonical accessible Site provenance', function () {
+    $worker = User::factory()->frontlineWorker()->create();
+    $recordPermission = Permission::query()->firstOrCreate(
+        ['key' => 'medications.administer.record'],
+        ['description' => 'medications.administer.record'],
+    );
+    $worker->permissionOverrides()->syncWithoutDetaching([
+        $recordPermission->id => ['allowed' => true],
+    ]);
+
+    $localSite = Site::factory()->create();
+    $foreignSite = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $localSite->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+    ]);
+
+    foreach ([$localSite, $foreignSite] as $site) {
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'name' => 'Scheduled medicine for '.$site->name,
+            'is_prn' => false,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+            'start_date' => '2026-05-01',
+            'end_date' => null,
+            'dose_times' => ['09:00'],
+        ]);
+    }
+
+    $roundDate = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+    $localRound = MedicationRound::query()->create([
+        'site_id' => $localSite->id,
+        'name' => 'Accessible local round',
+        'scheduled_time' => '09:00',
+        'window_minutes' => 60,
+        'round_date' => $roundDate,
+        'status' => 'pending',
+        'assigned_to' => $worker->id,
+    ]);
+    $nullSiteRound = MedicationRound::query()->create([
+        'site_id' => null,
+        'name' => 'CONCEALED NULL SITE ROUND',
+        'scheduled_time' => '08:00',
+        'window_minutes' => 60,
+        'round_date' => $roundDate,
+        'status' => 'in_progress',
+        'assigned_to' => $worker->id,
+        'started_by' => $worker->id,
+        'started_at' => now(),
+    ]);
+    $foreignRound = MedicationRound::query()->create([
+        'site_id' => $foreignSite->id,
+        'name' => 'CONCEALED FOREIGN SITE ROUND',
+        'scheduled_time' => '10:00',
+        'window_minutes' => 60,
+        'round_date' => $roundDate,
+        'status' => 'pending',
+        'assigned_to' => $worker->id,
+    ]);
+
+    $nullSiteResponse = $this->actingAs($worker)
+        ->get('/my-day')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('active_round.id', fn ($id): bool => (int) $id === $localRound->id)
+            ->where('active_round.name', 'Accessible local round')
+        );
+    expect($nullSiteResponse->getContent())->not->toContain('CONCEALED NULL SITE ROUND');
+
+    $nullSiteRound->update(['status' => 'completed']);
+    $foreignRound->update([
+        'status' => 'in_progress',
+        'started_by' => $worker->id,
+        'started_at' => now(),
+    ]);
+
+    $foreignSiteResponse = $this->actingAs($worker)
+        ->get('/my-day')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('active_round.id', fn ($id): bool => (int) $id === $localRound->id)
+            ->where('active_round.name', 'Accessible local round')
+        );
+    expect($foreignSiteResponse->getContent())->not->toContain('CONCEALED FOREIGN SITE ROUND');
 })->group('my-day');
 
 function makeWorkerWithMyDayMedicationClient(): array

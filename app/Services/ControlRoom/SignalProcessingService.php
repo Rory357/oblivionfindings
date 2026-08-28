@@ -507,7 +507,7 @@ class SignalProcessingService
 
                     $canonical = $this->lockedOriginAlertForSignal($signal);
                     if ($canonical !== null && (int) $canonical->id === (int) $alert->id) {
-                        return $canonical;
+                        return $this->reconcileSignalWithOriginAlert($signal, $canonical);
                     }
 
                     throw new \DomainException(
@@ -516,7 +516,7 @@ class SignalProcessingService
                     );
                 }
 
-                return $alert->fresh();
+                return $this->reconcileSignalWithOriginAlert($signal, $alert->fresh());
             }
 
             if ($originSignalId !== (int) $signal->id) {
@@ -525,7 +525,7 @@ class SignalProcessingService
                 );
             }
 
-            return $alert;
+            return $this->reconcileSignalWithOriginAlert($signal, $alert);
         }
 
         if ($signal->correlated_alert_id === null) {
@@ -565,7 +565,9 @@ class SignalProcessingService
             );
         }
 
-        if ($signal->correlated_alert_id !== null) {
+        if ($signal->correlated_alert_id !== null
+            && (int) $signal->correlated_alert_id !== (int) $alert->id
+        ) {
             throw new \DomainException(
                 'Signal provenance conflicts with its existing correlated alert link.',
             );
@@ -1172,11 +1174,20 @@ class SignalProcessingService
 
         $newAlertType = $this->resolveAlertType($signal);
         $isTransition = $this->isShiftStateTransition($alert->alert_type, $newAlertType);
+        $normalizedData = is_array($signal->normalized_data)
+            ? $signal->normalized_data
+            : [];
+        if (data_get($context, 'normalized_data.controlled_drug') === true) {
+            // Controlled content can remain in the alert title, notes or
+            // correlated history after a later signal refreshes the current
+            // normalized payload. Classification must therefore be sticky.
+            $normalizedData['controlled_drug'] = true;
+        }
         $updatedContext = array_merge($context, [
             'signal_id' => $signal->id,
             'signal_type_code' => $signal->signal_type_code,
             'signal_payload' => $signal->payload,
-            'normalized_data' => $signal->normalized_data,
+            'normalized_data' => $normalizedData,
             'correlated_signals' => $correlatedSignals,
             'last_signal_at' => $signal->occurred_at->toISOString(),
         ]);

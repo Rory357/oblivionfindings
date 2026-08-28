@@ -111,7 +111,6 @@ export function ClockOutWizard({
     const [stepIndex, setStepIndex] = useState(0);
     const [outTime, setOutTime] = useState(() => toHHMM(new Date()));
     const [extraBreak, setExtraBreak] = useState('0');
-    const [skipHandover, setSkipHandover] = useState(false);
     const [narrative, setNarrative] = useState('');
     const [mood, setMood] = useState<Mood>('settled');
     const [medsCompleted, setMedsCompleted] = useState(true);
@@ -125,7 +124,7 @@ export function ClockOutWizard({
         breakM: number;
         outLabel: string;
         timesheetId: number | null;
-        handoverSent: boolean;
+        handoverDraftSaved: boolean;
     } | null>(null);
 
     useEffect(() => {
@@ -133,7 +132,6 @@ export function ClockOutWizard({
         setStepIndex(0);
         setOutTime(toHHMM(new Date()));
         setExtraBreak('0');
-        setSkipHandover(false);
         setNarrative('');
         setMood('settled');
         setMedsCompleted(true);
@@ -194,8 +192,7 @@ export function ClockOutWizard({
     );
     const workedH = (workedM / 60).toFixed(2);
 
-    const handoverDone =
-        skipHandover || !hasShift || narrative.trim().length >= 10;
+    const handoverDone = !hasShift || narrative.trim().length >= 10;
     const pct = Math.round(((1 + (handoverDone ? 2 : 0)) / 3) * 100);
 
     const validate = (key: string): Record<string, string> => {
@@ -208,13 +205,8 @@ export function ClockOutWizard({
                 e.extraBreak = 'Breaks can’t exceed the session length';
             }
         }
-        if (
-            key === 'handover' &&
-            hasShift &&
-            !skipHandover &&
-            narrative.trim().length < 10
-        ) {
-            e.narrative = 'Add a short narrative (or mark no handover needed)';
+        if (key === 'handover' && hasShift && narrative.trim().length < 10) {
+            e.narrative = 'Add a short handover narrative';
         }
         return e;
     };
@@ -227,7 +219,7 @@ export function ClockOutWizard({
                 session_id: session.id,
                 clock_out_at: outAt.toISOString(),
                 break_minutes: totalBreakM,
-                ...(hasShift && !skipHandover
+                ...(hasShift
                     ? {
                           handover: {
                               meds_completed: medsCompleted,
@@ -247,7 +239,7 @@ export function ClockOutWizard({
                         breakM: totalBreakM,
                         outLabel: formatTime(outAt),
                         timesheetId: session.timesheet_id,
-                        handoverSent: hasShift && !skipHandover,
+                        handoverDraftSaved: hasShift,
                     }),
                 onError: (errs) =>
                     setErrors({
@@ -424,7 +416,7 @@ export function ClockOutWizard({
                     <StepHead
                         icon={ArrowLeftRight}
                         title="Brief the next shift"
-                        blurb="A short handover here saves a phone call later. Need the full wizard? Use Shift Handovers."
+                        blurb="Save the essentials as a draft, then assign and submit it from Shift Handovers."
                     />
                     <div className="grid gap-4">
                         {!hasShift ? (
@@ -436,99 +428,76 @@ export function ClockOutWizard({
                             </InfoCard>
                         ) : (
                             <>
+                                <Field
+                                    label="How the shift went"
+                                    required
+                                    error={errors.narrative}
+                                >
+                                    <Textarea
+                                        rows={4}
+                                        value={narrative}
+                                        onChange={(e) =>
+                                            setNarrative(e.target.value)
+                                        }
+                                        placeholder="e.g. Settled after lunch; physio exercises done; fluids slightly under target — encourage water this evening."
+                                    />
+                                </Field>
+                                <Field label="Client mood">
+                                    <Segmented<Mood>
+                                        value={mood}
+                                        onChange={setMood}
+                                        options={[
+                                            {
+                                                value: 'settled',
+                                                label: 'Settled',
+                                                icon: Smile,
+                                            },
+                                            {
+                                                value: 'mixed',
+                                                label: 'Up and down',
+                                            },
+                                            {
+                                                value: 'unsettled',
+                                                label: 'Unsettled',
+                                                icon: AlertTriangle,
+                                            },
+                                        ]}
+                                    />
+                                </Field>
                                 {/* eslint-disable-next-line no-restricted-syntax -- compact switch row, not a Card surface */}
                                 <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
                                     <div>
                                         <div className="text-sm font-semibold">
-                                            No handover needed
+                                            All medications given and signed
                                         </div>
                                         <div className="text-xs text-muted-foreground">
-                                            e.g. end of day, no incoming shift
-                                            at this site
+                                            turn off to flag a meds review for
+                                            the next shift
                                         </div>
                                     </div>
                                     <Switch
-                                        checked={skipHandover}
-                                        onCheckedChange={setSkipHandover}
-                                        aria-label="No handover needed"
+                                        checked={medsCompleted}
+                                        onCheckedChange={setMedsCompleted}
+                                        aria-label="All medications given and signed"
                                     />
                                 </div>
-                                {!skipHandover ? (
-                                    <>
-                                        <Field
-                                            label="How the shift went"
-                                            required
-                                            error={errors.narrative}
-                                        >
-                                            <Textarea
-                                                rows={4}
-                                                value={narrative}
-                                                onChange={(e) =>
-                                                    setNarrative(e.target.value)
-                                                }
-                                                placeholder="e.g. Settled after lunch; physio exercises done; fluids slightly under target — encourage water this evening."
-                                            />
-                                        </Field>
-                                        <Field label="Client mood">
-                                            <Segmented<Mood>
-                                                value={mood}
-                                                onChange={setMood}
-                                                options={[
-                                                    {
-                                                        value: 'settled',
-                                                        label: 'Settled',
-                                                        icon: Smile,
-                                                    },
-                                                    {
-                                                        value: 'mixed',
-                                                        label: 'Up and down',
-                                                    },
-                                                    {
-                                                        value: 'unsettled',
-                                                        label: 'Unsettled',
-                                                        icon: AlertTriangle,
-                                                    },
-                                                ]}
-                                            />
-                                        </Field>
-                                        {/* eslint-disable-next-line no-restricted-syntax -- compact switch row, not a Card surface */}
-                                        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
-                                            <div>
-                                                <div className="text-sm font-semibold">
-                                                    All medications given and
-                                                    signed
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">
-                                                    turn off to flag a meds
-                                                    review for the next shift
-                                                </div>
-                                            </div>
-                                            <Switch
-                                                checked={medsCompleted}
-                                                onCheckedChange={
-                                                    setMedsCompleted
-                                                }
-                                                aria-label="All medications given and signed"
-                                            />
-                                        </div>
-                                        <Field label="Tasks for the incoming shift">
-                                            <ChipMulti
-                                                values={tasks}
-                                                onChange={setTasks}
-                                                options={HANDOVER_TASKS}
-                                            />
-                                        </Field>
-                                        <InfoCard icon={ArrowLeftRight}>
-                                            This files the same record as the{' '}
-                                            <strong>
-                                                Shift Handover wizard
-                                            </strong>{' '}
-                                            — the incoming staff member
-                                            acknowledges it from their
-                                            attendance page.
-                                        </InfoCard>
-                                    </>
-                                ) : null}
+                                <Field label="Tasks for the incoming shift">
+                                    <ChipMulti
+                                        values={tasks}
+                                        onChange={setTasks}
+                                        options={HANDOVER_TASKS}
+                                    />
+                                </Field>
+                                <InfoCard icon={ArrowLeftRight}>
+                                    Clock-out saves this as a draft. Open{' '}
+                                    <strong>Shift Handovers</strong> to assign
+                                    the exact incoming shift, review it, and
+                                    submit it. If an incoming Shift is due,
+                                    submission unblocks completion but does not
+                                    complete the Shift automatically. Attendance
+                                    can close now; complete the Shift separately
+                                    from its record.
+                                </InfoCard>
                             </>
                         )}
                     </div>
@@ -581,10 +550,6 @@ export function ClockOutWizard({
                             {!hasShift ? (
                                 <p className="py-1.5 text-[13px] text-muted-foreground">
                                     No linked shift — nothing to hand over.
-                                </p>
-                            ) : skipHandover ? (
-                                <p className="py-1.5 text-[13px] text-muted-foreground">
-                                    Marked as not needed.
                                 </p>
                             ) : (
                                 <>
@@ -663,7 +628,7 @@ function ClockOutSuccess({
         breakM: number;
         outLabel: string;
         timesheetId: number | null;
-        handoverSent: boolean;
+        handoverDraftSaved: boolean;
     };
     onClose: () => void;
 }) {
@@ -677,8 +642,8 @@ function ClockOutSuccess({
                     {done.timesheetId
                         ? `The hours are synced to timesheet #${done.timesheetId} (draft)`
                         : 'The hours are synced to a draft timesheet'}
-                    {done.handoverSent
-                        ? ', and your handover is waiting for the incoming shift to acknowledge.'
+                    {done.handoverDraftSaved
+                        ? '. Your handover was saved as a draft. If an incoming Shift is due, assign and submit it from Shift Handovers, then complete the Shift separately from its record. Attendance is already clocked out.'
                         : '.'}
                 </>
             }

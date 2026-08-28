@@ -31,7 +31,10 @@ trait SanitizesCsvOutput
      */
     protected function putCsv($handle, array $row): void
     {
-        fputcsv($handle, array_map([$this, 'sanitizeCsvCell'], $row));
+        // PHP 8.4 deprecates relying on the implicit escape character. Keep the
+        // current backslash behavior explicit so exports do not change bytes as
+        // runtimes are upgraded; an RFC 4180 switch requires its own audit.
+        fputcsv($handle, array_map([$this, 'sanitizeCsvCell'], $row), ',', '"', '\\');
     }
 
     /**

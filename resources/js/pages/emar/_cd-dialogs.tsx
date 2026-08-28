@@ -19,8 +19,24 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
-import { submitOffline, type OfflineAction } from '@/lib/offline-queue';
+import {
+    createMedicationMutationReplayState,
+    emarMutationWasAccepted,
+    prepareMedicationMutationReplayState,
+    submitEmarMutation,
+} from '@/lib/emar-offline';
+import { applyFormRequestErrors } from '@/lib/form-request-errors';
+import {
+    createOfflineRequestUuid,
+    submitOffline,
+    type OfflineAction,
+} from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
+import {
+    addMedicationStockQuantities,
+    medicationStockQuantitiesEqual,
+    subtractMedicationStockQuantities,
+} from '@/pages/emar/medication-stock-governance';
 import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -32,7 +48,7 @@ import {
     ShieldCheck,
     Trash2,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 function medOptions(meds: CdMedication[]) {
@@ -57,6 +73,8 @@ function witnessOptions(
         .map((s) => ({ value: String(s.id), label: s.name }));
 }
 
+const newControlledMutationUuid = createOfflineRequestUuid;
+
 /**
  * When the device is offline, divert a CD mutation to the shared offline queue
  * (replayed on reconnect; the server dedupes on client_request_uuid). Returns
@@ -69,15 +87,25 @@ function queueIfOffline(
     url: string,
     payload: Record<string, unknown>,
     onClose: () => void,
+    requiresConnection = false,
 ): boolean {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        if (requiresConnection) {
+            toast.error(
+                'Reconnect to record this witnessed controlled-drug action. Witness credentials are never saved on this device.',
+            );
+            return true;
+        }
+
         void submitOffline({
             action,
             url,
             payload,
             queuedMessage:
                 'Saved on this device — we’ll send it when you’re back online.',
-        }).then(() => onClose());
+        }).then((result) => {
+            if (result.status === 'queued') onClose();
+        });
 
         return true;
     }
@@ -98,6 +126,7 @@ export function RecordCdEntryDialog({
     onClose: () => void;
 }) {
     const [step, setStep] = useState(0);
+    const entryReplay = useRef(createMedicationMutationReplayState());
     const form = useForm({
         medication_id: '',
         client_id: 0,
@@ -111,7 +140,9 @@ export function RecordCdEntryDialog({
         expiry_date: '',
         cd_schedule: '',
         witnessed_by: '',
+        witness_credential: '',
         notes: '',
+        client_request_uuid: entryReplay.current.uuid,
     });
     const isReceipt = form.data.entry_type === 'receipt';
     const med = medications.find(
@@ -119,10 +150,20 @@ export function RecordCdEntryDialog({
     );
     const dir = entryDirection(form.data.entry_type);
     const expectedAfter = useMemo(() => {
-        const before = parseFloat(form.data.on_hand_before);
-        const qty = parseFloat(form.data.quantity);
-        if (Number.isNaN(before) || Number.isNaN(qty) || dir === 0) return null;
-        return before + dir * qty;
+        if (dir === 0) return null;
+
+        const result =
+            dir > 0
+                ? addMedicationStockQuantities(
+                      form.data.on_hand_before,
+                      form.data.quantity,
+                  )
+                : subtractMedicationStockQuantities(
+                      form.data.on_hand_before,
+                      form.data.quantity,
+                  );
+
+        return result || null;
     }, [form.data.on_hand_before, form.data.quantity, dir]);
 
     const pickMed = (id: string) => {
@@ -140,27 +181,42 @@ export function RecordCdEntryDialog({
     };
 
     const submit = () => {
+        const { medication_id: medicationId, ...requestData } = form.data;
+        const initialPayload = {
+            ...requestData,
+            client_medication_id: Number(medicationId),
+            witnessed_by: form.data.witnessed_by
+                ? Number(form.data.witnessed_by)
+                : null,
+        };
+        const {
+            witness_credential: _witnessCredential,
+            client_request_uuid: _clientRequestUuid,
+            ...materialPayload
+        } = initialPayload;
+        entryReplay.current = prepareMedicationMutationReplayState(
+            entryReplay.current,
+            materialPayload,
+        );
+        const payload = {
+            ...initialPayload,
+            client_request_uuid: entryReplay.current.uuid,
+        };
         if (
             queueIfOffline(
                 'cd_entry',
                 '/emar/controlled/entries',
-                {
-                    ...form.data,
-                    witnessed_by: form.data.witnessed_by
-                        ? Number(form.data.witnessed_by)
-                        : null,
-                },
+                payload,
                 onClose,
+                true,
             )
         )
             return;
-        form.transform((d) => ({
-            ...d,
-            witnessed_by: d.witnessed_by ? Number(d.witnessed_by) : null,
-        }));
+        form.transform(() => payload);
         form.post('/emar/controlled/entries', {
             preserveScroll: true,
             onSuccess: () => {
+                entryReplay.current = createMedicationMutationReplayState();
                 toast.success('Controlled drug entry recorded');
                 onClose();
             },
@@ -173,6 +229,7 @@ export function RecordCdEntryDialog({
         !!form.data.medication_id && !!form.data.quantity,
         !!form.data.on_hand_after &&
             !!form.data.witnessed_by &&
+            !!form.data.witness_credential &&
             (!isReceipt ||
                 (!!form.data.batch_number && !!form.data.expiry_date)),
         true,
@@ -274,7 +331,7 @@ export function RecordCdEntryDialog({
                         >
                             <Input
                                 type="number"
-                                step="0.5"
+                                step="0.01"
                                 value={form.data.quantity}
                                 onChange={(e) =>
                                     form.setData('quantity', e.target.value)
@@ -324,7 +381,7 @@ export function RecordCdEntryDialog({
                         >
                             <Input
                                 type="number"
-                                step="0.5"
+                                step="0.01"
                                 value={form.data.on_hand_before}
                                 onChange={(e) =>
                                     form.setData(
@@ -341,7 +398,7 @@ export function RecordCdEntryDialog({
                         >
                             <Input
                                 type="number"
-                                step="0.5"
+                                step="0.01"
                                 value={form.data.on_hand_after}
                                 onChange={(e) =>
                                     form.setData(
@@ -358,8 +415,10 @@ export function RecordCdEntryDialog({
                                 icon={ShieldCheck}
                                 tone={
                                     form.data.on_hand_after &&
-                                    parseFloat(form.data.on_hand_after) !==
-                                        expectedAfter
+                                    !medicationStockQuantitiesEqual(
+                                        form.data.on_hand_after,
+                                        expectedAfter,
+                                    )
                                         ? 'crit'
                                         : 'info'
                                 }
@@ -368,8 +427,10 @@ export function RecordCdEntryDialog({
                                 {form.data.quantity} should leave{' '}
                                 <strong>{expectedAfter}</strong>.{' '}
                                 {form.data.on_hand_after &&
-                                parseFloat(form.data.on_hand_after) !==
-                                    expectedAfter
+                                !medicationStockQuantitiesEqual(
+                                    form.data.on_hand_after,
+                                    expectedAfter,
+                                )
                                     ? 'This does not reconcile.'
                                     : ''}
                                 <button
@@ -378,7 +439,7 @@ export function RecordCdEntryDialog({
                                     onClick={() =>
                                         form.setData(
                                             'on_hand_after',
-                                            String(expectedAfter),
+                                            expectedAfter,
                                         )
                                     }
                                 >
@@ -400,6 +461,23 @@ export function RecordCdEntryDialog({
                                 }
                                 placeholder="Second signatory…"
                                 options={witnessOptions(staff, [currentUserId])}
+                            />
+                        </Field>
+                        <Field
+                            label="Witness password or PIN"
+                            required
+                            error={form.errors.witness_credential}
+                        >
+                            <Input
+                                type="password"
+                                autoComplete="off"
+                                value={form.data.witness_credential}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'witness_credential',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                         <Field
@@ -508,6 +586,7 @@ export function BalanceCheckDialog({
     const preset = presetMedId
         ? medications.find((m) => m.id === presetMedId)
         : undefined;
+    const balanceReplay = useRef(createMedicationMutationReplayState());
     const form = useForm({
         medication_id: preset ? String(preset.id) : '',
         client_id: preset?.client_id ?? 0,
@@ -516,8 +595,10 @@ export function BalanceCheckDialog({
             preset?.stock?.on_hand != null ? String(preset.stock.on_hand) : '',
         actual_balance: '',
         witnessed_by: '',
+        witness_credential: '',
         discrepancy_notes: '',
         immediate_action_taken: '',
+        client_request_uuid: balanceReplay.current.uuid,
     });
     const med = medications.find(
         (m) => String(m.id) === form.data.medication_id,
@@ -543,27 +624,42 @@ export function BalanceCheckDialog({
     };
 
     const submit = () => {
+        const { medication_id: medicationId, ...requestData } = form.data;
+        const initialPayload = {
+            ...requestData,
+            client_medication_id: Number(medicationId),
+            witnessed_by: form.data.witnessed_by
+                ? Number(form.data.witnessed_by)
+                : null,
+        };
+        const {
+            witness_credential: _witnessCredential,
+            client_request_uuid: _clientRequestUuid,
+            ...materialPayload
+        } = initialPayload;
+        balanceReplay.current = prepareMedicationMutationReplayState(
+            balanceReplay.current,
+            materialPayload,
+        );
+        const payload = {
+            ...initialPayload,
+            client_request_uuid: balanceReplay.current.uuid,
+        };
         if (
             queueIfOffline(
                 'cd_balance_check',
                 '/emar/controlled/balance-check',
-                {
-                    ...form.data,
-                    witnessed_by: form.data.witnessed_by
-                        ? Number(form.data.witnessed_by)
-                        : null,
-                },
+                payload,
                 onClose,
+                true,
             )
         )
             return;
-        form.transform((d) => ({
-            ...d,
-            witnessed_by: d.witnessed_by ? Number(d.witnessed_by) : null,
-        }));
+        form.transform(() => payload);
         form.post('/emar/controlled/balance-check', {
             preserveScroll: true,
             onSuccess: () => {
+                balanceReplay.current = createMedicationMutationReplayState();
                 toast.success(
                     mismatch
                         ? 'Balance check recorded — discrepancy raised'
@@ -609,6 +705,7 @@ export function BalanceCheckDialog({
                             !form.data.medication_id ||
                             !form.data.actual_balance ||
                             !form.data.witnessed_by ||
+                            !form.data.witness_credential ||
                             (mismatch &&
                                 (!form.data.discrepancy_notes.trim() ||
                                     !form.data.immediate_action_taken.trim())) ||
@@ -654,7 +751,7 @@ export function BalanceCheckDialog({
                 <Field label="Expected (register)" required>
                     <Input
                         type="number"
-                        step="0.5"
+                        step="0.01"
                         value={form.data.expected_balance}
                         onChange={(e) =>
                             form.setData('expected_balance', e.target.value)
@@ -668,7 +765,7 @@ export function BalanceCheckDialog({
                 >
                     <Input
                         type="number"
-                        step="0.5"
+                        step="0.01"
                         value={form.data.actual_balance}
                         onChange={(e) =>
                             form.setData('actual_balance', e.target.value)
@@ -678,7 +775,6 @@ export function BalanceCheckDialog({
                 <Field
                     label="Witnessed by"
                     required
-                    span
                     error={form.errors.witnessed_by}
                 >
                     <SelectInput
@@ -686,6 +782,20 @@ export function BalanceCheckDialog({
                         onChange={(v) => form.setData('witnessed_by', v)}
                         placeholder="Second signatory…"
                         options={witnessOptions(staff, [currentUserId])}
+                    />
+                </Field>
+                <Field
+                    label="Witness password or PIN"
+                    required
+                    error={form.errors.witness_credential}
+                >
+                    <Input
+                        type="password"
+                        autoComplete="off"
+                        value={form.data.witness_credential}
+                        onChange={(e) =>
+                            form.setData('witness_credential', e.target.value)
+                        }
                     />
                 </Field>
             </div>
@@ -847,6 +957,18 @@ export function ReportLossDialog({
     onClose: () => void;
 }) {
     const [step, setStep] = useState(0);
+    const [submitting, setSubmitting] = useState(false);
+    const lossReplay = useRef({
+        uuid: newControlledMutationUuid(),
+        fingerprint: null as string | null,
+    });
+    const resetReplayAndClose = () => {
+        lossReplay.current = {
+            uuid: newControlledMutationUuid(),
+            fingerprint: null,
+        };
+        onClose();
+    };
     const form = useForm({
         medication_id: '',
         client_id: null as number | null,
@@ -863,6 +985,7 @@ export function ReportLossDialog({
         reported_to_regulator: false,
         regulator_name: '',
         regulator_reference: '',
+        client_request_uuid: lossReplay.current.uuid,
     });
     const pickMed = (id: string) => {
         const m = medications.find((x) => String(x.id) === id);
@@ -874,24 +997,57 @@ export function ReportLossDialog({
             unit: m?.stock?.unit ?? '',
         });
     };
-    const submit = () => {
+    const submit = async () => {
+        const {
+            client_request_uuid: _clientRequestUuid,
+            medication_id: medicationId,
+            ...reportPayload
+        } = form.data;
+        const materialPayload = {
+            ...reportPayload,
+            client_medication_id: medicationId ? Number(medicationId) : null,
+        };
+        const materialFingerprint = JSON.stringify(materialPayload);
         if (
-            queueIfOffline(
-                'cd_loss_report',
+            lossReplay.current.fingerprint !== null &&
+            lossReplay.current.fingerprint !== materialFingerprint
+        ) {
+            lossReplay.current.uuid = newControlledMutationUuid();
+        }
+        lossReplay.current.fingerprint = materialFingerprint;
+
+        setSubmitting(true);
+        form.clearErrors();
+        try {
+            const result = await submitEmarMutation(
                 '/emar/controlled/loss-reports',
-                { ...form.data },
-                onClose,
-            )
-        )
-            return;
-        form.post('/emar/controlled/loss-reports', {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Loss report raised');
-                onClose();
-            },
-            onError: () => toast.error('Please check the report'),
-        });
+                {
+                    ...materialPayload,
+                    client_request_uuid: lossReplay.current.uuid,
+                },
+                {
+                    action: 'cd_loss_report',
+                    successMessage: 'Loss report raised.',
+                    queuedMessage:
+                        'Loss report saved on this device and queued to sync when you reconnect.',
+                },
+            );
+            if (emarMutationWasAccepted(result.status)) {
+                resetReplayAndClose();
+            }
+        } catch (error) {
+            applyFormRequestErrors(
+                error,
+                (field, message) =>
+                    (form.setError as (key: string, value: string) => void)(
+                        field,
+                        message,
+                    ),
+                'Please check the loss report.',
+            );
+        } finally {
+            setSubmitting(false);
+        }
     };
     const valid = [
         !!form.data.medication_name &&
@@ -904,7 +1060,7 @@ export function ReportLossDialog({
     return (
         <MedsWizardDialog
             open
-            onClose={onClose}
+            onClose={resetReplayAndClose}
             title="Report CD loss"
             description="Report a controlled-drug loss or discrepancy for investigation."
             railIcon={FileWarning}
@@ -937,7 +1093,7 @@ export function ReportLossDialog({
                     <Button
                         variant="ghost"
                         onClick={step === 0 ? onClose : () => setStep(step - 1)}
-                        disabled={form.processing}
+                        disabled={submitting}
                     >
                         {step === 0 ? 'Cancel' : 'Back'}
                     </Button>
@@ -952,7 +1108,7 @@ export function ReportLossDialog({
                         <Button
                             variant="destructive"
                             onClick={submit}
-                            disabled={form.processing}
+                            disabled={submitting}
                         >
                             Raise loss report
                         </Button>
@@ -983,7 +1139,7 @@ export function ReportLossDialog({
                         >
                             <Input
                                 type="number"
-                                step="0.5"
+                                step="0.01"
                                 value={form.data.quantity_lost}
                                 onChange={(e) =>
                                     form.setData(
@@ -1355,6 +1511,19 @@ export function RecordDestructionDialog({
     onClose: () => void;
 }) {
     const [step, setStep] = useState(0);
+    const [submitting, setSubmitting] = useState(false);
+    const [initialDestructionRequestUuid] = useState(newControlledMutationUuid);
+    const destructionReplay = useRef({
+        uuid: initialDestructionRequestUuid,
+        fingerprint: null as string | null,
+    });
+    const resetReplayAndClose = () => {
+        destructionReplay.current = {
+            uuid: newControlledMutationUuid(),
+            fingerprint: null,
+        };
+        onClose();
+    };
     const form = useForm({
         medication_id: '',
         client_id: 0,
@@ -1366,10 +1535,13 @@ export function RecordDestructionDialog({
         disposal_method: '',
         is_controlled_drug: false,
         witness_1_id: '',
+        witness_1_credential: '',
         witness_2_id: '',
+        witness_2_credential: '',
         authorised_by_name: '',
         denaturing_confirmed: false,
         notes: '',
+        client_request_uuid: initialDestructionRequestUuid,
     });
     const isCd = form.data.is_controlled_drug;
     const pickMed = (id: string) => {
@@ -1383,8 +1555,11 @@ export function RecordDestructionDialog({
             is_controlled_drug: !!m?.controlled_drug,
         });
     };
-    const submit = () => {
+    const submit = async () => {
         const ids = {
+            client_medication_id: form.data.medication_id
+                ? Number(form.data.medication_id)
+                : null,
             site_id: form.data.site_id ? Number(form.data.site_id) : null,
             witness_1_id: form.data.witness_1_id
                 ? Number(form.data.witness_1_id)
@@ -1393,29 +1568,57 @@ export function RecordDestructionDialog({
                 ? Number(form.data.witness_2_id)
                 : null,
         };
-        if (
-            queueIfOffline(
-                'cd_destruction',
-                '/emar/destructions',
-                { ...form.data, ...ids },
-                onClose,
-            )
-        )
-            return;
-        form.transform((d) => ({ ...d, ...ids }));
-        form.post('/emar/destructions', {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Destruction recorded');
-                onClose();
-            },
-            onError: () =>
-                toast.error(
-                    isCd
-                        ? 'Please check — CD destruction needs two distinct witnesses + authorisation'
-                        : 'Please check the destruction details',
-                ),
+        const materialFingerprint = JSON.stringify({
+            ...form.data,
+            ...ids,
+            witness_1_credential: undefined,
+            witness_2_credential: undefined,
+            client_request_uuid: undefined,
         });
+        if (
+            destructionReplay.current.fingerprint !== null &&
+            destructionReplay.current.fingerprint !== materialFingerprint
+        ) {
+            destructionReplay.current.uuid = newControlledMutationUuid();
+        }
+        destructionReplay.current.fingerprint = materialFingerprint;
+        const payload = {
+            ...form.data,
+            ...ids,
+            client_request_uuid: destructionReplay.current.uuid,
+        };
+        setSubmitting(true);
+        form.clearErrors();
+        try {
+            const result = await submitEmarMutation(
+                '/emar/destructions',
+                payload,
+                {
+                    action: 'cd_destruction',
+                    allowQueueWhenOffline: !isCd,
+                    successMessage: 'Destruction recorded.',
+                    queuedMessage:
+                        'Destruction saved on this device and queued to sync when you reconnect.',
+                },
+            );
+            if (emarMutationWasAccepted(result.status)) {
+                resetReplayAndClose();
+            }
+        } catch (error) {
+            applyFormRequestErrors(
+                error,
+                (field, message) =>
+                    (form.setError as (key: string, value: string) => void)(
+                        field,
+                        message,
+                    ),
+                isCd
+                    ? 'Please check — CD destruction needs two distinct witnesses and authorisation.'
+                    : 'Please check the destruction details.',
+            );
+        } finally {
+            setSubmitting(false);
+        }
     };
     const valid = [
         !!form.data.medication_name &&
@@ -1426,6 +1629,8 @@ export function RecordDestructionDialog({
             !!form.data.witness_1_id &&
             (!isCd ||
                 (!!form.data.witness_2_id &&
+                    !!form.data.witness_1_credential &&
+                    !!form.data.witness_2_credential &&
                     !!form.data.authorised_by_name &&
                     form.data.denaturing_confirmed)),
         true,
@@ -1433,7 +1638,7 @@ export function RecordDestructionDialog({
     return (
         <MedsWizardDialog
             open
-            onClose={onClose}
+            onClose={resetReplayAndClose}
             title="Record destruction"
             description={
                 isCd
@@ -1470,7 +1675,7 @@ export function RecordDestructionDialog({
                     <Button
                         variant="ghost"
                         onClick={step === 0 ? onClose : () => setStep(step - 1)}
-                        disabled={form.processing}
+                        disabled={submitting}
                     >
                         {step === 0 ? 'Cancel' : 'Back'}
                     </Button>
@@ -1482,7 +1687,7 @@ export function RecordDestructionDialog({
                             Continue
                         </Button>
                     ) : (
-                        <Button onClick={submit} disabled={form.processing}>
+                        <Button onClick={submit} disabled={submitting}>
                             Record destruction
                         </Button>
                     )}
@@ -1518,7 +1723,7 @@ export function RecordDestructionDialog({
                         >
                             <Input
                                 type="number"
-                                step="0.5"
+                                step="0.01"
                                 value={form.data.quantity}
                                 onChange={(e) =>
                                     form.setData('quantity', e.target.value)
@@ -1604,6 +1809,25 @@ export function RecordDestructionDialog({
                         </Field>
                         {isCd && (
                             <Field
+                                label="Witness 1 password or PIN"
+                                required
+                                error={form.errors.witness_1_credential}
+                            >
+                                <Input
+                                    type="password"
+                                    autoComplete="off"
+                                    value={form.data.witness_1_credential}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'witness_1_credential',
+                                            event.target.value,
+                                        )
+                                    }
+                                />
+                            </Field>
+                        )}
+                        {isCd && (
+                            <Field
                                 label="Witness 2"
                                 required
                                 error={form.errors.witness_2_id}
@@ -1622,6 +1846,32 @@ export function RecordDestructionDialog({
                                     ])}
                                 />
                             </Field>
+                        )}
+                        {isCd && (
+                            <Field
+                                label="Witness 2 password or PIN"
+                                required
+                                error={form.errors.witness_2_credential}
+                            >
+                                <Input
+                                    type="password"
+                                    autoComplete="off"
+                                    value={form.data.witness_2_credential}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'witness_2_credential',
+                                            event.target.value,
+                                        )
+                                    }
+                                />
+                            </Field>
+                        )}
+                        {isCd && (
+                            <p className="text-xs text-muted-foreground sm:col-span-2">
+                                Witness credentials are never saved on this
+                                device. Reconnect before recording this
+                                controlled destruction.
+                            </p>
                         )}
                         {isCd && (
                             <Field

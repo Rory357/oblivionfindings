@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
+use App\Models\ClientControlledDrugDiscrepancy;
+use App\Models\ClientMedicationAdministration;
+use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Support\ReportCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +16,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ModuleReportController extends Controller
 {
+    public function __construct(
+        private readonly MedicationGovernanceScopeService $medicationScope,
+    ) {}
+
     public function show(Request $request, string $module)
     {
         $user = $request->user();
@@ -27,7 +36,7 @@ class ModuleReportController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $query = $this->buildQuery($definition, $filters);
+        $query = $this->buildQuery($definition, $filters, $user);
         $columns = $this->availableColumns($definition);
 
         $rows = $query
@@ -49,7 +58,7 @@ class ModuleReportController extends Controller
                 'date_to' => $filters['date_to'] ?? null,
                 'status' => $filters['status'] ?? null,
             ],
-            'statuses' => $this->statusOptions($definition),
+            'statuses' => $this->statusOptions($definition, $user),
             'rows' => $rows,
         ]);
     }
@@ -69,7 +78,7 @@ class ModuleReportController extends Controller
             'status' => ['nullable', 'string', 'max:80'],
         ]);
 
-        $query = $this->buildQuery($definition, $filters);
+        $query = $this->buildQuery($definition, $filters, $user);
         $columns = $this->availableColumns($definition);
         $labels = array_values($columns);
 
@@ -97,14 +106,14 @@ class ModuleReportController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $definition
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $definition
+     * @param  array<string, mixed>  $filters
      */
-    private function buildQuery(array $definition, array $filters): Builder
+    private function buildQuery(array $definition, array $filters, User $user): Builder
     {
         /** @var class-string<Model> $modelClass */
         $modelClass = $definition['model'];
-        $model = new $modelClass();
+        $model = new $modelClass;
 
         $table = $model->getTable();
         $dateField = (string) ($definition['date_field'] ?? 'created_at');
@@ -115,29 +124,34 @@ class ModuleReportController extends Controller
         ));
 
         $query = $modelClass::query()->select(array_keys($columns));
+        if ($this->medicationGovernance($definition) === 'administration') {
+            $query->effectiveClinicalEvidence();
+        }
+        $this->applyMedicationGovernanceScope($query, $definition, $user);
 
-        if (!empty($filters['search']) && count($searchColumns) > 0) {
+        if (! empty($filters['search']) && count($searchColumns) > 0) {
             $term = trim((string) $filters['search']);
             $query->where(function (Builder $inner) use ($searchColumns, $term): void {
                 foreach ($searchColumns as $index => $column) {
                     if ($index === 0) {
-                        $inner->where($column, 'like', '%' . $term . '%');
+                        $inner->where($column, 'like', '%'.$term.'%');
+
                         continue;
                     }
-                    $inner->orWhere($column, 'like', '%' . $term . '%');
+                    $inner->orWhere($column, 'like', '%'.$term.'%');
                 }
             });
         }
 
-        if (!empty($filters['date_from']) && Schema::hasColumn($table, $dateField)) {
+        if (! empty($filters['date_from']) && Schema::hasColumn($table, $dateField)) {
             $query->whereDate($dateField, '>=', (string) $filters['date_from']);
         }
 
-        if (!empty($filters['date_to']) && Schema::hasColumn($table, $dateField)) {
+        if (! empty($filters['date_to']) && Schema::hasColumn($table, $dateField)) {
             $query->whereDate($dateField, '<=', (string) $filters['date_to']);
         }
 
-        if (!empty($filters['status']) && Schema::hasColumn($table, 'status')) {
+        if (! empty($filters['status']) && Schema::hasColumn($table, 'status')) {
             $query->where('status', (string) $filters['status']);
         }
 
@@ -153,14 +167,14 @@ class ModuleReportController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $definition
+     * @param  array<string, mixed>  $definition
      * @return array<string, string>
      */
     private function availableColumns(array $definition): array
     {
         /** @var class-string<Model> $modelClass */
         $modelClass = $definition['model'];
-        $table = (new $modelClass())->getTable();
+        $table = (new $modelClass)->getTable();
 
         /** @var array<string, string> $configured */
         $configured = $definition['columns'] ?? [];
@@ -173,7 +187,7 @@ class ModuleReportController extends Controller
     }
 
     /**
-     * @param array<string, string> $columns
+     * @param  array<string, string>  $columns
      * @return array<string, string>
      */
     private function serializeRow(Model $model, array $columns): array
@@ -184,14 +198,17 @@ class ModuleReportController extends Controller
             $value = $model->getAttribute($column);
             if ($value instanceof \DateTimeInterface) {
                 $row[$column] = $value->format('Y-m-d H:i:s');
+
                 continue;
             }
             if (is_array($value)) {
                 $row[$column] = json_encode($value);
+
                 continue;
             }
             if (is_bool($value)) {
                 $row[$column] = $value ? 'yes' : 'no';
+
                 continue;
             }
             $row[$column] = $value === null ? '' : (string) $value;
@@ -201,20 +218,26 @@ class ModuleReportController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $definition
+     * @param  array<string, mixed>  $definition
      * @return array<int, string>
      */
-    private function statusOptions(array $definition): array
+    private function statusOptions(array $definition, User $user): array
     {
         /** @var class-string<Model> $modelClass */
         $modelClass = $definition['model'];
-        $table = (new $modelClass())->getTable();
+        $table = (new $modelClass)->getTable();
 
-        if (!Schema::hasColumn($table, 'status')) {
+        if (! Schema::hasColumn($table, 'status')) {
             return [];
         }
 
-        return $modelClass::query()
+        $query = $modelClass::query();
+        if ($this->medicationGovernance($definition) === 'administration') {
+            $query->effectiveClinicalEvidence();
+        }
+        $this->applyMedicationGovernanceScope($query, $definition, $user);
+
+        return $query
             ->whereNotNull('status')
             ->select('status')
             ->distinct()
@@ -225,5 +248,71 @@ class ModuleReportController extends Controller
             ->values()
             ->all();
     }
-}
 
+    /** @param array<string, mixed> $definition */
+    private function applyMedicationGovernanceScope(
+        Builder $query,
+        array $definition,
+        User $user,
+    ): void {
+        $governance = $this->medicationGovernance($definition);
+        if ($governance === 'general_audit') {
+            $this->excludeMedicationAuditFamilies($query);
+
+            return;
+        }
+        if (! in_array($governance, ['administration', 'controlled'], true)) {
+            return;
+        }
+
+        $isControlledModule = $governance === 'controlled';
+        $siteIds = $this->medicationScope->reportSiteIds(
+            $user,
+            controlled: $isControlledModule,
+        );
+        $this->medicationScope->scopeCanonicalClientMedicationRows(
+            $query,
+            $siteIds,
+            allowNullMedication: false,
+        );
+
+        if (! $isControlledModule
+            && ! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
+            $this->medicationScope->scopeWithoutControlledMedicationRows($query);
+        }
+    }
+
+    /** @param array<string, mixed> $definition */
+    private function medicationGovernance(array $definition): ?string
+    {
+        return match ($definition['model'] ?? null) {
+            AuditLog::class => 'general_audit',
+            ClientMedicationAdministration::class => 'administration',
+            ClientControlledDrugDiscrepancy::class => 'controlled',
+            default => null,
+        };
+    }
+
+    private function excludeMedicationAuditFamilies(Builder $query): void
+    {
+        $query->where(function (Builder $nonMedication): void {
+            $nonMedication->whereNull('auditable_type')
+                ->orWhere(function (Builder $typed): void {
+                    $typed->where('auditable_type', 'not like', '%Medication%')
+                        ->where('auditable_type', 'not like', '%ControlledDrug%');
+                });
+        })->where(function (Builder $nonMedicationAction): void {
+            $nonMedicationAction->whereNull('action')
+                ->orWhere(function (Builder $action): void {
+                    $action->where('action', 'not like', 'medication%')
+                        ->where('action', 'not like', 'meds.%')
+                        ->where('action', 'not like', 'emar.%')
+                        ->where('action', 'not like', 'clientmedication%')
+                        ->where('action', 'not like', 'clientcontrolleddrug%')
+                        ->where('action', 'not like', 'controlled_drug%')
+                        ->where('action', 'not like', 'cd.%')
+                        ->where('action', 'not like', 'cd\_%');
+                });
+        });
+    }
+}

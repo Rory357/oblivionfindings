@@ -2,13 +2,17 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationStock;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\Site;
+use App\Models\TimelineEvent;
 use App\Models\User;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
@@ -35,22 +39,38 @@ class WorkerMedsTodayPayloadTest extends TestCase
 
         $worker = $this->makeRoleUser('support_worker');
         $this->grantPermissions($worker, ['medications.administer.record']);
+        $this->denyPermissions($worker, [
+            'medications.controlled.view',
+            'medications.controlled.record',
+        ]);
+        $site = Site::factory()->create(['is_active' => true]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
 
         $serviceContext = ServiceContext::factory()->create([
             'name' => 'Worker Meds',
             'type' => 'residential',
             'is_active' => true,
+            'site_id' => $site->id,
         ]);
 
         $client = Client::factory()->create([
             'first_name' => 'Aroha',
             'last_name' => 'Ngata',
+            'site_id' => $site->id,
             'service_context_id' => $serviceContext->id,
             'status' => 'active',
         ]);
 
         Shift::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'service_context_id' => $serviceContext->id,
             'user_id' => $worker->id,
             'starts_at' => Carbon::parse('2026-04-30 09:00:00', config('app.worker_timezone'))->utc(),
@@ -82,6 +102,20 @@ class WorkerMedsTodayPayloadTest extends TestCase
             'state' => 'active',
         ]);
 
+        $untouchedPrn = ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Zulu untouched PRN',
+            'dosage' => '5mg',
+            'frequency' => 'As needed',
+            'dose_times' => [],
+            'is_prn' => true,
+            'prn_reason' => 'Breakthrough symptom',
+            'max_per_day' => 2,
+            'min_hours_between_doses' => 4,
+            'active' => true,
+            'state' => 'active',
+        ]);
+
         ClientMedicationAdministration::query()->create([
             'client_id' => $client->id,
             'client_medication_id' => $prn->id,
@@ -90,7 +124,84 @@ class WorkerMedsTodayPayloadTest extends TestCase
             'status' => 'given',
         ]);
 
-        $this->actingAs($worker)
+        ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => 'PRIVATE CONTROLLED BOARD SCHEDULE',
+            'dosage' => '5mg',
+            'frequency' => 'Three times daily',
+            'dose_times' => ['08:00', '10:00', '16:00'],
+            'is_prn' => false,
+            'controlled_drug' => true,
+            'active' => true,
+            'state' => 'active',
+        ]);
+        $controlledPrn = ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => 'PRIVATE CONTROLLED BOARD PRN',
+            'dosage' => '2mg',
+            'frequency' => 'As needed',
+            'dose_times' => [],
+            'is_prn' => true,
+            'controlled_drug' => true,
+            'active' => true,
+            'state' => 'active',
+        ]);
+        $controlledAdministration = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $controlledPrn->id,
+            'administered_by' => $worker->id,
+            'administered_at' => now()->subMinutes(30),
+            'status' => 'given',
+            'dose_given' => 'PRIVATE CONTROLLED DOSE',
+        ]);
+        ClientMedicationStock::query()->create([
+            'client_medication_id' => $controlledPrn->id,
+            'on_hand' => 1,
+            'reorder_level' => 2,
+            'unit' => 'tablets',
+        ]);
+        TimelineEvent::query()->create([
+            'source_type' => ClientMedicationAdministration::class,
+            'source_id' => $controlledAdministration->id,
+            'occurred_at' => now()->subMinutes(30),
+            'type' => 'medication_given',
+            'actor_user_id' => $worker->id,
+            'client_id' => $client->id,
+            'subject' => 'PRIVATE CONTROLLED BOARD ACTIVITY',
+            'visibility' => 'internal',
+            'is_pinned' => false,
+            'created_by' => $worker->id,
+        ]);
+
+        $foreignClient = Client::factory()->create(['status' => 'active']);
+        $foreignPrn = ClientMedication::query()->create([
+            'client_id' => $foreignClient->id,
+            'name' => 'FORGED foreign PRN',
+            'dosage' => '1mg',
+            'frequency' => 'As needed',
+            'dose_times' => [],
+            'is_prn' => true,
+            'active' => true,
+            'state' => 'active',
+        ]);
+        $forgedDayAdministration = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $foreignPrn->id,
+            'administered_by' => $worker->id,
+            'administered_at' => now()->subMinutes(20),
+            'status' => 'given',
+            'notes' => 'FORGED local-client foreign-medication administration',
+        ]);
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $foreignClient->id,
+            'client_medication_id' => $untouchedPrn->id,
+            'administered_by' => $worker->id,
+            'administered_at' => now()->subMinutes(10),
+            'status' => 'given',
+            'notes' => 'FORGED foreign-client local-medication administration',
+        ]);
+
+        $response = $this->actingAs($worker)
             ->get('/meds/today')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -107,7 +218,21 @@ class WorkerMedsTodayPayloadTest extends TestCase
                 ->where('prn_medications.0.remaining_today', 1)
                 ->where('prn_medications.0.near_limit', false)
                 ->where('prn_medications.0.over_limit', false)
+                ->where('prn_medications', function ($rows) use ($untouchedPrn): bool {
+                    $row = collect($rows)->firstWhere('id', $untouchedPrn->id);
+
+                    return data_get($row, 'given_last_24h') === 0
+                        && data_get($row, 'remaining_today') === 2
+                        && data_get($row, 'last_given_at') === null
+                        && data_get($row, 'next_allowed_at') === null
+                        && data_get($row, 'interval_blocked') === false;
+                })
+                ->where('prn_follow_ups', fn ($rows) => collect($rows)
+                    ->pluck('administration_id')
+                    ->doesntContain($forgedDayAdministration->id))
             );
+        $this->assertStringNotContainsString('PRIVATE CONTROLLED BOARD', $response->getContent());
+        $this->assertStringNotContainsString('PRIVATE CONTROLLED DOSE', $response->getContent());
     }
 
     public function test_meds_due_matches_administrations_with_a_single_query(): void
@@ -118,19 +243,32 @@ class WorkerMedsTodayPayloadTest extends TestCase
         $worker = $this->makeRoleUser('support_worker');
         $this->grantPermissions($worker, ['medications.administer.record']);
 
+        $site = Site::factory()->create(['is_active' => true]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+
         $serviceContext = ServiceContext::factory()->create([
             'name' => 'Worker Meds N+1',
             'type' => 'residential',
             'is_active' => true,
+            'site_id' => $site->id,
         ]);
 
         $client = Client::factory()->create([
+            'site_id' => $site->id,
             'service_context_id' => $serviceContext->id,
             'status' => 'active',
         ]);
 
         Shift::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'service_context_id' => $serviceContext->id,
             'user_id' => $worker->id,
             'starts_at' => Carbon::parse('2026-04-30 09:00:00', config('app.worker_timezone'))->utc(),
@@ -181,19 +319,31 @@ class WorkerMedsTodayPayloadTest extends TestCase
         $worker = $this->makeRoleUser('support_worker');
         $this->grantPermissions($worker, ['medications.administer.record']);
 
+        $site = Site::factory()->create(['is_active' => true]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
         $serviceContext = ServiceContext::factory()->create([
             'name' => 'Overnight worker meds',
             'type' => 'residential',
             'is_active' => true,
+            'site_id' => $site->id,
         ]);
 
         $client = Client::factory()->create([
+            'site_id' => $site->id,
             'service_context_id' => $serviceContext->id,
             'status' => 'active',
         ]);
 
         Shift::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'service_context_id' => $serviceContext->id,
             'user_id' => $worker->id,
             'starts_at' => Carbon::parse('2026-04-30 23:20:00', $timezone)->utc(),
@@ -217,6 +367,8 @@ class WorkerMedsTodayPayloadTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('auth.can.medications.overdueTodayCount', 1)
+                ->where('has_shift_context', true)
+                ->where('clients.0.id', $client->id)
             );
     }
 
@@ -247,5 +399,20 @@ class WorkerMedsTodayPayloadTest extends TestCase
             ->all();
 
         $user->permissionOverrides()->syncWithoutDetaching($permissionMap);
+    }
+
+    /**
+     * @param  array<int, string>  $permissionKeys
+     */
+    protected function denyPermissions(User $user, array $permissionKeys): void
+    {
+        $permissionMap = Permission::query()
+            ->whereIn('key', $permissionKeys)
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id) => [$id => ['allowed' => false]])
+            ->all();
+
+        $user->permissionOverrides()->syncWithoutDetaching($permissionMap);
+        $user->unsetRelation('permissionOverrides')->unsetRelation('roles');
     }
 }

@@ -6,7 +6,6 @@ use App\Models\AppSetting;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use Carbon\Carbon;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -90,6 +89,7 @@ class MarScheduleService
         [, $dayEndUtc] = $this->utcDayWindow($to);
 
         return ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
             ->whereIn('client_id', $clientIds)
             ->whereBetween('scheduled_for', [$dayStartUtc, $dayEndUtc])
             ->orderBy('id')
@@ -156,7 +156,7 @@ class MarScheduleService
     {
         $date = $date->copy()->timezone($this->workerTimezone())->startOfDay();
 
-        if (!$medication->active) {
+        if (! $medication->active) {
             return [];
         }
 
@@ -234,7 +234,7 @@ class MarScheduleService
                 if ($ampm === 'am' && $hour === 12) {
                     $hour = 0;
                 }
-                $times[] = str_pad((string) $hour, 2, '0', STR_PAD_LEFT) . ':' . str_pad((string) $min, 2, '0', STR_PAD_LEFT);
+                $times[] = str_pad((string) $hour, 2, '0', STR_PAD_LEFT).':'.str_pad((string) $min, 2, '0', STR_PAD_LEFT);
             }
         }
 
@@ -270,6 +270,7 @@ class MarScheduleService
     {
         $start = $scheduled->copy()->subMinutes($this->windowBeforeMinutes());
         $end = $scheduled->copy()->addMinutes($this->windowAfterMinutes());
+
         return [$start, $end];
     }
 
@@ -301,6 +302,7 @@ class MarScheduleService
         if ($now->lessThan($wStart)) {
             $mins = $now->diffInMinutes($scheduled, false);
             $state = ($mins <= $this->dueSoonMinutes()) ? 'due_soon' : 'upcoming';
+
             return [
                 'state' => $state,
                 'window_start' => $wStart,

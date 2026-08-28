@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\Medication\SafetyOverrideReason;
+use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationStock;
 use App\Models\ControlledDrugLossReport;
 use App\Models\MedicationAllergy;
 use App\Models\MedicationDashboardAlert;
@@ -21,6 +23,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\MedicationAlertService;
@@ -30,6 +33,7 @@ use App\Services\MedicationSafetyService;
 use App\Services\MedicationScanVerificationService;
 use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Encoding\Encoding;
@@ -38,6 +42,7 @@ use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Enum;
@@ -45,6 +50,8 @@ use Illuminate\Validation\ValidationException;
 
 class MedicationsApiController extends Controller
 {
+    use HandlesMedicationSync;
+
     private const CONTROLLED_ALERT_TYPES = [
         'controlled_discrepancy',
         'controlled_overdue_check',
@@ -61,6 +68,7 @@ class MedicationsApiController extends Controller
         protected MarScheduleService $scheduleService,
         protected MedicationScopeDecisionService $medicationScope,
         protected UserSiteAccessService $siteAccess,
+        protected MedicationGovernanceScopeService $governanceScope,
     ) {}
 
     private function idempotencyKey(string $scope, string $requestUuid): string
@@ -75,18 +83,75 @@ class MedicationsApiController extends Controller
         }
 
         $query->whereNotIn('alert_type', self::CONTROLLED_ALERT_TYPES);
+        $this->governanceScope->scopeWithoutControlledMedicationRows($query);
     }
 
-    private function assertCanViewAlert(Request $request, MedicationDashboardAlert $alert): void
+    /** @return array<int, int> */
+    private function reportSiteIds(User $user, ?int $requestedSiteId, ?int $requestedClientId): array
     {
-        if ($request->user()?->canDo('medications.controlled.view')) {
-            return;
-        }
-
-        abort_if(
-            in_array($alert->alert_type, self::CONTROLLED_ALERT_TYPES, true),
+        abort_unless(
+            $user->canDo('reports.viewAny') || $user->canDo('medications.reports.export'),
             403,
         );
+
+        $siteIds = $this->siteAccess->accessibleSiteIds(
+            $user,
+            MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+        );
+
+        if ($requestedSiteId !== null) {
+            abort_unless(in_array($requestedSiteId, $siteIds, true), 404);
+        }
+
+        if ($requestedClientId !== null) {
+            $client = Client::query()
+                ->whereKey($requestedClientId)
+                ->whereIn('site_id', $siteIds)
+                ->first(['id', 'site_id']);
+            abort_unless(
+                $client !== null
+                && ($requestedSiteId === null || (int) $client->site_id === $requestedSiteId),
+                404,
+            );
+        }
+
+        return $requestedSiteId !== null ? [$requestedSiteId] : $siteIds;
+    }
+
+    /**
+     * Rebuild alert aggregates without controlled-only alert types so totals,
+     * severities, and active counts cannot disclose controlled activity.
+     *
+     * @param  array<int, int>  $siteIds
+     * @return array<string, mixed>
+     */
+    private function ordinaryAuditSafetyAlerts(
+        ?int $clientId,
+        Carbon $dateFrom,
+        Carbon $dateTo,
+        array $siteIds,
+    ): array {
+        $query = MedicationDashboardAlert::query()
+            ->whereBetween('created_at', [
+                $dateFrom->copy()->startOfDay(),
+                $dateTo->copy()->endOfDay(),
+            ])
+            ->when($clientId, fn ($builder) => $builder->where('client_id', $clientId));
+        $query = $this->governanceScope->scopeCanonicalClientMedicationRows($query, $siteIds);
+        $this->constrainControlledAlertVisibility($query, false);
+
+        return [
+            'total_alerts' => (clone $query)->count(),
+            'by_type' => (clone $query)->selectRaw('alert_type, COUNT(*) as count')
+                ->groupBy('alert_type')
+                ->pluck('count', 'alert_type')
+                ->toArray(),
+            'by_severity' => (clone $query)->selectRaw('severity, COUNT(*) as count')
+                ->groupBy('severity')
+                ->pluck('count', 'severity')
+                ->toArray(),
+            'active_count' => (clone $query)->where('status', 'active')->count(),
+        ];
     }
 
     private function authorizeMedicationRecordingTarget(
@@ -97,18 +162,80 @@ class MedicationsApiController extends Controller
     ): void {
         abort_unless((int) $medication->client_id === (int) $client->id, 404);
 
-        if ($user->can('viewMedications', $client)) {
-            return;
+        if (! $user->can('viewMedications', $client)) {
+            // Exact record-only workers do not gain reader access. Resolve their
+            // action target through the canonical Site + covering-shift boundary.
+            $this->medicationScope->forMedication(
+                $user,
+                $medication,
+                $actionAt,
+                static fn (MedicationScopeDecision $scope) => null,
+                requireAdministrable: true,
+                submittedClientId: (int) $client->id,
+            );
         }
 
-        // Exact record-only workers do not gain reader access. Resolve their
-        // action target through the canonical Site + covering-shift boundary.
+        abort_unless(
+            ! (bool) $medication->controlled_drug
+            || $user->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY),
+            404,
+        );
+    }
+
+    private function authorizeReadableMedication(
+        Request $request,
+        Client $client,
+        ClientMedication $medication,
+    ): void {
+        $this->authorize('viewMedications', $client);
+        abort_unless((int) $medication->client_id === (int) $client->id, 404);
+        abort_unless(
+            ! (bool) $medication->controlled_drug
+            || $request->user()->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+            404,
+        );
+    }
+
+    private function preflightMedicationRecordingTarget(
+        Request $request,
+        User $user,
+        Client $client,
+        ClientMedication $medication,
+    ): void {
+        // Resolve the controlled classification canonically before validating
+        // user input or attempting shift/break-glass authority. Otherwise an
+        // unauthorised controlled target can be distinguished by the 403 from
+        // the assignment path before the later locked scope check conceals it.
+        $canonicalMedication = ClientMedication::query()
+            ->whereKey($medication->id)
+            ->where('client_id', $client->id)
+            ->whereNull('deleted_at')
+            ->whereNull('superseded_by')
+            ->first(['id', 'controlled_drug']);
+        abort_unless($canonicalMedication !== null, 404);
+        abort_unless(
+            ! (bool) $canonicalMedication->controlled_drug
+            || $user->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY),
+            404,
+        );
+
+        $actionAt = $this->medicationConcealmentActionAt(
+            $request,
+            $this->scheduleService,
+            now(),
+        );
+
         $this->medicationScope->forMedication(
             $user,
             $medication,
             $actionAt,
-            static fn (MedicationScopeDecision $scope) => null,
-            requireAdministrable: true,
+            static function (MedicationScopeDecision $scope) use ($user): void {
+                abort_unless(
+                    ! (bool) $scope->medication->controlled_drug
+                    || $user->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY),
+                    404,
+                );
+            },
             submittedClientId: (int) $client->id,
         );
     }
@@ -186,6 +313,16 @@ class MedicationsApiController extends Controller
     private function attachmentTargetTypeForAttachment(MedicationMarAttachment $attachment): string
     {
         if ($attachment->attachable) {
+            if (
+                $attachment->attachable instanceof ClientMedicationAdministration
+                && $attachment->client_medication_administration_id !== null
+            ) {
+                abort_unless(
+                    (int) $attachment->client_medication_administration_id === (int) $attachment->attachable->id,
+                    404,
+                );
+            }
+
             return $this->attachmentTargetTypeForModel($attachment->attachable);
         }
 
@@ -258,10 +395,61 @@ class MedicationsApiController extends Controller
         };
     }
 
-    private function assertCanViewSupportingAttachment(Request $request, MedicationMarAttachment $attachment): void
+    private function assertCanAccessAttachmentTarget(Request $request, Model $target, bool $write): void
     {
-        if (in_array($this->attachmentTargetTypeForAttachment($attachment), ['discrepancy', 'loss_report'], true)) {
-            abort_unless($request->user()->canDo('medications.controlled.view'), 403);
+        $targetType = $this->attachmentTargetTypeForModel($target);
+        $inherentlyControlled = in_array($targetType, ['discrepancy', 'loss_report'], true);
+        $medicationId = $target->getAttribute('client_medication_id');
+        $medication = null;
+
+        if ($medicationId !== null) {
+            $medication = ClientMedication::withTrashed()
+                ->whereKey($medicationId)
+                ->where('client_id', $target->getAttribute('client_id'))
+                ->first(['id', 'controlled_drug']);
+            abort_unless($medication !== null, 404);
+        }
+
+        if (! $inherentlyControlled && ! (bool) $medication?->controlled_drug) {
+            return;
+        }
+
+        $capability = $write
+            ? MedicationGovernanceScopeService::CONTROLLED_CAPABILITY
+            : MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY;
+        abort_unless($request->user()->canDo($capability), 404);
+    }
+
+    private function assertCanAccessSupportingAttachment(
+        Request $request,
+        MedicationMarAttachment $attachment,
+        bool $write,
+    ): void {
+        $attachment->loadMissing(['attachable', 'administration']);
+        $this->attachmentTargetTypeForAttachment($attachment);
+        $target = $attachment->attachable ?? $attachment->administration;
+        abort_unless($target instanceof Model, 404);
+        abort_unless((int) $target->getAttribute('client_id') === (int) $attachment->client_id, 404);
+        $this->assertCanAccessAttachmentTarget($request, $target, $write);
+    }
+
+    private function assertAdministrationAttachmentNested(
+        MedicationMarAttachment $attachment,
+        ClientMedicationAdministration $administration,
+    ): void {
+        abort_unless(
+            (int) $attachment->client_medication_administration_id === (int) $administration->id,
+            404,
+        );
+        abort_unless((int) $attachment->client_id === (int) $administration->client_id, 404);
+
+        $attachment->loadMissing('attachable');
+        if ($attachment->attachable !== null) {
+            abort_unless(
+                $attachment->attachable instanceof ClientMedicationAdministration
+                && (int) $attachment->attachable->id === (int) $administration->id,
+                404,
+            );
         }
     }
 
@@ -372,6 +560,7 @@ class MedicationsApiController extends Controller
             $date,
             now($this->scheduleService->workerTimezone()),
             $activeShiftId,
+            $request->user()->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
         );
 
         // Add permissions
@@ -381,12 +570,17 @@ class MedicationsApiController extends Controller
             'record_controlled' => $user->canDo('medications.controlled.record'),
             'view_controlled' => $user->canDo('medications.controlled.view'),
             'override_safety' => $user->canDo('medications.administer.override_safety'),
-            'correct' => $user->canDo('medications.administer.correct') || $user->canDo('clients.update'),
+            'correct' => $user->canDo('medications.administer.correct'),
             'witness' => $user->canDo('medications.controlled.witness'),
         ];
 
         // Add active alerts for this client
-        $alerts = MedicationDashboardAlert::where('client_id', $client->id)
+        $alerts = $this->governanceScope->scopeCanonicalClientMedicationRows(
+            MedicationDashboardAlert::query(),
+            $client->site_id ? [(int) $client->site_id] : [],
+            true,
+        )
+            ->where('client_id', $client->id)
             ->where('status', 'active')
             ->orderByDesc('severity')
             ->orderByDesc('created_at');
@@ -405,7 +599,12 @@ class MedicationsApiController extends Controller
 
         // Add controlled drug discrepancies
         $marData['controlled_discrepancies'] = $user->canDo('medications.controlled.view')
-            ? ClientControlledDrugDiscrepancy::where('client_id', $client->id)
+            ? $this->governanceScope->scopeCanonicalClientMedicationRows(
+                ClientControlledDrugDiscrepancy::query(),
+                $client->site_id ? [(int) $client->site_id] : [],
+                false,
+            )
+                ->where('client_id', $client->id)
                 ->whereIn('status', ['open', 'under_review'])
                 ->with('medication:id,name')
                 ->get()
@@ -426,10 +625,15 @@ class MedicationsApiController extends Controller
      */
     public function safetyCheck(Request $request, Client $client, ClientMedication $medication)
     {
-        $this->authorize('viewMedications', $client);
-        abort_unless($medication->client_id === $client->id, 404);
+        $this->authorizeReadableMedication($request, $client, $medication);
 
-        $check = $this->safetyService->performSafetyCheck($client, $medication);
+        $check = $this->safetyService->performSafetyCheck(
+            $client,
+            $medication,
+            includeControlled: $request->user()->canDo(
+                MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+            ),
+        );
 
         return response()->json([
             ...$check,
@@ -443,10 +647,12 @@ class MedicationsApiController extends Controller
      */
     public function getPrnHistory(Request $request, Client $client, ClientMedication $medication)
     {
-        $this->authorize('viewMedications', $client);
-        abort_unless($medication->client_id === $client->id, 404);
+        $this->authorizeReadableMedication($request, $client, $medication);
 
-        $hours = $request->input('hours', 24);
+        $filters = $request->validate([
+            'hours' => ['sometimes', 'integer', 'min:1', 'max:720'],
+        ]);
+        $hours = (int) ($filters['hours'] ?? 24);
         $history = $this->safetyService->getPrnHistory($medication, $hours);
 
         return response()->json($history);
@@ -454,16 +660,14 @@ class MedicationsApiController extends Controller
 
     public function getScanCode(Request $request, Client $client, ClientMedication $medication)
     {
-        $this->authorize('viewMedications', $client);
-        abort_unless($medication->client_id === $client->id, 404);
+        $this->authorizeReadableMedication($request, $client, $medication);
 
         return response()->json($this->buildMedicationScanPayload($client, $medication));
     }
 
     public function getScanCodeSvg(Request $request, Client $client, ClientMedication $medication)
     {
-        $this->authorize('viewMedications', $client);
-        abort_unless($medication->client_id === $client->id, 404);
+        $this->authorizeReadableMedication($request, $client, $medication);
 
         $payload = $this->scanVerificationService->payload($client, $medication);
 
@@ -520,6 +724,7 @@ class MedicationsApiController extends Controller
     ) {
         $this->authorize('viewMedications', $client);
         abort_unless($administration->client_id === $client->id, 404);
+        $this->assertCanAccessAttachmentTarget($request, $administration, true);
 
         $user = $request->user();
         $this->assertCanManageSupportingAttachment(
@@ -569,20 +774,24 @@ class MedicationsApiController extends Controller
     {
         $this->authorize('viewMedications', $client);
 
-        $data = $request->validate([
+        $locator = $request->validate([
             'target_type' => ['required', 'string', 'in:administration,correction,discrepancy,loss_report,error'],
             'target_id' => ['required', 'integer'],
-            'file' => ['required', 'file', 'max:10240'],
-            'description' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $this->assertCanManageSupportingAttachment($request, $data['target_type']);
+        $this->assertCanManageSupportingAttachment($request, $locator['target_type']);
 
         $target = $this->resolveAttachmentTarget(
             $client,
-            $data['target_type'],
-            (int) $data['target_id'],
+            $locator['target_type'],
+            (int) $locator['target_id'],
         );
+        $this->assertCanAccessAttachmentTarget($request, $target, true);
+
+        $data = $request->validate([
+            'file' => ['required', 'file', 'max:10240'],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ]);
 
         $file = $request->file('file');
         $path = $file->store('medication_mar_attachments');
@@ -607,7 +816,7 @@ class MedicationsApiController extends Controller
         AuditLogger::log('medications.supporting_attachment.uploaded', $target, [
             'attachment_id' => $attachment->id,
             'client_id' => $client->id,
-            'target_type' => $data['target_type'],
+            'target_type' => $locator['target_type'],
             'file_name' => $attachment->file_name,
         ]);
 
@@ -628,8 +837,8 @@ class MedicationsApiController extends Controller
     ) {
         $this->authorize('viewMedications', $client);
         abort_unless($administration->client_id === $client->id, 404);
-        abort_unless($attachment->client_medication_administration_id === $administration->id, 404);
-        abort_unless($attachment->client_id === $client->id, 404);
+        $this->assertAdministrationAttachmentNested($attachment, $administration);
+        $this->assertCanAccessAttachmentTarget($request, $administration, false);
 
         return Storage::download($attachment->file_path, $attachment->file_name);
     }
@@ -645,7 +854,7 @@ class MedicationsApiController extends Controller
         $attachment->loadMissing('attachable');
         abort_unless($attachment->attachable, 404);
         abort_unless((int) $attachment->attachable->client_id === (int) $client->id, 404);
-        $this->assertCanViewSupportingAttachment($request, $attachment);
+        $this->assertCanAccessSupportingAttachment($request, $attachment, false);
 
         return Storage::download($attachment->file_path, $attachment->file_name);
     }
@@ -658,8 +867,8 @@ class MedicationsApiController extends Controller
     ) {
         $this->authorize('viewMedications', $client);
         abort_unless($administration->client_id === $client->id, 404);
-        abort_unless($attachment->client_medication_administration_id === $administration->id, 404);
-        abort_unless($attachment->client_id === $client->id, 404);
+        $this->assertAdministrationAttachmentNested($attachment, $administration);
+        $this->assertCanAccessAttachmentTarget($request, $administration, true);
 
         abort_unless($this->canDeleteSupportingAttachment($request, $attachment), 403);
 
@@ -685,6 +894,7 @@ class MedicationsApiController extends Controller
         $attachment->loadMissing('attachable');
         abort_unless($attachment->attachable, 404);
         abort_unless((int) $attachment->attachable->client_id === (int) $client->id, 404);
+        $this->assertCanAccessSupportingAttachment($request, $attachment, true);
         abort_unless($this->canDeleteSupportingAttachment($request, $attachment), 403);
 
         AuditLogger::log('medications.supporting_attachment.deleted', $attachment->attachable, [
@@ -715,16 +925,18 @@ class MedicationsApiController extends Controller
         );
         abort_unless((int) $medication->client_id === (int) $client->id, 404);
 
+        $this->preflightMedicationRecordingTarget($request, $user, $client, $medication);
+
         $data = $request->validate([
             'status' => ['required', 'in:given,refused,missed,withheld'],
             'reason' => ['nullable', 'string', 'max:500'],
             'reason_code' => ['nullable', 'string', 'max:60'],
             'dose_given' => ['nullable', 'string', 'max:255'],
-            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
+            'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'scheduled_for' => ['nullable', 'date'],
             'administered_at' => ['nullable', 'date'],
-            'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
+            'witnessed_by' => ['nullable', 'integer', 'min:1'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
             'shift_id' => ['nullable', 'integer'],
             'outcome' => ['nullable', 'string', 'in:effective,ineffective,adverse_reaction'],
@@ -740,10 +952,7 @@ class MedicationsApiController extends Controller
             'safety_override.reason_code' => ['required_with:safety_override', new Enum(SafetyOverrideReason::class)],
             'safety_override.reason' => ['required_with:safety_override', 'string', 'min:10', 'max:1000'],
             'override_window' => ['nullable', 'boolean'],
-            'client_request_uuid' => ['nullable', 'uuid'],
-            'captured_offline_at' => ['nullable', 'date'],
-            'origin_device_id' => ['nullable', 'string', 'max:255'],
-            'queued_offline' => ['nullable', 'boolean'],
+            ...$this->medicationOfflineSubmissionRules($request),
             'scan_code' => ['nullable', 'string', 'max:255'],
             'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
             'scan_verified' => ['nullable', 'boolean'],
@@ -753,10 +962,10 @@ class MedicationsApiController extends Controller
         $scheduledFor = filled($data['scheduled_for'] ?? null)
             ? $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for'])
             : null;
+        $submittedAdministrationAt = $this->medicationSubmittedAdministrationAt($data);
         $actionAt = $this->scheduleService->parseWorkerDateTime((string) (
-            $data['administered_at'] ?? $data['captured_offline_at'] ?? now()->toIso8601String()
+            $submittedAdministrationAt ?? now()->toIso8601String()
         ));
-        $this->authorizeMedicationRecordingTarget($user, $client, $medication, $actionAt);
 
         return $this->medicationScope->forAdministration(
             $user,
@@ -766,9 +975,10 @@ class MedicationsApiController extends Controller
             $scheduledFor,
             isset($data['shift_id']) ? (int) $data['shift_id'] : null,
             null,
-            function (MedicationScopeDecision $scope) use ($data, $user) {
+            function (MedicationScopeDecision $scope) use ($data, $user, $submittedAdministrationAt) {
                 $client = $scope->client;
                 $medication = $scope->medication;
+                $data['administered_at'] = $submittedAdministrationAt;
                 $data['shift_id'] = $scope->shiftId();
                 $data['scope_authorized'] = true;
 
@@ -798,34 +1008,6 @@ class MedicationsApiController extends Controller
                     ], 422);
                 }
 
-                // Controlled drug witness validation
-                if ($medication->requiresWitness() && $data['status'] === 'given') {
-                    if (empty($data['witnessed_by'])) {
-                        return response()->json([
-                            'success' => false,
-                            'error' => 'Witness is required for this medication.',
-                            'error_field' => 'witnessed_by',
-                        ], 422);
-                    }
-
-                    if ($data['witnessed_by'] === $user->id) {
-                        return response()->json([
-                            'success' => false,
-                            'error' => 'Witness must be a different user.',
-                            'error_field' => 'witnessed_by',
-                        ], 422);
-                    }
-
-                    $witness = User::find($data['witnessed_by']);
-                    if (! $witness || ! $witness->canDo('medications.controlled.witness')) {
-                        return response()->json([
-                            'success' => false,
-                            'error' => 'Selected witness is not authorized to witness controlled drug administrations.',
-                            'error_field' => 'witnessed_by',
-                        ], 422);
-                    }
-                }
-
                 if (($data['queued_offline'] ?? false) && ! $medication->is_prn && ! empty($data['scheduled_for'])) {
                     $isDurableReplay = filled($data['client_request_uuid'] ?? null)
                         && ClientMedicationAdministration::withTrashed()
@@ -838,6 +1020,7 @@ class MedicationsApiController extends Controller
                         $scheduledFor = $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for']);
                         [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
                         $conflictingAdministration = ClientMedicationAdministration::query()
+                            ->effectiveClinicalEvidence()
                             ->where('client_id', $client->id)
                             ->where('client_medication_id', $medication->id)
                             ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
@@ -882,7 +1065,10 @@ class MedicationsApiController extends Controller
                     $medication,
                     $data,
                     $user->id,
-                    $data['shift_id'] ?? null
+                    $data['shift_id'] ?? null,
+                    $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+                    prelockedPresenceShifts: $scope->lockedPresenceShifts,
+                    prelockedPresenceEffectiveAt: $scope->lockedPresenceEffectiveAt,
                 );
 
                 if (! $result['success']) {
@@ -973,6 +1159,9 @@ class MedicationsApiController extends Controller
                     $this->rememberIdempotentResponse('administration', $data, $payload)
                 );
             },
+            authorizationUserIds: array_filter([
+                is_numeric($data['witnessed_by'] ?? null) ? (int) $data['witnessed_by'] : null,
+            ]),
         );
     }
 
@@ -984,87 +1173,281 @@ class MedicationsApiController extends Controller
         Client $client,
         ClientMedicationAdministration $administration
     ) {
-        $this->authorize('viewMedications', $client);
         $user = $request->user();
 
         abort_unless(
-            $user->canDo('medications.administer.correct') || $user->canDo('clients.update'),
+            $user?->canDo('medications.administer.correct'),
             403,
             'You do not have permission to correct medication administrations.'
         );
 
-        abort_unless($administration->client_id === $client->id, 404);
+        return DB::transaction(function () use ($request, $client, $administration, $user) {
+            // Read only the submitted child identity first, then lock the
+            // canonical aggregate in parent-first order. A forged nested owner,
+            // cross-client medication, foreign Site, and a missing row all
+            // collapse to the same concealed response before validation/writes.
+            $snapshot = ClientMedicationAdministration::query()
+                ->whereKey($administration->getKey())
+                ->first([
+                    'id',
+                    'client_id',
+                    'client_medication_id',
+                    'is_correction',
+                    'corrected_of_id',
+                ]);
+            abort_unless(
+                $snapshot !== null
+                && (int) $snapshot->client_id === (int) $client->getKey()
+                && is_numeric($snapshot->client_medication_id)
+                && (int) $snapshot->client_medication_id > 0,
+                404,
+            );
 
-        $data = $request->validate([
-            'status' => ['required', 'in:given,refused,missed,withheld'],
-            'reason' => ['nullable', 'string', 'max:500'],
-            'dose_given' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'administered_at' => ['nullable', 'date'],
-            'correction_reason' => ['required', 'string', 'max:500'],
-        ]);
+            $canonicalClient = Client::query()
+                ->whereKey($snapshot->client_id)
+                ->lockForUpdate()
+                ->first();
+            abort_unless(
+                $canonicalClient !== null
+                && is_numeric($canonicalClient->site_id)
+                && (int) $canonicalClient->site_id > 0
+                && in_array(
+                    (int) $canonicalClient->site_id,
+                    $this->siteAccess->accessibleSiteIds(
+                        $user,
+                        MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+                    ),
+                    true,
+                ),
+                404,
+            );
 
-        // Check correction time window
-        $minutesSince = $administration->created_at->diffInMinutes(now());
-        if ($minutesSince > 30 && empty($data['correction_reason'])) {
+            $canonicalMedication = ClientMedication::withTrashed()
+                ->whereKey($snapshot->client_medication_id)
+                ->where('client_id', $canonicalClient->id)
+                ->lockForUpdate()
+                ->first();
+            abort_unless($canonicalMedication !== null, 404);
+            abort_unless(
+                ! (bool) $canonicalMedication->controlled_drug
+                || $user->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY),
+                404,
+            );
+
+            $rootId = $snapshot->is_correction
+                ? (int) $snapshot->corrected_of_id
+                : (int) $snapshot->id;
+            abort_unless($rootId > 0, 404);
+
+            $rootAdministration = ClientMedicationAdministration::query()
+                ->whereKey($rootId)
+                ->where('client_id', $canonicalClient->id)
+                ->where('client_medication_id', $canonicalMedication->id)
+                ->where(function ($query): void {
+                    $query->where('is_correction', false)
+                        ->orWhereNull('is_correction');
+                })
+                ->lockForUpdate()
+                ->first();
+            abort_unless($rootAdministration !== null, 404);
+
+            $corrections = ClientMedicationAdministration::query()
+                ->where('corrected_of_id', $rootAdministration->id)
+                ->where('client_id', $canonicalClient->id)
+                ->where('client_medication_id', $canonicalMedication->id)
+                ->where('is_correction', true)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $submittedAdministration = $snapshot->is($rootAdministration)
+                ? $rootAdministration
+                : $corrections->first(
+                    fn (ClientMedicationAdministration $candidate): bool => $candidate->is($snapshot),
+                );
+            abort_unless($submittedAdministration instanceof ClientMedicationAdministration, 404);
+
+            $approvedWinner = $corrections
+                ->filter(
+                    fn (ClientMedicationAdministration $candidate): bool => $candidate->correction_status === 'approved',
+                )
+                ->sort(function (
+                    ClientMedicationAdministration $left,
+                    ClientMedicationAdministration $right,
+                ): int {
+                    $leftApprovedAt = $left->correction_approved_at?->getTimestamp() ?? PHP_INT_MIN;
+                    $rightApprovedAt = $right->correction_approved_at?->getTimestamp() ?? PHP_INT_MIN;
+
+                    return $leftApprovedAt === $rightApprovedAt
+                        ? (int) $right->id <=> (int) $left->id
+                        : $rightApprovedAt <=> $leftApprovedAt;
+                })
+                ->first();
+            $effectiveAdministration = $approvedWinner ?? $rootAdministration;
+
+            abort_unless(
+                $submittedAdministration->is($rootAdministration)
+                || $submittedAdministration->is($effectiveAdministration),
+                404,
+            );
+
+            $pendingSibling = $corrections->first(
+                fn (ClientMedicationAdministration $candidate): bool => $candidate->correction_status === 'pending',
+            );
+            if ($pendingSibling !== null) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'A correction for this administration is already awaiting approval.',
+                ], 409);
+            }
+
+            $data = $request->validate([
+                'status' => ['required', 'in:given,refused,missed,withheld'],
+                'reason' => ['nullable', 'string', 'max:500'],
+                'dose_given' => ['nullable', 'string', 'max:255'],
+                'notes' => ['nullable', 'string', 'max:2000'],
+                'administered_at' => ['nullable', 'date'],
+                'correction_reason' => ['required', 'string', 'max:500'],
+            ]);
+
+            if (
+                (bool) $canonicalMedication->controlled_drug
+                && (($effectiveAdministration->status === 'given') !== ($data['status'] === 'given'))
+            ) {
+                throw ValidationException::withMessages([
+                    'status' => 'A controlled medication correction cannot change whether stock was administered without a separate witnessed register reconciliation.',
+                ]);
+            }
+            $this->assertCorrectionClinicalIntegrity($canonicalMedication, $effectiveAdministration, $data);
+            if (
+                (bool) $canonicalMedication->controlled_drug
+                && $effectiveAdministration->witnessed_by !== null
+                && (int) $effectiveAdministration->administered_by === (int) $effectiveAdministration->witnessed_by
+            ) {
+                throw ValidationException::withMessages([
+                    'administration' => 'Controlled medication evidence must retain an administering worker distinct from its witness.',
+                ]);
+            }
+
+            // Check correction time window
+            $windowAnchor = $rootAdministration->administered_at
+                ?? $rootAdministration->updated_at
+                ?? $rootAdministration->created_at;
+            $minutesSince = $windowAnchor?->diffInMinutes(now()) ?? 999999;
+            if ($minutesSince > 30 && empty($data['correction_reason'])) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Correction reason is required when correcting after 30 minutes.',
+                ], 422);
+            }
+
+            // Create correction record
+            $correction = $effectiveAdministration->replicate([
+                'id',
+                'client_request_uuid',
+                'correction_requested_by',
+                'correction_status',
+                'correction_approved_by',
+                'correction_approved_at',
+                'correction_rejection_reason',
+                'deleted_at',
+                'created_at',
+                'updated_at',
+            ]);
+            $correction->is_correction = true;
+            $correction->corrected_of_id = $rootAdministration->id;
+            $correction->correction_reason = $data['correction_reason'];
+            $correction->status = $data['status'];
+            $correction->reason = $data['reason'] ?? $effectiveAdministration->reason;
+            $correction->dose_given = $data['dose_given'] ?? $effectiveAdministration->dose_given;
+            $correction->notes = $data['notes'] ?? $effectiveAdministration->notes;
+            $correction->administered_at = $data['administered_at'] ?? $effectiveAdministration->administered_at;
+            if ($correction->status !== 'given') {
+                foreach (ClientMedicationAdministration::ADMINISTRATION_ONLY_EVIDENCE_FIELDS as $field) {
+                    $correction->{$field} = null;
+                }
+            }
+            $correction->correction_requested_by = $user->id;
+            $correction->correction_status = 'pending';
+            $correction->save();
+
+            // Timeline event
+            app(TimelineEmitter::class)->record([
+                'source_type' => ClientMedicationAdministration::class,
+                'source_id' => $correction->id,
+                'occurred_at' => now(),
+                'type' => 'medication_correction',
+                'actor_user_id' => $user->id,
+                'client_id' => $canonicalClient->id,
+                'shift_id' => $effectiveAdministration->shift_id,
+                'site_id' => $canonicalClient->site_id,
+                'subject' => 'Medication corrected: '.$canonicalMedication->name,
+                'body' => $data['correction_reason'],
+                'meta' => array_filter([
+                    'corrected_from' => $effectiveAdministration->status,
+                    'corrected_to' => $data['status'],
+                    'original_administration_id' => $rootAdministration->id,
+                ]),
+                'visibility' => 'internal',
+                'is_pinned' => false,
+                'created_by' => $user->id,
+            ]);
+
+            // Handle incident for significant corrections
+            if ($minutesSince > 240) { // 4 hours
+                $this->incidentService->handleUnsafeCorrection($rootAdministration, $data, $user->id, $correction);
+            }
+
             return response()->json([
-                'success' => false,
-                'error' => 'Correction reason is required when correcting after 30 minutes.',
-            ], 422);
+                'success' => true,
+                'correction' => [
+                    'id' => $correction->id,
+                    'status' => $correction->status,
+                    'is_correction' => true,
+                    'correction_status' => $correction->correction_status,
+                ],
+            ]);
+        }, 3);
+    }
+
+    /** @param array<string, mixed> $data */
+    private function assertCorrectionClinicalIntegrity(
+        ClientMedication $medication,
+        ClientMedicationAdministration $effectiveAdministration,
+        array $data,
+    ): void {
+        $currentStatus = (string) $effectiveAdministration->status;
+        $correctedStatus = (string) $data['status'];
+
+        if ($currentStatus !== 'given' && $correctedStatus === 'given') {
+            throw ValidationException::withMessages([
+                'status' => 'A correction cannot create a given administration without the governed administration workflow and its required clinical evidence.',
+            ]);
+        }
+        if (! $medication->controlled_drug || $currentStatus !== 'given' || $correctedStatus !== 'given') {
+            return;
         }
 
-        // Create correction record
-        $correction = $administration->replicate([
-            'id',
-            'created_at',
-            'updated_at',
-        ]);
-        $correction->is_correction = true;
-        $correction->corrected_of_id = $administration->id;
-        $correction->correction_reason = $data['correction_reason'];
-        $correction->status = $data['status'];
-        $correction->reason = $data['reason'] ?? $administration->reason;
-        $correction->dose_given = $data['dose_given'] ?? $administration->dose_given;
-        $correction->notes = $data['notes'] ?? $administration->notes;
-        $correction->administered_at = $data['administered_at'] ?? $administration->administered_at;
-        $correction->administered_by = $user->id;
-        $correction->save();
-
-        // Timeline event
-        app(TimelineEmitter::class)->record([
-            'source_type' => ClientMedicationAdministration::class,
-            'source_id' => $correction->id,
-            'occurred_at' => now(),
-            'type' => 'medication_correction',
-            'actor_user_id' => $user->id,
-            'client_id' => $client->id,
-            'shift_id' => $administration->shift_id,
-            'site_id' => $client->site_id,
-            'subject' => 'Medication corrected: '.($administration->medication?->name ?? 'Unknown'),
-            'body' => $data['correction_reason'],
-            'meta' => array_filter([
-                'corrected_from' => $administration->status,
-                'corrected_to' => $data['status'],
-                'original_administration_id' => $administration->id,
-            ]),
-            'visibility' => 'internal',
-            'is_pinned' => false,
-            'created_by' => $user->id,
-        ]);
-
-        // Handle incident for significant corrections
-        if ($minutesSince > 240) { // 4 hours
-            $this->incidentService->handleUnsafeCorrection($administration, $data, $user->id, $correction);
+        if (array_key_exists('dose_given', $data)) {
+            $submittedDose = $data['dose_given'] === null ? null : trim((string) $data['dose_given']);
+            $recordedDose = $effectiveAdministration->dose_given === null
+                ? null
+                : trim((string) $effectiveAdministration->dose_given);
+            if ($submittedDose !== $recordedDose) {
+                throw ValidationException::withMessages([
+                    'dose_given' => 'A controlled medication correction cannot change the recorded dose without witnessed register reconciliation.',
+                ]);
+            }
         }
 
-        return response()->json([
-            'success' => true,
-            'correction' => [
-                'id' => $correction->id,
-                'status' => $correction->status,
-                'is_correction' => true,
-            ],
-        ]);
+        if (array_key_exists('administered_at', $data) && $data['administered_at'] !== null) {
+            $recordedAt = $effectiveAdministration->administered_at;
+            if ($recordedAt === null || ! Carbon::parse($data['administered_at'])->utc()->equalTo($recordedAt->copy()->utc())) {
+                throw ValidationException::withMessages([
+                    'administered_at' => 'A controlled medication correction cannot change the administration time without witnessed register reconciliation.',
+                ]);
+            }
+        }
     }
 
     /**
@@ -1073,24 +1456,23 @@ class MedicationsApiController extends Controller
     public function getDashboardAlerts(Request $request, ?Client $client = null)
     {
         $user = $request->user();
+        abort_unless($user, 403);
+        $clientId = $client ? (int) $client->id : null;
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $user,
+            MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            requestedClientId: $clientId,
+        );
 
-        if ($client) {
-            $this->authorize('viewMedications', $client);
-            $alertsQuery = MedicationDashboardAlert::forClient($client->id)
-                ->active()
-                ->with(['medication:id,name', 'client:id,first_name,last_name'])
-                ->orderByRaw("FIELD(severity, 'critical', 'warning', 'info')")
-                ->orderByDesc('created_at');
-        } else {
-            // Global alerts - check permissions
-            abort_unless($user->canDo('medications.view'), 403);
-
-            $alertsQuery = MedicationDashboardAlert::active()
-                ->with(['medication:id,name', 'client:id,first_name,last_name'])
-                ->orderByRaw("FIELD(severity, 'critical', 'warning', 'info')")
-                ->orderByDesc('created_at')
-                ->limit(50);
-        }
+        $alertsQuery = MedicationDashboardAlert::query()
+            ->active()
+            ->when($clientId, fn ($query) => $query->where('client_id', $clientId));
+        $alertsQuery = $this->governanceScope
+            ->scopeCanonicalClientMedicationRows($alertsQuery, $siteIds)
+            ->with(['medication:id,name', 'client:id,first_name,last_name'])
+            ->orderByRaw("FIELD(severity, 'critical', 'warning', 'info')")
+            ->orderByDesc('created_at')
+            ->limit(50);
 
         $this->constrainControlledAlertVisibility(
             $alertsQuery,
@@ -1126,15 +1508,11 @@ class MedicationsApiController extends Controller
     public function acknowledgeAlert(Request $request, int $alertId)
     {
         $user = $request->user();
+        abort_unless($user, 403);
 
-        $alert = MedicationDashboardAlert::findOrFail($alertId);
-        $this->assertCanViewAlert($request, $alert);
+        [$alert] = $this->authorizedDashboardAlert($user, $alertId);
 
-        // Verify user can access this client's medication data
-        $client = Client::findOrFail($alert->client_id);
-        $this->authorize('viewMedications', $client);
-
-        $success = $this->alertService->acknowledgeAlert($alertId, $user->id);
+        $success = $this->alertService->acknowledgeAlert($alert, $user);
 
         return response()->json([
             'success' => $success,
@@ -1147,28 +1525,42 @@ class MedicationsApiController extends Controller
     public function resolveAlert(Request $request, int $alertId)
     {
         $user = $request->user();
-
-        abort_unless(
-            $user->canDo('medications.administer.correct') || $user->canDo('clients.update'),
-            403
-        );
-
-        $alert = MedicationDashboardAlert::findOrFail($alertId);
-        $this->assertCanViewAlert($request, $alert);
-
-        // Verify user can access this client's medication data
-        $client = Client::findOrFail($alert->client_id);
-        $this->authorize('viewMedications', $client);
+        abort_unless($user, 403);
+        [$alert] = $this->authorizedDashboardAlert($user, $alertId);
 
         $data = $request->validate([
             'resolution_notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $success = $this->alertService->resolveAlert($alertId, $data['resolution_notes'] ?? null);
+        $success = $this->alertService->resolveAlert($alert, $data['resolution_notes'] ?? null, $user);
 
         return response()->json([
             'success' => $success,
         ]);
+    }
+
+    /** @return array{MedicationDashboardAlert, array<int, int>} */
+    private function authorizedDashboardAlert(User $user, int $alertId): array
+    {
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $user,
+            'medications.administer.correct',
+        );
+
+        $alertQuery = $this->governanceScope
+            ->scopeCanonicalClientMedicationRows(
+                MedicationDashboardAlert::query()->whereKey($alertId),
+                $siteIds,
+            )
+            ->with('client:id,site_id');
+        $this->constrainControlledAlertVisibility(
+            $alertQuery,
+            $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
+                && $user->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY),
+        );
+        $alert = $alertQuery->firstOrFail();
+
+        return [$alert, $siteIds];
     }
 
     /**
@@ -1178,20 +1570,20 @@ class MedicationsApiController extends Controller
     {
         $user = $request->user();
 
-        abort_unless($user->canDo('medications.view'), 403);
-
-        $clientId = $request->input('client_id');
-
-        // If not global view, restrict to assigned clients
-        if (! $user->canDo('clients.viewAny') && $clientId) {
-            $assignedIds = $user->assignedClients()->pluck('clients.id')->toArray();
-            if (! in_array((int) $clientId, $assignedIds)) {
-                abort(403);
-            }
-        }
+        abort_unless($user, 403);
+        $filters = $request->validate([
+            'client_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+        ]);
+        $clientId = isset($filters['client_id']) ? (int) $filters['client_id'] : null;
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $user,
+            MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            requestedClientId: $clientId,
+        );
 
         $widgets = $this->alertService->getGlobalDashboardWidgets(
             $clientId,
+            $siteIds,
             $user->canDo('medications.controlled.view'),
         );
 
@@ -1206,30 +1598,63 @@ class MedicationsApiController extends Controller
         $user = $request->user();
 
         abort_unless(
-            $user->canDo('medications.reports.export') || $user->canDo('reports.viewAny'),
-            403
+            $user
+            && ($user->canDo('reports.viewAny') || $user->canDo('medications.reports.export')),
+            403,
         );
 
-        $reportType = $request->input('type', 'mar');
+        $filters = $request->validate([
+            'type' => ['sometimes', 'string', 'in:mar,prn,missed,late,controlled_balance,controlled_discrepancies,changes,incidents,audit'],
+            'client_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'site_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'date_from' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'date_to' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+        ]);
+        $reportType = $filters['type'] ?? 'mar';
         if (in_array($reportType, ['controlled_balance', 'controlled_discrepancies'], true)) {
             abort_unless($user->canDo('medications.controlled.view'), 403);
         }
-        $clientId = $request->input('client_id');
-        $dateFrom = $request->input('date_from') ? Carbon::parse($request->input('date_from')) : null;
-        $dateTo = $request->input('date_to') ? Carbon::parse($request->input('date_to')) : null;
+        $clientId = isset($filters['client_id']) ? (int) $filters['client_id'] : null;
+        $siteId = isset($filters['site_id']) ? (int) $filters['site_id'] : null;
+        $readerSiteIds = $this->reportSiteIds($user, $siteId, $clientId);
+        $includeControlled = $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
+        $dateFrom = filled($filters['date_from'] ?? null) ? Carbon::parse($filters['date_from']) : null;
+        $dateTo = filled($filters['date_to'] ?? null) ? Carbon::parse($filters['date_to']) : null;
+        if ($dateFrom !== null && $dateTo !== null && $dateTo->lt($dateFrom)) {
+            throw ValidationException::withMessages([
+                'date_to' => 'The date to field must be a date after or equal to date from.',
+            ]);
+        }
 
         $report = match ($reportType) {
-            'mar' => $this->reportingService->exportMar($clientId, $dateFrom, $dateTo),
-            'prn' => $this->reportingService->reportPrnUsage($clientId, $dateFrom, $dateTo),
-            'missed' => $this->reportingService->reportMissedDoses($clientId, $dateFrom, $dateTo),
-            'late' => $this->reportingService->reportLateDoses($clientId, $dateFrom, $dateTo),
-            'controlled_balance' => $this->reportingService->reportControlledDrugBalance($clientId),
-            'controlled_discrepancies' => $this->reportingService->reportControlledDiscrepancies($clientId, null, $dateFrom, $dateTo),
-            'changes' => $this->reportingService->reportMedicationChanges($clientId, null, $dateFrom, $dateTo),
-            'incidents' => $this->reportingService->reportMedicationIncidents($clientId, $dateFrom, $dateTo),
-            'audit' => $this->reportingService->generateAuditReport($clientId, $dateFrom, $dateTo),
+            'mar' => $this->reportingService->exportMar($clientId, $dateFrom, $dateTo, null, null, null, $readerSiteIds, $includeControlled),
+            'prn' => $this->reportingService->reportPrnUsage($clientId, $dateFrom, $dateTo, null, $readerSiteIds, $includeControlled),
+            'missed' => $this->reportingService->reportMissedDoses($clientId, $dateFrom, $dateTo, $readerSiteIds, $includeControlled),
+            'late' => $this->reportingService->reportLateDoses($clientId, $dateFrom, $dateTo, 30, $readerSiteIds, $includeControlled),
+            'controlled_balance' => $this->reportingService->reportControlledDrugBalance($clientId, null, $readerSiteIds),
+            'controlled_discrepancies' => $this->reportingService->reportControlledDiscrepancies($clientId, null, $dateFrom, $dateTo, $readerSiteIds),
+            'changes' => $this->reportingService->reportMedicationChanges($clientId, null, $dateFrom, $dateTo, $readerSiteIds, $includeControlled),
+            'incidents' => $this->reportingService->reportMedicationIncidents(
+                $clientId,
+                $dateFrom,
+                $dateTo,
+                $readerSiteIds,
+                $includeControlled,
+            ),
+            'audit' => $this->reportingService->generateAuditReport($clientId, $dateFrom, $dateTo, $readerSiteIds, $includeControlled),
             default => throw new \InvalidArgumentException('Invalid report type'),
         };
+
+        if ($reportType === 'audit' && ! $user->canDo('medications.controlled.view')) {
+            unset($report['controlled_summary']);
+            unset($report['compliance_metrics']['witness_compliance_percentage']);
+            $report['safety_alerts'] = $this->ordinaryAuditSafetyAlerts(
+                $clientId,
+                ($dateFrom ?? now()->subDays(30))->copy(),
+                ($dateTo ?? now())->copy(),
+                $readerSiteIds,
+            );
+        }
 
         return response()->json($report);
     }
@@ -1242,25 +1667,41 @@ class MedicationsApiController extends Controller
         $user = $request->user();
 
         abort_unless(
-            $user->canDo('medications.reports.export') || $user->canDo('reports.viewAny'),
-            403
+            $user
+            && ($user->canDo('reports.viewAny') || $user->canDo('medications.reports.export')),
+            403,
         );
 
-        $reportType = $request->input('type', 'mar');
+        $filters = $request->validate([
+            'type' => ['sometimes', 'string', 'in:mar,prn,missed,late,controlled_discrepancies,changes'],
+            'client_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'site_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'date_from' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'date_to' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+        ]);
+        $reportType = $filters['type'] ?? 'mar';
         if ($reportType === 'controlled_discrepancies') {
             abort_unless($user->canDo('medications.controlled.view'), 403);
         }
-        $clientId = $request->input('client_id');
-        $dateFrom = $request->input('date_from') ? Carbon::parse($request->input('date_from')) : null;
-        $dateTo = $request->input('date_to') ? Carbon::parse($request->input('date_to')) : null;
+        $clientId = isset($filters['client_id']) ? (int) $filters['client_id'] : null;
+        $siteId = isset($filters['site_id']) ? (int) $filters['site_id'] : null;
+        $readerSiteIds = $this->reportSiteIds($user, $siteId, $clientId);
+        $includeControlled = $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
+        $dateFrom = filled($filters['date_from'] ?? null) ? Carbon::parse($filters['date_from']) : null;
+        $dateTo = filled($filters['date_to'] ?? null) ? Carbon::parse($filters['date_to']) : null;
+        if ($dateFrom !== null && $dateTo !== null && $dateTo->lt($dateFrom)) {
+            throw ValidationException::withMessages([
+                'date_to' => 'The date to field must be a date after or equal to date from.',
+            ]);
+        }
 
         $report = match ($reportType) {
-            'mar' => $this->reportingService->exportMar($clientId, $dateFrom, $dateTo),
-            'prn' => $this->reportingService->reportPrnUsage($clientId, $dateFrom, $dateTo),
-            'missed' => $this->reportingService->reportMissedDoses($clientId, $dateFrom, $dateTo),
-            'late' => $this->reportingService->reportLateDoses($clientId, $dateFrom, $dateTo),
-            'controlled_discrepancies' => $this->reportingService->reportControlledDiscrepancies($clientId, null, $dateFrom, $dateTo),
-            'changes' => $this->reportingService->reportMedicationChanges($clientId, null, $dateFrom, $dateTo),
+            'mar' => $this->reportingService->exportMar($clientId, $dateFrom, $dateTo, null, null, null, $readerSiteIds, $includeControlled),
+            'prn' => $this->reportingService->reportPrnUsage($clientId, $dateFrom, $dateTo, null, $readerSiteIds, $includeControlled),
+            'missed' => $this->reportingService->reportMissedDoses($clientId, $dateFrom, $dateTo, $readerSiteIds, $includeControlled),
+            'late' => $this->reportingService->reportLateDoses($clientId, $dateFrom, $dateTo, 30, $readerSiteIds, $includeControlled),
+            'controlled_discrepancies' => $this->reportingService->reportControlledDiscrepancies($clientId, null, $dateFrom, $dateTo, $readerSiteIds),
+            'changes' => $this->reportingService->reportMedicationChanges($clientId, null, $dateFrom, $dateTo, $readerSiteIds, $includeControlled),
             default => throw new \InvalidArgumentException('Invalid report type'),
         };
 
@@ -1290,7 +1731,13 @@ class MedicationsApiController extends Controller
             abort(404);
         }
 
-        $summary = $this->marService->getShiftSummary($shiftId);
+        $summary = $this->marService->getShiftSummary(
+            $shiftId,
+            $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+            (int) $shift->client_id,
+            (int) $shift->site_id,
+            is_numeric($shift->user_id) ? (int) $shift->user_id : null,
+        );
 
         return response()->json($summary);
     }
@@ -1362,10 +1809,15 @@ class MedicationsApiController extends Controller
      */
     public function getMedicationVersions(Request $request, Client $client, ClientMedication $medication)
     {
-        $this->authorize('viewMedications', $client);
-        abort_unless($medication->client_id === $client->id, 404);
+        $this->authorizeReadableMedication($request, $client, $medication);
 
-        $versions = MedicationOrderVersion::where('client_medication_id', $medication->id)
+        $versions = MedicationOrderVersion::query()
+            ->where('client_id', $client->id)
+            ->where('client_medication_id', $medication->id)
+            ->when(
+                ! $request->user()->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+                fn ($query) => $query->where('controlled_drug', false),
+            )
             ->orderByDesc('version_number')
             ->get()
             ->map(fn ($v) => [
@@ -1397,13 +1849,26 @@ class MedicationsApiController extends Controller
      */
     public function getScheduledStockCounts(Request $request, Client $client, ClientMedication $medication)
     {
-        $this->authorize('viewMedications', $client);
-        abort_unless($medication->client_id === $client->id, 404);
-        if ($medication->controlled_drug) {
-            abort_unless($request->user()?->canDo('medications.controlled.view'), 403);
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $actor,
+            MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            requestedClientId: (int) $client->id,
+        );
+        $client = Client::query()->whereKey($client->id)->whereIn('site_id', $siteIds)->firstOrFail();
+        $medicationQuery = ClientMedication::query()
+            ->current()
+            ->whereKey($medication->id)
+            ->where('client_id', $client->id);
+        if (! $actor->canDo('medications.controlled.view')) {
+            $medicationQuery->where('controlled_drug', false);
         }
+        $medication = $medicationQuery->firstOrFail();
 
-        $counts = MedicationScheduledStockCount::where('client_medication_id', $medication->id)
+        $counts = MedicationScheduledStockCount::query()
+            ->where('client_id', $client->id)
+            ->where('client_medication_id', $medication->id)
             ->orderByDesc('scheduled_date')
             ->orderByDesc('scheduled_time')
             ->limit(20)
@@ -1413,9 +1878,15 @@ class MedicationsApiController extends Controller
                 'scheduled_date' => $c->scheduled_date?->toDateString(),
                 'scheduled_time' => $c->scheduled_time?->format('H:i'),
                 'status' => $c->status,
-                'expected_quantity' => $c->expected_quantity,
-                'actual_quantity' => $c->actual_quantity,
-                'discrepancy' => $c->discrepancy,
+                'expected_quantity' => $c->expected_quantity !== null
+                    ? MedicationStockQuantity::toFloat($c->expected_quantity)
+                    : null,
+                'actual_quantity' => $c->actual_quantity !== null
+                    ? MedicationStockQuantity::toFloat($c->actual_quantity)
+                    : null,
+                'discrepancy' => $c->discrepancy !== null
+                    ? MedicationStockQuantity::toFloat($c->discrepancy)
+                    : null,
                 'notes' => $c->notes,
                 'completed_by' => $c->completedBy?->name,
                 'witnessed_by' => $c->witnessedBy?->name,
@@ -1427,7 +1898,9 @@ class MedicationsApiController extends Controller
             'medication' => [
                 'id' => $medication->id,
                 'name' => $medication->name,
-                'on_hand' => $medication->stock?->on_hand,
+                'on_hand' => $medication->stock?->on_hand !== null
+                    ? MedicationStockQuantity::toFloat($medication->stock->on_hand)
+                    : null,
                 'scan_verification' => $this->buildMedicationScanPayload($client, $medication),
             ],
             'counts' => $counts,
@@ -1439,66 +1912,131 @@ class MedicationsApiController extends Controller
      */
     public function createScheduledStockCount(Request $request, Client $client, ClientMedication $medication)
     {
-        $this->authorize('viewMedications', $client);
-        abort_unless($medication->client_id === $client->id, 404);
-
         $user = $request->user();
-        abort_unless($user->canDo('medications.stock.update'), 403);
-        if ($medication->controlled_drug) {
-            abort_unless($user->canDo('medications.controlled.record'), 403);
-        }
+        abort_unless($user, 403);
 
-        $data = $request->validate([
-            'scheduled_date' => ['required', 'date'],
-            'scheduled_time' => ['nullable', 'date_format:H:i'],
-            'expected_quantity' => ['nullable', 'integer', 'min:0'],
-            'notes' => ['nullable', 'string'],
-            'client_request_uuid' => ['nullable', 'uuid'],
-            'captured_offline_at' => ['nullable', 'date'],
-            'origin_device_id' => ['nullable', 'string', 'max:255'],
-            'queued_offline' => ['nullable', 'boolean'],
-        ]);
+        $payload = $this->governanceScope->forMedication(
+            $user,
+            (int) $medication->id,
+            MedicationGovernanceScopeService::STOCK_CAPABILITY,
+            function (Client $canonicalClient, ClientMedication $canonicalMedication) use ($request, $user): array {
+                if ((bool) $canonicalMedication->controlled_drug) {
+                    abort_unless(
+                        $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+                        404,
+                    );
+                    throw ValidationException::withMessages([
+                        'client_medication_id' => 'Controlled drug stock counts must be recorded through the controlled-drug balance check with a second witness.',
+                    ]);
+                }
 
-        if ($cached = $this->getCachedIdempotentResponse('scheduled-stock-count:create', $data)) {
-            if (
-                (int) data_get($cached, 'count.client_id') !== (int) $client->id
-                || (int) data_get($cached, 'count.client_medication_id') !== (int) $medication->id
-            ) {
-                return response()->json(
-                    $this->buildConflictPayload(
+                $data = $request->validate([
+                    'scheduled_date' => ['required', 'date'],
+                    'scheduled_time' => ['nullable', 'date_format:H:i'],
+                    'expected_quantity' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
+                    'notes' => ['nullable', 'string'],
+                    ...$this->medicationOfflineSubmissionRules($request),
+                ]);
+                if (($data['expected_quantity'] ?? null) !== null) {
+                    $data['expected_quantity'] = MedicationStockQuantity::normalize($data['expected_quantity']);
+                }
+
+                // Keep the replay namespace global for this queueable action so
+                // a request UUID cannot be reused by another actor or target.
+                // Actor and canonical target identity belong in the fingerprint.
+                $scope = 'scheduled-count:create';
+                $fingerprint = hash('sha256', json_encode([
+                    'actor_id' => (int) $user->id,
+                    'client_id' => (int) $canonicalClient->id,
+                    'client_medication_id' => (int) $canonicalMedication->id,
+                    'scheduled_date' => $data['scheduled_date'],
+                    'scheduled_time' => $data['scheduled_time'] ?? null,
+                    'expected_quantity' => $data['expected_quantity'] ?? null,
+                    'notes' => $data['notes'] ?? null,
+                    'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                    'origin_device_id' => $data['origin_device_id'] ?? null,
+                    'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+                ], JSON_THROW_ON_ERROR));
+
+                try {
+                    $replayed = $this->governanceScope->idempotencyResult(
+                        $scope,
                         $data,
-                        'This scheduled count request was already used for a different client or medication. Please schedule this count again with a new request identifier.',
-                    ),
-                    409,
+                        $fingerprint,
+                        durable: true,
+                    );
+                } catch (ValidationException) {
+                    return $this->buildConflictPayload(
+                        $data,
+                        'This stock count request was already used for a different target or payload. Please submit it again with a new request identifier.',
+                    );
+                }
+
+                if ($replayed) {
+                    return $this->withSync(
+                        $replayed,
+                        $data,
+                        'duplicate',
+                        true,
+                        'This medication request was already processed.',
+                    );
+                }
+
+                $stock = ClientMedicationStock::query()
+                    ->where('client_medication_id', $canonicalMedication->id)
+                    ->lockForUpdate()
+                    ->first();
+                $expectedQuantity = $data['expected_quantity']
+                    ?? ($stock?->on_hand !== null ? MedicationStockQuantity::normalize($stock->on_hand) : null);
+
+                $count = MedicationScheduledStockCount::create([
+                    'client_id' => $canonicalClient->id,
+                    'client_medication_id' => $canonicalMedication->id,
+                    'scheduled_date' => $data['scheduled_date'],
+                    'scheduled_time' => ($data['scheduled_time'] ?? null)
+                        ? $data['scheduled_date'].' '.$data['scheduled_time']
+                        : null,
+                    'expected_quantity' => $expectedQuantity,
+                    'status' => 'pending',
+                    'notes' => $data['notes'] ?? null,
+                ]);
+
+                AuditLogger::logOrFail('medications.stock.count.scheduled', $count, array_filter([
+                    'actor_id' => $user->id,
+                    'client_id' => $canonicalClient->id,
+                    'client_medication_id' => $canonicalMedication->id,
+                    'expected_quantity' => $expectedQuantity,
+                    'scheduled_date' => $data['scheduled_date'],
+                    'scheduled_time' => $data['scheduled_time'] ?? null,
+                    'client_request_uuid' => $data['client_request_uuid'] ?? null,
+                    'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                    'origin_device_id' => $data['origin_device_id'] ?? null,
+                    'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+                ], fn ($value) => $value !== null && $value !== ''));
+
+                $payload = $this->withSync([
+                    'success' => true,
+                    'count' => [
+                        'id' => $count->id,
+                        'scheduled_date' => $count->scheduled_date->toDateString(),
+                        'status' => $count->status,
+                    ],
+                ], $data, $this->medicationProcessedStatus($data));
+
+                return $this->governanceScope->rememberIdempotencyResult(
+                    $scope,
+                    $data,
+                    $payload,
+                    $fingerprint,
+                    durable: true,
                 );
-            }
-
-            return response()->json($cached);
-        }
-
-        $count = MedicationScheduledStockCount::create([
-            'client_id' => $client->id,
-            'client_medication_id' => $medication->id,
-            'scheduled_date' => $data['scheduled_date'],
-            'scheduled_time' => $data['scheduled_time'] ? $data['scheduled_date'].' '.$data['scheduled_time'] : null,
-            'expected_quantity' => $data['expected_quantity'] ?? $medication->stock?->on_hand,
-            'status' => 'pending',
-            'notes' => $data['notes'] ?? null,
-        ]);
-
-        $payload = $this->withSync([
-            'success' => true,
-            'count' => [
-                'id' => $count->id,
-                'client_id' => $count->client_id,
-                'client_medication_id' => $count->client_medication_id,
-                'scheduled_date' => $count->scheduled_date->toDateString(),
-                'status' => $count->status,
-            ],
-        ], $data, 'processed');
+            },
+            (int) $client->id,
+        );
 
         return response()->json(
-            $this->rememberIdempotentResponse('scheduled-stock-count:create', $data, $payload)
+            $payload,
+            data_get($payload, 'sync.status') === 'conflict' ? 409 : 200,
         );
     }
 
@@ -1507,118 +2045,150 @@ class MedicationsApiController extends Controller
      */
     public function completeScheduledStockCount(Request $request, Client $client, MedicationScheduledStockCount $count)
     {
-        $this->authorize('viewMedications', $client);
-        abort_unless($count->client_id === $client->id, 404);
-
         $user = $request->user();
-        abort_unless($user->canDo('medications.stock.update'), 403);
+        abort_unless($user, 403);
 
-        // Controlled stock counts require the dedicated controlled action too.
-        $medication = $count->medication;
-        abort_unless(
-            $medication && (int) $medication->client_id === (int) $client->id,
-            404,
-        );
-        $requiresWitness = (bool) $medication->controlled_drug;
-        if ($requiresWitness) {
-            abort_unless($user->canDo('medications.controlled.record'), 403);
-        }
+        $payload = $this->governanceScope->forScheduledStockCount(
+            $user,
+            (int) $client->id,
+            $count,
+            function (
+                Client $canonicalClient,
+                ClientMedication $medication,
+                MedicationScheduledStockCount $lockedCount,
+                ?ClientMedicationStock $stock,
+            ) use ($request, $user): array {
+                if ((bool) $medication->controlled_drug) {
+                    abort_unless(
+                        $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+                        404,
+                    );
+                    throw ValidationException::withMessages([
+                        'client_medication_id' => 'Controlled drug stock counts must be recorded through the controlled-drug balance check with a second witness.',
+                    ]);
+                }
 
-        $data = $request->validate([
-            'actual_quantity' => ['required', 'integer', 'min:0'],
-            'notes' => ['nullable', 'string'],
-            'witnessed_by' => $requiresWitness ? ['required', 'integer', 'exists:users,id'] : ['nullable'],
-            'client_request_uuid' => ['nullable', 'uuid'],
-            'captured_offline_at' => ['nullable', 'date'],
-            'origin_device_id' => ['nullable', 'string', 'max:255'],
-            'queued_offline' => ['nullable', 'boolean'],
-            'scan_code' => ['nullable', 'string', 'max:255'],
-            'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
-            'scan_verified' => ['nullable', 'boolean'],
-            'scan_match_source' => ['nullable', 'string', 'max:50'],
-        ]);
-
-        if ($requiresWitness && (int) $data['witnessed_by'] === (int) $user->id) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Witness must be a different user.',
-            ], 422);
-        }
-
-        if ($requiresWitness) {
-            $witness = User::query()->find((int) $data['witnessed_by']);
-            if (! $witness?->canDo('medications.controlled.witness')) {
-                throw ValidationException::withMessages([
-                    'witnessed_by' => 'The selected witness is not authorised to witness controlled drug records.',
+                $data = $request->validate([
+                    'actual_quantity' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
+                    'notes' => ['nullable', 'string'],
+                    ...$this->medicationOfflineSubmissionRules($request),
+                    'scan_code' => ['nullable', 'string', 'max:255'],
+                    'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
+                    'scan_verified' => ['nullable', 'boolean'],
+                    'scan_match_source' => ['nullable', 'string', 'max:50'],
                 ]);
-            }
-        }
+                $data['actual_quantity'] = MedicationStockQuantity::normalize($data['actual_quantity']);
 
-        if ($cached = $this->getCachedIdempotentResponse('scheduled-stock-count:complete', $data)) {
-            if ((int) data_get($cached, 'count.id') !== (int) $count->id) {
-                return response()->json(
-                    $this->buildConflictPayload(
+                // Completion UUIDs are likewise globally action-scoped. Actor
+                // and locked aggregate identity live in the fingerprint so
+                // cross-worker/count replay is detected rather than executed.
+                $scope = 'scheduled-count:complete';
+                $fingerprint = hash('sha256', json_encode([
+                    'actor_id' => (int) $user->id,
+                    'client_id' => (int) $canonicalClient->id,
+                    'client_medication_id' => (int) $medication->id,
+                    'scheduled_stock_count_id' => (int) $lockedCount->id,
+                    'actual_quantity' => $data['actual_quantity'],
+                    'notes' => $data['notes'] ?? null,
+                    'scan_code' => $data['scan_code'] ?? null,
+                    'scan_source' => $data['scan_source'] ?? null,
+                    'scan_verified' => (bool) ($data['scan_verified'] ?? false),
+                    'scan_match_source' => $data['scan_match_source'] ?? null,
+                    'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                    'origin_device_id' => $data['origin_device_id'] ?? null,
+                    'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+                ], JSON_THROW_ON_ERROR));
+
+                try {
+                    $replayed = $this->governanceScope->idempotencyResult(
+                        $scope,
                         $data,
-                        'This stock count completion request was already used for a different count. Please submit this completion again with a new request identifier.',
-                    ),
-                    409,
+                        $fingerprint,
+                        durable: true,
+                    );
+                } catch (ValidationException) {
+                    return $this->buildConflictPayload(
+                        $data,
+                        'This stock count completion request was already used for a different target or payload. Please submit it again with a new request identifier.',
+                    );
+                }
+
+                if ($replayed) {
+                    return $this->withSync(
+                        $replayed,
+                        $data,
+                        'duplicate',
+                        true,
+                        'This medication request was already processed.',
+                    );
+                }
+
+                if ($lockedCount->status === 'completed') {
+                    throw ValidationException::withMessages([
+                        'actual_quantity' => 'This stock count was already completed before the current request could be applied.',
+                    ]);
+                }
+
+                $scanAudit = $this->verifyMedicationScanOrFail($canonicalClient, $medication, $data);
+                $beforeOnHand = $stock?->on_hand !== null
+                    ? MedicationStockQuantity::normalize($stock->on_hand)
+                    : null;
+
+                if (! $stock) {
+                    $stock = new ClientMedicationStock(['client_medication_id' => $medication->id]);
+                }
+
+                $lockedCount->complete(
+                    $data['actual_quantity'],
+                    $data['notes'] ?? null,
+                    $user->id,
+                    null,
                 );
-            }
+                $stock->on_hand = $data['actual_quantity'];
+                $stock->last_counted_at = now();
+                $stock->save();
 
-            return response()->json($cached);
-        }
+                AuditLogger::logOrFail('medications.stock.count.completed', $lockedCount, array_filter([
+                    'actor_id' => $user->id,
+                    'client_id' => $canonicalClient->id,
+                    'client_medication_id' => $medication->id,
+                    'stock_id' => $stock->id,
+                    'on_hand_before' => $beforeOnHand,
+                    'on_hand_after' => $data['actual_quantity'],
+                    'actual_quantity' => $data['actual_quantity'],
+                    'discrepancy' => $lockedCount->discrepancy,
+                    'scan_source' => $scanAudit['scan_source'] ?? null,
+                    'scan_match_source' => $scanAudit['scan_match_source'] ?? null,
+                    'scan_match_label' => $scanAudit['scan_match_label'] ?? null,
+                    'entered_code_suffix' => $scanAudit['scan_code_suffix'] ?? null,
+                    'client_request_uuid' => $data['client_request_uuid'] ?? null,
+                    'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                    'origin_device_id' => $data['origin_device_id'] ?? null,
+                    'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+                ], fn ($value) => $value !== null && $value !== ''));
 
-        if ($count->status === 'completed') {
-            return response()->json(
-                $this->buildConflictPayload(
+                $payload = $this->withSync([
+                    'success' => true,
+                    'count' => [
+                        'id' => $lockedCount->id,
+                        'status' => 'completed',
+                        'discrepancy' => $lockedCount->discrepancy,
+                    ],
+                ], $data, ($data['queued_offline'] ?? false) ? 'synced' : 'processed');
+
+                return $this->governanceScope->rememberIdempotencyResult(
+                    $scope,
                     $data,
-                    'This stock count was already completed before the current request could be applied.',
-                ),
-                409
-            );
-        }
-
-        $scanAudit = $medication
-            ? $this->verifyMedicationScanOrFail($client, $medication, $data)
-            : null;
-
-        $count->complete(
-            $data['actual_quantity'],
-            $data['notes'] ?? null,
-            $user->id,
-            $data['witnessed_by'] ?? null
+                    $payload,
+                    $fingerprint,
+                    durable: true,
+                );
+            },
         );
-
-        // Update actual stock if different
-        if ($medication && $medication->stock && $data['actual_quantity'] !== $medication->stock->on_hand) {
-            $medication->stock->on_hand = $data['actual_quantity'];
-            $medication->stock->last_counted_at = now();
-            $medication->stock->save();
-        }
-
-        AuditLogger::log('medications.stock.count.completed', $count, array_filter([
-            'client_id' => $client->id,
-            'client_medication_id' => $medication?->id,
-            'actual_quantity' => (int) $data['actual_quantity'],
-            'discrepancy' => $count->discrepancy,
-            'witnessed_by' => $data['witnessed_by'] ?? null,
-            'scan_source' => $scanAudit['scan_source'] ?? null,
-            'scan_match_source' => $scanAudit['scan_match_source'] ?? null,
-            'scan_match_label' => $scanAudit['scan_match_label'] ?? null,
-            'entered_code_suffix' => $scanAudit['scan_code_suffix'] ?? null,
-        ], fn ($value) => $value !== null && $value !== ''));
-
-        $payload = $this->withSync([
-            'success' => true,
-            'count' => [
-                'id' => $count->id,
-                'status' => 'completed',
-                'discrepancy' => $count->discrepancy,
-            ],
-        ], $data, ($data['queued_offline'] ?? false) ? 'synced' : 'processed');
 
         return response()->json(
-            $this->rememberIdempotentResponse('scheduled-stock-count:complete', $data, $payload)
+            $payload,
+            data_get($payload, 'sync.status') === 'conflict' ? 409 : 200,
         );
     }
 
@@ -1658,7 +2228,7 @@ class MedicationsApiController extends Controller
     public function createDrugInteraction(Request $request)
     {
         $user = $request->user();
-        abort_unless($user->canDo('medications.administer.correct') || $user->canDo('clients.update'), 403);
+        abort_unless($user?->canDo('medications.administer.correct'), 403);
 
         $data = $request->validate([
             'medication_a' => ['required', 'string', 'max:255'],

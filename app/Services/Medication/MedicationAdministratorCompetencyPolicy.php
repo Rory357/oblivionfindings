@@ -42,11 +42,14 @@ class MedicationAdministratorCompetencyPolicy
             User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
         }
 
-        $latest = $this->latestAssessment($user, $lockForUpdate);
-        $assessmentFailure = $this->assessmentFailure($latest, $moment);
+        $latest = $this->latestAssessment($user, $moment, $lockForUpdate);
+        $assessmentFailure = $this->assessmentFailure($latest, $user, $moment);
 
         if ($assessmentFailure === null) {
-            $validUntil = $latest->expiry_date->copy()->endOfDay();
+            $validUntil = Carbon::parse(
+                $latest->expiry_date->toDateString(),
+                config('app.worker_timezone', 'Pacific/Auckland'),
+            )->endOfDay();
 
             return $this->decision(
                 true,
@@ -78,10 +81,18 @@ class MedicationAdministratorCompetencyPolicy
         );
     }
 
-    private function latestAssessment(User $user, bool $lockForUpdate): ?MedicationCompetencyAssessment
-    {
+    private function latestAssessment(
+        User $user,
+        CarbonInterface $moment,
+        bool $lockForUpdate,
+    ): ?MedicationCompetencyAssessment {
         if (! $lockForUpdate && $user->relationLoaded('medicationCompetencyAssessments')) {
             return $user->medicationCompetencyAssessments
+                ->filter(fn (MedicationCompetencyAssessment $assessment): bool => $this->assessmentWasEstablishedAt(
+                    $assessment,
+                    $user,
+                    $moment,
+                ))
                 ->sortByDesc(fn (MedicationCompetencyAssessment $assessment) => [
                     $assessment->assessment_date?->format('Y-m-d') ?? '',
                     $assessment->id,
@@ -89,8 +100,21 @@ class MedicationAdministratorCompetencyPolicy
                 ->first();
         }
 
+        // Date-only competency boundaries follow the worker's clinical day,
+        // while timestamp columns are persisted in the application timezone.
+        // Query bindings do not normalize a non-application Carbon timezone,
+        // so bind an explicit storage-time copy for exact instants.
+        $storageMoment = $this->storageMoment($moment);
+
         return MedicationCompetencyAssessment::query()
             ->where('user_id', $user->id)
+            ->whereDate('assessment_date', '<=', $this->clinicalDate($moment))
+            ->whereNotNull('assessor_id')
+            ->where('assessor_id', '!=', $user->id)
+            ->whereNotNull('assessor_declared_at')
+            ->where('assessor_declared_at', '<=', $storageMoment)
+            ->whereNotNull('staff_acknowledged_at')
+            ->where('staff_acknowledged_at', '<=', $storageMoment)
             ->orderByDesc('assessment_date')
             ->orderByDesc('id')
             ->when($lockForUpdate, fn (Builder $query) => $query->lockForUpdate())
@@ -100,12 +124,20 @@ class MedicationAdministratorCompetencyPolicy
     /** @return array{state: string, message: string}|null */
     private function assessmentFailure(
         ?MedicationCompetencyAssessment $assessment,
+        User $user,
         CarbonInterface $moment,
     ): ?array {
         if ($assessment === null) {
             return [
                 'state' => 'unassessed',
                 'message' => 'No medication competency assessment is on file.',
+            ];
+        }
+
+        if (! $this->assessmentWasEstablishedAt($assessment, $user, $moment)) {
+            return [
+                'state' => 'unassessed',
+                'message' => 'No medication competency assessment was established at this time.',
             ];
         }
 
@@ -123,8 +155,7 @@ class MedicationAdministratorCompetencyPolicy
             ];
         }
 
-        $expiresAt = $assessment->expiry_date->copy()->endOfDay();
-        if ($expiresAt->lt($moment)) {
+        if ($assessment->expiry_date->toDateString() < $this->clinicalDate($moment)) {
             return [
                 'state' => 'expired',
                 'message' => 'Medication competency expired on '.$assessment->expiry_date->format('j M Y').'.',
@@ -132,6 +163,37 @@ class MedicationAdministratorCompetencyPolicy
         }
 
         return null;
+    }
+
+    private function assessmentWasEstablishedAt(
+        MedicationCompetencyAssessment $assessment,
+        User $user,
+        CarbonInterface $moment,
+    ): bool {
+        return (int) $assessment->user_id === (int) $user->id
+            && $assessment->assessment_date !== null
+            && $assessment->assessment_date->toDateString() <= $this->clinicalDate($moment)
+            && $assessment->assessor_id !== null
+            && (int) $assessment->assessor_id !== (int) $user->id
+            && $assessment->assessor_declared_at !== null
+            && $assessment->assessor_declared_at->lte($moment)
+            && $assessment->staff_acknowledged_at !== null
+            && $assessment->staff_acknowledged_at->lte($moment);
+    }
+
+    private function clinicalDate(CarbonInterface $moment): string
+    {
+        return Carbon::instance($moment)
+            ->copy()
+            ->timezone(config('app.worker_timezone', 'Pacific/Auckland'))
+            ->toDateString();
+    }
+
+    private function storageMoment(CarbonInterface $moment): CarbonInterface
+    {
+        return Carbon::instance($moment)
+            ->copy()
+            ->timezone(config('app.timezone', 'UTC'));
     }
 
     private function effectiveExemption(
@@ -156,14 +218,15 @@ class MedicationAdministratorCompetencyPolicy
                 ->first();
         }
 
+        $storageMoment = $this->storageMoment($moment);
         $exemptions = MedicationCompetencyExemption::query()
             ->where('user_id', $user->id)
             ->where('site_id', $siteId)
             ->where('scope', MedicationCompetencyExemption::SCOPE_ADMINISTRATION)
             ->whereNull('revoked_at')
-            ->where('approved_at', '<=', $moment)
-            ->where('starts_at', '<=', $moment)
-            ->where('expires_at', '>=', $moment)
+            ->where('approved_at', '<=', $storageMoment)
+            ->where('starts_at', '<=', $storageMoment)
+            ->where('expires_at', '>=', $storageMoment)
             ->orderByDesc('expires_at')
             ->when($lockForUpdate, fn (Builder $query) => $query->lockForUpdate())
             ->get();

@@ -41,7 +41,13 @@ import {
     Sun,
     Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import {
+    createTransportMedicationReplayState,
+    onlineTransportMedicationEnvelope,
+    prepareTransportMedicationReplayState,
+} from './transport-medication-replay';
 
 export type ClientMedication = {
     id: number;
@@ -236,10 +242,13 @@ export function TransportWizard({
     const [submitMode, setSubmitMode] = useState<'transport' | 'pack'>(
         'transport',
     );
-    const [clientRequestUuid, setClientRequestUuid] = useState(() =>
-        crypto.randomUUID(),
-    );
+    const transportReplay = useRef(createTransportMedicationReplayState());
     const [stepIndex, setStepIndex] = useState(0);
+
+    const close = useCallback(() => {
+        transportReplay.current = createTransportMedicationReplayState();
+        onClose();
+    }, [onClose]);
 
     const selectedShift = useMemo(
         () =>
@@ -491,16 +500,31 @@ export function TransportWizard({
 
             setSubmitMode(mode);
             form.setData('medications', medications);
+            const initialPayload = {
+                ...form.data,
+                medications,
+                client_request_uuid: transportReplay.current.uuid,
+                ...onlineTransportMedicationEnvelope(medications),
+            };
+            if (medications.length > 0) {
+                transportReplay.current = prepareTransportMedicationReplayState(
+                    transportReplay.current,
+                    {
+                        action: 'create_transport_with_medications',
+                        ...initialPayload,
+                    },
+                );
+            }
             form.transform((data) => ({
                 ...data,
                 medications,
-                client_request_uuid: clientRequestUuid,
+                client_request_uuid: transportReplay.current.uuid,
+                ...onlineTransportMedicationEnvelope(medications),
             }));
             form.post('/fleet-assets/transports', {
                 preserveScroll: true,
                 onSuccess: () => {
-                    setClientRequestUuid(crypto.randomUUID());
-                    onClose();
+                    close();
                 },
                 onFinish: () => {
                     form.transform((data) => data);
@@ -510,13 +534,12 @@ export function TransportWizard({
         },
         [
             form,
-            onClose,
             safeMedications,
             scanCaptures,
             selectedMedIds,
             witnessCredentials,
             witnessIds,
-            clientRequestUuid,
+            close,
         ],
     );
 
@@ -531,7 +554,7 @@ export function TransportWizard({
     return (
         <WizardShell
             open={open}
-            onClose={onClose}
+            onClose={close}
             title="Log resident transport"
             description="Choose the resident and destination, confirm vehicle and staff, complete medication checks, and review before logging transport."
             railIcon={Car}
@@ -544,7 +567,7 @@ export function TransportWizard({
             maxWidth="min(96vw, 1120px)"
             maxHeight="min(90vh, 840px)"
             footerStart={
-                <Button type="button" variant="ghost" onClick={onClose}>
+                <Button type="button" variant="ghost" onClick={close}>
                     Cancel
                 </Button>
             }
@@ -1401,7 +1424,7 @@ export function TransportWizard({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={onClose}
+                                    onClick={close}
                                 >
                                     Cancel
                                 </Button>

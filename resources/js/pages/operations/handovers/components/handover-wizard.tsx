@@ -31,7 +31,7 @@ import {
     UserPlus,
     X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -47,10 +47,11 @@ import {
     type Handover,
     MOODS,
     clientName,
-    clientShiftsSorted,
     fmtTime,
+    incomingHandoverShifts,
     moodEmoji,
     nextShiftIdAfter,
+    outgoingHandoverShifts,
     shiftOptionLabel,
 } from './shared';
 import { type ShiftMedSnapshot, ShiftMedSummary } from './shift-med-snapshot';
@@ -76,8 +77,16 @@ type WizForm = {
     // eMAR lens: controlled-drug count reconciliation at handover.
     cd_result: '' | 'verified' | 'discrepancy';
     cd_witness: string;
+    cd_witness_credential: string;
     cd_notes: string;
 };
+
+type EditLockState =
+    | 'not_needed'
+    | 'acquiring'
+    | 'acquired'
+    | 'blocked'
+    | 'failed';
 
 const WIZ_STEPS = [
     {
@@ -122,11 +131,17 @@ function emptyForm(): WizForm {
         tasks: [],
         cd_result: '',
         cd_witness: '',
+        cd_witness_credential: '',
         cd_notes: '',
     };
 }
 
-function initFromEditing(h: Handover): WizForm {
+function initFromEditing(
+    h: Handover,
+    includeControlledEvidence: boolean,
+): WizForm {
+    const cdVerification = includeControlledEvidence ? h.cd_verification : null;
+
     return {
         client_id: h.client ? String(h.client.id) : '',
         outgoing: h.outgoing_staff ? String(h.outgoing_staff.id) : '',
@@ -140,12 +155,31 @@ function initFromEditing(h: Handover): WizForm {
         incidents: [...(h.incidents_to_note ?? [])],
         followups: [...(h.follow_up_items ?? [])],
         tasks: [...(h.tasks_pending ?? [])],
-        cd_result: h.cd_verification?.result ?? '',
-        cd_witness: h.cd_verification?.witness_id
-            ? String(h.cd_verification.witness_id)
+        cd_result: cdVerification?.result ?? '',
+        cd_witness: cdVerification?.witness_id
+            ? String(cdVerification.witness_id)
             : '',
-        cd_notes: h.cd_verification?.notes ?? '',
+        cd_witness_credential: '',
+        cd_notes: cdVerification?.notes ?? '',
     };
+}
+
+function cdEvidenceChanged(f: WizForm, editing: Handover | null): boolean {
+    const existing = editing?.cd_verification;
+    if (!existing) {
+        return Boolean(
+            f.cd_result ||
+            f.cd_witness ||
+            f.cd_witness_credential ||
+            f.cd_notes.trim(),
+        );
+    }
+
+    return (
+        f.cd_result !== existing.result ||
+        f.cd_witness !== String(existing.witness_id ?? '') ||
+        f.cd_notes.trim() !== (existing.notes ?? '').trim()
+    );
 }
 
 function readiness(f: WizForm): number {
@@ -166,6 +200,7 @@ function ListBuilder({
     placeholder,
     items,
     onChange,
+    readOnly = false,
 }: {
     icon: typeof Pill;
     tone: 'critical' | 'warning' | 'primary';
@@ -173,6 +208,7 @@ function ListBuilder({
     placeholder: string;
     items: string[];
     onChange: (items: string[]) => void;
+    readOnly?: boolean;
 }) {
     const [val, setVal] = useState('');
     const add = () => {
@@ -226,18 +262,20 @@ function ListBuilder({
                                 <span className="flex-1 leading-snug">
                                     {it}
                                 </span>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        onChange(
-                                            items.filter((_, j) => j !== i),
-                                        )
-                                    }
-                                    aria-label="Remove item"
-                                    className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                                >
-                                    <X className="h-3.5 w-3.5" />
-                                </button>
+                                {!readOnly ? (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            onChange(
+                                                items.filter((_, j) => j !== i),
+                                            )
+                                        }
+                                        aria-label="Remove item"
+                                        className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                ) : null}
                             </div>
                         ))}
                     </div>
@@ -246,28 +284,30 @@ function ListBuilder({
                         None added yet.
                     </div>
                 )}
-                <div className="flex items-center gap-2">
-                    <input
-                        className={cn(INPUT_CLASS, 'h-9')}
-                        placeholder={placeholder}
-                        value={val}
-                        onChange={(e) => setVal(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                add();
-                            }
-                        }}
-                    />
-                    <button
-                        type="button"
-                        onClick={add}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs font-semibold transition-colors hover:bg-accent"
-                    >
-                        <Plus className="h-3.5 w-3.5" />
-                        Add
-                    </button>
-                </div>
+                {!readOnly ? (
+                    <div className="flex items-center gap-2">
+                        <input
+                            className={cn(INPUT_CLASS, 'h-9')}
+                            placeholder={placeholder}
+                            value={val}
+                            onChange={(e) => setVal(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    add();
+                                }
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={add}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs font-semibold transition-colors hover:bg-accent"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            Add
+                        </button>
+                    </div>
+                ) : null}
             </div>
         </div>
     );
@@ -306,15 +346,54 @@ export function HandoverWizard({
     // eMAR lens: live medication picture for the selected outgoing shift's window.
     const [snapshot, setSnapshot] = useState<ShiftMedSnapshot | null>(null);
     const [snapLoading, setSnapLoading] = useState(false);
+    const [editLockState, setEditLockState] =
+        useState<EditLockState>('not_needed');
+    const [editLockHolder, setEditLockHolder] = useState<string | null>(null);
+    const credentialInputRef = useRef<HTMLInputElement | null>(null);
+
+    const clearWitnessCredential = () => {
+        if (credentialInputRef.current) credentialInputRef.current.value = '';
+        setF((current) =>
+            current.cd_witness_credential
+                ? { ...current, cd_witness_credential: '' }
+                : current,
+        );
+    };
+
+    const closeWizard = () => {
+        clearWitnessCredential();
+        onOpenChange(false);
+    };
 
     // Re-seed the form whenever the dialog (re)opens or the edited record changes.
     useEffect(() => {
-        if (!open) return;
+        if (!open) {
+            if (credentialInputRef.current)
+                credentialInputRef.current.value = '';
+            setF((current) =>
+                current.cd_witness_credential
+                    ? { ...current, cd_witness_credential: '' }
+                    : current,
+            );
+            return;
+        }
         setStepIndex(0);
         setErrors({});
-        setF(editing ? initFromEditing(editing) : emptyForm());
+        setF(
+            editing
+                ? initFromEditing(
+                      editing,
+                      medicationFocus && catalogue.capabilities.view_controlled,
+                  )
+                : emptyForm(),
+        );
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, editing?.id]);
+    }, [
+        open,
+        editing?.id,
+        medicationFocus,
+        catalogue.capabilities.view_controlled,
+    ]);
 
     // A client added via the inline Add Client dialog selects itself here.
     useEffect(() => {
@@ -324,6 +403,10 @@ export function HandoverWizard({
             client_id: String(preselectClientId),
             outgoing_shift: '',
             incoming_shift: '',
+            cd_result: '',
+            cd_witness: '',
+            cd_witness_credential: '',
+            cd_notes: '',
         }));
     }, [preselectClientId]);
 
@@ -371,58 +454,126 @@ export function HandoverWizard({
         };
     }, [open, medicationFocus, f.outgoing_shift, basePath]);
 
-    // eMAR lens: take a presence edit-lock while editing an existing draft so a
-    // second editor is warned; released on close (or by the server-side TTL if the
-    // tab dies). medicationFocus is false on Operations, so this stays inert there.
+    // eMAR lens: take a presence edit-lock while editing an existing draft. Only
+    // release it if this wizard instance actually acquired it; a failed/blocked
+    // acquisition must never unlock another worker's edit session.
     useEffect(() => {
         const id = editing?.id;
-        if (!open || !medicationFocus || !id) return;
+        if (
+            !open ||
+            !medicationFocus ||
+            !id ||
+            editing.status !== 'draft' ||
+            !editing.can_edit
+        ) {
+            setEditLockState('not_needed');
+            setEditLockHolder(null);
+            return;
+        }
+
+        let disposed = false;
+        let acquired = false;
+        const release = () =>
+            axios.post(`${basePath}/${id}/unlock`).catch(() => {});
+
+        setEditLockState('acquiring');
+        setEditLockHolder(null);
         axios
             .post(`${basePath}/${id}/lock`)
             .then((res) => {
-                if (res.data?.locked === false && res.data?.held_by) {
+                if (res.data?.locked === true) {
+                    acquired = true;
+                    if (disposed) release();
+                    else setEditLockState('acquired');
+                    return;
+                }
+
+                if (!disposed) {
+                    const heldBy =
+                        typeof res.data?.held_by === 'string'
+                            ? res.data.held_by
+                            : 'Another worker';
+                    setEditLockHolder(heldBy);
+                    setEditLockState('blocked');
                     toast.warning(
-                        `${res.data.held_by} is editing this handover — your changes may conflict on save.`,
+                        `${heldBy} is editing this handover. Close it and try again after they finish.`,
                     );
                 }
             })
-            .catch(() => {});
+            .catch(() => {
+                if (!disposed) {
+                    setEditLockState('failed');
+                    toast.error(
+                        'Could not secure this handover for editing. Close it and try again.',
+                    );
+                }
+            });
+
         return () => {
-            axios.post(`${basePath}/${id}/unlock`).catch(() => {});
+            disposed = true;
+            if (acquired) release();
         };
-    }, [open, medicationFocus, editing?.id, basePath]);
+    }, [
+        open,
+        medicationFocus,
+        editing?.id,
+        editing?.status,
+        editing?.can_edit,
+        basePath,
+    ]);
 
     const cur = WIZ_STEPS[stepIndex];
     const pct = readiness(f);
     const set = <K extends keyof WizForm>(k: K, v: WizForm[K]) =>
         setF((p) => ({ ...p, [k]: v }));
+    const canViewControlled =
+        medicationFocus && catalogue.capabilities.view_controlled;
+    const canGovernControlled =
+        canViewControlled && catalogue.capabilities.record_controlled;
+    const immutable = Boolean(
+        editing && (editing.status !== 'draft' || !editing.can_edit),
+    );
+    const editLockUnavailable = Boolean(
+        editing && medicationFocus && editLockState !== 'acquired',
+    );
+    const mutationDisabled = immutable || editLockUnavailable;
 
     const siteName = (siteId: number | null) =>
         catalogue.sites.find((s) => s.id === siteId)?.name ?? '';
     const client = f.client_id
         ? catalogue.clients.find((c) => String(c.id) === f.client_id)
         : null;
+    const controlledWitnesses = client?.site_id
+        ? (
+              catalogue.controlledWitnessesBySite[String(client.site_id)] ?? []
+          ).filter((staff) => staff.id !== currentUser.id)
+        : [];
 
     const outgoingShifts = useMemo(
-        () => clientShiftsSorted(catalogue.shifts, f.client_id),
-        [catalogue.shifts, f.client_id],
+        () =>
+            outgoingHandoverShifts(
+                catalogue.shifts,
+                f.client_id,
+                currentUser.id,
+                catalogue.capabilities.manage_any_shifts,
+            ),
+        [
+            catalogue.shifts,
+            catalogue.capabilities.manage_any_shifts,
+            f.client_id,
+            currentUser.id,
+        ],
     );
-    const suggestNextId = nextShiftIdAfter(
-        catalogue.shifts,
-        f.client_id,
-        f.outgoing_shift,
+    const incomingShifts = useMemo(
+        () =>
+            incomingHandoverShifts(
+                catalogue.shifts,
+                f.client_id,
+                f.outgoing_shift,
+            ),
+        [catalogue.shifts, f.client_id, f.outgoing_shift],
     );
-    const incomingShifts = useMemo(() => {
-        const outId = f.outgoing_shift;
-        const out = catalogue.shifts.find((s) => String(s.id) === outId);
-        const outEnd = out?.ends_at ? new Date(out.ends_at).getTime() : null;
-        return outgoingShifts.filter(
-            (s) =>
-                String(s.id) !== outId &&
-                (outEnd == null ||
-                    (s.starts_at && new Date(s.starts_at).getTime() >= outEnd)),
-        );
-    }, [outgoingShifts, catalogue.shifts, f.outgoing_shift]);
+    const suggestNextId = incomingShifts[0] ? String(incomingShifts[0].id) : '';
 
     const oSh = f.outgoing_shift
         ? catalogue.shifts.find((s) => String(s.id) === f.outgoing_shift)
@@ -459,6 +610,10 @@ export function HandoverWizard({
                 : String(currentUser.id),
             incoming_shift: p.leave_open ? '' : nextId,
             incoming: p.leave_open ? '' : incomingWorkerFor(nextId),
+            cd_result: '',
+            cd_witness: '',
+            cd_witness_credential: '',
+            cd_notes: '',
         }));
     };
 
@@ -485,6 +640,24 @@ export function HandoverWizard({
             if (f.narrative.trim().length < 10)
                 e.narrative = 'Add a short narrative of how the shift went';
         }
+        if (
+            key === 'lists' &&
+            canGovernControlled &&
+            cdEvidenceChanged(f, editing)
+        ) {
+            if (!f.cd_result) {
+                e.cd_result = editing?.cd_verification
+                    ? 'Recorded controlled-drug evidence cannot be removed; record a replacement result'
+                    : 'Choose the controlled-drug count result';
+            }
+            if (f.cd_result && !f.cd_witness)
+                e.cd_witness_id = 'Select the witnessing worker';
+            if (f.cd_result && !f.cd_witness_credential.trim())
+                e.cd_witness_credential =
+                    'The witness must enter their password or PIN';
+            if (f.cd_result === 'discrepancy' && !f.cd_notes.trim())
+                e.cd_notes = 'Describe the discrepancy before continuing';
+        }
         return e;
     }
 
@@ -497,13 +670,32 @@ export function HandoverWizard({
     const goBack = () => setStepIndex((i) => Math.max(i - 1, 0));
 
     const submit = (asDraft: boolean) => {
-        const all = { ...validate('shift'), ...validate('narrative') };
+        if (mutationDisabled) {
+            toast.error(
+                immutable
+                    ? 'This handover is read-only and cannot be changed.'
+                    : 'This handover is not secured for editing. Close it and try again.',
+            );
+            return;
+        }
+
+        const all = {
+            ...validate('shift'),
+            ...validate('narrative'),
+            ...validate('lists'),
+        };
+        if (!asDraft && f.leave_open) {
+            all.incoming_shift =
+                'Assign the bounded incoming shift before submitting. You can keep this as a draft while cover is arranged.';
+        }
         if (Object.keys(all).length) {
             setErrors(all);
             setStepIndex(
                 all.client_id || all.outgoing_shift || all.incoming_shift
                     ? 0
-                    : 1,
+                    : all.narrative
+                      ? 1
+                      : 2,
             );
             return;
         }
@@ -517,15 +709,18 @@ export function HandoverWizard({
                     : Number(f.incoming_shift),
             incoming_staff_id:
                 f.leave_open || !f.incoming ? null : Number(f.incoming),
-            medications_due_text: f.medications.join('\n'),
+            ...(canGovernControlled
+                ? { medications_due_text: f.medications.join('\n') }
+                : {}),
             incidents_to_note_text: f.incidents.join('\n'),
             follow_up_items_text: f.followups.join('\n'),
             tasks_pending_text: f.tasks.join('\n'),
             // eMAR lens only: controlled-drug count reconciliation.
-            ...(medicationFocus
+            ...(canGovernControlled && cdEvidenceChanged(f, editing)
                 ? {
                       cd_result: f.cd_result || null,
                       cd_witness_id: f.cd_witness ? Number(f.cd_witness) : null,
+                      cd_witness_credential: f.cd_witness_credential || null,
                       cd_notes: f.cd_notes || null,
                   }
                 : {}),
@@ -541,28 +736,49 @@ export function HandoverWizard({
                 : new Date(),
         );
 
+        // Credentials are one-shot proof for this request. Clear the controlled
+        // input/state before the network round-trip so retries require the witness
+        // to authenticate again and no secret lingers in the open wizard.
+        clearWitnessCredential();
         setSubmitting(true);
         const opts = {
             preserveScroll: true,
             onSuccess: () => {
+                clearWitnessCredential();
                 onOpenChange(false);
                 toast.success(
-                    editing
-                        ? 'Handover updated'
-                        : asDraft
-                          ? 'Handover saved as draft'
-                          : `Handover submitted for ${client ? clientName(client) : 'client'}`,
+                    asDraft
+                        ? 'Handover saved as draft'
+                        : `Handover submitted for ${client ? clientName(client) : 'client'}`,
                 );
                 onSubmitted(targetWeek);
             },
-            onError: (errors: Record<string, string>) =>
-                // Surface the server's concurrency message (someone else saved this
-                // shared draft) rather than a generic error.
+            onError: (serverErrors: Record<string, string>) => {
+                setErrors(serverErrors);
+                clearWitnessCredential();
+                if (
+                    serverErrors.cd_result ||
+                    serverErrors.cd_witness_id ||
+                    serverErrors.cd_witness_credential ||
+                    serverErrors.cd_notes
+                ) {
+                    setStepIndex(2);
+                }
+
+                // Surface concurrency and governed witness failures directly;
+                // the matching field message remains beside the affected input.
                 toast.error(
-                    errors?.handover ??
+                    serverErrors.handover ??
+                        serverErrors.cd_witness_credential ??
+                        serverErrors.cd_witness_id ??
+                        serverErrors.cd_notes ??
                         'Could not save the handover. Please review and retry.',
-                ),
-            onFinish: () => setSubmitting(false),
+                );
+            },
+            onFinish: () => {
+                clearWitnessCredential();
+                setSubmitting(false);
+            },
         };
 
         if (editing) {
@@ -581,7 +797,7 @@ export function HandoverWizard({
     };
 
     const footerStart =
-        stepIndex > 0 ? (
+        !mutationDisabled && stepIndex > 0 ? (
             <Button variant="ghost" onClick={goBack}>
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 Back
@@ -590,30 +806,28 @@ export function HandoverWizard({
 
     const footerEnd = (
         <>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+            <Button variant="outline" onClick={closeWizard}>
+                {immutable ? 'Close' : 'Cancel'}
             </Button>
-            {cur.key === 'review' ? (
+            {!mutationDisabled && cur.key === 'review' ? (
                 <>
                     {!editing || editing.status === 'draft' ? (
                         <Button
                             variant="secondary"
                             onClick={() => submit(true)}
-                            disabled={submitting}
+                            disabled={submitting || mutationDisabled}
                         >
                             Save as draft
                         </Button>
                     ) : null}
-                    <Button onClick={() => submit(false)} disabled={submitting}>
+                    <Button
+                        onClick={() => submit(false)}
+                        disabled={submitting || mutationDisabled}
+                    >
                         {submitting ? (
                             <>
                                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                                Saving…
-                            </>
-                        ) : editing ? (
-                            <>
-                                <Check className="mr-1.5 h-4 w-4" />
-                                Save changes
+                                Submitting…
                             </>
                         ) : (
                             <>
@@ -623,19 +837,19 @@ export function HandoverWizard({
                         )}
                     </Button>
                 </>
-            ) : (
+            ) : !mutationDisabled ? (
                 <Button onClick={goNext}>
                     Continue
                     <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
-            )}
+            ) : null}
         </>
     );
 
     return (
         <WizardShell
             open={open}
-            onClose={() => onOpenChange(false)}
+            onClose={closeWizard}
             title={editing ? 'Edit handover' : 'New handover'}
             description="A guided wizard to record a shift-to-shift handover."
             railIcon={editing ? FileText : ArrowLeftRight}
@@ -655,7 +869,67 @@ export function HandoverWizard({
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
-            {cur.key === 'shift' ? (
+            {errors.handover ? (
+                <div
+                    role="alert"
+                    className="mb-4 rounded-xl border border-status-critical/30 bg-status-critical-bg px-3.5 py-3 text-[13px] text-status-critical"
+                >
+                    <div className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                            <div className="font-semibold">
+                                This handover was not saved
+                            </div>
+                            <div className="mt-0.5">{errors.handover}</div>
+                            <div className="mt-1 text-[12px]">
+                                Close this window and reopen the handover to
+                                load the current version before applying your
+                                changes.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+            {immutable ? (
+                <div className="mb-4 rounded-xl border border-border bg-muted/50 px-3.5 py-3 text-[13px] text-muted-foreground">
+                    This handover is read-only. Submitted and acknowledged
+                    records cannot be edited.
+                </div>
+            ) : editLockState === 'acquiring' ? (
+                <div className="mb-4 rounded-xl border border-border bg-muted/50 px-3.5 py-3 text-[13px] text-muted-foreground">
+                    Securing this draft for editing…
+                </div>
+            ) : editLockState === 'blocked' ? (
+                <div
+                    role="alert"
+                    className="mb-4 rounded-xl border border-status-warning/30 bg-status-warning-bg px-3.5 py-3 text-[13px] text-status-warning"
+                >
+                    {editLockHolder ?? 'Another worker'} is editing this
+                    handover. It is read-only here until they finish.
+                </div>
+            ) : editLockState === 'failed' ? (
+                <div
+                    role="alert"
+                    className="mb-4 rounded-xl border border-status-critical/30 bg-status-critical-bg px-3.5 py-3 text-[13px] text-status-critical"
+                >
+                    The edit lock could not be confirmed. Close this handover
+                    and try again before making changes.
+                </div>
+            ) : null}
+            {mutationDisabled ? (
+                <WizardStepPane>
+                    <ReviewBody
+                        f={f}
+                        catalogue={catalogue}
+                        goTo={setStepIndex}
+                        canViewControlled={canViewControlled}
+                        canGovernControlled={canGovernControlled}
+                        editing={editing}
+                        editable={false}
+                    />
+                </WizardStepPane>
+            ) : null}
+            {!mutationDisabled && cur.key === 'shift' ? (
                 <WizardStepPane>
                     <div className="space-y-4">
                         <StepHead
@@ -681,6 +955,10 @@ export function HandoverWizard({
                                         client_id: e.target.value,
                                         outgoing_shift: '',
                                         incoming_shift: '',
+                                        cd_result: '',
+                                        cd_witness: '',
+                                        cd_witness_credential: '',
+                                        cd_notes: '',
                                     }))
                                 }
                             >
@@ -857,7 +1135,7 @@ export function HandoverWizard({
                 </WizardStepPane>
             ) : null}
 
-            {cur.key === 'narrative' ? (
+            {!mutationDisabled && cur.key === 'narrative' ? (
                 <WizardStepPane>
                     <div className="space-y-4">
                         <StepHead
@@ -930,7 +1208,7 @@ export function HandoverWizard({
                 </WizardStepPane>
             ) : null}
 
-            {cur.key === 'lists' ? (
+            {!mutationDisabled && cur.key === 'lists' ? (
                 <WizardStepPane>
                     <div className="space-y-4">
                         <StepHead
@@ -939,82 +1217,86 @@ export function HandoverWizard({
                             blurb="Add discrete items — they appear as checklists for the incoming worker."
                         />
                         <div className="grid gap-4 lg:grid-cols-2">
-                            <div className="space-y-2">
-                                {medicationFocus && (
-                                    <ShiftMedSummary
-                                        snapshot={snapshot}
-                                        loading={snapLoading}
-                                        hasShift={!!f.outgoing_shift}
-                                        noShiftHint="Select the outgoing shift to load its live medication picture."
-                                        note={
-                                            snapshot && snapshot.due.length > 0
-                                                ? 'Due meds were pre-filled into the list below — edit or remove as needed.'
-                                                : undefined
-                                        }
-                                    />
-                                )}
-                                {medicationFocus && (
-                                    <div className="rounded-xl border border-border bg-card p-3">
-                                        <div className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold">
-                                            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-status-critical-bg text-status-critical">
-                                                <Pill className="h-3.5 w-3.5" />
-                                            </span>
-                                            Add from medication orders
-                                        </div>
-                                        <select
-                                            className={SELECT_CLASS}
-                                            value=""
-                                            disabled={!client}
-                                            onChange={(e) => {
-                                                const name = e.target.value;
-                                                if (
-                                                    name &&
-                                                    !f.medications.includes(
-                                                        name,
-                                                    )
-                                                )
-                                                    set('medications', [
-                                                        ...f.medications,
-                                                        name,
-                                                    ]);
-                                            }}
-                                        >
-                                            <option value="">
-                                                {client
-                                                    ? 'Pulled from active medication orders…'
-                                                    : 'Select a client first'}
-                                            </option>
-                                            {(client?.medications ?? [])
-                                                .filter(
-                                                    (m) =>
+                            {canViewControlled ? (
+                                <div className="space-y-2">
+                                    {medicationFocus && (
+                                        <ShiftMedSummary
+                                            snapshot={snapshot}
+                                            loading={snapLoading}
+                                            hasShift={!!f.outgoing_shift}
+                                            noShiftHint="Select the outgoing shift to load its live medication picture."
+                                            note={
+                                                snapshot &&
+                                                snapshot.due.length > 0
+                                                    ? 'Due meds were pre-filled into the list below — edit or remove as needed.'
+                                                    : undefined
+                                            }
+                                        />
+                                    )}
+                                    {medicationFocus && canGovernControlled && (
+                                        <div className="rounded-xl border border-border bg-card p-3">
+                                            <div className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold">
+                                                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-status-critical-bg text-status-critical">
+                                                    <Pill className="h-3.5 w-3.5" />
+                                                </span>
+                                                Add from medication orders
+                                            </div>
+                                            <select
+                                                className={SELECT_CLASS}
+                                                value=""
+                                                disabled={!client}
+                                                onChange={(e) => {
+                                                    const name = e.target.value;
+                                                    if (
+                                                        name &&
                                                         !f.medications.includes(
-                                                            m.name,
-                                                        ),
-                                                )
-                                                .map((m) => (
-                                                    <option
-                                                        key={m.id}
-                                                        value={m.name}
-                                                    >
-                                                        {m.name}
-                                                    </option>
-                                                ))}
-                                        </select>
-                                    </div>
-                                )}
-                                <ListBuilder
-                                    icon={Pill}
-                                    tone="critical"
-                                    title="Medications due"
-                                    placeholder={
-                                        medicationFocus
-                                            ? 'Other / unscheduled medicine…'
-                                            : 'e.g. Quetiapine 25mg — due 20:00'
-                                    }
-                                    items={f.medications}
-                                    onChange={(v) => set('medications', v)}
-                                />
-                            </div>
+                                                            name,
+                                                        )
+                                                    )
+                                                        set('medications', [
+                                                            ...f.medications,
+                                                            name,
+                                                        ]);
+                                                }}
+                                            >
+                                                <option value="">
+                                                    {client
+                                                        ? 'Pulled from active medication orders…'
+                                                        : 'Select a client first'}
+                                                </option>
+                                                {(client?.medications ?? [])
+                                                    .filter(
+                                                        (m) =>
+                                                            !f.medications.includes(
+                                                                m.name,
+                                                            ),
+                                                    )
+                                                    .map((m) => (
+                                                        <option
+                                                            key={m.id}
+                                                            value={m.name}
+                                                        >
+                                                            {m.name}
+                                                        </option>
+                                                    ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    <ListBuilder
+                                        icon={Pill}
+                                        tone="critical"
+                                        title="Medications due"
+                                        placeholder={
+                                            medicationFocus
+                                                ? 'Other / unscheduled medicine…'
+                                                : 'e.g. Quetiapine 25mg — due 20:00'
+                                        }
+                                        items={f.medications}
+                                        onChange={(v) => set('medications', v)}
+                                        readOnly={!canGovernControlled}
+                                    />
+                                </div>
+                            ) : null}
                             <ListBuilder
                                 icon={ShieldAlert}
                                 tone="critical"
@@ -1040,25 +1322,51 @@ export function HandoverWizard({
                                 onChange={(v) => set('tasks', v)}
                             />
                         </div>
-                        {medicationFocus && (
+                        {canGovernControlled ? (
                             <CdVerificationSection
                                 result={f.cd_result}
                                 witness={f.cd_witness}
+                                witnessCredential={f.cd_witness_credential}
+                                witnessCredentialRef={credentialInputRef}
                                 notes={f.cd_notes}
                                 cdDue={snapshot?.counts.cd_due ?? 0}
-                                witnesses={catalogue.staff.filter(
-                                    (s) => String(s.id) !== f.outgoing,
-                                )}
-                                onResult={(v) => set('cd_result', v)}
-                                onWitness={(v) => set('cd_witness', v)}
+                                witnesses={controlledWitnesses}
+                                onResult={(v) =>
+                                    setF((current) => ({
+                                        ...current,
+                                        cd_result: v,
+                                        cd_witness: v ? current.cd_witness : '',
+                                        cd_witness_credential: '',
+                                    }))
+                                }
+                                onWitness={(v) =>
+                                    setF((current) => ({
+                                        ...current,
+                                        cd_witness: v,
+                                        cd_witness_credential: '',
+                                    }))
+                                }
+                                onWitnessCredential={(v) =>
+                                    set('cd_witness_credential', v)
+                                }
                                 onNotes={(v) => set('cd_notes', v)}
+                                errors={{
+                                    result: errors.cd_result,
+                                    witness: errors.cd_witness_id,
+                                    credential: errors.cd_witness_credential,
+                                    notes: errors.cd_notes,
+                                }}
                             />
-                        )}
+                        ) : canViewControlled && editing?.cd_verification ? (
+                            <CdEvidenceSummary
+                                evidence={editing.cd_verification}
+                            />
+                        ) : null}
                     </div>
                 </WizardStepPane>
             ) : null}
 
-            {cur.key === 'review' ? (
+            {!mutationDisabled && cur.key === 'review' ? (
                 <WizardStepPane>
                     <div className="space-y-4">
                         <StepHead
@@ -1070,6 +1378,10 @@ export function HandoverWizard({
                             f={f}
                             catalogue={catalogue}
                             goTo={setStepIndex}
+                            canViewControlled={canViewControlled}
+                            canGovernControlled={canGovernControlled}
+                            editing={editing}
+                            editable={!mutationDisabled}
                         />
                     </div>
                 </WizardStepPane>
@@ -1115,21 +1427,34 @@ function SubHead({ n, text }: { n: number; text: string }) {
 function CdVerificationSection({
     result,
     witness,
+    witnessCredential,
+    witnessCredentialRef,
     notes,
     cdDue,
     witnesses,
     onResult,
     onWitness,
+    onWitnessCredential,
     onNotes,
+    errors,
 }: {
     result: '' | 'verified' | 'discrepancy';
     witness: string;
+    witnessCredential: string;
+    witnessCredentialRef: React.RefObject<HTMLInputElement | null>;
     notes: string;
     cdDue: number;
     witnesses: { id: number; name: string }[];
     onResult: (v: '' | 'verified' | 'discrepancy') => void;
     onWitness: (v: string) => void;
+    onWitnessCredential: (v: string) => void;
     onNotes: (v: string) => void;
+    errors: {
+        result?: string;
+        witness?: string;
+        credential?: string;
+        notes?: string;
+    };
 }) {
     const options = [
         ['verified', 'Counts verified', Check],
@@ -1189,12 +1514,19 @@ function CdVerificationSection({
                             </button>
                         ))}
                     </div>
+                    {errors.result ? (
+                        <FieldError>{errors.result}</FieldError>
+                    ) : null}
                 </div>
                 <div className="space-y-1.5">
-                    <label className="text-[12.5px] font-semibold">
+                    <label
+                        htmlFor="handover-cd-witness"
+                        className="text-[12.5px] font-semibold"
+                    >
                         Witness (second checker)
                     </label>
                     <select
+                        id="handover-cd-witness"
                         className={SELECT_CLASS}
                         value={witness}
                         disabled={!result}
@@ -1211,34 +1543,131 @@ function CdVerificationSection({
                             </option>
                         ))}
                     </select>
+                    {errors.witness ? (
+                        <FieldError>{errors.witness}</FieldError>
+                    ) : null}
                 </div>
             </div>
             {result ? (
-                <div className="mt-3 space-y-1.5">
-                    <label className="text-[12.5px] font-semibold">
-                        Notes{' '}
-                        {result === 'discrepancy' ? (
-                            <span className="text-status-critical">
-                                — describe the discrepancy
-                            </span>
-                        ) : (
-                            <span className="font-normal text-muted-foreground">
-                                (optional)
-                            </span>
-                        )}
-                    </label>
-                    <input
-                        className={cn(INPUT_CLASS, 'h-9')}
-                        placeholder={
-                            result === 'discrepancy'
-                                ? 'e.g. Diazepam register shows 1 fewer than counted — escalated'
-                                : 'e.g. All CD counts matched the register'
-                        }
-                        value={notes}
-                        onChange={(e) => onNotes(e.target.value)}
-                    />
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                        <label
+                            htmlFor="handover-cd-witness-credential"
+                            className="text-[12.5px] font-semibold"
+                        >
+                            Witness password or PIN
+                        </label>
+                        <input
+                            ref={witnessCredentialRef}
+                            id="handover-cd-witness-credential"
+                            type="password"
+                            autoComplete="new-password"
+                            spellCheck={false}
+                            data-lpignore="true"
+                            className={cn(INPUT_CLASS, 'h-9')}
+                            value={witnessCredential}
+                            disabled={!witness}
+                            aria-invalid={Boolean(errors.credential)}
+                            onChange={(event) =>
+                                onWitnessCredential(event.target.value)
+                            }
+                        />
+                        {errors.credential ? (
+                            <FieldError>{errors.credential}</FieldError>
+                        ) : null}
+                    </div>
+                    <div className="space-y-1.5">
+                        <label
+                            htmlFor="handover-cd-notes"
+                            className="text-[12.5px] font-semibold"
+                        >
+                            Notes{' '}
+                            {result === 'discrepancy' ? (
+                                <span className="text-status-critical">
+                                    — describe the discrepancy
+                                </span>
+                            ) : (
+                                <span className="font-normal text-muted-foreground">
+                                    (optional)
+                                </span>
+                            )}
+                        </label>
+                        <input
+                            id="handover-cd-notes"
+                            className={cn(INPUT_CLASS, 'h-9')}
+                            placeholder={
+                                result === 'discrepancy'
+                                    ? 'e.g. Diazepam register shows 1 fewer than counted — escalated'
+                                    : 'e.g. All CD counts matched the register'
+                            }
+                            value={notes}
+                            onChange={(e) => onNotes(e.target.value)}
+                        />
+                        {errors.notes ? (
+                            <FieldError>{errors.notes}</FieldError>
+                        ) : null}
+                    </div>
                 </div>
             ) : null}
+        </div>
+    );
+}
+
+function CdEvidenceSummary({
+    evidence,
+    pending = false,
+}: {
+    evidence: NonNullable<Handover['cd_verification']>;
+    pending?: boolean;
+}) {
+    const discrepancy = evidence.result === 'discrepancy';
+
+    return (
+        <div className="rounded-xl border border-border bg-card p-3.5">
+            <div className="flex items-center gap-2">
+                {discrepancy ? (
+                    <AlertTriangle className="h-4 w-4 text-status-critical" />
+                ) : (
+                    <CheckCircle2 className="h-4 w-4 text-status-success" />
+                )}
+                <span className="text-[13px] font-semibold">
+                    {pending
+                        ? 'Controlled-drug count to record'
+                        : 'Controlled-drug count evidence'}
+                </span>
+                <span
+                    className={cn(
+                        'ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                        discrepancy
+                            ? 'bg-status-critical-bg text-status-critical'
+                            : 'bg-status-success-bg text-status-success',
+                    )}
+                >
+                    {discrepancy ? 'Discrepancy recorded' : 'Counts verified'}
+                </span>
+            </div>
+            <div className="mt-2 grid gap-1 text-[12.5px] sm:grid-cols-2">
+                <span className="text-muted-foreground">Second checker</span>
+                <span className="font-medium">
+                    {evidence.witness_name ?? 'Recorded witness'}
+                </span>
+                {!pending ? (
+                    <>
+                        <span className="text-muted-foreground">
+                            Recorded by
+                        </span>
+                        <span className="font-medium">
+                            {evidence.verified_by_name ?? 'Authorised worker'}
+                        </span>
+                    </>
+                ) : null}
+                {evidence.notes ? (
+                    <>
+                        <span className="text-muted-foreground">Notes</span>
+                        <span className="font-medium">{evidence.notes}</span>
+                    </>
+                ) : null}
+            </div>
         </div>
     );
 }
@@ -1319,32 +1748,78 @@ function ReviewBody({
     f,
     catalogue,
     goTo,
+    canViewControlled,
+    canGovernControlled,
+    editing,
+    editable,
 }: {
     f: WizForm;
     catalogue: Catalogue;
     goTo: (i: number) => void;
+    canViewControlled: boolean;
+    canGovernControlled: boolean;
+    editing: Handover | null;
+    editable: boolean;
 }) {
-    const client = catalogue.clients.find((c) => String(c.id) === f.client_id);
+    const client =
+        catalogue.clients.find((c) => String(c.id) === f.client_id) ??
+        editing?.client;
     const out = catalogue.staff.find((s) => String(s.id) === f.outgoing);
     const inc = catalogue.staff.find((s) => String(s.id) === f.incoming);
-    const oSh = catalogue.shifts.find((s) => String(s.id) === f.outgoing_shift);
-    const nSh = catalogue.shifts.find((s) => String(s.id) === f.incoming_shift);
+    const submittedRecipient = editing?.submitted_incoming_staff ?? null;
+    const currentAcknowledgementAssignee =
+        editing?.current_incoming_staff ??
+        (editing?.status === 'draft' ? editing.incoming_staff : null);
+    const immutableRecipientEvidence = Boolean(
+        editing && editing.status !== 'draft' && submittedRecipient,
+    );
+    const oSh =
+        catalogue.shifts.find((s) => String(s.id) === f.outgoing_shift) ??
+        editing?.outgoing_shift;
+    const nSh =
+        catalogue.shifts.find((s) => String(s.id) === f.incoming_shift) ??
+        editing?.incoming_shift;
     const siteName = (siteId: number | null) =>
-        catalogue.sites.find((s) => s.id === siteId)?.name ?? '';
+        catalogue.sites.find((s) => s.id === siteId)?.name ??
+        (editing?.site?.id === siteId ? editing.site.name : '');
 
     const lists: [string, string[], 'critical' | 'warning' | 'primary'][] = [
-        ['Medications due', f.medications, 'critical'],
+        ...(canViewControlled
+            ? ([['Medications due', f.medications, 'critical']] as [
+                  string,
+                  string[],
+                  'critical',
+              ][])
+            : []),
         ['Incidents', f.incidents, 'critical'],
         ['Follow-ups', f.followups, 'primary'],
         ['Tasks pending', f.tasks, 'warning'],
     ];
+    const cdChanged = canGovernControlled && cdEvidenceChanged(f, editing);
+    const cdWitness = catalogue.staff.find(
+        (staff) => String(staff.id) === f.cd_witness,
+    );
+    const reviewCdEvidence =
+        canViewControlled && cdChanged && f.cd_result
+            ? {
+                  result: f.cd_result,
+                  witness_id: f.cd_witness ? Number(f.cd_witness) : null,
+                  witness_name: cdWitness?.name ?? null,
+                  notes: f.cd_notes.trim() || null,
+                  verified_at: null,
+                  verified_by: null,
+                  verified_by_name: null,
+              }
+            : canViewControlled
+              ? (editing?.cd_verification ?? null)
+              : null;
 
     return (
         <div className="space-y-3">
             <ReviewCard
                 icon={ArrowLeftRight}
                 title="Shift & people"
-                onEdit={() => goTo(0)}
+                onEdit={editable ? () => goTo(0) : undefined}
             >
                 <ReviewRow
                     k="Client"
@@ -1354,7 +1829,10 @@ function ReviewBody({
                             : '—'
                     }
                 />
-                <ReviewRow k="Outgoing" v={out ? out.name : '—'} />
+                <ReviewRow
+                    k="Outgoing"
+                    v={out?.name ?? editing?.outgoing_staff?.name ?? '—'}
+                />
                 <ReviewRow
                     k="Outgoing shift"
                     v={
@@ -1363,20 +1841,39 @@ function ReviewBody({
                             : '—'
                     }
                 />
-                <ReviewRow
-                    k="Incoming"
-                    v={
-                        f.leave_open ? (
-                            <span className="text-status-warning">
-                                Open — needs cover
-                            </span>
-                        ) : inc ? (
-                            inc.name
-                        ) : (
-                            '—'
-                        )
-                    }
-                />
+                {immutableRecipientEvidence ? (
+                    <>
+                        <ReviewRow
+                            k="Submitted recipient"
+                            v={submittedRecipient?.name ?? '—'}
+                        />
+                        <ReviewRow
+                            k="Current acknowledgement assignee"
+                            v={
+                                currentAcknowledgementAssignee?.name ?? (
+                                    <span className="text-status-warning">
+                                        No worker currently assigned
+                                    </span>
+                                )
+                            }
+                        />
+                    </>
+                ) : (
+                    <ReviewRow
+                        k="Incoming"
+                        v={
+                            f.leave_open ? (
+                                <span className="text-status-warning">
+                                    Open — needs cover
+                                </span>
+                            ) : inc || editing?.incoming_staff ? (
+                                (inc?.name ?? editing?.incoming_staff?.name)
+                            ) : (
+                                '—'
+                            )
+                        }
+                    />
+                )}
                 <ReviewRow
                     k="New shift"
                     v={
@@ -1396,7 +1893,7 @@ function ReviewBody({
             <ReviewCard
                 icon={FileText}
                 title="Narrative & mood"
-                onEdit={() => goTo(1)}
+                onEdit={editable ? () => goTo(1) : undefined}
             >
                 <ReviewRow
                     k="Mood"
@@ -1415,7 +1912,7 @@ function ReviewBody({
                 <ReviewCard
                     icon={ListChecks}
                     title="Action items"
-                    onEdit={() => goTo(2)}
+                    onEdit={editable ? () => goTo(2) : undefined}
                 >
                     {lists
                         .filter(([, arr]) => arr.length > 0)
@@ -1441,6 +1938,12 @@ function ReviewBody({
                         ))}
                 </ReviewCard>
             ) : null}
+            {reviewCdEvidence ? (
+                <CdEvidenceSummary
+                    evidence={reviewCdEvidence}
+                    pending={cdChanged}
+                />
+            ) : null}
         </div>
     );
 }
@@ -1453,7 +1956,7 @@ function ReviewCard({
 }: {
     icon: typeof ArrowLeftRight;
     title: string;
-    onEdit: () => void;
+    onEdit?: () => void;
     children: React.ReactNode;
 }) {
     return (
@@ -1461,13 +1964,15 @@ function ReviewCard({
             <div className="mb-2 flex items-center gap-2">
                 <Icon className="h-4 w-4 text-primary" />
                 <span className="text-[13px] font-bold">{title}</span>
-                <button
-                    type="button"
-                    onClick={onEdit}
-                    className="ml-auto text-[12px] font-semibold text-primary hover:underline"
-                >
-                    Edit
-                </button>
+                {onEdit ? (
+                    <button
+                        type="button"
+                        onClick={onEdit}
+                        className="ml-auto text-[12px] font-semibold text-primary hover:underline"
+                    >
+                        Edit
+                    </button>
+                ) : null}
             </div>
             {children}
         </div>

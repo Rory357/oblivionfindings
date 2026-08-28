@@ -86,7 +86,8 @@ export interface MyDayMedDue {
     scheduled_for: string;
     status: 'overdue' | 'due' | 'upcoming' | 'given' | 'refused' | 'withheld';
     flag?: string | null;
-    emar_url: string;
+    /** Admin eMAR deep-link; null for record-only frontline workers. */
+    emar_url: string | null;
 }
 
 export type TimesheetAllocationMethod =
@@ -456,6 +457,7 @@ export interface MyDayPageProps {
     can_view_medications?: boolean;
     can_record_medications?: boolean;
     can_record_controlled_medications?: boolean;
+    can_open_emar?: boolean;
     labels?: Record<string, string>;
 }
 

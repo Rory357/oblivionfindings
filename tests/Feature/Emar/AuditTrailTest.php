@@ -11,6 +11,7 @@ use App\Models\MedicationOrderVersion;
 use App\Models\MedicationPharmacyOrder;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -164,6 +165,162 @@ class AuditTrailTest extends TestCase
         );
     }
 
+    public function test_raw_administration_evidence_uses_truthful_clinical_and_correction_event_types(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAudit();
+        $decisionMaker = User::factory()->create();
+        $correctionRequester = User::factory()->create();
+        $medication = ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Aspirin',
+            'dosage' => '75mg',
+            'frequency' => 'PRN',
+            'is_prn' => true,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+        ]);
+        $original = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'administered_by' => $user->id,
+            'administered_at' => now()->subMonths(2),
+            'status' => 'given',
+            'dose_given' => '75mg',
+        ]);
+        $withheld = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'administered_by' => $user->id,
+            'administered_at' => now()->subMinutes(15),
+            'status' => 'withheld',
+            'reason' => 'Clinical hold',
+        ]);
+        $pending = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'administered_by' => $user->id,
+            'administered_at' => now()->subMinutes(10),
+            'status' => 'pending',
+        ]);
+        $submittedCorrection = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'corrected_of_id' => $original->id,
+            'is_correction' => true,
+            'correction_status' => 'pending',
+            'correction_reason' => 'Submitted correction',
+            'administered_by' => $user->id,
+            'correction_requested_by' => $correctionRequester->id,
+            'administered_at' => $original->administered_at,
+            'status' => 'given',
+            'dose_given' => '75mg',
+        ]);
+        $legacySubmittedCorrection = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'corrected_of_id' => $original->id,
+            'is_correction' => true,
+            'correction_status' => 'pending',
+            'correction_reason' => 'Legacy submitted correction',
+            'administered_by' => $user->id,
+            'administered_at' => $original->administered_at,
+            'status' => 'given',
+            'dose_given' => '75mg',
+        ]);
+        $approvedCorrection = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'corrected_of_id' => $original->id,
+            'is_correction' => true,
+            'correction_status' => 'approved',
+            'correction_reason' => 'Approved correction',
+            'correction_approved_by' => $decisionMaker->id,
+            'correction_approved_at' => now()->subMinutes(5),
+            'administered_by' => $user->id,
+            'correction_requested_by' => $correctionRequester->id,
+            'administered_at' => $original->administered_at,
+            'status' => 'given',
+            'dose_given' => '75mg',
+        ]);
+        $rejectedCorrection = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'corrected_of_id' => $original->id,
+            'is_correction' => true,
+            'correction_status' => 'rejected',
+            'correction_reason' => 'Rejected correction',
+            'correction_rejection_reason' => 'The proposed outcome was not supported.',
+            'correction_approved_by' => $decisionMaker->id,
+            'correction_approved_at' => now()->subMinutes(2),
+            'administered_by' => $user->id,
+            'correction_requested_by' => $correctionRequester->id,
+            'administered_at' => $original->administered_at,
+            'status' => 'given',
+            'dose_given' => '75mg',
+        ]);
+
+        $events = collect($this->actingAs($user)
+            ->get(route('emar.audit'))
+            ->assertOk()
+            ->inertiaProps('events'));
+        $expectedTypes = [
+            $original->id => 'dose_administered',
+            $withheld->id => 'dose_withheld',
+            $pending->id => 'dose_pending',
+            $submittedCorrection->id => 'correction_submitted',
+            $legacySubmittedCorrection->id => 'correction_submitted',
+            $approvedCorrection->id => 'correction_approved',
+            $rejectedCorrection->id => 'correction_rejected',
+        ];
+
+        foreach ($expectedTypes as $administrationId => $expectedType) {
+            $event = $events->firstWhere('id', 'admin_'.$administrationId);
+            $this->assertNotNull($event);
+            $this->assertSame($expectedType, $event['event_type']);
+
+            if ($administrationId !== $original->id) {
+                $this->assertNotSame('dose_administered', $event['event_type']);
+                $this->assertStringNotContainsString('administered', strtolower($event['description']));
+            }
+        }
+
+        $submittedEvent = $events->firstWhere('id', 'admin_'.$submittedCorrection->id);
+        $this->assertSame($correctionRequester->name, $submittedEvent['performed_by']);
+        $this->assertSame($correctionRequester->name, $submittedEvent['details']['submitted_by']);
+
+        $legacySubmittedEvent = $events->firstWhere('id', 'admin_'.$legacySubmittedCorrection->id);
+        $this->assertSame($user->name, $legacySubmittedEvent['performed_by']);
+        $this->assertSame($user->name, $legacySubmittedEvent['details']['submitted_by']);
+
+        $approvedEvent = $events->firstWhere('id', 'admin_'.$approvedCorrection->id);
+        $this->assertSame(
+            $decisionMaker->name,
+            $approvedEvent['performed_by'],
+        );
+        $this->assertSame($correctionRequester->name, $approvedEvent['details']['submitted_by']);
+
+        $rejectedEvent = $events->firstWhere('id', 'admin_'.$rejectedCorrection->id);
+        $this->assertSame(
+            $decisionMaker->name,
+            $rejectedEvent['performed_by'],
+        );
+        $this->assertSame($correctionRequester->name, $rejectedEvent['details']['submitted_by']);
+
+        $todayApprovedCorrections = collect($this->actingAs($user)
+            ->get(route('emar.audit', [
+                'date_from' => today()->toDateString(),
+                'date_to' => today()->toDateString(),
+                'event_types' => 'correction_approved',
+            ]))
+            ->assertOk()
+            ->inertiaProps('events'));
+        $this->assertSame(
+            ['admin_'.$approvedCorrection->id],
+            $todayApprovedCorrections->pluck('id')->all(),
+        );
+    }
+
     public function test_unrecorded_scheduled_dose_becomes_an_omission(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedAudit();
@@ -239,7 +396,7 @@ class AuditTrailTest extends TestCase
         );
     }
 
-    public function test_integrity_endpoint_returns_fingerprint_and_derived_for_omission(): void
+    public function test_integrity_endpoint_confirms_backing_record_without_sensitive_metadata_and_conceals_derived_omissions(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedAudit();
         $med = ClientMedication::query()->create([
@@ -253,18 +410,29 @@ class AuditTrailTest extends TestCase
 
         $this->actingAs($user)->getJson('/emar/audit/event/admin_'.$admin->id.'/integrity')
             ->assertOk()
-            ->assertJson(['backed' => true])
-            ->assertJsonStructure(['backed', 'fingerprint', 'edited', 'recorded_at']);
+            ->assertExactJson(['backed' => true]);
 
         $this->actingAs($user)->getJson('/emar/audit/event/omission_999_202601010800/integrity')
-            ->assertOk()
-            ->assertJson(['backed' => false]);
+            ->assertNotFound();
     }
 
     public function test_flag_endpoint_opens_a_medication_error(): void
     {
-        ['user' => $user, 'client' => $client] = $this->seedAudit();
+        ['user' => $user, 'site' => $site, 'client' => $client] = $this->seedAudit();
         $this->grantPermissions($user, ['medications.administer.record']);
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'service_context_id' => $client->service_context_id,
+            'user_id' => $user->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $user->id,
+            'created_by' => $user->id,
+            'status' => 'in_progress',
+        ]);
         $med = ClientMedication::query()->create([
             'client_id' => $client->id, 'name' => 'Codeine', 'dosage' => '30mg', 'frequency' => 'PRN',
             'controlled_drug' => true, 'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
@@ -280,6 +448,7 @@ class AuditTrailTest extends TestCase
 
         $this->assertDatabaseHas('medication_errors', [
             'client_id' => $client->id,
+            'client_medication_id' => $med->id,
             'reported_by' => $user->id,
             'status' => 'reported',
             'error_type' => 'documentation',

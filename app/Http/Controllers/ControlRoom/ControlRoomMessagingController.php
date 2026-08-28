@@ -8,6 +8,7 @@ use App\Models\ControlRoom\Communication;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,15 +28,15 @@ class ControlRoomMessagingController extends Controller
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
 
         $siteAccess = $this->siteAccess();
+        $alertAccess = app(ControlRoomAlertAccessService::class);
         $bypassPermissions = $this->alertBypassPermissions();
 
         $rankedAlertCommunications = Communication::query()
             ->conversational()
             ->whereNotNull('alert_id')
-            ->whereHas('alert', fn (Builder $alertQuery) => $siteAccess->applyAlertScope(
+            ->whereHas('alert', fn (Builder $alertQuery) => $alertAccess->applyVisibleScope(
                 $alertQuery,
                 $user,
-                $bypassPermissions,
             ))
             ->select([
                 'control_room_communications.id',
@@ -57,6 +58,7 @@ class ControlRoomMessagingController extends Controller
         $alertsById = ControlRoomAlert::query()
             ->select('id', 'alert_type')
             ->whereIn('id', $alertThreads->pluck('alert_id'))
+            ->tap(fn (Builder $alertQuery) => $alertAccess->applyVisibleScope($alertQuery, $user))
             ->get()
             ->keyBy('id');
 
@@ -289,7 +291,7 @@ class ControlRoomMessagingController extends Controller
     private function resolveAccessibleAlert(User $user, int $alertId): ControlRoomAlert
     {
         $query = ControlRoomAlert::query()->whereKey($alertId);
-        $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions());
+        app(ControlRoomAlertAccessService::class)->applyReadableScope($query, $user);
 
         return $query->firstOrFail();
     }
@@ -304,18 +306,18 @@ class ControlRoomMessagingController extends Controller
     private function resolveAccessibleCommunication(User $user, Communication $communication): Communication
     {
         $siteAccess = $this->siteAccess();
+        $alertAccess = app(ControlRoomAlertAccessService::class);
         $bypassPermissions = $this->alertBypassPermissions();
 
         return Communication::query()
             ->whereKey($communication->id)
-            ->where(function (Builder $query) use ($user, $siteAccess, $bypassPermissions): void {
-                $query->where(function (Builder $alertCommunicationQuery) use ($user, $siteAccess, $bypassPermissions): void {
+            ->where(function (Builder $query) use ($user, $siteAccess, $alertAccess, $bypassPermissions): void {
+                $query->where(function (Builder $alertCommunicationQuery) use ($user, $alertAccess): void {
                     $alertCommunicationQuery
                         ->whereNotNull('alert_id')
-                        ->whereHas('alert', fn (Builder $alertQuery) => $siteAccess->applyAlertScope(
+                        ->whereHas('alert', fn (Builder $alertQuery) => $alertAccess->applyReadableScope(
                             $alertQuery,
                             $user,
-                            $bypassPermissions,
                         ));
                 })->orWhere(function (Builder $directCommunicationQuery) use ($user, $siteAccess, $bypassPermissions): void {
                     $directCommunicationQuery

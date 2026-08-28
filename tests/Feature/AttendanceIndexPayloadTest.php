@@ -6,9 +6,12 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\ServiceContext;
+use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ShiftHandoverService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 
@@ -30,7 +33,8 @@ beforeEach(function () {
     ]);
     $manage = Permission::query()->where('key', 'timesheets.manageAny')->first();
     $view = Permission::query()->where('key', 'timesheets.viewAny')->first();
-    $overrides = collect([$manage, $view])
+    $viewHandovers = Permission::query()->where('key', 'shifts.viewAny')->first();
+    $overrides = collect([$manage, $view, $viewHandovers])
         ->filter()
         ->mapWithKeys(fn (Permission $p) => [$p->id => ['allowed' => true]])
         ->all();
@@ -172,7 +176,7 @@ test('the open session carries its break state and tracked break events', functi
         ->and($open['breaks'][1]['ended_at'])->toBeNull();
 });
 
-test('handovers involving the user are listed with an incoming flag', function () {
+test('legacy unbound handovers retain submitted-recipient evidence without implying acknowledgement authority', function () {
     $incoming = ShiftHandover::factory()->create([
         'client_id' => $this->client->id,
         'incoming_staff_id' => $this->worker->id,
@@ -187,7 +191,8 @@ test('handovers involving the user are listed with an incoming flag', function (
     $handovers = collect($response->viewData('page')['props']['handovers']);
     expect($handovers)->toHaveCount(1)
         ->and($handovers[0]['id'])->toBe($incoming->id)
-        ->and($handovers[0]['incoming'])->toBeTrue()
+        ->and($handovers[0]['incoming'])->toBeFalse()
+        ->and($handovers[0]['submitted_recipient'])->toBeTrue()
         ->and($handovers[0]['status'])->toBe('submitted');
 });
 
@@ -210,8 +215,119 @@ test('handovers follow the viewed staff member when a manager filters', function
     $handovers = collect($response->viewData('page')['props']['handovers']);
     expect($handovers)->toHaveCount(1)
         ->and($handovers[0]['id'])->toBe($workerHandover->id)
-        // `incoming` is relative to the viewed user, not the manager.
-        ->and($handovers[0]['incoming'])->toBeTrue();
+        ->and($handovers[0]['incoming'])->toBeFalse()
+        // Submit-time evidence is relative to the viewed user, not the manager.
+        ->and($handovers[0]['submitted_recipient'])->toBeTrue();
+});
+
+test('a timesheet-only reader receives no handover narratives', function () {
+    $reader = User::factory()->create([
+        'role' => 'attendance_reader',
+        'approved_at' => now(),
+    ]);
+    $permissions = Permission::query()
+        ->whereIn('key', ['timesheets.manageAny', 'timesheets.viewAny'])
+        ->pluck('id');
+    $reader->permissionOverrides()->sync(
+        $permissions->mapWithKeys(fn ($id) => [(int) $id => ['allowed' => true]])->all(),
+    );
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $reader->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+    ]);
+    $context = ServiceContext::factory()->create();
+    $outgoingShift = Shift::factory()->create([
+        'client_id' => $this->client->id,
+        'site_id' => $this->site->id,
+        'service_context_id' => $context->id,
+        'user_id' => $this->worker->id,
+        'starts_at' => now()->subHours(8),
+        'ends_at' => now()->subHour(),
+        'actual_starts_at' => now()->subHours(8),
+        'actual_ends_at' => now()->subHour(),
+        'started_by' => $this->worker->id,
+        'completed_by' => $this->worker->id,
+        'status' => 'completed',
+    ]);
+    $incomingShift = Shift::factory()->create([
+        'client_id' => $this->client->id,
+        'site_id' => $this->site->id,
+        'service_context_id' => $context->id,
+        'user_id' => $this->manager->id,
+        'starts_at' => now()->subHour(),
+        'ends_at' => now()->addHours(7),
+        'status' => 'in_progress',
+    ]);
+    ShiftHandover::factory()->create([
+        'outgoing_shift_id' => $outgoingShift->id,
+        'incoming_shift_id' => $incomingShift->id,
+        'client_id' => $this->client->id,
+        'outgoing_staff_id' => $this->worker->id,
+        'incoming_staff_id' => $this->manager->id,
+        'handover_notes' => 'PRIVATE handover narrative for the incoming worker.',
+        'status' => 'submitted',
+        'submitted_at' => now()->subHour(),
+        'submitted_by' => $this->worker->id,
+    ]);
+
+    expect($reader->canDo('timesheets.viewAny'))->toBeTrue()
+        ->and($reader->canDo('timesheets.manageAny'))->toBeTrue()
+        ->and(app(ShiftHandoverService::class)->canAccessWorkflow($reader))->toBeFalse();
+
+    $response = $this->actingAs($reader)
+        ->get('/attendance?user_id='.$this->worker->id)
+        ->assertOk();
+
+    expect($response->viewData('page')['props']['handovers'])->toHaveCount(0)
+        ->and(json_encode($response->viewData('page')['props']))
+        ->not->toContain('PRIVATE handover narrative');
+
+    $this->actingAs($reader)
+        ->get(
+            '/attendance?user_id='.$this->worker->id,
+            $this->inertiaPartialHeaders('attendance/index', 'catalogue'),
+        )
+        ->assertOk()
+        ->assertJsonPath('props.catalogue.clients', [])
+        ->assertJsonPath('props.catalogue.shifts', [])
+        ->assertJsonPath('props.catalogue.staff', []);
+});
+
+test('eligible shifts for a viewed worker are limited to the viewers accessible Sites', function () {
+    $foreignSite = Site::factory()->create();
+    $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
+    $profile = $this->worker->hrEmployeeProfile;
+    $profile->update(['secondary_site_ids' => [$foreignSite->id]]);
+    $context = ServiceContext::factory()->create();
+    $localShift = Shift::factory()->create([
+        'client_id' => $this->client->id,
+        'site_id' => $this->site->id,
+        'service_context_id' => $context->id,
+        'user_id' => $this->worker->id,
+        'starts_at' => now()->subHour(),
+        'ends_at' => now()->addHours(2),
+        'status' => 'scheduled',
+        'published_at' => now(),
+    ]);
+    $foreignShift = Shift::factory()->create([
+        'client_id' => $foreignClient->id,
+        'site_id' => $foreignSite->id,
+        'service_context_id' => $context->id,
+        'user_id' => $this->worker->id,
+        'starts_at' => now()->subHour(),
+        'ends_at' => now()->addHours(2),
+        'status' => 'scheduled',
+        'published_at' => now(),
+    ]);
+
+    $response = $this->actingAs($this->manager)
+        ->get('/attendance?user_id='.$this->worker->id)
+        ->assertOk();
+    $eligibleIds = collect($response->viewData('page')['props']['eligibleShifts'])->pluck('id');
+
+    expect($eligibleIds->all())->toBe([$localShift->id])
+        ->and($eligibleIds)->not->toContain($foreignShift->id);
 });
 
 test('week hours sum the viewed user sessions for the current week only', function () {
@@ -242,4 +358,42 @@ test('week hours sum the viewed user sessions for the current week only', functi
 
     $response->assertOk();
     expect((float) $response->viewData('page')['props']['weekHours'])->toBe(3.0);
+});
+
+test('today and week KPIs use worker-local midnight and Monday converted to UTC', function () {
+    $tz = config('app.worker_timezone', 'Pacific/Auckland');
+    $this->travelTo(Carbon::parse('2026-08-30 15:00:00', 'UTC')); // Monday 03:00 in Auckland.
+
+    $localMondayStart = Carbon::parse('2026-08-31 00:00:00', $tz)->utc();
+    HrAttendanceSession::query()->create([
+        'tenant_id' => null,
+        'user_id' => $this->worker->id,
+        'clock_in_at' => $localMondayStart,
+        'clock_out_at' => $localMondayStart->copy()->addHour(),
+        'break_minutes' => 0,
+        'status' => 'closed',
+        'source' => 'manual',
+        'created_by' => $this->worker->id,
+    ]);
+
+    // This is the same UTC calendar date as "now", but Sunday in the worker
+    // timezone, so neither the Today nor this-week KPI may include it.
+    $localSunday = Carbon::parse('2026-08-30 23:00:00', $tz)->utc();
+    HrAttendanceSession::query()->create([
+        'tenant_id' => null,
+        'user_id' => $this->worker->id,
+        'clock_in_at' => $localSunday,
+        'clock_out_at' => $localSunday->copy()->addMinutes(30),
+        'break_minutes' => 0,
+        'status' => 'closed',
+        'source' => 'manual',
+        'created_by' => $this->worker->id,
+    ]);
+
+    $response = $this->actingAs($this->worker)->get('/attendance');
+
+    $response->assertOk();
+    $props = $response->viewData('page')['props'];
+    expect((float) $props['todayHours'])->toBe(1.0)
+        ->and((float) $props['weekHours'])->toBe(1.0);
 });

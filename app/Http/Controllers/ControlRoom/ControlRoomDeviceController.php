@@ -6,6 +6,7 @@ use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\Device;
 use App\Models\ControlRoomAlert;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomDevicePresenter;
 use App\Services\ControlRoom\ControlRoomDeviceVisibilityService;
 use App\Services\UserSiteAccessService;
@@ -19,6 +20,7 @@ class ControlRoomDeviceController extends Controller
         private readonly ControlRoomDeviceVisibilityService $visibility,
         private readonly ControlRoomDevicePresenter $presenter,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly ControlRoomAlertAccessService $alertAccess,
     ) {}
 
     /**
@@ -200,7 +202,16 @@ class ControlRoomDeviceController extends Controller
 
         // Recent signals (last 50).
         $signals = $device->signals()
-            ->with(['alert:id,reference_number', 'correlatedAlert:id,reference_number'])
+            ->with([
+                'alert' => function ($query) use ($user): void {
+                    $this->alertAccess->applyReadableScope($query->getQuery(), $user);
+                    $query->select(['id', 'reference_number']);
+                },
+                'correlatedAlert' => function ($query) use ($user): void {
+                    $this->alertAccess->applyReadableScope($query->getQuery(), $user);
+                    $query->select(['id', 'reference_number']);
+                },
+            ])
             ->when($isPersonalTracker && ! $canViewPersonalLocation, fn ($query) => $query->whereRaw('1 = 0'))
             ->when(
                 $isPersonalTracker && $personalAssignment,
@@ -244,6 +255,7 @@ class ControlRoomDeviceController extends Controller
         // Linked alerts (last 20).
         $alertQuery = ControlRoomAlert::query()->where('device_id', $device->id);
         $this->siteAccess->applyAlertSiteScopeForSiteIds($alertQuery, $visibleSiteIds);
+        $this->alertAccess->applyControlledMedicationContentScope($alertQuery, $user);
         $alerts = $alertQuery
             ->when($isPersonalTracker && ! $canViewPersonalLocation, fn ($query) => $query->whereRaw('1 = 0'))
             ->when(

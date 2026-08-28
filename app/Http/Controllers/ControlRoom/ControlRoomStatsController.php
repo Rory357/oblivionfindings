@@ -8,6 +8,7 @@ use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomReportService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -42,7 +43,12 @@ class ControlRoomStatsController extends Controller
         $accessibleSiteIds = $canViewApplicationWide
             ? null
             : $siteAccess->accessibleSiteIds($user, $bypassPermissions);
-        $slaMetrics = $this->reportService->slaCompliance($startDate, now(), $accessibleSiteIds);
+        $slaMetrics = $this->reportService->slaCompliance(
+            $startDate,
+            now(),
+            $accessibleSiteIds,
+            $user,
+        );
 
         $driver = DB::connection()->getDriverName();
 
@@ -243,6 +249,8 @@ class ControlRoomStatsController extends Controller
     {
         $query = ControlRoomAlert::query();
         $siteAccess->applyAlertScope($query, $user, $this->alertBypassPermissions());
+        app(ControlRoomAlertAccessService::class)
+            ->applyControlledMedicationContentScope($query, $user);
 
         return $query;
     }

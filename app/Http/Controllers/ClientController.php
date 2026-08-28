@@ -13,6 +13,7 @@ namespace App\Http\Controllers;
  */
 
 use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
+use App\Domain\Hr\Services\EmployeeIntakeService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Presenters\ClientProfileHealthcareDevicesPresenter;
 use App\Domain\SecurityDevices\Services\PersonalTrackingLocationExportService;
@@ -82,6 +83,7 @@ use App\Models\SiteHouseRoom;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Client\ActionsAggregator;
 use App\Services\Client\BehaviourPatternsService;
 use App\Services\Clients\ClientFamilyCommunicationAccess;
@@ -97,6 +99,8 @@ use App\Services\ConsentValidationService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\Integration\IntegrationEventHistoryService;
+use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationTimelineVisibilityService;
 use App\Services\NotificationService;
 use App\Services\Queclink\LocateNowService;
 use App\Services\Respite\ClientRespiteAllocationSummary;
@@ -385,6 +389,31 @@ class ClientController extends Controller
 
         $sectionAccess = app(ClientProfileSectionAccess::class)
             ->for($request->user(), $client);
+        $canViewControlledMedication = $sectionAccess['medical']
+            && ($request->user()?->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY) ?? false);
+        $medicationGovernance = app(MedicationGovernanceScopeService::class);
+        $medicationAdministrationCountScope = function ($query) use (
+            $sectionAccess,
+            $canViewControlledMedication,
+            $client,
+            $medicationGovernance,
+        ): void {
+            if (! $sectionAccess['medical']) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query->effectiveClinicalEvidence();
+            $medicationGovernance->scopeCanonicalClientMedicationRows(
+                $query,
+                is_numeric($client->site_id) ? [(int) $client->site_id] : [],
+                allowNullMedication: false,
+            );
+            if (! $canViewControlledMedication) {
+                $medicationGovernance->scopeWithoutControlledMedicationRows($query);
+            }
+        };
         $sectionAccess['healthcare_devices'] = $healthcareDevicesPresenter
             ->canView($request->user(), $client);
         $canViewClientLocation = (bool) $sectionAccess['tracking'];
@@ -444,6 +473,14 @@ class ClientController extends Controller
             $profileRelations[] = 'risks';
         }
         $client->load($profileRelations);
+        if ($sectionAccess['medical'] && ! $canViewControlledMedication) {
+            $client->setRelation(
+                'medications',
+                $client->medications
+                    ->reject(fn (ClientMedication $medication): bool => (bool) $medication->controlled_drug)
+                    ->values(),
+            );
+        }
 
         // For modal / async detail views, return JSON.
         if ($request->wantsJson() || $request->boolean('modal')) {
@@ -490,7 +527,7 @@ class ClientController extends Controller
                 'tasks',
                 'tasks as incomplete_tasks_count' => fn ($query) => $query->where('is_completed', false),
                 'formSubmissions',
-                'medicationAdministrations',
+                'medicationAdministrations' => $medicationAdministrationCountScope,
                 'timesheets',
                 'outgoingHandovers',
                 'incomingHandovers',
@@ -508,7 +545,7 @@ class ClientController extends Controller
                 'tasks',
                 'tasks as incomplete_tasks_count' => fn ($query) => $query->where('is_completed', false),
                 'formSubmissions',
-                'medicationAdministrations',
+                'medicationAdministrations' => $medicationAdministrationCountScope,
                 'timesheets',
                 'outgoingHandovers',
                 'incomingHandovers',
@@ -555,6 +592,10 @@ class ClientController extends Controller
         $eventsBase = $sectionAccess['timeline']
             ? TimelineEvent::query()->where('client_id', $client->id)
             : null;
+        if ($eventsBase) {
+            app(MedicationTimelineVisibilityService::class)
+                ->applyVisibleScope($eventsBase, $request->user());
+        }
         $eventsTotal = $eventsBase ? (clone $eventsBase)->count() : 0;
         $events = $eventsBase
             ? (clone $eventsBase)
@@ -575,6 +616,10 @@ class ClientController extends Controller
                 ->where('type', 'handover')
                 ->where('is_pinned', true)
             : null;
+        if ($handoverBase) {
+            app(MedicationTimelineVisibilityService::class)
+                ->applyVisibleScope($handoverBase, $request->user());
+        }
         $handoverTotal = $handoverBase ? (clone $handoverBase)->count() : 0;
         $handover = $handoverBase
             ? (clone $handoverBase)
@@ -698,7 +743,10 @@ class ClientController extends Controller
             && ($request->user()?->canDo('medications.administer.record') ?? false);
         $canRecordControlledMedication = $canRecordMedicationAdministration
             && ($request->user()?->canDo('medications.controlled.record') ?? false);
-        $pendingMedicationAlerts = MedicationDashboardAlert::query()
+        $pendingMedicationAlerts = $medicationGovernance->scopeCanonicalClientMedicationRows(
+            MedicationDashboardAlert::query(),
+            $siteId ? [(int) $siteId] : [],
+        )
             ->where('client_id', $client->id)
             ->where('status', 'active');
         if (! ($request->user()?->canDo('medications.controlled.view') ?? false)) {
@@ -707,8 +755,34 @@ class ClientController extends Controller
                 'controlled_overdue_check',
                 'controlled_loss',
             ]);
+            $medicationGovernance->scopeWithoutControlledMedicationRows($pendingMedicationAlerts);
         }
         $pendingMedicationAlertsCount = $pendingMedicationAlerts->count();
+        $activeMedicationsCount = 0;
+        $lastMedicationAdministration = null;
+        if ($sectionAccess['medical']) {
+            $activeMedications = ClientMedication::query()
+                ->where('client_id', $client->id)
+                ->active()
+                ->whereNull('ceased_at')
+                ->when(! $canViewControlledMedication, fn ($query) => $query
+                    ->where('controlled_drug', false));
+            $activeMedicationsCount = $activeMedications->count();
+
+            $administrations = ClientMedicationAdministration::query()
+                ->effectiveClinicalEvidence()
+                ->where('client_id', $client->id)
+                ->whereNotNull('administered_at');
+            $medicationGovernance->scopeCanonicalClientMedicationRows(
+                $administrations,
+                $siteId ? [(int) $siteId] : [],
+                allowNullMedication: false,
+            );
+            if (! $canViewControlledMedication) {
+                $medicationGovernance->scopeWithoutControlledMedicationRows($administrations);
+            }
+            $lastMedicationAdministration = $administrations->max('administered_at');
+        }
         $dailyNotesTotal = $dailyNotesBase
             ? (clone $dailyNotesBase)->dailyNotes()->count()
             : 0;
@@ -1569,13 +1643,8 @@ class ClientController extends Controller
                 'available_trackers' => $this->buildAvailableTrackers($client, $request->user()),
             ] : []),
             'emar_summary' => $sectionAccess['medical'] ? [
-                'active_medications_count' => ClientMedication::where('client_id', $client->id)
-                    ->where('active', true)
-                    ->whereNull('ceased_at')
-                    ->count(),
-                'last_administration' => ClientMedicationAdministration::where('client_id', $client->id)
-                    ->whereNotNull('administered_at')
-                    ->max('administered_at'),
+                'active_medications_count' => $activeMedicationsCount,
+                'last_administration' => $lastMedicationAdministration,
                 'pending_alerts_count' => $pendingMedicationAlertsCount,
                 'next_review_date' => MedicationReview::where('client_id', $client->id)
                     ->where('status', '!=', 'completed')
@@ -1597,6 +1666,7 @@ class ClientController extends Controller
                     includeShifts: $sectionAccess['shifts'],
                     includeFamilyVisits: $sectionAccess['portal_access'],
                     includeMedicationData: $sectionAccess['medical'],
+                    includeControlledMedicationData: $canViewControlledMedication,
                 )
                 : null,
             'expiredConsents' => $expiredConsents->map(fn ($c) => [
@@ -1932,6 +2002,7 @@ class ClientController extends Controller
         bool $includeShifts,
         bool $includeFamilyVisits,
         bool $includeMedicationData,
+        bool $includeControlledMedicationData,
     ): array {
         $start = now()->startOfMonth();
         $end = now()->endOfMonth()->addDays(7);
@@ -2006,11 +2077,22 @@ class ClientController extends Controller
         }
 
         if ($includeMedicationData) {
+            $medicationGovernance = app(MedicationGovernanceScopeService::class);
             // Medication administrations
-            $medAdmins = ClientMedicationAdministration::where('client_id', $client->id)
+            $medAdmins = ClientMedicationAdministration::query()
+                ->effectiveClinicalEvidence()
+                ->where('client_id', $client->id)
                 ->whereBetween('scheduled_for', [$start, $end])
-                ->with('medication:id,name,dosage,route')
-                ->get();
+                ->with('medication:id,client_id,name,dosage,route,controlled_drug');
+            $medicationGovernance->scopeCanonicalClientMedicationRows(
+                $medAdmins,
+                is_numeric($client->site_id) ? [(int) $client->site_id] : [],
+                allowNullMedication: false,
+            );
+            if (! $includeControlledMedicationData) {
+                $medicationGovernance->scopeWithoutControlledMedicationRows($medAdmins);
+            }
+            $medAdmins = $medAdmins->get();
             foreach ($medAdmins as $ma) {
                 $medName = $ma->medication?->name ?? 'Medication';
                 $statusColor = match ($ma->status) {
@@ -2032,7 +2114,13 @@ class ClientController extends Controller
             // Scheduled medication doses — only show for today ± 3 days to avoid clutter
             $medStart = now()->subDays(3)->startOfDay();
             $medEnd = now()->addDays(3)->endOfDay();
-            $activeMeds = ClientMedication::where('client_id', $client->id)->where('active', true)->whereNull('ceased_at')->where('is_prn', false)->get();
+            $activeMeds = ClientMedication::where('client_id', $client->id)
+                ->active()
+                ->whereNull('ceased_at')
+                ->where('is_prn', false)
+                ->when(! $includeControlledMedicationData, fn ($query) => $query
+                    ->where('controlled_drug', false))
+                ->get();
             foreach ($activeMeds as $med) {
                 $times = $this->parseFrequencyTimes($med->frequency);
                 if (empty($times)) {
@@ -2567,7 +2655,7 @@ class ClientController extends Controller
                     $clientEmail = trim((string) ($data['email'] ?? $client->email ?? ''));
                     if ($clientEmail !== '') {
                         $name = trim($client->first_name.' '.$client->last_name);
-                        $clientUser = $this->findOrCreatePortalUser($clientEmail, $name, 'client');
+                        $clientUser = $this->findOrCreatePortalUser($auth, $clientEmail, $name, 'client');
                         $portalMembership->link($client, $clientUser, 'client');
                         $this->sendPasswordSetupEmail($clientEmail);
                     }
@@ -2603,12 +2691,46 @@ class ClientController extends Controller
         }
     }
 
-    private function findOrCreatePortalUser(string $email, string $name, string $roleName): User
-    {
-        $user = User::where('email', $email)->first();
+    private function findOrCreatePortalUser(
+        User $actor,
+        string $email,
+        string $name,
+        string $roleName,
+    ): User {
+        if (DB::transactionLevel() < 1) {
+            throw new \LogicException('Portal identity publication must share the client transaction.');
+        }
+
+        $email = strtolower(trim($email));
+        app(EmployeeIntakeService::class)
+            ->acquireIntakeLock('email:'.$email);
+        $userId = User::query()->where('email', $email)->value('id');
+        $roleId = (int) Role::query()->where('name', $roleName)->value('id');
+        abort_unless($roleId > 0, 404);
+        $lockedUsers = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+            [(int) $actor->id, $userId],
+            ['clients.create'],
+            [$roleId],
+        );
+        $lockedRole = Role::query()->whereKey($roleId)->lockForUpdate()->first();
+        abort_unless(
+            $lockedRole instanceof Role && (string) $lockedRole->name === $roleName,
+            409,
+            'The requested portal role changed. Please retry.',
+        );
+        /** @var User|null $lockedActor */
+        $lockedActor = $lockedUsers->get((int) $actor->id);
+        abort_unless($lockedActor?->canDo('clients.create'), 403);
+        /** @var User|null $user */
+        $user = $userId ? $lockedUsers->get((int) $userId) : null;
+        if ($user && strtolower(trim((string) $user->email)) !== $email) {
+            throw ValidationException::withMessages([
+                'email' => 'The matching account changed while this request was waiting. Please retry.',
+            ]);
+        }
 
         if (! $user) {
-            $user = User::create([
+            $user = User::query()->create([
                 'name' => $name,
                 'email' => $email,
                 // Random placeholder; user sets their own password from reset email.
@@ -2625,10 +2747,7 @@ class ClientController extends Controller
             }
         }
 
-        $role = Role::where('name', $roleName)->first();
-        if ($role) {
-            $user->roles()->syncWithoutDetaching([$role->id]);
-        }
+        $user->roles()->syncWithoutDetaching([$roleId]);
 
         return $user;
     }

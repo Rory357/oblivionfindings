@@ -12,11 +12,18 @@ import {
     SelectInput,
     StepHead,
 } from '@/components/wizard/primitives';
+import {
+    createMedicationMutationReplayState,
+    emarMutationWasAccepted,
+    prepareMedicationMutationReplayState,
+    submitEmarMutation,
+} from '@/lib/emar-offline';
 import { router } from '@inertiajs/react';
 import { ClipboardCheck, Info, Package, PackagePlus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { genericStockMedications } from '../medication-stock-governance';
 import type { MedicationOption } from './cd-register-modal';
 import type { ClientOption } from './report-error-modal';
 
@@ -56,6 +63,7 @@ export function StockMovementModal({
 }) {
     const [step, setStep] = useState(0);
     const [saving, setSaving] = useState(false);
+    const stockReplay = useRef(createMedicationMutationReplayState());
     const [action, setAction] = useState<'receive' | 'adjust'>('receive');
     const [clientId, setClientId] = useState(
         initialClientId ? String(initialClientId) : '',
@@ -70,6 +78,7 @@ export function StockMovementModal({
     // Seed the client from the triggering row (if any) on each opening.
     useEffect(() => {
         if (open) {
+            stockReplay.current = createMedicationMutationReplayState();
             setClientId(initialClientId ? String(initialClientId) : '');
             setMedId('');
         }
@@ -92,7 +101,7 @@ export function StockMovementModal({
         onClose();
     };
 
-    const clientMeds = medications.filter(
+    const clientMeds = genericStockMedications(medications).filter(
         (m) => String(m.client_id) === clientId,
     );
     const step1Ok = clientId && medId;
@@ -101,7 +110,7 @@ export function StockMovementModal({
             ? quantity.trim() && Number(quantity) > 0
             : newQuantity.trim() !== '' && reason.trim().length > 0;
 
-    const submit = () => {
+    const submit = async () => {
         setSaving(true);
         const url =
             action === 'receive' ? '/emar/stock/receive' : '/emar/stock/adjust';
@@ -109,28 +118,51 @@ export function StockMovementModal({
             action === 'receive'
                 ? {
                       client_medication_id: Number(medId),
-                      quantity: Number(quantity),
+                      quantity,
                       batch_number: batch || null,
                       expiry_date: expiry || null,
                   }
                 : {
                       client_medication_id: Number(medId),
-                      new_quantity: Number(newQuantity),
+                      new_quantity: newQuantity,
                       reason,
                   };
-        router.post(url, payload, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success(
-                    action === 'receive'
-                        ? 'Stock received'
-                        : 'Stock count adjusted',
-                );
+        stockReplay.current = prepareMedicationMutationReplayState(
+            stockReplay.current,
+            { action, client_id: Number(clientId), ...payload },
+        );
+        try {
+            const result = await submitEmarMutation(
+                url,
+                {
+                    ...payload,
+                    client_request_uuid: stockReplay.current.uuid,
+                },
+                {
+                    action: 'stock_update',
+                    successMessage:
+                        action === 'receive'
+                            ? 'Stock received'
+                            : 'Stock count adjusted',
+                },
+            );
+            if (emarMutationWasAccepted(result.status)) {
+                stockReplay.current = createMedicationMutationReplayState();
                 close();
-            },
-            onError: () => toast.error('Could not save the stock change'),
-            onFinish: () => setSaving(false),
-        });
+                router.reload({
+                    only: [
+                        'stockItems',
+                        'lowStockCount',
+                        'expiringCount',
+                        'expiredCount',
+                    ],
+                });
+            }
+        } catch {
+            toast.error('Could not save the stock change');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const medName = clientMeds.find((m) => String(m.id) === medId)?.name ?? '—';
@@ -249,7 +281,8 @@ export function StockMovementModal({
                             <Field label="Quantity received" required>
                                 <Input
                                     type="number"
-                                    inputMode="numeric"
+                                    inputMode="decimal"
+                                    step={0.01}
                                     value={quantity}
                                     onChange={(e) =>
                                         setQuantity(e.target.value)
@@ -279,7 +312,8 @@ export function StockMovementModal({
                             <Field label="New on-hand count" required>
                                 <Input
                                     type="number"
-                                    inputMode="numeric"
+                                    inputMode="decimal"
+                                    step={0.01}
                                     value={newQuantity}
                                     onChange={(e) =>
                                         setNewQuantity(e.target.value)

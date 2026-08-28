@@ -68,6 +68,7 @@ export type TemplateClientOption = {
     last_name?: string | null;
     name?: string | null;
     service_context_id?: number | null;
+    site_id: number | null;
 };
 export type TemplateStaffOption = {
     id: number;
@@ -79,6 +80,7 @@ export type TemplateServiceContextOption = {
     name: string;
     type?: string | null;
     is_active?: boolean;
+    site_id: number | null;
 };
 
 const DAY_OPTIONS = [
@@ -112,6 +114,83 @@ const SHIFT_TYPE_OPTIONS = [
 ];
 
 const NONE = '__none__';
+
+function contextMatchesClient(
+    context: TemplateServiceContextOption,
+    client: TemplateClientOption | undefined,
+): boolean {
+    return (
+        context.is_active !== false &&
+        (context.site_id === null ||
+            (client?.site_id != null && context.site_id === client.site_id))
+    );
+}
+
+export function templateContextsForClient(
+    clientId: string,
+    clients: TemplateClientOption[],
+    contexts: TemplateServiceContextOption[],
+): TemplateServiceContextOption[] {
+    const client = clients.find((candidate) => String(candidate.id) === clientId);
+
+    return contexts.filter((context) => contextMatchesClient(context, client));
+}
+
+export function retainedTemplateContextId(
+    clientId: string,
+    currentContextId: string,
+    clients: TemplateClientOption[],
+    contexts: TemplateServiceContextOption[],
+): string {
+    const client = clients.find((candidate) => String(candidate.id) === clientId);
+    const current = contexts.find(
+        (context) => String(context.id) === currentContextId,
+    );
+
+    return current && contextMatchesClient(current, client)
+        ? currentContextId
+        : '';
+}
+
+export function reconcileTemplateContextId(
+    clientId: string,
+    currentContextId: string,
+    clients: TemplateClientOption[],
+    contexts: TemplateServiceContextOption[],
+): string {
+    const client = clients.find((candidate) => String(candidate.id) === clientId);
+    const retainedContextId = retainedTemplateContextId(
+        clientId,
+        currentContextId,
+        clients,
+        contexts,
+    );
+
+    if (retainedContextId) {
+        return retainedContextId;
+    }
+
+    const preferred = contexts.find(
+        (context) =>
+            client?.service_context_id != null &&
+            context.id === client.service_context_id &&
+            contextMatchesClient(context, client),
+    );
+
+    return preferred ? String(preferred.id) : '';
+}
+
+export function templateApplyBlockLines(errors: {
+    template_shifts?: string;
+    preflight_blocks?: string;
+}): string[] {
+    return [
+        ...(errors.template_shifts ? [errors.template_shifts] : []),
+        ...(errors.preflight_blocks
+            ? errors.preflight_blocks.split('\n').filter(Boolean)
+            : []),
+    ];
+}
 
 function clientLabel(client: TemplateClientOption): string {
     if (client.name) return client.name;
@@ -198,13 +277,25 @@ function emptyRow(): WizardShiftRow {
     };
 }
 
-function toWizardRow(shift: RosterTemplateShiftRow): WizardShiftRow {
+function toWizardRow(
+    shift: RosterTemplateShiftRow,
+    clients: TemplateClientOption[],
+    serviceContexts: TemplateServiceContextOption[],
+): WizardShiftRow {
+    const clientId = shift.client_id ? String(shift.client_id) : '';
+    const contextId = shift.service_context_id
+        ? String(shift.service_context_id)
+        : '';
+
     return {
-        client_id: shift.client_id ? String(shift.client_id) : '',
+        client_id: clientId,
         user_id: shift.user_id ? String(shift.user_id) : '',
-        service_context_id: shift.service_context_id
-            ? String(shift.service_context_id)
-            : '',
+        service_context_id: retainedTemplateContextId(
+            clientId,
+            contextId,
+            clients,
+            serviceContexts,
+        ),
         day_of_week: String(shift.day_of_week ?? 0),
         start_time: shift.start_time || '07:00',
         end_time: shift.end_time || '15:00',
@@ -301,7 +392,9 @@ function WizardBody({
         template_type: template?.template_type ?? 'weekly',
         is_active: template?.is_active ?? true,
         template_shifts: template?.template_shifts?.length
-            ? template.template_shifts.map(toWizardRow)
+            ? template.template_shifts.map((shift) =>
+                  toWizardRow(shift, clients, serviceContexts),
+              )
             : [emptyRow()],
     });
     const { data, setData, processing } = form;
@@ -312,13 +405,11 @@ function WizardBody({
     const isLast = stepIndex === WIZARD_STEPS.length - 1;
 
     const clientOptions = useMemo(
-        () => [
-            { value: NONE, label: 'No client' },
-            ...clients.map((c) => ({
+        () =>
+            clients.map((c) => ({
                 value: String(c.id),
                 label: clientLabel(c),
             })),
-        ],
         [clients],
     );
     const staffOptions = useMemo(
@@ -331,17 +422,6 @@ function WizardBody({
         ],
         [staff],
     );
-    const contextOptions = useMemo(
-        () => [
-            { value: NONE, label: 'No service context' },
-            ...serviceContexts.map((s) => ({
-                value: String(s.id),
-                label: s.is_active === false ? `${s.name} (inactive)` : s.name,
-            })),
-        ],
-        [serviceContexts],
-    );
-
     const setRow = (index: number, patch: Partial<WizardShiftRow>) => {
         setData(
             'template_shifts',
@@ -385,8 +465,8 @@ function WizardBody({
             e.template_shifts = 'Add at least one shift row.';
         }
         data.template_shifts.forEach((row, i) => {
-            if (!row.client_id && !row.service_context_id) {
-                e[`row-${i}`] = 'Each row needs a client or a service context.';
+            if (!row.client_id) {
+                e[`row-${i}`] = 'Each row needs a client.';
             } else if (row.start_time === row.end_time) {
                 e[`row-${i}`] = 'Start and end time cannot be the same.';
             }
@@ -669,7 +749,7 @@ function WizardBody({
                                         error={localErrors[`row-${index}`]}
                                         clientOptions={clientOptions}
                                         staffOptions={staffOptions}
-                                        contextOptions={contextOptions}
+                                        serviceContexts={serviceContexts}
                                         clients={clients}
                                         onChange={(patch) =>
                                             setRow(index, patch)
@@ -779,7 +859,7 @@ function RowEditor({
     error,
     clientOptions,
     staffOptions,
-    contextOptions,
+    serviceContexts,
     clients,
     onChange,
     onRemove,
@@ -791,13 +871,27 @@ function RowEditor({
     error?: string;
     clientOptions: { value: string; label: string }[];
     staffOptions: { value: string; label: string }[];
-    contextOptions: { value: string; label: string }[];
+    serviceContexts: TemplateServiceContextOption[];
     clients: TemplateClientOption[];
     onChange: (patch: Partial<WizardShiftRow>) => void;
     onRemove: () => void;
     onDuplicate: () => void;
 }) {
     const overnight = row.end_time <= row.start_time;
+    const contextOptions = [
+        { value: NONE, label: 'No service context' },
+        ...templateContextsForClient(
+            row.client_id,
+            clients,
+            serviceContexts,
+        ).map((context) => ({
+            value: String(context.id),
+            label:
+                context.is_active === false
+                    ? `${context.name} (inactive)`
+                    : context.name,
+        })),
+    ];
     return (
         <div
             className={cn(
@@ -878,28 +972,23 @@ function RowEditor({
                 </Field>
 
                 <SubHead icon={Users}>Who</SubHead>
-                <Field label="Client">
+                <Field label="Client" required>
                     <SelectInput
-                        value={row.client_id || NONE}
+                        value={row.client_id}
                         onChange={(v) => {
-                            const clientId = v === NONE ? '' : v;
+                            const clientId = v;
                             const patch: Partial<WizardShiftRow> = {
                                 client_id: clientId,
+                                service_context_id: reconcileTemplateContextId(
+                                    clientId,
+                                    row.service_context_id,
+                                    clients,
+                                    serviceContexts,
+                                ),
                             };
-                            // Auto-fill the service context from the client when blank.
-                            if (clientId && !row.service_context_id) {
-                                const picked = clients.find(
-                                    (c) => String(c.id) === clientId,
-                                );
-                                if (picked?.service_context_id) {
-                                    patch.service_context_id = String(
-                                        picked.service_context_id,
-                                    );
-                                }
-                            }
                             onChange(patch);
                         }}
-                        placeholder="No client"
+                        placeholder="Select a client"
                         options={clientOptions}
                     />
                 </Field>
@@ -1248,11 +1337,8 @@ function DetailBody({
         [errors.preflight_warnings],
     );
     const blockLines = useMemo(
-        () =>
-            errors.preflight_blocks
-                ? errors.preflight_blocks.split('\n').filter(Boolean)
-                : [],
-        [errors.preflight_blocks],
+        () => templateApplyBlockLines(errors),
+        [errors.preflight_blocks, errors.template_shifts],
     );
 
     useEffect(() => {

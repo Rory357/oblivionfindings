@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Exceptions\AttendanceClockOutBlockedException;
 use App\Domain\Hr\Models\HrAnnouncement;
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrBenefitEnrollment;
 use App\Domain\Hr\Models\HrCourseAssignment;
 use App\Domain\Hr\Models\HrCourseEnrollment;
@@ -1452,10 +1454,16 @@ class MyHrController extends Controller
     {
         $user = $this->currentMyHrUser($request);
 
+        $shift = $this->attendanceService->resolveSelfClockInShift(
+            $user,
+            $request->input('shift_id'),
+        );
+
         $validated = $request->validate([
-            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+            'shift_id' => ['nullable', 'integer', 'min:1'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
+        $validated['shift_id'] = $shift?->id;
 
         // Guard against a second concurrent clock-in (which would leave two open
         // entries and a stuck "on shift" banner). One active clock at a time.
@@ -1473,12 +1481,6 @@ class MyHrController extends Controller
                 'shift_id' => $validated['shift_id'] ?? null,
                 'notes' => $validated['notes'] ?? null,
                 'source' => 'self_service',
-            ]);
-
-            // Single owner of the HrTimeEntry payload + NZ break formula lives in
-            // TimeTrackingService (de-forked from this controller, handoff §6).
-            $this->timeTrackingService->syncEntryFromSession($session, $user, [
-                'notes' => $validated['notes'] ?? null,
             ]);
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -1504,42 +1506,51 @@ class MyHrController extends Controller
         // no matching session — that's fine: we still close the time entry below
         // so the hero's live clock always clears (never a phantom "on shift").
         $session = null;
+        $attendanceFailure = null;
         try {
             $session = $this->attendanceService->clockOut($user, null, [
                 'break_minutes' => $requestedBreak,
                 'notes' => $validated['notes'] ?? null,
-            ]);
-        } catch (\LogicException) {
-            // No open attendance session — fall through and close the entry(ies).
-        }
-
-        $clockOutAt = $session?->clock_out_at ?? now();
-        $breakMinutes = (int) ($session?->break_minutes ?? $requestedBreak);
-
-        // Sync the session-linked entry (creating it for any legacy in-flight
-        // session that predates the unified clock paths), then self-heal any
-        // remaining orphaned actives — all through the one shared close path so
-        // the NZ break formula is de-forked (handoff §6).
-        if ($session) {
-            $this->timeTrackingService->syncEntryFromSession($session, $user, [
                 'mileage_km' => $validated['mileage_km'] ?? null,
-                'notes' => $validated['notes'] ?? null,
             ]);
+        } catch (AttendanceClockOutBlockedException $exception) {
+            return redirect()->back()
+                ->with('error', $exception->getMessage())
+                ->with('clock_out_blockers', $exception->blockers());
+        } catch (\LogicException $exception) {
+            $attendanceFailure = $exception;
         }
 
-        $closed = $this->timeTrackingService->closeOpenEntries(
-            $user,
-            $clockOutAt,
-            $breakMinutes,
-            $validated['mileage_km'] ?? null,
-            $validated['notes'] ?? null,
-        );
-
-        if (! $session && $closed === 0) {
-            return redirect()->back()->with('error', 'You are not currently clocked in.');
+        if ($session) {
+            return redirect()->back()->with('success', 'Clocked out successfully.');
         }
 
-        return redirect()->back()->with('success', 'Clocked out successfully.');
+        // Never turn an attendance projection/provenance failure into a direct
+        // HrTimeEntry write. Only self-heal after an unlocked early check finds
+        // no live session; closeOpenEntries repeats that check under the User
+        // lock before touching a truly orphaned row.
+        if (HrAttendanceSession::query()->where('user_id', $user->id)->open()->exists()) {
+            return redirect()->back()->with(
+                'error',
+                $attendanceFailure?->getMessage() ?? 'The attendance session could not be clocked out.',
+            );
+        }
+
+        try {
+            $closed = $this->timeTrackingService->closeOpenEntries(
+                $user,
+                now(),
+                $requestedBreak,
+                $validated['mileage_km'] ?? null,
+                $validated['notes'] ?? null,
+            );
+        } catch (\LogicException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return $closed > 0
+            ? redirect()->back()->with('success', 'Clocked out successfully.')
+            : redirect()->back()->with('error', 'You are not currently clocked in.');
     }
 
     /** Download a single roster shift as a calendar (.ics) event. */

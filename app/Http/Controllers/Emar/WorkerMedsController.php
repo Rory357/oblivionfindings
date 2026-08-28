@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Emar;
 
+use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Concerns\HandlesOfflineSubmission;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -22,6 +23,7 @@ use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -52,6 +54,7 @@ use Inertia\Response;
  */
 class WorkerMedsController extends Controller
 {
+    use HandlesMedicationSync;
     use HandlesOfflineSubmission;
 
     public function __construct(
@@ -71,6 +74,8 @@ class WorkerMedsController extends Controller
             $user->canDo('medications.view') || $user->canDo('medications.administer.record'),
             403,
         );
+        $includeControlled = $user->canDo('medications.controlled.view')
+            || $user->canDo('medications.controlled.record');
 
         $timezone = $this->scheduleService->workerTimezone();
         $now = Carbon::now($timezone);
@@ -87,10 +92,10 @@ class WorkerMedsController extends Controller
         // reused for (a) matching scheduled dose slots, and (b) deriving the
         // PRN follow-up queue — keeping the today() path at a single
         // client_medication_administrations query regardless of slot count.
-        $dayAdministrations = $this->boardPayload->administrationsForDay($assignedClientIds, $date);
+        $dayAdministrations = $this->boardPayload->administrationsForDay($assignedClientIds, $date, $includeControlled);
         $bySlot = $this->boardPayload->slotIndex($dayAdministrations);
 
-        $schedule = $this->boardPayload->scheduleForDate($assignedClientIds, $date, $now, $bySlot);
+        $schedule = $this->boardPayload->scheduleForDate($assignedClientIds, $date, $now, $bySlot, $includeControlled);
 
         // Legacy due lists (kept for the established payload contract): the
         // operational "what needs me" window of -2h … +8h around now.
@@ -116,7 +121,7 @@ class WorkerMedsController extends Controller
             fn ($r) => in_array($r['status'], ['pending', 'in_progress'], true),
         ));
 
-        $prnMedications = $this->boardPayload->prnMedications($assignedClientIds, $now);
+        $prnMedications = $this->boardPayload->prnMedications($assignedClientIds, $now, $includeControlled);
 
         return Inertia::render('meds/today/index', [
             'today' => $now->format('l, j F Y'),
@@ -142,9 +147,9 @@ class WorkerMedsController extends Controller
             'sites' => $this->boardPayload->sitesPayload($assignedClientIds),
             'prn_medications' => $prnMedications,
             'prn_follow_ups' => $this->prnFollowUps($dayAdministrations, $timezone),
-            'stock_alerts' => $this->stockAlerts($assignedClientIds),
+            'stock_alerts' => $this->stockAlerts($assignedClientIds, $includeControlled),
             'activity' => $this->activityForDate($assignedClientIds, $date, $dayAdministrations),
-            'witnesses' => $this->boardPayload->witnesses($user),
+            'witnesses' => $this->boardPayload->witnesses($user, $assignedClientIds),
             'not_given_reasons' => $this->boardPayload->notGivenReasons(),
             'shift_label' => $this->shiftLabel($user, $date, $timezone),
             'board_user' => $this->boardPayload->boardUser($user),
@@ -189,23 +194,24 @@ class WorkerMedsController extends Controller
             'reason_code' => ['nullable', 'string', 'max:60', 'required_unless:status,given'],
             'reason' => ['nullable', 'string', 'max:500'],
             'administered_at' => ['nullable', 'date'],
-            'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
+            'witnessed_by' => ['nullable', 'integer', 'min:1'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
-            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
-            'cd_balance' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
+            'cd_balance' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', 'max:100000'],
             'blood_glucose_level' => ['nullable', 'numeric', 'min:0', 'max:999.9'],
             'pulse_bpm' => ['nullable', 'integer', 'min:20', 'max:250'],
             'blood_pressure_systolic' => ['nullable', 'integer', 'min:40', 'max:300'],
             'blood_pressure_diastolic' => ['nullable', 'integer', 'min:20', 'max:200'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            ...$this->offlineSubmissionRules(),
+            ...$this->medicationOfflineSubmissionRules($request),
         ]);
 
         $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
         abort_unless($medication->client, 404);
         $scheduledFor = $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for']);
+        $submittedAdministrationAt = $this->medicationSubmittedAdministrationAt($data);
         $actionAt = $this->scheduleService->parseWorkerDateTime((string) (
-            $data['administered_at'] ?? $data['captured_offline_at'] ?? now()->toIso8601String()
+            $submittedAdministrationAt ?? now()->toIso8601String()
         ));
 
         return $this->medicationScope->forAdministration(
@@ -216,7 +222,7 @@ class WorkerMedsController extends Controller
             $scheduledFor,
             null,
             null,
-            function (MedicationScopeDecision $scope) use ($user, $data) {
+            function (MedicationScopeDecision $scope) use ($user, $data, $submittedAdministrationAt) {
                 $medication = $scope->medication;
                 $shiftId = $scope->shiftId();
 
@@ -235,10 +241,9 @@ class WorkerMedsController extends Controller
                         'reason_code' => $data['status'] === 'given' ? null : ($data['reason_code'] ?? null),
                         'dose_given' => $data['status'] === 'given' ? $medication->dosage : null,
                         'quantity_administered' => $data['quantity_administered'] ?? null,
+                        'cd_balance' => $data['cd_balance'] ?? null,
                         'scheduled_for' => $data['scheduled_for'],
-                        'administered_at' => $data['administered_at']
-                            ?? $data['captured_offline_at']
-                            ?? now()->toIso8601String(),
+                        'administered_at' => $submittedAdministrationAt,
                         'witnessed_by' => $data['witnessed_by'] ?? null,
                         'witness_credential' => $data['witness_credential'] ?? null,
                         'blood_glucose_level' => $data['blood_glucose_level'] ?? null,
@@ -247,10 +252,16 @@ class WorkerMedsController extends Controller
                         'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
                         'notes' => $notes !== '' ? $notes : null,
                         'client_request_uuid' => $data['client_request_uuid'] ?? null,
+                        'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                        'origin_device_id' => $data['origin_device_id'] ?? null,
+                        'queued_offline' => (bool) ($data['queued_offline'] ?? false),
                         'scope_authorized' => true,
                     ],
                     $user->id,
                     $shiftId,
+                    $user->canDo('medications.controlled.view'),
+                    prelockedPresenceShifts: $scope->lockedPresenceShifts,
+                    prelockedPresenceEffectiveAt: $scope->lockedPresenceEffectiveAt,
                 );
 
                 if (! ($result['success'] ?? false)) {
@@ -267,7 +278,7 @@ class WorkerMedsController extends Controller
                     return back()->with('warning', 'This dose was already recorded — no changes made.');
                 }
 
-                $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId);
+                $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId, $data);
                 $this->medicationScope->recordBreakGlassUse(
                     $scope,
                     'recorded_dose',
@@ -288,7 +299,9 @@ class WorkerMedsController extends Controller
                 };
 
                 return back()->with('success', $medication->name.' '.$outcome.' for '.$clientName);
-            });
+            }, authorizationUserIds: array_filter([
+                is_numeric($data['witnessed_by'] ?? null) ? (int) $data['witnessed_by'] : null,
+            ]));
     }
 
     /**
@@ -315,22 +328,23 @@ class WorkerMedsController extends Controller
             'client_medication_id' => ['required', 'integer'],
             'reason' => ['required', 'string', 'max:500'],
             'dose_given' => ['nullable', 'string', 'max:255'],
-            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
+            'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
             'administered_at' => ['nullable', 'date'],
-            'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
+            'witnessed_by' => ['nullable', 'integer', 'min:1'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
             'blood_glucose_level' => ['nullable', 'numeric', 'min:0', 'max:999.9'],
             'pulse_bpm' => ['nullable', 'integer', 'min:20', 'max:250'],
             'blood_pressure_systolic' => ['nullable', 'integer', 'min:40', 'max:300'],
             'blood_pressure_diastolic' => ['nullable', 'integer', 'min:20', 'max:200'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            ...$this->offlineSubmissionRules(),
+            ...$this->medicationOfflineSubmissionRules($request),
         ]);
 
         $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
         abort_unless($medication->client, 404);
+        $submittedAdministrationAt = $this->medicationSubmittedAdministrationAt($data);
         $actionAt = $this->scheduleService->parseWorkerDateTime((string) (
-            $data['administered_at'] ?? $data['captured_offline_at'] ?? now()->toIso8601String()
+            $submittedAdministrationAt ?? now()->toIso8601String()
         ));
 
         return $this->medicationScope->forAdministration(
@@ -341,7 +355,7 @@ class WorkerMedsController extends Controller
             null,
             null,
             null,
-            function (MedicationScopeDecision $scope) use ($user, $data) {
+            function (MedicationScopeDecision $scope) use ($user, $data, $submittedAdministrationAt) {
                 $medication = $scope->medication;
                 $shiftId = $scope->shiftId();
 
@@ -361,13 +375,17 @@ class WorkerMedsController extends Controller
                         'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
                         'notes' => $data['notes'] ?? null,
                         'client_request_uuid' => $data['client_request_uuid'] ?? null,
-                        'administered_at' => $data['administered_at']
-                            ?? $data['captured_offline_at']
-                            ?? now()->toIso8601String(),
+                        'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                        'origin_device_id' => $data['origin_device_id'] ?? null,
+                        'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+                        'administered_at' => $submittedAdministrationAt,
                         'scope_authorized' => true,
                     ],
                     $user->id,
                     $shiftId,
+                    $user->canDo('medications.controlled.view'),
+                    prelockedPresenceShifts: $scope->lockedPresenceShifts,
+                    prelockedPresenceEffectiveAt: $scope->lockedPresenceEffectiveAt,
                 );
 
                 if (! ($result['success'] ?? false)) {
@@ -382,7 +400,7 @@ class WorkerMedsController extends Controller
                     return $this->onDuplicateOfflineSubmission('prn', $data);
                 }
 
-                $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId);
+                $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId, $data);
                 $this->medicationScope->recordBreakGlassUse(
                     $scope,
                     'recorded_prn_dose',
@@ -393,7 +411,9 @@ class WorkerMedsController extends Controller
                     'success',
                     'Saved — '.$medication->name.' recorded for '.trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? '')),
                 );
-            });
+            }, authorizationUserIds: array_filter([
+                is_numeric($data['witnessed_by'] ?? null) ? (int) $data['witnessed_by'] : null,
+            ]));
     }
 
     /**
@@ -412,18 +432,6 @@ class WorkerMedsController extends Controller
             'You do not have permission to record medication administrations.'
         );
 
-        $data = $request->validate([
-            'client_medication_administration_id' => ['required', 'integer'],
-            'effectiveness' => ['required', 'in:effective,partially_effective,not_effective'],
-            // Explicit "reviewed X minutes after the dose" chip from the eMAR
-            // effectiveness wizard; when omitted we derive it from the elapsed
-            // time (the worker board's quick follow-up never sends it).
-            'review_minutes_after' => ['nullable', 'integer', 'min:0', 'max:1440'],
-            'observations' => ['nullable', 'string', 'max:2000'],
-            'escalation_needed' => ['nullable', 'boolean'],
-            'escalation_action' => ['nullable', 'string', 'max:500'],
-        ]);
-
         // The medication_prn_effectiveness schema only supports the fields above.
         // Richer review data the eMAR design asked for needs migrations and is
         // deferred (see docs/PRN_GAP_ANALYSIS.md "effectiveness extra fields"):
@@ -434,18 +442,34 @@ class WorkerMedsController extends Controller
         //   TODO(G5): structured "who was notified" (GP/family/senior)
         //   TODO(G6): follow-up due time
         //   TODO(G7): link to care/behaviour plan
-        $administration = ClientMedicationAdministration::with(['medication:id,name,is_prn,controlled_drug', 'prnEffectiveness'])
-            ->findOrFail($data['client_medication_administration_id']);
+        $administrationId = filter_var(
+            $request->input('client_medication_administration_id'),
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]],
+        );
+        abort_unless($administrationId !== false, 404);
+        $administration = new ClientMedicationAdministration;
+        $administration->setAttribute($administration->getKeyName(), (int) $administrationId);
 
         return $this->medicationScope->forPrnEffectiveness(
             $user,
             $administration,
             now(),
-            function (MedicationScopeDecision $scope) use ($data, $user) {
-                abort_if(
-                    $scope->medication->controlled_drug
-                        && ! $user->canDo('medications.controlled.record'),
-                    403,
+            function (MedicationScopeDecision $scope) use ($request) {
+                $data = $request->validate([
+                    'client_medication_administration_id' => ['required', 'integer'],
+                    'effectiveness' => ['required', 'in:effective,partially_effective,not_effective'],
+                    // Explicit "reviewed X minutes after the dose" chip from the eMAR
+                    // effectiveness wizard; when omitted we derive it from the elapsed
+                    // time (the worker board's quick follow-up never sends it).
+                    'review_minutes_after' => ['nullable', 'integer', 'min:0', 'max:1440'],
+                    'observations' => ['nullable', 'string', 'max:2000'],
+                    'escalation_needed' => ['nullable', 'boolean'],
+                    'escalation_action' => ['nullable', 'string', 'max:500'],
+                ]);
+                abort_unless(
+                    (int) $data['client_medication_administration_id'] === (int) $scope->administration->id,
+                    404,
                 );
                 $administration = $scope->administration;
                 $administration->loadMissing('prnEffectiveness');
@@ -467,7 +491,7 @@ class WorkerMedsController extends Controller
                         'observations' => $data['observations'] ?? null,
                         'escalation_needed' => (bool) ($data['escalation_needed'] ?? false),
                         'escalation_action' => $data['escalation_action'] ?? null,
-                        'reviewed_by' => $user->id,
+                        'reviewed_by' => $scope->performer->id,
                         'reviewed_at' => now(),
                     ],
                 );
@@ -506,7 +530,25 @@ class WorkerMedsController extends Controller
 
         try {
             $shiftClientIds = Shift::where('user_id', $user->id)
-                ->whereBetween('starts_at', [$from, $to])
+                ->where('starts_at', '<=', $to)
+                ->where(function ($overlap) use ($from): void {
+                    $overlap
+                        ->where('actual_ends_at', '>=', $from)
+                        ->orWhere(function ($scheduledEnd) use ($from): void {
+                            $scheduledEnd
+                                ->whereNull('actual_ends_at')
+                                ->where(function ($effectiveEnd) use ($from): void {
+                                    $effectiveEnd
+                                        ->where('ends_at', '>=', $from)
+                                        ->orWhere(function ($openShift): void {
+                                            $openShift
+                                                ->whereNull('ends_at')
+                                                ->where('status', 'in_progress');
+                                        });
+                                });
+                        });
+                })
+                ->where('status', '!=', 'cancelled')
                 ->whereHas('client', fn ($clients) => $clients->whereIn('site_id', $siteIds))
                 ->pluck('client_id')
                 ->filter()
@@ -557,6 +599,7 @@ class WorkerMedsController extends Controller
         ClientMedication $medication,
         User $user,
         ?int $shiftId,
+        array $submission,
     ): void {
         $statusLabel = ucfirst(str_replace('_', ' ', (string) $administration->status));
 
@@ -571,14 +614,18 @@ class WorkerMedsController extends Controller
             'site_id' => $medication->client?->site_id,
             'subject' => $statusLabel.': '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
             'body' => null,
-            'meta' => array_filter([
+            'meta' => [
                 'medication_name' => $medication->name,
                 'dosage' => $medication->dosage,
                 'status' => $administration->status,
                 'reason' => $administration->reason,
                 'witnessed_by' => $administration->witnessed_by,
                 'is_prn' => $medication->is_prn ? true : null,
-            ]),
+                'client_request_uuid' => $administration->client_request_uuid,
+                'captured_offline_at' => $submission['captured_offline_at'] ?? null,
+                'origin_device_id' => $submission['origin_device_id'] ?? null,
+                'queued_offline' => (bool) ($submission['queued_offline'] ?? false),
+            ],
         ]);
     }
 
@@ -628,7 +675,7 @@ class WorkerMedsController extends Controller
      * expiring within 30 days, or already expired. Always anchored to today —
      * stock is a now problem regardless of which day the board shows.
      */
-    private function stockAlerts(array $clientIds): array
+    private function stockAlerts(array $clientIds, bool $includeControlled): array
     {
         if (empty($clientIds)) {
             return [];
@@ -638,7 +685,10 @@ class WorkerMedsController extends Controller
             $today = Carbon::today($this->scheduleService->workerTimezone());
 
             return ClientMedicationStock::query()
-                ->whereHas('medication', fn ($q) => $q->whereIn('client_id', $clientIds)->active())
+                ->whereHas('medication', fn ($q) => $q
+                    ->whereIn('client_id', $clientIds)
+                    ->active()
+                    ->when(! $includeControlled, fn ($medications) => $medications->where('controlled_drug', false)))
                 ->where(function ($query) {
                     $query->where(function ($q) {
                         $q->whereNotNull('reorder_level')->whereColumn('on_hand', '<=', 'reorder_level');
@@ -658,7 +708,7 @@ class WorkerMedsController extends Controller
 
                     $expired = $stock->expiry_date && $stock->expiry_date->lte($today);
                     $expiringSoon = ! $expired && $stock->expiry_date && $stock->expiry_date->lte($today->copy()->addDays(30));
-                    $low = $stock->reorder_level !== null && $stock->on_hand <= $stock->reorder_level;
+                    $low = $stock->isLowStock();
 
                     if ($expired) {
                         $type = 'expired';
@@ -666,7 +716,7 @@ class WorkerMedsController extends Controller
                         $detail = 'Expired '.$stock->expiry_date->format('j M Y');
                     } elseif ($low) {
                         $type = 'stock_low';
-                        $tone = $stock->on_hand <= 0 ? 'crit' : 'warn';
+                        $tone = MedicationStockQuantity::lessThanOrEqual($stock->on_hand ?? 0, 0) ? 'crit' : 'warn';
                         $detail = $stock->on_hand.' '.($stock->unit ?: 'units').' left · reorder at '.$stock->reorder_level;
                     } else {
                         $type = 'expiring_soon';
@@ -708,10 +758,16 @@ class WorkerMedsController extends Controller
             $timezone = $this->scheduleService->workerTimezone();
             [$dayStartUtc, $dayEndUtc] = $this->scheduleService->utcDayWindow($date);
             $administrationsById = $dayAdministrations->keyBy('id');
+            $administrationIds = $administrationsById->keys()->all();
+            if ($administrationIds === []) {
+                return [];
+            }
 
             return TimelineEvent::query()
                 ->whereIn('client_id', $clientIds)
                 ->where('type', 'like', 'medication%')
+                ->where('source_type', ClientMedicationAdministration::class)
+                ->whereIn('source_id', $administrationIds)
                 ->whereBetween('occurred_at', [$dayStartUtc, $dayEndUtc])
                 ->with(['actor:id,name', 'client:id,first_name,last_name'])
                 ->orderByDesc('occurred_at')
@@ -819,7 +875,10 @@ class WorkerMedsController extends Controller
                 return null;
             }
 
-            $progress = $this->guidedRoundService->progress($round);
+            $progress = $this->guidedRoundService->progress(
+                $round,
+                $user->canDo('medications.controlled.view') || $user->canDo('medications.controlled.record'),
+            );
 
             if ($progress['total'] === 0) {
                 return null;
@@ -870,9 +929,12 @@ class WorkerMedsController extends Controller
                 ->limit(12)
                 ->get();
 
+            $includeControlled = $user->canDo('medications.controlled.view')
+                || $user->canDo('medications.controlled.record');
+
             return $rounds
-                ->map(function (MedicationRound $round) {
-                    $progress = $this->guidedRoundService->progress($round);
+                ->map(function (MedicationRound $round) use ($includeControlled) {
+                    $progress = $this->guidedRoundService->progress($round, $includeControlled);
 
                     return [
                         'id' => $round->id,

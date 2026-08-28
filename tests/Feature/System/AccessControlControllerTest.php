@@ -61,7 +61,7 @@ class AccessControlControllerTest extends TestCase
             );
     }
 
-    public function test_custom_role_can_be_created_updated_and_deleted(): void
+    public function test_custom_role_can_be_created_updated_and_delete_is_fail_closed(): void
     {
         $permission = Permission::where('key', 'settings.access.manage')->firstOrFail();
 
@@ -92,9 +92,14 @@ class AccessControlControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->delete("/system/access/roles/{$role->id}")
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasErrors('role');
 
-        $this->assertDatabaseMissing('roles', ['id' => $role->id]);
+        $this->assertDatabaseHas('roles', [
+            'id' => $role->id,
+            'name' => 'care_scheduler',
+            'type' => 'custom',
+        ]);
     }
 
     public function test_system_role_cannot_be_deleted(): void

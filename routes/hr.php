@@ -1301,12 +1301,14 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/clock-out', [TimeTrackingController::class, 'clockOut'])->name('clock-out');
         Route::post('/entries', [TimeTrackingController::class, 'store'])->name('entries.store');
         Route::get('/timesheets', [TimeTrackingController::class, 'timesheets'])->name('timesheets');
-        Route::get('/export', [TimeTrackingController::class, 'export'])->name('export');
+        Route::get('/export', [TimeTrackingController::class, 'export'])
+            ->middleware('permission:reports.viewAny')
+            ->name('export');
         Route::get('/report/pdf', [TimeTrackingController::class, 'reportPdf'])->name('report.pdf');
+        Route::get('/entries/{entry}/amendments', [TimeTrackingController::class, 'entryAmendments'])->name('entries.amendments');
 
         Route::middleware('permission:timesheets.manageAny|timesheets.approve')->group(function () {
             Route::put('/entries/{entry}', [TimeTrackingController::class, 'updateEntry'])->name('entries.update');
-            Route::get('/entries/{entry}/amendments', [TimeTrackingController::class, 'entryAmendments'])->name('entries.amendments');
             Route::post('/entries/{entry}/correct', [TimeTrackingController::class, 'correct'])->name('entries.correct');
             Route::post('/entries/{entry}/note', [TimeTrackingController::class, 'addNote'])->name('entries.note');
             Route::post('/clock-on-behalf', [TimeTrackingController::class, 'clockOnBehalf'])->name('clock-on-behalf');

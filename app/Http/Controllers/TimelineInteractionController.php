@@ -8,6 +8,7 @@ use App\Models\TimelineEvent;
 use App\Models\TimelineEventComment;
 use App\Models\TimelineEventReaction;
 use App\Services\Clients\ClientProfileSectionAccess;
+use App\Services\Medication\MedicationTimelineVisibilityService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -17,12 +18,13 @@ class TimelineInteractionController extends Controller
 
     public function __construct(
         protected ClientProfileSectionAccess $sectionAccess,
+        protected MedicationTimelineVisibilityService $timelineVisibility,
     ) {}
 
     public function storeComment(Request $request, Client $client, TimelineEvent $timelineEvent)
     {
         $this->authorize('view', $client);
-        abort_unless($timelineEvent->client_id === $client->id, 404);
+        $this->assertTimelineEventVisible($request, $client, $timelineEvent);
         $this->authorizeInteractionCapabilities($request, $client);
 
         $validated = $request->validate([
@@ -49,7 +51,7 @@ class TimelineInteractionController extends Controller
     public function destroyComment(Request $request, Client $client, TimelineEventComment $timelineEventComment)
     {
         $this->authorize('view', $client);
-        $this->assertCommentBelongsToClient($timelineEventComment, $client);
+        $this->assertCommentVisible($request, $timelineEventComment, $client);
         $this->authorizeInteractionCapabilities($request, $client);
         abort_unless($timelineEventComment->user_id === $request->user()->id, 403);
 
@@ -61,7 +63,7 @@ class TimelineInteractionController extends Controller
     public function toggleCommentLike(Request $request, Client $client, TimelineEventComment $timelineEventComment)
     {
         $this->authorize('view', $client);
-        $this->assertCommentBelongsToClient($timelineEventComment, $client);
+        $this->assertCommentVisible($request, $timelineEventComment, $client);
         $this->authorizeInteractionCapabilities($request, $client);
 
         $existing = TimelineCommentLike::where('comment_id', $timelineEventComment->id)
@@ -83,7 +85,7 @@ class TimelineInteractionController extends Controller
     public function toggleReaction(Request $request, Client $client, TimelineEvent $timelineEvent)
     {
         $this->authorize('view', $client);
-        abort_unless($timelineEvent->client_id === $client->id, 404);
+        $this->assertTimelineEventVisible($request, $client, $timelineEvent);
         $this->authorizeInteractionCapabilities($request, $client);
 
         $validated = $request->validate([
@@ -119,15 +121,35 @@ class TimelineInteractionController extends Controller
         );
     }
 
-    private function assertCommentBelongsToClient(
+    private function assertTimelineEventVisible(
+        Request $request,
+        Client $client,
+        TimelineEvent $timelineEvent,
+    ): void {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $query = TimelineEvent::query()
+            ->whereKey($timelineEvent->id)
+            ->where('client_id', $client->id);
+        $this->timelineVisibility->applyVisibleScope($query, $user);
+
+        abort_unless($query->exists(), 404);
+    }
+
+    private function assertCommentVisible(
+        Request $request,
         TimelineEventComment $comment,
         Client $client,
     ): void {
-        abort_unless(
-            $comment->timelineEvent()
-                ->where('client_id', $client->id)
-                ->exists(),
-            404,
-        );
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $query = TimelineEvent::query()
+            ->whereKey($comment->timeline_event_id)
+            ->where('client_id', $client->id);
+        $this->timelineVisibility->applyVisibleScope($query, $user);
+
+        abort_unless($query->exists(), 404);
     }
 }

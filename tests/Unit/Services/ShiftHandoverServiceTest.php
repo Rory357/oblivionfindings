@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit\Services;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -9,6 +12,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ShiftHandoverService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -28,7 +32,7 @@ class ShiftHandoverServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->service = app(ShiftHandoverService::class);
         $this->site = Site::factory()->create();
@@ -112,7 +116,7 @@ class ShiftHandoverServiceTest extends TestCase
 
         $this->assertTrue($expectation['ambiguous']);
         $this->assertNull($expectation['matched_shift']);
-        $this->assertFalse($completionRequirement['requires_handover']);
+        $this->assertTrue($completionRequirement['requires_handover']);
     }
 
     protected function makeUser(): User
@@ -123,6 +127,14 @@ class ShiftHandoverServiceTest extends TestCase
         ]);
 
         $user->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
 
         return $user;
     }

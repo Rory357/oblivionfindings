@@ -18,13 +18,16 @@ class EndingComplianceRenewalLockService extends PeopleMutationLockService
 {
     public function __construct(private readonly int $targetProfileId) {}
 
-    public function lock(iterable $userIds, iterable $profileIds = []): array
-    {
+    public function lock(
+        iterable $userIds,
+        iterable $profileIds = [],
+        iterable $additionalRoleIds = [],
+    ): array {
         HrEmployeeProfile::query()->whereKey($this->targetProfileId)->update([
             'end_date' => now()->subDay()->toDateString(),
         ]);
 
-        return parent::lock($userIds, $profileIds);
+        return parent::lock($userIds, $profileIds, $additionalRoleIds);
     }
 }
 

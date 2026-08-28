@@ -1,6 +1,7 @@
 import { CloudOff, RefreshCw } from 'lucide-react';
 
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
+import { retryOfflineSubmissionsNeedingAttention } from '@/lib/offline-queue';
 
 /**
  * PR 26 — A thin, calm banner that surfaces offline state and the number of
@@ -18,7 +19,8 @@ import { useOfflineQueueState } from '@/hooks/use-offline-queue';
  * sticky header, so it never covers interactive content.
  */
 export default function OfflineStatusBanner() {
-    const { online, pendingCount, syncing } = useOfflineQueueState();
+    const { online, pendingCount, needsAttentionCount, syncing } =
+        useOfflineQueueState();
 
     const showing = !online || pendingCount > 0 || syncing;
     if (!showing) return null;
@@ -30,7 +32,7 @@ export default function OfflineStatusBanner() {
     if (!offline && syncing) {
         tone =
             'border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/60 dark:bg-status-info-bg dark:text-status-info';
-    } else if (!offline && pendingCount > 0) {
+    } else if (!offline && pendingCount > 0 && needsAttentionCount === 0) {
         tone =
             'border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/60 dark:bg-status-info-bg dark:text-status-info';
     }
@@ -39,7 +41,11 @@ export default function OfflineStatusBanner() {
     const iconClass = !offline && syncing ? 'h-4 w-4 animate-spin' : 'h-4 w-4';
 
     let message: string;
-    if (offline && pendingCount === 0) {
+    if (needsAttentionCount > 0) {
+        message = offline
+            ? `${needsAttentionCount} queued item${needsAttentionCount === 1 ? '' : 's'} will need a manual retry after reconnecting.`
+            : `${needsAttentionCount} queued item${needsAttentionCount === 1 ? '' : 's'} need${needsAttentionCount === 1 ? 's' : ''} attention. A manual retry will reuse the original request ID.`;
+    } else if (offline && pendingCount === 0) {
         message =
             'You\u2019re offline. We\u2019ll send anything you save when you\u2019re back.';
     } else if (offline && pendingCount === 1) {
@@ -66,6 +72,17 @@ export default function OfflineStatusBanner() {
             <div className="mx-auto flex max-w-3xl items-center justify-center gap-2">
                 <Icon aria-hidden className={iconClass} />
                 <span>{message}</span>
+                {!offline && needsAttentionCount > 0 && !syncing ? (
+                    <button
+                        type="button"
+                        className="rounded border border-current px-2 py-0.5 font-semibold"
+                        onClick={() => {
+                            void retryOfflineSubmissionsNeedingAttention();
+                        }}
+                    >
+                        Retry safely
+                    </button>
+                ) : null}
             </div>
         </div>
     );

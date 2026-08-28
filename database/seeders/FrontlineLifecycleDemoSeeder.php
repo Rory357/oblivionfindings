@@ -783,9 +783,28 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             $this->grantSiteAccess($worker, $client);
         }
 
+        $incomingWorker = $workers->get('sw8@demo.test');
+        if (! $incomingWorker) {
+            $this->command?->warn('sw8@demo.test not found — attendance handover readiness fixtures were skipped.');
+
+            return;
+        }
+        $incomingHandoverShift = $this->seedIncomingHandoverShift(
+            $incomingWorker,
+            $admin,
+            $client,
+            $serviceContext,
+        );
+
         foreach (['sw2@demo.test', 'sw6@demo.test'] as $email) {
             if ($workers->has($email)) {
-                $this->seedActiveClockOutClean($workers[$email], $admin, $client, $serviceContext);
+                $this->seedActiveClockOutClean(
+                    $workers[$email],
+                    $admin,
+                    $client,
+                    $serviceContext,
+                    $incomingHandoverShift,
+                );
                 $this->seedSubmittedApprovalTimesheet($workers[$email], $admin, $client, $serviceContext);
             }
         }
@@ -805,12 +824,45 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         }
 
         if ($workers->has('sw5@demo.test')) {
-            $this->seedActiveIncidentBlockerShift($workers['sw5@demo.test'], $admin, $client, $serviceContext);
+            $this->seedActiveIncidentBlockerShift(
+                $workers['sw5@demo.test'],
+                $admin,
+                $client,
+                $serviceContext,
+                $incomingHandoverShift,
+            );
         }
     }
 
-    private function seedActiveClockOutClean(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
-    {
+    private function seedIncomingHandoverShift(
+        User $worker,
+        User $admin,
+        Client $client,
+        ServiceContext $serviceContext,
+    ): Shift {
+        // Keep this after the clock-in candidate's seven-hour window while
+        // remaining within the hardened handover boundary (outgoing end + 12h).
+        $startsAt = Carbon::now()->addHours(8)->startOfMinute();
+
+        return $this->upsertPlaywrightShift(
+            $worker,
+            $admin,
+            $client,
+            $serviceContext,
+            'PW:incoming-handover:'.$worker->email,
+            $startsAt,
+            $startsAt->copy()->addHours(8),
+            'scheduled',
+        );
+    }
+
+    private function seedActiveClockOutClean(
+        User $worker,
+        User $admin,
+        Client $client,
+        ServiceContext $serviceContext,
+        Shift $incomingHandoverShift,
+    ): void {
         $startsAt = Carbon::now()->subHours(2)->startOfMinute();
         $endsAt = Carbon::now()->addHours(6)->startOfMinute();
         $shift = $this->upsertPlaywrightShift(
@@ -852,6 +904,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         );
 
         $this->ensureSubmittedPlaywrightHandover($shift, $worker, [
+            'incoming_shift_id' => $incomingHandoverShift->id,
             'handover_notes' => 'Playwright clean handover already submitted.',
             'client_mood' => 'calm',
             'submit' => true,
@@ -935,8 +988,13 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         );
     }
 
-    private function seedActiveIncidentBlockerShift(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
-    {
+    private function seedActiveIncidentBlockerShift(
+        User $worker,
+        User $admin,
+        Client $client,
+        ServiceContext $serviceContext,
+        Shift $incomingHandoverShift,
+    ): void {
         $startsAt = Carbon::now()->subHours(2)->startOfMinute();
         $endsAt = Carbon::now()->addHours(6)->startOfMinute();
         $shift = $this->upsertPlaywrightShift(
@@ -995,6 +1053,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         );
 
         $this->ensureSubmittedPlaywrightHandover($shift, $worker, [
+            'incoming_shift_id' => $incomingHandoverShift->id,
             'handover_notes' => 'Playwright incident blocker handover already submitted.',
             'client_mood' => 'mixed',
             'submit' => true,
@@ -1158,14 +1217,48 @@ class FrontlineLifecycleDemoSeeder extends Seeder
      */
     private function ensureSubmittedPlaywrightHandover(Shift $shift, User $worker, array $payload): void
     {
-        $exists = $shift->outgoingHandovers()
+        $existing = $shift->outgoingHandovers()
             ->whereIn('status', [
                 ShiftHandoverService::STATUS_SUBMITTED,
                 ShiftHandoverService::STATUS_ACKNOWLEDGED,
             ])
-            ->exists();
+            ->first();
 
-        if ($exists) {
+        if ($existing) {
+            $incomingShiftId = filter_var(
+                $payload['incoming_shift_id'] ?? null,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1]],
+            );
+            $incomingShift = $incomingShiftId === false
+                ? null
+                : Shift::query()
+                    ->whereKey($incomingShiftId)
+                    ->where('client_id', $shift->client_id)
+                    ->where('site_id', $shift->site_id)
+                    ->where('service_context_id', $shift->service_context_id)
+                    ->whereNotNull('user_id')
+                    ->first(['id', 'user_id']);
+
+            if (! $incomingShift
+                || (int) $existing->client_id !== (int) $shift->client_id
+                || (int) $existing->outgoing_staff_id !== (int) $worker->id) {
+                throw new \LogicException('The deterministic Playwright handover fixture has conflicting canonical identity.');
+            }
+
+            if ((int) $existing->incoming_shift_id !== (int) $incomingShift->id
+                || (int) $existing->incoming_staff_id !== (int) $incomingShift->user_id) {
+                // Older demo databases already contain submitted handovers from
+                // before exact incoming-Shift binding. Repair only the two
+                // deterministic fixture identities; retain lifecycle, version,
+                // timestamps, acknowledgement, and authored clinical content.
+                $existing->timestamps = false;
+                $existing->forceFill([
+                    'incoming_shift_id' => $incomingShift->id,
+                    'incoming_staff_id' => $incomingShift->user_id,
+                ])->save();
+            }
+
             return;
         }
 

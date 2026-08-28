@@ -38,6 +38,7 @@ export type ContextMenuAction =
 
 interface StreamContextMenuProps {
     menu: { item: StreamItem; x: number; y: number };
+    canOpenEmar: boolean;
     onClose: () => void;
     onAction: (action: ContextMenuAction) => void;
 }
@@ -54,6 +55,7 @@ interface MenuEntry {
 
 export function StreamContextMenu({
     menu,
+    canOpenEmar,
     onClose,
     onAction,
 }: StreamContextMenuProps) {
@@ -77,7 +79,9 @@ export function StreamContextMenu({
 
     const { item, x, y } = menu;
     const sections =
-        item.kind === 'task' ? buildTaskMenu(item) : buildMedMenu(item);
+        item.kind === 'task'
+            ? buildTaskMenu(item)
+            : buildMedMenu(item, canOpenEmar);
 
     // Clamp to viewport.
     const left = Math.min(
@@ -250,8 +254,10 @@ function buildTaskMenu(
 
 function buildMedMenu(
     item: Extract<StreamItem, { kind: 'med' }>,
+    canOpenEmar: boolean,
 ): MenuEntry[][] {
     const m = item.data;
+    const showEmarLink = canOpenEmar && m.emar_url !== null;
     const resolvedLabel =
         m.status === 'given'
             ? 'Already given'
@@ -269,7 +275,15 @@ function buildMedMenu(
                     action: 'noop',
                     disabled: true,
                 },
-                { icon: Pill, label: 'Open in eMAR', action: 'open-emar' },
+                ...(showEmarLink
+                    ? [
+                          {
+                              icon: Pill,
+                              label: 'Open in eMAR',
+                              action: 'open-emar',
+                          } as MenuEntry,
+                      ]
+                    : []),
                 {
                     icon: Shield,
                     label: 'Why this dose?',
@@ -295,7 +309,15 @@ function buildMedMenu(
             { icon: StickyNote, label: 'Add note', action: 'add-note' },
         ],
         [
-            { icon: Pill, label: 'Open in eMAR', action: 'open-emar' },
+            ...(showEmarLink
+                ? [
+                      {
+                          icon: Pill,
+                          label: 'Open in eMAR',
+                          action: 'open-emar',
+                      } as MenuEntry,
+                  ]
+                : []),
             {
                 icon: Shield,
                 label: 'Why this dose?',

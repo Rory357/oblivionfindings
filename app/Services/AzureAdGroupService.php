@@ -3,7 +3,8 @@
 namespace App\Services;
 
 use App\Models\Identity;
-use App\Models\SsoGroupMapping;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 class AzureAdGroupService
@@ -32,29 +33,50 @@ class AzureAdGroupService
                 '$top' => 100,
             ]);
 
-        if ($response->failed()) return [];
+        if ($response->failed()) {
+            return [];
+        }
+
         return collect($response->json('value', []))
             ->filter(fn ($g) => ($g['@odata.type'] ?? '') === '#microsoft.graph.group')
             ->values()
             ->all();
     }
 
-    public function syncUserRoles(\App\Models\User $user): void
+    public function syncUserRoles(User $user): void
     {
         $identity = $user->identities()->where('provider', 'microsoft')->first();
-        if (!$identity || $identity->isExpired()) return;
+        if (! $identity || $identity->isExpired()) {
+            return;
+        }
 
         $userGroups = collect($this->getUserGroups($identity))->pluck('id')->all();
-        $mappings = SsoGroupMapping::where('provider', 'microsoft')->with('role')->get();
+        DB::transaction(function () use ($user, $userGroups): void {
+            $lockedMappings = app(SsoGroupMappingLockService::class)
+                ->lockMappingSet()
+                ->filter(fn ($mapping): bool => $mapping->provider === 'microsoft');
+            $roleIds = $lockedMappings->pluck('role_id')
+                ->map(fn ($roleId): int => (int) $roleId)
+                ->unique()
+                ->sort()
+                ->values();
+            $lockedUsers = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+                [$user],
+                [],
+                $roleIds->all(),
+            );
+            /** @var User $lockedUser */
+            $lockedUser = $lockedUsers->get((int) $user->id);
 
-        foreach ($mappings as $mapping) {
-            $inGroup = in_array($mapping->external_group_id, $userGroups);
+            foreach ($lockedMappings as $mapping) {
+                $inGroup = in_array($mapping->external_group_id, $userGroups, true);
 
-            if ($inGroup && $mapping->auto_assign) {
-                $user->roles()->syncWithoutDetaching([$mapping->role_id]);
-            } elseif (!$inGroup && $mapping->auto_remove) {
-                $user->roles()->detach($mapping->role_id);
+                if ($inGroup && $mapping->auto_assign) {
+                    $lockedUser->roles()->syncWithoutDetaching([$mapping->role_id]);
+                } elseif (! $inGroup && $mapping->auto_remove) {
+                    $lockedUser->roles()->detach($mapping->role_id);
+                }
             }
-        }
+        });
     }
 }

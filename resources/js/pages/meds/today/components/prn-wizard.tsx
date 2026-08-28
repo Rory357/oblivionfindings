@@ -27,7 +27,12 @@ import {
     SelectInput,
     StepHead,
 } from '@/components/wizard/primitives';
-import { submitOffline } from '@/lib/offline-queue';
+import {
+    emarMutationWasAccepted,
+    submitEmarMutation,
+} from '@/lib/emar-offline';
+import { applyFormRequestErrors } from '@/lib/form-request-errors';
+import { createOfflineRequestUuid } from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
 import { router, useForm } from '@inertiajs/react';
 import {
@@ -44,7 +49,7 @@ import {
     Stethoscope,
     Zap,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import type { ClientInfo, PrnMedication, WitnessOption } from '../types';
 
@@ -121,6 +126,18 @@ export function PrnWizard({
     const [otherReason, setOtherReason] = useState('');
     const [severity, setSeverity] = useState<Severity>('moderate');
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [submitting, setSubmitting] = useState(false);
+    const submissionReplay = useRef({
+        uuid: createOfflineRequestUuid(),
+        fingerprint: null as string | null,
+    });
+    const resetAndClose = () => {
+        submissionReplay.current = {
+            uuid: createOfflineRequestUuid(),
+            fingerprint: null,
+        };
+        onClose();
+    };
 
     const med = useMemo(
         () => medications.find((m) => m.id === medId) ?? null,
@@ -192,10 +209,10 @@ export function PrnWizard({
     };
     const back = () => setStepIndex((i) => Math.max(i - 1, 0));
 
-    const submit = () => {
+    const submit = async () => {
         if (!med) return;
 
-        const payload = {
+        const materialPayload = {
             client_medication_id: med.id,
             reason: reasonText,
             dose_given: form.data.dose_given,
@@ -207,49 +224,73 @@ export function PrnWizard({
             witnessed_by: form.data.witnessed_by
                 ? parseInt(form.data.witnessed_by, 10)
                 : null,
-            witness_credential: form.data.witness_credential || null,
             notes: form.data.notes.trim() || null,
         };
-
-        // Offline: queue locally and replay on reconnect — the server dedupes
-        // on client_request_uuid so a lost ACK doesn't double-record.
-        if (typeof navigator !== 'undefined' && !navigator.onLine) {
-            void submitOffline({
-                action: 'prn',
-                url: '/meds/today/prn',
-                payload,
-                queuedMessage:
-                    'PRN saved on this device — we’ll send it when you’re back online.',
-            }).then(() => {
-                router.reload({ preserveScroll: true });
-                onClose();
-            });
-            return;
+        const materialFingerprint = JSON.stringify(materialPayload);
+        if (
+            submissionReplay.current.fingerprint !== null &&
+            submissionReplay.current.fingerprint !== materialFingerprint
+        ) {
+            submissionReplay.current.uuid = createOfflineRequestUuid();
         }
+        submissionReplay.current.fingerprint = materialFingerprint;
+        const payload = {
+            ...materialPayload,
+            witness_credential: form.data.witness_credential || null,
+            client_request_uuid: submissionReplay.current.uuid,
+        };
 
-        form.transform(() => payload);
-        form.post('/meds/today/prn', {
-            preserveScroll: true,
-            onSuccess: () => onClose(),
-            onError: (serverErrors) => {
-                const first = Object.keys(serverErrors)[0];
-                if (
-                    first &&
-                    [
-                        'witnessed_by',
-                        'witness_credential',
-                        'dose_given',
-                        'administered_at',
-                    ].includes(first)
-                ) {
-                    setStepIndex(2);
-                } else if (first === 'reason') {
-                    setStepIndex(1);
-                } else if (first === 'client_medication_id') {
-                    setStepIndex(0);
-                }
-            },
-        });
+        setSubmitting(true);
+        form.clearErrors();
+        try {
+            const result = await submitEmarMutation(
+                '/meds/today/prn',
+                payload,
+                {
+                    action: 'prn',
+                    allowQueueWhenOffline: !med.requires_witness,
+                    successMessage: 'PRN administration recorded.',
+                    queuedMessage:
+                        'PRN saved on this device — we’ll send it when you’re back online.',
+                },
+            );
+
+            if (!emarMutationWasAccepted(result.status)) return;
+            if (result.status === 'queued') {
+                router.reload({ preserveScroll: true });
+            }
+            resetAndClose();
+        } catch (error) {
+            let firstField: string | null = null;
+            applyFormRequestErrors(
+                error,
+                (field, message) => {
+                    firstField ??= field;
+                    (form.setError as (key: string, value: string) => void)(
+                        field,
+                        message,
+                    );
+                },
+                'Could not record this PRN dose.',
+            );
+            if (
+                firstField &&
+                [
+                    'witnessed_by',
+                    'witness_credential',
+                    'dose_given',
+                    'administered_at',
+                ].includes(firstField)
+            ) {
+                setStepIndex(2);
+            } else if (firstField === 'reason') {
+                setStepIndex(1);
+            } else if (firstField === 'client_medication_id') {
+                setStepIndex(0);
+            }
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const isReview = stepIndex === 3;
@@ -260,7 +301,7 @@ export function PrnWizard({
     return (
         <MedsWizardDialog
             open
-            onClose={onClose}
+            onClose={resetAndClose}
             title="Give as-needed med"
             description="A guided, audited walk-through for recording an as-needed (PRN) dose."
             railIcon={Zap}
@@ -307,10 +348,10 @@ export function PrnWizard({
                             <Button
                                 type="button"
                                 onClick={submit}
-                                disabled={form.processing}
+                                disabled={submitting}
                                 data-test="meds-prn-submit"
                             >
-                                {form.processing ? (
+                                {submitting ? (
                                     <>
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                         Recording…
@@ -564,8 +605,8 @@ export function PrnWizard({
                             >
                                 <Input
                                     type="number"
-                                    min={0.25}
-                                    step="0.25"
+                                    min={0.01}
+                                    step="0.01"
                                     placeholder="e.g. 1"
                                     value={form.data.quantity_administered}
                                     onChange={(e) =>

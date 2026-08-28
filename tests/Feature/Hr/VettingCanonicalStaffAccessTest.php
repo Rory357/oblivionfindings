@@ -177,14 +177,17 @@ test('vetting mutations reauthorise the staff Site boundary after the shared Peo
     {
         public ?Closure $beforeLock = null;
 
-        public function lock(iterable $userIds, iterable $profileIds = []): array
-        {
+        public function lock(
+            iterable $userIds,
+            iterable $profileIds = [],
+            iterable $additionalRoleIds = [],
+        ): array {
             if ($this->beforeLock) {
                 ($this->beforeLock)();
                 $this->beforeLock = null;
             }
 
-            return parent::lock($userIds, $profileIds);
+            return parent::lock($userIds, $profileIds, $additionalRoleIds);
         }
     };
     $locks->beforeLock = function () use ($staff, $otherSite): void {

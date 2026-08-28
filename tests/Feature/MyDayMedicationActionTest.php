@@ -25,7 +25,7 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
-it('records a given administration via /my-day/medications/{med}/administer', function () {
+it('lets a medication-record-only worker administer via /my-day/medications/{med}/administer', function () {
     [$worker, $medication] = makeWorkerAndMedication();
 
     $response = $this->actingAs($worker)
@@ -40,6 +40,40 @@ it('records a given administration via /my-day/medications/{med}/administer', fu
         ->where('administered_by', $worker->id)
         ->exists())->toBeTrue();
 });
+
+it('records My Day medication actions from a non-second-aligned authorization instant', function (
+    string $action,
+    array $actionPayload,
+    string $expectedStatus,
+) {
+    $actionAt = Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->setMicrosecond(123456);
+    Carbon::setTestNow($actionAt);
+    [$worker, $medication] = makeWorkerAndMedication();
+
+    $this->actingAs($worker)
+        ->post("/my-day/medications/{$medication->id}/{$action}", [
+            'scheduled_for' => Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->toIso8601String(),
+            ...$actionPayload,
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $administration = ClientMedicationAdministration::query()
+        ->where('client_medication_id', $medication->id)
+        ->sole();
+    expect($administration->status)->toBe($expectedStatus)
+        ->and(Carbon::parse(
+            (string) $administration->getRawOriginal('administered_at'),
+            'UTC',
+        )->format('Y-m-d H:i:s'))
+        ->toBe($actionAt->copy()->utc()->format('Y-m-d H:i:s'));
+})->with([
+    'given' => ['administer', [], 'given'],
+    'refused' => ['refuse', [
+        'reason_code' => 'refused',
+        'reason' => 'Resident declined at the scheduled time.',
+    ], 'refused'],
+]);
 
 it('does not create duplicate administrations when the same My Day dose is submitted twice', function () {
     [$worker, $medication] = makeWorkerAndMedication();
@@ -147,7 +181,7 @@ it('records a witnessed controlled drug My Day give through the MAR service', fu
         ->assertRedirect()
         ->assertSessionHas('success');
 
-    expect($medication->stock()->value('on_hand'))->toBe(9);
+    expect((float) $medication->stock()->value('on_hand'))->toBe(9.0);
     expect(ClientMedicationAdministration::query()
         ->where('client_medication_id', $medication->id)
         ->where('status', 'given')
@@ -162,6 +196,52 @@ it('records a witnessed controlled drug My Day give through the MAR service', fu
         'on_hand_before' => 10,
         'on_hand_after' => 9,
     ]);
+});
+
+it('conceals missing and foreign My Day witnesses before checking eligible credentials', function () {
+    [$worker, $medication] = makeWorkerAndMedication([
+        'controlled_drug' => true,
+        'witness_required' => true,
+    ]);
+    ClientMedicationStock::query()->create([
+        'client_medication_id' => $medication->id,
+        'on_hand' => 10,
+        'unit' => 'tablets',
+    ]);
+    $foreignSite = Site::factory()->create();
+    $foreignClient = Client::factory()->create([
+        'site_id' => $foreignSite->id,
+        'service_context_id' => $medication->client->service_context_id,
+    ]);
+    $foreignWitness = makeMedicationWitness($foreignClient);
+    $missingWitnessId = (int) User::query()->max('id') + 1000;
+    $payload = [
+        'scheduled_for' => Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->toIso8601String(),
+        'witness_credential' => 'wrong-password',
+    ];
+
+    foreach ([$missingWitnessId, $foreignWitness->id] as $concealedWitnessId) {
+        $this->actingAs($worker)
+            ->post("/my-day/medications/{$medication->id}/administer", [
+                ...$payload,
+                'witnessed_by' => $concealedWitnessId,
+            ])
+            ->assertNotFound();
+    }
+
+    $eligibleWitness = makeMedicationWitness($medication->client);
+    $this->actingAs($worker)
+        ->from('/my-day')
+        ->post("/my-day/medications/{$medication->id}/administer", [
+            ...$payload,
+            'witnessed_by' => $eligibleWitness->id,
+        ])
+        ->assertRedirect('/my-day')
+        ->assertSessionHasErrors('witness_credential');
+
+    expect(ClientMedicationAdministration::query()
+        ->where('client_medication_id', $medication->id)
+        ->exists())->toBeFalse();
 });
 
 it('records a refused administration via /my-day/medications/{med}/refuse', function () {
@@ -230,16 +310,112 @@ it('rejects workers without medications.administer.record permission', function 
     $medication = ClientMedication::factory()->create(['client_id' => $client->id]);
 
     $this->actingAs($worker)
-        ->post("/my-day/medications/{$medication->id}/administer")
+        ->post("/my-day/medications/{$medication->id}/administer", [
+            'scheduled_for' => now()->toIso8601String(),
+        ])
         ->assertForbidden();
+
+    $this->actingAs($worker)
+        ->post("/my-day/medications/{$medication->id}/refuse", [
+            'scheduled_for' => now()->toIso8601String(),
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($worker)
+        ->post("/my-day/medications/{$medication->id}/snooze", [
+            'minutes' => 15,
+            'scheduled_for' => '2026-05-21T10:00:00+12:00',
+        ])
+        ->assertForbidden();
+
+    expect(ClientMedicationAdministration::count())->toBe(0);
+    expect(Cache::has("my-day.med-snooze.user-{$worker->id}.med-{$medication->id}.2026-05-21T10:00:00+12:00"))->toBeFalse();
+});
+
+it('conceals same-Site unassigned, foreign and missing My Day medication actions before request validation', function () {
+    [$worker, $ordinaryMedication] = makeWorkerAndMedication();
+    $localClient = $ordinaryMedication->client()->firstOrFail();
+    $sameSiteClient = Client::factory()->create([
+        'site_id' => $localClient->site_id,
+        'service_context_id' => $localClient->service_context_id,
+    ]);
+    $sameSiteUnassignedMedication = ClientMedication::factory()->create([
+        'client_id' => $sameSiteClient->id,
+        'active' => true,
+        'state' => 'active',
+        'approval_status' => 'verified',
+    ]);
+    $foreignSite = Site::factory()->create();
+    $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
+    $foreignMedication = ClientMedication::factory()->create([
+        'client_id' => $foreignClient->id,
+        'active' => true,
+        'state' => 'active',
+        'approval_status' => 'verified',
+    ]);
+
+    $invalidPayload = [
+        'scheduled_for' => 'not-a-date',
+        'witnessed_by' => 'not-a-user-id',
+        'minutes' => 'not-a-duration',
+    ];
+    foreach (['administer', 'refuse', 'snooze'] as $action) {
+        $this->actingAs($worker)
+            ->post("/my-day/medications/{$foreignMedication->id}/{$action}", $invalidPayload)
+            ->assertNotFound();
+        $this->actingAs($worker)
+            ->post("/my-day/medications/999999999/{$action}", $invalidPayload)
+            ->assertNotFound();
+    }
+    foreach (['administer', 'refuse'] as $action) {
+        $this->actingAs($worker)
+            ->post("/my-day/medications/{$sameSiteUnassignedMedication->id}/{$action}", $invalidPayload)
+            ->assertNotFound();
+    }
+
+    expect(ClientMedicationAdministration::query()->exists())->toBeFalse();
+    expect($ordinaryMedication->fresh())->not->toBeNull();
+});
+
+it('conceals controlled My Day actions without exact controlled record authority', function () {
+    [$worker, $ordinaryMedication] = makeWorkerAndMedication();
+    $controlledRecordPermission = Permission::query()->firstOrCreate(
+        ['key' => 'medications.controlled.record'],
+        ['description' => 'medications.controlled.record'],
+    );
+    $worker->permissionOverrides()->syncWithoutDetaching([
+        $controlledRecordPermission->id => ['allowed' => false],
+    ]);
+    $worker->unsetRelation('permissionOverrides')->unsetRelation('roles');
+    expect($worker->canDo('medications.controlled.record'))->toBeFalse();
+
+    $controlledMedication = ClientMedication::factory()->create([
+        'client_id' => $ordinaryMedication->client_id,
+        'controlled_drug' => true,
+        'active' => true,
+        'state' => 'active',
+        'approval_status' => 'verified',
+        'dose_times' => ['10:00'],
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+    ]);
+
+    foreach (['administer', 'refuse', 'snooze'] as $action) {
+        $this->actingAs($worker)
+            ->post("/my-day/medications/{$controlledMedication->id}/{$action}", [])
+            ->assertNotFound();
+    }
+
+    expect(ClientMedicationAdministration::query()
+        ->where('client_medication_id', $controlledMedication->id)
+        ->exists())->toBeFalse();
 });
 
 /**
  * Build a worker assigned to a client + an active medication for that client.
  *
- * Attaches the `medications.administer.record` permission as an allow override
- * so we don't need to seed the full role hierarchy, AND pivots the client/
- * worker via `support_workers` so the ClientPolicy::view check passes.
+ * Attaches only the exact medication recording authority used by these actions.
+ * Client-profile visibility is intentionally not part of the write contract.
  */
 function makeWorkerAndMedication(array $medicationOverrides = []): array
 {
@@ -247,12 +423,8 @@ function makeWorkerAndMedication(array $medicationOverrides = []): array
     $site = Site::factory()->create();
     assignMedicationWorkerToSite($worker, $site);
 
-    // Two permissions are needed:
-    //   - clients.viewAssigned so ClientPolicy::view passes (worker is assigned
-    //     to the client via the support_workers pivot below)
-    //   - medications.administer.record so the controller's canDo() check passes
     $overrides = [];
-    $permissionKeys = ['clients.viewAssigned', 'medications.administer.record'];
+    $permissionKeys = ['medications.administer.record'];
     if ((bool) ($medicationOverrides['controlled_drug'] ?? false)) {
         $permissionKeys[] = 'medications.controlled.record';
     }
@@ -265,12 +437,16 @@ function makeWorkerAndMedication(array $medicationOverrides = []): array
         $overrides[$permission->id] = ['allowed' => true];
     }
     $worker->permissionOverrides()->syncWithoutDetaching($overrides);
+    $assessor = User::factory()->create();
     MedicationCompetencyAssessment::query()->create([
         'user_id' => $worker->id,
+        'assessor_id' => $assessor->id,
         'assessment_type' => 'annual',
         'status' => 'passed',
-        'assessment_date' => today(),
+        'assessment_date' => today()->subMonth(),
         'expiry_date' => today()->addYear(),
+        'assessor_declared_at' => now()->subMonth(),
+        'staff_acknowledged_at' => now()->subMonth()->addMinute(),
     ]);
 
     $client = Client::factory()->create(['site_id' => $site->id]);
@@ -314,6 +490,30 @@ function makeMedicationWitness(Client $client): User
     );
     $witness->permissionOverrides()->syncWithoutDetaching([
         $permission->id => ['allowed' => true],
+    ]);
+    $assessor = User::query()->staff()->whereKeyNot($witness->id)->firstOrFail();
+    MedicationCompetencyAssessment::query()->create([
+        'user_id' => $witness->id,
+        'assessor_id' => $assessor->id,
+        'assessment_type' => 'annual',
+        'status' => 'passed',
+        'assessment_date' => today()->subMonth(),
+        'expiry_date' => today()->addYear(),
+        'assessor_declared_at' => now()->subMonth(),
+        'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+        'can_witness_controlled' => true,
+    ]);
+    Shift::factory()->create([
+        'client_id' => $client->id,
+        'site_id' => $client->site_id,
+        'service_context_id' => $client->service_context_id,
+        'user_id' => $witness->id,
+        'starts_at' => now()->subHour(),
+        'ends_at' => now()->addHours(2),
+        'actual_starts_at' => now()->subHour(),
+        'actual_ends_at' => null,
+        'started_by' => $witness->id,
+        'status' => 'in_progress',
     ]);
 
     return $witness;

@@ -208,6 +208,44 @@ describe('app sidebar workforce navigation', () => {
         expect(catalog.map((item) => item.section)).not.toContain('Operations');
     });
 
+    it('shows shift handovers for every workflow capability and hides them from unrelated workforce permissions', () => {
+        const workflowCapabilities = [
+            { handovers: { viewAny: true } },
+            { shifts: { viewAny: true } },
+            { shifts: { manageAny: true } },
+            { shifts: { viewAssigned: true } },
+            { shifts: { update: true } },
+            { handovers: { create: true } },
+        ];
+
+        for (const can of workflowCapabilities) {
+            expect(
+                buildNavSearchCatalog({ can }).find(
+                    (item) => item.href === '/operations/handovers',
+                ),
+            ).toMatchObject({
+                label: 'Handovers',
+                section: 'Workforce',
+                group: 'Workforce',
+            });
+        }
+
+        const unrelatedCapabilities = [
+            { timesheets: { viewAssigned: true } },
+            { job_board: { claim: true } },
+            { shifts: { create: true } },
+            { handovers: { update: true } },
+        ];
+
+        for (const can of unrelatedCapabilities) {
+            expect(
+                buildNavSearchCatalog({ can }).some(
+                    (item) => item.href === '/operations/handovers',
+                ),
+            ).toBe(false);
+        }
+    });
+
     it('marks workforce routes active under Workforce instead of the generic Operations dashboard', () => {
         const operationsItem = {
             id: 'operations',

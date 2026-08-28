@@ -67,6 +67,10 @@ type Props = {
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
+    can: {
+        record: boolean;
+        correct: boolean;
+    };
 };
 
 type Modal =
@@ -153,6 +157,7 @@ export default function MedicationErrors({
     sites,
     active_site: activeSite,
     site_brand_colour: brandColour,
+    can,
 }: Props) {
     const [activeTab, setActiveTab] = useState('all');
     const [search, setSearch] = useState('');
@@ -287,13 +292,13 @@ export default function MedicationErrors({
             : 'Unknown client';
         // One honest incident action: jump when linked, else create-and-link;
         // for an open critical/major error with no incident it escalates (critical tone).
-        const incidentItem: ShiftCtxItem = err.incident
+        const incidentItem: ShiftCtxItem | null = err.incident
             ? {
                   icon: <Link2 className="h-3.5 w-3.5" />,
                   label: `View linked incident ${err.incident.ref}`,
                   onClick: () => viewIncident(err.incident!.id),
               }
-            : criticalOpen
+            : can.correct && criticalOpen
               ? {
                     icon: <AlertTriangle className="h-3.5 w-3.5" />,
                     label: 'Escalate — create & link incident',
@@ -301,12 +306,14 @@ export default function MedicationErrors({
                     tone: 'critical',
                     onClick: () => createAndLinkIncident(err),
                 }
-              : {
-                    icon: <Link2 className="h-3.5 w-3.5" />,
-                    label: 'Create & link incident',
-                    sub: 'Raise into the incident register',
-                    onClick: () => createAndLinkIncident(err),
-                };
+              : can.correct && open
+                ? {
+                      icon: <Link2 className="h-3.5 w-3.5" />,
+                      label: 'Create & link incident',
+                      sub: 'Raise into the incident register',
+                      onClick: () => createAndLinkIncident(err),
+                  }
+                : null;
         const items: ShiftCtxItem[] = [
             {
                 icon: <Eye className="h-3.5 w-3.5" />,
@@ -315,7 +322,7 @@ export default function MedicationErrors({
                 tone: 'primary',
                 onClick: () => setModal({ type: 'triage', error: err }),
             },
-            ...(err.status === 'reported'
+            ...(can.correct && err.status === 'reported'
                 ? [
                       {
                           icon: <ClipboardList className="h-3.5 w-3.5" />,
@@ -325,7 +332,7 @@ export default function MedicationErrors({
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            ...(open
+            ...(can.correct && open
                 ? [
                       {
                           icon: <ShieldCheck className="h-3.5 w-3.5" />,
@@ -335,7 +342,7 @@ export default function MedicationErrors({
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            ...(err.status === 'resolved'
+            ...(can.correct && err.status === 'resolved'
                 ? [
                       {
                           icon: <Lock className="h-3.5 w-3.5" />,
@@ -364,7 +371,7 @@ export default function MedicationErrors({
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            incidentItem,
+            ...(incidentItem ? [incidentItem] : []),
         ];
         setCtx({
             x: ev.clientX,
@@ -528,13 +535,15 @@ export default function MedicationErrors({
                     description="Report, triage and resolve medication errors and near misses. A no-blame register — every report strengthens the system."
                     stats={heroStats}
                     actions={
-                        <Button
-                            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                            onClick={() => setModal({ type: 'report' })}
-                        >
-                            <Plus className="h-4 w-4" />
-                            Report an error
-                        </Button>
+                        can.record ? (
+                            <Button
+                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                onClick={() => setModal({ type: 'report' })}
+                            >
+                                <Plus className="h-4 w-4" />
+                                Report an error
+                            </Button>
+                        ) : null
                     }
                     footer={
                         <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
@@ -926,51 +935,60 @@ export default function MedicationErrors({
                                                         >
                                                             View
                                                         </Button>
-                                                        {e.status ===
-                                                            'reported' && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() =>
-                                                                    setModal({
-                                                                        type: 'review',
-                                                                        error: e,
-                                                                    })
-                                                                }
-                                                            >
-                                                                Review
-                                                            </Button>
-                                                        )}
-                                                        {(e.status ===
-                                                            'reported' ||
+                                                        {can.correct &&
                                                             e.status ===
-                                                                'investigating') && (
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    setModal({
-                                                                        type: 'resolve',
-                                                                        error: e,
-                                                                    })
-                                                                }
-                                                            >
-                                                                Resolve
-                                                            </Button>
-                                                        )}
-                                                        {e.status ===
-                                                            'resolved' && (
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    setModal({
-                                                                        type: 'close',
-                                                                        error: e,
-                                                                    })
-                                                                }
-                                                            >
-                                                                Close out
-                                                            </Button>
-                                                        )}
+                                                                'reported' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={() =>
+                                                                        setModal(
+                                                                            {
+                                                                                type: 'review',
+                                                                                error: e,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Review
+                                                                </Button>
+                                                            )}
+                                                        {can.correct &&
+                                                            (e.status ===
+                                                                'reported' ||
+                                                                e.status ===
+                                                                    'investigating') && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        setModal(
+                                                                            {
+                                                                                type: 'resolve',
+                                                                                error: e,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Resolve
+                                                                </Button>
+                                                            )}
+                                                        {can.correct &&
+                                                            e.status ===
+                                                                'resolved' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        setModal(
+                                                                            {
+                                                                                type: 'close',
+                                                                                error: e,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Close out
+                                                                </Button>
+                                                            )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -995,6 +1013,7 @@ export default function MedicationErrors({
             {modal?.type === 'triage' && (
                 <TriageDialog
                     error={modal.error}
+                    canCorrect={can.correct}
                     onDismiss={() => setModal(null)}
                     onAction={(a: TriageAction) =>
                         setModal({ type: a, error: modal.error })

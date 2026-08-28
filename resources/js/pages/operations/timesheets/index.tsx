@@ -131,6 +131,12 @@ const TABS: Array<{
 export const needsApprovalBadgeClassName =
     'border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning';
 
+export function canEditTimesheetRow(
+    row: Pick<TimesheetRow, 'can_edit' | 'attendance_session_id'>,
+): boolean {
+    return Boolean(row.can_edit && row.attendance_session_id == null);
+}
+
 function fmtTime(iso: string) {
     if (!iso) return '';
     return new Date(iso).toLocaleTimeString('en-NZ', {
@@ -438,7 +444,15 @@ function menuItemsFor(t: TimesheetRow): MenuItem[] {
             { id: 'pdf', label: 'Download archived copy', icon: FileDown },
         ],
     };
-    return [...common, ...(byStatus[t.status] ?? []), ...tail];
+    const statusItems = (byStatus[t.status] ?? []).filter(
+        (item) => item.id !== 'edit' || canEditTimesheetRow(t),
+    );
+
+    return [
+        ...common,
+        ...(t.can_mutate ? statusItems : []),
+        ...tail,
+    ];
 }
 
 function ContextMenu({
@@ -615,7 +629,8 @@ export default function TimesheetsIndex({
         const editId = params.get('edit');
         if (editId) {
             const row = timesheets.data.find((r) => String(r.id) === editId);
-            if (row) setEditing(row);
+            if (row && canEditTimesheetRow(row)) setEditing(row);
+            else if (row) setViewing(row);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -623,7 +638,7 @@ export default function TimesheetsIndex({
     const rows = timesheets.data;
     const submittedCount = tabCounts.submitted ?? 0;
     const selectableApprovalIds = rows
-        .filter((row) => row.status === 'submitted')
+        .filter((row) => row.status === 'submitted' && row.can_approve)
         .map((row) => row.id);
     const allVisibleApprovalsSelected =
         selectableApprovalIds.length > 0 &&
@@ -713,12 +728,35 @@ export default function TimesheetsIndex({
     }
 
     function handleAction(id: string, row: TimesheetRow) {
+        if (
+            !row.can_mutate &&
+            [
+                'edit',
+                'submit',
+                'approve',
+                'return',
+                'reject',
+                'archive',
+                'restore',
+                'discard',
+                'duplicate',
+                'reassign',
+                'reopen',
+                'recreate',
+                'correction',
+            ].includes(id)
+        ) {
+            setViewing(row);
+            return;
+        }
+
         switch (id) {
             case 'view':
                 setViewing(row);
                 return;
             case 'edit':
-                setEditing(row);
+                if (canEditTimesheetRow(row)) setEditing(row);
+                else setViewing(row);
                 return;
             case 'shift':
                 if (row.shift)
@@ -1031,7 +1069,9 @@ export default function TimesheetsIndex({
                                                     )}
                                                     disabled={
                                                         !canApprove ||
-                                                        t.status !== 'submitted'
+                                                        t.status !==
+                                                            'submitted' ||
+                                                        !t.can_approve
                                                     }
                                                     data-test={
                                                         t.status === 'submitted'
@@ -1267,7 +1307,7 @@ export default function TimesheetsIndex({
                 open={!!viewing}
                 timesheet={viewing}
                 onOpenChange={(o) => !o && setViewing(null)}
-                canApprove={canApprove}
+                canApprove={Boolean(viewing?.can_approve)}
             />
             <EditTimesheetDialog
                 open={!!editing}

@@ -2,17 +2,20 @@
 
 namespace Tests\Feature\FleetAssets;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetResidentTransport;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\MedicationScanVerificationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ResidentTransportMedicationTransitTest extends TestCase
@@ -262,9 +265,174 @@ class ResidentTransportMedicationTransitTest extends TestCase
         ]);
     }
 
+    public function test_medication_transport_commands_enforce_the_shared_v4_provenance_envelope(): void
+    {
+        [$transport, $client] = $this->createInProgressTransport();
+        $medication = ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Envelope medication',
+            'dosage' => '1 tablet',
+            'frequency' => 'Daily',
+            'dose_times' => ['09:00'],
+            'is_prn' => false,
+            'controlled_drug' => false,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+            'version' => 1,
+        ]);
+        $scanCode = app(MedicationScanVerificationService::class)
+            ->internalCode($client, $medication);
+        $scan = [
+            'scan_code' => $scanCode,
+            'scan_source' => 'manual',
+            'scan_verified' => true,
+            'scan_match_source' => 'internal_emar',
+        ];
+        $log = FleetMedicationTransitLog::query()->create([
+            'transport_id' => $transport->id,
+            'client_id' => $client->id,
+            'site_id' => $transport->site_id,
+            'medication_id' => $medication->id,
+            'medication_order_version' => 1,
+            'medication_name' => $medication->name,
+            'is_controlled_drug' => false,
+            'packed_by_user_id' => $this->admin->id,
+            'packed_at' => now(),
+        ]);
+        $pack = [
+            'client_id' => $client->id,
+            'medication_id' => $medication->id,
+            'medication_name' => $medication->name,
+            'is_controlled_drug' => false,
+            ...$scan,
+        ];
+        $v4 = (string) Str::uuid();
+        $invalidEnvelopes = [
+            [['client_request_uuid' => '11111111-1111-1111-8111-111111111111'], 'client_request_uuid'],
+            [['client_request_uuid' => '55555555-5555-5555-8555-555555555555'], 'client_request_uuid'],
+            [[
+                'client_request_uuid' => $v4,
+                'queued_offline' => true,
+                'captured_offline_at' => '2026-08-28T09:30:00+12:00',
+            ], 'origin_device_id'],
+            [[
+                'client_request_uuid' => $v4,
+                'queued_offline' => true,
+                'captured_offline_at' => '2026-08-28 09:30:00',
+                'origin_device_id' => 'fleet-device-01',
+            ], 'captured_offline_at'],
+            [[
+                'client_request_uuid' => $v4,
+                'queued_offline' => true,
+                'captured_offline_at' => '2026-08-28T09:30:00+12:00',
+                'origin_device_id' => '   ',
+            ], 'origin_device_id'],
+            [[
+                'client_request_uuid' => $v4,
+                'captured_offline_at' => '2026-08-28T09:30:00+12:00',
+            ], 'captured_offline_at'],
+        ];
+        $commands = [
+            ["/fleet-assets/transports/{$transport->id}/pack-medication", $pack],
+            ["/fleet-assets/medication-transit/{$log->id}/administer", [
+                ...$scan,
+                'quantity_administered' => '1.00',
+            ]],
+            ["/fleet-assets/medication-transit/{$log->id}/return", $scan],
+        ];
+
+        foreach ($commands as [$uri, $payload]) {
+            foreach ($invalidEnvelopes as [$envelope, $errorField]) {
+                $this->actingAs($this->admin)
+                    ->postJson($uri, [...$payload, ...$envelope])
+                    ->assertUnprocessable()
+                    ->assertJsonValidationErrors($errorField);
+            }
+        }
+
+        foreach ([
+            [['client_request_uuid' => '11111111-1111-1111-8111-111111111111'], 'client_request_uuid'],
+            [['client_request_uuid' => '55555555-5555-5555-8555-555555555555'], 'client_request_uuid'],
+            [[
+                'client_request_uuid' => $v4,
+                'queued_offline' => true,
+                'captured_offline_at' => '2026-08-28T09:30:00+12:00',
+                'origin_device_id' => 'fleet-device-01',
+            ], 'captured_offline_at'],
+        ] as [$envelope, $errorField]) {
+            $this->actingAs($this->admin)
+                ->postJson("/fleet-assets/medication-transit/{$log->id}/correct-packing-attestation", [
+                    'witnessed_by_user_id' => $this->admin->id,
+                    'witness_credential' => 'not-persisted',
+                    'correction_reason' => 'Envelope validation must run first.',
+                    ...$envelope,
+                ])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors($errorField);
+        }
+
+        $asset = Asset::factory()->vehicle()->forSite(Site::query()->findOrFail($transport->site_id))->create();
+        $createBase = [
+            'asset_id' => $asset->id,
+            'resident_name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
+            'client_id' => $client->id,
+            'transport_type' => 'medical',
+            'departed_at' => now()->addHour()->toDateTimeString(),
+            'passengers_count' => 1,
+        ];
+        $medicationSelection = [[
+            'medication_id' => $medication->id,
+            'medication_name' => $medication->name,
+            'is_controlled_drug' => false,
+            ...$scan,
+        ]];
+
+        foreach ([
+            [['client_request_uuid' => '11111111-1111-1111-8111-111111111111'], 'client_request_uuid'],
+            [['client_request_uuid' => '55555555-5555-5555-8555-555555555555'], 'client_request_uuid'],
+            [[
+                'client_request_uuid' => $v4,
+                'captured_offline_at' => '2026-08-28T09:30:00+12:00',
+            ], 'captured_offline_at'],
+            [[
+                'client_request_uuid' => $v4,
+                'queued_offline' => true,
+                'captured_offline_at' => '2026-08-28T09:30:00+12:00',
+                'origin_device_id' => 'fleet-device-01',
+            ], 'queued_offline'],
+        ] as [$envelope, $errorField]) {
+            $this->actingAs($this->admin)
+                ->postJson('/fleet-assets/transports', [
+                    ...$createBase,
+                    'medications' => $medicationSelection,
+                    ...$envelope,
+                ])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors($errorField);
+        }
+
+        $this->actingAs($this->admin)
+            ->post('/fleet-assets/transports', [
+                ...$createBase,
+                'medications' => [],
+                // Non-medication journeys retain the pre-existing generic
+                // UUID contract and are not forced into the clinical envelope.
+                'client_request_uuid' => '11111111-1111-1111-8111-111111111111',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('fleet_medication_transit_logs', 1);
+        $this->assertDatabaseCount('fleet_resident_transport_events', 1);
+        $this->assertNull($log->fresh()->administered_at);
+        $this->assertNull($log->fresh()->returned_to_house_at);
+    }
+
     public function test_store_can_create_transport_and_pack_selected_medications(): void
     {
         $site = Site::factory()->create();
+        $this->assignAdminToSite($site);
         $asset = Asset::factory()->vehicle()->forSite($site)->create();
         $client = Client::factory()->create(['site_id' => $site->id]);
 
@@ -294,6 +462,8 @@ class ResidentTransportMedicationTransitTest extends TestCase
                 'departed_at' => now()->toDateTimeString(),
                 'passengers_count' => 1,
                 'notes' => 'Create and pack medication now.',
+                'client_request_uuid' => (string) Str::uuid(),
+                'queued_offline' => false,
                 'medications' => [[
                     'medication_id' => $medication->id,
                     'medication_name' => 'Packed Medication 10mg',
@@ -364,7 +534,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
 
     public function test_controlled_drug_administration_rejects_label_only_packing_evidence(): void
     {
-        [$transport, $client] = $this->createInProgressTransport();
+        [$transport, $client] = $this->createInProgressTransport(withMedicationCompetency: true);
 
         $medication = ClientMedication::query()->create([
             'client_id' => $client->id,
@@ -397,6 +567,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
             ->from("/fleet-assets/transports/{$transport->id}")
             ->post("/fleet-assets/medication-transit/{$log->id}/administer", [
                 'witnessed_by_user_id' => null,
+                'quantity_administered' => '1.00',
                 'notes' => 'Dose given during transport.',
                 'scan_code' => $scanCode,
                 'scan_source' => 'manual',
@@ -464,9 +635,10 @@ class ResidentTransportMedicationTransitTest extends TestCase
     }
 
     /** @return array{FleetResidentTransport, Client} */
-    private function createInProgressTransport(): array
+    private function createInProgressTransport(bool $withMedicationCompetency = false): array
     {
         $site = Site::factory()->create();
+        $this->assignAdminToSite($site, $withMedicationCompetency);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $asset = Asset::factory()->vehicle()->forSite($site)->create();
 
@@ -483,5 +655,33 @@ class ResidentTransportMedicationTransitTest extends TestCase
         ]);
 
         return [$transport, $client];
+    }
+
+    private function assignAdminToSite(Site $site, bool $withMedicationCompetency = false): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+
+        if (! $withMedicationCompetency) {
+            return;
+        }
+
+        $assessor = User::factory()->create();
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $this->admin->id,
+            'assessor_id' => $assessor->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => today()->subMonth(),
+            'expiry_date' => today()->addYear(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+        ]);
     }
 }

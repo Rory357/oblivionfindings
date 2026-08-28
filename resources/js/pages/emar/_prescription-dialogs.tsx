@@ -2,6 +2,7 @@
    bordered surfaces inside the wizard, not Card components; all colours are tokens. */
 import type {
     ClientOption,
+    CovertAuth,
     MedOption,
     PrescriptionOrder,
     StaffOption,
@@ -9,6 +10,7 @@ import type {
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
     ChipMulti,
     Field,
@@ -21,6 +23,7 @@ import {
 import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Ban,
     FileText,
     Link2,
     Package,
@@ -65,14 +68,73 @@ function CheckRow({
 
 const VERBAL = ['verbal', 'telephone'];
 
+type GovernedMedOption = MedOption & {
+    controlled_drug: boolean;
+    can_create_covert_authorisation: boolean;
+    can_link_prescriber_order: boolean;
+};
+
+export type SiteBoundClientOption = ClientOption & {
+    site_id: number;
+    can_create_prescriber_order: boolean;
+};
+
+export type SiteBoundStaffOption = StaffOption & {
+    site_ids: number[];
+};
+
+export function clientsAllowedForPrescriberOrder(
+    clients: SiteBoundClientOption[],
+): SiteBoundClientOption[] {
+    return clients.filter(
+        (candidate) => candidate.can_create_prescriber_order === true,
+    );
+}
+
+export function readBackWitnessesForClient(
+    clients: SiteBoundClientOption[],
+    staff: SiteBoundStaffOption[],
+    selectedClientId: string | number,
+    currentUserId: number,
+): SiteBoundStaffOption[] {
+    const client = clients.find(
+        (candidate) => candidate.id === Number(selectedClientId),
+    );
+    if (!client || !Number.isInteger(client.site_id) || client.site_id <= 0) {
+        return [];
+    }
+
+    return staff.filter(
+        (candidate) =>
+            candidate.id !== currentUserId &&
+            Array.isArray(candidate.site_ids) &&
+            candidate.site_ids.includes(client.site_id),
+    );
+}
+
+type GovernedLinkOrder = PrescriptionOrder & {
+    controlled_drug_snapshot: boolean | null;
+};
+
+export function controlledDrugSnapshotFromSelection(
+    classification: string,
+): boolean | null {
+    if (classification === 'controlled') return true;
+    if (classification === 'ordinary') return false;
+
+    return null;
+}
+
 // ── New / changed order (4-step) ─────────────────────────────────────────────
 export function NewOrderDialog({
     clients,
     staff,
+    currentUserId,
     onClose,
 }: {
-    clients: ClientOption[];
-    staff: StaffOption[];
+    clients: SiteBoundClientOption[];
+    staff: SiteBoundStaffOption[];
+    currentUserId: number;
     onClose: () => void;
 }) {
     const [step, setStep] = useState(0);
@@ -84,6 +146,7 @@ export function NewOrderDialog({
         prescriber_registration: '',
         prescriber_type: '',
         medication_name: '',
+        controlled_drug_snapshot: '',
         dose: '',
         route: '',
         frequency: '',
@@ -93,28 +156,56 @@ export function NewOrderDialog({
         expiry_date: '',
         read_back_confirmed: false,
         read_back_witnessed_by: '',
+        read_back_witness_credential: '',
     });
     const isVerbal = VERBAL.includes(form.data.order_type);
+    const readBackWitnesses = readBackWitnessesForClient(
+        clients,
+        staff,
+        form.data.client_id,
+        currentUserId,
+    );
+    const clearReadBackWitnessCredential = () => {
+        form.setData('read_back_witness_credential', '');
+        form.transform((data) => data);
+    };
+    const close = () => {
+        clearReadBackWitnessCredential();
+        onClose();
+    };
 
     const submit = () => {
-        form.transform((d) => ({
-            ...d,
-            read_back_witnessed_by: d.read_back_witnessed_by
-                ? Number(d.read_back_witnessed_by)
-                : null,
-        }));
+        form.transform((d) => {
+            const { read_back_witness_credential, ...payload } = d;
+
+            return {
+                ...payload,
+                controlled_drug_snapshot: controlledDrugSnapshotFromSelection(
+                    payload.controlled_drug_snapshot,
+                ),
+                read_back_witnessed_by: payload.read_back_witnessed_by
+                    ? Number(payload.read_back_witnessed_by)
+                    : null,
+                ...(VERBAL.includes(payload.order_type)
+                    ? { read_back_witness_credential }
+                    : {}),
+            };
+        });
         form.post('/emar/prescriptions', {
             preserveScroll: true,
+            onBefore: clearReadBackWitnessCredential,
             onSuccess: () => {
                 toast.success(
                     isVerbal
                         ? 'Order recorded — awaiting prescriber countersignature.'
                         : 'Prescriber order recorded.',
                 );
-                onClose();
+                close();
             },
             onError: () => toast.error('Please check the order details'),
+            onFinish: clearReadBackWitnessCredential,
         });
+        clearReadBackWitnessCredential();
     };
 
     const valid = [
@@ -123,14 +214,18 @@ export function NewOrderDialog({
         !!form.data.medication_name &&
             !!form.data.dose &&
             !!form.data.route &&
-            !!form.data.frequency,
-        !isVerbal || form.data.read_back_confirmed,
+            !!form.data.frequency &&
+            !!form.data.controlled_drug_snapshot,
+        !isVerbal ||
+            (form.data.read_back_confirmed &&
+                !!form.data.read_back_witnessed_by &&
+                !!form.data.read_back_witness_credential),
     ];
 
     return (
         <MedsWizardDialog
             open
-            onClose={onClose}
+            onClose={close}
             title="New prescriber order"
             description="Record a prescriber order for a resident."
             railIcon={FileText}
@@ -168,7 +263,7 @@ export function NewOrderDialog({
                 <>
                     <Button
                         variant="ghost"
-                        onClick={step === 0 ? onClose : () => setStep(step - 1)}
+                        onClick={step === 0 ? close : () => setStep(step - 1)}
                         disabled={form.processing}
                     >
                         {step === 0 ? 'Cancel' : 'Back'}
@@ -201,7 +296,15 @@ export function NewOrderDialog({
                     <Field label="Order type" span>
                         <TilePicker
                             value={form.data.order_type}
-                            onChange={(v) => form.setData('order_type', v)}
+                            onChange={(v) =>
+                                form.setData((data) => ({
+                                    ...data,
+                                    order_type: v,
+                                    read_back_confirmed: false,
+                                    read_back_witnessed_by: '',
+                                    read_back_witness_credential: '',
+                                }))
+                            }
                             cols={3}
                             options={[
                                 { key: 'new', label: 'New', icon: FileText },
@@ -236,7 +339,14 @@ export function NewOrderDialog({
                         >
                             <SelectInput
                                 value={form.data.client_id}
-                                onChange={(v) => form.setData('client_id', v)}
+                                onChange={(v) =>
+                                    form.setData((data) => ({
+                                        ...data,
+                                        client_id: v,
+                                        read_back_witnessed_by: '',
+                                        read_back_witness_credential: '',
+                                    }))
+                                }
                                 placeholder="Select resident…"
                                 options={clients.map((c) => ({
                                     value: String(c.id),
@@ -357,6 +467,32 @@ export function NewOrderDialog({
                                 placeholder="Generic name & strength"
                             />
                         </Field>
+                        <Field
+                            label="Medication classification"
+                            required
+                            span
+                            error={form.errors.controlled_drug_snapshot}
+                        >
+                            <Segmented
+                                value={form.data.controlled_drug_snapshot}
+                                onChange={(value) =>
+                                    form.setData(
+                                        'controlled_drug_snapshot',
+                                        value,
+                                    )
+                                }
+                                options={[
+                                    {
+                                        value: 'ordinary',
+                                        label: 'Ordinary medication',
+                                    },
+                                    {
+                                        value: 'controlled',
+                                        label: 'Controlled drug',
+                                    },
+                                ]}
+                            />
+                        </Field>
                         <Field label="Dose" required error={form.errors.dose}>
                             <Input
                                 value={form.data.dose}
@@ -449,28 +585,60 @@ export function NewOrderDialog({
                                 label="Read-back confirmed"
                                 hint="The order was read back to the prescriber and confirmed correct."
                                 onChange={(v) =>
-                                    form.setData('read_back_confirmed', v)
+                                    form.setData((data) => ({
+                                        ...data,
+                                        read_back_confirmed: v,
+                                        read_back_witness_credential: '',
+                                    }))
                                 }
                             />
-                            <Field label="Read-back witness">
+                            <Field
+                                label="Read-back witness"
+                                required
+                                error={form.errors.read_back_witnessed_by}
+                            >
                                 <SelectInput
                                     value={form.data.read_back_witnessed_by}
                                     onChange={(v) =>
-                                        form.setData(
-                                            'read_back_witnessed_by',
-                                            v,
-                                        )
+                                        form.setData((data) => ({
+                                            ...data,
+                                            read_back_witnessed_by: v,
+                                            read_back_witness_credential: '',
+                                        }))
                                     }
                                     placeholder="Select witness…"
-                                    options={staff.map((s) => ({
+                                    options={readBackWitnesses.map((s) => ({
                                         value: String(s.id),
                                         label: s.name,
                                     }))}
                                 />
                             </Field>
+                            <Field
+                                label="Witness verification"
+                                required
+                                error={form.errors.read_back_witness_credential}
+                            >
+                                <Input
+                                    type="password"
+                                    value={
+                                        form.data.read_back_witness_credential
+                                    }
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'read_back_witness_credential',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="Witness enters their password"
+                                    autoComplete="off"
+                                    maxLength={255}
+                                    required
+                                />
+                            </Field>
                             <InfoCard icon={AlertTriangle} tone="warn">
-                                This order will await prescriber
-                                countersignature within 24 hours.
+                                The selected witness must enter their own
+                                password now. It is sent once for verification,
+                                is not stored, and is cleared after submission.
                             </InfoCard>
                         </div>
                     )}
@@ -487,6 +655,15 @@ export function NewOrderDialog({
                         <SummaryRow
                             label="Medication"
                             value={`${form.data.medication_name} ${form.data.dose}`}
+                        />
+                        <SummaryRow
+                            label="Classification"
+                            value={
+                                form.data.controlled_drug_snapshot ===
+                                'controlled'
+                                    ? 'Controlled drug'
+                                    : 'Ordinary medication'
+                            }
                         />
                         <SummaryRow
                             label="Prescriber"
@@ -513,7 +690,10 @@ export function CountersignDialog({
     const [declared, setDeclared] = useState(false);
     const form = useForm({});
     const submit = () => {
-        form.transform(() => ({ countersign_method: method }));
+        form.transform(() => ({
+            countersign_method: method,
+            prescriber_declaration: true,
+        }));
         form.post(`/emar/prescriptions/${order.id}/countersign`, {
             preserveScroll: true,
             onSuccess: () => {
@@ -602,28 +782,20 @@ export function CountersignDialog({
 // ── Record dispensing (single) ───────────────────────────────────────────────
 export function DispenseDialog({
     order,
-    staff,
     onClose,
 }: {
     order: PrescriptionOrder;
-    staff: StaffOption[];
     onClose: () => void;
 }) {
     const form = useForm({
-        status: 'dispensed',
         pharmacy_name: '',
         batch_number: '',
         batch_expiry: '',
-        dispensed_by: '',
         dispensed_at: '',
         pharmacy_notes: '',
     });
     const submit = () => {
-        form.transform((d) => ({
-            ...d,
-            dispensed_by: d.dispensed_by ? Number(d.dispensed_by) : null,
-        }));
-        form.put(`/emar/prescriptions/${order.id}`, {
+        form.post(`/emar/prescriptions/${order.id}/dispense`, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Dispensing recorded');
@@ -659,7 +831,14 @@ export function DispenseDialog({
                     >
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={form.processing}>
+                    <Button
+                        onClick={submit}
+                        disabled={
+                            !form.data.pharmacy_name.trim() ||
+                            !form.data.dispensed_at ||
+                            form.processing
+                        }
+                    >
                         Record dispensing
                     </Button>
                 </>
@@ -671,13 +850,20 @@ export function DispenseDialog({
                 blurb={`${order.medication_name} · ${order.client_name}`}
             />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Pharmacy" span>
+                <Field
+                    label="Pharmacy"
+                    required
+                    span
+                    error={form.errors.pharmacy_name}
+                >
                     <Input
                         value={form.data.pharmacy_name}
                         onChange={(e) =>
                             form.setData('pharmacy_name', e.target.value)
                         }
                         placeholder="e.g. Community Pharmacy"
+                        maxLength={255}
+                        required
                     />
                 </Field>
                 <Field label="Batch number">
@@ -697,24 +883,18 @@ export function DispenseDialog({
                         }
                     />
                 </Field>
-                <Field label="Dispensed by">
-                    <SelectInput
-                        value={form.data.dispensed_by}
-                        onChange={(v) => form.setData('dispensed_by', v)}
-                        placeholder="Select…"
-                        options={staff.map((s) => ({
-                            value: String(s.id),
-                            label: s.name,
-                        }))}
-                    />
-                </Field>
-                <Field label="Dispensed date">
+                <Field
+                    label="Dispensed date"
+                    required
+                    error={form.errors.dispensed_at}
+                >
                     <Input
                         type="date"
                         value={form.data.dispensed_at}
                         onChange={(e) =>
                             form.setData('dispensed_at', e.target.value)
                         }
+                        required
                     />
                 </Field>
                 <Field label="Pharmacy notes" span>
@@ -730,14 +910,195 @@ export function DispenseDialog({
     );
 }
 
+// ── Cancel order (single) ───────────────────────────────────────────────────
+export function CancelOrderDialog({
+    order,
+    onClose,
+}: {
+    order: PrescriptionOrder;
+    onClose: () => void;
+}) {
+    const form = useForm({ reason: '' });
+    const submit = () => {
+        form.post(`/emar/prescriptions/${order.id}/cancel`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Order cancelled');
+                onClose();
+            },
+        });
+    };
+
+    return (
+        <MedsWizardDialog
+            open
+            onClose={onClose}
+            title="Cancel order"
+            description="Record why this prescriber order is being cancelled."
+            railIcon={Ban}
+            railTitle="Cancellation"
+            railSubtitle={order.client_name}
+            steps={[
+                {
+                    key: 'cancel',
+                    label: 'Cancel',
+                    blurb: 'Reason required',
+                    icon: Ban,
+                },
+            ]}
+            stepIndex={0}
+            onStepClick={() => {}}
+            footer={
+                <>
+                    <Button
+                        variant="ghost"
+                        onClick={onClose}
+                        disabled={form.processing}
+                    >
+                        Keep order
+                    </Button>
+                    <Button
+                        variant="destructive"
+                        onClick={submit}
+                        disabled={!form.data.reason.trim() || form.processing}
+                    >
+                        Cancel order
+                    </Button>
+                </>
+            }
+        >
+            <StepHead
+                icon={Ban}
+                title="Cancel prescriber order"
+                blurb={`${order.medication_name} · ${order.client_name}`}
+            />
+            <InfoCard icon={AlertTriangle} tone="warn">
+                Cancellation is recorded in the medication audit trail and
+                cannot reverse a completed dispense or cease action.
+            </InfoCard>
+            <div className="mt-4">
+                <Field
+                    label="Cancellation reason"
+                    required
+                    span
+                    error={form.errors.reason}
+                >
+                    <Textarea
+                        value={form.data.reason}
+                        onChange={(e) => form.setData('reason', e.target.value)}
+                        placeholder="Explain why this order is being cancelled…"
+                        maxLength={500}
+                        required
+                    />
+                </Field>
+            </div>
+        </MedsWizardDialog>
+    );
+}
+
+// ── Revoke covert authorisation (single) ────────────────────────────────────
+export function RevokeCovertDialog({
+    authorisation,
+    onClose,
+}: {
+    authorisation: CovertAuth;
+    onClose: () => void;
+}) {
+    const form = useForm({ reason: '' });
+    const close = () => {
+        form.reset('reason');
+        form.clearErrors();
+        onClose();
+    };
+    const submit = () => {
+        form.transform((data) => ({ reason: data.reason.trim() }));
+        form.post(`/emar/prescriptions/covert/${authorisation.id}/revoke`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Covert authorisation revoked');
+                close();
+            },
+            onError: () => toast.error('Please record a revoke reason'),
+        });
+    };
+
+    return (
+        <MedsWizardDialog
+            open
+            onClose={close}
+            title="Revoke covert authorisation"
+            description="Record why this covert administration authorisation is ending."
+            railIcon={Ban}
+            railTitle="Revoke authorisation"
+            railSubtitle={authorisation.client_name}
+            steps={[
+                {
+                    key: 'revoke',
+                    label: 'Revoke',
+                    blurb: 'Reason required',
+                    icon: Ban,
+                },
+            ]}
+            stepIndex={0}
+            onStepClick={() => {}}
+            footer={
+                <>
+                    <Button
+                        variant="ghost"
+                        onClick={close}
+                        disabled={form.processing}
+                    >
+                        Keep authorisation
+                    </Button>
+                    <Button
+                        variant="destructive"
+                        onClick={submit}
+                        disabled={!form.data.reason.trim() || form.processing}
+                    >
+                        Revoke authorisation
+                    </Button>
+                </>
+            }
+        >
+            <StepHead
+                icon={Ban}
+                title="Revoke covert authorisation"
+                blurb={`${authorisation.medication_name ?? 'Medication'} · ${authorisation.client_name}`}
+            />
+            <InfoCard icon={AlertTriangle} tone="warn">
+                Revocation ends this authorisation and is recorded in the
+                medication audit trail. It cannot be undone from this screen.
+            </InfoCard>
+            <div className="mt-4">
+                <Field
+                    label="Revocation reason"
+                    required
+                    span
+                    error={form.errors.reason}
+                >
+                    <Textarea
+                        value={form.data.reason}
+                        onChange={(event) =>
+                            form.setData('reason', event.target.value)
+                        }
+                        placeholder="Explain why this authorisation is being revoked…"
+                        maxLength={500}
+                        required
+                    />
+                </Field>
+            </div>
+        </MedsWizardDialog>
+    );
+}
+
 // ── Link order → MAR (single) ────────────────────────────────────────────────
 export function LinkMarDialog({
     order,
     medications,
     onClose,
 }: {
-    order: PrescriptionOrder;
-    medications: MedOption[];
+    order: GovernedLinkOrder;
+    medications: GovernedMedOption[];
     onClose: () => void;
 }) {
     const form = useForm({
@@ -745,8 +1106,14 @@ export function LinkMarDialog({
             ? String(order.client_medication_id)
             : '',
     });
-    const clientMeds = medications.filter(
+    const allClientMeds = medications.filter(
         (m) => m.client_id === order.client_id,
+    );
+    const clientMeds = allClientMeds.filter(
+        (m) =>
+            m.can_link_prescriber_order &&
+            (order.controlled_drug_snapshot === null ||
+                m.controlled_drug === order.controlled_drug_snapshot),
     );
     const submit = () => {
         form.transform((d) => ({
@@ -808,8 +1175,9 @@ export function LinkMarDialog({
             />
             {clientMeds.length === 0 ? (
                 <InfoCard icon={AlertTriangle} tone="warn">
-                    This resident has no charted medications yet. Add the
-                    medication on the Medications page first.
+                    {allClientMeds.length === 0
+                        ? 'This resident has no charted medications yet. Add the medication on the Medications page first.'
+                        : 'No charted medications are available to link to this order.'}
                 </InfoCard>
             ) : (
                 <Field label="Charted medication" required>
@@ -846,7 +1214,7 @@ export function CovertDialog({
     onClose,
 }: {
     clients: ClientOption[];
-    medications: MedOption[];
+    medications: GovernedMedOption[];
     onClose: () => void;
 }) {
     const [step, setStep] = useState(0);
@@ -868,7 +1236,9 @@ export function CovertDialog({
         review_date: '',
     });
     const clientMeds = medications.filter(
-        (m) => m.client_id === Number(form.data.client_id),
+        (m) =>
+            m.client_id === Number(form.data.client_id) &&
+            m.can_create_covert_authorisation,
     );
 
     const submit = () => {
@@ -1031,6 +1401,14 @@ export function CovertDialog({
                             }))}
                         />
                     </Field>
+                    {form.data.client_id && clientMeds.length === 0 ? (
+                        <div className="sm:col-span-2">
+                            <InfoCard icon={AlertTriangle} tone="warn">
+                                No charted medications are available for a new
+                                covert authorisation.
+                            </InfoCard>
+                        </div>
+                    ) : null}
                     <Field label="Lacks capacity for this decision" span>
                         <Segmented
                             value={form.data.lacks_capacity}

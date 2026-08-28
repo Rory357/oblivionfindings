@@ -157,7 +157,7 @@ test('clock-in endpoints share the single open attendance session guard', functi
 test('S1 seam: the HrTimeEntry and HrAttendanceSession read paths agree across both clock surfaces', function () {
     // /hr/my/time reads the live clock via HrTimeEntry::active(); /my-day's
     // /attendance reads it via HrAttendanceSession::open(). Both are written
-    // through the ONE AttendanceService + TimeTrackingService::syncEntryFromSession,
+    // atomically through the one AttendanceService projection transaction,
     // so a clock made on either surface must be visible to the other's read path,
     // and a clock-out on either must clear both (never a phantom "on shift").
     $hrTimePermission = Permission::query()->where('key', 'hr.time.viewAny')->firstOrFail();
@@ -460,17 +460,21 @@ test('every clock surface funnels into one session and one canonical timesheet',
     expect($sessions)->toHaveCount(1);
 
     $session = $sessions->first();
-    expect($session->status)->toBe('closed');
+    expect($session->status)->toBe('closed')
+        ->and((int) $session->site_id)->toBe($this->site->id);
 
     $timesheets = Timesheet::query()
         ->where('user_id', $this->staff->id)
         ->where('status', 'draft')
         ->get();
     expect($timesheets)->toHaveCount(1);
-    expect((int) $timesheets->first()->attendance_session_id)->toBe((int) $session->id);
+    expect((int) $timesheets->first()->attendance_session_id)->toBe((int) $session->id)
+        ->and((int) $timesheets->first()->site_id)->toBe($this->site->id);
 
-    expect(HrTimeEntry::query()->where('user_id', $this->staff->id)->count())
-        ->toBe($surface['expected_time_entries']);
+    $timeEntries = HrTimeEntry::query()->where('user_id', $this->staff->id)->get();
+    expect($timeEntries)->toHaveCount($surface['expected_time_entries'])
+        ->and((int) $timeEntries->sole()->attendance_session_id)->toBe((int) $session->id)
+        ->and((int) $timeEntries->sole()->site_id)->toBe($this->site->id);
 })->with([
     'canonical attendance' => [[
         'clock_in' => '/attendance/clock-in',

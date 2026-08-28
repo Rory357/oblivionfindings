@@ -110,10 +110,11 @@ class SsoGroupControllerTest extends TestCase
             'auto_assign' => true,
             'auto_remove' => false,
         ]);
+        $replacementRole = Role::where('name', 'admin')->firstOrFail();
 
         $this->actingAs($this->admin)
             ->put("/settings/sso-groups/{$mapping->id}", [
-                'role_id' => $this->supportRole->id,
+                'role_id' => $replacementRole->id,
                 'auto_assign' => false,
                 'auto_remove' => true,
             ])
@@ -122,6 +123,7 @@ class SsoGroupControllerTest extends TestCase
 
         $this->assertDatabaseHas('sso_group_mappings', [
             'id' => $mapping->id,
+            'role_id' => $replacementRole->id,
             'auto_assign' => false,
             'auto_remove' => true,
         ]);
@@ -175,7 +177,7 @@ class SsoGroupControllerTest extends TestCase
                 ['id' => 'graph-group-1', 'displayName' => 'Graph Group', 'securityEnabled' => true],
             ]);
 
-        Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer ' . $identity->access_token)
+        Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer '.$identity->access_token)
             && str_starts_with($request->url(), 'https://graph.microsoft.com/v1.0/groups'));
     }
 
@@ -193,7 +195,7 @@ class SsoGroupControllerTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $overrides
+     * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>
      */
     private function mappingPayload(array $overrides = []): array
@@ -213,16 +215,16 @@ class SsoGroupControllerTest extends TestCase
         return Identity::create([
             'user_id' => $user->id,
             'provider' => 'microsoft',
-            'provider_user_id' => 'ms-' . $user->id,
+            'provider_user_id' => 'ms-'.$user->id,
             'email' => $user->email,
-            'access_token' => 'token-' . $user->id,
-            'refresh_token' => 'refresh-' . $user->id,
+            'access_token' => 'token-'.$user->id,
+            'refresh_token' => 'refresh-'.$user->id,
             'token_expires_at' => $expiresAt,
         ]);
     }
 
     /**
-     * @param array<string, mixed> $overrides
+     * @param  array<string, mixed>  $overrides
      */
     private function createMapping(array $overrides = []): SsoGroupMapping
     {

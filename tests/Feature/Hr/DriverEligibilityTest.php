@@ -259,14 +259,17 @@ test('driver creation reauthorises the staff Site boundary after the shared Peop
     {
         public ?Closure $beforeLock = null;
 
-        public function lock(iterable $userIds, iterable $profileIds = []): array
-        {
+        public function lock(
+            iterable $userIds,
+            iterable $profileIds = [],
+            iterable $additionalRoleIds = [],
+        ): array {
             if ($this->beforeLock) {
                 ($this->beforeLock)();
                 $this->beforeLock = null;
             }
 
-            return parent::lock($userIds, $profileIds);
+            return parent::lock($userIds, $profileIds, $additionalRoleIds);
         }
     };
     $locks->beforeLock = function () use ($otherSite): void {

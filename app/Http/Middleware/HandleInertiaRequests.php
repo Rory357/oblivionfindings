@@ -68,7 +68,6 @@ class HandleInertiaRequests extends Middleware
             $showsWorkerMedsItem = ! (
                 (($can['medications']['view'] ?? false) && ($can['medications']['ordersManage'] ?? false))
                 || (($can['medications']['view'] ?? false) && ($can['medications']['stockUpdate'] ?? false))
-                || (($can['medications']['view'] ?? false) && ($can['medications']['controlledView'] ?? false))
                 || ($can['medications']['auditView'] ?? false)
                 || ($can['medications']['reportsExport'] ?? false)
                 || ($can['reports']['viewAny'] ?? false)
@@ -521,6 +520,7 @@ class HandleInertiaRequests extends Middleware
                 'reportsExport' => $user->canDo('medications.reports.export'),
                 'stockUpdate' => $user->canDo('medications.stock.update'),
                 'controlledView' => $user->canDo('medications.controlled.view'),
+                'stockUpdate' => $user->canDo('medications.stock.update'),
                 'controlledRecord' => $user->canDo('medications.controlled.record'),
                 'controlledWitness' => $user->canDo('medications.controlled.witness'),
                 'controlledOverride' => $user->canDo('medications.controlled.override'),

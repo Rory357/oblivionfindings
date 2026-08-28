@@ -63,13 +63,6 @@ export type AuditEvent = {
 type Change = { field: string; from: string; to: string };
 type Integrity = {
     backed: boolean;
-    note: string | null;
-    recorded_at: string | null;
-    device: string | null;
-    ip_address: string | null;
-    edited: string | null;
-    edit_count: number;
-    fingerprint: string | null;
 };
 
 type Meta = { label: string; icon: LucideIcon; cls: string };
@@ -240,7 +233,7 @@ export function MedicationEventDrawer({
         ...(changes.length > 0
             ? [{ key: 'changes', label: 'Before → after', icon: Pencil }]
             : []),
-        { key: 'integrity', label: 'Device & integrity', icon: Fingerprint },
+        { key: 'integrity', label: 'Record integrity', icon: Fingerprint },
         { key: 'linked', label: 'Linked records', icon: Link2 },
     ];
 
@@ -259,7 +252,7 @@ export function MedicationEventDrawer({
         [],
     );
 
-    // Lazy-load the integrity panel from the AuditLog-backed endpoint.
+    // Lazy-load the canonical backing-record check.
     useEffect(() => {
         setIntegrity(null);
         let cancelled = false;
@@ -340,8 +333,8 @@ export function MedicationEventDrawer({
         );
     };
 
-    // Read-only integrity re-check: focus the integrity panel and re-fetch its
-    // tamper-evidence fingerprint from the append-only audit log (no mutation).
+    // Read-only integrity re-check: confirm that the already-authorized event
+    // still has a canonical stored backing record (no mutation).
     const verifyIntegrity = () => {
         goToSection('integrity');
         setVerifying(true);
@@ -612,13 +605,13 @@ export function MedicationEventDrawer({
                                 </Section>
                             )}
 
-                            {/* Device & integrity */}
+                            {/* Record integrity */}
                             <Section
                                 refCb={(el) =>
                                     (sectionEls.current.integrity = el)
                                 }
                                 flash={flash === 'integrity'}
-                                title="Device & integrity"
+                                title="Record integrity"
                             >
                                 {integrity === null ? (
                                     <div className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">
@@ -626,58 +619,22 @@ export function MedicationEventDrawer({
                                     </div>
                                 ) : !integrity.backed ? (
                                     <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-                                        {integrity.note}
+                                        No canonical stored record is available.
                                     </div>
                                 ) : (
                                     <div className="rounded-lg border px-4">
-                                        {integrity.recorded_at && (
-                                            <SummaryRow
-                                                label="Recorded at"
-                                                value={fmtDateTime(
-                                                    integrity.recorded_at,
-                                                )}
-                                            />
-                                        )}
                                         <SummaryRow
-                                            label="Device"
-                                            value={
-                                                integrity.device ??
-                                                'Not captured'
-                                            }
+                                            label="Canonical record"
+                                            value="Stored record confirmed"
+                                            tone="success"
                                         />
-                                        <SummaryRow
-                                            label="IP address"
-                                            value={
-                                                integrity.ip_address ??
-                                                'Not captured'
-                                            }
-                                        />
-                                        <SummaryRow
-                                            label="Edited since"
-                                            value={integrity.edited ?? '—'}
-                                            tone={
-                                                integrity.edit_count > 0
-                                                    ? undefined
-                                                    : 'success'
-                                            }
-                                        />
-                                        {integrity.fingerprint && (
-                                            <div className="flex items-baseline justify-between gap-4 py-2">
-                                                <span className="text-[13px] text-muted-foreground">
-                                                    Content fingerprint
-                                                </span>
-                                                <span className="max-w-[60%] text-right font-mono text-[11px] break-all text-muted-foreground">
-                                                    {integrity.fingerprint}
-                                                </span>
-                                            </div>
-                                        )}
                                     </div>
                                 )}
                                 <p className="mt-2 text-[11px] text-muted-foreground">
-                                    SHA-256 fingerprint of the stored record —
-                                    an integrity check over its current content,
-                                    derived from the append-only audit log. Not
-                                    a sealed hash-chain.
+                                    Confirms the event is backed by the
+                                    authorized canonical medication record.
+                                    Device, network and edit-history metadata
+                                    are not exposed.
                                 </p>
                             </Section>
 

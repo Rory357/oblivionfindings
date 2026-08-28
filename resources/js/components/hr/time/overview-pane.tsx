@@ -166,7 +166,9 @@ export function OverviewPane({
                                             onClick={() => onException(e)}
                                             className="inline-flex h-[30px] flex-none items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-[12px] font-semibold opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:opacity-100"
                                         >
-                                            {e.action === 'correct'
+                                            {!e.can_mutate
+                                                ? 'View'
+                                                : e.action === 'correct'
                                                 ? 'Correct'
                                                 : e.action === 'edit'
                                                   ? 'Amend'

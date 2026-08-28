@@ -41,6 +41,12 @@ class MedicationOrderLifecycleService
             $authorizationAt,
             function (MedicationScopeDecision $decision) use ($reason, $ceasedAt, $requestKey): ClientMedication {
                 $medication = $decision->medication;
+                abort_if(
+                    $medication->controlled_drug
+                        && (! $decision->performer->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
+                            || ! $decision->performer->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY)),
+                    404,
+                );
                 // When a request waited behind an administration lock, stamp
                 // cessation only after this callback owns the canonical order.
                 // That prevents a completed dose being recorded after the

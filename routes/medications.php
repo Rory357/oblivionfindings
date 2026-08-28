@@ -21,14 +21,21 @@ Route::middleware(['auth'])->group(function () {
 
     // Medication audit log
     Route::get('/medications/audit', [MedicationAuditController::class, 'index'])
-        ->middleware('permission:medications.audit.view')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.audit.view',
+        ])
         ->name('medications.audit.index');
     Route::get('/medications/audit/export', [MedicationAuditController::class, 'exportCsv'])
-        ->middleware('permission:medications.reports.export')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.audit.view',
+            'permission:medications.reports.export',
+        ])
         ->name('medications.audit.export');
 
     // Medication reports
-    Route::middleware('permission:reports.viewAny')->group(function () {
+    Route::middleware('permission:medications.reports.export|reports.viewAny')->group(function () {
         Route::get('/reports/medications', [MedicationsReportController::class, 'index'])
             ->name('reports.medications');
         Route::get('/reports/medications/export-mar', [MedicationsReportController::class, 'exportMarCsv'])

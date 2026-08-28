@@ -52,6 +52,7 @@ import type {
 import { Head, router } from '@inertiajs/react';
 import {
     Activity,
+    Archive,
     CalendarCheck,
     CalendarDays,
     CheckCircle2,
@@ -64,7 +65,6 @@ import {
     Pill,
     Plus,
     Printer,
-    Trash2,
     Zap,
 } from 'lucide-react';
 import type { ComponentType, MouseEvent } from 'react';
@@ -97,6 +97,22 @@ type Props = {
 };
 
 type StatusChip = 'all' | 'due' | 'flagged';
+
+function hasConcreteTemplateSite(template: RoundTemplate): boolean {
+    return (
+        Number.isInteger(template.site_id) &&
+        template.site_id !== null &&
+        template.site_id > 0
+    );
+}
+
+function templateSiteLabel(template: RoundTemplate): string {
+    if (!hasConcreteTemplateSite(template)) {
+        return 'No site assigned (legacy template)';
+    }
+
+    return template.site_name ?? 'Assigned site unavailable';
+}
 
 export default function Rounds(props: Props) {
     const {
@@ -151,14 +167,33 @@ export default function Rounds(props: Props) {
 
     const toggleExpand = (id: number) =>
         setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-    const deleteTemplate = (id: number) =>
-        router.delete(`/emar/rounds/templates/${id}`, { preserveScroll: true });
-    const toggleTemplateActive = (t: RoundTemplate) =>
+    const retireTemplate = (id: number) => {
+        if (
+            !window.confirm(
+                'Retire this round template? Existing rounds will be kept and no new rounds will be generated.',
+            )
+        ) {
+            return;
+        }
+
+        router.post(
+            `/emar/rounds/templates/${id}/retire`,
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
+    };
+    const toggleTemplateActive = (t: RoundTemplate) => {
+        if (t.retired_at !== null) return;
+        if (!t.active && !hasConcreteTemplateSite(t)) return;
+
         router.put(
             `/emar/rounds/templates/${t.id}`,
             { active: !t.active },
             { preserveScroll: true },
         );
+    };
     const printRoundSheet = () =>
         window.open(
             `/emar/pdf/round-sheet?date=${encodeURIComponent(date)}`,
@@ -250,13 +285,7 @@ export default function Rounds(props: Props) {
             : null;
     const auditRoundCanOpen = auditRound
         ? (() => {
-              const counts = roundCounts(auditRound.cells);
-
-              return (
-                  signer.med_competent ||
-                  auditRound.status === 'completed' ||
-                  (counts.total > 0 && counts.due === 0 && counts.recorded > 0)
-              );
+              return signer.med_competent || auditRound.status === 'completed';
           })()
         : false;
 
@@ -265,9 +294,7 @@ export default function Rounds(props: Props) {
         e.preventDefault();
         const original = rounds.find((r) => r.id === round.id) ?? round;
         const c = roundCounts(original.cells);
-        const completed =
-            original.status === 'completed' ||
-            (c.total > 0 && c.due === 0 && c.recorded > 0);
+        const completed = original.status === 'completed';
         const inProgress =
             original.status === 'in_progress' || original.status === 'partial';
         const tag = statusTag(original.status);
@@ -310,7 +337,11 @@ export default function Rounds(props: Props) {
             },
             { sep: true },
         ];
-        if (canManage && !completed) {
+        if (
+            canManage &&
+            original.status === 'in_progress' &&
+            original.can_complete
+        ) {
             items.push({
                 icon: <CheckCircle2 className="h-3.5 w-3.5" />,
                 label: 'Mark round complete',
@@ -693,7 +724,15 @@ export default function Rounds(props: Props) {
                                                 className="border-b last:border-b-0"
                                             >
                                                 <td className="px-4 py-3 font-medium">
-                                                    {t.name}
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{t.name}</span>
+                                                        {t.retired_at !==
+                                                            null && (
+                                                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                Retired
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
                                                     {t.scheduled_time}
@@ -712,12 +751,30 @@ export default function Rounds(props: Props) {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
-                                                    {t.site_name ?? 'All sites'}
+                                                    {templateSiteLabel(t)}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    {canManage ? (
+                                                    {t.retired_at !== null ? (
+                                                        <span className="text-muted-foreground">
+                                                            Retired
+                                                        </span>
+                                                    ) : canManage ? (
                                                         <Switch
                                                             checked={t.active}
+                                                            disabled={
+                                                                !t.active &&
+                                                                !hasConcreteTemplateSite(
+                                                                    t,
+                                                                )
+                                                            }
+                                                            title={
+                                                                !t.active &&
+                                                                !hasConcreteTemplateSite(
+                                                                    t,
+                                                                )
+                                                                    ? 'Assign a site before enabling auto-generation'
+                                                                    : undefined
+                                                            }
                                                             onCheckedChange={() =>
                                                                 toggleTemplateActive(
                                                                     t,
@@ -733,34 +790,37 @@ export default function Rounds(props: Props) {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
-                                                    {canManage && (
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                onClick={() =>
-                                                                    setTemplateEditing(
-                                                                        t,
-                                                                    )
-                                                                }
-                                                                aria-label="Edit template"
-                                                            >
-                                                                <Pencil className="h-4 w-4" />
-                                                            </Button>
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                onClick={() =>
-                                                                    deleteTemplate(
-                                                                        t.id,
-                                                                    )
-                                                                }
-                                                                aria-label="Delete template"
-                                                            >
-                                                                <Trash2 className="h-4 w-4 text-status-critical" />
-                                                            </Button>
-                                                        </div>
-                                                    )}
+                                                    {canManage &&
+                                                        t.retired_at ===
+                                                            null && (
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    onClick={() =>
+                                                                        setTemplateEditing(
+                                                                            t,
+                                                                        )
+                                                                    }
+                                                                    aria-label="Edit template"
+                                                                >
+                                                                    <Pencil className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    onClick={() =>
+                                                                        retireTemplate(
+                                                                            t.id,
+                                                                        )
+                                                                    }
+                                                                    aria-label="Retire template"
+                                                                    title="Retire template and keep existing rounds"
+                                                                >
+                                                                    <Archive className="h-4 w-4 text-muted-foreground" />
+                                                                </Button>
+                                                            </div>
+                                                        )}
                                                 </td>
                                             </tr>
                                         ))

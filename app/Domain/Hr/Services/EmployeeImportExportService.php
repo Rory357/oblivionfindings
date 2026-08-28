@@ -34,7 +34,11 @@ class EmployeeImportExportService
         'is_active',
     ];
 
-    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly PeopleMutationLockService $mutationLocks,
+        private readonly EmployeeIntakeService $employeeIntake,
+    ) {}
 
     /**
      * Export employees to CSV. With no $userIds, exports all active employees;
@@ -156,22 +160,63 @@ class EmployeeImportExportService
 
             try {
                 $validated = $validator->validated();
-                DB::transaction(function () use ($validated, $actor, &$created, &$updated): void {
+                $email = strtolower(trim((string) $validated['email']));
+                DB::transaction(function () use ($validated, $actor, $email, &$created, &$updated): void {
+                    $this->employeeIntake->acquireIntakeLock('email:'.$email);
+                    $existingUserId = User::query()
+                        ->whereRaw('LOWER(email) = ?', [$email])
+                        ->value('id');
+                    $existingProfileId = $existingUserId
+                        ? HrEmployeeProfile::withTrashed()->where('user_id', $existingUserId)->value('id')
+                        : null;
+                    $locks = $this->mutationLocks->lock(
+                        [(int) $actor->id, $existingUserId],
+                        [$existingProfileId],
+                    );
+                    /** @var User|null $lockedActor */
+                    $lockedActor = $locks['users']->get((int) $actor->id);
+                    abort_unless($lockedActor?->canDo('hr.employees.manage'), 403);
+
+                    $user = $existingUserId
+                        ? $locks['users']->get((int) $existingUserId)
+                        : null;
+                    if ($user && strtolower(trim((string) $user->email)) !== $email) {
+                        throw ValidationException::withMessages([
+                            'email' => 'The employee identity changed while this row was being prepared. Retry the import.',
+                        ]);
+                    }
+                    $profile = $existingProfileId
+                        ? $locks['profiles']->get((int) $existingProfileId)
+                        : null;
+                    if ($profile?->trashed()) {
+                        throw ValidationException::withMessages([
+                            'email' => 'An archived employee profile must be restored from People before import.',
+                        ]);
+                    }
+                    if ($profile && ! $this->siteAccess
+                        ->applyHistoricalStaffProfileScope(HrEmployeeProfile::query(), $lockedActor)
+                        ->whereKey($profile->getKey())
+                        ->lockForUpdate()
+                        ->exists()
+                    ) {
+                        throw (new ModelNotFoundException)->setModel(HrEmployeeProfile::class);
+                    }
+
+                    // Shared People order is Users, Profiles, then destination
+                    // Sites. Medication current-evidence readers use the same
+                    // prefix, so Site reassignment cannot race a clinical write.
                     $site = $this->siteAccess
                         ->applySiteScope(
                             Site::query()->active()->notArchived()->whereNull('archived_at'),
-                            $actor,
+                            $lockedActor,
                         )
                         ->lockForUpdate()
                         ->findOrFail((int) $validated['primary_site_id']);
 
-                    $email = strtolower(trim((string) $validated['email']));
-                    $user = User::query()
-                        ->whereRaw('LOWER(email) = ?', [$email])
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($user && ! User::query()->staff()->whereKey($user->getKey())->exists()) {
+                    if ($user && (
+                        in_array($user->role, ['client', 'next_of_kin'], true)
+                        || $user->hasRole('client', 'next_of_kin')
+                    )) {
                         throw ValidationException::withMessages([
                             'email' => 'That email belongs to a non-staff account and cannot be imported.',
                         ]);
@@ -184,23 +229,6 @@ class EmployeeImportExportService
                             'password' => bcrypt(str()->random(32)),
                             'role' => 'staff',
                         ]);
-                    }
-
-                    $profile = HrEmployeeProfile::withTrashed()
-                        ->where('user_id', $user->id)
-                        ->lockForUpdate()
-                        ->first();
-                    if ($profile?->trashed()) {
-                        throw ValidationException::withMessages([
-                            'email' => 'An archived employee profile must be restored from People before import.',
-                        ]);
-                    }
-                    if ($profile && ! $this->siteAccess
-                        ->applyHistoricalStaffProfileScope(HrEmployeeProfile::query(), $actor)
-                        ->whereKey($profile->getKey())
-                        ->exists()
-                    ) {
-                        throw (new ModelNotFoundException)->setModel(HrEmployeeProfile::class);
                     }
 
                     $profileData = array_filter([
@@ -220,13 +248,13 @@ class EmployeeImportExportService
                     }
 
                     if ($profile) {
-                        $profile->update([...$profileData, 'updated_by' => $actor->id]);
+                        $profile->update([...$profileData, 'updated_by' => $lockedActor->id]);
                         $updated++;
                     } else {
                         HrEmployeeProfile::create([
                             ...$profileData,
                             'is_active' => $profileData['is_active'] ?? true,
-                            'created_by' => $actor->id,
+                            'created_by' => $lockedActor->id,
                         ]);
                         $created++;
                     }

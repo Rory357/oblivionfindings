@@ -158,7 +158,7 @@ export function MyDayHero({
                               hour12: false,
                           })
                         : undefined,
-                    href: med.emar_url,
+                    href: med.emar_url ?? undefined,
                 })),
                 action: { label: t('open_emar'), href: '/meds/today' },
             },

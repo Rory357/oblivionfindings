@@ -14,6 +14,7 @@ class ClientControlledDrugEntry extends Model
     protected $fillable = [
         'client_id',
         'client_medication_id',
+        'pharmacy_order_id',
         'shift_id',
         'service_context_id',
         'entry_type',
@@ -31,6 +32,9 @@ class ClientControlledDrugEntry extends Model
     ];
 
     protected $casts = [
+        'quantity' => 'decimal:2',
+        'on_hand_before' => 'decimal:2',
+        'on_hand_after' => 'decimal:2',
         'recorded_at' => 'datetime',
         'expiry_date' => 'date',
     ];
@@ -43,6 +47,11 @@ class ClientControlledDrugEntry extends Model
     public function medication()
     {
         return $this->belongsTo(ClientMedication::class, 'client_medication_id')->withTrashed();
+    }
+
+    public function pharmacyOrder()
+    {
+        return $this->belongsTo(MedicationPharmacyOrder::class, 'pharmacy_order_id');
     }
 
     public function shift()

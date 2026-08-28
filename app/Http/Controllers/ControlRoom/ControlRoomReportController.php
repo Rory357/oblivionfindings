@@ -5,6 +5,7 @@ namespace App\Http\Controllers\ControlRoom;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomReportService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
@@ -28,11 +29,11 @@ class ControlRoomReportController extends Controller
         [$from, $to, $period] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
         $reportSiteScope = $this->reportSiteScope($user, $siteId);
-        $sla = $this->reportService->slaCompliance($from, $to, $reportSiteScope);
-        $volume = $this->reportService->alertVolume($from, $to, $reportSiteScope);
-        $escalation = $this->reportService->escalationAnalysis($from, $to, $reportSiteScope);
-        $workload = $this->reportService->workloadDistribution($from, $to, $reportSiteScope);
-        $playbooks = $this->reportService->playbookPerformance($from, $to, $reportSiteScope);
+        $sla = $this->reportService->slaCompliance($from, $to, $reportSiteScope, $user);
+        $volume = $this->reportService->alertVolume($from, $to, $reportSiteScope, $user);
+        $escalation = $this->reportService->escalationAnalysis($from, $to, $reportSiteScope, $user);
+        $workload = $this->reportService->workloadDistribution($from, $to, $reportSiteScope, $user);
+        $playbooks = $this->reportService->playbookPerformance($from, $to, $reportSiteScope, $user);
 
         AuditLogger::log('controlRoom.reports.view', null, ['period' => $period]);
 
@@ -79,7 +80,12 @@ class ControlRoomReportController extends Controller
         [$from, $to] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
 
-        return response()->json($this->reportService->slaCompliance($from, $to, $this->reportSiteScope($user, $siteId)));
+        return response()->json($this->reportService->slaCompliance(
+            $from,
+            $to,
+            $this->reportSiteScope($user, $siteId),
+            $user,
+        ));
     }
 
     /**
@@ -93,7 +99,12 @@ class ControlRoomReportController extends Controller
         [$from, $to] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
 
-        return response()->json($this->reportService->alertVolume($from, $to, $this->reportSiteScope($user, $siteId)));
+        return response()->json($this->reportService->alertVolume(
+            $from,
+            $to,
+            $this->reportSiteScope($user, $siteId),
+            $user,
+        ));
     }
 
     /**
@@ -107,7 +118,12 @@ class ControlRoomReportController extends Controller
         [$from, $to] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
 
-        return response()->json($this->reportService->workloadDistribution($from, $to, $this->reportSiteScope($user, $siteId)));
+        return response()->json($this->reportService->workloadDistribution(
+            $from,
+            $to,
+            $this->reportSiteScope($user, $siteId),
+            $user,
+        ));
     }
 
     /**
@@ -122,9 +138,9 @@ class ControlRoomReportController extends Controller
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
         $reportSiteScope = $this->reportSiteScope($user, $siteId);
 
-        $sla = $this->reportService->slaCompliance($from, $to, $reportSiteScope);
-        $volume = $this->reportService->alertVolume($from, $to, $reportSiteScope);
-        $escalation = $this->reportService->escalationAnalysis($from, $to, $reportSiteScope);
+        $sla = $this->reportService->slaCompliance($from, $to, $reportSiteScope, $user);
+        $volume = $this->reportService->alertVolume($from, $to, $reportSiteScope, $user);
+        $escalation = $this->reportService->escalationAnalysis($from, $to, $reportSiteScope, $user);
 
         return response()->json([
             'total_alerts' => $volume['total'],
@@ -196,6 +212,8 @@ class ControlRoomReportController extends Controller
     {
         $siteAccess = app(UserSiteAccessService::class);
         $siteAccess->applyAlertScope($query, $user, $this->alertBypassPermissions());
+        app(ControlRoomAlertAccessService::class)
+            ->applyControlledMedicationContentScope($query, $user);
 
         if ($siteId) {
             $siteAccess->applyAlertSiteScopeForSiteIds($query, [$siteId]);

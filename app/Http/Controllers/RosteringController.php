@@ -116,7 +116,7 @@ class RosteringController extends Controller
             $serviceContexts = ServiceContext::query()
                 ->availableToSites($accessibleSiteIds)
                 ->orderBy('name')
-                ->get(['id', 'name', 'type', 'is_active']);
+                ->get(['id', 'name', 'type', 'is_active', 'site_id']);
         }
 
         $query = Shift::query()
@@ -773,6 +773,7 @@ class RosteringController extends Controller
                         'shift_type' => $shift->shift_type ?? 'standard',
                         'is_sleepover' => (bool) $shift->is_sleepover,
                         'is_on_call' => (bool) $shift->is_on_call,
+                        'is_lone_worker' => (bool) $shift->is_lone_worker,
                         'expected_break_minutes' => $shift->expected_break_minutes,
                         'required_skills' => $shift->required_skills ?? [],
                         'location' => $shift->location,

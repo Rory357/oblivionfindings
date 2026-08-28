@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -22,23 +23,26 @@ class ControlRoomSlaController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
         $siteAccess = app(UserSiteAccessService::class);
+        $alertAccess = app(ControlRoomAlertAccessService::class);
         $bypassPermissions = $this->alertBypassPermissions();
 
         $slaDefinitions = SlaDefinition::withCount([
-            'alertSlas as applicable_alert_slas_count' => function ($query) use ($siteAccess, $user, $bypassPermissions) {
-                $query->applicable()->whereHas('alert', function ($alertQuery) use ($siteAccess, $user, $bypassPermissions) {
+            'alertSlas as applicable_alert_slas_count' => function ($query) use ($siteAccess, $alertAccess, $user, $bypassPermissions) {
+                $query->applicable()->whereHas('alert', function ($alertQuery) use ($siteAccess, $alertAccess, $user, $bypassPermissions) {
                     $siteAccess->applyAlertScope($alertQuery, $user, $bypassPermissions);
+                    $alertAccess->applyControlledMedicationContentScope($alertQuery, $user);
                 });
             },
         ])
             ->get()
-            ->map(function (SlaDefinition $sla) use ($siteAccess, $user, $bypassPermissions) {
+            ->map(function (SlaDefinition $sla) use ($siteAccess, $alertAccess, $user, $bypassPermissions) {
                 $totalAlerts = $sla->applicable_alert_slas_count;
                 $definitionSlas = AlertSla::query()
                     ->where('sla_definition_id', $sla->id)
                     ->applicable()
-                    ->whereHas('alert', function ($alertQuery) use ($siteAccess, $user, $bypassPermissions) {
+                    ->whereHas('alert', function ($alertQuery) use ($siteAccess, $alertAccess, $user, $bypassPermissions) {
                         $siteAccess->applyAlertScope($alertQuery, $user, $bypassPermissions);
+                        $alertAccess->applyControlledMedicationContentScope($alertQuery, $user);
                     });
                 $acknowledgeApplicable = (clone $definitionSlas)->milestoneAssessed('acknowledge')->count();
                 $responseApplicable = (clone $definitionSlas)->milestoneAssessed('response')->count();
@@ -204,6 +208,7 @@ class ControlRoomSlaController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
         $siteAccess = app(UserSiteAccessService::class);
+        $alertAccess = app(ControlRoomAlertAccessService::class);
         $bypassPermissions = $this->alertBypassPermissions();
 
         $filters = $request->validate([
@@ -235,8 +240,9 @@ class ControlRoomSlaController extends Controller
                             ->whereBetween('resolution_deadline', [$rangeStart, $rangeEnd]);
                     });
             })
-            ->whereHas('alert', function ($alertQuery) use ($siteAccess, $user, $bypassPermissions) {
+            ->whereHas('alert', function ($alertQuery) use ($siteAccess, $alertAccess, $user, $bypassPermissions) {
                 $siteAccess->applyAlertScope($alertQuery, $user, $bypassPermissions);
+                $alertAccess->applyControlledMedicationContentScope($alertQuery, $user);
             })
             ->with([
                 'alert:id,reference_number,alert_type,severity,source,status,triggered_at',

@@ -13,6 +13,7 @@ use App\Models\ShiftTask;
 use App\Models\StaffCredential;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\Schema;
 
@@ -20,18 +21,20 @@ class ReportingService
 {
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
+        private readonly MedicationGovernanceScopeService $medicationGovernance,
     ) {}
 
     public function shiftAnalytics(int $orgId, string $dateFrom, string $dateTo, array $filters): array
     {
+        $allowedSiteIds = $this->allowedSiteIds($filters);
+
         $query = Shift::query()
             ->whereHas('client', fn ($q) => $q->where('organization_id', $orgId))
             ->whereBetween('starts_at', [$dateFrom, $dateTo.' 23:59:59'])
-            ->when(! empty($filters['allowed_site_ids']), fn ($q) => $q->where(function ($siteQuery) use ($filters) {
-                $siteIds = $filters['allowed_site_ids'];
-                $siteQuery->whereIn('shifts.site_id', $siteIds)
-                    ->orWhereHas('client', fn ($clientQuery) => $clientQuery->whereIn('clients.site_id', $siteIds));
-            }))
+            ->where(function ($siteQuery) use ($allowedSiteIds) {
+                $siteQuery->whereIn('shifts.site_id', $allowedSiteIds)
+                    ->orWhereHas('client', fn ($clientQuery) => $clientQuery->whereIn('clients.site_id', $allowedSiteIds));
+            })
             ->when(! empty($filters['client_id']), fn ($q) => $q->where('shifts.client_id', $filters['client_id']))
             ->when(! empty($filters['staff_id']), fn ($q) => $q->where('shifts.user_id', $filters['staff_id']));
 
@@ -50,7 +53,18 @@ class ReportingService
             ->count();
         $incidentCount = ClientIncident::query()->whereIn('shift_id', $shiftIds)->count();
         $formSubmissionCount = CustomFormSubmission::query()->whereIn('shift_id', $shiftIds)->count();
-        $medicationRecordCount = ClientMedicationAdministration::query()->whereIn('shift_id', $shiftIds)->count();
+        $medicationRecordQuery = ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
+            ->whereIn('shift_id', $shiftIds);
+        $this->medicationGovernance->scopeCanonicalClientMedicationRows(
+            $medicationRecordQuery,
+            $allowedSiteIds,
+            allowNullMedication: false,
+        );
+        if (empty($filters['can_view_controlled_medications'])) {
+            $this->medicationGovernance->scopeWithoutControlledMedicationRows($medicationRecordQuery);
+        }
+        $medicationRecordCount = $medicationRecordQuery->count();
         $handoverCount = ShiftHandover::query()
             ->tap(fn ($handoverQuery) => $this->siteAccess->applyHandoverIntegrityScope($handoverQuery))
             ->where(function ($query) use ($shiftIds) {
@@ -167,22 +181,19 @@ class ReportingService
     public function complianceReport(int $orgId, array $filters): array
     {
         $staffQuery = User::where('organization_id', $orgId)->staff();
+        $allowedSiteIds = $this->allowedSiteIds($filters);
 
-        if (! empty($filters['allowed_site_ids'])) {
-            $siteIds = array_values(array_map('intval', $filters['allowed_site_ids']));
+        $staffQuery->where(function ($query) use ($allowedSiteIds) {
+            $query->whereHas('hrEmployeeProfile', function ($profileQuery) use ($allowedSiteIds) {
+                $profileQuery->where(function ($siteProfileQuery) use ($allowedSiteIds) {
+                    $siteProfileQuery->whereIn('primary_site_id', $allowedSiteIds);
 
-            $staffQuery->where(function ($query) use ($siteIds) {
-                $query->whereHas('hrEmployeeProfile', function ($profileQuery) use ($siteIds) {
-                    $profileQuery->where(function ($siteProfileQuery) use ($siteIds) {
-                        $siteProfileQuery->whereIn('primary_site_id', $siteIds);
-
-                        foreach ($siteIds as $siteId) {
-                            $siteProfileQuery->orWhereJsonContains('secondary_site_ids', $siteId);
-                        }
-                    });
-                })->orWhereHas('shifts', fn ($shiftQuery) => $shiftQuery->whereIn('shifts.site_id', $siteIds));
-            });
-        }
+                    foreach ($allowedSiteIds as $siteId) {
+                        $siteProfileQuery->orWhereJsonContains('secondary_site_ids', $siteId);
+                    }
+                });
+            })->orWhereHas('shifts', fn ($shiftQuery) => $shiftQuery->whereIn('shifts.site_id', $allowedSiteIds));
+        });
 
         if (! empty($filters['client_id'])) {
             $staffQuery->whereHas('shifts', function ($shiftQuery) use ($filters) {
@@ -231,5 +242,21 @@ class ReportingService
                 'days_overdue' => $c->expires_at->diffInDays(now()),
             ])->values(),
         ];
+    }
+
+    /**
+     * Resolve the controller's explicit Site scope. The only production caller
+     * supplies accessible Site IDs; missing or empty scope must match no rows.
+     *
+     * @return array<int, int>
+     */
+    private function allowedSiteIds(array $filters): array
+    {
+        return collect((array) ($filters['allowed_site_ids'] ?? []))
+            ->filter(fn ($siteId): bool => is_numeric($siteId) && (int) $siteId > 0)
+            ->map(fn ($siteId): int => (int) $siteId)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

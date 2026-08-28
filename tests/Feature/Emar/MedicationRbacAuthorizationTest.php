@@ -9,7 +9,10 @@ use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationDashboardAlert;
+use App\Models\MedicationError;
+use App\Models\MedicationIdempotencyResult;
 use App\Models\MedicationMarAttachment;
 use App\Models\MedicationPharmacyOrder;
 use App\Models\MedicationScheduledStockCount;
@@ -20,11 +23,11 @@ use App\Models\User;
 use App\Services\EnhancedMarService;
 use App\Services\Fleet\ResidentTransportJourneyScope;
 use App\Services\Fleet\ResidentTransportJourneyService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Tasks\Providers\CdLossReportProvider;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -162,7 +165,11 @@ class MedicationRbacAuthorizationTest extends TestCase
 
     public function test_global_dashboard_omits_controlled_alerts_and_widgets_without_the_exact_reader(): void
     {
-        $client = Client::factory()->create(['status' => 'active']);
+        $site = Site::factory()->create(['is_active' => true]);
+        $client = Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+        ]);
         $ordinaryMedication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'controlled_drug' => false,
@@ -213,13 +220,13 @@ class MedicationRbacAuthorizationTest extends TestCase
             'status' => 'open',
         ]);
 
-        $reader = $this->userWithPermissions(['medications.view']);
+        $reader = $this->userWithPermissions(['medications.view'], $site);
         $alertsResponse = $this->actingAs($reader)
             ->getJson(route('api.medications.alerts.index'))
             ->assertOk()
             ->assertJsonFragment(['id' => $ordinaryAlert->id])
-            ->assertJsonFragment(['id' => $controlledMedicationClinicalAlert->id])
-            ->assertJsonMissing(['message' => 'Restricted controlled alert']);
+            ->assertJsonMissing(['message' => 'Restricted controlled alert'])
+            ->assertJsonMissing(['message' => 'Controlled medication clinical alert remains visible']);
         $this->assertNotContains(
             $controlledAlert->id,
             collect($alertsResponse->json('alerts'))->pluck('id')->all(),
@@ -228,16 +235,17 @@ class MedicationRbacAuthorizationTest extends TestCase
             ->getJson(route('api.medications.dashboard.widgets'))
             ->assertOk()
             ->assertJsonMissingPath('controlled_discrepancies')
-            ->assertJsonFragment(['message' => 'Controlled medication clinical alert remains visible']);
+            ->assertJsonMissing(['message' => 'Controlled medication clinical alert remains visible']);
 
         $controlledReader = $this->userWithPermissions([
             'medications.view',
             'medications.controlled.view',
-        ]);
+        ], $site);
         $this->actingAs($controlledReader)
             ->getJson(route('api.medications.alerts.index'))
             ->assertOk()
-            ->assertJsonFragment(['id' => $controlledAlert->id]);
+            ->assertJsonFragment(['id' => $controlledAlert->id])
+            ->assertJsonFragment(['id' => $controlledMedicationClinicalAlert->id]);
         $this->actingAs($controlledReader)
             ->getJson(route('api.medications.dashboard.widgets'))
             ->assertOk()
@@ -245,9 +253,95 @@ class MedicationRbacAuthorizationTest extends TestCase
             ->assertJsonFragment(['medication' => 'Restricted controlled medication']);
     }
 
+    public function test_controlled_medication_clinical_alerts_are_concealed_from_direct_actions_and_audit_aggregates(): void
+    {
+        $site = Site::factory()->create(['is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $controlledMedication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'controlled_drug' => true,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+        ]);
+        $alert = MedicationDashboardAlert::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $controlledMedication->id,
+            'alert_type' => 'overdue',
+            'severity' => 'warning',
+            'message' => 'Controlled medication alert with an ordinary type',
+            'status' => 'active',
+        ]);
+        $actor = $this->userWithPermissions([
+            'medications.view',
+            'medications.administer.correct',
+            'medications.reports.export',
+            'shifts.manageAny',
+        ], $site);
+
+        $this->actingAs($actor)
+            ->postJson(route('api.medications.alerts.acknowledge', $alert))
+            ->assertNotFound();
+        $this->actingAs($actor)
+            ->postJson(route('api.medications.alerts.resolve', $alert), [
+                'resolution_notes' => 'Must remain concealed.',
+            ])
+            ->assertNotFound();
+        $this->actingAs($actor)
+            ->post(route('emar.alerts.dismiss', $alert))
+            ->assertNotFound();
+        $this->actingAs($actor)
+            ->getJson(route('api.medications.reports', ['type' => 'audit']))
+            ->assertOk()
+            ->assertJsonPath('safety_alerts.total_alerts', 0)
+            ->assertJsonMissing(['message' => 'Controlled medication alert with an ordinary type']);
+        $dashboard = $this->actingAs($actor)
+            ->get(route('dashboard'))
+            ->assertOk();
+        $this->assertSame(0, $dashboard->inertiaProps('emarWidgets.activeAlerts'));
+        $this->assertSame('active', $alert->fresh()->status);
+
+        $controlledView = Permission::query()
+            ->where('key', MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
+            ->firstOrFail();
+        $actor->permissionOverrides()->syncWithoutDetaching([
+            $controlledView->id => ['allowed' => true],
+        ]);
+        $actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        $this->actingAs($actor)
+            ->postJson(route('api.medications.alerts.acknowledge', $alert))
+            ->assertNotFound();
+        $this->actingAs($actor)
+            ->postJson(route('api.medications.alerts.resolve', $alert), [
+                'resolution_notes' => 'Controlled view alone cannot mutate this alert.',
+            ])
+            ->assertNotFound();
+        $this->assertSame('active', $alert->fresh()->status);
+
+        $controlledRecord = Permission::query()
+            ->where('key', MedicationGovernanceScopeService::CONTROLLED_CAPABILITY)
+            ->firstOrFail();
+        $actor->permissionOverrides()->syncWithoutDetaching([
+            $controlledRecord->id => ['allowed' => true],
+        ]);
+        $actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        $this->actingAs($actor)
+            ->postJson(route('api.medications.alerts.acknowledge', $alert))
+            ->assertOk();
+        $this->actingAs($actor)
+            ->postJson(route('api.medications.alerts.resolve', $alert), [
+                'resolution_notes' => 'Resolved by an exact controlled writer.',
+            ])
+            ->assertOk();
+        $this->assertSame('resolved', $alert->fresh()->status);
+    }
+
     public function test_emar_overview_payload_and_actions_follow_exact_controlled_and_stock_capabilities(): void
     {
-        $client = Client::factory()->create(['status' => 'active']);
+        $site = Site::factory()->create(['is_active' => true]);
+        $foreignSite = Site::factory()->create(['is_active' => true]);
+        $reporter = User::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $ordinaryMedication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'name' => 'Ordinary stock item',
@@ -274,6 +368,44 @@ class MedicationRbacAuthorizationTest extends TestCase
             'on_hand' => 0,
             'reorder_level' => 1,
         ]);
+        $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id, 'status' => 'active']);
+        $foreignMedication = ClientMedication::factory()->create([
+            'client_id' => $foreignClient->id,
+            'name' => 'Foreign ordinary stock item',
+            'controlled_drug' => false,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+        ]);
+        ClientMedicationStock::query()->create([
+            'client_medication_id' => $foreignMedication->id,
+            'on_hand' => 0,
+            'reorder_level' => 1,
+        ]);
+        $ordinaryAlert = MedicationDashboardAlert::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $ordinaryMedication->id,
+            'alert_type' => 'overdue',
+            'severity' => 'warning',
+            'message' => 'Ordinary overview alert',
+            'status' => 'active',
+        ]);
+        $controlledClinicalAlert = MedicationDashboardAlert::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $controlledMedication->id,
+            'alert_type' => 'overdue',
+            'severity' => 'warning',
+            'message' => 'Restricted controlled overview alert',
+            'status' => 'active',
+        ]);
+        MedicationDashboardAlert::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $foreignMedication->id,
+            'alert_type' => 'overdue',
+            'severity' => 'critical',
+            'message' => 'FORGED FOREIGN OVERVIEW ALERT',
+            'status' => 'active',
+        ]);
         ClientControlledDrugDiscrepancy::query()->create([
             'client_id' => $client->id,
             'client_medication_id' => $controlledMedication->id,
@@ -282,8 +414,45 @@ class MedicationRbacAuthorizationTest extends TestCase
             'reported_at' => now(),
             'status' => 'open',
         ]);
+        ClientControlledDrugDiscrepancy::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $foreignMedication->id,
+            'difference' => -9,
+            'reason' => 'FORGED FOREIGN OVERVIEW DISCREPANCY',
+            'reported_at' => now(),
+            'status' => 'open',
+        ]);
+        MedicationError::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $foreignMedication->id,
+            'error_type' => 'documentation',
+            'severity' => 'minor',
+            'description' => 'FORGED FOREIGN OVERVIEW ERROR',
+            'reported_at' => now(),
+            'reported_by' => $reporter->id,
+            'status' => 'reported',
+        ]);
+        MedicationError::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $controlledMedication->id,
+            'error_type' => 'documentation',
+            'severity' => 'minor',
+            'description' => 'Restricted controlled overview error',
+            'reported_at' => now(),
+            'reported_by' => $reporter->id,
+            'status' => 'reported',
+        ]);
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $foreignMedication->id,
+            'administered_by' => $reporter->id,
+            'status' => 'missed',
+            'scheduled_for' => now(),
+            'administered_at' => now(),
+            'notes' => 'FORGED FOREIGN OVERVIEW ADMINISTRATION',
+        ]);
 
-        $reader = $this->userWithPermissions(['medications.view']);
+        $reader = $this->userWithPermissions(['medications.view'], $site);
         $this->actingAs($reader)
             ->get(route('emar.index'))
             ->assertOk()
@@ -292,17 +461,25 @@ class MedicationRbacAuthorizationTest extends TestCase
                 ->where('can.manage_stock', false)
                 ->where('stats.controlledCount', 0)
                 ->where('stats.activeDiscrepancies', 0)
+                ->where('stats.activeAlerts', 1)
                 ->where('stats.stockAlerts', 0)
+                ->where('stats.totalToday', 0)
+                ->where('medicationErrors.open', 0)
+                ->where('medicationErrors.byType', [])
+                ->where('medicationErrors.trend', fn ($rows) => collect($rows)->sum('count') === 0)
+                ->where('activeAlertsList', fn ($alerts) => collect($alerts)->pluck('id')->all() === [$ordinaryAlert->id])
+                ->where('recentActivity', fn ($rows) => collect($rows)->isEmpty())
                 ->where('medicationOptions', [])
                 ->where('witnesses', [])
                 ->where('actionCentre', fn ($items) => collect($items)->every(
                     fn ($item) => ! in_array(data_get($item, 'category'), ['controlled', 'stock'], true)
+                        && data_get($item, 'summary') !== 'Restricted controlled overview error'
                 )));
 
         $controlledReader = $this->userWithPermissions([
             'medications.view',
             'medications.controlled.view',
-        ]);
+        ], $site);
         $this->actingAs($controlledReader)
             ->get(route('emar.index'))
             ->assertOk()
@@ -311,15 +488,23 @@ class MedicationRbacAuthorizationTest extends TestCase
                 ->where('can.manage_stock', false)
                 ->where('stats.controlledCount', 1)
                 ->where('stats.activeDiscrepancies', 1)
+                ->where('stats.activeAlerts', 2)
                 ->where('stats.stockAlerts', 0)
+                ->where('medicationErrors.open', 1)
+                ->where('medicationErrors.byType', fn ($rows) => collect($rows)->sum('count') === 1)
+                ->where('medicationErrors.trend', fn ($rows) => collect($rows)->sum('count') === 1)
+                ->where('activeAlertsList', fn ($alerts) => collect($alerts)->pluck('id')->sort()->values()->all() === collect([$ordinaryAlert->id, $controlledClinicalAlert->id])->sort()->values()->all())
                 ->where('actionCentre', fn ($items) => collect($items)->contains(
                     fn ($item) => data_get($item, 'category') === 'controlled'
+                ))
+                ->where('actionCentre', fn ($items) => collect($items)->contains(
+                    fn ($item) => data_get($item, 'summary') === 'Restricted controlled overview error'
                 )));
 
         $stockReader = $this->userWithPermissions([
             'medications.view',
             'medications.stock.update',
-        ]);
+        ], $site);
         $this->actingAs($stockReader)
             ->get(route('emar.index'))
             ->assertOk()
@@ -399,12 +584,12 @@ class MedicationRbacAuthorizationTest extends TestCase
             ->assertJsonPath('can.view_controlled', false)
             ->assertJsonCount(0, 'controlled_discrepancies')
             ->assertJsonMissing(['message' => 'Restricted MAR alert'])
-            ->assertJsonFragment(['message' => 'Controlled medication clinical MAR alert']);
+            ->assertJsonMissing(['message' => 'Controlled medication clinical MAR alert']);
         $this->actingAs($reader)
             ->get(route('operations.clients.show', $client))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('emar_summary.pending_alerts_count', 1));
+                ->where('emar_summary.pending_alerts_count', 0));
 
         $controlledReader = $this->userWithPermissions([
             'clients.viewAssigned',
@@ -470,7 +655,7 @@ class MedicationRbacAuthorizationTest extends TestCase
 
         $this->actingAs($actor)
             ->getJson(route('api.medications.scheduled_counts.index', [$client, $controlledMedication]))
-            ->assertForbidden();
+            ->assertNotFound();
 
         $controlledView = Permission::query()
             ->where('key', 'medications.controlled.view')
@@ -487,6 +672,64 @@ class MedicationRbacAuthorizationTest extends TestCase
             ->assertJsonPath('counts.0.id', $controlledCount->id);
     }
 
+    public function test_medication_detail_conceals_controlled_count_evidence_without_controlled_view(): void
+    {
+        $site = Site::factory()->create(['is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $ordinaryMedication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'controlled_drug' => false,
+        ]);
+        $controlledMedication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'controlled_drug' => true,
+        ]);
+        MedicationScheduledStockCount::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $ordinaryMedication->id,
+            'scheduled_date' => today(),
+            'status' => 'completed',
+            'expected_quantity' => 4,
+            'actual_quantity' => 4,
+            'notes' => 'Ordinary count evidence',
+            'completed_at' => now(),
+        ]);
+        MedicationScheduledStockCount::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $controlledMedication->id,
+            'scheduled_date' => today(),
+            'status' => 'completed',
+            'expected_quantity' => 8,
+            'actual_quantity' => 8,
+            'notes' => 'Controlled count evidence',
+            'completed_at' => now(),
+        ]);
+        $actor = $this->userWithPermissions(['medications.view'], $site);
+        $client->supportWorkers()->syncWithoutDetaching([$actor->id]);
+
+        $this->actingAs($actor)
+            ->getJson(route('emar.medications.detail', $ordinaryMedication))
+            ->assertOk()
+            ->assertJsonFragment(['note' => 'Ordinary count evidence']);
+        $this->actingAs($actor)
+            ->getJson(route('emar.medications.detail', $controlledMedication))
+            ->assertNotFound();
+
+        $controlledView = Permission::query()
+            ->where('key', 'medications.controlled.view')
+            ->firstOrFail();
+        $actor->permissionOverrides()->syncWithoutDetaching([
+            $controlledView->id => ['allowed' => true],
+        ]);
+        $actor->unsetRelation('permissionOverrides');
+        $actor->unsetRelation('roles');
+
+        $this->actingAs($actor)
+            ->getJson(route('emar.medications.detail', $controlledMedication))
+            ->assertOk()
+            ->assertJsonFragment(['note' => 'Controlled count evidence']);
+    }
+
     public function test_sidebar_reachability_and_deep_links_match_the_exact_reader_capabilities(): void
     {
         $sidebar = file_get_contents(resource_path('js/components/app-sidebar.tsx'));
@@ -495,10 +738,18 @@ class MedicationRbacAuthorizationTest extends TestCase
         $this->assertIsString($inertiaMiddleware);
 
         $this->assertMatchesRegularExpression(
-            '/const canAdminEmar =(?:(?!;).)*\\(can\\?\\.medications\\?\\.view && can\\?\\.medications\\?\\.controlledView\\)/s',
+            '/const canAdminEmar =(?:(?!;).)*can\\?\\.medications\\?\\.ordersManage(?:(?!;).)*can\\?\\.medications\\?\\.stockUpdate(?:(?!;).)*can\\?\\.medications\\?\\.controlledView(?:(?!;).)*can\\?\\.medications\\?\\.controlledRecord/s',
             $sidebar,
         );
-        $this->assertStringContainsString(
+        $this->assertStringNotContainsString(
+            '(can?.medications?.view && can?.medications?.controlledView) ||',
+            $sidebar,
+        );
+        $this->assertStringNotContainsString(
+            '(can?.medications?.view && can?.medications?.controlledRecord) ||',
+            $sidebar,
+        );
+        $this->assertStringNotContainsString(
             "((\$can['medications']['view'] ?? false) && (\$can['medications']['controlledView'] ?? false))",
             $inertiaMiddleware,
         );
@@ -622,7 +873,8 @@ class MedicationRbacAuthorizationTest extends TestCase
 
     public function test_dedicated_permissions_preserve_positive_medication_jobs_without_broad_substitutes(): void
     {
-        $client = Client::factory()->create(['status' => 'active']);
+        $site = Site::factory()->create(['is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $controlledMedication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'name' => 'Morphine sulfate',
@@ -636,13 +888,15 @@ class MedicationRbacAuthorizationTest extends TestCase
             'on_hand' => 10,
             'reorder_level' => 5,
         ]);
-        $controlledActor = $this->userWithPermissions(['medications.controlled.record']);
-        $witness = $this->userWithPermissions(['medications.controlled.witness']);
+        $controlledActor = $this->userWithPermissions(['medications.controlled.record'], $site);
+        $witness = $this->userWithPermissions(['medications.controlled.witness'], $site);
+        $this->qualifyControlledWitness($witness, $site, $client, $controlledActor);
 
         $this->assertFalse($controlledActor->canDo('medications.orders.manage'));
         $this->assertFalse($controlledActor->canDo('clients.update'));
         $this->actingAs($controlledActor)
             ->post(route('emar.controlled.entries.store'), [
+                'client_medication_id' => $controlledMedication->id,
                 'client_id' => $client->id,
                 'medication_name' => $controlledMedication->name,
                 'entry_type' => 'administration',
@@ -650,6 +904,7 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'on_hand_before' => 10,
                 'on_hand_after' => 8,
                 'witnessed_by' => $witness->id,
+                'witness_credential' => 'password',
             ])
             ->assertSessionHasNoErrors();
         $this->assertDatabaseHas('client_controlled_drug_entries', [
@@ -672,7 +927,7 @@ class MedicationRbacAuthorizationTest extends TestCase
             'on_hand' => 5,
             'reorder_level' => 2,
         ]);
-        $stockActor = $this->userWithPermissions(['medications.stock.update']);
+        $stockActor = $this->userWithPermissions(['medications.stock.update'], $site);
         $this->actingAs($stockActor)
             ->post(route('emar.stock.adjust'), [
                 'client_medication_id' => $ordinaryMedication->id,
@@ -682,7 +937,7 @@ class MedicationRbacAuthorizationTest extends TestCase
             ->assertSessionHasNoErrors();
         $this->assertSame(3, (int) $ordinaryStock->refresh()->on_hand);
 
-        $administrationActor = $this->userWithPermissions(['medications.administer.record']);
+        $administrationActor = $this->userWithPermissions(['medications.administer.record'], $site);
         $result = app(EnhancedMarService::class)->recordAdministration(
             $client,
             $ordinaryMedication,
@@ -726,6 +981,7 @@ class MedicationRbacAuthorizationTest extends TestCase
 
         $this->actingAs($actor)
             ->postJson(route('emar.controlled.entries.store'), [
+                'client_medication_id' => $medication->id,
                 'client_id' => $client->id,
                 'medication_name' => $medication->name,
                 'entry_type' => 'administration',
@@ -739,6 +995,7 @@ class MedicationRbacAuthorizationTest extends TestCase
 
         $this->actingAs($actor)
             ->postJson(route('emar.controlled.balance_check.store'), [
+                'client_medication_id' => $medication->id,
                 'client_id' => $client->id,
                 'medication_name' => $medication->name,
                 'expected_balance' => 10,
@@ -773,24 +1030,23 @@ class MedicationRbacAuthorizationTest extends TestCase
         $actor = $this->userWithPermissions(['medications.controlled.record'], $site);
         $unauthorisedWitness = $this->userWithPermissions([], $site);
         $authorisedWitness = $this->userWithPermissions(['medications.controlled.witness'], $site);
+        $this->qualifyControlledWitness($authorisedWitness, $site, $client, $actor);
         $entryUuid = '0d7527ad-b469-4480-858e-a49a966c9370';
         $balanceUuid = 'd88c78e5-34cf-4f7f-b6a3-31d586d8447e';
 
-        Cache::put('emar:idempotency:emar-controlled-entry:'.$entryUuid, [
-            'success' => true,
-            'idempotency_binding' => [
-                'version' => 1,
-                'operation' => 'controlled_entry',
-                'client_id' => $client->id,
-                'client_medication_id' => $medication->id,
-                'medication_name' => strtolower($medication->name),
-                'witnessed_by' => $unauthorisedWitness->id,
-                'entry_type' => 'administration',
+        $entryReplay = MedicationIdempotencyResult::query()->create([
+            'scope' => 'emar-controlled-entry',
+            'request_uuid' => $entryUuid,
+            'response_payload' => [
+                'success' => true,
+                '_request_fingerprint' => 'unauthorised-witness-binding',
             ],
+            'expires_at' => now()->addDays(7),
         ]);
 
         $this->actingAs($actor)
             ->postJson(route('emar.controlled.entries.store'), [
+                'client_medication_id' => $medication->id,
                 'client_id' => $client->id,
                 'medication_name' => $medication->name,
                 'entry_type' => 'administration',
@@ -800,24 +1056,19 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'witnessed_by' => $unauthorisedWitness->id,
                 'client_request_uuid' => $entryUuid,
             ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('witnessed_by');
+            ->assertNotFound();
 
-        Cache::put('emar:idempotency:emar-controlled-entry:'.$entryUuid, [
-            'success' => true,
-            'idempotency_binding' => [
-                'version' => 1,
-                'operation' => 'controlled_entry',
-                'client_id' => $client->id + 1,
-                'client_medication_id' => $medication->id,
-                'medication_name' => strtolower($medication->name),
-                'witnessed_by' => $authorisedWitness->id,
-                'entry_type' => 'administration',
+        $entryReplay->forceFill([
+            'response_payload' => [
+                'success' => true,
+                '_request_fingerprint' => 'different-client-binding',
             ],
         ]);
+        $entryReplay->save();
 
         $this->actingAs($actor)
             ->postJson(route('emar.controlled.entries.store'), [
+                'client_medication_id' => $medication->id,
                 'client_id' => $client->id,
                 'medication_name' => $medication->name,
                 'entry_type' => 'administration',
@@ -825,31 +1076,31 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'on_hand_before' => 10,
                 'on_hand_after' => 9,
                 'witnessed_by' => $authorisedWitness->id,
+                'witness_credential' => 'password',
                 'client_request_uuid' => $entryUuid,
             ])
             ->assertConflict()
             ->assertJsonPath('sync.status', 'conflict');
 
-        Cache::put('emar:idempotency:emar-controlled-balance-check:'.$balanceUuid, [
-            'success' => true,
-            'idempotency_binding' => [
-                'version' => 1,
-                'operation' => 'controlled_entry',
-                'client_id' => $client->id,
-                'client_medication_id' => $medication->id,
-                'medication_name' => strtolower($medication->name),
-                'witnessed_by' => $authorisedWitness->id,
-                'entry_type' => 'balance_check',
+        MedicationIdempotencyResult::query()->create([
+            'scope' => 'emar-controlled-balance-check',
+            'request_uuid' => $balanceUuid,
+            'response_payload' => [
+                'success' => true,
+                '_request_fingerprint' => 'different-balance-binding',
             ],
+            'expires_at' => now()->addDays(7),
         ]);
 
         $this->actingAs($actor)
             ->postJson(route('emar.controlled.balance_check.store'), [
+                'client_medication_id' => $medication->id,
                 'client_id' => $client->id,
                 'medication_name' => $medication->name,
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $authorisedWitness->id,
+                'witness_credential' => 'password',
                 'client_request_uuid' => $balanceUuid,
             ])
             ->assertConflict()
@@ -876,13 +1127,19 @@ class MedicationRbacAuthorizationTest extends TestCase
         $actor = $this->userWithPermissions(['medications.stock.update']);
         $requestUuid = '4ed258d1-9005-4631-bbdd-c6982731df88';
 
-        Cache::put('emar:idempotency:emar-stock-receive:'.$requestUuid, [
-            'success' => true,
-            'stock' => [
-                'id' => $stock->id,
-                'client_medication_id' => $medication->id,
-                'on_hand' => 12,
+        MedicationIdempotencyResult::query()->create([
+            'scope' => 'emar-stock-receive',
+            'request_uuid' => $requestUuid,
+            'response_payload' => [
+                'success' => true,
+                'stock' => [
+                    'id' => $stock->id,
+                    'client_medication_id' => $medication->id,
+                    'on_hand' => 12,
+                ],
+                '_request_fingerprint' => 'controlled-stock-binding',
             ],
+            'expires_at' => now()->addDays(7),
         ]);
 
         $this->actingAs($actor)
@@ -891,14 +1148,15 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'quantity' => 2,
                 'client_request_uuid' => $requestUuid,
             ])
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->assertSame(10, (int) $stock->refresh()->on_hand);
     }
 
     public function test_stock_receipt_replay_is_bound_to_the_requested_medication(): void
     {
-        $client = Client::factory()->create(['status' => 'active']);
+        $site = Site::factory()->create(['is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $cachedMedication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'controlled_drug' => true,
@@ -912,16 +1170,22 @@ class MedicationRbacAuthorizationTest extends TestCase
             'on_hand' => 4,
             'reorder_level' => 2,
         ]);
-        $actor = $this->userWithPermissions(['medications.stock.update']);
+        $actor = $this->userWithPermissions(['medications.stock.update'], $site);
         $requestUuid = '9bcbb6d7-6e64-47df-b455-87f23f792328';
 
-        Cache::put('emar:idempotency:emar-stock-receive:'.$requestUuid, [
-            'success' => true,
-            'stock' => [
-                'id' => 987654,
-                'client_medication_id' => $cachedMedication->id,
-                'on_hand' => 99,
+        MedicationIdempotencyResult::query()->create([
+            'scope' => 'emar-stock-receive',
+            'request_uuid' => $requestUuid,
+            'response_payload' => [
+                'success' => true,
+                'stock' => [
+                    'id' => 987654,
+                    'client_medication_id' => $cachedMedication->id,
+                    'on_hand' => 99,
+                ],
+                '_request_fingerprint' => 'different-medication-binding',
             ],
+            'expires_at' => now()->addDays(7),
         ]);
 
         $this->actingAs($actor)
@@ -964,7 +1228,7 @@ class MedicationRbacAuthorizationTest extends TestCase
 
         $this->actingAs($actor)
             ->post(route('emar.pharmacy_orders.advance', $order), ['quantity_received' => 2])
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->assertSame('dispensed', $order->refresh()->status);
         $this->assertDatabaseMissing('client_medication_stocks', [
@@ -1050,8 +1314,26 @@ class MedicationRbacAuthorizationTest extends TestCase
 
     public function test_controlled_stock_metadata_update_requires_exact_controlled_record_permission(): void
     {
-        $ordinaryMedication = ClientMedication::factory()->create(['controlled_drug' => false]);
-        $controlledMedication = ClientMedication::factory()->create(['controlled_drug' => true]);
+        $localSite = Site::factory()->create(['is_active' => true]);
+        $foreignSite = Site::factory()->create(['is_active' => true]);
+        $localClient = Client::factory()->create(['site_id' => $localSite->id, 'status' => 'active']);
+        $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id, 'status' => 'active']);
+        $ordinaryMedication = ClientMedication::factory()->create([
+            'client_id' => $localClient->id,
+            'controlled_drug' => false,
+        ]);
+        $controlledMedication = ClientMedication::factory()->create([
+            'client_id' => $localClient->id,
+            'controlled_drug' => true,
+        ]);
+        $foreignOrdinaryMedication = ClientMedication::factory()->create([
+            'client_id' => $foreignClient->id,
+            'controlled_drug' => false,
+        ]);
+        $foreignControlledMedication = ClientMedication::factory()->create([
+            'client_id' => $foreignClient->id,
+            'controlled_drug' => true,
+        ]);
         $ordinaryStock = ClientMedicationStock::query()->create([
             'client_medication_id' => $ordinaryMedication->id,
             'on_hand' => 10,
@@ -1062,7 +1344,17 @@ class MedicationRbacAuthorizationTest extends TestCase
             'on_hand' => 10,
             'reorder_level' => 5,
         ]);
-        $stockOnlyActor = $this->userWithPermissions(['medications.stock.update']);
+        $foreignOrdinaryStock = ClientMedicationStock::query()->create([
+            'client_medication_id' => $foreignOrdinaryMedication->id,
+            'on_hand' => 10,
+            'reorder_level' => 5,
+        ]);
+        $foreignControlledStock = ClientMedicationStock::query()->create([
+            'client_medication_id' => $foreignControlledMedication->id,
+            'on_hand' => 10,
+            'reorder_level' => 5,
+        ]);
+        $stockOnlyActor = $this->userWithPermissions(['medications.stock.update'], $localSite);
 
         $this->actingAs($stockOnlyActor)
             ->from(route('emar.stock'))
@@ -1070,15 +1362,25 @@ class MedicationRbacAuthorizationTest extends TestCase
             ->assertRedirect(route('emar.stock'));
         $this->actingAs($stockOnlyActor)
             ->patch(route('emar.stock.update', $controlledStock), ['reorder_level' => 8])
-            ->assertForbidden();
+            ->assertNotFound();
+        foreach ([$foreignOrdinaryStock, $foreignControlledStock] as $foreignStock) {
+            $this->actingAs($stockOnlyActor)
+                ->patch(route('emar.stock.update', $foreignStock), ['reorder_level' => 9])
+                ->assertNotFound();
+        }
+        $this->actingAs($stockOnlyActor)
+            ->patch(route('emar.stock.update', 999999999), ['reorder_level' => 9])
+            ->assertNotFound();
 
         $this->assertSame(7, (int) $ordinaryStock->refresh()->reorder_level);
         $this->assertSame(5, (int) $controlledStock->refresh()->reorder_level);
+        $this->assertSame(5, (int) $foreignOrdinaryStock->refresh()->reorder_level);
+        $this->assertSame(5, (int) $foreignControlledStock->refresh()->reorder_level);
 
         $controlledWriter = $this->userWithPermissions([
             'medications.stock.update',
             'medications.controlled.record',
-        ]);
+        ], $localSite);
         $this->actingAs($controlledWriter)
             ->from(route('emar.stock'))
             ->patch(route('emar.stock.update', $controlledStock), ['reorder_level' => 8])
@@ -1087,7 +1389,7 @@ class MedicationRbacAuthorizationTest extends TestCase
         $this->assertSame(8, (int) $controlledStock->refresh()->reorder_level);
     }
 
-    public function test_controlled_scheduled_count_requires_historical_classification_and_exact_witness(): void
+    public function test_retired_controlled_scheduled_count_is_concealed_even_with_exact_controlled_authority(): void
     {
         $site = Site::factory()->create(['is_active' => true]);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
@@ -1107,7 +1409,6 @@ class MedicationRbacAuthorizationTest extends TestCase
             'medications.view',
             'medications.stock.update',
         ], $site);
-        $witness = $this->userWithPermissions([], $site);
         ClientMedication::query()
             ->whereKey($medication->id)
             ->update(['deleted_at' => now()]);
@@ -1115,53 +1416,28 @@ class MedicationRbacAuthorizationTest extends TestCase
         $this->actingAs($stockOnlyActor)
             ->postJson(route('api.medications.scheduled_counts.complete', [$client, $count]), [
                 'actual_quantity' => 10,
-                'witnessed_by' => $witness->id,
             ])
-            ->assertForbidden();
+            ->assertNotFound();
         $this->assertSame('pending', $count->refresh()->status);
 
         $controlledActor = $this->userWithPermissions([
             'medications.view',
             'medications.stock.update',
+            'medications.controlled.view',
             'medications.controlled.record',
-            'medications.controlled.witness',
         ], $site);
+        $this->assertTrue($controlledActor->canDo('medications.controlled.view'));
+        $this->assertTrue($controlledActor->canDo('medications.controlled.record'));
         $this->actingAs($controlledActor)
             ->postJson(route('api.medications.scheduled_counts.complete', [$client, $count]), [
                 'actual_quantity' => 10,
-                'witnessed_by' => (string) $controlledActor->id,
             ])
-            ->assertUnprocessable()
-            ->assertJsonPath('error', 'Witness must be a different user.');
-        $this->assertSame('pending', $count->refresh()->status);
-
-        $this->actingAs($controlledActor)
-            ->postJson(route('api.medications.scheduled_counts.complete', [$client, $count]), [
-                'actual_quantity' => 10,
-                'witnessed_by' => $witness->id,
-            ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('witnessed_by');
+            ->assertNotFound();
 
         $this->assertSame('pending', $count->refresh()->status);
-
-        $authorisedWitness = $this->userWithPermissions([
-            'medications.controlled.witness',
-        ], $site);
-        $this->actingAs($controlledActor)
-            ->postJson(route('api.medications.scheduled_counts.complete', [$client, $count]), [
-                'actual_quantity' => 10,
-                'witnessed_by' => $authorisedWitness->id,
-                'scan_code' => 'COUNT-123',
-                'scan_source' => 'manual',
-                'scan_verified' => true,
-                'scan_match_source' => 'vendor_barcode',
-            ])
-            ->assertOk()
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('count.status', 'completed');
-
-        $this->assertSame('completed', $count->refresh()->status);
+        $this->assertDatabaseMissing('client_medication_stocks', [
+            'client_medication_id' => $medication->id,
+        ]);
     }
 
     public function test_scheduled_count_replays_are_bound_to_the_current_target(): void
@@ -1183,15 +1459,21 @@ class MedicationRbacAuthorizationTest extends TestCase
         ], $site);
 
         $createUuid = 'be6f691b-5047-4521-b46a-22a8afe581ef';
-        Cache::put('emar:idempotency:scheduled-stock-count:create:'.$createUuid, [
-            'success' => true,
-            'count' => [
-                'id' => 123456,
-                'client_id' => $otherClient->id,
-                'client_medication_id' => $otherMedication->id,
-                'scheduled_date' => today()->toDateString(),
-                'status' => 'pending',
+        MedicationIdempotencyResult::query()->create([
+            'scope' => 'scheduled-count:create',
+            'request_uuid' => $createUuid,
+            'response_payload' => [
+                'success' => true,
+                'count' => [
+                    'id' => 123456,
+                    'client_id' => $otherClient->id,
+                    'client_medication_id' => $otherMedication->id,
+                    'scheduled_date' => today()->toDateString(),
+                    'status' => 'pending',
+                ],
+                '_request_fingerprint' => 'different-create-target-binding',
             ],
+            'expires_at' => now()->addDays(7),
         ]);
 
         $this->actingAs($actor)
@@ -1220,13 +1502,19 @@ class MedicationRbacAuthorizationTest extends TestCase
             'expected_quantity' => 4,
         ]);
         $completeUuid = 'd90e1928-64c2-431e-ab85-c8a106e48f26';
-        Cache::put('emar:idempotency:scheduled-stock-count:complete:'.$completeUuid, [
-            'success' => true,
-            'count' => [
-                'id' => $firstCount->id,
-                'status' => 'completed',
-                'actual_quantity' => 4,
+        MedicationIdempotencyResult::query()->create([
+            'scope' => 'scheduled-count:complete',
+            'request_uuid' => $completeUuid,
+            'response_payload' => [
+                'success' => true,
+                'count' => [
+                    'id' => $firstCount->id,
+                    'status' => 'completed',
+                    'actual_quantity' => 4,
+                ],
+                '_request_fingerprint' => 'different-completion-target-binding',
             ],
+            'expires_at' => now()->addDays(7),
         ]);
 
         $this->actingAs($actor)
@@ -1310,7 +1598,7 @@ class MedicationRbacAuthorizationTest extends TestCase
         $client->supportWorkers()->syncWithoutDetaching([$ordinaryViewer->id]);
         $this->actingAs($ordinaryViewer)
             ->get(route('api.medications.supporting_attachments.download', [$client, $attachment]))
-            ->assertForbidden();
+            ->assertNotFound();
 
         $controlledViewer = $this->userWithPermissions([
             'clients.viewAssigned',
@@ -1327,7 +1615,7 @@ class MedicationRbacAuthorizationTest extends TestCase
         $controlledActor->unsetRelation('permissionOverrides')->unsetRelation('roles');
         $this->actingAs($controlledActor)
             ->deleteJson(route('api.medications.supporting_attachments.delete', [$client, $attachment]))
-            ->assertForbidden();
+            ->assertNotFound();
         $this->assertDatabaseHas('medication_mar_attachments', ['id' => $attachment->id]);
         Storage::disk($disk)->assertExists($attachment->file_path);
 
@@ -1345,6 +1633,83 @@ class MedicationRbacAuthorizationTest extends TestCase
             'medications.administer.record',
         ], $site);
         $client->supportWorkers()->syncWithoutDetaching([$recordActor->id]);
+        $controlledError = MedicationError::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'error_type' => 'documentation',
+            'severity' => 'minor',
+            'description' => 'Restricted controlled medication evidence',
+            'status' => 'reported',
+            'reported_by' => $reporter->id,
+            'reported_at' => now(),
+        ]);
+        $this->actingAs($recordActor)
+            ->post(route('api.medications.supporting_attachments.upload', $client), [
+                'target_type' => 'error',
+                'target_id' => $controlledError->id,
+                'file' => UploadedFile::fake()->create('concealed-error-evidence.pdf', 12, 'application/pdf'),
+            ])
+            ->assertNotFound();
+        $this->assertDatabaseCount('medication_mar_attachments', 0);
+
+        $controlledViewPermission = Permission::query()
+            ->where('key', MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
+            ->firstOrFail();
+        $recordActor->permissionOverrides()->syncWithoutDetaching([
+            $controlledViewPermission->id => ['allowed' => true],
+        ]);
+        $recordActor->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        $this->actingAs($recordActor)
+            ->post(route('api.medications.supporting_attachments.upload', $client), [
+                'target_type' => 'error',
+                'target_id' => $controlledError->id,
+                'file' => UploadedFile::fake()->create('controlled-error-evidence.pdf', 12, 'application/pdf'),
+            ])
+            ->assertNotFound();
+        $recordActor->permissionOverrides()->syncWithoutDetaching([
+            $recordPermission->id => ['allowed' => true],
+        ]);
+        $recordActor->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        $this->actingAs($recordActor)
+            ->post(route('api.medications.supporting_attachments.upload', $client), [
+                'target_type' => 'error',
+                'target_id' => $controlledError->id,
+                'file' => UploadedFile::fake()->create('controlled-error-evidence.pdf', 12, 'application/pdf'),
+            ])
+            ->assertOk();
+        $errorAttachment = MedicationMarAttachment::query()->sole();
+
+        $this->actingAs($ordinaryViewer)
+            ->get(route('api.medications.supporting_attachments.download', [$client, $errorAttachment]))
+            ->assertNotFound();
+        $this->actingAs($controlledViewer)
+            ->get(route('api.medications.supporting_attachments.download', [$client, $errorAttachment]))
+            ->assertOk();
+
+        $errorEditor = $this->userWithPermissions([
+            'clients.viewAssigned',
+            'medications.view',
+            'medications.administer.correct',
+        ], $site);
+        $client->supportWorkers()->syncWithoutDetaching([$errorEditor->id]);
+        $this->actingAs($errorEditor)
+            ->deleteJson(route('api.medications.supporting_attachments.delete', [$client, $errorAttachment]))
+            ->assertNotFound();
+        $errorEditor->permissionOverrides()->syncWithoutDetaching([
+            $controlledViewPermission->id => ['allowed' => true],
+        ]);
+        $errorEditor->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        $this->actingAs($errorEditor)
+            ->deleteJson(route('api.medications.supporting_attachments.delete', [$client, $errorAttachment]))
+            ->assertNotFound();
+        $errorEditor->permissionOverrides()->syncWithoutDetaching([
+            $recordPermission->id => ['allowed' => true],
+        ]);
+        $errorEditor->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        $this->actingAs($errorEditor)
+            ->deleteJson(route('api.medications.supporting_attachments.delete', [$client, $errorAttachment]))
+            ->assertOk();
+
         $correction = ClientMedicationAdministration::query()->create([
             'client_id' => $client->id,
             'client_medication_id' => $medication->id,
@@ -1540,6 +1905,31 @@ class MedicationRbacAuthorizationTest extends TestCase
     }
 
     /** @param list<string> $permissions */
+    private function qualifyControlledWitness(User $witness, Site $site, Client $client, User $assessor): void
+    {
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $witness->id,
+            'assessor_id' => $assessor->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => today()->subMonth(),
+            'expiry_date' => today()->addYear(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_witness_controlled' => true,
+        ]);
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'service_context_id' => $client->service_context_id,
+            'user_id' => $witness->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHour(),
+            'actual_starts_at' => now()->subHour(),
+            'status' => 'in_progress',
+        ]);
+    }
+
     private function userWithPermissions(array $permissions, ?Site $site = null): User
     {
         $user = User::factory()->create([

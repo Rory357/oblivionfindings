@@ -2,19 +2,25 @@ import axios from 'axios';
 import { toast } from 'sonner';
 
 import {
+    createOfflineRequestUuid,
+    EphemeralCredentialQueueError,
     getOfflineQueueSnapshot,
-    queueOfflineSubmission,
+    isOfflineRequestUuidV4,
+    quarantineLegacyOfflineSubmission,
     submitOffline,
     type OfflineAction,
 } from './offline-queue';
 
 type MutationMethod = 'post' | 'put' | 'patch' | 'delete';
 
-type SyncStatus =
+export type SyncStatus =
     | 'processed'
     | 'synced'
     | 'duplicate'
     | 'queued'
+    | 'requires_connection'
+    | 'requires_authentication'
+    | 'storage_unavailable'
     | 'conflict'
     | 'rejected';
 
@@ -30,7 +36,49 @@ type SubmitMutationOptions = {
 type SubmitMutationResult<T = unknown> = {
     status: SyncStatus;
     data?: T;
+    clientRequestUuid?: string;
 };
+
+export type MedicationMutationReplayState = {
+    uuid: string;
+    fingerprint: string | null;
+};
+
+function canonicalizeReplayMaterial(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(canonicalizeReplayMaterial);
+    if (value !== null && typeof value === 'object') {
+        return Object.fromEntries(
+            Object.entries(value as Record<string, unknown>)
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(([key, child]) => [
+                    key,
+                    canonicalizeReplayMaterial(child),
+                ]),
+        );
+    }
+
+    return value;
+}
+
+export function createMedicationMutationReplayState(
+    createUuid: () => string = createOfflineRequestUuid,
+): MedicationMutationReplayState {
+    return { uuid: createUuid(), fingerprint: null };
+}
+
+export function prepareMedicationMutationReplayState(
+    current: MedicationMutationReplayState,
+    material: Record<string, unknown>,
+    createUuid: () => string = createOfflineRequestUuid,
+): MedicationMutationReplayState {
+    const fingerprint = JSON.stringify(canonicalizeReplayMaterial(material));
+
+    if (current.fingerprint !== null && current.fingerprint !== fingerprint) {
+        return { uuid: createUuid(), fingerprint };
+    }
+
+    return { uuid: current.uuid, fingerprint };
+}
 
 type LegacyOfflineQueueEntry = {
     id?: string;
@@ -39,6 +87,9 @@ type LegacyOfflineQueueEntry = {
     payload?: Record<string, unknown>;
     queued_at?: string;
 };
+
+const CONNECTION_REQUIRED_MESSAGE =
+    'Stay on this screen and reconnect before retrying. The same request ID has been kept.';
 
 const EMAR_QUEUE_STORAGE_KEY = 'emar-offline-queue:v1';
 const EMAR_DEVICE_STORAGE_KEY = 'emar-offline-device-id:v1';
@@ -112,25 +163,53 @@ async function migrateLegacyQueue() {
         entries = [];
     }
 
-    window.localStorage.removeItem(EMAR_QUEUE_STORAGE_KEY);
-    window.localStorage.removeItem(EMAR_DEVICE_STORAGE_KEY);
+    for (const [index, entry] of entries.entries()) {
+        try {
+            if (entry.url && entry.payload) {
+                await quarantineLegacyOfflineSubmission({
+                    action: inferAction(entry.url),
+                    method: entry.method ?? 'post',
+                    url: entry.url,
+                    payload: {
+                        ...entry.payload,
+                        client_request_uuid:
+                            entry.payload.client_request_uuid ?? entry.id,
+                        queued_offline: true,
+                    },
+                    createdAt: entry.queued_at,
+                });
+            }
+        } catch (error) {
+            if (error instanceof EphemeralCredentialQueueError) {
+                toast.error(error.message);
+            } else {
+                window.localStorage.setItem(
+                    EMAR_QUEUE_STORAGE_KEY,
+                    JSON.stringify(entries.slice(index)),
+                );
+                throw error;
+            }
+        }
 
-    for (const entry of entries) {
-        if (!entry.url || !entry.payload) continue;
-
-        await queueOfflineSubmission({
-            action: inferAction(entry.url),
-            method: entry.method ?? 'post',
-            url: entry.url,
-            payload: {
-                ...entry.payload,
-                client_request_uuid:
-                    entry.payload.client_request_uuid ?? entry.id,
-                queued_offline: true,
-            },
-            createdAt: entry.queued_at,
-        });
+        const remaining = entries.slice(index + 1);
+        if (remaining.length > 0) {
+            window.localStorage.setItem(
+                EMAR_QUEUE_STORAGE_KEY,
+                JSON.stringify(remaining),
+            );
+        } else {
+            window.localStorage.removeItem(EMAR_QUEUE_STORAGE_KEY);
+        }
     }
+
+    if (entries.length === 0) {
+        window.localStorage.removeItem(EMAR_QUEUE_STORAGE_KEY);
+    }
+    window.localStorage.removeItem(EMAR_DEVICE_STORAGE_KEY);
+}
+
+export async function __migrateLegacyEmarQueueForTests(): Promise<void> {
+    await migrateLegacyQueue();
 }
 
 export function bootEmarOffline() {
@@ -140,7 +219,35 @@ export function bootEmarOffline() {
 
     emarOfflineBooted = true;
     registerServiceWorker();
-    void migrateLegacyQueue();
+    void migrateLegacyQueue().catch((error: unknown) => {
+        toast.error(
+            error instanceof Error
+                ? error.message
+                : 'Secure offline storage is unavailable. Saved actions were not changed.',
+        );
+    });
+}
+
+export function emarMutationWasAccepted(status: SyncStatus): boolean {
+    return ['processed', 'synced', 'duplicate', 'queued'].includes(status);
+}
+
+function isUncertainTransportError(error: unknown): boolean {
+    if (!axios.isAxiosError(error)) return false;
+    if (!error.response) return true;
+
+    return error.response.status >= 500 && error.response.status < 600;
+}
+
+function requiresConnectionResult<T>(
+    clientRequestUuid: string,
+): SubmitMutationResult<T> {
+    toast.error(CONNECTION_REQUIRED_MESSAGE);
+
+    return {
+        status: 'requires_connection',
+        clientRequestUuid,
+    };
 }
 
 export async function submitEmarMutation<T = unknown>(
@@ -159,9 +266,32 @@ export async function submitEmarMutation<T = unknown>(
 
     try {
         if (!allowQueueWhenOffline) {
-            const data = await executeMutation<
-                T & { sync?: { status?: SyncStatus; message?: string } }
-            >(method, url, payload);
+            const suppliedUuid = payload.client_request_uuid;
+            const clientRequestUuid = isOfflineRequestUuidV4(suppliedUuid)
+                ? suppliedUuid
+                : createOfflineRequestUuid();
+            const onlinePayload = {
+                ...payload,
+                client_request_uuid: clientRequestUuid,
+            };
+
+            if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                return requiresConnectionResult<T>(clientRequestUuid);
+            }
+
+            let data: T & {
+                sync?: { status?: SyncStatus; message?: string };
+            };
+            try {
+                data = await executeMutation<
+                    T & { sync?: { status?: SyncStatus; message?: string } }
+                >(method, url, onlinePayload);
+            } catch (error) {
+                if (isUncertainTransportError(error)) {
+                    return requiresConnectionResult<T>(clientRequestUuid);
+                }
+                throw error;
+            }
             const syncStatus = data?.sync?.status ?? 'processed';
 
             if (syncStatus === 'duplicate') {
@@ -190,6 +320,23 @@ export async function submitEmarMutation<T = unknown>(
 
         if (result.status === 'queued') {
             return { status: 'queued' };
+        }
+
+        if (result.status === 'requires_connection') {
+            return {
+                status: 'requires_connection',
+                clientRequestUuid: result.clientRequestUuid,
+            };
+        }
+
+        if (
+            result.status === 'requires_authentication' ||
+            result.status === 'storage_unavailable'
+        ) {
+            return {
+                status: result.status,
+                clientRequestUuid: result.clientRequestUuid,
+            };
         }
 
         const data = result.data as T & {

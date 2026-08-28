@@ -16,7 +16,10 @@ import {
     WizardStepPane,
     type WizardStep,
 } from '@/components/wizard/shell';
-import { submitEmarMutation } from '@/lib/emar-offline';
+import {
+    emarMutationWasAccepted,
+    submitEmarMutation,
+} from '@/lib/emar-offline';
 import { applyFormRequestErrors } from '@/lib/form-request-errors';
 import {
     emptyMedicationScanCapture,
@@ -36,7 +39,12 @@ import {
     Pill,
     ShieldCheck,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+
+import {
+    createTransportMedicationReplayState,
+    prepareTransportMedicationReplayState,
+} from '../transport-medication-replay';
 
 export type TransportMedicationOption = {
     id: number;
@@ -105,8 +113,8 @@ const packSteps = [
 const administerSteps = [
     {
         key: 'checks',
-        label: 'Witness & notes',
-        blurb: 'Complete administration checks',
+        label: 'Dose & checks',
+        blurb: 'Record the amount and complete checks',
         icon: ShieldCheck,
     },
     {
@@ -201,17 +209,20 @@ export function buildCorrectPackingAttestationPayload({
 }
 
 export function buildAdministerMedicationPayload({
+    quantityAdministered,
     witnessedByUserId,
     witnessCredential,
     notes,
     scan,
 }: {
+    quantityAdministered: string;
     witnessedByUserId: string;
     witnessCredential: string;
     notes: string;
     scan: MedicationScanCapture;
 }) {
     return {
+        quantity_administered: quantityAdministered.trim(),
         witnessed_by_user_id: witnessedByUserId
             ? Number(witnessedByUserId)
             : null,
@@ -271,9 +282,7 @@ export function PackMedicationWizard({
         emptyMedicationScanCapture(),
     );
     const [submitting, setSubmitting] = useState(false);
-    const [clientRequestUuid, setClientRequestUuid] = useState(() =>
-        crypto.randomUUID(),
-    );
+    const packReplay = useRef(createTransportMedicationReplayState());
     const form = useForm({
         medication_id: '',
         attestation_state: 'accepted' as 'accepted' | 'refused' | 'unavailable',
@@ -320,7 +329,7 @@ export function PackMedicationWizard({
         form.reset();
         form.clearErrors();
         setScanCapture(emptyMedicationScanCapture());
-        setClientRequestUuid(crypto.randomUUID());
+        packReplay.current = createTransportMedicationReplayState();
     };
 
     const close = () => {
@@ -334,20 +343,32 @@ export function PackMedicationWizard({
         form.clearErrors();
         setSubmitting(true);
         try {
+            const initialPayload = {
+                ...buildPackMedicationPayload({
+                    clientId: client.id,
+                    medication: selectedMedication,
+                    attestationState: form.data.attestation_state,
+                    witnessedByUserId: form.data.witnessed_by_user_id,
+                    witnessCredential: form.data.witness_credential,
+                    attestationReason: form.data.attestation_reason,
+                    notes: form.data.notes,
+                    scan: scanCapture,
+                }),
+                client_request_uuid: packReplay.current.uuid,
+            };
+            packReplay.current = prepareTransportMedicationReplayState(
+                packReplay.current,
+                {
+                    action: 'pack',
+                    transport_id: transportId,
+                    ...initialPayload,
+                },
+            );
             const result = await submitEmarMutation(
                 `/fleet-assets/transports/${transportId}/pack-medication`,
                 {
-                    ...buildPackMedicationPayload({
-                        clientId: client.id,
-                        medication: selectedMedication,
-                        attestationState: form.data.attestation_state,
-                        witnessedByUserId: form.data.witnessed_by_user_id,
-                        witnessCredential: form.data.witness_credential,
-                        attestationReason: form.data.attestation_reason,
-                        notes: form.data.notes,
-                        scan: scanCapture,
-                    }),
-                    client_request_uuid: clientRequestUuid,
+                    ...initialPayload,
+                    client_request_uuid: packReplay.current.uuid,
                 },
                 {
                     allowQueueWhenOffline: !requiresWitness,
@@ -362,7 +383,7 @@ export function PackMedicationWizard({
                 },
             );
 
-            if (result.status === 'conflict') return;
+            if (!emarMutationWasAccepted(result.status)) return;
             const queued = result.status === 'queued';
             reset();
             onClose();
@@ -853,9 +874,7 @@ export function CorrectPackingAttestationWizard({
 }) {
     const [stepIndex, setStepIndex] = useState(0);
     const [submitting, setSubmitting] = useState(false);
-    const [clientRequestUuid, setClientRequestUuid] = useState(() =>
-        crypto.randomUUID(),
-    );
+    const correctionReplay = useRef(createTransportMedicationReplayState());
     const form = useForm({
         witnessed_by_user_id: '',
         witness_credential: '',
@@ -877,7 +896,7 @@ export function CorrectPackingAttestationWizard({
         setStepIndex(0);
         form.reset();
         form.clearErrors();
-        setClientRequestUuid(crypto.randomUUID());
+        correctionReplay.current = createTransportMedicationReplayState();
     };
     const close = () => {
         reset();
@@ -888,22 +907,34 @@ export function CorrectPackingAttestationWizard({
         form.clearErrors();
         setSubmitting(true);
         try {
+            const initialPayload = {
+                ...buildCorrectPackingAttestationPayload({
+                    witnessedByUserId: form.data.witnessed_by_user_id,
+                    witnessCredential: form.data.witness_credential,
+                    correctionReason: form.data.correction_reason,
+                }),
+                client_request_uuid: correctionReplay.current.uuid,
+            };
+            correctionReplay.current = prepareTransportMedicationReplayState(
+                correctionReplay.current,
+                {
+                    action: 'correct_packing_attestation',
+                    log_id: log.id,
+                    ...initialPayload,
+                },
+            );
             const result = await submitEmarMutation(
                 `/fleet-assets/medication-transit/${log.id}/correct-packing-attestation`,
                 {
-                    ...buildCorrectPackingAttestationPayload({
-                        witnessedByUserId: form.data.witnessed_by_user_id,
-                        witnessCredential: form.data.witness_credential,
-                        correctionReason: form.data.correction_reason,
-                    }),
-                    client_request_uuid: clientRequestUuid,
+                    ...initialPayload,
+                    client_request_uuid: correctionReplay.current.uuid,
                 },
                 {
                     allowQueueWhenOffline: false,
                     successMessage: 'Packing witness correction recorded.',
                 },
             );
-            if (result.status === 'conflict') return;
+            if (!emarMutationWasAccepted(result.status)) return;
             reset();
             onClose();
             onCompleted(false);
@@ -1123,10 +1154,9 @@ export function AdministerTransportMedicationWizard({
         emptyMedicationScanCapture(),
     );
     const [submitting, setSubmitting] = useState(false);
-    const [clientRequestUuid, setClientRequestUuid] = useState(() =>
-        crypto.randomUUID(),
-    );
+    const administrationReplay = useRef(createTransportMedicationReplayState());
     const form = useForm({
+        quantity_administered: '',
         witnessed_by_user_id: '',
         witness_credential: '',
         notes: '',
@@ -1136,8 +1166,14 @@ export function AdministerTransportMedicationWizard({
         log?.witness_required || log?.is_controlled_drug
     );
     const requiresScan = !!log?.scan_verification;
+    const normalizedQuantity = form.data.quantity_administered.trim();
+    const quantityIsValid =
+        /^\d+(?:\.\d{1,2})?$/.test(normalizedQuantity) &&
+        Number(normalizedQuantity) >= 0.01 &&
+        Number(normalizedQuantity) <= 99_999_999.99;
     const canContinue =
         !!log &&
+        quantityIsValid &&
         (!requiresWitness ||
             (!!form.data.witnessed_by_user_id &&
                 !!form.data.witness_credential.trim())) &&
@@ -1148,7 +1184,7 @@ export function AdministerTransportMedicationWizard({
         form.reset();
         form.clearErrors();
         setScanCapture(emptyMedicationScanCapture());
-        setClientRequestUuid(crypto.randomUUID());
+        administrationReplay.current = createTransportMedicationReplayState();
     };
     const close = () => {
         reset();
@@ -1159,16 +1195,30 @@ export function AdministerTransportMedicationWizard({
         form.clearErrors();
         setSubmitting(true);
         try {
+            const initialPayload = {
+                ...buildAdministerMedicationPayload({
+                    quantityAdministered: form.data.quantity_administered,
+                    witnessedByUserId: form.data.witnessed_by_user_id,
+                    witnessCredential: form.data.witness_credential,
+                    notes: form.data.notes,
+                    scan: scanCapture,
+                }),
+                client_request_uuid: administrationReplay.current.uuid,
+            };
+            administrationReplay.current =
+                prepareTransportMedicationReplayState(
+                    administrationReplay.current,
+                    {
+                        action: 'administer',
+                        log_id: log.id,
+                        ...initialPayload,
+                    },
+                );
             const result = await submitEmarMutation(
                 `/fleet-assets/medication-transit/${log.id}/administer`,
                 {
-                    ...buildAdministerMedicationPayload({
-                        witnessedByUserId: form.data.witnessed_by_user_id,
-                        witnessCredential: form.data.witness_credential,
-                        notes: form.data.notes,
-                        scan: scanCapture,
-                    }),
-                    client_request_uuid: clientRequestUuid,
+                    ...initialPayload,
+                    client_request_uuid: administrationReplay.current.uuid,
                 },
                 {
                     allowQueueWhenOffline: !requiresWitness,
@@ -1177,7 +1227,7 @@ export function AdministerTransportMedicationWizard({
                         'Medication transit administration saved offline and will sync automatically when the device reconnects.',
                 },
             );
-            if (result.status === 'conflict') return;
+            if (!emarMutationWasAccepted(result.status)) return;
             const queued = result.status === 'queued';
             reset();
             onClose();
@@ -1202,7 +1252,7 @@ export function AdministerTransportMedicationWizard({
             open={!!log}
             onClose={close}
             title="Record transport administration"
-            description="Complete witness and verification checks, then review before recording this administration."
+            description="Record the amount given, complete witness and verification checks, then review this administration."
             railIcon={CheckCircle}
             railTitle="Administration"
             railSub={log?.client?.name ?? 'Medication transit'}
@@ -1256,6 +1306,38 @@ export function AdministerTransportMedicationWizard({
                 {stepIndex === 0 ? (
                     <div className="space-y-5">
                         <MedicationSummary log={log} />
+                        <div className="space-y-2">
+                            <Label htmlFor="administer-quantity">
+                                Units given
+                            </Label>
+                            <Input
+                                id="administer-quantity"
+                                type="number"
+                                inputMode="decimal"
+                                min={0.01}
+                                max={99_999_999.99}
+                                step="0.01"
+                                required
+                                placeholder="e.g. 1 or 0.25"
+                                value={form.data.quantity_administered}
+                                onChange={(event) => {
+                                    form.clearErrors('quantity_administered');
+                                    form.setData(
+                                        'quantity_administered',
+                                        event.target.value,
+                                    );
+                                }}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Enter the amount actually given. This is removed
+                                from medication stock where stock is tracked.
+                            </p>
+                            {form.errors.quantity_administered ? (
+                                <p className="text-sm text-destructive">
+                                    {form.errors.quantity_administered}
+                                </p>
+                            ) : null}
+                        </div>
                         {requiresWitness ? (
                             <div className="space-y-2">
                                 <Label htmlFor="administer-witness">
@@ -1372,6 +1454,10 @@ export function AdministerTransportMedicationWizard({
                                 value={log?.client?.name ?? '---'}
                             />
                             <ReviewItem
+                                label="Units given"
+                                value={form.data.quantity_administered.trim()}
+                            />
+                            <ReviewItem
                                 label="Witness"
                                 value={
                                     witnesses.find(
@@ -1413,6 +1499,7 @@ export function ReturnTransportMedicationWizard({
         emptyMedicationScanCapture(),
     );
     const [submitting, setSubmitting] = useState(false);
+    const returnReplay = useRef(createTransportMedicationReplayState());
     const form = useForm({ notes: '', scan_code: '' });
     const requiresScan = !!log?.scan_verification;
     const canContinue =
@@ -1423,6 +1510,7 @@ export function ReturnTransportMedicationWizard({
         form.reset();
         form.clearErrors();
         setScanCapture(emptyMedicationScanCapture());
+        returnReplay.current = createTransportMedicationReplayState();
     };
     const close = () => {
         reset();
@@ -1433,19 +1521,34 @@ export function ReturnTransportMedicationWizard({
         form.clearErrors();
         setSubmitting(true);
         try {
-            const result = await submitEmarMutation(
-                `/fleet-assets/medication-transit/${log.id}/return`,
-                buildReturnMedicationPayload({
+            const initialPayload = {
+                ...buildReturnMedicationPayload({
                     notes: form.data.notes,
                     scan: scanCapture,
                 }),
+                client_request_uuid: returnReplay.current.uuid,
+            };
+            returnReplay.current = prepareTransportMedicationReplayState(
+                returnReplay.current,
+                {
+                    action: 'return',
+                    log_id: log.id,
+                    ...initialPayload,
+                },
+            );
+            const result = await submitEmarMutation(
+                `/fleet-assets/medication-transit/${log.id}/return`,
+                {
+                    ...initialPayload,
+                    client_request_uuid: returnReplay.current.uuid,
+                },
                 {
                     successMessage: 'Medication return recorded.',
                     queuedMessage:
                         'Medication return saved offline and will sync automatically when the device reconnects.',
                 },
             );
-            if (result.status === 'conflict') return;
+            if (!emarMutationWasAccepted(result.status)) return;
             const queued = result.status === 'queued';
             reset();
             onClose();

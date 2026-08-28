@@ -4,18 +4,22 @@ namespace Tests\Feature\Emar;
 
 use App\Domain\Governance\Models\IncidentGovernanceEscalation;
 use App\Domain\Governance\Services\IncidentEscalationService;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Jobs\Governance\RecoverIncidentGovernanceEscalationsJob;
 use App\Jobs\Governance\RegisterIncidentGovernanceEscalationJob;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ClientMedication;
 use App\Models\ControlRoom\MaintenanceWindow;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\MedicationError;
+use App\Models\MedicationMarAttachment;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
@@ -50,6 +54,25 @@ class MedicationErrorsTest extends TestCase
         $this->grantPermissions($user, ['medications.view', 'medications.administer.record', 'medications.administer.correct', 'clients.update']);
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'brand_colour' => '#5E35B1']);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+        ]);
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'service_context_id' => $client->service_context_id,
+            'user_id' => $user->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(7),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $user->id,
+            'status' => 'in_progress',
+        ]);
 
         return compact('user', 'site', 'client');
     }
@@ -74,6 +97,329 @@ class MedicationErrorsTest extends TestCase
                 ->has('stats.by_severity')
                 ->where('stats.near_miss', 1)
             );
+    }
+
+    public function test_register_conceals_forged_foreign_incident_and_attachment_relationships(): void
+    {
+        ['user' => $user, 'site' => $site, 'client' => $client] = $this->seedErrors();
+        $otherClient = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $foreignIncident = ClientIncident::withoutEvents(fn () => ClientIncident::query()->create([
+            'client_id' => $otherClient->id,
+            'site_id' => $site->id,
+            'title' => 'Foreign confidential incident',
+            'description' => 'This incident belongs to another client.',
+            'occurred_at' => now(),
+            'reported_by' => $user->id,
+            'severity' => 'low',
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'type' => 'medication_error',
+        ]));
+        $error = MedicationError::query()->create([
+            'client_id' => $client->id,
+            'client_incident_id' => $foreignIncident->id,
+            'error_type' => 'documentation',
+            'severity' => 'minor',
+            'description' => 'Local medication error.',
+            'status' => 'reported',
+            'reported_by' => $user->id,
+            'reported_at' => now(),
+        ]);
+        $attachment = MedicationMarAttachment::query()->create([
+            'client_id' => $otherClient->id,
+            'attachable_type' => $error->getMorphClass(),
+            'attachable_id' => $error->id,
+            'file_name' => 'foreign-client-confidential-evidence.txt',
+            'file_path' => 'medication-evidence/foreign-client-confidential-evidence.txt',
+            'mime_type' => 'text/plain',
+            'file_size' => 42,
+            'description' => 'Foreign client evidence',
+            'uploaded_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get('/emar/errors?site_id='.$site->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('errors', 1)
+                ->where('errors.0.id', $error->id)
+                ->where('errors.0.incident', null)
+                ->where('errors.0.attachments', [])
+            );
+
+        $this->actingAs($user)
+            ->get(route('api.medications.supporting_attachments.download', [$client, $attachment]))
+            ->assertNotFound();
+    }
+
+    public function test_register_and_stats_conceal_controlled_medication_errors_without_the_exact_reader(): void
+    {
+        ['site' => $site, 'client' => $client] = $this->seedErrors();
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $this->grantPermissions($viewer, ['medications.view']);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+        ]);
+        $ordinaryMedication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'name' => 'Ordinary visible medicine',
+            'controlled_drug' => false,
+        ]);
+        $controlledMedication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'name' => 'Restricted controlled medicine',
+            'controlled_drug' => true,
+        ]);
+        foreach ([
+            [$ordinaryMedication, 'Ordinary visible error'],
+            [$controlledMedication, 'Restricted controlled error'],
+        ] as [$medication, $description]) {
+            MedicationError::query()->create([
+                'client_id' => $client->id,
+                'client_medication_id' => $medication->id,
+                'error_type' => 'documentation',
+                'severity' => 'minor',
+                'description' => $description,
+                'status' => 'reported',
+                'reported_by' => $viewer->id,
+                'reported_at' => now(),
+            ]);
+        }
+
+        $this->actingAs($viewer)
+            ->get('/emar/errors?site_id='.$site->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('errors', 1)
+                ->where('errors.0.medication.name', 'Ordinary visible medicine')
+                ->where('stats.total_open', 1)
+            )
+            ->assertDontSee('Restricted controlled medicine')
+            ->assertDontSee('Restricted controlled error');
+
+        $this->grantPermissions($viewer, ['medications.controlled.view']);
+        $viewer->unsetRelation('permissionOverrides')->unsetRelation('roles');
+
+        $this->actingAs($viewer)
+            ->get('/emar/errors?site_id='.$site->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('errors', 2)
+                ->where('stats.total_open', 2)
+            )
+            ->assertSee('Restricted controlled medicine')
+            ->assertSee('Restricted controlled error');
+    }
+
+    public function test_controlled_error_attachment_delete_prop_requires_the_exact_record_capability(): void
+    {
+        ['site' => $site, 'client' => $client] = $this->seedErrors();
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $this->grantPermissions($viewer, [
+            'clients.viewAny',
+            'medications.view',
+            'medications.administer.correct',
+            'medications.controlled.view',
+        ]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+        ]);
+        $controlledMedication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'name' => 'Controlled attachment medication',
+            'controlled_drug' => true,
+        ]);
+        $error = MedicationError::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $controlledMedication->id,
+            'error_type' => 'documentation',
+            'severity' => 'minor',
+            'description' => 'Controlled supporting evidence.',
+            'status' => 'reported',
+            'reported_by' => $viewer->id,
+            'reported_at' => now(),
+        ]);
+        $attachment = MedicationMarAttachment::query()->create([
+            'client_id' => $client->id,
+            'attachable_type' => $error->getMorphClass(),
+            'attachable_id' => $error->id,
+            'file_name' => 'controlled-evidence.txt',
+            'file_path' => 'medication-evidence/controlled-evidence.txt',
+            'mime_type' => 'text/plain',
+            'file_size' => 42,
+            'description' => 'Controlled evidence',
+            'uploaded_by' => $viewer->id,
+        ]);
+
+        $this->actingAs($viewer)
+            ->get('/emar/errors?site_id='.$site->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('errors', 1)
+                ->where('errors.0.attachments.0.id', $attachment->id)
+                ->where('errors.0.attachments.0.can_delete', false)
+            );
+        $this->actingAs($viewer)
+            ->delete(route('api.medications.supporting_attachments.delete', [$client, $attachment]))
+            ->assertNotFound();
+        $this->assertDatabaseHas('medication_mar_attachments', ['id' => $attachment->id]);
+
+        $this->grantPermissions($viewer, ['medications.controlled.record']);
+        $viewer->unsetRelation('permissionOverrides')->unsetRelation('roles');
+
+        $this->actingAs($viewer)
+            ->get('/emar/errors?site_id='.$site->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('errors.0.attachments.0.can_delete', true)
+            );
+        $this->actingAs($viewer)
+            ->delete(route('api.medications.supporting_attachments.delete', [$client, $attachment]))
+            ->assertOk();
+        $this->assertDatabaseMissing('medication_mar_attachments', ['id' => $attachment->id]);
+    }
+
+    public function test_controlled_error_direct_actions_are_concealed_without_the_exact_reader(): void
+    {
+        ['site' => $site, 'client' => $client] = $this->seedErrors();
+        $corrector = User::factory()->create(['approved_at' => now()]);
+        $this->grantPermissions($corrector, ['medications.administer.correct']);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $corrector->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+        ]);
+        $controlledMedication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'controlled_drug' => true,
+        ]);
+        $error = MedicationError::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $controlledMedication->id,
+            'error_type' => 'documentation',
+            'severity' => 'minor',
+            'description' => 'Restricted governed evidence.',
+            'status' => 'reported',
+            'reported_by' => $corrector->id,
+            'reported_at' => now(),
+        ]);
+
+        $missing = $this->actingAs($corrector)
+            ->put('/emar/errors/999999999', ['description' => 'Missing target.']);
+        $restricted = $this->actingAs($corrector)
+            ->put(route('emar.errors.update', $error), ['description' => 'Attempted mutation.']);
+
+        $missing->assertNotFound();
+        $restricted->assertNotFound();
+        $this->assertSame($missing->getContent(), $restricted->getContent());
+        $this->assertSame('Restricted governed evidence.', $error->fresh()->description);
+
+        $this->grantPermissions($corrector, ['medications.controlled.view']);
+        $corrector->unsetRelation('permissionOverrides')->unsetRelation('roles');
+
+        $this->actingAs($corrector)
+            ->put(route('emar.errors.update', $error), ['description' => 'Authorised correction.'])
+            ->assertRedirect();
+        $this->assertSame('Authorised correction.', $error->fresh()->description);
+    }
+
+    public function test_journey_defining_fields_cannot_be_reclassified_after_reporting(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $error = MedicationError::query()->create([
+            'client_id' => $client->id,
+            'error_type' => 'documentation',
+            'severity' => 'minor',
+            'description' => 'Original governed report.',
+            'status' => 'reported',
+            'reported_by' => $user->id,
+            'reported_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('emar.errors'))
+            ->put(route('emar.errors.update', $error), [
+                'error_type' => 'wrong_client',
+                'severity' => 'critical',
+                'description' => 'Attempted journey reclassification.',
+            ])
+            ->assertSessionHasErrors(['error_type', 'severity']);
+
+        $error->refresh();
+        $this->assertSame('documentation', $error->error_type);
+        $this->assertSame('minor', $error->severity);
+        $this->assertSame('Original governed report.', $error->description);
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('control_room_signals', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+    }
+
+    public function test_controlled_error_reporting_requires_the_exact_reader_before_any_write(): void
+    {
+        ['site' => $site, 'client' => $client] = $this->seedErrors();
+        $recorder = User::factory()->create(['approved_at' => now()]);
+        $this->grantPermissions($recorder, [
+            'medications.view',
+            'medications.administer.record',
+        ]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $recorder->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+        ]);
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'service_context_id' => $client->service_context_id,
+            'user_id' => $recorder->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(7),
+            'actual_starts_at' => now()->subHour(),
+            'started_by' => $recorder->id,
+            'status' => 'in_progress',
+        ]);
+        $controlledMedication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'controlled_drug' => true,
+        ]);
+        $payload = [
+            'client_id' => $client->id,
+            'client_medication_id' => $controlledMedication->id,
+            'error_type' => 'documentation',
+            'severity' => 'minor',
+            'description' => 'Restricted controlled medication evidence.',
+        ];
+
+        $this->actingAs($recorder)
+            ->post(route('emar.errors.store'), $payload)
+            ->assertNotFound();
+        $this->assertDatabaseCount('medication_errors', 0);
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('control_room_signals', 0);
+
+        $this->grantPermissions($recorder, ['medications.controlled.view']);
+        $recorder->unsetRelation('permissionOverrides')->unsetRelation('roles');
+
+        $this->actingAs($recorder)
+            ->post(route('emar.errors.store'), $payload)
+            ->assertRedirect();
+        $this->assertDatabaseHas('medication_errors', [
+            'client_id' => $client->id,
+            'client_medication_id' => $controlledMedication->id,
+            'description' => 'Restricted controlled medication evidence.',
+        ]);
     }
 
     public function test_store_persists_ncc_merp_fields(): void
@@ -240,6 +586,7 @@ class MedicationErrorsTest extends TestCase
     public function test_direct_incident_timeline_and_governance_are_discarded_with_the_outer_transaction(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $timelineIdsBefore = TimelineEvent::query()->orderBy('id')->pluck('id')->all();
         DB::beginTransaction();
 
         $this->actingAs($user)
@@ -260,13 +607,17 @@ class MedicationErrorsTest extends TestCase
         $this->assertSame(1, $timelineCountInsideTransaction);
         $this->assertSame(0, $governanceCountInsideTransaction);
         $this->assertNoMedicationErrorJourneyRecords();
-        $this->assertDatabaseCount('timeline_events', 0);
+        $this->assertSame(
+            $timelineIdsBefore,
+            TimelineEvent::query()->orderBy('id')->pluck('id')->all(),
+        );
         $this->assertDatabaseCount('incident_governance_escalations', 0);
     }
 
     public function test_required_medication_error_delivery_fails_closed_when_a_new_signal_is_suppressed(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $timelineIdsBefore = TimelineEvent::query()->orderBy('id')->pluck('id')->all();
         MaintenanceWindow::query()->create([
             'name' => 'Suppress all operational signals',
             'starts_at' => now()->subMinute(),
@@ -292,7 +643,10 @@ class MedicationErrorsTest extends TestCase
         $this->assertSame(MedicationSignalService::TYPE_ERROR, $exception->signalType());
         $this->assertIsInt($exception->signalId());
         $this->assertNoMedicationErrorJourneyRecords();
-        $this->assertDatabaseCount('timeline_events', 0);
+        $this->assertSame(
+            $timelineIdsBefore,
+            TimelineEvent::query()->orderBy('id')->pluck('id')->all(),
+        );
         $this->assertDatabaseCount('incident_governance_escalations', 0);
     }
 
@@ -365,6 +719,7 @@ class MedicationErrorsTest extends TestCase
     public function test_store_rolls_back_the_official_journey_when_signal_source_fails_and_retry_is_exact(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $timelineIdsBefore = TimelineEvent::query()->orderBy('id')->pluck('id')->all();
         $signals = new class(app(SignalProcessingService::class)) extends MedicationSignalService
         {
             protected function getSignalSource(): ?SignalSource
@@ -383,7 +738,10 @@ class MedicationErrorsTest extends TestCase
         }
 
         $this->assertNoMedicationErrorJourneyRecords();
-        $this->assertDatabaseCount('timeline_events', 0);
+        $this->assertSame(
+            $timelineIdsBefore,
+            TimelineEvent::query()->orderBy('id')->pluck('id')->all(),
+        );
         $this->assertDatabaseCount('incident_governance_escalations', 0);
 
         $this->app->forgetInstance(MedicationSignalService::class);
@@ -396,6 +754,7 @@ class MedicationErrorsTest extends TestCase
     public function test_store_rolls_back_the_official_journey_when_signal_processing_fails_and_retry_is_exact(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $timelineIdsBefore = TimelineEvent::query()->orderBy('id')->pluck('id')->all();
         $processor = $this->partialMock(SignalProcessingService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('process')
                 ->once()
@@ -415,7 +774,10 @@ class MedicationErrorsTest extends TestCase
         }
 
         $this->assertNoMedicationErrorJourneyRecords();
-        $this->assertDatabaseCount('timeline_events', 0);
+        $this->assertSame(
+            $timelineIdsBefore,
+            TimelineEvent::query()->orderBy('id')->pluck('id')->all(),
+        );
         $this->assertDatabaseCount('incident_governance_escalations', 0);
 
         $this->app->forgetInstance(MedicationSignalService::class);
@@ -604,6 +966,119 @@ class MedicationErrorsTest extends TestCase
         $this->assertSame('Clinical review completed.', $incident->immediate_action_taken);
     }
 
+    public function test_record_only_actor_cannot_link_an_incident(): void
+    {
+        ['client' => $client] = $this->seedErrors();
+        $recordOnly = User::factory()->create(['approved_at' => now()]);
+        $this->grantPermissions($recordOnly, [
+            'medications.view',
+            'medications.administer.record',
+        ]);
+        $error = MedicationError::query()->create([
+            'client_id' => $client->id,
+            'error_type' => 'wrong_dose',
+            'severity' => 'minor',
+            'description' => 'Reported evidence.',
+            'immediate_action' => 'Observed and reported.',
+            'status' => 'reported',
+            'reported_by' => $recordOnly->id,
+            'reported_at' => now(),
+        ]);
+
+        $this->assertTrue($recordOnly->canDo('medications.administer.record'));
+        $this->assertFalse($recordOnly->canDo('medications.administer.correct'));
+
+        $this->actingAs($recordOnly)
+            ->post(route('emar.errors.link_incident', $error), [
+                'immediate_action' => 'Attempted correction.',
+            ])
+            ->assertForbidden();
+
+        $this->assertNull($error->fresh()->client_incident_id);
+        $this->assertSame('Observed and reported.', $error->fresh()->immediate_action);
+        $this->assertDatabaseCount('client_incidents', 0);
+    }
+
+    public function test_terminal_unlinked_errors_cannot_be_mutated_or_linked_to_a_new_incident(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedErrors();
+
+        foreach (['resolved', 'closed'] as $status) {
+            $error = MedicationError::query()->create([
+                'client_id' => $client->id,
+                'error_type' => 'wrong_dose',
+                'severity' => 'major',
+                'description' => 'Terminal governed evidence.',
+                'immediate_action' => 'Original immutable action.',
+                'status' => $status,
+                'reported_by' => $user->id,
+                'reported_at' => now(),
+                'closed_by' => $status === 'closed' ? $user->id : null,
+                'closed_at' => $status === 'closed' ? now() : null,
+                'close_note' => $status === 'closed' ? 'Final sign-off retained.' : null,
+            ]);
+
+            $this->actingAs($user)
+                ->from('/emar/errors')
+                ->post(route('emar.errors.link_incident', $error), [
+                    'immediate_action' => 'Attempted replacement action.',
+                ])
+                ->assertSessionHasErrors('status');
+
+            $error->refresh();
+            $this->assertSame($status, $error->status);
+            $this->assertSame('Original immutable action.', $error->immediate_action);
+            $this->assertNull($error->client_incident_id);
+            if ($status === 'closed') {
+                $this->assertSame('Final sign-off retained.', $error->close_note);
+                $this->assertSame($user->id, (int) $error->closed_by);
+                $this->assertNotNull($error->closed_at);
+            }
+        }
+
+        $this->assertDatabaseCount('client_incidents', 0);
+    }
+
+    public function test_error_correction_locks_client_then_medication_then_error(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $medication = ClientMedication::factory()->create(['client_id' => $client->id]);
+        $error = MedicationError::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'error_type' => 'documentation',
+            'severity' => 'minor',
+            'description' => 'Original description.',
+            'status' => 'reported',
+            'reported_by' => $user->id,
+            'reported_at' => now(),
+        ]);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $this->actingAs($user)
+            ->put(route('emar.errors.update', $error), [
+                'description' => 'Governed correction.',
+            ])
+            ->assertRedirect();
+
+        $lockQueries = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->filter(fn (string $query): bool => str_contains(strtolower($query), 'for update'))
+            ->values();
+        $clientLock = $lockQueries->search(fn (string $query): bool => str_contains($query, 'from `clients`'));
+        $medicationLock = $lockQueries->search(fn (string $query): bool => str_contains($query, 'from `client_medications`'));
+        $errorLock = $lockQueries->search(fn (string $query): bool => str_contains($query, 'from `medication_errors`'));
+
+        $this->assertNotFalse($clientLock, 'The canonical Client must be locked.');
+        $this->assertNotFalse($medicationLock, 'The canonical medication must be locked.');
+        $this->assertNotFalse($errorLock, 'The medication error must be locked.');
+        $this->assertLessThan($medicationLock, $clientLock);
+        $this->assertLessThan($errorLock, $medicationLock);
+        $this->assertSame('Governed correction.', $error->fresh()->description);
+    }
+
     public function test_linking_a_serious_error_requires_and_persists_the_actual_immediate_action(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
@@ -724,7 +1199,7 @@ class MedicationErrorsTest extends TestCase
         $event = HsEvent::query()->findOrFail($incident->hs_event_id);
 
         $this->assertSame($alert->id, $signal->alert_id);
-        $this->assertSame($alert->id, $signal->correlated_alert_id);
+        $this->assertNull($signal->correlated_alert_id);
         $this->assertSame($incident->id, data_get($signal->normalized_data, 'incident_id'));
         $this->assertSame($alert->id, $incident->control_room_alert_id);
         $this->assertSame($alert->id, $event->control_room_alert_id);
@@ -887,7 +1362,8 @@ class MedicationErrorsTest extends TestCase
         $this->assertSame($alert->id, $incident->control_room_alert_id);
         $this->assertSame($alert->id, $event->control_room_alert_id);
         $this->assertSame($incident->id, data_get($alert->context, 'incident_id'));
-        $this->assertSame($alert->id, $signal->alert_id);
+        $this->assertNull($signal->alert_id);
+        $this->assertSame($alert->id, $signal->correlated_alert_id);
         $this->assertDatabaseCount('medication_errors', 1);
         $this->assertDatabaseCount('client_incidents', 1);
         $this->assertDatabaseCount('hs_events', 1);

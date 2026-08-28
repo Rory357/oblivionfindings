@@ -16,12 +16,14 @@ class ClockOnBehalfRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'target_user_id' => ['required', 'integer', 'exists:users,id'],
+            // The command service resolves target and Site ownership together;
+            // request-layer exists rules would disclose which IDs are real.
+            'target_user_id' => ['required', 'integer'],
             'clock_in' => ['required', 'date'],
             'clock_out' => ['nullable', 'date', 'after:clock_in'],
-            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
-            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'shift_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer'],
+            'client_id' => ['nullable', 'integer'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
             'mileage_km' => ['nullable', 'numeric', 'min:0', 'max:9999'],
             'pay_type' => ['nullable', 'string', Rule::in(['standard', 'sleepover', 'on_call', 'public_holiday', 'night', 'weekend', 'evening'])],

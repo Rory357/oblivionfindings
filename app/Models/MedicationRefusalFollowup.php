@@ -92,6 +92,7 @@ class MedicationRefusalFollowup extends Model
     public function scopeRequiresGpNotification($query)
     {
         return $query->where('gp_notification_required', true)
+            ->whereNull('follow_up_completed_at')
             ->whereNull('gp_notified_at');
     }
 

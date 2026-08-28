@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Exceptions\AttendanceClockOutBlockedException;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\AttendanceService;
 use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Http\Controllers\Controller;
@@ -14,7 +16,9 @@ use App\Models\Client;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -23,6 +27,8 @@ class TimeTrackingController extends Controller
     public function __construct(
         private readonly TimeTrackingService $timeTrackingService,
         private readonly HrCurrentStaffService $currentStaff,
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly AttendanceService $attendanceService,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -41,22 +47,45 @@ class TimeTrackingController extends Controller
     {
         $canManage = $user->canDo('timesheets.manageAny');
         $canApproveTeam = $user->canDo('timesheets.approve');
+        $canReportAny = $user->canDo('timesheets.viewAny')
+            && $user->canDo('reports.viewAny');
+        $readSiteIds = $this->siteAccess->accessibleSiteIds(
+            $user,
+            UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
+        );
+        $mutationSiteIds = $this->siteAccess->accessibleSiteIds($user, []);
         $teamUserIds = [];
 
         if ($canApproveTeam && ! $canManage) {
-            $teamUserIds = $this->timeTrackingService->getTeamUserIds($user);
+            $teamUserIds = User::query()
+                ->whereIn('id', $this->timeTrackingService->getTeamUserIds($user))
+                ->tap(fn (Builder $query) => $this->siteAccess->applyStaffScope(
+                    $query,
+                    $user,
+                    [],
+                ))
+                ->pluck('id')
+                ->map(fn ($userId) => (int) $userId)
+                ->all();
         }
 
         return [
             'canManage' => $canManage,
             'canApproveTeam' => $canApproveTeam,
             'canApproveAny' => $canManage || $canApproveTeam,
+            'canReportAny' => $canReportAny,
             'teamUserIds' => $teamUserIds,
+            'readSiteIds' => $readSiteIds,
+            'mutationSiteIds' => $mutationSiteIds,
         ];
     }
 
     private function normaliseScope(string $requestedScope, array $access): string
     {
+        if ($access['canReportAny']) {
+            return $requestedScope === 'mine' ? 'mine' : 'all';
+        }
+
         if ($access['canManage']) {
             return in_array($requestedScope, ['mine', 'team', 'all'], true)
                 ? $requestedScope
@@ -72,34 +101,130 @@ class TimeTrackingController extends Controller
 
     /**
      * Guard a single-entry write/read. An approve-only manager may touch only
-     * their own or their current direct reports' entries; application-wide
-     * managers retain historical access for payroll correction and audit.
+     * their own or their current direct reports' entries. Action authority is
+     * always intersected with the actor's approved attendance Sites.
      */
-    private function assertEntryAccess(HrTimeEntry $entry, User $user): void
+    private function assertEntryAccess(HrTimeEntry $entry, User $user, bool $forMutation = false): void
     {
-        if ($user->canDo('timesheets.manageAny')) {
-            return;
+        $access = $this->resolveAccess($user);
+        $query = HrTimeEntry::query()->whereKey($entry->getKey());
+        if ($forMutation) {
+            $this->applyMutationAccessScope($query, $user, $access);
+        } else {
+            $this->applyAccessScope($query, $user, $access);
         }
 
-        $teamUserIds = $this->timeTrackingService->getTeamUserIds($user);
-        if ($entry->user_id !== $user->id && ! in_array($entry->user_id, $teamUserIds, true)) {
-            abort(403);
-        }
+        abort_unless($query->exists(), 404);
     }
 
-    private function applyAccessScope($query, $user, array $access)
+    private function applyAccessScope(Builder $query, User $user, array $access): Builder
     {
+        if ($access['canReportAny']) {
+            $query->whereIn(
+                $query->qualifyColumn('user_id'),
+                $this->currentStaff->currentUsersQuery()->select('users.id'),
+            );
+
+            return $this->applyEntrySiteScope($query, $access['readSiteIds']);
+        }
+
+        return $this->applyMutationAccessScope($query, $user, $access);
+    }
+
+    private function applyMutationAccessScope(Builder $query, User $user, array $access): Builder
+    {
+        if (! $access['canManage']) {
+            if ($access['canApproveTeam']) {
+                $query->forUserOrTeam($user->id, $access['teamUserIds']);
+            } else {
+                $query->forUser($user->id);
+            }
+        }
+
+        return $this->applyEntrySiteScope($query, $access['mutationSiteIds']);
+    }
+
+    private function canMutateEntry(HrTimeEntry $entry, User $user, array $access): bool
+    {
+        if (! in_array((int) $entry->site_id, $access['mutationSiteIds'], true)) {
+            return false;
+        }
+
         if ($access['canManage']) {
-            return $query; // Admin sees all
-        }
-        if ($access['canApproveTeam']) {
-            return $query->forUserOrTeam($user->id, $access['teamUserIds']);
+            return true;
         }
 
-        return $query->forUser($user->id);
+        return $access['canApproveTeam']
+            && (
+                (int) $entry->user_id === (int) $user->id
+                || in_array((int) $entry->user_id, $access['teamUserIds'], true)
+            );
     }
 
-    private function operationsTimesheetQuery(User $user, array $access)
+    /**
+     * Scope time-ledger rows to an approved Site and reject contradictory
+     * Shift, Client, or attendance-session provenance before it reaches any
+     * dashboard, direct-object, report, or export surface.
+     *
+     * @param  array<int, int>  $siteIds
+     */
+    private function applyEntrySiteScope(Builder $query, array $siteIds): Builder
+    {
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $siteColumn = $query->qualifyColumn('site_id');
+        $userColumn = $query->qualifyColumn('user_id');
+        $shiftColumn = $query->qualifyColumn('shift_id');
+        $clientColumn = $query->qualifyColumn('client_id');
+        $sessionColumn = $query->qualifyColumn('attendance_session_id');
+
+        return $query
+            ->whereIn($siteColumn, $siteIds)
+            ->where(function (Builder $clientIntegrity) use ($clientColumn, $siteColumn): void {
+                $clientIntegrity->whereNull($clientColumn)
+                    ->orWhereHas('client', fn (Builder $client) => $client
+                        ->whereColumn($client->qualifyColumn('site_id'), $siteColumn));
+            })
+            ->where(function (Builder $shiftIntegrity) use (
+                $shiftColumn,
+                $userColumn,
+                $clientColumn,
+                $siteColumn,
+            ): void {
+                $shiftIntegrity->whereNull($shiftColumn)
+                    ->orWhereHas('shift', function (Builder $shift) use (
+                        $userColumn,
+                        $clientColumn,
+                        $siteColumn,
+                    ): void {
+                        $shift->whereColumn($shift->qualifyColumn('user_id'), $userColumn)
+                            ->whereColumn($shift->qualifyColumn('client_id'), $clientColumn)
+                            ->whereHas('client', fn (Builder $client) => $client
+                                ->whereColumn($client->qualifyColumn('site_id'), $siteColumn));
+                    });
+            })
+            ->where(function (Builder $sessionIntegrity) use (
+                $sessionColumn,
+                $userColumn,
+                $shiftColumn,
+                $siteColumn,
+            ): void {
+                $sessionIntegrity->whereNull($sessionColumn)
+                    ->orWhereHas('attendanceSession', function (Builder $session) use (
+                        $userColumn,
+                        $shiftColumn,
+                        $siteColumn,
+                    ): void {
+                        $session->whereColumn($session->qualifyColumn('user_id'), $userColumn)
+                            ->whereColumn($session->qualifyColumn('site_id'), $siteColumn)
+                            ->whereRaw($session->qualifyColumn('shift_id').' <=> '.$shiftColumn);
+                    });
+            });
+    }
+
+    private function operationsTimesheetQuery(User $user, array $access, bool $forApproval = false): Builder
     {
         $staffUserIds = $this->currentStaff->currentUserIds();
 
@@ -112,7 +237,13 @@ class TimeTrackingController extends Controller
             ->whereIn('user_id', $staffUserIds)
             ->whereNull('archived_at');
 
-        if ($access['canManage']) {
+        $this->siteAccess->applyTimesheetScope(
+            $query,
+            $user,
+            $forApproval ? [] : UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
+        );
+
+        if ($access['canManage'] || (! $forApproval && $access['canReportAny'])) {
             return $query;
         }
 
@@ -120,7 +251,9 @@ class TimeTrackingController extends Controller
             return $query->whereIn('user_id', array_values(array_unique(array_merge([$user->id], $access['teamUserIds']))));
         }
 
-        return $query->where('user_id', $user->id);
+        return $forApproval
+            ? $query->whereRaw('1 = 0')
+            : $query->where('user_id', $user->id);
     }
 
     /**
@@ -175,7 +308,10 @@ class TimeTrackingController extends Controller
         $payType = $request->query('pay_type');
         $siteFilter = $request->query('site_id');
         $scope = $this->normaliseScope(
-            (string) $request->query('scope', $access['canApproveAny'] ? 'team' : 'mine'),
+            (string) $request->query(
+                'scope',
+                $access['canReportAny'] ? 'all' : ($access['canApproveAny'] ? 'team' : 'mine'),
+            ),
             $access,
         );
         $tab = $request->query('tab', 'overview');
@@ -185,13 +321,16 @@ class TimeTrackingController extends Controller
         $teamMembers = [];
         if ($access['canApproveAny']) {
             $currentUserIds = $this->currentStaff->currentUserIds();
-            $teamProfiles = $access['canManage']
-                ? HrEmployeeProfile::query()->whereIn('user_id', $currentUserIds)->with('user:id,name')->get()
-                : HrEmployeeProfile::query()
-                    ->where('manager_user_id', $user->id)
-                    ->whereIn('user_id', $currentUserIds)
-                    ->with('user:id,name')
-                    ->get();
+            $teamProfilesQuery = HrEmployeeProfile::query()->whereIn('user_id', $currentUserIds);
+            if (! $access['canManage']) {
+                $teamProfilesQuery->where('manager_user_id', $user->id);
+            }
+            $this->siteAccess->applyCurrentStaffProfileScope(
+                $teamProfilesQuery,
+                $user,
+                [],
+            );
+            $teamProfiles = $teamProfilesQuery->with('user:id,name')->get();
 
             $teamMembers = $teamProfiles->map(fn ($p) => [
                 'id' => $p->user_id,
@@ -211,25 +350,19 @@ class TimeTrackingController extends Controller
             ->whereNotNull('clock_out')
             ->sum('total_hours');
 
-        $activeClockedIn = HrTimeEntry::query()
-            ->active()
-            ->when(! $access['canManage'], function ($q) use ($user, $access) {
-                if ($access['canApproveTeam']) {
-                    $q->forUserOrTeam($user->id, $access['teamUserIds']);
-                } else {
-                    $q->forUser($user->id);
-                }
-            })
+        $activeClockedInQuery = HrTimeEntry::query()->active();
+        $this->applyAccessScope($activeClockedInQuery, $user, $access);
+        $activeClockedIn = $activeClockedInQuery
             ->distinct('user_id')
             ->count('user_id');
 
-        $pendingTimesheets = (clone $this->operationsTimesheetQuery($user, $access))
+        $pendingTimesheets = (clone $this->operationsTimesheetQuery($user, $access, true))
             ->where('status', 'submitted')
             ->count();
 
         // Overtime
         $overtimeHours = 0;
-        if ($access['canApproveAny']) {
+        if ($access['canApproveAny'] || $access['canReportAny']) {
             $otQuery = HrTimeEntry::query()
                 ->forDateRange($weekStart, $weekEnd)
                 ->whereNotNull('clock_out');
@@ -250,13 +383,7 @@ class TimeTrackingController extends Controller
         }
 
         // --- Entries (scoped by toggle) ---
-        $entriesBaseQuery = HrTimeEntry::query();
-        if ($scope === 'mine') {
-            $entriesBaseQuery->forUser($user->id);
-        } elseif ($scope === 'team' && $access['canApproveTeam'] && ! $access['canManage']) {
-            $entriesBaseQuery->forUserOrTeam($user->id, $access['teamUserIds']);
-        }
-        // 'all' scope → no filter (admin only)
+        $entriesBaseQuery = $this->scopedEntriesQuery($user, $access, $scope);
 
         $entries = (clone $entriesBaseQuery)
             // Voided entries are soft-deleted; without withTrashed() the
@@ -277,7 +404,7 @@ class TimeTrackingController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $entries->through(fn ($entry) => $this->serializeEntry($entry, $tz));
+        $entries->through(fn ($entry) => $this->serializeEntry($entry, $tz, $user, $access));
 
         // --- Timesheets ---
         $timesheets = (clone $this->operationsTimesheetQuery($user, $access))
@@ -290,11 +417,10 @@ class TimeTrackingController extends Controller
 
         // --- Approval queue (submitted timesheets from team) ---
         $approvalTimesheets = [];
-        $pendingApprovalCount = 0;
+        $pendingApprovalCount = $pendingTimesheets;
         if ($access['canApproveAny']) {
-            $approvalQuery = (clone $this->operationsTimesheetQuery($user, $access))
+            $approvalQuery = (clone $this->operationsTimesheetQuery($user, $access, true))
                 ->where('status', 'submitted');
-            $pendingApprovalCount = (clone $approvalQuery)->count();
 
             $approvalTimesheets = (clone $approvalQuery)
                 ->orderBy('submitted_at')
@@ -307,9 +433,10 @@ class TimeTrackingController extends Controller
         $activeClock = HrTimeEntry::query()
             ->forUser($user->id)
             ->active()
+            ->tap(fn (Builder $query) => $this->applyEntrySiteScope($query, $access['mutationSiteIds']))
             ->first();
 
-        $weeklySummary = $this->timeTrackingService->getWeeklySummary($user->id);
+        $weeklySummary = $this->scopedWeeklySummary($user, $access);
 
         // --- On now (everyone currently clocked in, in scope) ---
         $onNowQuery = HrTimeEntry::query()->active();
@@ -318,7 +445,7 @@ class TimeTrackingController extends Controller
             ->with('user:id,name', 'site:id,name', 'client:id,first_name,last_name', 'shift:id,starts_at,ends_at')
             ->orderBy('clock_in')
             ->get()
-            ->map(function (HrTimeEntry $e) use ($tz) {
+            ->map(function (HrTimeEntry $e) use ($tz, $user, $access) {
                 $name = $e->user?->name ?? 'Unknown';
                 $client = $e->client
                     ? trim(($e->client->first_name ?? '').' '.($e->client->last_name ?? ''))
@@ -337,6 +464,7 @@ class TimeTrackingController extends Controller
                     'elapsed_minutes' => (int) $e->clock_in->diffInMinutes(now()),
                     'pay_type' => $e->pay_type ?? 'standard',
                     'is_sleepover' => (bool) $e->is_sleepover,
+                    'can_mutate' => $this->canMutateEntry($e, $user, $access),
                 ];
             })
             ->values()
@@ -358,13 +486,13 @@ class TimeTrackingController extends Controller
         }
 
         // --- Exceptions board ---
-        $exceptions = $access['canApproveAny']
+        $exceptions = ($access['canApproveAny'] || $access['canReportAny'])
             ? $this->buildExceptions($user, $access, $tz, $weekStart, $weekEnd)
             : [];
 
         // --- Recent activity ---
         $recentActivity = [];
-        if ($access['canApproveAny']) {
+        if ($access['canApproveAny'] || $access['canReportAny']) {
             $activityQuery = HrTimeEntry::query();
             $this->applyAccessScope($activityQuery, $user, $access);
             $recentActivity = $activityQuery
@@ -388,15 +516,27 @@ class TimeTrackingController extends Controller
             'name' => $m['name'],
         ])->values()->all();
 
+        $filterSites = Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('id', $access['readSiteIds'])
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])
+            ->all();
+
         $sites = Site::query()
             ->active()
             ->notArchived()
             ->whereNull('archived_at')
+            ->whereIn('id', $access['mutationSiteIds'])
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->all();
 
         $clients = Client::query()
+            ->whereIn('site_id', $access['mutationSiteIds'])
             ->orderBy('first_name')
             ->limit(500)
             ->get(['id', 'first_name', 'last_name'])
@@ -406,7 +546,7 @@ class TimeTrackingController extends Controller
             ])->all();
 
         // Reports tab data (manager-only, computed lazily on that tab).
-        $report = ($tab === 'reports' && $access['canApproveAny'])
+        $report = ($tab === 'reports' && $access['canReportAny'])
             ? $this->buildReport($user, $access, $scope, $weekStart, $weekEnd)
             : null;
 
@@ -422,6 +562,7 @@ class TimeTrackingController extends Controller
             'recentActivity' => $recentActivity,
             'teamMembers' => $teamMembers,
             'staff' => $staff,
+            'filterSites' => $filterSites,
             'sites' => $sites,
             'clients' => $clients,
             'activeClock' => $activeClock ? [
@@ -450,6 +591,7 @@ class TimeTrackingController extends Controller
                 'manage' => $access['canManage'],
                 'approveTeam' => $access['canApproveTeam'],
                 'approveAny' => $access['canApproveAny'],
+                'reportAny' => $access['canReportAny'],
                 'editEntry' => $access['canApproveAny'],
                 'clockOnBehalf' => $access['canApproveAny'],
             ],
@@ -468,10 +610,37 @@ class TimeTrackingController extends Controller
         return implode('', $letters) ?: '—';
     }
 
+    /** @return array<string, mixed> */
+    private function scopedWeeklySummary(User $user, array $access): array
+    {
+        $start = now()->startOfWeek();
+        $end = $start->copy()->endOfWeek();
+        $entries = HrTimeEntry::query()
+            ->forUser($user->id)
+            ->forDateRange($start->toDateString(), $end->toDateString())
+            ->whereNotNull('clock_out')
+            ->tap(fn (Builder $query) => $this->applyEntrySiteScope($query, $access['readSiteIds']))
+            ->get();
+
+        $dailyHours = [];
+        for ($day = $start->copy(); $day->lte($end); $day->addDay()) {
+            $date = $day->toDateString();
+            $dailyHours[$date] = $entries->where('entry_date', $date)->sum('total_hours');
+        }
+
+        return [
+            'week_start' => $start->toDateString(),
+            'week_end' => $end->toDateString(),
+            'daily_hours' => $dailyHours,
+            'total_hours' => round($entries->sum('total_hours'), 2),
+            'total_entries' => $entries->count(),
+        ];
+    }
+
     /**
      * @return array<string, mixed>
      */
-    private function serializeEntry(HrTimeEntry $entry, string $tz): array
+    private function serializeEntry(HrTimeEntry $entry, string $tz, User $user, array $access): array
     {
         $name = $entry->user?->name ?? 'Unknown';
         $clientName = $entry->client
@@ -494,6 +663,9 @@ class TimeTrackingController extends Controller
             'break_minutes' => $entry->break_minutes,
             'total_hours' => $entry->total_hours !== null ? (float) $entry->total_hours : null,
             'entry_type' => $entry->entry_type,
+            'can_mutate' => $this->canMutateEntry($entry, $user, $access),
+            'is_attendance_backed' => $entry->attendance_session_id !== null
+                || $entry->source_type === 'attendance',
             'status' => $entry->status,
             'pay_type' => $entry->pay_type ?? 'standard',
             'is_sleepover' => (bool) $entry->is_sleepover,
@@ -547,6 +719,7 @@ class TimeTrackingController extends Controller
                 'user_name' => $e->user?->name ?? 'Unknown',
                 'clock_in' => $e->clock_in->copy()->setTimezone($tz)->format('Y-m-d\TH:i'),
                 'entry_date' => $e->entry_date->toDateString(),
+                'can_mutate' => $this->canMutateEntry($e, $user, $access),
                 'action' => 'correct',
             ];
         }
@@ -565,7 +738,16 @@ class TimeTrackingController extends Controller
                 'detail' => $e->entry_date->format('D d M').' — '.($e->break_minutes ?: 0).'m break logged on a '.($e->total_hours ?? 0).'h shift',
                 'badge' => 'Break shortfall',
                 'entry_id' => $e->id,
-                'action' => 'edit',
+                'user_id' => $e->user_id,
+                'user_name' => $e->user?->name ?? 'Unknown',
+                'clock_in' => $e->clock_in->copy()->setTimezone($tz)->format('Y-m-d\TH:i'),
+                'entry_date' => $e->entry_date->toDateString(),
+                'is_attendance_backed' => $e->attendance_session_id !== null
+                    || $e->source_type === 'attendance',
+                'can_mutate' => $this->canMutateEntry($e, $user, $access),
+                'action' => ($e->attendance_session_id !== null || $e->source_type === 'attendance')
+                    ? 'correct'
+                    : 'edit',
             ];
         }
 
@@ -588,6 +770,7 @@ class TimeTrackingController extends Controller
                 'detail' => round((float) $row->week_hours, 1).'h logged this week — '.round((float) $row->week_hours - 40, 1).'h over 40h',
                 'badge' => 'Overtime',
                 'user_id' => $row->user_id,
+                'can_mutate' => false,
                 'action' => 'view_entries',
             ];
         }
@@ -607,6 +790,7 @@ class TimeTrackingController extends Controller
                 'title' => $unlinkedCount.' '.($unlinkedCount === 1 ? 'entry' : 'entries').' not linked to a roster shift',
                 'detail' => 'Clock entries this week with no rostered shift — confirm they were worked as planned.',
                 'badge' => 'Unlinked',
+                'can_mutate' => false,
                 'action' => 'view_entries',
             ];
         }
@@ -625,6 +809,7 @@ class TimeTrackingController extends Controller
                 'title' => $loadingCount.' loading '.($loadingCount === 1 ? 'entry' : 'entries').' today',
                 'detail' => 'Sleepover, on-call or public-holiday loadings to verify before payroll.',
                 'badge' => 'Loadings',
+                'can_mutate' => false,
                 'action' => 'view_entries',
             ];
         }
@@ -641,11 +826,17 @@ class TimeTrackingController extends Controller
         $user = $this->currentStaffUser($request);
         abort_unless($user->canDo('timesheets.viewAny'), 403);
 
+        $shift = $this->attendanceService->resolveSelfClockInShift(
+            $user,
+            $request->input('shift_id'),
+        );
+
         $validated = $request->validate([
-            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+            'shift_id' => ['nullable', 'integer', 'min:1'],
             'notes' => ['nullable', 'string', 'max:500'],
             'project_code' => ['nullable', 'string', 'max:50'],
         ]);
+        $validated['shift_id'] = $shift?->id;
 
         try {
             $this->timeTrackingService->clockIn(
@@ -683,6 +874,10 @@ class TimeTrackingController extends Controller
                 $validated['notes'] ?? null,
                 isset($validated['mileage_km']) ? (float) $validated['mileage_km'] : null,
             );
+        } catch (AttendanceClockOutBlockedException $exception) {
+            return redirect()->back()
+                ->with('error', $exception->getMessage())
+                ->with('clock_out_blockers', $exception->blockers());
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -726,11 +921,12 @@ class TimeTrackingController extends Controller
     /*  Update — edit/amend time entry */
     /* ------------------------------------------------------------------ */
 
-    public function updateEntry(UpdateTimeEntryRequest $request, HrTimeEntry $entry)
+    public function updateEntry(Request $request, HrTimeEntry $entry)
     {
         $user = $this->currentStaffUser($request);
-        $this->assertEntryAccess($entry, $user);
-        $validated = $request->validated();
+        abort_unless($user->canDo('timesheets.manageAny') || $user->canDo('timesheets.approve'), 403);
+        $this->assertEntryAccess($entry, $user, true);
+        $validated = $request->validate((new UpdateTimeEntryRequest)->rules());
         $reason = $validated['amendment_reason'];
         unset($validated['amendment_reason']);
 
@@ -777,7 +973,7 @@ class TimeTrackingController extends Controller
     {
         $user = $this->currentStaffUser($request);
         abort_unless($user->canDo('timesheets.manageAny') || $user->canDo('timesheets.approve'), 403);
-        $this->assertEntryAccess($entry, $user);
+        $this->assertEntryAccess($entry, $user, true);
 
         $validated = $request->validate([
             'clock_out' => ['required', 'date', 'after:'.$entry->clock_in->toDateTimeString()],
@@ -808,10 +1004,10 @@ class TimeTrackingController extends Controller
     {
         $user = $this->currentStaffUser($request);
         abort_unless($user->canDo('timesheets.manageAny'), 403);
-        $this->assertEntryAccess($entry, $user);
+        $this->assertEntryAccess($entry, $user, true);
 
         $validated = $request->validate([
-            'reason' => ['required', 'string', 'max:2000'],
+            'reason' => ['required', 'string', 'max:255'],
         ]);
 
         try {
@@ -831,7 +1027,7 @@ class TimeTrackingController extends Controller
     {
         $user = $this->currentStaffUser($request);
         abort_unless($user->canDo('timesheets.manageAny') || $user->canDo('timesheets.approve'), 403);
-        $this->assertEntryAccess($entry, $user);
+        $this->assertEntryAccess($entry, $user, true);
 
         $validated = $request->validate([
             'note' => ['required', 'string', 'max:2000'],
@@ -864,11 +1060,16 @@ class TimeTrackingController extends Controller
         $query = HrTimeEntry::query();
         if ($scope === 'mine') {
             $query->forUser($user->id);
+        } elseif ($access['canReportAny']) {
+            $query->whereIn(
+                $query->qualifyColumn('user_id'),
+                $this->currentStaff->currentUsersQuery()->select('users.id'),
+            );
         } elseif ($scope === 'team' && $access['canApproveTeam'] && ! $access['canManage']) {
             $query->forUserOrTeam($user->id, $access['teamUserIds']);
         }
 
-        return $query;
+        return $this->applyEntrySiteScope($query, $access['readSiteIds']);
     }
 
     /**
@@ -882,9 +1083,13 @@ class TimeTrackingController extends Controller
         abort_unless($user->canDo('timesheets.viewAny'), 403);
 
         $access = $this->resolveAccess($user);
+        abort_unless($access['canReportAny'], 403);
         $tz = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
         $scope = $this->normaliseScope(
-            (string) $request->query('scope', $access['canApproveAny'] ? 'team' : 'mine'),
+            (string) $request->query(
+                'scope',
+                $access['canReportAny'] ? 'all' : ($access['canApproveAny'] ? 'team' : 'mine'),
+            ),
             $access,
         );
 
@@ -992,8 +1197,8 @@ class TimeTrackingController extends Controller
         abort_unless($user->canDo('timesheets.viewAny'), 403);
 
         $access = $this->resolveAccess($user);
-        abort_unless($access['canApproveAny'], 403);
-        $scope = $this->normaliseScope((string) $request->query('scope', 'team'), $access);
+        abort_unless($access['canReportAny'], 403);
+        $scope = $this->normaliseScope((string) $request->query('scope', 'all'), $access);
         $weekStart = now()->startOfWeek()->toDateString();
         $weekEnd = now()->endOfWeek()->toDateString();
 

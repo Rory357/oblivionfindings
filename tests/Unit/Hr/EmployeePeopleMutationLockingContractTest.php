@@ -73,10 +73,13 @@ test('People mutations acquire one globally sorted user then profile lock graph'
     expect(is_file($lockServicePath))->toBeTrue();
     $lockService = file_get_contents($lockServicePath);
     expect($lockService)
-        ->toContain('User::query()')
+        ->toContain('AuthorizationEvidenceLockService::class')
+        ->toContain('->lockForUsers(')
+        ->toContain("['*']")
+        ->toContain('$additionalRoleIds')
         ->toContain('HrEmployeeProfile::withTrashed()')
         ->toContain("->orderBy('id')")
-        ->and(strpos($lockService, 'User::query()'))->toBeLessThan(strpos($lockService, 'HrEmployeeProfile::withTrashed()'));
+        ->and(strpos($lockService, '->lockForUsers('))->toBeLessThan(strpos($lockService, 'HrEmployeeProfile::withTrashed()'));
 
     foreach (['resendInvite', 'store', 'setActive', 'rehire', 'bulkAction', 'update'] as $method) {
         expect(employeePeopleMethodSource($controller, $method))->toContain('lockPeopleMutationGraph(');

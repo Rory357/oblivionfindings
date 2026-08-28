@@ -279,7 +279,9 @@ export function TimeEntryDialog({
     clients: NamedOption[];
     onClose: () => void;
 }) {
-    const open = mode != null;
+    const open =
+        mode != null &&
+        !(entry?.is_attendance_backed && (mode === 'edit' || mode === 'void'));
     const activeMode: TimeDialogMode = mode ?? 'add';
     const steps = useMemo(() => stepsFor(activeMode), [activeMode]);
     const wizard = useWizard(steps.length);
@@ -289,6 +291,7 @@ export function TimeEntryDialog({
 
     const meta = MODE_META[activeMode];
     const RailIcon = meta.icon;
+    const isShiftlessCreate = activeMode === 'add' || activeMode === 'behalf';
 
     // Seed the form each time the dialog opens for a given mode/entry.
     useEffect(() => {
@@ -372,6 +375,9 @@ export function TimeEntryDialog({
                 errs.clock_out = 'Set a clock-out time.';
             if (form.data.clock_out && totalHours == null)
                 errs.clock_out = 'Clock-out must be after clock-in.';
+        }
+        if (key === 'pay' && isShiftlessCreate && !form.data.client_id) {
+            errs.client_id = 'Pick a client.';
         }
         if (key === 'reason') {
             if (activeMode === 'edit' && !form.data.amendment_reason.trim())
@@ -988,21 +994,41 @@ export function TimeEntryDialog({
                                         />
                                     </Field>
                                 ) : null}
-                                {clients.length > 0 ? (
-                                    <Field label="Client" hint="— optional">
-                                        <SelectInput
-                                            value={form.data.client_id}
-                                            onChange={(v) =>
-                                                form.setData('client_id', v)
-                                            }
-                                            placeholder="No client"
-                                            options={clients.map((c) => ({
-                                                value: String(c.id),
-                                                label: c.name,
-                                            }))}
-                                        />
-                                    </Field>
-                                ) : null}
+                                <Field
+                                    label="Client"
+                                    required={isShiftlessCreate}
+                                    error={form.errors.client_id}
+                                >
+                                    <SelectInput
+                                        value={form.data.client_id}
+                                        onChange={(v) =>
+                                            form.setData('client_id', v)
+                                        }
+                                        placeholder={
+                                            clients.length > 0
+                                                ? 'Select a client…'
+                                                : 'No clients available'
+                                        }
+                                        options={clients.map((c) => ({
+                                            value: String(c.id),
+                                            label: c.name,
+                                        }))}
+                                    />
+                                </Field>
+                            </div>
+                        ) : null}
+
+                        {isShiftlessCreate && clients.length === 0 ? (
+                            <div
+                                role="alert"
+                                className="flex items-start gap-2.5 rounded-xl border border-status-warning/30 bg-status-warning-bg px-4 py-3 text-[12.5px] text-status-warning"
+                            >
+                                <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
+                                <span>
+                                    No clients are available at your approved
+                                    Sites. A client is required because this
+                                    entry is not linked to a rostered shift.
+                                </span>
                             </div>
                         ) : null}
 
@@ -1165,6 +1191,9 @@ export function TimeEntryDialog({
                             >
                                 <Textarea
                                     rows={3}
+                                    maxLength={
+                                        activeMode === 'void' ? 255 : undefined
+                                    }
                                     value={form.data.reason}
                                     onChange={(e) =>
                                         form.setData('reason', e.target.value)

@@ -699,7 +699,12 @@ export default function MyDay() {
                     item.data.medication_id,
                     item.data.scheduled_for,
                 );
-            if (action === 'open-emar' && item.kind === 'med')
+            if (
+                action === 'open-emar' &&
+                item.kind === 'med' &&
+                props.can_open_emar &&
+                item.data.emar_url
+            )
                 router.visit(item.data.emar_url);
             if (
                 action === 'open-care-plan' &&
@@ -720,6 +725,7 @@ export default function MyDay() {
             handleSnoozeMed,
             handleRefuseMed,
             handleAddNote,
+            props.can_open_emar,
         ],
     );
 
@@ -948,6 +954,7 @@ export default function MyDay() {
             {ctxMenu ? (
                 <StreamContextMenu
                     menu={ctxMenu}
+                    canOpenEmar={props.can_open_emar ?? false}
                     onClose={() => setCtxMenu(null)}
                     onAction={handleContextMenuAction}
                 />

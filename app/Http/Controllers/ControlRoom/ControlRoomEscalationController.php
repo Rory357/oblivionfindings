@@ -11,6 +11,7 @@ use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertPriorityService;
 use App\Services\ControlRoom\AlertWorklistPresenter;
 use App\Services\ControlRoom\AlertWorkspaceService;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
@@ -32,11 +33,10 @@ class ControlRoomEscalationController extends Controller
         Request $request,
         AlertPriorityService $priority,
         AlertWorklistPresenter $presenter,
+        ControlRoomAlertAccessService $alertAccess,
     ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
-        $siteAccess = app(UserSiteAccessService::class);
-        $bypassPermissions = $this->alertBypassPermissions();
         $canManage = $user->canDo('controlRoom.alerts.manage');
 
         $activeQueues = TriageQueue::active()
@@ -45,9 +45,9 @@ class ControlRoomEscalationController extends Controller
             ->get();
 
         $queues = $activeQueues
-            ->map(function (TriageQueue $queue) use ($siteAccess, $user, $bypassPermissions) {
+            ->map(function (TriageQueue $queue) use ($alertAccess, $user) {
                 $queueAlerts = ControlRoomAlert::query()->unresolved()->where('queue_id', $queue->id);
-                $siteAccess->applyAlertScope($queueAlerts, $user, $bypassPermissions);
+                $alertAccess->applyVisibleScope($queueAlerts, $user);
                 $totalCount = (clone $queueAlerts)->count();
                 $breachedCount = (clone $queueAlerts)
                     ->whereHas('sla', fn ($sla) => $sla->breached())
@@ -91,7 +91,7 @@ class ControlRoomEscalationController extends Controller
         $summaryQuery = ControlRoomAlert::query()
             ->unresolved()
             ->whereIn('queue_id', $activeQueueIds);
-        $siteAccess->applyAlertScope($summaryQuery, $user, $bypassPermissions);
+        $alertAccess->applyVisibleScope($summaryQuery, $user);
         $summary = [
             'active_queues' => $activeQueues->count(),
             'total_alerts' => (clone $summaryQuery)->count(),
@@ -120,7 +120,7 @@ class ControlRoomEscalationController extends Controller
                 'clientIncident:id,reference_number,control_room_alert_id,status',
                 'hsEvent:id,reference_number,control_room_alert_id,handover_status,status',
             ]);
-        $siteAccess->applyAlertScope($worklistQuery, $user, $bypassPermissions);
+        $alertAccess->applyVisibleScope($worklistQuery, $user);
 
         $worklistQuery
             ->when($filters['queue_id'], fn ($query, $queueId) => $query->where('control_room_alerts.queue_id', (int) $queueId))

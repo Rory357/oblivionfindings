@@ -132,8 +132,9 @@ class UserSiteAccessCanonicalIntegrityTest extends TestCase
             $outgoing,
             $incoming,
         );
+        $conflictedOutgoingShift = $this->shiftAt($site, $client, $outgoing);
         $conflictedHandover = $this->shiftHandover(
-            $outgoingShift,
+            $conflictedOutgoingShift,
             $incomingShift,
             $client,
             $outgoing,

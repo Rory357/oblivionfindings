@@ -2,14 +2,22 @@
 
 namespace App\Domain\Shifts\Timesheets;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
+use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\AlternativeHolidayService;
+use App\Models\Client;
+use App\Models\Shift;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Operations\BillingService;
 use App\Services\Operations\TimesheetHrSyncService;
 use App\Services\Operations\TimesheetReconciliationService;
 use App\Services\ShiftOperationalSnapshotService;
+use App\Services\UserSiteAccessService;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -23,13 +31,18 @@ class TimesheetApprovalService
         private readonly TimesheetHrSyncService $hrSync,
         private readonly BillingService $billing,
         private readonly AlternativeHolidayService $alternativeHolidays,
+        private readonly AuthorizationEvidenceLockService $authorizationEvidence,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     public function submit(Timesheet $timesheet, User $actor): TimesheetWorkflowResult
     {
         try {
             return DB::transaction(function () use ($timesheet, $actor): TimesheetWorkflowResult {
+                $this->lockApplicationPayrollMutex();
                 $locked = $this->lock($timesheet);
+                $actor = $this->lockCurrentWriterAuthority($actor, $locked, 'submit');
+                $this->lockPayrollRunsForWorkDates([$locked->work_date], 'submitted');
 
                 $this->assertSubmittable($locked, 'submitted');
                 $this->reconciliation->assertWorkflowAllowed($locked, 'submitted');
@@ -54,11 +67,21 @@ class TimesheetApprovalService
      *
      * @param  array<string, mixed>  $updates
      */
-    public function updateEditable(Timesheet $timesheet, array $updates): TimesheetWorkflowResult
+    public function updateEditable(Timesheet $timesheet, User $actor, array $updates): TimesheetWorkflowResult
     {
         try {
-            return DB::transaction(function () use ($timesheet, $updates): TimesheetWorkflowResult {
+            return DB::transaction(function () use ($timesheet, $actor, $updates): TimesheetWorkflowResult {
+                $this->lockApplicationPayrollMutex();
                 $locked = $this->lock($timesheet);
+                $actor = $this->lockCurrentWriterAuthority($actor, $locked, 'update', $updates);
+                $this->assertEditableSource($locked);
+                $linkedEntry = $this->hrSync->lockCanonicalEntryForMutation($locked);
+
+                $this->lockPayrollRunsForWorkDates([
+                    $locked->work_date,
+                    $updates['work_date'] ?? $locked->work_date,
+                    $linkedEntry?->entry_date,
+                ], 'updated');
 
                 $this->assertSubmittable($locked, 'updated');
                 $originalClientId = $this->clientId($locked);
@@ -88,7 +111,17 @@ class TimesheetApprovalService
     {
         try {
             return DB::transaction(function () use ($timesheet, $actor, $updates): TimesheetWorkflowResult {
+                $this->lockApplicationPayrollMutex();
                 $locked = $this->lock($timesheet);
+                $actor = $this->lockCurrentWriterAuthority($actor, $locked, 'resubmit', $updates);
+                $this->assertEditableSource($locked);
+                $linkedEntry = $this->hrSync->lockCanonicalEntryForMutation($locked);
+
+                $this->lockPayrollRunsForWorkDates([
+                    $locked->work_date,
+                    $updates['work_date'] ?? $locked->work_date,
+                    $linkedEntry?->entry_date,
+                ], 'resubmitted');
 
                 $this->assertSubmittable($locked, 'resubmitted');
                 $originalClientId = $this->clientId($locked);
@@ -119,7 +152,13 @@ class TimesheetApprovalService
     {
         try {
             return DB::transaction(function () use ($timesheet, $actor, $decisionNotes): TimesheetWorkflowResult {
+                // Attendance correction and payroll publication both enter
+                // through this application-wide gate. Approval must take the
+                // same first lock so whichever command queues first owns the
+                // Timesheet decision; the loser then rechecks the locked row.
+                $this->lockApplicationPayrollMutex();
                 $locked = $this->lock($timesheet);
+                $actor = $this->lockCurrentReviewAuthority($actor, $locked);
 
                 if ($locked->status === 'approved') {
                     return new TimesheetWorkflowResult(
@@ -134,6 +173,12 @@ class TimesheetApprovalService
                     ]);
                 }
 
+                $linkedEntry = $this->hrSync->lockCanonicalEntryForMutation($locked);
+                $this->hrSync->assertNoWorkerOverlapForMutation($locked, $linkedEntry);
+                $this->lockPayrollRunsForWorkDates([
+                    $locked->work_date,
+                    $linkedEntry?->entry_date,
+                ], 'approved');
                 $this->assertApprovalAllowed($locked, $actor);
 
                 $locked->forceFill([
@@ -143,7 +188,7 @@ class TimesheetApprovalService
                     'decision_notes' => $decisionNotes,
                 ])->save();
 
-                $this->syncApprovedTimesheet($locked);
+                $this->syncApprovedTimesheet($locked, $linkedEntry);
 
                 try {
                     $this->alternativeHolidays->accrueForTimesheet($locked->fresh() ?? $locked);
@@ -170,7 +215,9 @@ class TimesheetApprovalService
     {
         try {
             return DB::transaction(function () use ($timesheet, $actor, $notes): TimesheetWorkflowResult {
+                $this->lockApplicationPayrollMutex();
                 $locked = $this->lock($timesheet);
+                $actor = $this->lockCurrentReviewAuthority($actor, $locked);
 
                 if ($locked->status !== 'submitted') {
                     return new TimesheetWorkflowResult(
@@ -179,10 +226,8 @@ class TimesheetApprovalService
                     );
                 }
 
+                $this->lockPayrollRunsForWorkDates([$locked->work_date], 'returned');
                 $this->assertNotPayrollLinked($locked, 'returned after export preparation');
-                // Status downgrade inside a locked/exported payroll period would
-                // let the row be re-edited after payroll figures were frozen.
-                $this->assertNotLockedByPayroll($locked, 'returned');
                 $this->reconciliation->assertWorkflowAllowed($locked, 'returned');
 
                 $locked->forceFill([
@@ -211,7 +256,9 @@ class TimesheetApprovalService
     {
         try {
             return DB::transaction(function () use ($timesheet, $actor, $notes): TimesheetWorkflowResult {
+                $this->lockApplicationPayrollMutex();
                 $locked = $this->lock($timesheet);
+                $actor = $this->lockCurrentReviewAuthority($actor, $locked);
 
                 if ($locked->status !== 'submitted') {
                     return new TimesheetWorkflowResult(
@@ -220,10 +267,8 @@ class TimesheetApprovalService
                     );
                 }
 
+                $this->lockPayrollRunsForWorkDates([$locked->work_date], 'rejected');
                 $this->assertNotPayrollLinked($locked, 'rejected after export preparation');
-                // Same payroll-period freeze as returnForChanges: a rejection is
-                // a status change on a work_date payroll has already locked.
-                $this->assertNotLockedByPayroll($locked, 'rejected');
                 $this->reconciliation->assertWorkflowAllowed($locked, 'rejected');
 
                 $locked->forceFill([
@@ -252,7 +297,11 @@ class TimesheetApprovalService
     {
         $timesheets
             ->filter(fn (Timesheet $timesheet): bool => $timesheet->status !== 'approved')
-            ->each(fn (Timesheet $timesheet) => $this->assertApprovalAllowed($timesheet, $actor));
+            // Keep the batch preflight read-only. Current permission and Site
+            // evidence is locked again by every transactional approve leaf;
+            // an unauthorized native caller must not cause reconciliation
+            // fields to be materialised before that authority decision.
+            ->each(fn (Timesheet $timesheet) => $this->assertApprovalAllowed($timesheet, $actor, false));
 
         return BulkResult::fromResults(
             $timesheets->map(fn (Timesheet $timesheet) => $this->approve($timesheet, $actor, $decisionNotes))
@@ -286,6 +335,270 @@ class TimesheetApprovalService
             ->findOrFail($timesheet->id);
     }
 
+    protected function lockApplicationPayrollMutex(): void
+    {
+        $mutex = DB::table('hr_payroll_run_mutexes')
+            ->where('key', 'application')
+            ->lockForUpdate()
+            ->first();
+
+        if (! $mutex) {
+            throw new \RuntimeException('The application payroll mutex is missing; migration repair is required.');
+        }
+    }
+
+    /**
+     * Re-read and lock the complete current authority decision after the
+     * payroll/Timesheet aggregate has joined this transaction's lock set.
+     * Route middleware and controller Site checks are request snapshots and
+     * cannot authorize a write that waited behind either of those mutexes.
+     */
+    protected function lockCurrentReviewAuthority(User $actor, Timesheet $timesheet): User
+    {
+        $lockedActor = $this->authorizationEvidence->lockForUser($actor, [
+            'timesheets.approve',
+            'hr.time.approveTeam',
+            'timesheets.manageAny',
+            'hr.time.manage',
+        ]);
+        abort_unless(
+            $lockedActor->canDo('timesheets.approve')
+                || $lockedActor->canDo('timesheets.manageAny'),
+            403,
+        );
+
+        $profile = HrEmployeeProfile::query()
+            ->where('user_id', $lockedActor->id)
+            ->lockForUpdate()
+            ->first([
+                'id',
+                'user_id',
+                'primary_site_id',
+                'secondary_site_ids',
+                'is_active',
+                'start_date',
+                'end_date',
+            ]);
+        abort_unless($profile && $this->isCurrentReviewProfile($profile), 403);
+
+        $siteId = $this->siteAccess->timesheetSiteId($timesheet);
+        $site = Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereKey($siteId)
+            ->lockForUpdate()
+            ->first(['id']);
+        abort_unless($site, 403, 'You are not authorized to access timesheets for this site.');
+
+        $assignedSiteIds = collect([
+            $profile->primary_site_id,
+            ...($profile->secondary_site_ids ?? []),
+        ])
+            ->filter(fn (mixed $assignedSiteId): bool => is_numeric($assignedSiteId) && (int) $assignedSiteId > 0)
+            ->map(fn (mixed $assignedSiteId): int => (int) $assignedSiteId)
+            ->unique()
+            ->values()
+            ->all();
+        abort_unless(
+            in_array((int) $site->id, $assignedSiteIds, true),
+            403,
+            'You are not authorized to access timesheets for this site.',
+        );
+
+        $lockedActor->setRelation('hrEmployeeProfile', $profile);
+
+        return $lockedActor;
+    }
+
+    /**
+     * Rebuild the native draft-writer decision only after the application
+     * payroll mutex and canonical Timesheet row are owned. Controller and
+     * route checks are pre-wait snapshots; they cannot authorize a mutation.
+     *
+     * @param  array<string, mixed>  $updates
+     */
+    protected function lockCurrentWriterAuthority(
+        User $actor,
+        Timesheet $timesheet,
+        string $command,
+        array $updates = [],
+    ): User {
+        $siteIds = $this->lockCanonicalWriterProvenance($timesheet, $updates);
+        $lockedActor = $this->authorizationEvidence->lockForUser($actor, [
+            'timesheets.update',
+            'timesheets.submit',
+            'timesheets.manageAny',
+            'hr.time.manage',
+        ]);
+
+        $hasRequiredPermission = match ($command) {
+            'submit' => $lockedActor->canDo('timesheets.submit'),
+            'update' => $lockedActor->canDo('timesheets.update'),
+            'resubmit' => $lockedActor->canDo('timesheets.update')
+                && $lockedActor->canDo('timesheets.submit'),
+            default => false,
+        };
+        abort_unless($hasRequiredPermission, 403);
+        abort_unless(
+            (int) $timesheet->user_id === (int) $lockedActor->id
+                || $lockedActor->canDo('timesheets.manageAny'),
+            403,
+        );
+
+        $profile = HrEmployeeProfile::query()
+            ->where('user_id', $lockedActor->id)
+            ->lockForUpdate()
+            ->first([
+                'id',
+                'user_id',
+                'primary_site_id',
+                'secondary_site_ids',
+                'is_active',
+                'start_date',
+                'end_date',
+            ]);
+        abort_unless($profile && $this->isCurrentReviewProfile($profile), 403);
+
+        $lockedSiteIds = Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('id', $siteIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->pluck('id')
+            ->map(fn (mixed $siteId): int => (int) $siteId)
+            ->all();
+        abort_unless($lockedSiteIds === $siteIds, 403, 'You are not authorized to access timesheets for this site.');
+
+        $assignedSiteIds = collect([
+            $profile->primary_site_id,
+            ...($profile->secondary_site_ids ?? []),
+        ])
+            ->filter(fn (mixed $assignedSiteId): bool => is_numeric($assignedSiteId) && (int) $assignedSiteId > 0)
+            ->map(fn (mixed $assignedSiteId): int => (int) $assignedSiteId)
+            ->unique()
+            ->values()
+            ->all();
+        abort_unless(
+            collect($siteIds)->every(fn (int $siteId): bool => in_array($siteId, $assignedSiteIds, true)),
+            403,
+            'You are not authorized to access timesheets for this site.',
+        );
+
+        $lockedActor->setRelation('hrEmployeeProfile', $profile);
+
+        return $lockedActor;
+    }
+
+    /**
+     * Lock the old and proposed Client/Site provenance in the shared
+     * Client -> Shift -> User/RBAC -> Profile -> Site order. Linked shifts
+     * remain authoritative; manual rows must resolve to one Site before any
+     * editable field or workflow evidence is written.
+     *
+     * @param  array<string, mixed>  $updates
+     * @return list<int>
+     */
+    protected function lockCanonicalWriterProvenance(Timesheet $timesheet, array $updates): array
+    {
+        $requestedClientId = array_key_exists('client_id', $updates) && $updates['client_id'] !== null
+            ? (int) $updates['client_id']
+            : (array_key_exists('client_id', $updates) ? null : $this->clientId($timesheet));
+        $shiftSnapshot = $timesheet->shift_id !== null
+            ? Shift::query()->whereKey($timesheet->shift_id)->first(['id', 'client_id'])
+            : null;
+
+        $clientIds = collect([
+            $this->clientId($timesheet),
+            $requestedClientId,
+            $shiftSnapshot?->client_id,
+        ])
+            ->filter(fn (mixed $clientId): bool => is_numeric($clientId) && (int) $clientId > 0)
+            ->map(fn (mixed $clientId): int => (int) $clientId)
+            ->unique()
+            ->sort()
+            ->values();
+        $clients = Client::query()
+            ->withTrashed()
+            ->whereIn('id', $clientIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id', 'site_id'])
+            ->keyBy(fn (Client $client): int => (int) $client->id);
+        abort_unless($clients->count() === $clientIds->count(), 403, 'You are not authorized to access timesheets for this site.');
+
+        $lockedShift = null;
+        if ($timesheet->shift_id !== null) {
+            $lockedShift = Shift::query()
+                ->whereKey($timesheet->shift_id)
+                ->lockForUpdate()
+                ->first(['id', 'client_id', 'site_id', 'user_id']);
+            abort_unless(
+                $lockedShift
+                    && $clients->has((int) $lockedShift->client_id)
+                    && (int) $lockedShift->client_id === (int) $timesheet->client_id
+                    && (int) $lockedShift->client_id === (int) $requestedClientId
+                    && (int) $lockedShift->user_id === (int) $timesheet->user_id,
+                403,
+                'You are not authorized to access timesheets for this site.',
+            );
+        }
+
+        $currentSiteIds = collect([
+            $timesheet->site_id,
+            $timesheet->shift_site_id,
+            $this->clientSiteId($clients, $this->clientId($timesheet)),
+            $lockedShift?->site_id,
+            $this->clientSiteId($clients, $lockedShift?->client_id),
+        ])->filter(fn (mixed $siteId): bool => is_numeric($siteId) && (int) $siteId > 0)
+            ->map(fn (mixed $siteId): int => (int) $siteId)
+            ->unique()
+            ->values();
+        abort_unless($currentSiteIds->count() === 1, 403, 'You are not authorized to access timesheets for this site.');
+
+        $proposedSiteIds = collect([
+            array_key_exists('site_id', $updates) ? $updates['site_id'] : $timesheet->site_id,
+            array_key_exists('shift_site_id', $updates) ? $updates['shift_site_id'] : $timesheet->shift_site_id,
+            $this->clientSiteId($clients, $requestedClientId),
+            $lockedShift?->site_id,
+            $this->clientSiteId($clients, $lockedShift?->client_id),
+        ])->filter(fn (mixed $siteId): bool => is_numeric($siteId) && (int) $siteId > 0)
+            ->map(fn (mixed $siteId): int => (int) $siteId)
+            ->unique()
+            ->values();
+        abort_unless($proposedSiteIds->count() === 1, 403, 'You are not authorized to access timesheets for this site.');
+
+        return $currentSiteIds
+            ->merge($proposedSiteIds)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /** @param Collection<int, Client> $clients */
+    protected function clientSiteId(Collection $clients, mixed $clientId): ?int
+    {
+        if (! is_numeric($clientId) || (int) $clientId <= 0) {
+            return null;
+        }
+
+        $siteId = $clients->get((int) $clientId)?->site_id;
+
+        return is_numeric($siteId) && (int) $siteId > 0 ? (int) $siteId : null;
+    }
+
+    protected function isCurrentReviewProfile(HrEmployeeProfile $profile): bool
+    {
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+
+        return (bool) $profile->is_active
+            && ($profile->start_date === null || $profile->start_date->toDateString() <= $today)
+            && ($profile->end_date === null || $profile->end_date->toDateString() >= $today);
+    }
+
     protected function clientId(Timesheet $timesheet): ?int
     {
         return $timesheet->client_id !== null
@@ -314,8 +627,6 @@ class TimesheetApprovalService
             ]);
         }
 
-        $this->assertNotLockedByPayroll($timesheet, $action);
-
         if ($timesheet->is_protected_from_changes) {
             throw ValidationException::withMessages([
                 'timesheet' => 'Approved or payroll-linked timesheets require a controlled correction workflow.',
@@ -329,8 +640,20 @@ class TimesheetApprovalService
         }
     }
 
-    protected function assertApprovalAllowed(Timesheet $timesheet, User $actor): void
+    protected function assertEditableSource(Timesheet $timesheet): void
     {
+        if ($timesheet->attendance_session_id !== null) {
+            throw ValidationException::withMessages([
+                'timesheet' => 'Attendance-backed timesheets must be corrected through the governed attendance correction workflow.',
+            ]);
+        }
+    }
+
+    protected function assertApprovalAllowed(
+        Timesheet $timesheet,
+        User $actor,
+        bool $persistReconciliation = true,
+    ): void {
         if ((int) $timesheet->user_id === (int) $actor->id) {
             abort(403, 'You cannot approve your own timesheet.');
         }
@@ -339,45 +662,34 @@ class TimesheetApprovalService
             abort(422, 'Timesheets linked to cancelled shifts cannot be approved.');
         }
 
-        // Approving into a locked/exported payroll period would create an
-        // approved timesheet the (already frozen) run never picked up — the
-        // hours would silently never be paid. Block it like every other
-        // in-period status mutation.
-        $this->assertNotLockedByPayroll($timesheet, 'approved');
-
-        $this->reconciliation->assertWorkflowAllowed($timesheet, 'approved');
+        $this->reconciliation->assertWorkflowAllowed($timesheet, 'approved', $persistReconciliation);
     }
 
-    protected function assertNotLockedByPayroll(Timesheet $timesheet, string $action): void
+    /**
+     * @param  array<int, mixed>  $workDates
+     */
+    protected function lockPayrollRunsForWorkDates(array $workDates, string $action): void
     {
-        if (! $timesheet->work_date) {
-            return;
-        }
+        $dates = collect($workDates)
+            ->filter(fn (mixed $date): bool => filled($date))
+            ->map(fn (mixed $date): string => Carbon::parse($date)->toDateString())
+            ->unique()
+            ->sort()
+            ->values();
 
-        $user = $timesheet->relationLoaded('user')
-            ? $timesheet->user
-            : User::query()->with('hrEmployeeProfile')->find($timesheet->user_id);
+        foreach ($dates as $workDate) {
+            $runs = HrPayrollRun::query()
+                ->where('period_start', '<=', $workDate)
+                ->where('period_end', '>=', $workDate)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id', 'status']);
 
-        $user?->loadMissing('hrEmployeeProfile');
-
-        $tenantId = $user?->hrEmployeeProfile?->tenant_id
-            ?? $user?->organization_id;
-
-        if (! $tenantId) {
-            return;
-        }
-
-        $locked = HrPayrollRun::query()
-            ->where('tenant_id', $tenantId)
-            ->whereIn('status', ['locked', 'exported'])
-            ->where('period_start', '<=', $timesheet->work_date)
-            ->where('period_end', '>=', $timesheet->work_date)
-            ->exists();
-
-        if ($locked) {
-            throw ValidationException::withMessages([
-                'timesheet' => "This timesheet is locked by a payroll run and cannot be {$action}.",
-            ]);
+            if ($runs->contains(fn (HrPayrollRun $run): bool => in_array($run->status, ['locked', 'exported'], true))) {
+                throw ValidationException::withMessages([
+                    'timesheet' => "This timesheet is locked by a payroll run and cannot be {$action}.",
+                ]);
+            }
         }
     }
 
@@ -410,7 +722,7 @@ class TimesheetApprovalService
         ];
     }
 
-    protected function syncApprovedTimesheet(Timesheet $timesheet): void
+    protected function syncApprovedTimesheet(Timesheet $timesheet, ?HrTimeEntry $lockedEntry): void
     {
         // Use `load` (not `loadMissing`) for relations that may have been
         // partially eager-loaded by site access checks before approval.
@@ -453,7 +765,7 @@ class TimesheetApprovalService
             ]);
         }
 
-        $this->hrSync->syncToHr($freshTimesheet);
+        $this->hrSync->syncToHr($freshTimesheet, $lockedEntry, true);
         $this->billing->generateFromTimesheet($freshTimesheet);
     }
 

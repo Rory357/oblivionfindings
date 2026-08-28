@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Http\Controllers\Hr\EmployeeProfileController;
+use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -100,12 +101,15 @@ class EmployeeIntakeService
             // same-email requests even when no User row exists yet.
             $this->acquireIntakeLock('email:'.$email);
             $resolvedExistingUserId = $this->existingUserIdForEmail($email);
+            $requestedRoleId = (int) Role::query()->where('name', $roleName)->value('id');
             $locks = $this->mutationLocks->lock(
                 [$actorId, $authorizedExistingUserId, $resolvedExistingUserId],
+                [],
+                [$requestedRoleId],
             );
             $actor = $locks['users']->get($actorId);
             abort_unless($actor, 403);
-            $role = $this->roleAssignments->assertAssignable($roleName, $actor);
+            $role = $this->roleAssignments->assertAssignable($requestedRoleId, $roleName, $actor);
             $this->assertSiteAssignmentIsAvailable($actor, $profileAttributes);
 
             // 1. Resolve the normalized email. Any existing account must pass
@@ -328,8 +332,13 @@ class EmployeeIntakeService
 
         $profileId = (int) $profile->id;
         $profileUserId = (int) $profile->user_id;
-        $profile = DB::transaction(function () use ($profileId, $profileUserId, $attributes, $actorId, $newStart, &$roleName) {
-            $locks = $this->mutationLocks->lock([$actorId, $profileUserId], [$profileId]);
+        $requestedRoleId = (int) Role::query()->where('name', $roleName)->value('id');
+        $profile = DB::transaction(function () use ($profileId, $profileUserId, $attributes, $actorId, $newStart, $requestedRoleId, &$roleName) {
+            $locks = $this->mutationLocks->lock(
+                [$actorId, $profileUserId],
+                [$profileId],
+                [$requestedRoleId],
+            );
             $actor = $locks['users']->get($actorId);
             abort_unless($actor, 403);
             $profileUser = $locks['users']->get($profileUserId);
@@ -344,7 +353,11 @@ class EmployeeIntakeService
             }
             $profile->setRelation('user', $profileUser);
             $roleName = $attributes['position_role'] ?? $profile->position_role ?? $profileUser?->role;
-            $role = $this->roleAssignments->assertAssignable((string) $roleName, $actor);
+            $role = $this->roleAssignments->assertAssignable(
+                $requestedRoleId,
+                (string) $roleName,
+                $actor,
+            );
 
             // 0. Close out any leaver workflow still open from the previous
             //    stint — rehiring supersedes it, and leaving it open would

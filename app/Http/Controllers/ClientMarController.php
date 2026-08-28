@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\User;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -41,7 +42,11 @@ class ClientMarController extends Controller
         abort_unless($user && ($user->canDo('medications.reports.export') || $user->canDo('reports.viewAny')), 403);
 
         $date = app(MarScheduleService::class)->dateFromInput($request->query('date'));
-        $payload = app(EnhancedMarService::class)->build($client, $date);
+        $payload = app(EnhancedMarService::class)->build(
+            $client,
+            $date,
+            includeControlled: $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+        );
 
         $filename = 'MAR_'.$client->id.'_'.$date->toDateString().'.csv';
 

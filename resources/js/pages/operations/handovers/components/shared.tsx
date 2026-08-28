@@ -64,6 +64,10 @@ export type Handover = {
     site: HandoverSite | null;
     outgoing_staff: HandoverStaff | null;
     incoming_staff: HandoverStaff | null;
+    /** Immutable worker recorded as the recipient at submission time. */
+    submitted_incoming_staff?: HandoverStaff | null;
+    /** Worker currently assigned to the incoming Shift and able to acknowledge. */
+    current_incoming_staff?: HandoverStaff | null;
     acknowledger: { id: number; name: string } | null;
     outgoing_shift: HandoverShift | null;
     incoming_shift: HandoverShift | null;
@@ -89,6 +93,7 @@ export type CatalogueStaff = {
     name: string;
     email?: string | null;
     role?: string | null;
+    site_ids?: number[];
 };
 export type CatalogueSite = { id: number; name: string };
 export type CatalogueServiceContext = {
@@ -103,17 +108,26 @@ export type CatalogueShift = {
     user_id: number | null;
     service_context_id: number | null;
     shift_type: string | null;
+    status: string;
     label: string;
     starts_at: string | null;
     ends_at: string | null;
+    actual_ends_at: string | null;
     staff: { id: number; name: string } | null;
 };
 export type Catalogue = {
     clients: CatalogueClient[];
     staff: CatalogueStaff[];
+    staffBySite: Record<string, { id: number; name: string }[]>;
     sites: CatalogueSite[];
     serviceContexts: CatalogueServiceContext[];
     shifts: CatalogueShift[];
+    controlledWitnessesBySite: Record<string, { id: number; name: string }[]>;
+    capabilities: {
+        view_controlled: boolean;
+        record_controlled: boolean;
+        manage_any_shifts: boolean;
+    };
 };
 
 export type ViewMode = 'cards' | 'list' | 'board';
@@ -261,6 +275,76 @@ export function clientShiftsSorted(
         );
 }
 
+/** Outgoing choices the current actor can actually write. A broad read grant is
+ *  deliberately irrelevant: only the assigned worker or an exact shift manager
+ *  may create the handover. Unassigned shifts cannot satisfy the server's
+ *  canonical outgoing-owner contract. */
+export function outgoingHandoverShifts(
+    shifts: CatalogueShift[],
+    clientId: number | string | null,
+    currentUserId: number,
+    canManageAnyShift: boolean,
+): CatalogueShift[] {
+    return clientShiftsSorted(shifts, clientId).filter(
+        (shift) =>
+            shift.site_id !== null &&
+            shift.user_id !== null &&
+            shift.status !== 'cancelled' &&
+            (canManageAnyShift || shift.user_id === currentUserId),
+    );
+}
+
+/** Incoming choices mirror ShiftHandoverService::incomingShiftMatches(): same
+ *  client/Site/context, assigned and active, beginning at the handoff boundary
+ *  and no more than twelve hours later. */
+export function incomingHandoverShifts(
+    shifts: CatalogueShift[],
+    clientId: number | string | null,
+    outgoingId: number | string | null,
+): CatalogueShift[] {
+    if (!clientId || !outgoingId) return [];
+    const list = clientShiftsSorted(shifts, clientId);
+    const outgoing = list.find(
+        (shift) => String(shift.id) === String(outgoingId),
+    );
+    const outgoingBoundary = outgoing?.actual_ends_at ?? outgoing?.ends_at;
+    if (!outgoing || outgoing.site_id === null || !outgoingBoundary) return [];
+
+    const boundary = new Date(outgoingBoundary).getTime();
+    const latest = boundary + 12 * 60 * 60 * 1000;
+
+    return list.filter((shift) => {
+        if (
+            String(shift.id) === String(outgoing.id) ||
+            !shift.user_id ||
+            shift.site_id === null ||
+            !['scheduled', 'in_progress'].includes(shift.status) ||
+            !shift.starts_at
+        ) {
+            return false;
+        }
+        if (outgoing.site_id !== shift.site_id) {
+            return false;
+        }
+        if (
+            outgoing.service_context_id &&
+            shift.service_context_id !== outgoing.service_context_id
+        ) {
+            return false;
+        }
+
+        const starts = new Date(shift.starts_at).getTime();
+        const ends = shift.ends_at ? new Date(shift.ends_at).getTime() : null;
+
+        return (
+            Number.isFinite(starts) &&
+            starts >= boundary &&
+            starts <= latest &&
+            (ends === null || (Number.isFinite(ends) && ends > starts))
+        );
+    });
+}
+
 /** Immediate next shift for the same client that starts at/after the outgoing
  *  shift ends — the auto-suggested incoming shift. */
 export function nextShiftIdAfter(
@@ -268,17 +352,7 @@ export function nextShiftIdAfter(
     clientId: number | string | null,
     outgoingId: number | string | null,
 ): string {
-    if (!clientId || !outgoingId) return '';
-    const list = clientShiftsSorted(shifts, clientId);
-    const out = list.find((x) => String(x.id) === String(outgoingId));
-    if (!out || !out.ends_at) return '';
-    const outEnd = new Date(out.ends_at).getTime();
-    const next = list.find(
-        (x) =>
-            String(x.id) !== String(outgoingId) &&
-            x.starts_at &&
-            new Date(x.starts_at).getTime() >= outEnd,
-    );
+    const next = incomingHandoverShifts(shifts, clientId, outgoingId).at(0);
     return next ? String(next.id) : '';
 }
 

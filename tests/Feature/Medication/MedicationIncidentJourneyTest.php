@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Medication;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientIncident;
@@ -14,6 +15,7 @@ use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationError;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\Permission;
@@ -344,7 +346,8 @@ class MedicationIncidentJourneyTest extends TestCase
         $this->assertSame($incident->id, data_get($alert->context, 'incident_id'));
         $this->assertSame($incident->id, data_get($alert->context, 'normalized_data.incident_id'));
         $this->assertSame($discrepancy->id, data_get($alert->context, 'normalized_data.discrepancy_id'));
-        $this->assertSame($alert->id, $signal->alert_id);
+        $this->assertNull($signal->alert_id);
+        $this->assertSame($alert->id, $signal->correlated_alert_id);
         $this->assertSame('processed', $signal->status);
         $this->assertDatabaseCount('client_incidents', 1);
         $this->assertDatabaseCount('control_room_alerts', 1);
@@ -1356,6 +1359,25 @@ REGEX;
             $permission->id => ['allowed' => true],
         ]);
         $site = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $actor->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+        $assessor = User::factory()->create();
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $actor->id,
+            'assessor_id' => $assessor->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => today()->subMonth(),
+            'expiry_date' => today()->addYear(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+        ]);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $medication = ClientMedication::factory()->create([
             'client_id' => $client->id,

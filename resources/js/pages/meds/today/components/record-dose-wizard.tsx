@@ -29,6 +29,10 @@ import {
     StepHead,
     SubHead,
 } from '@/components/wizard/primitives';
+import {
+    createMedicationMutationReplayState,
+    prepareMedicationMutationReplayState,
+} from '@/lib/emar-offline';
 import { cn } from '@/lib/utils';
 import { useForm } from '@inertiajs/react';
 import {
@@ -47,7 +51,7 @@ import {
     ShieldAlert,
     Stethoscope,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import type {
     ClientInfo,
@@ -137,6 +141,7 @@ export function RecordDoseWizard({
     const [stepIndex, setStepIndex] = useState(0);
     const [rights, setRights] = useState<string[]>([]);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const doseReplay = useRef(createMedicationMutationReplayState());
 
     const form = useForm({
         client_medication_id: row.medication_id,
@@ -154,6 +159,7 @@ export function RecordDoseWizard({
         blood_pressure_systolic: '',
         blood_pressure_diastolic: '',
         notes: '',
+        client_request_uuid: doseReplay.current.uuid,
     });
 
     const outcome = form.data.status;
@@ -223,44 +229,74 @@ export function RecordDoseWizard({
     const back = () => setStepIndex((i) => Math.max(i - 1, 0));
 
     const submit = () => {
-        form.transform((data) => ({
-            client_medication_id: data.client_medication_id,
-            scheduled_for: data.scheduled_for,
-            status: data.status,
+        const initialPayload = {
+            client_medication_id: form.data.client_medication_id,
+            scheduled_for: form.data.scheduled_for,
+            status: form.data.status,
             reason_code:
-                data.status === 'given' ? null : data.reason_code || null,
-            reason: data.reason.trim() || null,
+                form.data.status === 'given'
+                    ? null
+                    : form.data.reason_code || null,
+            reason: form.data.reason.trim() || null,
             // No timezone suffix — the backend parses bare datetimes in the
             // worker timezone (Pacific/Auckland), matching the board's day.
-            administered_at: `${date}T${data.time}:00`,
-            witnessed_by: data.witnessed_by
-                ? parseInt(data.witnessed_by, 10)
+            administered_at: `${date}T${form.data.time}:00`,
+            witnessed_by: form.data.witnessed_by
+                ? parseInt(form.data.witnessed_by, 10)
                 : null,
-            witness_credential: data.witness_credential || null,
+            witness_credential: form.data.witness_credential || null,
             quantity_administered:
-                data.quantity_administered === ''
+                form.data.quantity_administered === ''
                     ? null
-                    : Number(data.quantity_administered),
+                    : Number(form.data.quantity_administered),
             cd_balance:
-                data.cd_balance === '' ? null : parseInt(data.cd_balance, 10),
+                form.data.cd_balance === ''
+                    ? null
+                    : Number(form.data.cd_balance),
             blood_glucose_level:
-                data.blood_glucose_level === ''
+                form.data.blood_glucose_level === ''
                     ? null
-                    : Number(data.blood_glucose_level),
-            pulse_bpm: data.pulse_bpm === '' ? null : Number(data.pulse_bpm),
+                    : Number(form.data.blood_glucose_level),
+            pulse_bpm:
+                form.data.pulse_bpm === '' ? null : Number(form.data.pulse_bpm),
             blood_pressure_systolic:
-                data.blood_pressure_systolic === ''
+                form.data.blood_pressure_systolic === ''
                     ? null
-                    : Number(data.blood_pressure_systolic),
+                    : Number(form.data.blood_pressure_systolic),
             blood_pressure_diastolic:
-                data.blood_pressure_diastolic === ''
+                form.data.blood_pressure_diastolic === ''
                     ? null
-                    : Number(data.blood_pressure_diastolic),
-            notes: data.notes.trim() || null,
-        }));
+                    : Number(form.data.blood_pressure_diastolic),
+            notes: form.data.notes.trim() || null,
+            client_request_uuid: doseReplay.current.uuid,
+        };
+        const {
+            witness_credential: _witnessCredential,
+            client_request_uuid: _clientRequestUuid,
+            ...materialPayload
+        } = initialPayload;
+        doseReplay.current = prepareMedicationMutationReplayState(
+            doseReplay.current,
+            materialPayload,
+        );
+        const payload = {
+            ...initialPayload,
+            client_request_uuid: doseReplay.current.uuid,
+        };
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            setErrors({
+                connection:
+                    'Reconnect before signing this dose. Witness credentials are never saved on this device.',
+            });
+            return;
+        }
+        form.transform(() => payload);
         form.post('/meds/today/record', {
             preserveScroll: true,
-            onSuccess: () => onClose(),
+            onSuccess: () => {
+                doseReplay.current = createMedicationMutationReplayState();
+                onClose();
+            },
             onError: (serverErrors) => {
                 const first = Object.keys(serverErrors)[0];
                 if (first && RECORD_STEP_FIELDS.includes(first)) {
@@ -628,8 +664,8 @@ export function RecordDoseWizard({
                                 >
                                     <Input
                                         type="number"
-                                        min={0.25}
-                                        step="0.25"
+                                        min={0.01}
+                                        step="0.01"
                                         placeholder="e.g. 2"
                                         value={form.data.quantity_administered}
                                         onChange={(e) =>
@@ -650,6 +686,7 @@ export function RecordDoseWizard({
                                     <Input
                                         type="number"
                                         min={0}
+                                        step="0.01"
                                         placeholder="e.g. 26"
                                         value={form.data.cd_balance}
                                         onChange={(e) =>

@@ -102,7 +102,7 @@ type Client = {
     last_name?: string | null;
     name?: string | null;
     service_context_id?: number | null;
-    site_id?: number | null;
+    site_id: number | null;
 };
 type Site = { id: number; name: string; type?: string | null };
 type ServiceContext = {
@@ -110,6 +110,7 @@ type ServiceContext = {
     name: string;
     type: string;
     is_active: boolean;
+    site_id: number | null;
 };
 type ShiftLite = {
     id: number;

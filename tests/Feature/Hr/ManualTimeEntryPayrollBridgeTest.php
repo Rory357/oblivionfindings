@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\PayrollExportService;
 use App\Domain\Hr\Services\TimeTrackingService;
+use App\Models\Client;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\Timesheet;
@@ -62,11 +63,17 @@ beforeEach(function () {
         'created_by' => $this->hr->id,
         'updated_by' => $this->hr->id,
     ]);
+
+    $this->client = Client::factory()->create([
+        'site_id' => $this->site->id,
+        'status' => 'active',
+    ]);
 });
 
 test('manual HR time entries store worker local input in UTC and create payroll-ready operations timesheets', function () {
     $entry = app(TimeTrackingService::class)->createManualEntry($this->hr, [
         'user_id' => $this->staff->id,
+        'client_id' => $this->client->id,
         'clock_in' => '2026-06-15T09:00',
         'clock_out' => '2026-06-15T17:00',
         'break_minutes' => 30,

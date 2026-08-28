@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\Clients\ClientProfileSectionAccess;
+use App\Services\Medication\MedicationTimelineVisibilityService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -13,6 +14,7 @@ class TimelineController extends Controller
 {
     public function __construct(
         protected ClientProfileSectionAccess $sectionAccess,
+        private readonly MedicationTimelineVisibilityService $medicationTimeline,
     ) {}
 
     public function my(Request $request)
@@ -36,7 +38,7 @@ class TimelineController extends Controller
 
         $range = $this->parseRange($request);
 
-        $events = TimelineEvent::query()
+        $eventsQuery = TimelineEvent::query()
             ->where('actor_user_id', $user->id)
             ->whereBetween('occurred_at', [$range['from'], $range['to']])
             ->orderBy('occurred_at')
@@ -45,8 +47,9 @@ class TimelineController extends Controller
                 'site:id,name',
                 'actor:id,name,email',
             ])
-            ->limit(400)
-            ->get();
+            ->limit(400);
+        $this->medicationTimeline->applyVisibleScope($eventsQuery, $viewer);
+        $events = $eventsQuery->get();
 
         return inertia('timeline/index', [
             'scope' => ['type' => 'staff', 'id' => $user->id, 'name' => $user->name],
@@ -79,6 +82,7 @@ class TimelineController extends Controller
                 'comments' => fn ($q) => $q->whereNull('parent_id')->with(['user:id,name,role', 'replies' => fn ($r) => $r->with('user:id,name,role')->orderBy('created_at'), 'replies.likes', 'likes'])->orderBy('created_at'),
                 'reactions',
             ]);
+        $this->medicationTimeline->applyVisibleScope($query, $viewer);
 
         if ($request->filled('type') && $request->type !== 'all') {
             $query->where('type', $request->type);

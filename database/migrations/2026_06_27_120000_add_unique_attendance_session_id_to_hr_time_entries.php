@@ -8,37 +8,76 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Backend handoff §7 — one HrTimeEntry per attendance session.
  *
- * The clock paths self-heal around a duplicate-open-entry race; this adds the
- * unique constraint that prevents it at the database level so the new idempotent
- * TimeTrackingService::syncEntryFromSession() can updateOrCreate safely. NULL is
- * still allowed many times (manual entries have no session), per SQL's
- * multiple-NULLs-in-a-unique-index behaviour.
+ * This adds the database identity that serializes the attendance-backed ledger.
+ * Existing duplicates are governed evidence and must be reconciled explicitly;
+ * this migration refuses to guess or delete either row. NULL remains allowed
+ * many times (manual entries have no session), per SQL's multiple-NULLs-in-a-
+ * unique-index behaviour.
  */
 return new class extends Migration
 {
+    private const UNIQUE_INDEX = 'hr_time_entries_attendance_session_id_unique';
+
+    private const SUPPORTING_INDEX = 'hr_time_entries_attendance_session_id_index';
+
     public function up(): void
     {
-        // Defensive dedupe: physically remove any stray rows that already share a
-        // non-null attendance_session_id, keeping the highest id, so the unique
-        // index can be created. (Includes soft-deleted rows, which still occupy
-        // the index slot.)
-        DB::statement(
-            'DELETE t1 FROM hr_time_entries t1 '.
-            'INNER JOIN hr_time_entries t2 '.
-            'ON t1.attendance_session_id = t2.attendance_session_id '.
-            'AND t1.attendance_session_id IS NOT NULL '.
-            'AND t1.id < t2.id'
-        );
+        if (Schema::hasIndex('hr_time_entries', self::UNIQUE_INDEX)) {
+            $this->ensureForeignKeySupportingIndex();
+
+            return;
+        }
+
+        // Never guess which duplicate is canonical: either row can carry
+        // approval, payroll, amendment, audit, or Timesheet references. Halt
+        // before DDL and leave every byte intact for explicit reconciliation.
+        $duplicates = DB::table('hr_time_entries')
+            ->whereNotNull('attendance_session_id')
+            ->select('attendance_session_id')
+            ->groupBy('attendance_session_id')
+            ->havingRaw('COUNT(*) > 1')
+            ->orderBy('attendance_session_id')
+            ->pluck('attendance_session_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+        if ($duplicates !== []) {
+            throw new RuntimeException(
+                'Cannot add the attendance time-entry unique index until duplicate session evidence is reconciled. '.
+                'Conflicting attendance_session_id values: '.implode(', ', $duplicates),
+            );
+        }
+
+        $this->ensureForeignKeySupportingIndex();
 
         Schema::table('hr_time_entries', function (Blueprint $table) {
-            $table->unique('attendance_session_id');
+            $table->unique('attendance_session_id', self::UNIQUE_INDEX);
         });
     }
 
     public function down(): void
     {
+        if (! Schema::hasIndex('hr_time_entries', self::UNIQUE_INDEX)) {
+            return;
+        }
+
+        // InnoDB may discard its implicit FK index once the unique index can
+        // support the constraint. Recreate an explicit support index before
+        // removing uniqueness so rollback also works on already-deployed DBs.
+        $this->ensureForeignKeySupportingIndex();
+
         Schema::table('hr_time_entries', function (Blueprint $table) {
-            $table->dropUnique(['attendance_session_id']);
+            $table->dropUnique(self::UNIQUE_INDEX);
+        });
+    }
+
+    private function ensureForeignKeySupportingIndex(): void
+    {
+        if (Schema::hasIndex('hr_time_entries', self::SUPPORTING_INDEX)) {
+            return;
+        }
+
+        Schema::table('hr_time_entries', function (Blueprint $table): void {
+            $table->index('attendance_session_id', self::SUPPORTING_INDEX);
         });
     }
 };

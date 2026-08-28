@@ -44,8 +44,12 @@ class MarOmissionService
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function omissionsForRange(?Carbon $from = null, ?Carbon $to = null, ?int $clientId = null): array
-    {
+    public function omissionsForRange(
+        ?Carbon $from = null,
+        ?Carbon $to = null,
+        ?int $clientId = null,
+        bool $includeControlled = true,
+    ): array {
         $tz = $this->schedule->workerTimezone();
         $now = Carbon::now($tz);
 
@@ -63,6 +67,9 @@ class MarOmissionService
         $medications = ClientMedication::query()
             ->active()
             ->where('is_prn', false)
+            ->when(! $includeControlled, fn ($query) => $query->where(function ($classification): void {
+                $classification->where('controlled_drug', false)->orWhereNull('controlled_drug');
+            }))
             ->where(fn ($q) => $q->whereNotNull('dose_times')->orWhereNotNull('frequency'))
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
             ->with('client:id,first_name,last_name')

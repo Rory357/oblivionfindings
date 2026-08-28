@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Operations;
 
 use App\Domain\Rostering\RosterPublishValidator;
 use App\Domain\Shifts\Lifecycle\ShiftLifecycleService;
+use App\Domain\Shifts\Lifecycle\ShiftLifecycleSource;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Operations\Rostering\ApplyRosterTemplateRequest;
 use App\Http\Requests\Operations\Rostering\StoreRosterTemplateRequest;
@@ -223,13 +224,30 @@ class RosterTemplateController extends Controller
                 ->with('status', 'This template was already applied by you for that week in the last hour; no duplicate shifts were created.');
         }
 
+        $bulkOverrideRequest = (bool) ($data['confirm_warnings'] ?? false)
+            ? [
+                'override_acknowledged' => true,
+                'override_reason' => 'Applied confirmed roster-template eligibility warnings after current recheck.',
+            ]
+            : null;
+
         try {
-            DB::transaction(function () use ($occurrences, $auth, $lifecycle): void {
+            DB::transaction(function () use ($occurrences, $auth, $lifecycle, $bulkOverrideRequest): void {
                 foreach ($occurrences as $occurrence) {
-                    $shift = $lifecycle->create($occurrence['attributes'], $auth);
+                    $shift = $lifecycle->create(
+                        $occurrence['attributes'],
+                        $auth,
+                        ShiftLifecycleSource::Bulk,
+                    );
 
                     if ($occurrence['assignee'] instanceof User) {
-                        $lifecycle->assign($shift, $auth, $occurrence['assignee']);
+                        $lifecycle->assign(
+                            $shift,
+                            $auth,
+                            $occurrence['assignee'],
+                            $bulkOverrideRequest,
+                            source: ShiftLifecycleSource::Bulk,
+                        );
                     }
                 }
             });
@@ -335,9 +353,10 @@ class RosterTemplateController extends Controller
     }
 
     /**
-     * Template rows may only refer to Clients, service contexts and staff from
-     * Sites available to the actor. The template catalogue itself is shared by
-     * this single application; Site provenance lives on each row's references.
+     * Template rows must retain canonical Client ownership and may only refer
+     * to Clients, service contexts and staff from Sites available to the actor.
+     * The template catalogue itself is shared by this single application; Site
+     * provenance lives on each row's references.
      *
      * @param  array<int, array<string, mixed>>  $rows
      */
@@ -346,24 +365,35 @@ class RosterTemplateController extends Controller
         $siteIds = $this->siteAccess->accessibleSiteIds($actor, ['shifts.manageAny']);
         abort_if($siteIds === [], 403, UserSiteAccessService::DEFAULT_MESSAGE);
 
+        if (collect($rows)->contains(function ($row): bool {
+            $clientId = data_get($row, 'client_id');
+
+            return ! is_numeric($clientId) || (int) $clientId < 1;
+        })) {
+            throw ValidationException::withMessages([
+                'template_shifts' => 'Each template shift must be linked to a client.',
+            ]);
+        }
+
         $clientIds = collect($rows)->pluck('client_id')->filter()->map(fn ($id) => (int) $id)->unique();
         $serviceContextIds = collect($rows)->pluck('service_context_id')->filter()->map(fn ($id) => (int) $id)->unique();
         $staffIds = collect($rows)->pluck('user_id')->filter()->map(fn ($id) => (int) $id)->unique();
 
-        if ($clientIds->isNotEmpty()) {
-            $visibleClientCount = Client::query()
-                ->whereKey($clientIds)
-                ->whereIn('site_id', $siteIds)
-                ->count();
-            abort_unless($visibleClientCount === $clientIds->count(), 403, UserSiteAccessService::DEFAULT_MESSAGE);
-        }
+        $visibleClients = Client::query()
+            ->whereKey($clientIds->all())
+            ->whereIn('site_id', $siteIds)
+            ->get(['id', 'site_id'])
+            ->keyBy('id');
+        abort_unless($visibleClients->count() === $clientIds->count(), 403, UserSiteAccessService::DEFAULT_MESSAGE);
 
+        $visibleServiceContexts = collect();
         if ($serviceContextIds->isNotEmpty()) {
-            $visibleServiceContextCount = ServiceContext::query()
+            $visibleServiceContexts = ServiceContext::query()
                 ->availableToSites($siteIds)
-                ->whereKey($serviceContextIds)
-                ->count();
-            abort_unless($visibleServiceContextCount === $serviceContextIds->count(), 403, UserSiteAccessService::DEFAULT_MESSAGE);
+                ->whereKey($serviceContextIds->all())
+                ->get(['id', 'site_id', 'is_active'])
+                ->keyBy('id');
+            abort_unless($visibleServiceContexts->count() === $serviceContextIds->count(), 403, UserSiteAccessService::DEFAULT_MESSAGE);
         }
 
         if ($staffIds->isNotEmpty()) {
@@ -372,6 +402,26 @@ class RosterTemplateController extends Controller
                 ->whereKey($staffIds)
                 ->count();
             abort_unless($visibleStaffCount === $staffIds->count(), 403, UserSiteAccessService::DEFAULT_MESSAGE);
+        }
+
+        foreach ($rows as $row) {
+            $serviceContextId = data_get($row, 'service_context_id');
+            if (! is_numeric($serviceContextId) || (int) $serviceContextId < 1) {
+                continue;
+            }
+
+            $client = $visibleClients->get((int) data_get($row, 'client_id'));
+            $serviceContext = $visibleServiceContexts->get((int) $serviceContextId);
+            if (! $client instanceof Client
+                || ! $serviceContext instanceof ServiceContext
+                || ! $serviceContext->is_active
+                || ($serviceContext->site_id !== null
+                    && (int) $serviceContext->site_id !== (int) $client->site_id)
+            ) {
+                throw ValidationException::withMessages([
+                    'template_shifts' => 'Each service context must be active and available to the template shift client\'s Site.',
+                ]);
+            }
         }
     }
 
@@ -386,9 +436,9 @@ class RosterTemplateController extends Controller
 
     private function normalizeTemplateShift(array $row): array
     {
-        if (empty($row['client_id']) && empty($row['service_context_id'])) {
+        if (empty($row['client_id'])) {
             throw ValidationException::withMessages([
-                'template_shifts' => 'Each template shift must be linked to a client or a service context.',
+                'template_shifts' => 'Each template shift must be linked to a client.',
             ]);
         }
 

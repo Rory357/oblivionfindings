@@ -138,10 +138,12 @@ export type TriageAction = 'review' | 'resolve' | 'close';
 // ── Triage / detail (read-only) ──────────────────────────────────────────────
 export function TriageDialog({
     error,
+    canCorrect,
     onDismiss,
     onAction,
 }: {
     error: ErrorRow;
+    canCorrect: boolean;
     onDismiss: () => void;
     onAction: (a: TriageAction) => void;
 }) {
@@ -203,20 +205,21 @@ export function TriageDialog({
                         Close
                     </Button>
                     <div className="flex flex-wrap items-center justify-end gap-2">
-                        {error.status === 'reported' && (
+                        {canCorrect && error.status === 'reported' && (
                             <Button onClick={() => onAction('review')}>
                                 <ClipboardList className="h-4 w-4" />
                                 Review
                             </Button>
                         )}
-                        {(error.status === 'reported' ||
-                            error.status === 'investigating') && (
-                            <Button onClick={() => onAction('resolve')}>
-                                <ShieldCheck className="h-4 w-4" />
-                                Resolve
-                            </Button>
-                        )}
-                        {error.status === 'resolved' && (
+                        {canCorrect &&
+                            (error.status === 'reported' ||
+                                error.status === 'investigating') && (
+                                <Button onClick={() => onAction('resolve')}>
+                                    <ShieldCheck className="h-4 w-4" />
+                                    Resolve
+                                </Button>
+                            )}
+                        {canCorrect && error.status === 'resolved' && (
                             <Button onClick={() => onAction('close')}>
                                 <Lock className="h-4 w-4" />
                                 Close out
@@ -233,7 +236,9 @@ export function TriageDialog({
                                 <Link2 className="h-4 w-4" />
                                 Incident {error.incident.ref}
                             </Button>
-                        ) : (
+                        ) : canCorrect &&
+                          (error.status === 'reported' ||
+                              error.status === 'investigating') ? (
                             <Button
                                 variant="outline"
                                 onClick={createIncident}
@@ -242,7 +247,7 @@ export function TriageDialog({
                                 <Link2 className="h-4 w-4" />
                                 Create &amp; link incident
                             </Button>
-                        )}
+                        ) : null}
                         {error.mar_url && (
                             <Button
                                 variant="ghost"
@@ -347,7 +352,8 @@ export function TriageDialog({
                         <p className="text-sm whitespace-pre-wrap">{v}</p>
                     </div>
                 ))}
-            {!error.incident &&
+            {canCorrect &&
+            !error.incident &&
             ['major', 'critical'].includes(error.severity) &&
             !error.immediate_action ? (
                 <div className="mt-4">

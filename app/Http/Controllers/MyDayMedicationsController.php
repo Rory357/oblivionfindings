@@ -9,6 +9,7 @@ use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -41,36 +42,26 @@ class MyDayMedicationsController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $this->authorize('view', $medication->client);
         abort_unless($user->canDo('medications.administer.record'), 403);
 
-        $data = $request->validate([
-            'scheduled_for' => ['required', 'date'],
-            'dose_given' => ['nullable', 'string', 'max:255'],
-            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
-            'witness_credential' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $scheduledFor = $this->scheduleService->parseWorkerDateTime($data['scheduled_for']);
+        $actionAt = now();
 
         return $this->medicationScope->forAdministration(
             $user,
-            $medication->client,
+            null,
             $medication,
-            now(),
-            $scheduledFor,
+            $actionAt,
             null,
             null,
-            function (MedicationScopeDecision $scope) use ($data, $user) {
+            null,
+            function (MedicationScopeDecision $scope, ?array $data) use ($user) {
+                $data ??= [];
                 $result = $this->marService->recordAdministration(
                     $scope->client,
                     $scope->medication,
                     [
                         'status' => 'given',
                         'scheduled_for' => $data['scheduled_for'],
-                        'administered_at' => now(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
                         'dose_given' => $data['dose_given'] ?? $scope->medication->dosage,
                         'quantity_administered' => $data['quantity_administered'] ?? null,
                         'notes' => $data['notes'] ?? null,
@@ -80,6 +71,9 @@ class MyDayMedicationsController extends Controller
                     ],
                     $user->id,
                     $scope->shiftId(),
+                    $user->canDo('medications.controlled.view'),
+                    prelockedPresenceShifts: $scope->lockedPresenceShifts,
+                    prelockedPresenceEffectiveAt: $scope->lockedPresenceEffectiveAt,
                 );
 
                 if (! ($result['success'] ?? false)) {
@@ -99,6 +93,22 @@ class MyDayMedicationsController extends Controller
 
                 return back()->with('success', empty($result['duplicate']) ? 'Dose given.' : 'Dose already recorded.');
             },
+            scopedInputResolver: function () use ($request, $actionAt): array {
+                $data = $request->validate([
+                    'scheduled_for' => ['required', 'date'],
+                    'dose_given' => ['nullable', 'string', 'max:255'],
+                    'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
+                    'notes' => ['nullable', 'string', 'max:2000'],
+                    'witnessed_by' => ['nullable', 'integer', 'min:1'],
+                    'witness_credential' => ['nullable', 'string', 'max:255'],
+                ]);
+
+                return [
+                    'scheduled_for' => $this->scheduleService->parseWorkerDateTime($data['scheduled_for']),
+                    'action_at' => $actionAt,
+                    'payload' => $data,
+                ];
+            },
         );
     }
 
@@ -112,41 +122,36 @@ class MyDayMedicationsController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $this->authorize('view', $medication->client);
         abort_unless($user->canDo('medications.administer.record'), 403);
 
-        $data = $request->validate([
-            'scheduled_for' => ['required', 'date'],
-            'reason_code' => ['nullable', 'string', 'max:60'],
-            'reason' => ['nullable', 'string', 'max:500'],
-        ]);
-
-        $reasonCode = $data['reason_code'] ?? NotGivenReason::Refused->value;
-
-        $scheduledFor = $this->scheduleService->parseWorkerDateTime($data['scheduled_for']);
+        $actionAt = now();
 
         return $this->medicationScope->forAdministration(
             $user,
-            $medication->client,
+            null,
             $medication,
-            now(),
-            $scheduledFor,
+            $actionAt,
             null,
             null,
-            function (MedicationScopeDecision $scope) use ($data, $reasonCode, $user) {
+            null,
+            function (MedicationScopeDecision $scope, ?array $data) use ($user) {
+                $data ??= [];
+                $reasonCode = $data['reason_code'] ?? NotGivenReason::Refused->value;
                 $result = $this->marService->recordAdministration(
                     $scope->client,
                     $scope->medication,
                     [
                         'status' => 'refused',
                         'scheduled_for' => $data['scheduled_for'],
-                        'administered_at' => now(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
                         'reason_code' => $reasonCode,
                         'reason' => $data['reason'] ?? NotGivenReason::tryFrom($reasonCode)?->label(),
                         'scope_authorized' => true,
                     ],
                     $user->id,
                     $scope->shiftId(),
+                    $user->canDo('medications.controlled.view'),
+                    prelockedPresenceShifts: $scope->lockedPresenceShifts,
+                    prelockedPresenceEffectiveAt: $scope->lockedPresenceEffectiveAt,
                 );
 
                 if (! ($result['success'] ?? false)) {
@@ -168,6 +173,19 @@ class MyDayMedicationsController extends Controller
 
                 return back()->with('success', empty($result['duplicate']) ? 'Dose marked refused.' : 'Dose already recorded.');
             },
+            scopedInputResolver: function () use ($request, $actionAt): array {
+                $data = $request->validate([
+                    'scheduled_for' => ['required', 'date'],
+                    'reason_code' => ['nullable', 'string', 'max:60'],
+                    'reason' => ['nullable', 'string', 'max:500'],
+                ]);
+
+                return [
+                    'scheduled_for' => $this->scheduleService->parseWorkerDateTime($data['scheduled_for']),
+                    'action_at' => $actionAt,
+                    'payload' => $data,
+                ];
+            },
         );
     }
 
@@ -183,29 +201,42 @@ class MyDayMedicationsController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $this->authorize('view', $medication->client);
+        abort_unless($user->canDo('medications.administer.record'), 403);
 
-        $data = $request->validate([
-            'minutes' => ['nullable', 'integer', 'min:1', 'max:120'],
-            'scheduled_for' => ['nullable', 'date'],
-        ]);
+        return $this->medicationScope->forMedication(
+            $user,
+            $medication,
+            now(),
+            function (MedicationScopeDecision $scope) use ($request, $user) {
+                if ((bool) $scope->medication->controlled_drug) {
+                    abort_unless($user->canDo('medications.controlled.record'), 404);
+                }
+                $data = $request->validate([
+                    'minutes' => ['nullable', 'integer', 'min:1', 'max:120'],
+                    'scheduled_for' => ['nullable', 'date'],
+                ]);
 
-        $minutes = $data['minutes'] ?? 15;
-        $key = sprintf(
-            'my-day.med-snooze.user-%d.med-%d.%s',
-            $user->id,
-            $medication->id,
-            ($data['scheduled_for'] ?? now()->toIso8601String()),
+                $minutes = $data['minutes'] ?? 15;
+                $key = sprintf(
+                    'my-day.med-snooze.user-%d.med-%d.%s',
+                    $user->id,
+                    $scope->medication->id,
+                    ($data['scheduled_for'] ?? now()->toIso8601String()),
+                );
+                Cache::put($key, true, now()->addMinutes($minutes));
+
+                AuditLogger::log('meds.snooze', $scope->medication, [
+                    'medication_id' => $scope->medication->id,
+                    'client_id' => $scope->client->id,
+                    'minutes' => $minutes,
+                    'via' => 'my-day',
+                ]);
+
+                $this->medicationScope->recordBreakGlassUse($scope, 'snoozed_dose', 'Via My Day');
+
+                return back()->with('success', "Snoozed {$minutes}m.");
+            },
+            requireAdministrable: true,
         );
-        Cache::put($key, true, now()->addMinutes($minutes));
-
-        AuditLogger::log('meds.snooze', $medication, [
-            'medication_id' => $medication->id,
-            'client_id' => $medication->client_id,
-            'minutes' => $minutes,
-            'via' => 'my-day',
-        ]);
-
-        return back()->with('success', "Snoozed {$minutes}m.");
     }
 }

@@ -4,6 +4,7 @@ namespace Tests\Feature\Operations;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrTimeEntry;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\CustomForm;
@@ -220,6 +221,216 @@ class ShiftSiteIsolationTest extends TestCase
             );
     }
 
+    public function test_report_wide_timesheet_reads_never_broaden_any_mutation_site_boundary(): void
+    {
+        $manager = $this->makeSiteScopedUser([$this->siteA], [
+            'timesheets.viewAny',
+            'reports.viewAny',
+            'timesheets.manageAny',
+            'timesheets.approve',
+            'timesheets.create',
+            'timesheets.update',
+            'timesheets.submit',
+        ]);
+        $localStaff = $this->makeSiteScopedUser([$this->siteA], []);
+        $foreignStaff = $this->makeSiteScopedUser([$this->siteB], []);
+
+        $localSubmitted = Timesheet::factory()->submitted()->create([
+            'user_id' => $localStaff->id,
+            'client_id' => $this->clientA->id,
+            'shift_id' => null,
+            'shift_site_id' => $this->siteA->id,
+            'work_date' => '2026-04-05',
+        ]);
+        $foreignSubmitted = Timesheet::factory()->submitted()->create([
+            'user_id' => $foreignStaff->id,
+            'client_id' => $this->clientB->id,
+            'shift_id' => null,
+            'shift_site_id' => $this->siteB->id,
+            'work_date' => '2026-04-05',
+        ]);
+        $foreignDraft = Timesheet::factory()->create([
+            'user_id' => $foreignStaff->id,
+            'client_id' => $this->clientB->id,
+            'shift_id' => null,
+            'shift_site_id' => $this->siteB->id,
+            'work_date' => '2026-04-05',
+            'status' => 'draft',
+            'archived_at' => null,
+        ]);
+        $foreignShift = Shift::factory()->create([
+            'client_id' => $this->clientB->id,
+            'site_id' => $this->siteB->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $foreignStaff->id,
+            'starts_at' => now()->subDay()->setTime(9, 0),
+            'ends_at' => now()->subDay()->setTime(17, 0),
+            'actual_starts_at' => now()->subDay()->setTime(9, 0),
+            'actual_ends_at' => now()->subDay()->setTime(17, 0),
+            'status' => 'completed',
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('operations.timesheets.index', [
+                'tab' => 'submitted',
+                'view' => $foreignSubmitted->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('timesheets.data', function ($rows) use ($localSubmitted, $foreignSubmitted): bool {
+                    $rows = collect($rows)->keyBy('id');
+
+                    return $rows->has($localSubmitted->id)
+                        && $rows->has($foreignSubmitted->id)
+                        && $rows[$localSubmitted->id]['can_mutate'] === true
+                        && $rows[$localSubmitted->id]['can_approve'] === true
+                        && $rows[$foreignSubmitted->id]['can_mutate'] === false
+                        && $rows[$foreignSubmitted->id]['can_approve'] === false;
+                })
+                ->where('clients', fn ($clients) => collect($clients)->pluck('id')->contains($this->clientA->id)
+                    && ! collect($clients)->pluck('id')->contains($this->clientB->id))
+                ->where('sites', fn ($sites) => collect($sites)->pluck('id')->contains($this->siteA->id)
+                    && ! collect($sites)->pluck('id')->contains($this->siteB->id))
+                ->where('availableShifts', fn ($shifts) => ! collect($shifts)->pluck('id')->contains($foreignShift->id))
+            );
+
+        $this->actingAs($manager)
+            ->getJson(route('operations.timesheets.show', $foreignSubmitted))
+            ->assertOk()
+            ->assertJsonPath('timesheet.id', $foreignSubmitted->id)
+            ->assertJsonPath('timesheet.can_mutate', false)
+            ->assertJsonPath('can_approve', false);
+
+        foreach ([
+            ['operations.timesheets.approve', $foreignSubmitted, []],
+            ['operations.timesheets.reject', $foreignSubmitted, ['decision_notes' => 'No']],
+            ['operations.timesheets.return', $foreignSubmitted, ['returned_notes' => 'Fix']],
+            ['operations.timesheets.submit', $foreignDraft, []],
+            ['operations.timesheets.archive', $foreignDraft, ['reason' => 'Out of scope']],
+        ] as [$routeName, $timesheet, $payload]) {
+            $before = $timesheet->fresh()->getRawOriginal();
+            $this->actingAs($manager)
+                ->post(route($routeName, $timesheet), $payload)
+                ->assertForbidden();
+            $this->assertSame($before, $timesheet->fresh()->getRawOriginal());
+        }
+
+        $beforeDraft = $foreignDraft->fresh()->getRawOriginal();
+        $this->actingAs($manager)
+            ->put(route('operations.timesheets.update', $foreignDraft), [
+                'work_date' => '2026-04-05',
+                'starts_at' => '2026-04-05 09:00:00',
+                'ends_at' => '2026-04-05 17:00:00',
+            ])
+            ->assertForbidden();
+        $this->assertSame($beforeDraft, $foreignDraft->fresh()->getRawOriginal());
+
+        $timesheetCount = Timesheet::query()->count();
+        $this->actingAs($manager)
+            ->post(route('operations.timesheets.store'), [
+                'mode' => 'shift',
+                'shift_id' => $foreignShift->id,
+                'work_date' => '2026-04-05',
+                'starts_at' => '2026-04-05 09:00:00',
+                'ends_at' => '2026-04-05 17:00:00',
+            ])
+            ->assertForbidden();
+        $this->assertSame($timesheetCount, Timesheet::query()->count());
+
+        foreach ([
+            ['operations.timesheets.bulkApprove', ['decision_notes' => 'Batch']],
+            ['operations.timesheets.bulkReturn', ['returned_notes' => 'Batch']],
+            ['operations.timesheets.bulkReject', ['decision_notes' => 'Batch']],
+        ] as [$routeName, $payload]) {
+            $localBefore = $localSubmitted->fresh()->getRawOriginal();
+            $foreignBefore = $foreignSubmitted->fresh()->getRawOriginal();
+            $this->actingAs($manager)
+                ->post(route($routeName), [
+                    'ids' => [$localSubmitted->id, $foreignSubmitted->id],
+                    ...$payload,
+                ])
+                ->assertForbidden();
+            $this->assertSame($localBefore, $localSubmitted->fresh()->getRawOriginal());
+            $this->assertSame($foreignBefore, $foreignSubmitted->fresh()->getRawOriginal());
+        }
+    }
+
+    public function test_attendance_backed_timesheet_http_update_and_resubmit_are_governed_correction_only(): void
+    {
+        $manager = $this->makeSiteScopedUser([$this->siteA], [
+            'timesheets.viewAny',
+            'timesheets.manageAny',
+            'timesheets.update',
+            'timesheets.submit',
+        ]);
+        $staff = $this->makeSiteScopedUser([$this->siteA], []);
+        $session = HrAttendanceSession::query()->create([
+            'user_id' => $staff->id,
+            'site_id' => $this->siteA->id,
+            'clock_in_at' => Carbon::parse('2026-04-05 09:00:00'),
+            'clock_out_at' => Carbon::parse('2026-04-05 17:00:00'),
+            'break_minutes' => 0,
+            'status' => 'closed',
+            'source' => 'manual',
+            'created_by' => $staff->id,
+            'closed_by' => $staff->id,
+        ]);
+        $entry = HrTimeEntry::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $staff->id,
+            'attendance_session_id' => $session->id,
+            'site_id' => $this->siteA->id,
+            'client_id' => $this->clientA->id,
+            'entry_date' => '2026-04-05',
+            'clock_in' => $session->clock_in_at,
+            'clock_out' => $session->clock_out_at,
+            'break_minutes' => 0,
+            'total_hours' => 8,
+            'entry_type' => 'clock',
+            'status' => 'submitted',
+            'source_type' => 'attendance',
+            'source_id' => $session->id,
+            'created_by' => $staff->id,
+        ]);
+
+        foreach (['update', 'resubmit'] as $command) {
+            $timesheet = Timesheet::query()->create([
+                'user_id' => $staff->id,
+                'client_id' => $this->clientA->id,
+                'site_id' => $this->siteA->id,
+                'attendance_session_id' => $session->id,
+                'hr_time_entry_id' => $entry->id,
+                'work_date' => '2026-04-05',
+                'starts_at' => $session->clock_in_at,
+                'ends_at' => $session->clock_out_at,
+                'break_minutes' => 0,
+                'status' => $command === 'resubmit' ? 'returned' : 'draft',
+                'created_by' => $staff->id,
+            ]);
+            $timesheetBefore = $timesheet->fresh()->getRawOriginal();
+            $sessionBefore = $session->fresh()->getRawOriginal();
+            $entryBefore = $entry->fresh()->getRawOriginal();
+            $payload = [
+                'client_id' => $this->clientA->id,
+                'work_date' => '2026-04-05',
+                'starts_at' => '2026-04-05 10:00:00',
+                'ends_at' => '2026-04-05 18:00:00',
+                'break_minutes' => 30,
+            ];
+
+            $response = $this->actingAs($manager);
+            $response = $command === 'resubmit'
+                ? $response->post(route('operations.timesheets.resubmit', $timesheet), $payload)
+                : $response->put(route('operations.timesheets.update', $timesheet), $payload);
+            $response->assertSessionHasErrors(['timesheet']);
+
+            $this->assertSame($timesheetBefore, $timesheet->fresh()->getRawOriginal());
+            $this->assertSame($sessionBefore, $session->fresh()->getRawOriginal());
+            $this->assertSame($entryBefore, $entry->fresh()->getRawOriginal());
+            $timesheet->forceDelete();
+        }
+    }
+
     public function test_handover_acknowledgement_is_blocked_for_foreign_site(): void
     {
         $viewer = $this->makeSiteScopedUser([$this->siteA], ['handovers.viewAny']);
@@ -291,10 +502,16 @@ class ShiftSiteIsolationTest extends TestCase
             'incoming_staff_id' => $foreignIncoming->id,
             'submitted_by' => $foreignOutgoing->id,
         ]);
+        $corruptOutgoingShift = $this->makeHandoverShift(
+            $this->clientA,
+            $this->siteA,
+            $localOutgoing,
+            'in_progress',
+        );
 
         $corruptId = DB::table('shift_handovers')->insertGetId([
             'organization_id' => 1,
-            'outgoing_shift_id' => $localOutgoingShift->id,
+            'outgoing_shift_id' => $corruptOutgoingShift->id,
             'incoming_shift_id' => null,
             'client_id' => $this->clientB->id,
             'outgoing_staff_id' => $localOutgoing->id,
@@ -343,7 +560,7 @@ class ShiftSiteIsolationTest extends TestCase
                 'incoming_shift_id' => $foreignIncomingShift->id,
                 'handover_notes' => 'This mismatched incoming Shift must be rejected.',
             ])
-            ->assertSessionHasErrors('incoming_shift_id');
+            ->assertNotFound();
 
         $this->actingAs($manager)
             ->post('/operations/handovers', [
@@ -351,7 +568,7 @@ class ShiftSiteIsolationTest extends TestCase
                 'client_id' => $this->clientB->id,
                 'handover_notes' => 'This mismatched Client must be rejected.',
             ])
-            ->assertSessionHasErrors('handover');
+            ->assertNotFound();
 
         $this->assertDatabaseMissing('shift_handovers', [
             'outgoing_shift_id' => $outgoingShift->id,
@@ -557,7 +774,7 @@ class ShiftSiteIsolationTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('id', $shift->id)
             ->assertJsonPath('client.id', $this->clientA->id)
-            ->assertJsonMissing(['id' => $this->clientB->id]);
+            ->assertJsonMissingPath('clients');
     }
 
     public function test_shift_show_scopes_medication_witnesses_to_accessible_sites(): void

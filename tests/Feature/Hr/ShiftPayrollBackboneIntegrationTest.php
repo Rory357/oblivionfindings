@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayRateRule;
+use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\PayrollExportService;
 use App\Models\Client;
 use App\Models\Role;
@@ -40,6 +41,14 @@ test('attendance generated shift timesheet flows into payroll run with shift and
     $finance = payrollRoleUser('finance');
     $worker = payrollRoleUser('support_worker');
     $site = Site::factory()->create(['type' => 'house']);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $finance->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
     $serviceContext = ServiceContext::factory()->create([
         'name' => 'Residential Support',
         'type' => 'residential',
@@ -110,11 +119,17 @@ test('attendance generated shift timesheet flows into payroll run with shift and
     $timesheet = Timesheet::query()
         ->where('attendance_session_id', $openSession->id)
         ->firstOrFail();
+    $attendanceEntry = HrTimeEntry::query()
+        ->where('attendance_session_id', $openSession->id)
+        ->sole();
 
     expect((int) $timesheet->shift_id)->toBe($shift->id)
         ->and((int) $timesheet->client_id)->toBe($client->id)
         ->and((int) $timesheet->shift_site_id)->toBe($site->id)
-        ->and($timesheet->reconciliation_status)->toBe('clear');
+        ->and($timesheet->reconciliation_status)->toBe('clear')
+        ->and((int) $timesheet->hr_time_entry_id)->toBe($attendanceEntry->id)
+        ->and($attendanceEntry->source_type)->toBe('attendance')
+        ->and((int) $attendanceEntry->source_id)->toBe($openSession->id);
 
     $this->actingAs($worker)
         ->post(route('operations.timesheets.submit', $timesheet))
@@ -128,7 +143,14 @@ test('attendance generated shift timesheet flows into payroll run with shift and
         ->assertSessionHas('success');
 
     $timesheet->refresh();
-    expect($timesheet->status)->toBe('approved');
+    $attendanceEntry->refresh();
+    expect($timesheet->status)->toBe('approved')
+        ->and(HrTimeEntry::query()->where('user_id', $worker->id)->count())->toBe(1)
+        ->and((int) $timesheet->hr_time_entry_id)->toBe($attendanceEntry->id)
+        ->and($attendanceEntry->source_type)->toBe('attendance')
+        ->and((int) $attendanceEntry->source_id)->toBe($openSession->id)
+        ->and((int) $attendanceEntry->attendance_session_id)->toBe($openSession->id)
+        ->and($attendanceEntry->status)->toBe('approved');
 
     // The attendance pipeline stamps work_date as the WORKER-LOCAL calendar day
     // (DraftTimesheetService converts the clock-in to app.worker_timezone =
@@ -156,6 +178,14 @@ test('returned shift timesheet keeps special pay flags intact when resubmitted i
     $finance = payrollRoleUser('finance');
     $worker = payrollRoleUser('support_worker');
     $site = Site::factory()->create(['type' => 'house']);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $finance->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
     $serviceContext = ServiceContext::factory()->create([
         'name' => 'Residential Support',
         'type' => 'residential',

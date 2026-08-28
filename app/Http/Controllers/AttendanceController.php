@@ -2,20 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Enums\AttendanceTimesheetSyncOutcome;
 use App\Domain\Hr\Exceptions\AttendanceClockOutBlockedException;
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Services\AttendanceService;
-use App\Domain\Hr\Services\TimeTrackingService;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\User;
-use App\Services\AuditLogger;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Operations\HandoverPresenter;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class AttendanceController extends Controller
@@ -24,7 +25,6 @@ class AttendanceController extends Controller
         protected AttendanceService $attendanceService,
         protected ShiftHandoverService $handoverService,
         protected HandoverPresenter $handoverPresenter,
-        protected TimeTrackingService $timeTrackingService,
         protected UserSiteAccessService $siteAccess,
     ) {}
 
@@ -74,6 +74,11 @@ class AttendanceController extends Controller
             ? Carbon::parse($request->string('week'), $tz)->startOfWeek(Carbon::MONDAY)
             : Carbon::now($tz)->startOfWeek(Carbon::MONDAY);
         $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
+        $workerNow = Carbon::now($tz);
+        $todayStartUtc = $workerNow->copy()->startOfDay()->utc();
+        $tomorrowStartUtc = $workerNow->copy()->addDay()->startOfDay()->utc();
+        $currentWeekStartUtc = $workerNow->copy()->startOfWeek(Carbon::MONDAY)->utc();
+        $nextWeekStartUtc = $workerNow->copy()->startOfWeek(Carbon::MONDAY)->addWeek()->utc();
 
         $sessions = $scopeTargetAttendance(HrAttendanceSession::query()
             ->with(['timesheet:id,attendance_session_id,status']))
@@ -108,7 +113,7 @@ class AttendanceController extends Controller
             ->first();
 
         $eligibleShifts = $targetUser
-            ? $this->attendanceService->eligibleShiftsForUser($targetUser, now())
+            ? $this->attendanceService->eligibleShiftsForUser($targetUser, now(), $auth)
             : collect();
         $activeShift = $eligibleShifts->count() === 1 ? $eligibleShifts->first() : null;
 
@@ -121,12 +126,14 @@ class AttendanceController extends Controller
             : collect();
 
         $todayHours = $scopeTargetAttendance(HrAttendanceSession::query())
-            ->whereDate('clock_in_at', now()->toDateString())
+            ->where('clock_in_at', '>=', $todayStartUtc)
+            ->where('clock_in_at', '<', $tomorrowStartUtc)
             ->get()
             ->sum(fn (HrAttendanceSession $session) => $session->worked_hours);
 
         $weekHours = $scopeTargetAttendance(HrAttendanceSession::query())
-            ->whereBetween('clock_in_at', [now()->startOfWeek(), now()->endOfWeek()])
+            ->where('clock_in_at', '>=', $currentWeekStartUtc)
+            ->where('clock_in_at', '<', $nextWeekStartUtc)
             ->get()
             ->sum(fn (HrAttendanceSession $session) => $session->worked_hours);
 
@@ -168,30 +175,39 @@ class AttendanceController extends Controller
         // Action flags (can_acknowledge/can_edit) stay relative to the
         // signed-in user, as does the `incoming` treatment only when viewing
         // yourself.
-        $handovers = ShiftHandover::query()
-            ->tap(fn ($query) => $this->siteAccess->applyHandoverScope(
-                $query,
-                $auth,
-                UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
-            ))
-            ->whereIn('status', [ShiftHandoverService::STATUS_SUBMITTED, ShiftHandoverService::STATUS_ACKNOWLEDGED])
-            ->where(function ($involving) use ($targetUserId) {
-                $involving->where('outgoing_staff_id', $targetUserId)
-                    ->orWhere('incoming_staff_id', $targetUserId)
-                    ->orWhereHas('outgoingShift', fn ($shift) => $shift->where('user_id', $targetUserId))
-                    ->orWhereHas('incomingShift', fn ($shift) => $shift->where('user_id', $targetUserId));
-            })
-            ->with($this->handoverPresenter->mapEagerLoads())
-            ->orderByDesc('created_at')
-            ->limit(50)
-            ->get()
-            ->map(function (ShiftHandover $handover) use ($auth, $targetUserId) {
-                $mapped = $this->handoverPresenter->mapHandover($handover, $auth);
-                $mapped['incoming'] = (int) $handover->incoming_staff_id === (int) $targetUserId
-                    || (int) ($handover->incomingShift?->user_id ?? 0) === (int) $targetUserId;
+        $canAccessHandovers = $this->handoverService->canAccessWorkflow($auth);
+        $handovers = $canAccessHandovers
+            ? ShiftHandover::query()
+                ->tap(fn ($query) => $this->siteAccess->applyHandoverScope(
+                    $query,
+                    $auth,
+                    UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
+                ))
+                ->whereIn('status', [ShiftHandoverService::STATUS_SUBMITTED, ShiftHandoverService::STATUS_ACKNOWLEDGED])
+                ->where(function ($involving) use ($targetUserId) {
+                    $involving->where('outgoing_staff_id', $targetUserId)
+                        ->orWhere('incoming_staff_id', $targetUserId)
+                        ->orWhereHas('outgoingShift', fn ($shift) => $shift->where('user_id', $targetUserId))
+                        ->orWhereHas('incomingShift', fn ($shift) => $shift->where('user_id', $targetUserId));
+                })
+                ->with($this->handoverPresenter->mapEagerLoads())
+                ->orderByDesc('created_at')
+                ->limit(50)
+                ->get()
+                ->map(function (ShiftHandover $handover) use ($auth, $targetUserId) {
+                    $mapped = $this->handoverPresenter->mapHandover(
+                        $handover,
+                        $auth,
+                        $auth->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+                    );
+                    // `incoming` is deliberately live acknowledgement
+                    // authority, not the immutable submit-time recipient.
+                    $mapped['incoming'] = (int) ($handover->incomingShift?->user_id ?? 0) === (int) $targetUserId;
+                    $mapped['submitted_recipient'] = (int) $handover->incoming_staff_id === (int) $targetUserId;
 
-                return $mapped;
-            })->values();
+                    return $mapped;
+                })->values()
+            : collect();
 
         return Inertia::render('attendance/index', [
             'sessions' => $sessions,
@@ -246,35 +262,58 @@ class AttendanceController extends Controller
             'currentUser' => ['id' => $auth->id, 'name' => $auth->name],
             // Heavy wizard catalogue — loaded on demand the first time the
             // Handover wizard opens (router.reload only:['catalogue']).
-            'catalogue' => Inertia::optional(fn () => $this->handoverPresenter->catalogue($auth)),
+            'catalogue' => Inertia::optional(fn () => $canAccessHandovers
+                ? $this->handoverPresenter->catalogue($auth)
+                : [
+                    'clients' => [],
+                    'staff' => [],
+                    'staffBySite' => [],
+                    'sites' => [],
+                    'serviceContexts' => [],
+                    'shifts' => [],
+                    'controlledWitnessesBySite' => [],
+                    'capabilities' => [
+                        'view_controlled' => false,
+                        'record_controlled' => false,
+                        'manage_any_shifts' => false,
+                    ],
+                ]),
         ]);
     }
 
     /**
      * Correct a session's clock-out (the "fix a missed clock-out" wizard).
-     * Managers may correct anyone's session; workers only their own. The
-     * required reason lands in the audit log and the linked timesheet is
-     * recalculated (submitted ones return to draft).
+     * Managers may correct sessions within their canonical attendance Site
+     * scope; workers may correct only their own. The required reason lands in
+     * the audit log and the linked timesheet is recalculated (submitted ones
+     * return to draft).
      */
-    public function correctSession(Request $request, HrAttendanceSession $session)
+    public function correctSession(Request $request, $session)
     {
         $auth = $request->user();
-        $ownSession = $auth && (int) $session->user_id === (int) $auth->id;
         abort_unless(
-            $auth && ($auth->canDo('timesheets.manageAny') || ($ownSession && $this->canClock($auth))),
+            $auth && ($auth->canDo('timesheets.manageAny') || $this->canClock($auth)),
             403,
         );
+
+        $sessionId = filter_var($session, FILTER_VALIDATE_INT);
+        abort_unless(is_int($sessionId) && $sessionId > 0, 404);
+
+        // Resolve before target-sensitive validation so missing, foreign-user,
+        // and foreign-Site identifiers share the same concealed response. The
+        // command repeats this authorization under the aggregate lock.
+        $this->attendanceService->resolveCorrectableSession($auth, $sessionId);
 
         $data = $request->validate([
             'clock_out_at' => ['required', 'date'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
-            'reason' => ['required', 'string', 'max:1000'],
+            'reason' => ['required', 'string', 'max:1000', 'not_regex:/^\s*$/'],
         ]);
 
         try {
             $corrected = $this->attendanceService->correctSession(
                 $auth,
-                $session,
+                $sessionId,
                 Carbon::parse($data['clock_out_at']),
                 (int) ($data['break_minutes'] ?? 0),
                 trim($data['reason']),
@@ -283,9 +322,13 @@ class AttendanceController extends Controller
             return redirect()->back()->withErrors(['correct_session' => $exception->getMessage()]);
         }
 
+        $ownSession = (int) $corrected->user_id === (int) $auth->id;
         $name = $ownSession ? 'Session' : "Session for {$corrected->user?->name}";
-        if ($corrected->timesheet) {
+        if ($corrected->timesheetSyncOutcome()->wasSynced() && $corrected->timesheet) {
             return redirect()->back()->with('success', "{$name} corrected. Timesheet #{$corrected->timesheet->id} recalculated.");
+        }
+        if ($corrected->timesheetSyncOutcome() === AttendanceTimesheetSyncOutcome::SkippedFollowUp) {
+            return redirect()->back()->with('success', "{$name} corrected. Payroll follow-up is required; no Timesheet was changed.");
         }
 
         return redirect()->back()->with('success', "{$name} corrected. The reason was recorded in the audit log.");
@@ -296,31 +339,23 @@ class AttendanceController extends Controller
         $auth = $request->user();
         abort_unless($this->canClock($auth), 403);
 
+        // Resolve the direct object through the worker's canonical attendance
+        // scope before validating the remaining payload. Missing, foreign and
+        // malformed Shift identities therefore share one concealed response.
+        $shift = $this->attendanceService->resolveSelfClockInShift(
+            $auth,
+            $request->input('shift_id'),
+        );
+
         $data = $request->validate([
-            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+            'shift_id' => ['nullable', 'integer', 'min:1'],
             'location' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
-
-        if (! empty($data['shift_id'])) {
-            $shift = Shift::query()->findOrFail((int) $data['shift_id']);
-
-            if ((int) $shift->user_id !== (int) $auth->id) {
-                AuditLogger::log('attendance.clockIn.unauthorized', $shift, [
-                    'shift_id' => $shift->id,
-                    'shift_user_id' => $shift->user_id,
-                    'attempted_by_user_id' => $auth->id,
-                ], $request);
-
-                abort(403);
-            }
-        }
+        $data['shift_id'] = $shift?->id;
 
         try {
             $session = $this->attendanceService->clockIn($auth, $data);
-            // Backend handoff §5 — every clock source now maintains a consistent
-            // HrTimeEntry so the HR Time entries tab + KPIs include /my-day clockers.
-            $this->timeTrackingService->syncEntryFromSession($session, $auth);
         } catch (\LogicException $exception) {
             return redirect()->back()->withErrors(['clock_in' => $exception->getMessage()]);
         }
@@ -333,12 +368,20 @@ class AttendanceController extends Controller
         $auth = $request->user();
         abort_unless($this->canClock($auth), 403);
 
+        // Resolve the governing session before any nested Client/task
+        // validation so a foreign session cannot be used as an existence
+        // oracle for objects elsewhere in the application.
+        $session = $this->attendanceService->resolveSelfAttendanceSession(
+            $auth,
+            $request->input('session_id'),
+        );
+
         $data = $request->validate([
-            'session_id' => ['nullable', 'integer', 'exists:hr_attendance_sessions,id'],
+            'session_id' => ['nullable', 'integer', 'min:1'],
             'clock_out_at' => ['nullable', 'date'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'client_id' => ['nullable', 'integer', 'min:1'],
             'force' => ['nullable', 'boolean'],
             'override_reason' => ['nullable', 'required_if:force,true', 'string', 'max:1000'],
             'handover' => ['nullable', 'array'],
@@ -349,25 +392,10 @@ class AttendanceController extends Controller
             'handover.tasks_pending' => ['nullable', 'array', 'max:20'],
             'handover.tasks_pending.*' => ['string', 'max:255'],
             'task_updates' => ['nullable', 'array'],
-            'task_updates.*.id' => ['required', 'integer', 'distinct', 'exists:shift_tasks,id'],
+            'task_updates.*.id' => ['required', 'integer', 'min:1', 'distinct'],
             'task_updates.*.is_completed' => ['required', 'boolean'],
         ]);
-
-        $session = null;
-        if (! empty($data['session_id'])) {
-            $session = HrAttendanceSession::query()->findOrFail($data['session_id']);
-
-            if ((int) $session->user_id !== (int) $auth->id) {
-                AuditLogger::log('attendance.clockOut.unauthorized', $session, [
-                    'attendance_session_id' => $session->id,
-                    'session_user_id' => $session->user_id,
-                    'shift_id' => $session->shift_id,
-                    'attempted_by_user_id' => $auth->id,
-                ], $request);
-
-                abort(403);
-            }
-        }
+        $data['session_id'] = $session?->id;
 
         try {
             $closed = $this->attendanceService->clockOut($auth, $session, $data);
@@ -392,11 +420,11 @@ class AttendanceController extends Controller
             return redirect()->back()->withErrors(['clock_out' => $exception->getMessage()]);
         }
 
-        // Keep the HrTimeEntry in lockstep with the closed session (handoff §5).
-        $this->timeTrackingService->syncEntryFromSession($closed, $auth);
-
-        if ($closed->timesheet) {
+        if ($closed->timesheetSyncOutcome()->wasSynced() && $closed->timesheet) {
             return redirect()->back()->with('success', "Clocked out. Draft timesheet #{$closed->timesheet->id} synced.");
+        }
+        if ($closed->timesheetSyncOutcome() === AttendanceTimesheetSyncOutcome::SkippedFollowUp) {
+            return redirect()->back()->with('success', 'Clocked out. Payroll follow-up is required; no Timesheet was changed.');
         }
 
         return redirect()->back()->with('success', 'Clocked out successfully.');
@@ -411,14 +439,10 @@ class AttendanceController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('timesheets.manageAny'), 403);
 
-        $session = $this->siteAccess->resolveAuthorizedAttendanceSession(
-            $auth,
-            (int) $session->id,
-            UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
-        );
+        $session = $this->attendanceService->resolveManageableSession($auth, (int) $session->id);
 
         $data = $request->validate([
-            'reason' => ['required', 'string', 'max:1000'],
+            'reason' => ['required', 'string', 'max:1000', 'not_regex:/^\s*$/'],
         ]);
 
         if ($session->status !== 'open' || $session->clock_out_at) {
@@ -432,8 +456,11 @@ class AttendanceController extends Controller
         }
 
         $name = $closed->user?->name ?? 'staff member';
-        if ($closed->timesheet) {
+        if ($closed->timesheetSyncOutcome()->wasSynced() && $closed->timesheet) {
             return redirect()->back()->with('success', "Session ended for {$name}. Draft timesheet #{$closed->timesheet->id} synced.");
+        }
+        if ($closed->timesheetSyncOutcome() === AttendanceTimesheetSyncOutcome::SkippedFollowUp) {
+            return redirect()->back()->with('success', "Session ended for {$name}. Payroll follow-up is required; no Timesheet was changed.");
         }
 
         return redirect()->back()->with('success', "Session ended for {$name}.");
@@ -444,14 +471,15 @@ class AttendanceController extends Controller
         $auth = $request->user();
         abort_unless($this->canClock($auth), 403);
 
-        $data = $request->validate([
-            'session_id' => ['nullable', 'integer', 'exists:hr_attendance_sessions,id'],
-        ]);
+        $session = $this->attendanceService->resolveSelfAttendanceSession(
+            $auth,
+            $request->input('session_id'),
+        );
 
-        $session = null;
-        if (! empty($data['session_id'])) {
-            $session = HrAttendanceSession::query()->findOrFail($data['session_id']);
-        }
+        $data = $request->validate([
+            'session_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+        $data['session_id'] = $session?->id;
 
         try {
             $this->attendanceService->startBreak($auth, $session, $data);
@@ -467,14 +495,15 @@ class AttendanceController extends Controller
         $auth = $request->user();
         abort_unless($this->canClock($auth), 403);
 
-        $data = $request->validate([
-            'session_id' => ['nullable', 'integer', 'exists:hr_attendance_sessions,id'],
-        ]);
+        $session = $this->attendanceService->resolveSelfAttendanceSession(
+            $auth,
+            $request->input('session_id'),
+        );
 
-        $session = null;
-        if (! empty($data['session_id'])) {
-            $session = HrAttendanceSession::query()->findOrFail($data['session_id']);
-        }
+        $data = $request->validate([
+            'session_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+        $data['session_id'] = $session?->id;
 
         try {
             $this->attendanceService->endBreak($auth, $session, $data);
@@ -522,33 +551,25 @@ class AttendanceController extends Controller
      * PR 11 — Handover write on clock-out.
      *
      * Small structured handover captured at shift end from the frontline
-     * clock card. Persisted as a submitted `ShiftHandover` so the next
-     * worker sees it in the clock-in read prompt, and so it joins the
-     * existing handover timeline/audit pipeline (no parallel storage).
+     * clock card. It remains a draft until the outgoing worker reviews and
+     * selects the exact bounded incoming Shift in the handover workflow.
      */
     public function submitHandover(Request $request)
     {
         $auth = $request->user();
         abort_unless($this->canClock($auth), 403);
 
+        $shiftId = filter_var($request->input('shift_id'), FILTER_VALIDATE_INT);
+        abort_unless(is_int($shiftId) && $shiftId > 0, 404);
+        $shift = $this->handoverService->writableOutgoingShift($auth, $shiftId);
+
         $data = $request->validate([
-            'shift_id' => ['required', 'integer', 'exists:shifts,id'],
+            'shift_id' => ['required', 'integer', 'min:1'],
             'meds_completed' => ['required', 'boolean'],
             'shift_rating' => ['nullable', 'string', 'in:calm,mixed,challenging'],
             'handover_notes' => ['nullable', 'string', 'max:2000'],
             'follow_up_needed' => ['required', 'boolean'],
         ]);
-
-        $shift = Shift::query()->findOrFail((int) $data['shift_id']);
-
-        // Only the worker who worked the shift — or a manager — may leave a
-        // handover for it. Avoids strangers writing on someone else's shift.
-        if (
-            ! $auth->canDo('shifts.manageAny')
-            && (int) $shift->user_id !== (int) $auth->id
-        ) {
-            abort(403);
-        }
 
         $notes = trim((string) ($data['handover_notes'] ?? ''));
         if ($notes === '') {
@@ -560,30 +581,38 @@ class AttendanceController extends Controller
         $payload = [
             'handover_notes' => $notes,
             'client_mood' => $data['shift_rating'] ?? null,
-            'medications_due' => $data['meds_completed']
-                ? null
-                : [[
-                    'label' => 'Review outstanding medications from previous shift',
-                    'severity' => 'high',
-                ]],
             'follow_up_items' => $data['follow_up_needed']
                 ? [[
                     'label' => 'Follow-up flagged by outgoing worker',
                     'priority' => 'medium',
                 ]]
                 : null,
-            'submit' => true,
+            'submit' => false,
         ];
+
+        if (
+            $auth->canDo('medications.controlled.view')
+            && $auth->canDo('medications.controlled.record')
+        ) {
+            $payload['medications_due'] = $data['meds_completed']
+                ? null
+                : [[
+                    'label' => ShiftHandoverService::OUTSTANDING_MEDICATION_DUE_LABEL,
+                    'severity' => 'high',
+                ]];
+        }
 
         try {
             $this->handoverService->save($shift, $auth, $payload);
-        } catch (\Throwable $exception) {
+        } catch (ValidationException $exception) {
+            return redirect()->back()->withErrors($exception->errors());
+        } catch (\DomainException) {
             return redirect()->back()->withErrors([
-                'handover' => $exception->getMessage(),
+                'handover' => 'The handover draft could not be saved. Review it and try again.',
             ]);
         }
 
-        return redirect()->back()->with('success', 'Handover saved for the next shift.');
+        return redirect()->back()->with('success', 'Handover draft saved. Assign the incoming shift before submitting.');
     }
 
     /**
@@ -594,75 +623,49 @@ class AttendanceController extends Controller
      * `/my-day` handover-read card without depending on the operations-module
      * route.
      */
-    public function acknowledgeHandover(Request $request, ShiftHandover $handover)
+    public function acknowledgeHandover(Request $request, $handover)
     {
         $auth = $request->user();
         abort_unless($this->canClock($auth), 403);
-
-        $this->siteAccess->assertCanAccessHandover(
-            $auth,
-            $handover,
-            ['reports.viewAny'],
-            'You are not authorized to access handovers for this site.',
-        );
-
-        $handover->loadMissing(['incomingShift:id,user_id', 'client:id,site_id']);
-        $isUnassigned = $handover->incoming_staff_id === null && $handover->incoming_shift_id === null;
-        $relatedToUser = (int) $handover->incoming_staff_id === (int) $auth->id
-            || (int) $handover->incomingShift?->user_id === (int) $auth->id
-            || ($isUnassigned && $this->workerHasMatchingShiftForUnassignedHandover($auth, $handover));
-
         abort_unless(
-            $relatedToUser || $auth->canDo('shifts.manageAny') || $auth->canDo('handovers.viewAny'),
+            $auth->canDo('shifts.update') || $auth->canDo('shifts.viewAssigned'),
             403,
         );
 
+        $handoverId = filter_var($handover, FILTER_VALIDATE_INT);
+        abort_unless(is_int($handoverId) && $handoverId > 0, 404);
+        $handover = ShiftHandover::query()
+            ->tap(fn (Builder $query) => $this->siteAccess->applyHandoverScope(
+                $query,
+                $auth,
+                MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+            ))
+            ->whereKey($handoverId)
+            ->where('status', ShiftHandoverService::STATUS_SUBMITTED)
+            ->whereNotNull('incoming_shift_id')
+            ->whereHas('incomingShift', fn (Builder $query) => $query
+                ->where('user_id', $auth->id)
+                ->whereIn('status', ['scheduled', 'in_progress']))
+            ->with(['incomingShift:id,user_id,status', 'client:id,site_id'])
+            ->firstOrFail();
+
         try {
-            // `acknowledge` requires an assigned incoming shift. If the
-            // read surface found the handover via client match without a
-            // linked incoming shift, attach the arriving worker so the
-            // acknowledgement can settle.
-            if ($isUnassigned) {
-                $handover->forceFill(['incoming_staff_id' => $auth->id])->save();
+            $this->handoverService->acknowledge($handover, $auth);
+        } catch (ValidationException $exception) {
+            // Context drift (client, Site, service context, or handoff window)
+            // is a direct-object miss on this frontline route, not validation
+            // detail the requester may use to probe a retained handover.
+            if (array_key_exists('incoming_shift_id', $exception->errors())) {
+                abort(404);
             }
 
-            $this->handoverService->acknowledge($handover, $auth);
-        } catch (\Throwable $exception) {
+            return redirect()->back()->withErrors($exception->errors());
+        } catch (\DomainException) {
             return redirect()->back()->withErrors([
-                'handover' => $exception->getMessage(),
+                'handover' => 'The handover could not be acknowledged. Refresh it and try again.',
             ]);
         }
 
         return redirect()->back()->with('success', 'Handover marked as read.');
-    }
-
-    protected function workerHasMatchingShiftForUnassignedHandover(User $auth, ShiftHandover $handover): bool
-    {
-        $clientId = $handover->client_id ? (int) $handover->client_id : null;
-
-        if (! $clientId) {
-            return false;
-        }
-
-        $workerNow = now(config('app.worker_timezone', 'Pacific/Auckland'));
-        $windowStart = $workerNow->copy()->subHours(4)->utc();
-        $windowEnd = $workerNow->copy()->addHours(36)->utc();
-
-        return Shift::query()
-            ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth, ['reports.viewAny']))
-            ->where('user_id', $auth->id)
-            ->where('client_id', $clientId)
-            ->whereNotIn('status', ['cancelled', 'completed'])
-            ->where(function ($query) use ($windowStart, $windowEnd) {
-                $query
-                    ->whereBetween('starts_at', [$windowStart, $windowEnd])
-                    ->orWhereBetween('ends_at', [$windowStart, $windowEnd])
-                    ->orWhere(function ($overlap) use ($windowStart, $windowEnd) {
-                        $overlap
-                            ->where('starts_at', '<=', $windowStart)
-                            ->where('ends_at', '>=', $windowEnd);
-                    });
-            })
-            ->exists();
     }
 }

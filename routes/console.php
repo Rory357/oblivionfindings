@@ -71,6 +71,7 @@ use App\Jobs\SendEventReminderJob;
 use App\Jobs\ShiftAutoAlertJob;
 use App\Jobs\ShiftTaskDueJob;
 use App\Jobs\SyncResourceCalendarsJob;
+use App\Models\MedicationIdempotencyResult;
 use App\Services\MedicationAlertService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
@@ -209,6 +210,16 @@ app(Schedule::class)
     ->dailyAt('02:20')
     ->onOneServer()
     ->withoutOverlapping();
+
+// Ordinary medication replay bindings expire after seven days. Safety-critical
+// durable bindings have no expiry and are therefore excluded by the model.
+app(Schedule::class)
+    ->command('model:prune', ['--model' => MedicationIdempotencyResult::class])
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('02:35')
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->name('medication.idempotency.prune');
 
 // Daily break-glass summary (internal ops): 08:00 NZ time
 app(Schedule::class)

@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\FleetAssets;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetResidentTransport;
@@ -389,18 +392,31 @@ class ResidentTransportJourneySecurityTest extends TestCase
     {
         $site = Site::factory()->create();
         $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage', 'medications.administer.record']);
+        $this->recordCompetency($actor);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $vehicle = $this->vehicle($site, 'Replay vehicle');
         $transport = $this->transport($site, $client, $vehicle, $actor);
         $medication = $this->medication($client, 'Replay medication');
-        $medication->forceFill(['witness_required' => true])->save();
+        $medication->forceFill([
+            'witness_required' => true,
+            'approval_status' => 'verified',
+        ])->saveQuietly();
         $witness = $this->siteUser(
             $site,
             ['medications.controlled.witness'],
             ['password' => Hash::make('packing-witness-secret')],
         );
         $this->recordCompetency($witness);
-        $this->shift($site, $client, $witness);
+        $presenceShift = $this->shift($site, $client, $witness);
+        $presence = HrAttendanceSession::query()->create([
+            'user_id' => $witness->id,
+            'shift_id' => $presenceShift->id,
+            'site_id' => $site->id,
+            'clock_in_at' => now()->subHour(),
+            'status' => 'open',
+            'source' => 'manual',
+            'created_by' => $witness->id,
+        ]);
         $uuid = (string) Str::uuid();
         $payload = [
             ...$this->medicationPayload($client, $medication),
@@ -417,6 +433,8 @@ class ResidentTransportJourneySecurityTest extends TestCase
                 ...$payload,
                 'client_request_uuid' => (string) Str::uuid(),
                 'queued_offline' => true,
+                'captured_offline_at' => now()->toIso8601String(),
+                'origin_device_id' => 'fleet-pack-device',
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('witness_credential');
@@ -431,6 +449,15 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ->postJson("/fleet-assets/transports/{$transport->id}/pack-medication", $payload)
             ->assertOk()
             ->assertJsonPath('sync.duplicate', true);
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/transports/{$transport->id}/pack-medication", [
+                ...$payload,
+                'queued_offline' => true,
+                'captured_offline_at' => now()->toIso8601String(),
+                'origin_device_id' => 'fleet-pack-device',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('client_request_uuid');
         $this->actingAs($actor)
             ->postJson("/fleet-assets/transports/{$transport->id}/pack-medication", $payload)
             ->assertOk()
@@ -460,7 +487,8 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $this->assertSame('password', $eventContext['attestation']['method']);
         $this->assertSame('medications.controlled.witness', $eventContext['attestation']['authority_permission']);
         $this->assertSame('valid', $eventContext['attestation']['competency_state']);
-        $this->assertSame('shift', $eventContext['attestation']['presence_source']);
+        $this->assertSame('attendance_session', $eventContext['attestation']['presence_source']);
+        $this->assertSame($presence->id, $eventContext['attestation']['presence_record_id']);
         $this->assertIsInt($eventContext['attestation']['employment_profile_id']);
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $eventContext['attestation']['subject_digest']);
         $this->assertSame($log->packing_attestation_event_id, $event->id);
@@ -475,10 +503,14 @@ class ResidentTransportJourneySecurityTest extends TestCase
             Carbon::parse($eventContext['attestation']['witnessed_at'])->toIso8601String(),
         );
 
-        $medication->forceFill(['witness_required' => false])->save();
+        $medication->forceFill([
+            'witness_required' => false,
+            'approval_status' => 'verified',
+        ])->saveQuietly();
         $this->actingAs($actor)
             ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
                 ...$this->scanPayload($client, $medication),
+                'quantity_administered' => '1.00',
                 'client_request_uuid' => (string) Str::uuid(),
             ])
             ->assertUnprocessable()
@@ -495,6 +527,86 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ->assertJsonValidationErrors('client_request_uuid');
         $this->assertDatabaseCount('fleet_medication_transit_logs', 1);
         $this->assertDatabaseCount('fleet_resident_transport_events', 1);
+    }
+
+    public function test_offline_ordinary_pack_uses_bounded_capture_time_and_keeps_receipt_time_in_provenance(): void
+    {
+        $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
+        $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
+        $this->travelTo($journeyStartedAt);
+
+        $site = Site::factory()->create();
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage']);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $transport = $this->transport($site, $client, $this->vehicle($site, 'Offline packing vehicle'), $actor);
+        $medication = $this->medication($client, 'Offline packing medication');
+        $this->travelTo($receivedAt);
+
+        $base = [
+            ...$this->medicationPayload($client, $medication),
+            ...$this->scanPayload($client, $medication),
+            'attestation_state' => 'accepted',
+            'queued_offline' => true,
+            'origin_device_id' => ' fleet-pack-device ',
+        ];
+        foreach ([
+            $journeyStartedAt->copy()->subSecond()->toIso8601String(),
+            $receivedAt->copy()->addMinutes(6)->toIso8601String(),
+        ] as $invalidCapture) {
+            $this->actingAs($actor)
+                ->postJson("/fleet-assets/transports/{$transport->id}/pack-medication", [
+                    ...$base,
+                    'client_request_uuid' => (string) Str::uuid(),
+                    'captured_offline_at' => $invalidCapture,
+                ])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('captured_offline_at');
+        }
+        $this->assertDatabaseCount('fleet_medication_transit_logs', 0);
+        $this->assertSame(0, FleetResidentTransportEvent::query()->where('action', 'medication_packed')->count());
+        $this->assertSame(0, AuditLog::query()->where('action', 'fleet.medication.pack')->count());
+
+        $uuid = (string) Str::uuid();
+        $capturedAt = $journeyStartedAt->copy()->addMinutes(30);
+        $payload = [
+            ...$base,
+            'client_request_uuid' => $uuid,
+            'captured_offline_at' => $capturedAt->toIso8601String(),
+        ];
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/transports/{$transport->id}/pack-medication", $payload)
+            ->assertOk()
+            ->assertJsonPath('sync.duplicate', false);
+
+        $log = FleetMedicationTransitLog::query()->sole();
+        $expectedActionAt = $capturedAt->copy()->utc()->format('Y-m-d H:i:s');
+        $expectedReceiptAt = $receivedAt->copy()->utc()->format('Y-m-d H:i:s');
+        $this->assertSame($expectedActionAt, $log->getRawOriginal('packed_at'));
+        $this->assertSame($expectedReceiptAt, $log->getRawOriginal('created_at'));
+
+        $event = FleetResidentTransportEvent::query()->where('action', 'medication_packed')->sole();
+        $this->assertSame($expectedReceiptAt, $event->getRawOriginal('occurred_at'));
+        $this->assertSame($capturedAt->toIso8601String(), $event->context['captured_offline_at']);
+        $this->assertSame('fleet-pack-device', $event->context['origin_device_id']);
+        $this->assertTrue($event->context['queued_offline']);
+
+        $audit = AuditLog::query()->where('action', 'fleet.medication.pack')->sole();
+        $this->assertSame($expectedReceiptAt, $audit->getRawOriginal('created_at'));
+        $this->assertSame($capturedAt->toIso8601String(), $audit->meta['captured_offline_at']);
+        $this->assertSame('fleet-pack-device', $audit->meta['origin_device_id']);
+        $this->assertTrue($audit->meta['queued_offline']);
+
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/transports/{$transport->id}/pack-medication", [
+                ...$payload,
+                'captured_offline_at' => $capturedAt->copy()->utc()->toIso8601String(),
+                'origin_device_id' => 'fleet-pack-device',
+            ])
+            ->assertOk()
+            ->assertJsonPath('sync.duplicate', true);
+        $this->assertDatabaseCount('fleet_medication_transit_logs', 1);
+        $this->assertSame(1, FleetResidentTransportEvent::query()->where('action', 'medication_packed')->count());
+        $this->assertSame(1, AuditLog::query()->where('action', 'fleet.medication.pack')->count());
     }
 
     public function test_controlled_administration_reconciles_emar_stock_and_provenance_once_and_is_terminal(): void
@@ -542,6 +654,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             'witnessed_by_user_id' => $witness->id,
             'witness_credential' => 'witness-secret',
             'notes' => 'Given during the authorised journey.',
+            'quantity_administered' => '0.25',
             'client_request_uuid' => $uuid,
         ];
 
@@ -566,6 +679,15 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", $payload)
             ->assertOk()
             ->assertJsonPath('sync.duplicate', true);
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
+                ...$payload,
+                'queued_offline' => true,
+                'captured_offline_at' => now()->toIso8601String(),
+                'origin_device_id' => 'fleet-admin-device',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('client_request_uuid');
 
         $log->refresh();
         $this->assertNotNull($log->administered_at);
@@ -574,9 +696,10 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $this->assertSame($witness->id, $log->witnessed_by_user_id);
         $this->assertNotNull($log->medication_administration_id);
         $this->assertDatabaseCount('client_medication_administrations', 1);
-        $this->assertSame(4.0, (float) $stock->fresh()->on_hand);
+        $this->assertSame(4.75, (float) $stock->fresh()->on_hand);
         $this->assertDatabaseCount('client_controlled_drug_entries', 1);
         $this->assertSame(1, ClientControlledDrugEntry::query()->where('client_medication_id', $medication->id)->count());
+        $this->assertSame('0.25', (string) ClientControlledDrugEntry::query()->sole()->quantity);
         $this->assertSame(1, FleetResidentTransportEvent::query()->where('action', 'medication_administered')->count());
 
         $medication->forceFill(['controlled_drug' => false])->save();
@@ -593,7 +716,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", $payload)
             ->assertForbidden();
         $this->assertDatabaseCount('client_medication_administrations', 1);
-        $this->assertSame(4.0, (float) $stock->fresh()->on_hand);
+        $this->assertSame(4.75, (float) $stock->fresh()->on_hand);
         $this->assertDatabaseCount('client_controlled_drug_entries', 1);
         $this->assertSame(1, FleetResidentTransportEvent::query()->where('action', 'medication_administered')->count());
 
@@ -605,6 +728,270 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ->assertStatus(409);
         $this->assertNull($log->fresh()->returned_to_house_at);
         $this->assertDatabaseCount('client_medication_administrations', 1);
+    }
+
+    public function test_offline_ordinary_administration_uses_bounded_capture_time_and_preserves_both_clocks(): void
+    {
+        $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
+        $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
+        $this->travelTo($journeyStartedAt);
+
+        $site = Site::factory()->create();
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
+        $this->recordCompetency($actor);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $transport = $this->transport($site, $client, $this->vehicle($site, 'Offline administration vehicle'), $actor);
+        $medication = $this->medication($client, 'Offline fractional transit dose');
+        $log = $this->log($transport, $client, $medication, $actor);
+        $this->travelTo($receivedAt);
+
+        foreach ([null, '0', '0.001', '100000000.00'] as $invalidQuantity) {
+            $quantityPayload = [
+                ...$this->scanPayload($client, $medication),
+                'client_request_uuid' => (string) Str::uuid(),
+            ];
+            if ($invalidQuantity !== null) {
+                $quantityPayload['quantity_administered'] = $invalidQuantity;
+            }
+            $this->actingAs($actor)
+                ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", $quantityPayload)
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('quantity_administered');
+        }
+
+        $base = [
+            ...$this->scanPayload($client, $medication),
+            'quantity_administered' => '0.25',
+            'queued_offline' => true,
+            'origin_device_id' => ' fleet-admin-device ',
+        ];
+        foreach ([
+            $journeyStartedAt->copy()->subSecond()->toIso8601String(),
+            $receivedAt->copy()->addMinutes(6)->toIso8601String(),
+        ] as $invalidCapture) {
+            $this->actingAs($actor)
+                ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
+                    ...$base,
+                    'client_request_uuid' => (string) Str::uuid(),
+                    'captured_offline_at' => $invalidCapture,
+                ])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('captured_offline_at');
+        }
+        $this->assertNull($log->fresh()->administered_at);
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertSame(0, FleetResidentTransportEvent::query()->where('action', 'medication_administered')->count());
+        $this->assertSame(0, AuditLog::query()->whereIn('action', [
+            'medications.administration.record',
+            'fleet.medication.administer',
+        ])->count());
+
+        $uuid = (string) Str::uuid();
+        $capturedAt = $journeyStartedAt->copy()->addMinutes(30);
+        $payload = [
+            ...$base,
+            'client_request_uuid' => $uuid,
+            'captured_offline_at' => $capturedAt->toIso8601String(),
+        ];
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", $payload)
+            ->assertOk()
+            ->assertJsonPath('sync.duplicate', false);
+
+        $administration = ClientMedicationAdministration::query()->sole();
+        $expectedActionAt = $capturedAt->copy()->utc()->format('Y-m-d H:i:s');
+        $expectedReceiptAt = $receivedAt->copy()->utc()->format('Y-m-d H:i:s');
+        $this->assertSame($expectedActionAt, $administration->getRawOriginal('administered_at'));
+        $this->assertSame($expectedReceiptAt, $administration->getRawOriginal('created_at'));
+        $this->assertSame($expectedActionAt, $log->fresh()->getRawOriginal('administered_at'));
+
+        $emarAudit = AuditLog::query()
+            ->where('action', 'medications.administration.record')
+            ->where('auditable_id', $administration->id)
+            ->sole();
+        $this->assertSame($uuid, $emarAudit->meta['client_request_uuid']);
+        $this->assertSame($capturedAt->toIso8601String(), $emarAudit->meta['captured_offline_at']);
+        $this->assertSame('fleet-admin-device', $emarAudit->meta['origin_device_id']);
+        $this->assertTrue($emarAudit->meta['queued_offline']);
+
+        $event = FleetResidentTransportEvent::query()->where('action', 'medication_administered')->sole();
+        $this->assertSame($expectedReceiptAt, $event->getRawOriginal('occurred_at'));
+        $this->assertSame('0.25', $event->context['quantity_administered']);
+        $this->assertSame($capturedAt->toIso8601String(), $event->context['captured_offline_at']);
+        $this->assertSame('fleet-admin-device', $event->context['origin_device_id']);
+        $this->assertTrue($event->context['queued_offline']);
+
+        $fleetAudit = AuditLog::query()->where('action', 'fleet.medication.administer')->sole();
+        $this->assertSame($expectedReceiptAt, $fleetAudit->getRawOriginal('created_at'));
+        $this->assertSame('0.25', $fleetAudit->meta['quantity_administered']);
+        $this->assertSame($capturedAt->toIso8601String(), $fleetAudit->meta['captured_offline_at']);
+        $this->assertSame('fleet-admin-device', $fleetAudit->meta['origin_device_id']);
+        $this->assertTrue($fleetAudit->meta['queued_offline']);
+
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
+                ...$payload,
+                'captured_offline_at' => $capturedAt->copy()->utc()->toIso8601String(),
+                'origin_device_id' => 'fleet-admin-device',
+                'quantity_administered' => '0.250',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('quantity_administered');
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
+                ...$payload,
+                'captured_offline_at' => $capturedAt->copy()->utc()->toIso8601String(),
+                'origin_device_id' => 'fleet-admin-device',
+                'quantity_administered' => '0.25',
+            ])
+            ->assertOk()
+            ->assertJsonPath('sync.duplicate', true);
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
+                ...$payload,
+                'quantity_administered' => '0.50',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('client_request_uuid');
+
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertSame(1, AuditLog::query()->where('action', 'medications.administration.record')->count());
+        $this->assertSame(1, AuditLog::query()->where('action', 'fleet.medication.administer')->count());
+        $this->assertSame(1, FleetResidentTransportEvent::query()->where('action', 'medication_administered')->count());
+    }
+
+    public function test_offline_administration_compares_shift_actual_bounds_as_storage_instants(): void
+    {
+        $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
+        $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
+        $capturedAt = $journeyStartedAt->copy()->addMinutes(30);
+        $this->travelTo($journeyStartedAt);
+
+        $site = Site::factory()->create();
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
+        $this->recordCompetency($actor);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $shift = Shift::factory()->completed()->create([
+            'site_id' => $site->id,
+            'client_id' => $client->id,
+            'user_id' => $actor->id,
+            'starts_at' => $journeyStartedAt->copy()->subHour()->utc(),
+            'ends_at' => $receivedAt->copy()->addHour()->utc(),
+            'actual_starts_at' => $journeyStartedAt->copy()->utc(),
+            'actual_ends_at' => $receivedAt->copy()->utc(),
+            'started_by' => $actor->id,
+            'completed_by' => $actor->id,
+        ]);
+        $transport = $this->transport(
+            $site,
+            $client,
+            $this->vehicle($site, 'Shift-bound offline administration vehicle'),
+            $actor,
+            ['shift_id' => $shift->id],
+        );
+        $medication = $this->medication($client, 'Shift-bound offline administration medication');
+        $log = $this->log($transport, $client, $medication, $actor);
+        $this->travelTo($receivedAt);
+
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
+                ...$this->scanPayload($client, $medication),
+                'quantity_administered' => '0.25',
+                'client_request_uuid' => (string) Str::uuid(),
+                'queued_offline' => true,
+                'captured_offline_at' => $capturedAt->toIso8601String(),
+                'origin_device_id' => 'fleet-shift-admin-device',
+            ])
+            ->assertOk()
+            ->assertJsonPath('sync.duplicate', false);
+
+        $this->assertSame(
+            $capturedAt->copy()->utc()->format('Y-m-d H:i:s'),
+            ClientMedicationAdministration::query()->sole()->getRawOriginal('administered_at'),
+        );
+    }
+
+    public function test_medication_administration_accepts_a_legacy_null_site_shift_through_the_residents_canonical_site(): void
+    {
+        $site = Site::factory()->create();
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
+        $this->recordCompetency($actor);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $shift = Shift::factory()->create([
+            'site_id' => null,
+            'client_id' => $client->id,
+            'user_id' => $actor->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(3),
+            'status' => 'in_progress',
+        ]);
+        $transport = $this->transport(
+            $site,
+            $client,
+            $this->vehicle($site, 'Legacy Site-derived shift vehicle'),
+            $actor,
+            ['shift_id' => $shift->id],
+        );
+        $medication = $this->medication($client, 'Legacy Site-derived shift medication');
+        $log = $this->log($transport, $client, $medication, $actor);
+
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
+                ...$this->scanPayload($client, $medication),
+                'quantity_administered' => '0.25',
+                'client_request_uuid' => (string) Str::uuid(),
+            ])
+            ->assertOk()
+            ->assertJsonPath('sync.duplicate', false);
+
+        $this->assertDatabaseHas('client_medication_administrations', [
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'shift_id' => $shift->id,
+            'administered_by' => $actor->id,
+        ]);
+    }
+
+    public function test_medication_administration_conceals_a_shift_with_a_conflicting_non_null_site(): void
+    {
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
+        $this->recordCompetency($actor);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $shift = Shift::factory()->create([
+            'site_id' => $otherSite->id,
+            'client_id' => $client->id,
+            'user_id' => $actor->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(3),
+            'status' => 'in_progress',
+        ]);
+        $transport = $this->transport(
+            $site,
+            $client,
+            $this->vehicle($site, 'Conflicting shift Site vehicle'),
+            $actor,
+            ['shift_id' => $shift->id],
+        );
+        $medication = $this->medication($client, 'Conflicting shift Site medication');
+        $log = $this->log($transport, $client, $medication, $actor);
+
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
+                ...$this->scanPayload($client, $medication),
+                'quantity_administered' => '0.25',
+                'client_request_uuid' => (string) Str::uuid(),
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertSame(0, FleetResidentTransportEvent::query()
+            ->where('action', 'medication_administered')
+            ->count());
+        $this->assertSame(0, AuditLog::query()
+            ->whereIn('action', ['medications.administration.record', 'fleet.medication.administer'])
+            ->count());
     }
 
     public function test_packing_attestation_rejects_foreign_ineligible_and_non_present_witnesses_but_allows_an_explicit_global_actor(): void
@@ -674,8 +1061,17 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ])
             ->assertNotFound();
 
+        $this->actingAs($globalActor)
+            ->postJson("/fleet-assets/transports/{$transportB->id}/pack-medication", [
+                ...$basePayload,
+                'witnessed_by_user_id' => $globalActor->id,
+                'witness_credential' => 'actor-cannot-self-attest',
+                'client_request_uuid' => (string) Str::uuid(),
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('witnessed_by_user_id');
+
         foreach ([
-            [$globalActor, 'actor-cannot-self-attest'],
             [$foreignWitness, 'foreign-secret'],
             [$nonPresentWitness, 'not-present-secret'],
             [$outOfWindowWitness, 'out-of-window-secret'],
@@ -944,35 +1340,86 @@ class ResidentTransportJourneySecurityTest extends TestCase
 
     public function test_return_is_an_actor_attributed_terminal_alternative_and_replays_once(): void
     {
+        $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
+        $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
+        $this->travelTo($journeyStartedAt);
+
         $site = Site::factory()->create();
         $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage', 'medications.administer.record']);
+        $this->recordCompetency($actor);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Return vehicle'), $actor);
         $medication = $this->medication($client, 'Return medication');
         $log = $this->log($transport, $client, $medication, $actor);
+        $this->travelTo($receivedAt);
         $uuid = (string) Str::uuid();
+        $capturedAt = $journeyStartedAt->copy()->addMinutes(30);
         $payload = [
             ...$this->scanPayload($client, $medication),
             'notes' => 'Returned and reconciled at the house.',
             'client_request_uuid' => $uuid,
+            'queued_offline' => true,
+            'captured_offline_at' => $capturedAt->toIso8601String(),
+            'origin_device_id' => ' fleet-return-device ',
         ];
+
+        foreach ([
+            $journeyStartedAt->copy()->subSecond()->toIso8601String(),
+            $receivedAt->copy()->addMinutes(6)->toIso8601String(),
+        ] as $invalidCapture) {
+            $this->actingAs($actor)
+                ->postJson("/fleet-assets/medication-transit/{$log->id}/return", [
+                    ...$payload,
+                    'client_request_uuid' => (string) Str::uuid(),
+                    'captured_offline_at' => $invalidCapture,
+                ])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('captured_offline_at');
+        }
+        $this->assertNull($log->fresh()->returned_to_house_at);
+        $this->assertSame(0, FleetResidentTransportEvent::query()->where('action', 'medication_returned')->count());
+        $this->assertSame(0, AuditLog::query()->where('action', 'fleet.medication.return')->count());
 
         $this->actingAs($actor)->postJson("/fleet-assets/medication-transit/{$log->id}/return", $payload)->assertOk();
         $this->actingAs($actor)
-            ->postJson("/fleet-assets/medication-transit/{$log->id}/return", $payload)
+            ->postJson("/fleet-assets/medication-transit/{$log->id}/return", [
+                ...$payload,
+                'captured_offline_at' => $capturedAt->copy()->utc()->toIso8601String(),
+                'origin_device_id' => 'fleet-return-device',
+            ])
             ->assertOk()
             ->assertJsonPath('sync.duplicate', true);
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/medication-transit/{$log->id}/return", [
+                ...$payload,
+                'captured_offline_at' => $capturedAt->copy()->addSecond()->utc()->toIso8601String(),
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('client_request_uuid');
 
         $log->refresh();
-        $this->assertNotNull($log->returned_to_house_at);
+        $expectedActionAt = $capturedAt->copy()->utc()->format('Y-m-d H:i:s');
+        $expectedReceiptAt = $receivedAt->copy()->utc()->format('Y-m-d H:i:s');
+        $this->assertSame($expectedActionAt, $log->getRawOriginal('returned_to_house_at'));
         $this->assertSame($actor->id, $log->returned_by_user_id);
         $this->assertNull($log->administered_at);
         $this->assertDatabaseCount('client_medication_administrations', 0);
-        $this->assertSame(1, FleetResidentTransportEvent::query()->where('action', 'medication_returned')->count());
+        $event = FleetResidentTransportEvent::query()->where('action', 'medication_returned')->sole();
+        $this->assertSame($expectedReceiptAt, $event->getRawOriginal('occurred_at'));
+        $this->assertSame($capturedAt->toIso8601String(), $event->context['captured_offline_at']);
+        $this->assertSame('fleet-return-device', $event->context['origin_device_id']);
+        $this->assertTrue($event->context['queued_offline']);
+
+        $audit = AuditLog::query()->where('action', 'fleet.medication.return')->sole();
+        $this->assertSame($expectedReceiptAt, $audit->getRawOriginal('created_at'));
+        $this->assertSame($capturedAt->toIso8601String(), $audit->meta['captured_offline_at']);
+        $this->assertSame('fleet-return-device', $audit->meta['origin_device_id']);
+        $this->assertTrue($audit->meta['queued_offline']);
 
         $this->actingAs($actor)
             ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
                 ...$this->scanPayload($client, $medication),
+                'quantity_administered' => '1.00',
                 'client_request_uuid' => (string) Str::uuid(),
             ])
             ->assertStatus(409);
@@ -1000,6 +1447,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         try {
             app(ResidentTransportJourneyService::class)->administerMedication($actor, $log->id, [
                 ...$this->scanPayload($client, $medication),
+                'quantity_administered' => '1.00',
                 'client_request_uuid' => (string) Str::uuid(),
             ]);
             $this->fail('The late failure was not raised.');
@@ -1521,12 +1969,20 @@ PHP;
 
     private function recordCompetency(User $user): void
     {
+        $assessorId = User::query()
+            ->where('id', '!=', $user->id)
+            ->value('id')
+            ?? User::factory()->create(['approved_at' => now()])->id;
+
         MedicationCompetencyAssessment::query()->create([
             'user_id' => $user->id,
+            'assessor_id' => $assessorId,
             'assessment_type' => 'annual',
             'status' => 'passed',
-            'assessment_date' => now()->toDateString(),
+            'assessment_date' => now()->subYear()->toDateString(),
             'expiry_date' => now()->addYear()->toDateString(),
+            'assessor_declared_at' => now()->subYear(),
+            'staff_acknowledged_at' => now()->subYear()->addMinute(),
             'can_witness_controlled' => true,
         ]);
     }

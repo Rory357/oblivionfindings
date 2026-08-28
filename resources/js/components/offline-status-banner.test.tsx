@@ -8,6 +8,9 @@ import OfflineStatusBanner from './offline-status-banner';
 vi.mock('@/hooks/use-offline-queue', () => ({
     useOfflineQueueState: vi.fn(),
 }));
+vi.mock('@/lib/offline-queue', () => ({
+    retryOfflineSubmissionsNeedingAttention: vi.fn(),
+}));
 
 const mockedUseOfflineQueueState = vi.mocked(useOfflineQueueState);
 
@@ -16,6 +19,7 @@ describe('OfflineStatusBanner', () => {
         mockedUseOfflineQueueState.mockReturnValue({
             online: true,
             pendingCount: 0,
+            needsAttentionCount: 0,
             pendingSubmissions: [],
             syncing: false,
         });
@@ -31,6 +35,7 @@ describe('OfflineStatusBanner', () => {
         mockedUseOfflineQueueState.mockReturnValue({
             online: false,
             pendingCount: 0,
+            needsAttentionCount: 0,
             pendingSubmissions: [],
             syncing: false,
         });
@@ -46,6 +51,7 @@ describe('OfflineStatusBanner', () => {
         mockedUseOfflineQueueState.mockReturnValue({
             online: false,
             pendingCount: 3,
+            needsAttentionCount: 0,
             pendingSubmissions: [],
             syncing: false,
         });
@@ -61,6 +67,7 @@ describe('OfflineStatusBanner', () => {
         mockedUseOfflineQueueState.mockReturnValue({
             online: true,
             pendingCount: 2,
+            needsAttentionCount: 0,
             pendingSubmissions: [],
             syncing: true,
         });
@@ -70,5 +77,24 @@ describe('OfflineStatusBanner', () => {
         expect(screen.getByRole('status')).toHaveTextContent(
             'Sending 2 queued items…',
         );
+    });
+
+    it('offers a manual retry without discarding the original request identity', () => {
+        mockedUseOfflineQueueState.mockReturnValue({
+            online: true,
+            pendingCount: 1,
+            needsAttentionCount: 1,
+            pendingSubmissions: [],
+            syncing: false,
+        });
+
+        render(<OfflineStatusBanner />);
+
+        expect(screen.getByRole('status')).toHaveTextContent(
+            /manual retry.*original request ID/i,
+        );
+        expect(
+            screen.getByRole('button', { name: 'Retry safely' }),
+        ).toBeInTheDocument();
     });
 });

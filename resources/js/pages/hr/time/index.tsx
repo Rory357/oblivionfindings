@@ -65,6 +65,7 @@ interface Props {
     recentActivity: RecentActivityItem[];
     teamMembers: NamedOption[];
     staff: NamedOption[];
+    filterSites: NamedOption[];
     sites: NamedOption[];
     clients: NamedOption[];
     activeClock: { id: number; clock_in: string; notes: string | null } | null;
@@ -103,6 +104,7 @@ export default function TimeIndex({
     weeklyTeam,
     recentActivity,
     staff,
+    filterSites,
     sites,
     clients,
     activeClock,
@@ -111,7 +113,9 @@ export default function TimeIndex({
     filters,
     can,
 }: Props) {
-    const isManager = !!can.approveAny;
+    const canMutate = !!can.approveAny;
+    const canReadTeam = canMutate || !!can.reportAny;
+    const isManager = canReadTeam;
     const [tab, setTab] = useHrTab(
         filters.tab && KNOWN_TABS.includes(filters.tab)
             ? filters.tab
@@ -185,7 +189,7 @@ export default function TimeIndex({
             const el = e.target as HTMLElement;
             if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
             if (dialogMode || drawerEntry) return;
-            if (e.key === 'n' && isManager) {
+            if (e.key === 'n' && canMutate) {
                 e.preventDefault();
                 openDialog('add');
             } else if (e.key === 'b' && can.clockOnBehalf) {
@@ -204,7 +208,7 @@ export default function TimeIndex({
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dialogMode, drawerEntry, isManager, can.clockOnBehalf]);
+    }, [dialogMode, drawerEntry, canMutate, can.clockOnBehalf]);
 
     function openDialog(mode: TimeDialogMode, entry: TimeEntry | null = null) {
         setDialogEntry(entry);
@@ -248,6 +252,7 @@ export default function TimeIndex({
         user_name: string;
         clock_in: string;
         entry_date: string;
+        can_mutate: boolean;
     }): TimeEntry {
         const inList = entries.data.find((e) => e.id === seed.id);
         if (inList) return inList;
@@ -265,6 +270,8 @@ export default function TimeIndex({
             break_minutes: 0,
             total_hours: null,
             entry_type: 'clock',
+            can_mutate: seed.can_mutate,
+            is_attendance_backed: true,
             status: 'active',
             pay_type: 'standard',
             is_sleepover: false,
@@ -289,7 +296,13 @@ export default function TimeIndex({
     function rowMenu(e: TimeEntry, ev: MouseEvent) {
         ev.preventDefault();
         const items: ShiftCtxState['items'] = [];
-        if (e.status !== 'approved' && e.status !== 'voided') {
+        if (
+            can.editEntry &&
+            e.can_mutate &&
+            !e.is_attendance_backed &&
+            e.status !== 'approved' &&
+            e.status !== 'voided'
+        ) {
             items.push({
                 icon: <Pencil className="h-4 w-4" />,
                 label: 'Amend entry',
@@ -297,7 +310,11 @@ export default function TimeIndex({
                 onClick: () => openDialog('edit', e),
             });
         }
-        if (!e.clock_out) {
+        if (
+            can.editEntry &&
+            e.can_mutate &&
+            (!e.clock_out || e.is_attendance_backed)
+        ) {
             items.push({
                 icon: <CalendarClock className="h-4 w-4" />,
                 label: 'Correct clock-out',
@@ -311,17 +328,25 @@ export default function TimeIndex({
                 onClick: () => setDrawerEntry(e),
             });
         }
-        items.push({
-            icon: <StickyNote className="h-4 w-4" />,
-            label: 'Add note',
-            onClick: () => setNoteEntry(e),
-        });
+        if (can.editEntry && e.can_mutate) {
+            items.push({
+                icon: <StickyNote className="h-4 w-4" />,
+                label: 'Add note',
+                onClick: () => setNoteEntry(e),
+            });
+        }
         items.push({
             icon: <List className="h-4 w-4" />,
             label: 'View this person’s entries',
             onClick: () => viewPersonEntries(e.user_name),
         });
-        if (can.manage && e.status !== 'approved' && e.status !== 'voided') {
+        if (
+            can.manage &&
+            e.can_mutate &&
+            !e.is_attendance_backed &&
+            e.status !== 'approved' &&
+            e.status !== 'voided'
+        ) {
             items.push({ sep: true });
             items.push({
                 icon: <Trash2 className="h-4 w-4" />,
@@ -341,27 +366,29 @@ export default function TimeIndex({
 
     function personMenu(p: OnNowItem, ev: MouseEvent) {
         ev.preventDefault();
+        const items: ShiftCtxState['items'] = [];
+        if (can.editEntry && p.can_mutate) {
+            items.push({
+                icon: <CalendarClock className="h-4 w-4" />,
+                label: 'Correct / close clock-out',
+                onClick: () =>
+                    openDialog(
+                        'correct',
+                        correctSeed({ ...p, user_name: p.name }),
+                    ),
+            });
+        }
+        items.push({
+            icon: <List className="h-4 w-4" />,
+            label: 'View this person’s entries',
+            onClick: () => viewPersonEntries(p.name),
+        });
         setCtx({
             x: ev.clientX,
             y: ev.clientY,
             tag: 'On now',
             meta: p.name,
-            items: [
-                {
-                    icon: <CalendarClock className="h-4 w-4" />,
-                    label: 'Correct / close clock-out',
-                    onClick: () =>
-                        openDialog(
-                            'correct',
-                            correctSeed({ ...p, user_name: p.name }),
-                        ),
-                },
-                {
-                    icon: <List className="h-4 w-4" />,
-                    label: 'View this person’s entries',
-                    onClick: () => viewPersonEntries(p.name),
-                },
-            ],
+            items,
         });
     }
 
@@ -374,13 +401,18 @@ export default function TimeIndex({
             meta: e.title,
             items: [
                 {
-                    icon: <AlertTriangle className="h-4 w-4" />,
-                    label:
-                        e.action === 'correct'
-                            ? 'Correct clock-out'
-                            : e.action === 'edit'
-                              ? 'Amend entry'
-                              : 'View entries',
+                    icon: can.editEntry && e.can_mutate ? (
+                        <AlertTriangle className="h-4 w-4" />
+                    ) : (
+                        <List className="h-4 w-4" />
+                    ),
+                    label: !can.editEntry || !e.can_mutate
+                        ? 'View entries'
+                        : e.action === 'correct'
+                          ? 'Correct clock-out'
+                          : e.action === 'edit'
+                            ? 'Amend entry'
+                            : 'View entries',
                     onClick: () => runException(e),
                 },
             ],
@@ -388,6 +420,11 @@ export default function TimeIndex({
     }
 
     function runException(e: ExceptionItem) {
+        if ((!can.editEntry || !e.can_mutate) && e.entry_id) {
+            viewPersonEntries(e.user_name ?? e.title);
+            return;
+        }
+
         if (
             e.action === 'correct' &&
             e.entry_id &&
@@ -402,6 +439,7 @@ export default function TimeIndex({
                     user_name: e.user_name ?? e.title,
                     clock_in: e.clock_in,
                     entry_date: e.entry_date,
+                    can_mutate: e.can_mutate,
                 }),
             );
         } else if (e.action === 'edit' && e.entry_id) {
@@ -414,7 +452,7 @@ export default function TimeIndex({
     }
 
     /* ---- tabs ---- */
-    const tabItems: HrTabItem[] = [
+    const allTabItems: HrTabItem[] = [
         {
             id: 'overview',
             label: 'Overview',
@@ -446,6 +484,9 @@ export default function TimeIndex({
             tone: 'info',
         },
     ];
+    const tabItems = allTabItems.filter(
+        (item) => item.id !== 'reports' || !!can.reportAny,
+    );
 
     const exportHref = `/hr/time/export?${filterQuery({ ...filters, tab: undefined })}`;
     const pdfHref = `/hr/time/report/pdf?scope=${filters.scope ?? 'team'}`;
@@ -569,7 +610,7 @@ export default function TimeIndex({
                         selfHoursWeek={weeklySummary.total_hours}
                         isOnClock={!!activeClock}
                         handlers={{
-                            onAddEntry: isManager
+                            onAddEntry: canMutate
                                 ? () => openDialog('add')
                                 : undefined,
                             onClockOnBehalf: can.clockOnBehalf
@@ -577,7 +618,7 @@ export default function TimeIndex({
                                 : undefined,
                             onReviewTimesheets: () =>
                                 router.visit('/operations/timesheets'),
-                            onExport: isManager
+                            onExport: can.reportAny
                                 ? () => {
                                       window.location.href = exportHref;
                                   }
@@ -622,9 +663,9 @@ export default function TimeIndex({
                     <EntriesPane
                         entries={entries}
                         filters={filters}
-                        sites={sites}
+                        sites={filterSites}
                         can={can}
-                        onAdd={isManager ? () => openDialog('add') : undefined}
+                        onAdd={canMutate ? () => openDialog('add') : undefined}
                         onFilter={applyFilter}
                         onRowContext={rowMenu}
                         onAmendments={(e) => setDrawerEntry(e)}
@@ -639,7 +680,7 @@ export default function TimeIndex({
                     />
                 ) : null}
 
-                {activeTab === 'reports' && isManager ? (
+                {activeTab === 'reports' && can.reportAny ? (
                     <ReportsPane
                         report={report}
                         exportHref={exportHref}
@@ -648,7 +689,7 @@ export default function TimeIndex({
                 ) : null}
             </PageLayout>
 
-            {isManager ? (
+            {canMutate ? (
                 <TimeEntryDialog
                     mode={dialogMode}
                     entry={dialogEntry}

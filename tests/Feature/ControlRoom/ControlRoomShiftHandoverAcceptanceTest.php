@@ -8,6 +8,7 @@ use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -394,6 +395,84 @@ class ControlRoomShiftHandoverAcceptanceTest extends TestCase
         $this->assertDatabaseCount('control_room_shifts', 1);
     }
 
+    public function test_controlled_handover_snapshot_requires_exact_access_at_prepare_replay_and_acceptance(): void
+    {
+        $this->setPermission($this->outgoingLead, 'medications.controlled.view', true);
+        $this->setPermission($this->incomingLead, 'medications.controlled.view', false);
+        $shift = $this->activeShift();
+        $controlled = $this->urgentAlert('high', 'CR-2026-1222', [
+            'alert_type' => 'Restricted methadone handover',
+            'context' => [
+                'normalized_data' => [
+                    'controlled_drug' => true,
+                    'medication_name' => 'Methadone replay secret',
+                ],
+            ],
+        ]);
+        $note = OperatorNote::query()->create([
+            'alert_id' => $controlled->id,
+            'shift_id' => $shift->id,
+            'type' => OperatorNote::TYPE_HANDOVER,
+            'purpose' => OperatorNote::PURPOSE_ESCALATION_HANDOVER,
+            'content' => 'Restricted methadone handover note',
+            'is_pinned' => true,
+            'user_id' => $this->outgoingLead->id,
+        ]);
+        $this->saveDraft($shift, [
+            'incoming_lead_user_id' => $this->incomingLead->id,
+            'reviewed_alert_ids' => [$controlled->id],
+        ]);
+        $shift->refresh();
+
+        $this->actingAs($this->outgoingLead)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'incoming_lead_user_id' => $this->incomingLead->id,
+                'reviewed_alert_ids' => [$controlled->id],
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasErrors('incoming_lead_user_id');
+        $this->assertSame(Shift::HANDOVER_NONE, $shift->fresh()->handover_status);
+
+        $this->setPermission($this->incomingLead, 'medications.controlled.view', true);
+        $shift->refresh();
+        $this->actingAs($this->outgoingLead)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'incoming_lead_user_id' => $this->incomingLead->id,
+                'reviewed_alert_ids' => [$controlled->id],
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $prepared = $shift->fresh();
+        $this->assertSame([$controlled->id], data_get($prepared->handover_snapshot, 'note_alert_ids'));
+        $this->assertSame($controlled->id, data_get($prepared->handover_snapshot, 'pinned_notes.0.alert_id'));
+        $this->assertSame($note->id, data_get($prepared->handover_snapshot, 'pinned_notes.0.id'));
+
+        $this->setPermission($this->incomingLead, 'medications.controlled.view', false);
+        $replay = $this->actingAs($this->incomingLead)
+            ->get("/control-room/shifts/{$shift->id}/handover")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('shift.handover_snapshot', null)
+                ->where('shift.can_accept', false)
+                ->has('pinnedNotes', 0)
+                ->where('snapshotIssue', fn ($issue): bool => is_string($issue) && $issue !== ''));
+        $this->assertStringNotContainsString(
+            'Restricted methadone',
+            json_encode($replay->inertiaProps(), JSON_THROW_ON_ERROR),
+        );
+
+        $this->actingAs($this->incomingLead)
+            ->post("/control-room/shifts/{$shift->id}/accept-handover", [
+                'expected_version' => $prepared->handover_version,
+            ])
+            ->assertSessionHasErrors('handover');
+
+        $this->assertSame('active', $shift->fresh()->status);
+        $this->assertSame(Shift::HANDOVER_PREPARED, $shift->fresh()->handover_status);
+        $this->assertDatabaseCount('control_room_shifts', 1);
+    }
+
     public function test_only_selected_incoming_lead_can_accept_and_acceptance_switches_shifts_once(): void
     {
         $shift = $this->activeShift();
@@ -623,5 +702,15 @@ class ControlRoomShiftHandoverAcceptanceTest extends TestCase
         ]);
 
         return $user;
+    }
+
+    private function setPermission(User $user, string $permissionKey, bool $allowed): void
+    {
+        $permission = Permission::query()->where('key', $permissionKey)->firstOrFail();
+        $user->permissionOverrides()->syncWithoutDetaching([
+            $permission->id => ['allowed' => $allowed],
+        ]);
+        $user->unsetRelation('permissionOverrides');
+        $user->unsetRelation('roles');
     }
 }

@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationStock;
 use App\Models\MedicationAdminRule;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\Permission;
@@ -14,6 +15,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -65,12 +67,20 @@ class OneChartAdministrationSafetyTest extends TestCase
             'end_date' => null,
             'is_active' => true,
         ]);
+        $assessor = User::factory()->create([
+            'role' => 'manager',
+            'approved_at' => now(),
+        ]);
         MedicationCompetencyAssessment::query()->create([
             'user_id' => $this->admin->id,
+            'assessor_id' => $assessor->id,
             'assessment_type' => 'annual',
             'status' => 'passed',
-            'assessment_date' => today(),
+            'assessment_date' => today()->subMonth(),
             'expiry_date' => today()->addYear(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_administer_unsupervised' => true,
         ]);
 
         Shift::factory()->create([
@@ -140,6 +150,11 @@ class OneChartAdministrationSafetyTest extends TestCase
             'controlled_drug' => true,
             'witness_required' => true,
         ]);
+        ClientMedicationStock::query()->create([
+            'client_medication_id' => $medication->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
         $witness = $this->createWitness('witness-secret');
 
         $this->actingAs($this->admin, 'sanctum')
@@ -150,9 +165,8 @@ class OneChartAdministrationSafetyTest extends TestCase
                 'scheduled_for' => now()->toIso8601String(),
                 'administered_at' => now()->toIso8601String(),
             ])
-            ->assertStatus(422)
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('error_field', 'witness_credential');
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('witness_credential');
 
         $this->actingAs($this->admin, 'sanctum')
             ->postJson($this->administrationUrl($medication), [
@@ -163,9 +177,8 @@ class OneChartAdministrationSafetyTest extends TestCase
                 'scheduled_for' => now()->toIso8601String(),
                 'administered_at' => now()->toIso8601String(),
             ])
-            ->assertStatus(422)
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('error_field', 'witness_credential');
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('witness_credential');
 
         $this->assertDatabaseMissing('client_medication_administrations', [
             'client_medication_id' => $medication->id,
@@ -287,6 +300,116 @@ class OneChartAdministrationSafetyTest extends TestCase
             ->assertJsonPath('success', true);
     }
 
+    public function test_api_scheduled_administration_rejects_incomplete_or_contradictory_offline_provenance(): void
+    {
+        $medication = $this->createMedication();
+        $basePayload = [
+            'status' => 'given',
+            'dose_given' => '500mg',
+            'scheduled_for' => now()->toIso8601String(),
+        ];
+        $validUuid = '9ef0f6a2-8d62-4d4a-945b-c7a29b6f36ce';
+        $validCapturedAt = now()->subMinutes(5)->toIso8601String();
+        $nonRfcCapturedAt = now(config('app.worker_timezone', 'Pacific/Auckland'))
+            ->subMinutes(5)
+            ->format('Y-m-d H:i:s');
+        $invalidSubmissions = [
+            [[
+                'captured_offline_at' => $validCapturedAt,
+                'origin_device_id' => 'shift-medication-card',
+                'queued_offline' => true,
+            ], 'client_request_uuid'],
+            [[
+                'client_request_uuid' => $validUuid,
+                'origin_device_id' => 'shift-medication-card',
+                'queued_offline' => true,
+            ], 'captured_offline_at'],
+            [[
+                'client_request_uuid' => $validUuid,
+                'captured_offline_at' => $nonRfcCapturedAt,
+                'origin_device_id' => 'shift-medication-card',
+                'queued_offline' => true,
+            ], 'captured_offline_at'],
+            [[
+                'client_request_uuid' => $validUuid,
+                'captured_offline_at' => $validCapturedAt,
+                'queued_offline' => true,
+            ], 'origin_device_id'],
+            [[
+                'client_request_uuid' => $validUuid,
+                'captured_offline_at' => $validCapturedAt,
+                'queued_offline' => false,
+            ], 'captured_offline_at'],
+        ];
+
+        foreach ($invalidSubmissions as [$submission, $errorField]) {
+            $this->actingAs($this->admin, 'sanctum')
+                ->postJson($this->administrationUrl($medication), [
+                    ...$basePayload,
+                    ...$submission,
+                ])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors($errorField);
+        }
+
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+    }
+
+    public function test_api_prn_administration_uses_capture_time_only_for_valid_offline_provenance(): void
+    {
+        $medication = $this->createMedication([
+            'frequency' => null,
+            'dose_times' => null,
+            'is_prn' => true,
+            'prn_reason' => 'Breakthrough pain',
+            'max_per_day' => 4,
+        ]);
+        $basePayload = [
+            'status' => 'given',
+            'dose_given' => '500mg',
+            'reason' => 'Breakthrough pain',
+            'client_request_uuid' => '9c8567f5-4d2f-41fa-904e-0ad12a259aa5',
+        ];
+        $capturedAt = now()->subMinutes(5)->utc()->format('Y-m-d\TH:i:s.v\Z');
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson($this->administrationUrl($medication), [
+                ...$basePayload,
+                'captured_offline_at' => $capturedAt,
+                'queued_offline' => true,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('origin_device_id');
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson($this->administrationUrl($medication), [
+                ...$basePayload,
+                'captured_offline_at' => $capturedAt,
+                'origin_device_id' => 'shift-medication-card',
+                'queued_offline' => false,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'captured_offline_at',
+                'origin_device_id',
+            ]);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson($this->administrationUrl($medication), [
+                ...$basePayload,
+                'captured_offline_at' => $capturedAt,
+                'origin_device_id' => 'shift-medication-card',
+                'queued_offline' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('sync.status', 'synced');
+
+        $administration = ClientMedicationAdministration::query()->sole();
+        $this->assertSame(
+            Carbon::parse($capturedAt)->utc()->format('Y-m-d H:i:s'),
+            $administration->getRawOriginal('administered_at'),
+        );
+    }
+
     private function createMedication(array $overrides = []): ClientMedication
     {
         return ClientMedication::query()->create(array_merge([
@@ -318,6 +441,38 @@ class OneChartAdministrationSafetyTest extends TestCase
 
         $witness->permissionOverrides()->syncWithoutDetaching([
             $permission->id => ['allowed' => true],
+        ]);
+
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $witness->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $witness->id,
+            'assessor_id' => $this->admin->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => today()->subMonth(),
+            'expiry_date' => today()->addYear(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_witness_controlled' => true,
+        ]);
+        Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->client->service_context_id,
+            'user_id' => $witness->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'created_by' => $this->admin->id,
+            'status' => 'in_progress',
         ]);
 
         return $witness;

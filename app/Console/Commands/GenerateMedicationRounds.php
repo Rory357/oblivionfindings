@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
-use Carbon\Carbon;
+use App\Services\Medication\MedicationRoundGenerationService;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 
 class GenerateMedicationRounds extends Command
@@ -15,50 +15,45 @@ class GenerateMedicationRounds extends Command
 
     protected $description = 'Generate medication rounds from active templates for the given date';
 
-    public function handle(): int
+    public function handle(MedicationRoundGenerationService $roundGeneration): int
     {
-        $date = $this->option('date') ? Carbon::parse($this->option('date')) : today();
-        $dayOfWeek = $date->dayOfWeekIso; // 1=Mon, 7=Sun
+        $workerTimezone = config('app.worker_timezone', 'Pacific/Auckland');
+        $date = $this->option('date')
+            ? CarbonImmutable::parse($this->option('date'), $workerTimezone)
+            : CarbonImmutable::now($workerTimezone);
         $generateAll = (bool) $this->option('generate-all');
 
-        $templates = MedicationRoundTemplate::active()->get();
+        $templateIds = MedicationRoundTemplate::query()
+            ->active()
+            ->orderBy('id')
+            ->pluck('id');
         $generated = 0;
+        $alreadyExisted = 0;
         $skipped = 0;
+        $skipReasons = [];
 
-        foreach ($templates as $template) {
-            if (! $generateAll && ! $template->appliesToDay($dayOfWeek)) {
+        foreach ($templateIds as $templateId) {
+            $result = $roundGeneration->generate(
+                (int) $templateId,
+                $date,
+                $generateAll,
+            );
+
+            if ($result['status'] === MedicationRoundGenerationService::STATUS_CREATED) {
+                $generated++;
+            } elseif ($result['status'] === MedicationRoundGenerationService::STATUS_ALREADY_EXISTS) {
+                $alreadyExisted++;
+            } else {
                 $skipped++;
-                continue;
+                $skipReasons[$result['reason']] = ($skipReasons[$result['reason']] ?? 0) + 1;
             }
-
-            // Skip if round already exists for this template + date
-            $exists = MedicationRound::where('round_template_id', $template->id)
-                ->whereDate('round_date', $date)
-                ->exists();
-
-            if ($exists) {
-                $skipped++;
-                continue;
-            }
-
-            MedicationRound::create([
-                'name' => $template->name,
-                'round_template_id' => $template->id,
-                'round_type' => 'scheduled',
-                'scheduled_time' => $template->scheduled_time,
-                'window_minutes' => $template->window_minutes ?? 60,
-                'round_date' => $date->toDateString(),
-                'status' => 'pending',
-                'assigned_to' => $template->default_assigned_to,
-                'total_medications' => $template->applicableMedicationCountForDate($date),
-                'site_id' => $template->site_id,
-                'service_context_id' => $template->service_context_id,
-            ]);
-            $generated++;
         }
 
-        $this->info("Generated {$generated} rounds, skipped {$skipped} (already exist or not scheduled today).");
+        $this->info("Generated {$generated} rounds; {$alreadyExisted} already existed; skipped {$skipped}.");
+        foreach ($skipReasons as $reason => $count) {
+            $this->line("Skipped {$count}: {$reason}");
+        }
 
-        return 0;
+        return self::SUCCESS;
     }
 }

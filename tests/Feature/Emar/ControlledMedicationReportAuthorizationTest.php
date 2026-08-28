@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationDashboardAlert;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
@@ -33,7 +34,11 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
         ] as $routeName) {
             $middleware = Route::getRoutes()->getByName($routeName)?->gatherMiddleware() ?? [];
 
-            $this->assertContains('permission:reports.viewAny', $middleware, $routeName);
+            $this->assertContains(
+                'permission:medications.reports.export|reports.viewAny',
+                $middleware,
+                $routeName,
+            );
             $this->assertContains('permission:medications.controlled.view', $middleware, $routeName);
         }
 
@@ -90,15 +95,16 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
     {
         $actor = $this->userWithPermissions([
             'reports.viewAny',
-            'medications.view',
             'sites.viewAll',
         ]);
+        $this->assertFalse($actor->canDo('medications.view'));
+        $this->assertFalse($actor->canDo('medications.controlled.view'));
         $site = Site::factory()->create(['is_active' => true]);
         $client = Client::factory()->create([
             'site_id' => $site->id,
             'status' => 'active',
         ]);
-        $medication = ClientMedication::factory()->create([
+        $controlledMedication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'name' => 'Controlled MAR fixture',
             'controlled_drug' => true,
@@ -107,23 +113,57 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             'approval_status' => 'verified',
             'end_date' => null,
         ]);
+        $ordinaryMedication = ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'name' => 'Ordinary MAR fixture',
+            'controlled_drug' => false,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+            'end_date' => null,
+        ]);
         ClientMedicationAdministration::query()->create([
             'client_id' => $client->id,
-            'client_medication_id' => $medication->id,
+            'client_medication_id' => $controlledMedication->id,
             'administered_by' => $actor->id,
             'administered_at' => now(),
             'scheduled_for' => now(),
             'status' => 'given',
             'dose_given' => '5 mg',
         ]);
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $ordinaryMedication->id,
+            'administered_by' => $actor->id,
+            'administered_at' => now(),
+            'scheduled_for' => now(),
+            'status' => 'given',
+            'dose_given' => '500 mg',
+        ]);
         ClientControlledDrugDiscrepancy::query()->create([
             'client_id' => $client->id,
-            'client_medication_id' => $medication->id,
+            'client_medication_id' => $controlledMedication->id,
             'difference' => -1,
             'reason' => 'Controlled-only fixture',
             'reported_at' => now(),
             'reported_by' => $actor->id,
             'status' => 'open',
+        ]);
+        MedicationDashboardAlert::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $ordinaryMedication->id,
+            'alert_type' => 'overdue',
+            'severity' => 'warning',
+            'message' => 'Ordinary audit alert fixture',
+            'status' => 'active',
+        ]);
+        MedicationDashboardAlert::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $controlledMedication->id,
+            'alert_type' => 'controlled_discrepancy',
+            'severity' => 'critical',
+            'message' => 'Controlled audit alert fixture',
+            'status' => 'active',
         ]);
 
         $this->actingAs($actor)
@@ -134,8 +174,8 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
                 ->where('can_view_controlled', false)
                 ->has('discrepancies', 0)
                 ->has('administrations', 1)
-                ->where('administrations.0.medication.name', 'Controlled MAR fixture')
-                ->where('administrations.0.medication.controlled_drug', true));
+                ->where('administrations.0.medication.name', 'Ordinary MAR fixture')
+                ->where('administrations.0.medication.controlled_drug', false));
 
         $this->actingAs($actor)
             ->get(route('emar.reports'))
@@ -156,18 +196,32 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             ->getJson(route('api.medications.reports', ['type' => 'mar']))
             ->assertOk()
             ->assertJsonPath('meta.total_records', 1)
-            ->assertJsonPath('records.0.medication', 'Controlled MAR fixture')
-            ->assertJsonPath('records.0.controlled_drug', true);
+            ->assertJsonPath('records.0.medication', 'Ordinary MAR fixture')
+            ->assertJsonPath('records.0.controlled_drug', false)
+            ->assertJsonMissing(['medication' => 'Controlled MAR fixture']);
+
+        $this->actingAs($actor)
+            ->getJson(route('api.medications.reports', ['type' => 'audit']))
+            ->assertOk()
+            ->assertJsonMissingPath('controlled_summary')
+            ->assertJsonMissingPath('compliance_metrics.witness_compliance_percentage')
+            ->assertJsonPath('safety_alerts.total_alerts', 1)
+            ->assertJsonPath('safety_alerts.by_type.overdue', 1)
+            ->assertJsonMissingPath('safety_alerts.by_type.controlled_discrepancy');
 
         $emarCsv = $this->actingAs($actor)
             ->get(route('emar.reports.export', ['report_type' => 'administration']))
             ->assertOk();
-        $this->assertStringContainsString('Controlled MAR fixture', $emarCsv->streamedContent());
+        $emarCsvContent = $emarCsv->streamedContent();
+        $this->assertStringContainsString('Ordinary MAR fixture', $emarCsvContent);
+        $this->assertStringNotContainsString('Controlled MAR fixture', $emarCsvContent);
 
         $medicationsCsv = $this->actingAs($actor)
             ->get(route('reports.medications.export_mar'))
             ->assertOk();
-        $this->assertStringContainsString('Controlled MAR fixture', $medicationsCsv->streamedContent());
+        $medicationsCsvContent = $medicationsCsv->streamedContent();
+        $this->assertStringContainsString('Ordinary MAR fixture', $medicationsCsvContent);
+        $this->assertStringNotContainsString('Controlled MAR fixture', $medicationsCsvContent);
 
         $this->actingAs($actor)
             ->get(route('emar.pdf.mar', ['client_id' => $client->id]))
@@ -221,6 +275,11 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             ->pluck('id')
             ->mapWithKeys(fn (int $id) => [$id => ['allowed' => true]])
             ->all();
+        if (! in_array('medications.view', $permissions, true)) {
+            $medicationsViewId = Permission::query()->where('key', 'medications.view')->value('id');
+            $this->assertNotNull($medicationsViewId, 'Missing medications.view permission in test setup.');
+            $grants[(int) $medicationsViewId] = ['allowed' => false];
+        }
         $user->permissionOverrides()->sync($grants);
         $user->unsetRelation('permissionOverrides')->unsetRelation('roles');
 

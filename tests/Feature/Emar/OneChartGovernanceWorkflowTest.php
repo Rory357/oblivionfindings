@@ -2,14 +2,17 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationAlert;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationReview;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\MedicationAlertService;
@@ -55,6 +58,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
             'site_id' => $site->id,
             'care_level' => 'hospital',
         ]);
+        $this->assignCurrentSiteStaff($this->admin, $site);
     }
 
     public function test_attention_alerts_are_exposed_and_med_admin_suppression_skips_overdue_generation(): void
@@ -168,6 +172,122 @@ class OneChartGovernanceWorkflowTest extends TestCase
             ->assertRedirect('/emar/mar')
             ->assertSessionHasErrors('witness_credential');
 
+        $foreignSite = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $foreignWitness = $this->createWitness('foreign-secret', $foreignSite);
+        $this->actingAs($this->admin)
+            ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
+                ...$payload,
+                'witnessed_by' => $foreignWitness->id,
+                'witness_credential' => 'foreign-secret',
+            ])
+            ->assertNotFound();
+
+        $staleWitness = $this->createWitness('stale-secret');
+        $staleWitness->hrEmployeeProfile->forceFill([
+            'is_active' => false,
+            'end_date' => today()->subDay(),
+        ])->save();
+        $this->actingAs($this->admin)
+            ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
+                ...$payload,
+                'witnessed_by' => $staleWitness->id,
+                'witness_credential' => 'stale-secret',
+            ])
+            ->assertNotFound();
+
+        $invalidCompetencyWitnesses = [
+            'unassessed-secret' => function (User $candidate): void {
+                $candidate->medicationCompetencyAssessments()->delete();
+            },
+            'failed-secret' => function (User $candidate): void {
+                $candidate->medicationCompetencyAssessments()->update(['status' => 'failed']);
+            },
+            'expired-secret' => function (User $candidate): void {
+                $candidate->medicationCompetencyAssessments()->update(['expiry_date' => today()->subDay()]);
+            },
+            'not-witness-competent-secret' => function (User $candidate): void {
+                $candidate->medicationCompetencyAssessments()->update(['can_witness_controlled' => false]);
+            },
+            'not-present-secret' => function (User $candidate): void {
+                Shift::query()->where('user_id', $candidate->id)->delete();
+            },
+        ];
+        foreach ($invalidCompetencyWitnesses as $password => $invalidate) {
+            $candidate = $this->createWitness($password);
+            $invalidate($candidate);
+            $this->actingAs($this->admin)
+                ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
+                    ...$payload,
+                    'witnessed_by' => $candidate->id,
+                    'witness_credential' => $password,
+                ])
+                ->assertNotFound();
+        }
+
+        $backdatedWitness = $this->createWitness('backdated-secret');
+        $backdatedAt = now()->subDays(3);
+        Shift::withoutEvents(function () use ($backdatedWitness, $backdatedAt): void {
+            Shift::query()->where('user_id', $backdatedWitness->id)->firstOrFail()->forceFill([
+                'starts_at' => $backdatedAt->copy()->subHour(),
+                'ends_at' => $backdatedAt->copy()->addHour(),
+                'status' => 'in_progress',
+            ])->save();
+        });
+        $this->actingAs($this->admin)
+            ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
+                ...$payload,
+                'commenced_at' => $backdatedAt->toIso8601String(),
+                'witnessed_by' => $backdatedWitness->id,
+                'witness_credential' => 'backdated-secret',
+            ])
+            ->assertNotFound();
+
+        $unauthorisedWitness = $this->createWitness('no-capability-secret');
+        $witnessPermissionId = Permission::query()
+            ->where('key', 'medications.controlled.witness')
+            ->value('id');
+        $this->assertNotNull($witnessPermissionId);
+        $unauthorisedWitness->permissionOverrides()->syncWithoutDetaching([
+            $witnessPermissionId => ['allowed' => false],
+        ]);
+        $unauthorisedWitness->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        $this->actingAs($this->admin)
+            ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
+                ...$payload,
+                'witnessed_by' => $unauthorisedWitness->id,
+                'witness_credential' => 'no-capability-secret',
+            ])
+            ->assertNotFound();
+
+        $this->actingAs($this->admin)
+            ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
+                ...$payload,
+                'witnessed_by' => $this->admin->id,
+                'witness_credential' => 'admin-secret',
+            ])
+            ->assertSessionHasErrors('witnessed_by');
+        $this->assertDatabaseCount('medication_syringe_drivers', 0);
+
+        $this->actingAs($this->admin)
+            ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
+                ...$payload,
+                'commenced_at' => now()->addMinutes(5)->toIso8601String(),
+                'witness_credential' => 'witness-secret',
+            ])
+            ->assertSessionHasErrors('commenced_at');
+        $this->actingAs($this->admin)
+            ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
+                ...$payload,
+                'contents' => [[
+                    'name' => 'Unlinked caller-classified Morphine',
+                    'dose' => '10mg',
+                    'requires_witness' => false,
+                ]],
+                'witnessed_by' => null,
+            ])
+            ->assertSessionHasErrors('contents.0.client_medication_id');
+        $this->assertDatabaseCount('medication_syringe_drivers', 0);
+
         $this->actingAs($this->admin)
             ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
                 ...$payload,
@@ -178,6 +298,20 @@ class OneChartGovernanceWorkflowTest extends TestCase
         $driver = $this->client->syringeDrivers()->firstOrFail();
         $this->assertSame($witness->id, $driver->witnessed_by);
         $this->assertSame('password', $driver->witness_method);
+
+        $this->actingAs($this->admin)
+            ->post("/emar/syringe-drivers/{$driver->id}/checks", [
+                'checked_at' => $driver->commenced_at->copy()->subMinute()->toIso8601String(),
+                'infusion_running' => true,
+            ])
+            ->assertSessionHasErrors('checked_at');
+        $this->actingAs($this->admin)
+            ->post("/emar/syringe-drivers/{$driver->id}/checks", [
+                'checked_at' => now()->addMinutes(5)->toIso8601String(),
+                'infusion_running' => true,
+            ])
+            ->assertSessionHasErrors('checked_at');
+        $this->assertSame(0, $driver->checks()->count());
 
         $this->actingAs($this->admin)
             ->post("/emar/syringe-drivers/{$driver->id}/checks", [
@@ -192,6 +326,125 @@ class OneChartGovernanceWorkflowTest extends TestCase
             'checked_by' => $this->admin->id,
             'site_condition' => 'Clean and dry',
         ]);
+
+        $this->actingAs($this->admin)
+            ->post("/emar/syringe-drivers/{$driver->id}/complete", [
+                'status' => 'completed',
+                'notes' => 'Driver completed after the final check.',
+            ])
+            ->assertRedirect();
+        $terminal = $driver->fresh();
+
+        $this->actingAs($this->admin)
+            ->post("/emar/syringe-drivers/{$driver->id}/checks", [
+                'infusion_running' => true,
+                'notes' => 'Must not append after completion.',
+            ])
+            ->assertNotFound();
+        $this->actingAs($this->admin)
+            ->post("/emar/syringe-drivers/{$driver->id}/complete", [
+                'status' => 'stopped',
+                'notes' => 'Must not replace terminal evidence.',
+            ])
+            ->assertNotFound();
+
+        $replayed = $driver->fresh();
+        $this->assertSame('completed', $replayed->status);
+        $this->assertSame($terminal->notes, $replayed->notes);
+        $this->assertSame($terminal->completed_by, $replayed->completed_by);
+        $this->assertTrue($terminal->completed_at->equalTo($replayed->completed_at));
+        $this->assertSame(1, $driver->checks()->count());
+    }
+
+    public function test_syringe_driver_checks_and_completion_require_canonical_controlled_authority(): void
+    {
+        $controlled = $this->createMedication([
+            'name' => 'Controlled syringe-driver aggregate',
+            'controlled_drug' => true,
+        ]);
+        $driver = $this->client->syringeDrivers()->create([
+            'site_id' => $this->client->site_id,
+            'status' => 'running',
+            'commenced_at' => now()->subHour(),
+            'commenced_by' => $this->admin->id,
+            'contents' => [[
+                'client_medication_id' => $controlled->id,
+                'name' => $controlled->name,
+                'dose' => '5 mg',
+            ]],
+        ]);
+        $recordOnly = $this->syringeMutationActor([
+            'medications.orders.manage',
+            'medications.controlled.record',
+        ]);
+        $viewOnly = $this->syringeMutationActor([
+            'medications.orders.manage',
+            'medications.controlled.view',
+        ]);
+
+        foreach ([$recordOnly, $viewOnly] as $unauthorised) {
+            $this->actingAs($unauthorised)
+                ->post("/emar/syringe-drivers/{$driver->id}/checks", [])
+                ->assertNotFound();
+            $this->actingAs($unauthorised)
+                ->post("/emar/syringe-drivers/{$driver->id}/complete", [])
+                ->assertNotFound();
+        }
+        $this->assertSame('running', $driver->fresh()->status);
+        $this->assertSame(0, $driver->checks()->count());
+
+        $foreignClient = Client::factory()->create(['status' => 'active']);
+        $foreignMedication = ClientMedication::factory()->create([
+            'client_id' => $foreignClient->id,
+            'name' => 'FORGED foreign syringe content',
+            'controlled_drug' => false,
+        ]);
+        $forgedDriver = $this->client->syringeDrivers()->create([
+            'site_id' => $this->client->site_id,
+            'status' => 'running',
+            'commenced_at' => now()->subHour(),
+            'commenced_by' => $this->admin->id,
+            'contents' => [[
+                'client_medication_id' => $foreignMedication->id,
+                'name' => 'FORGED foreign syringe content',
+            ]],
+        ]);
+        $malformedDriver = $this->client->syringeDrivers()->create([
+            'site_id' => $this->client->site_id,
+            'status' => 'running',
+            'commenced_at' => now()->subHour(),
+            'commenced_by' => $this->admin->id,
+            'contents' => [[
+                'client_medication_id' => 'not-a-medication-id',
+                'name' => 'Malformed syringe content',
+            ]],
+        ]);
+        $unlinkedDriver = $this->client->syringeDrivers()->create([
+            'site_id' => $this->client->site_id,
+            'status' => 'running',
+            'commenced_at' => now()->subHour(),
+            'commenced_by' => $this->admin->id,
+            'contents' => [[
+                'client_medication_id' => null,
+                'name' => 'Unlinked syringe content',
+                'requires_witness' => false,
+            ]],
+        ]);
+
+        foreach ([$forgedDriver, $malformedDriver, $unlinkedDriver] as $noncanonicalDriver) {
+            $this->actingAs($this->admin)
+                ->post("/emar/syringe-drivers/{$noncanonicalDriver->id}/checks", [
+                    'infusion_running' => true,
+                ])
+                ->assertNotFound();
+            $this->actingAs($this->admin)
+                ->post("/emar/syringe-drivers/{$noncanonicalDriver->id}/complete", [
+                    'status' => 'completed',
+                ])
+                ->assertNotFound();
+            $this->assertSame('running', $noncanonicalDriver->fresh()->status);
+            $this->assertSame(0, $noncanonicalDriver->checks()->count());
+        }
     }
 
     public function test_review_completion_sets_next_chart_review_date_from_client_interval(): void
@@ -242,6 +495,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
 
         $restHomeClient = Client::factory()->create([
             'service_context_id' => $this->client->service_context_id,
+            'site_id' => $this->client->site_id,
             'care_level' => 'rest_home',
         ]);
         $restHomeMedication = $this->createMedication([
@@ -259,10 +513,19 @@ class OneChartGovernanceWorkflowTest extends TestCase
             'administered_at' => now(),
         ]);
 
-        $report = app(MedicationReportingService::class)->exportMar(
+        $reporting = app(MedicationReportingService::class);
+        $unscopedReport = $reporting->exportMar(
             dateFrom: now()->subDay(),
             dateTo: now()->addDay(),
             careLevel: 'hospital',
+        );
+        $this->assertSame([], $unscopedReport['records']);
+
+        $report = $reporting->exportMar(
+            dateFrom: now()->subDay(),
+            dateTo: now()->addDay(),
+            careLevel: 'hospital',
+            siteIds: [(int) $this->client->site_id],
         );
 
         $this->assertCount(1, $report['records']);
@@ -286,7 +549,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
         ], $overrides));
     }
 
-    private function createWitness(string $password): User
+    private function createWitness(string $password, ?Site $site = null): User
     {
         $witness = User::factory()->create([
             'role' => 'support_worker',
@@ -302,7 +565,67 @@ class OneChartGovernanceWorkflowTest extends TestCase
         $witness->permissionOverrides()->syncWithoutDetaching([
             $permission->id => ['allowed' => true],
         ]);
+        $site ??= Site::query()->findOrFail($this->client->site_id);
+        $this->assignCurrentSiteStaff($witness, $site);
+
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $witness->id,
+            'assessor_id' => $this->admin->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => today()->subMonth(),
+            'expiry_date' => today()->addYear(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_witness_controlled' => true,
+        ]);
+        $presenceClient = (int) $site->id === (int) $this->client->site_id
+            ? $this->client
+            : Client::factory()->create([
+                'site_id' => $site->id,
+                'service_context_id' => $this->client->service_context_id,
+                'status' => 'active',
+            ]);
+        Shift::factory()->create([
+            'client_id' => $presenceClient->id,
+            'site_id' => $site->id,
+            'service_context_id' => $presenceClient->service_context_id,
+            'user_id' => $witness->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHour(),
+            'status' => 'in_progress',
+            'created_by' => $this->admin->id,
+        ]);
 
         return $witness;
+    }
+
+    private function assignCurrentSiteStaff(User $user, Site $site): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+            'end_date' => null,
+        ]);
+    }
+
+    /** @param array<int, string> $permissions */
+    private function syringeMutationActor(array $permissions): User
+    {
+        $actor = User::factory()->create(['approved_at' => now()]);
+        $this->assignCurrentSiteStaff(
+            $actor,
+            Site::query()->findOrFail($this->client->site_id),
+        );
+        $permissionIds = Permission::query()->whereIn('key', $permissions)->pluck('id');
+        $this->assertCount(count($permissions), $permissionIds);
+        $actor->permissionOverrides()->sync(
+            $permissionIds->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all(),
+        );
+
+        return $actor->refresh();
     }
 }

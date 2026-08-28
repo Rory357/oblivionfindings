@@ -20,10 +20,17 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import {
+    createMedicationMutationReplayState,
+    emarMutationWasAccepted,
+    prepareMedicationMutationReplayState,
+    submitEmarMutation,
+} from '@/lib/emar-offline';
 import { cn } from '@/lib/utils';
 import { DiscontinueDialog } from '@/pages/emar/_dialogs';
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 type Props = {
     client: { id: number; first_name: string; last_name: string };
@@ -44,6 +51,27 @@ type Props = {
     med_charts?: Array<any>;
     has_open_controlled_discrepancy?: boolean;
 };
+
+type DiscontinueMedicationCandidate = {
+    controlled_drug?: boolean;
+    is_controlled_drug?: boolean;
+};
+
+export function canRenderMedicationDiscontinue(
+    hasBaseAuthority: boolean,
+    canControlledView: boolean,
+    canControlledRecord: boolean,
+    medication: DiscontinueMedicationCandidate,
+): boolean {
+    const isControlled = Boolean(
+        medication.controlled_drug || medication.is_controlled_drug,
+    );
+
+    return (
+        hasBaseAuthority &&
+        (!isControlled || (canControlledView && canControlledRecord))
+    );
+}
 
 export default function ClientMedical({
     client,
@@ -68,11 +96,17 @@ export default function ClientMedical({
     const canDiscontinue = Boolean(
         auth?.can?.medications?.view && auth?.can?.medications?.ordersManage,
     );
+    const canClassifyMedication = Boolean(
+        can_edit && can_controlled_view && can_controlled_record,
+    );
     const name = `${client.first_name} ${client.last_name}`.trim();
     const [confirmAdminOpen, setConfirmAdminOpen] = useState(false);
+    const administrationReplay = useRef(createMedicationMutationReplayState());
     const [medicationToDiscontinue, setMedicationToDiscontinue] = useState<{
         id: number;
         name: string;
+        controlled_drug?: boolean;
+        is_controlled_drug?: boolean;
     } | null>(null);
 
     // When navigating from the client profile "Manage" buttons, we pass a section.
@@ -123,7 +157,9 @@ export default function ClientMedical({
         scheduled_for: '',
         shift_id: '',
         witnessed_by: '',
+        witness_credential: '',
         notes: '',
+        client_request_uuid: administrationReplay.current.uuid,
     });
 
     const selectedMedication = medications.find(
@@ -132,6 +168,11 @@ export default function ClientMedical({
     const administrationNeedsReason =
         administrationForm.data.status !== 'given' ||
         !!selectedMedication?.is_prn;
+    const administrationNeedsWitness = Boolean(
+        administrationForm.data.status === 'given' &&
+        (selectedMedication?.controlled_drug ||
+            selectedMedication?.witness_required),
+    );
 
     const stockForm = useForm({
         medication_id: medications?.[0]?.id ?? '',
@@ -144,6 +185,8 @@ export default function ClientMedical({
         witnessed_by: '',
         immediate_action_taken: '',
     });
+    const stockReplay = useRef(createMedicationMutationReplayState());
+    const [stockSubmitting, setStockSubmitting] = useState(false);
 
     const [closeDiscOpen, setCloseDiscOpen] = useState(false);
     const [selectedDiscId, setSelectedDiscId] = useState<number | null>(null);
@@ -154,6 +197,48 @@ export default function ClientMedical({
     const selectedStockMedication = medications.find(
         (m) => `${m.id}` === `${stockForm.data.medication_id}`,
     );
+
+    const submitGenericStock = async () => {
+        const payload = {
+            on_hand: stockForm.data.on_hand || null,
+            unit: stockForm.data.unit || null,
+            reorder_level: stockForm.data.reorder_level || null,
+            last_counted_at: stockForm.data.last_counted_at || null,
+            notes: stockForm.data.notes || null,
+            reason: stockForm.data.reason || null,
+        };
+        stockReplay.current = prepareMedicationMutationReplayState(
+            stockReplay.current,
+            {
+                client_id: client.id,
+                client_medication_id: Number(stockForm.data.medication_id),
+                ...payload,
+            },
+        );
+        setStockSubmitting(true);
+        try {
+            const result = await submitEmarMutation(
+                `/clients/${client.id}/medical/medications/${stockForm.data.medication_id}/stock`,
+                {
+                    ...payload,
+                    client_request_uuid: stockReplay.current.uuid,
+                },
+                {
+                    method: 'put',
+                    action: 'stock_update',
+                    successMessage: 'Medication stock updated',
+                },
+            );
+            if (emarMutationWasAccepted(result.status)) {
+                stockReplay.current = createMedicationMutationReplayState();
+                router.reload({ only: ['medications'] });
+            }
+        } catch {
+            toast.error('Could not update medication stock');
+        } finally {
+            setStockSubmitting(false);
+        }
+    };
     const stockDiscrepancyWillBeRaised = Boolean(
         selectedStockMedication?.controlled_drug &&
         selectedStockMedication?.stock?.on_hand !== null &&
@@ -177,6 +262,30 @@ export default function ClientMedical({
     });
 
     const submitAdministration = () => {
+        const {
+            witness_credential: _witnessCredential,
+            client_request_uuid: _clientRequestUuid,
+            ...materialPayload
+        } = administrationForm.data;
+        administrationReplay.current = prepareMedicationMutationReplayState(
+            administrationReplay.current,
+            { client_id: client.id, ...materialPayload },
+        );
+        if (
+            administrationNeedsWitness &&
+            typeof navigator !== 'undefined' &&
+            !navigator.onLine
+        ) {
+            administrationForm.setError(
+                'witness_credential',
+                'Reconnect before signing this witnessed action. Witness credentials are never saved on this device.',
+            );
+            return;
+        }
+        administrationForm.transform((data) => ({
+            ...data,
+            client_request_uuid: administrationReplay.current.uuid,
+        }));
         administrationForm.post(
             `/clients/${client.id}/medical/medications/${administrationForm.data.medication_id}/administrations`,
             {
@@ -189,6 +298,13 @@ export default function ClientMedical({
                         'reason',
                     );
                     administrationForm.reset('witnessed_by');
+                    administrationForm.reset('witness_credential');
+                    administrationReplay.current =
+                        createMedicationMutationReplayState();
+                    administrationForm.setData(
+                        'client_request_uuid',
+                        administrationReplay.current.uuid,
+                    );
                     setConfirmAdminOpen(false);
                 },
             },
@@ -436,7 +552,7 @@ export default function ClientMedical({
                         <CardTitle className="text-base">Medications</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        {can_edit && (
+                        {canClassifyMedication && (
                             <div className="rounded-md border p-3">
                                 <div className="text-sm font-medium">
                                     Add medication
@@ -775,7 +891,12 @@ export default function ClientMedical({
                                             >
                                                 View in eMAR
                                             </Button>
-                                            {canDiscontinue &&
+                                            {canRenderMedicationDiscontinue(
+                                                canDiscontinue,
+                                                can_controlled_view,
+                                                can_controlled_record,
+                                                m,
+                                            ) &&
                                                 m.state !== 'ceased' &&
                                                 !m.ceased_at && (
                                                     <Button
@@ -785,6 +906,10 @@ export default function ClientMedical({
                                                                 {
                                                                     id: m.id,
                                                                     name: m.name,
+                                                                    controlled_drug:
+                                                                        m.controlled_drug,
+                                                                    is_controlled_drug:
+                                                                        m.is_controlled_drug,
                                                                 },
                                                             )
                                                         }
@@ -1225,10 +1350,9 @@ export default function ClientMedical({
                                         </div>
                                     )}
 
-                                    {selectedMedication?.controlled_drug &&
-                                        administrationForm.data.status ===
-                                            'given' && (
-                                            <div className="md:col-span-2">
+                                    {administrationNeedsWitness && (
+                                        <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
+                                            <div>
                                                 <Label>
                                                     Witness (required)
                                                 </Label>
@@ -1268,7 +1392,38 @@ export default function ClientMedical({
                                                     </div>
                                                 )}
                                             </div>
-                                        )}
+                                            <div>
+                                                <Label>
+                                                    Witness password / PIN
+                                                    (required)
+                                                </Label>
+                                                <Input
+                                                    type="password"
+                                                    autoComplete="off"
+                                                    value={
+                                                        administrationForm.data
+                                                            .witness_credential
+                                                    }
+                                                    onChange={(event) =>
+                                                        administrationForm.setData(
+                                                            'witness_credential',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                                {administrationForm.errors
+                                                    .witness_credential && (
+                                                    <div className="mt-1 text-xs text-status-critical">
+                                                        {
+                                                            administrationForm
+                                                                .errors
+                                                                .witness_credential
+                                                        }
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div>
                                         <Label>Dose given</Label>
@@ -1355,15 +1510,23 @@ export default function ClientMedical({
                                                 return;
                                             }
                                             if (
-                                                selectedMedication?.controlled_drug &&
-                                                administrationForm.data
-                                                    .status === 'given' &&
+                                                administrationNeedsWitness &&
                                                 !administrationForm.data
                                                     .witnessed_by
                                             ) {
                                                 administrationForm.setError(
                                                     'witnessed_by',
                                                     'A witness is required for controlled drug administration.',
+                                                );
+                                                return;
+                                            }
+                                            if (
+                                                administrationNeedsWitness &&
+                                                !administrationForm.data.witness_credential.trim()
+                                            ) {
+                                                administrationForm.setError(
+                                                    'witness_credential',
+                                                    'The witness must enter their password or PIN.',
                                                 );
                                                 return;
                                             }
@@ -1747,13 +1910,20 @@ export default function ClientMedical({
                                                     return;
                                                 }
                                             }
-                                            stockForm.put(
-                                                `/clients/${client.id}/medical/medications/${stockForm.data.medication_id}/stock`,
-                                                { preserveScroll: true },
-                                            );
+                                            if (
+                                                selectedStockMedication?.controlled_drug
+                                            ) {
+                                                stockForm.put(
+                                                    `/clients/${client.id}/medical/medications/${stockForm.data.medication_id}/stock`,
+                                                    { preserveScroll: true },
+                                                );
+                                            } else {
+                                                void submitGenericStock();
+                                            }
                                         }}
                                         disabled={
                                             stockForm.processing ||
+                                            stockSubmitting ||
                                             !stockForm.data.medication_id
                                         }
                                     >
@@ -1972,13 +2142,19 @@ export default function ClientMedical({
                 </div>
             )}
 
-            {medicationToDiscontinue && (
-                <DiscontinueDialog
-                    medication={medicationToDiscontinue}
-                    action={`/clients/${client.id}/medical/medications/${medicationToDiscontinue.id}/discontinue`}
-                    onClose={() => setMedicationToDiscontinue(null)}
-                />
-            )}
+            {medicationToDiscontinue &&
+                canRenderMedicationDiscontinue(
+                    canDiscontinue,
+                    can_controlled_view,
+                    can_controlled_record,
+                    medicationToDiscontinue,
+                ) && (
+                    <DiscontinueDialog
+                        medication={medicationToDiscontinue}
+                        action={`/clients/${client.id}/medical/medications/${medicationToDiscontinue.id}/discontinue`}
+                        onClose={() => setMedicationToDiscontinue(null)}
+                    />
+                )}
 
             <Dialog open={closeDiscOpen} onOpenChange={setCloseDiscOpen}>
                 <DialogContent>

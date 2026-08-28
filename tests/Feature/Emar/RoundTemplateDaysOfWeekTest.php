@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -31,9 +34,11 @@ class RoundTemplateDaysOfWeekTest extends TestCase
     {
         // 2026-05-03 is a Sunday (dayOfWeekIso = 7).
         Carbon::setTestNow(Carbon::parse('2026-05-03 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $user = $this->makeRoleUser('admin');
+        $site = Site::factory()->create(['is_active' => true]);
+        $this->assignCurrentSiteStaff($user, $site);
         $this->grantPermissions($user, [
             'medications.view',
             'medications.administer.record',
@@ -47,6 +52,7 @@ class RoundTemplateDaysOfWeekTest extends TestCase
                 'scheduled_time' => '18:00',
                 'window_minutes' => 60,
                 'days_of_week' => [7],
+                'site_id' => $site->id,
             ])
             ->assertSessionHasNoErrors();
 
@@ -71,9 +77,11 @@ class RoundTemplateDaysOfWeekTest extends TestCase
 
     public function test_template_rejects_day_of_week_zero(): void
     {
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $user = $this->makeRoleUser('admin');
+        $site = Site::factory()->create(['is_active' => true]);
+        $this->assignCurrentSiteStaff($user, $site);
         $this->grantPermissions($user, ['medications.orders.manage']);
 
         $this->actingAs($user)
@@ -83,8 +91,80 @@ class RoundTemplateDaysOfWeekTest extends TestCase
                 'scheduled_time' => '08:00',
                 'window_minutes' => 60,
                 'days_of_week' => [0],
+                'site_id' => $site->id,
             ])
             ->assertSessionHasErrors('days_of_week.0');
+    }
+
+    public function test_round_templates_reject_foreign_default_assignees_and_command_skips_unscoped_or_stale_templates(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-03 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        $this->seed(RbacSeeder::class);
+        $site = Site::factory()->create(['is_active' => true]);
+        $foreignSite = Site::factory()->create(['is_active' => true]);
+        $actor = $this->makeRoleUser('admin');
+        $this->assignCurrentSiteStaff($actor, $site);
+        $this->grantPermissions($actor, ['medications.orders.manage']);
+        $currentAssignee = $this->makeRoleUser('support_worker');
+        $foreignAssignee = $this->makeRoleUser('support_worker');
+        foreach ([[$currentAssignee, $site], [$foreignAssignee, $foreignSite]] as [$staff, $staffSite]) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $staff->id,
+                'primary_site_id' => $staffSite->id,
+                'secondary_site_ids' => [],
+                'start_date' => now()->subMonth(),
+                'end_date' => null,
+                'is_active' => true,
+            ]);
+        }
+
+        $payload = [
+            'name' => 'Foreign assignee probe',
+            'scheduled_time' => '18:00',
+            'window_minutes' => 60,
+            'days_of_week' => [7],
+            'site_id' => $site->id,
+            'default_assigned_to' => $foreignAssignee->id,
+        ];
+        $this->actingAs($actor)
+            ->post('/emar/rounds/templates', $payload)
+            ->assertNotFound();
+
+        $valid = MedicationRoundTemplate::query()->create([
+            ...$payload,
+            'name' => 'Current Site assignee',
+            'default_assigned_to' => $currentAssignee->id,
+            'active' => true,
+        ]);
+        $foreign = MedicationRoundTemplate::query()->create([
+            ...$payload,
+            'active' => true,
+        ]);
+        $unscoped = MedicationRoundTemplate::query()->create([
+            ...$payload,
+            'name' => 'Legacy null Site template',
+            'site_id' => null,
+            'default_assigned_to' => null,
+            'active' => true,
+        ]);
+
+        $this->actingAs($actor)
+            ->put('/emar/rounds/templates/'.$valid->id, $payload)
+            ->assertNotFound();
+        $this->assertSame($currentAssignee->id, (int) $valid->refresh()->default_assigned_to);
+
+        $this->artisan('emar:generate-rounds', [
+            '--date' => '2026-05-03',
+            '--generate-all' => true,
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('medication_rounds', [
+            'round_template_id' => $valid->id,
+            'site_id' => $site->id,
+            'assigned_to' => $currentAssignee->id,
+        ]);
+        $this->assertDatabaseMissing('medication_rounds', ['round_template_id' => $foreign->id]);
+        $this->assertDatabaseMissing('medication_rounds', ['round_template_id' => $unscoped->id]);
     }
 
     protected function makeRoleUser(string $roleName): User
@@ -96,6 +176,18 @@ class RoundTemplateDaysOfWeekTest extends TestCase
         }
 
         return $user;
+    }
+
+    private function assignCurrentSiteStaff(User $user, Site $site): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
     }
 
     /**

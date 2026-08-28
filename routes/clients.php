@@ -197,7 +197,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Medication administration corrections
     Route::post('/clients/{client}/mar/administrations/{administration}/corrections', [MedicationAdministrationCorrectionController::class, 'store'])
-        ->middleware('permission:medications.administer.correct|clients.update')
+        ->middleware('permission:medications.administer.correct')
         ->name('clients.mar.administrations.corrections.store');
 
     // Break-glass emergency access

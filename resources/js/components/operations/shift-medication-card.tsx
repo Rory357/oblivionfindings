@@ -18,11 +18,15 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { submitEmarMutation } from '@/lib/emar-offline';
+import {
+    emarMutationWasAccepted,
+    submitEmarMutation,
+} from '@/lib/emar-offline';
+import { createOfflineRequestUuid } from '@/lib/offline-queue';
 import { Link, router, useForm } from '@inertiajs/react';
 import axios from 'axios';
 import { AlertTriangle, QrCode, ShieldCheck } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 type MedicationRow = {
@@ -134,6 +138,10 @@ export default function ShiftMedicationCard({
     const [scanMessage, setScanMessage] = useState('');
     const [scanMatchSource, setScanMatchSource] = useState<string | null>(null);
     const [verifyingScan, setVerifyingScan] = useState(false);
+    const administrationReplay = useRef({
+        uuid: createOfflineRequestUuid(),
+        fingerprint: null as string | null,
+    });
     const canRecordOnShift = canRecord && shiftStatus !== 'completed';
     const canRecordRow = (row: MedicationRow) =>
         canRecordOnShift &&
@@ -148,6 +156,7 @@ export default function ShiftMedicationCard({
         administered_at: '',
         shift_id: shiftId as number | string,
         witnessed_by: '__none__',
+        witness_credential: '',
     });
 
     const outstandingCount = useMemo(
@@ -208,11 +217,13 @@ export default function ShiftMedicationCard({
             !!activeRow &&
             (!needsReason || !!adminForm.data.reason.trim()) &&
             (!needsWitness || adminForm.data.witnessed_by !== '__none__') &&
+            (!needsWitness || !!adminForm.data.witness_credential.trim()) &&
             (!needsScanVerification || scanStatus === 'verified'),
         [
             activeRow,
             adminForm.data.reason,
             adminForm.data.witnessed_by,
+            adminForm.data.witness_credential,
             needsReason,
             needsScanVerification,
             needsWitness,
@@ -222,6 +233,10 @@ export default function ShiftMedicationCard({
 
     const openAdministrationDialog = (row: MedicationRow) => {
         if (!canRecordRow(row)) return;
+        administrationReplay.current = {
+            uuid: createOfflineRequestUuid(),
+            fingerprint: null,
+        };
         setActiveRow(row);
         adminForm.reset();
         adminForm.setData('status', 'given');
@@ -235,6 +250,7 @@ export default function ShiftMedicationCard({
         );
         adminForm.setData('shift_id', shiftId);
         adminForm.setData('witnessed_by', '__none__');
+        adminForm.setData('witness_credential', '');
         setScanCode('');
         setScanStatus('idle');
         setScanMessage('');
@@ -280,45 +296,74 @@ export default function ShiftMedicationCard({
 
     const submitAdministration = async () => {
         if (!activeRow) return;
+        if (
+            needsWitness &&
+            typeof navigator !== 'undefined' &&
+            !navigator.onLine
+        ) {
+            toast.error(
+                'Reconnect to record this witnessed medication action. Witness credentials are never saved on this device.',
+            );
+            return;
+        }
 
         setSubmitting(true);
 
         try {
+            const { witness_credential: witnessCredential, ...materialForm } =
+                adminForm.data;
+            const materialPayload = {
+                ...materialForm,
+                administered_at: fromLocalDateTimeInput(
+                    adminForm.data.administered_at,
+                ),
+                scheduled_for: adminForm.data.scheduled_for || null,
+                witnessed_by:
+                    adminForm.data.witnessed_by === '__none__'
+                        ? null
+                        : Number(adminForm.data.witnessed_by),
+                scan_code:
+                    needsScanVerification && scanStatus === 'verified'
+                        ? scanCode.trim()
+                        : null,
+                scan_source:
+                    needsScanVerification && scanStatus === 'verified'
+                        ? 'manual'
+                        : null,
+                scan_verified:
+                    needsScanVerification && scanStatus === 'verified',
+                scan_match_source:
+                    needsScanVerification && scanStatus === 'verified'
+                        ? scanMatchSource
+                        : null,
+            };
+            const materialFingerprint = JSON.stringify(materialPayload);
+            if (
+                administrationReplay.current.fingerprint !== null &&
+                administrationReplay.current.fingerprint !== materialFingerprint
+            ) {
+                administrationReplay.current.uuid = createOfflineRequestUuid();
+            }
+            administrationReplay.current.fingerprint = materialFingerprint;
+
             const result = await submitEmarMutation(
                 `/api/medications/clients/${clientId}/medications/${activeRow.medication.id}/administrations`,
                 {
-                    ...adminForm.data,
-                    administered_at: fromLocalDateTimeInput(
-                        adminForm.data.administered_at,
-                    ),
-                    scheduled_for: adminForm.data.scheduled_for || null,
-                    witnessed_by:
-                        adminForm.data.witnessed_by === '__none__'
-                            ? null
-                            : Number(adminForm.data.witnessed_by),
-                    scan_code:
-                        needsScanVerification && scanStatus === 'verified'
-                            ? scanCode.trim()
-                            : null,
-                    scan_source:
-                        needsScanVerification && scanStatus === 'verified'
-                            ? 'manual'
-                            : null,
-                    scan_verified:
-                        needsScanVerification && scanStatus === 'verified',
-                    scan_match_source:
-                        needsScanVerification && scanStatus === 'verified'
-                            ? scanMatchSource
-                            : null,
+                    ...materialPayload,
+                    ...(needsWitness
+                        ? { witness_credential: witnessCredential }
+                        : {}),
+                    client_request_uuid: administrationReplay.current.uuid,
                 },
                 {
+                    allowQueueWhenOffline: !needsWitness,
                     successMessage: 'Medication administration recorded.',
                     queuedMessage:
                         'Medication administration saved offline and queued to sync automatically.',
                 },
             );
 
-            if (result.status === 'conflict') {
+            if (!emarMutationWasAccepted(result.status)) {
                 return;
             }
 
@@ -329,6 +374,13 @@ export default function ShiftMedicationCard({
                 router.reload();
             }
         } catch (error: unknown) {
+            if (needsWitness && axios.isAxiosError(error) && !error.response) {
+                toast.error(
+                    'Reconnect and retry this witnessed medication action. The same request ID has been kept.',
+                );
+                return;
+            }
+
             toast.error(
                 error instanceof Error
                     ? error.message
@@ -827,34 +879,59 @@ export default function ShiftMedicationCard({
                             </div>
 
                             {needsWitness ? (
-                                <div className="space-y-1">
-                                    <Label>Witness</Label>
-                                    <Select
-                                        value={adminForm.data.witnessed_by}
-                                        onValueChange={(value) =>
-                                            adminForm.setData(
-                                                'witnessed_by',
-                                                value,
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select witness" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__none__">
-                                                Select witness
-                                            </SelectItem>
-                                            {witnesses.map((witness) => (
-                                                <SelectItem
-                                                    key={witness.id}
-                                                    value={String(witness.id)}
-                                                >
-                                                    {witness.name}
+                                <div className="space-y-3 rounded-md border p-3">
+                                    <div className="space-y-1">
+                                        <Label>Witness</Label>
+                                        <Select
+                                            value={adminForm.data.witnessed_by}
+                                            onValueChange={(value) =>
+                                                adminForm.setData(
+                                                    'witnessed_by',
+                                                    value,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select witness" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">
+                                                    Select witness
                                                 </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                                {witnesses.map((witness) => (
+                                                    <SelectItem
+                                                        key={witness.id}
+                                                        value={String(
+                                                            witness.id,
+                                                        )}
+                                                    >
+                                                        {witness.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>Witness password or PIN</Label>
+                                        <Input
+                                            type="password"
+                                            autoComplete="off"
+                                            value={
+                                                adminForm.data
+                                                    .witness_credential
+                                            }
+                                            onChange={(event) =>
+                                                adminForm.setData(
+                                                    'witness_credential',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                        <div className="text-xs text-muted-foreground">
+                                            Entered by the witness and never
+                                            saved on this device.
+                                        </div>
+                                    </div>
                                 </div>
                             ) : null}
 

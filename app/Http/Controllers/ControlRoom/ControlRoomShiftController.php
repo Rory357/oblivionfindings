@@ -8,6 +8,7 @@ use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomShiftHandoverService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class ControlRoomShiftController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
         $siteAccess = app(UserSiteAccessService::class);
+        $alertAccess = app(ControlRoomAlertAccessService::class);
         $bypassPermissions = $this->alertBypassPermissions();
 
         // Current active shift
@@ -76,7 +78,20 @@ class ControlRoomShiftController extends Controller
             ];
 
             $notes = OperatorNote::where('shift_id', $activeShift->id)
-                ->with(['user:id,name', 'alert:id,reference_number'])
+                ->where(function ($notes) use ($alertAccess, $user): void {
+                    $notes->whereNull('alert_id')
+                        ->orWhereHas('alert', fn ($alerts) => $alertAccess->applyReadableScope(
+                            $alerts,
+                            $user,
+                        ));
+                })
+                ->with([
+                    'user:id,name',
+                    'alert' => function ($alerts) use ($alertAccess, $user): void {
+                        $alertAccess->applyReadableScope($alerts->getQuery(), $user);
+                        $alerts->select(['id', 'reference_number']);
+                    },
+                ])
                 ->orderByDesc('is_pinned')
                 ->orderByDesc('created_at')
                 ->get()
@@ -126,7 +141,7 @@ class ControlRoomShiftController extends Controller
 
         // Current alert counts
         $openAlertsBase = ControlRoomAlert::unresolved();
-        $siteAccess->applyAlertScope($openAlertsBase, $user, $bypassPermissions);
+        $alertAccess->applyVisibleScope($openAlertsBase, $user);
 
         $openAlertsCount = (clone $openAlertsBase)->count();
         $criticalAlertsCount = (clone $openAlertsBase)->where('severity', 'critical')->count();
@@ -352,6 +367,14 @@ class ControlRoomShiftController extends Controller
             'requires_followup' => ['nullable', 'boolean'],
             'followup_at' => ['nullable', 'date'],
         ]);
+        $alert = null;
+        if (filled($validated['alert_id'] ?? null)) {
+            $alert = app(ControlRoomAlertAccessService::class)->findVisible(
+                $user,
+                (int) $validated['alert_id'],
+            );
+            abort_unless($alert, 404, 'Control Room alert not found.');
+        }
 
         $note = OperatorNote::create([
             'shift_id' => $shift->id,
@@ -365,7 +388,7 @@ class ControlRoomShiftController extends Controller
                 ? OperatorNote::PURPOSE_ESCALATION_HANDOVER
                 : OperatorNote::PURPOSE_GENERAL,
             'content' => $validated['content'],
-            'alert_id' => $validated['alert_id'] ?? null,
+            'alert_id' => $alert?->id,
             'is_pinned' => $validated['is_pinned'] ?? false,
             'requires_followup' => $validated['requires_followup'] ?? false,
             'followup_at' => $validated['followup_at'] ?? null,

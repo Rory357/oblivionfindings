@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\FleetAssets;
 
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
+use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Client;
@@ -16,6 +17,7 @@ use App\Services\Fleet\ResidentTransportJourneyScope;
 use App\Services\Fleet\ResidentTransportJourneyService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\MedicationScanVerificationService;
+use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -24,6 +26,8 @@ use Inertia\Inertia;
 
 class ResidentTransportController extends Controller
 {
+    use HandlesMedicationSync;
+
     public function __construct(
         protected MedicationScanVerificationService $scanVerificationService,
         protected ResidentTransportJourneyScope $journeyScope,
@@ -403,6 +407,11 @@ class ResidentTransportController extends Controller
 
     public function store(Request $request)
     {
+        $medicationEnvelopeRules = is_array($request->input('medications'))
+            && count($request->input('medications')) > 0
+                ? $this->medicationOnlineOnlySubmissionRules()
+                : ['client_request_uuid' => ['nullable', 'uuid']];
+
         $data = $request->validate([
             'asset_id' => ['required', 'integer'],
             'shift_id' => ['nullable', 'integer'],
@@ -416,7 +425,7 @@ class ResidentTransportController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
             'booking_id' => ['nullable', 'integer'],
             'client_id' => ['nullable', 'integer'],
-            'client_request_uuid' => ['nullable', 'uuid'],
+            ...$medicationEnvelopeRules,
             'medications' => ['nullable', 'array'],
             'medications.*.medication_id' => ['required', 'integer'],
             'medications.*.medication_order_version_id' => ['nullable', 'integer'],
@@ -1069,10 +1078,7 @@ class ResidentTransportController extends Controller
             'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
             'scan_verified' => ['nullable', 'boolean'],
             'scan_match_source' => ['nullable', 'string', 'max:50'],
-            'client_request_uuid' => ['nullable', 'uuid'],
-            'captured_offline_at' => ['nullable', 'date'],
-            'origin_device_id' => ['nullable', 'string', 'max:255'],
-            'queued_offline' => ['nullable', 'boolean'],
+            ...$this->medicationOfflineSubmissionRules($request),
         ]);
 
         $result = $this->journeys->packMedication(
@@ -1118,7 +1124,7 @@ class ResidentTransportController extends Controller
             'witnessed_by_user_id' => ['required', 'integer'],
             'witness_credential' => ['required', 'string', 'max:255'],
             'correction_reason' => ['required', 'string', 'max:1000'],
-            'client_request_uuid' => ['nullable', 'uuid'],
+            ...$this->medicationOnlineOnlySubmissionRules(),
         ]);
 
         $result = $this->journeys->correctPackingAttestation(
@@ -1156,15 +1162,19 @@ class ResidentTransportController extends Controller
         $rules = [
             'witnessed_by_user_id' => ['nullable', 'integer'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
+            'quantity_administered' => [
+                'required',
+                'numeric',
+                MedicationStockQuantity::VALIDATION_RULE,
+                'min:0.01',
+                MedicationStockQuantity::DECIMAL_10_2_MAX_RULE,
+            ],
             'notes' => ['nullable', 'string', 'max:2000'],
             'scan_code' => ['nullable', 'string', 'max:255'],
             'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
             'scan_verified' => ['nullable', 'boolean'],
             'scan_match_source' => ['nullable', 'string', 'max:50'],
-            'client_request_uuid' => ['nullable', 'uuid'],
-            'captured_offline_at' => ['nullable', 'date'],
-            'origin_device_id' => ['nullable', 'string', 'max:255'],
-            'queued_offline' => ['nullable', 'boolean'],
+            ...$this->medicationOfflineSubmissionRules($request),
         ];
 
         $data = $request->validate($rules);
@@ -1207,10 +1217,7 @@ class ResidentTransportController extends Controller
             'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
             'scan_verified' => ['nullable', 'boolean'],
             'scan_match_source' => ['nullable', 'string', 'max:50'],
-            'client_request_uuid' => ['nullable', 'uuid'],
-            'captured_offline_at' => ['nullable', 'date'],
-            'origin_device_id' => ['nullable', 'string', 'max:255'],
-            'queued_offline' => ['nullable', 'boolean'],
+            ...$this->medicationOfflineSubmissionRules($request),
         ]);
 
         $result = $this->journeys->returnMedication(

@@ -10,6 +10,7 @@ use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\Shift;
 use App\Services\Clients\ClientProfileSectionAccess;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Support\ShiftTaskSupport;
 use App\Support\WorkerClock;
 use Carbon\Carbon;
@@ -20,6 +21,7 @@ class ClientCalendarController extends Controller
 {
     public function __construct(
         private readonly ClientProfileSectionAccess $sectionAccess,
+        private readonly MedicationGovernanceScopeService $medicationGovernance,
     ) {}
 
     public function events(Request $request, Client $client)
@@ -31,6 +33,11 @@ class ClientCalendarController extends Controller
 
         $access = $this->sectionAccess->for($user, $client);
         abort_unless($access['calendar'], 403);
+        $canViewMedication = $access['medical']
+            && $user->canDo(MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY);
+        $canViewControlledMedication = $user->canDo(
+            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+        );
 
         $request->merge([
             'start' => $this->normalizeCalendarBoundaryInput($request->query('start')),
@@ -201,12 +208,24 @@ class ClientCalendarController extends Controller
         }
 
         // 5. Medication administrations (scheduled doses)
-        $medAdmins = $access['medical']
-            ? ClientMedicationAdministration::where('client_id', $client->id)
+        if ($canViewMedication) {
+            $medAdminsQuery = ClientMedicationAdministration::query()
+                ->effectiveClinicalEvidence()
+                ->where('client_id', $client->id)
                 ->whereBetween('scheduled_for', [$start, $end])
-                ->with('medication:id,name,dosage,route,form')
-                ->get()
-            : collect();
+                ->with('medication:id,name,dosage,route,form');
+            $this->medicationGovernance->scopeCanonicalClientMedicationRows(
+                $medAdminsQuery,
+                [(int) $client->site_id],
+                false,
+            );
+            if (! $canViewControlledMedication) {
+                $this->medicationGovernance->scopeWithoutControlledMedicationRows($medAdminsQuery);
+            }
+            $medAdmins = $medAdminsQuery->get();
+        } else {
+            $medAdmins = collect();
+        }
 
         foreach ($medAdmins as $ma) {
             $medName = $ma->medication?->name ?? 'Medication';
@@ -251,11 +270,17 @@ class ClientCalendarController extends Controller
         $medEnd = $end->lessThan(now()->addDays(3)->endOfDay())
             ? $end->copy()
             : now()->addDays(3)->endOfDay();
-        $activeMeds = $access['medical']
+        $activeMeds = $canViewMedication
             ? ClientMedication::where('client_id', $client->id)
-                ->where('active', true)
+                ->whereHas('client', fn ($query) => $query->whereKey($client->id)
+                    ->where('site_id', $client->site_id))
+                ->active()
                 ->whereNull('ceased_at')
                 ->where('is_prn', false)
+                ->when(
+                    ! $canViewControlledMedication,
+                    fn ($query) => $query->where('controlled_drug', false),
+                )
                 ->get()
             : collect();
 

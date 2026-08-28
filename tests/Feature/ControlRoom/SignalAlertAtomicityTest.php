@@ -93,6 +93,128 @@ class SignalAlertAtomicityTest extends TestCase
         $this->assertDatabaseCount('control_room_communications', 0);
     }
 
+    public function test_legacy_origin_backfill_promotes_a_matching_correlated_link_atomically(): void
+    {
+        $this->notifications->shouldNotReceive('stageAlertNotifications');
+        $signal = $this->pendingSignal('legacy-origin-same-correlation');
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'origin_signal_id' => null,
+            'source' => $signal->signalSource->slug,
+            'site_id' => null,
+            'client_id' => null,
+            'asset_id' => null,
+            'device_id' => null,
+            'context' => ['signal_id' => $signal->id],
+        ]);
+        $signal->forceFill([
+            'status' => 'processed',
+            'alert_id' => $alert->id,
+            'correlated_alert_id' => $alert->id,
+            'processed_at' => now(),
+        ])->save();
+
+        $result = $this->service->process($signal);
+
+        $signal->refresh();
+        $this->assertTrue($result?->is($alert));
+        $this->assertSame($signal->id, $alert->fresh()->origin_signal_id);
+        $this->assertSame($alert->id, $signal->alert_id);
+        $this->assertNull($signal->correlated_alert_id);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+    }
+
+    public function test_legacy_origin_backfill_rejects_a_conflicting_correlated_link_without_claiming_origin(): void
+    {
+        $this->notifications->shouldNotReceive('stageAlertNotifications');
+        $signal = $this->pendingSignal('legacy-origin-correlation-conflict');
+        $legacyAlert = ControlRoomAlert::factory()->open()->create([
+            'origin_signal_id' => null,
+            'source' => $signal->signalSource->slug,
+            'site_id' => null,
+            'client_id' => null,
+            'asset_id' => null,
+            'device_id' => null,
+            'context' => ['signal_id' => $signal->id],
+        ]);
+        $conflictingAlert = ControlRoomAlert::factory()->open()->create([
+            'origin_signal_id' => null,
+            'source' => $signal->signalSource->slug,
+            'site_id' => null,
+            'client_id' => null,
+            'asset_id' => null,
+            'device_id' => null,
+        ]);
+        $signal->forceFill([
+            'status' => 'processed',
+            'alert_id' => $legacyAlert->id,
+            'correlated_alert_id' => $conflictingAlert->id,
+            'processed_at' => now(),
+        ])->save();
+
+        try {
+            $this->service->process($signal);
+            $this->fail('A different correlated alert must prevent legacy origin backfill.');
+        } catch (\DomainException $exception) {
+            $this->assertSame(
+                'Signal provenance conflicts with its existing correlated alert link.',
+                $exception->getMessage(),
+            );
+        }
+
+        $signal->refresh();
+        $this->assertSame('processed', $signal->status);
+        $this->assertSame($legacyAlert->id, $signal->alert_id);
+        $this->assertSame($conflictingAlert->id, $signal->correlated_alert_id);
+        $this->assertNull($legacyAlert->fresh()->origin_signal_id);
+        $this->assertDatabaseCount('control_room_alerts', 2);
+    }
+
+    public function test_retry_rejects_a_conflicting_correlated_alert_without_rewriting_provenance(): void
+    {
+        $this->notifications->shouldNotReceive('stageAlertNotifications');
+        $signal = $this->pendingSignal('durable-origin-correlation-conflict');
+        $originAlert = ControlRoomAlert::factory()->open()->create([
+            'origin_signal_id' => $signal->id,
+            'source' => $signal->signalSource->slug,
+            'site_id' => null,
+            'client_id' => null,
+            'asset_id' => null,
+            'device_id' => null,
+            'context' => ['signal_id' => $signal->id],
+        ]);
+        $conflictingAlert = ControlRoomAlert::factory()->open()->create([
+            'origin_signal_id' => null,
+            'source' => $signal->signalSource->slug,
+            'site_id' => null,
+            'client_id' => null,
+            'asset_id' => null,
+            'device_id' => null,
+        ]);
+        $signal->forceFill([
+            'status' => 'processed',
+            'alert_id' => null,
+            'correlated_alert_id' => $conflictingAlert->id,
+            'processed_at' => now(),
+        ])->save();
+
+        try {
+            $this->service->process($signal);
+            $this->fail('A different correlated alert must remain a hard provenance conflict.');
+        } catch (\DomainException $exception) {
+            $this->assertSame(
+                'Signal provenance conflicts with its existing correlated alert link.',
+                $exception->getMessage(),
+            );
+        }
+
+        $signal->refresh();
+        $this->assertSame('processed', $signal->status);
+        $this->assertNull($signal->alert_id);
+        $this->assertSame($conflictingAlert->id, $signal->correlated_alert_id);
+        $this->assertSame($signal->id, $originAlert->fresh()->origin_signal_id);
+        $this->assertDatabaseCount('control_room_alerts', 2);
+    }
+
     public function test_failure_between_alert_insert_and_signal_link_rolls_back_every_phase(): void
     {
         $signal = $this->pendingSignal('crash-window-rollback');

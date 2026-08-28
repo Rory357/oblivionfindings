@@ -24,9 +24,9 @@ class CompleteShiftData
         public readonly bool $createSummaryNote = true,
         public readonly bool $syncDraftTimesheet = true,
         public readonly bool $autoWaiveHandover = false,
+        public readonly bool $deferCompletionUntilHandoverSubmitted = false,
         public readonly array $timelineMeta = [],
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -66,11 +66,12 @@ class CompleteShiftData
             actualEndsAt: $session->clock_out_at,
             allowIncompleteTasks: $forced,
             incompleteTasksReason: $forced && $reason !== '' ? $reason : null,
-            handoverWaiverReason: $forced && $reason !== '' ? $reason : 'clock_out_auto_complete',
+            handoverWaiverReason: $forced && $reason !== '' ? $reason : null,
             source: ShiftLifecycleSource::ClockOut,
             createSummaryNote: false,
             syncDraftTimesheet: false,
-            autoWaiveHandover: $forced,
+            autoWaiveHandover: false,
+            deferCompletionUntilHandoverSubmitted: ! $forced,
             timelineMeta: $timelineMeta,
         );
     }

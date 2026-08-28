@@ -201,6 +201,184 @@ it('preserves every calendar contributor for a staff user with each canonical se
     ]);
 });
 
+it('keeps non-medication calendar entries while applying exact controlled and canonical medication scope', function () {
+    ['client' => $client, 'site' => $site, 'viewer' => $ordinaryViewer] = clientCalendarDisclosureFixture([
+        'clients.viewAssigned',
+        'calendar.view',
+        'shifts.viewAny',
+        'medications.view',
+    ]);
+    $baseEvents = seedClientCalendarDisclosureEvents($client, $ordinaryViewer);
+
+    $noMedicationViewer = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    grantClientCalendarDisclosurePermissions($noMedicationViewer, [
+        'clients.viewAssigned',
+        'calendar.view',
+        'shifts.viewAny',
+    ]);
+    scopeClientCalendarDisclosureStaffToSite($noMedicationViewer, $site);
+    $client->supportWorkers()->attach($noMedicationViewer->id);
+
+    $controlledViewer = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    grantClientCalendarDisclosurePermissions($controlledViewer, [
+        'clients.viewAssigned',
+        'calendar.view',
+        'shifts.viewAny',
+        'medications.view',
+        'medications.controlled.view',
+    ]);
+    scopeClientCalendarDisclosureStaffToSite($controlledViewer, $site);
+    $client->supportWorkers()->attach($controlledViewer->id);
+
+    $ordinaryMedication = ClientMedication::factory()->create([
+        'client_id' => $client->id,
+        'name' => 'Ordinary scheduled medication',
+        'frequency' => '09:00',
+        'active' => true,
+        'is_prn' => false,
+        'state' => 'active',
+        'controlled_drug' => false,
+    ]);
+    $controlledMedication = ClientMedication::factory()->create([
+        'client_id' => $client->id,
+        'name' => 'Controlled scheduled medication',
+        'frequency' => '09:00',
+        'active' => true,
+        'is_prn' => false,
+        'state' => 'active',
+        'controlled_drug' => true,
+    ]);
+    $unverifiedMedication = ClientMedication::factory()->create([
+        'client_id' => $client->id,
+        'name' => 'Unverified scheduled medication',
+        'frequency' => '09:00',
+        'active' => true,
+        'is_prn' => false,
+        'state' => 'active',
+        'approval_status' => 'pending_verification',
+        'controlled_drug' => false,
+    ]);
+    $supersededMedication = ClientMedication::factory()->create([
+        'client_id' => $client->id,
+        'name' => 'Superseded scheduled medication',
+        'frequency' => '09:00',
+        'active' => true,
+        'is_prn' => false,
+        'state' => 'active',
+        'approval_status' => 'verified',
+        'controlled_drug' => false,
+    ]);
+    $supersededMedication->forceFill(['superseded_by' => $ordinaryMedication->id])->saveQuietly();
+    $foreignClient = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
+    $foreignMedication = ClientMedication::factory()->create([
+        'client_id' => $foreignClient->id,
+        'name' => 'Forged foreign medication',
+        'frequency' => '09:00',
+        'active' => true,
+        'is_prn' => false,
+        'state' => 'active',
+        'controlled_drug' => true,
+    ]);
+
+    $ordinaryAdministration = ClientMedicationAdministration::query()->create([
+        'client_id' => $client->id,
+        'client_medication_id' => $ordinaryMedication->id,
+        'administered_by' => $ordinaryViewer->id,
+        'scheduled_for' => now()->startOfHour(),
+        'administered_at' => now()->startOfHour(),
+        'status' => 'given',
+    ]);
+    $controlledAdministration = ClientMedicationAdministration::query()->create([
+        'client_id' => $client->id,
+        'client_medication_id' => $controlledMedication->id,
+        'administered_by' => $ordinaryViewer->id,
+        'scheduled_for' => now()->startOfHour(),
+        'administered_at' => now()->startOfHour(),
+        'status' => 'given',
+    ]);
+    $forgedAdministration = ClientMedicationAdministration::query()->create([
+        'client_id' => $client->id,
+        'client_medication_id' => $foreignMedication->id,
+        'administered_by' => $ordinaryViewer->id,
+        'scheduled_for' => now()->startOfHour(),
+        'administered_at' => now()->startOfHour(),
+        'status' => 'given',
+    ]);
+
+    $calendarUri = route('client.calendar.events', [
+        'client' => $client,
+        'start' => now()->startOfMonth()->toIso8601String(),
+        'end' => now()->endOfMonth()->toIso8601String(),
+    ], false);
+
+    $noMedicationIds = collect($this->actingAs($noMedicationViewer)
+        ->getJson($calendarUri)
+        ->assertOk()
+        ->json())->pluck('id');
+    expect($noMedicationIds)
+        ->toContain('appt-'.$baseEvents['appointment'], 'shift-'.$baseEvents['shift'])
+        ->not->toContain('med-'.$ordinaryAdministration->id, 'med-'.$controlledAdministration->id);
+    expect($noMedicationIds->contains(fn (string $id): bool => str_starts_with($id, 'medsched-')))
+        ->toBeFalse();
+
+    $ordinaryIds = collect($this->actingAs($ordinaryViewer)
+        ->getJson($calendarUri)
+        ->assertOk()
+        ->json())->pluck('id');
+    expect($ordinaryIds)
+        ->toContain('med-'.$ordinaryAdministration->id)
+        ->not->toContain(
+            'med-'.$controlledAdministration->id,
+            'med-'.$forgedAdministration->id,
+        );
+    expect($ordinaryIds->contains(fn (string $id): bool => str_starts_with(
+        $id,
+        'medsched-'.$ordinaryMedication->id.'-',
+    )))->toBeTrue();
+    expect($ordinaryIds->contains(fn (string $id): bool => str_starts_with(
+        $id,
+        'medsched-'.$controlledMedication->id.'-',
+    )))->toBeFalse();
+    expect($ordinaryIds->contains(fn (string $id): bool => str_starts_with(
+        $id,
+        'medsched-'.$unverifiedMedication->id.'-',
+    )))->toBeFalse();
+    expect($ordinaryIds->contains(fn (string $id): bool => str_starts_with(
+        $id,
+        'medsched-'.$supersededMedication->id.'-',
+    )))->toBeFalse();
+
+    $controlledIds = collect($this->actingAs($controlledViewer)
+        ->getJson($calendarUri)
+        ->assertOk()
+        ->json())->pluck('id');
+    expect($controlledIds)
+        ->toContain('med-'.$ordinaryAdministration->id, 'med-'.$controlledAdministration->id)
+        ->not->toContain('med-'.$forgedAdministration->id);
+    expect($controlledIds->contains(fn (string $id): bool => str_starts_with(
+        $id,
+        'medsched-'.$ordinaryMedication->id.'-',
+    )))->toBeTrue();
+    expect($controlledIds->contains(fn (string $id): bool => str_starts_with(
+        $id,
+        'medsched-'.$controlledMedication->id.'-',
+    )))->toBeTrue();
+    expect($controlledIds->contains(fn (string $id): bool => str_starts_with(
+        $id,
+        'medsched-'.$unverifiedMedication->id.'-',
+    )))->toBeFalse();
+    expect($controlledIds->contains(fn (string $id): bool => str_starts_with(
+        $id,
+        'medsched-'.$supersededMedication->id.'-',
+    )))->toBeFalse();
+});
+
 it('validates orders and bounds the direct calendar event range to 93 days', function () {
     ['client' => $client, 'viewer' => $viewer] = clientCalendarDisclosureFixture([
         'clients.viewAssigned',

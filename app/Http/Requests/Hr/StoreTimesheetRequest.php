@@ -18,7 +18,10 @@ class StoreTimesheetRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user_id' => ['nullable', 'exists:users,id'],
+            // Identity existence and object scope are resolved together by the
+            // command service so missing, foreign, and conflicting records all
+            // fail through the same concealed 404 path.
+            'user_id' => ['nullable', 'integer'],
             'clock_in' => ['required', 'date'],
             'clock_out' => ['required', 'date', 'after:clock_in'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
@@ -31,9 +34,9 @@ class StoreTimesheetRequest extends FormRequest
             'sleepover_disturbances.*.end' => ['required_with:sleepover_disturbances', 'string', 'max:5'],
             'sleepover_disturbances.*.minutes' => ['nullable', 'integer', 'min:0', 'max:1440'],
             'mileage_km' => ['nullable', 'numeric', 'min:0', 'max:9999'],
-            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+            'site_id' => ['nullable', 'integer'],
+            'client_id' => ['nullable', 'integer'],
+            'shift_id' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string', 'max:500'],
             'project_code' => ['nullable', 'string', 'max:50'],
             'cost_centre' => ['nullable', 'string', 'max:50'],

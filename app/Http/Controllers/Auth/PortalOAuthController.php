@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Domain\Hr\Services\EmployeeIntakeService;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -57,43 +61,80 @@ class PortalOAuthController extends Controller
         return $this->handlePortalLogin($email, $g->getName());
     }
 
-    private function handlePortalLogin(string $email, ?string $name): \Illuminate\Http\RedirectResponse
+    private function handlePortalLogin(string $email, ?string $name): RedirectResponse
     {
-        $user = User::where('email', $email)->first();
+        [$user, $created, $loggedIn] = DB::transaction(function () use ($email, $name): array {
+            app(EmployeeIntakeService::class)->acquireIntakeLock('email:'.$email);
+            $userId = User::query()->where('email', $email)->value('id');
+            $portalRoleId = (int) Role::query()->where('name', 'next_of_kin')->value('id');
+            abort_unless($portalRoleId > 0, 503, 'The portal access role is unavailable.');
+            if ($userId) {
+                $lockedUsers = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+                    [(int) $userId],
+                    [],
+                    [$portalRoleId],
+                );
+                /** @var User|null $user */
+                $user = $lockedUsers->get((int) $userId);
+                abort_unless($user instanceof User, 404);
+                abort_unless(strtolower(trim((string) $user->email)) === $email, 409, 'The account email changed. Please retry sign-in.');
+                $lockedPortalRole = Role::query()->whereKey($portalRoleId)->lockForUpdate()->first();
+                abort_unless(
+                    $lockedPortalRole instanceof Role && (string) $lockedPortalRole->name === 'next_of_kin',
+                    409,
+                    'The portal access role changed. Please retry sign-in.',
+                );
+                if (! $user->approved_at) {
+                    return [$user, false, false];
+                }
+                abort_unless(
+                    $user->hasRole('client', 'next_of_kin')
+                        || in_array($user->role, ['client', 'next_of_kin'], true),
+                    403,
+                    'This account does not have portal access.',
+                );
 
-        if (!$user) {
+                return [$user, false, true];
+            }
+
             // Create pending portal user (not approved until staff activates)
-            $user = User::create([
+            // while the shared email mutex and requested Role are both held.
+            $user = User::query()->create([
                 'name' => $name ?: Str::before($email, '@'),
                 'email' => $email,
                 'password' => bcrypt(Str::random(32)),
+                'role' => 'next_of_kin',
             ]);
+            $lockedUsers = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+                [(int) $user->id],
+                [],
+                [$portalRoleId],
+            );
+            /** @var User $user */
+            $user = $lockedUsers->get((int) $user->id);
+            $lockedPortalRole = Role::query()->whereKey($portalRoleId)->lockForUpdate()->first();
+            abort_unless(
+                $lockedPortalRole instanceof Role && (string) $lockedPortalRole->name === 'next_of_kin',
+                409,
+                'The portal access role changed. Please retry sign-in.',
+            );
+            $user->roles()->syncWithoutDetaching([$portalRoleId]);
 
-            // Auto-assign the seeded family portal role.
-            $portalRole = Role::where('name', 'next_of_kin')->first();
-            if ($portalRole) {
-                $user->roles()->syncWithoutDetaching([$portalRole->id]);
-                $user->forceFill(['role' => 'next_of_kin'])->save();
-            }
+            return [$user, true, false];
+        }, 3);
 
+        if ($created) {
             return redirect()
                 ->route('portal.login')
                 ->with('success', 'Your account has been created and is awaiting approval by staff.');
         }
 
-        if (! $user->approved_at) {
+        if (! $loggedIn) {
             return redirect()
                 ->route('portal.login')
                 ->with('success', 'Your account is awaiting approval by staff.');
         }
 
-        abort_unless(
-            $user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true),
-            403,
-            'This account does not have portal access.'
-        );
-
-        // Existing approved portal user.
         Auth::login($user, remember: true);
 
         return redirect()->intended('/portal');

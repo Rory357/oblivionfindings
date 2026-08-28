@@ -12,6 +12,8 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\ClientSupportPlan;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -33,11 +35,13 @@ class ComplianceMetricsService
 
     private const CLIENT_SITE_BYPASS_PERMISSIONS = ['clients.viewAny', 'reports.viewAny'];
 
-    private const MEDICATION_SITE_BYPASS_PERMISSIONS = ['clients.viewAny', 'medications.audit.view', 'reports.viewAny'];
-
     private const CONTROL_ROOM_SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
 
-    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly MedicationGovernanceScopeService $medicationScope,
+        private readonly ControlRoomAlertAccessService $alertAccess,
+    ) {}
 
     public function normalisePeriod(?string $period): string
     {
@@ -79,38 +83,25 @@ class ComplianceMetricsService
         $days = $this->days($period);
         $today = Carbon::today();
         $from = Carbon::now()->subDays($days);
+        $medicationSiteIds = $this->medicationSiteIds($viewer);
+        $canViewControlled = $viewer->canDo(
+            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+        );
 
         $incidents = ClientIncident::query();
         $this->siteAccess->applyClientIncidentScope($incidents, $viewer, self::INCIDENT_SITE_BYPASS_PERMISSIONS);
         $openIncidents = (clone $incidents)->whereIn('status', ['submitted', 'reviewed'])->count();
 
-        $cd = $this->scopeClientOwned(
-            ClientControlledDrugDiscrepancy::query(),
-            $viewer,
-            self::MEDICATION_SITE_BYPASS_PERMISSIONS,
-        );
-        $openCd = (clone $cd)->where('status', 'open')->count();
-
-        $mar = $this->scopeClientOwned(
-            ClientMedicationAdministration::query(),
-            $viewer,
-            self::MEDICATION_SITE_BYPASS_PERMISSIONS,
-        );
+        $mar = $this->medicationAdministrationQuery($viewer, $medicationSiteIds);
         $marExceptions = (clone $mar)
             ->whereDate('scheduled_for', $today)
             ->whereIn('status', ['missed', 'refused', 'withheld'])
             ->count();
-        $marExceptionSeries = $this->scopeClientOwned(
-            ClientMedicationAdministration::query(),
-            $viewer,
-            self::MEDICATION_SITE_BYPASS_PERMISSIONS,
-        )
-            ->whereIn('status', ['missed', 'refused', 'withheld']);
+        $marExceptionSeries = (clone $mar)->whereIn('status', ['missed', 'refused', 'withheld']);
 
-        $bg = $this->scopeClientOwned(
+        $bg = $this->scopeClientOwnedForSiteIds(
             ClientBreakGlassAccess::query(),
-            $viewer,
-            self::MEDICATION_SITE_BYPASS_PERMISSIONS,
+            $medicationSiteIds,
         );
         $breakGlass = (clone $bg)->where('created_at', '>=', $from)->count();
 
@@ -119,18 +110,12 @@ class ComplianceMetricsService
         $audit = $this->visibleAuditActivity($viewer);
         $auditEvents = (clone $audit)->where('created_at', '>=', $from)->count();
 
-        return [
+        $kpis = [
             [
                 'key' => 'incidents', 'label' => 'Open incidents', 'value' => $openIncidents,
                 'caption' => 'Submitted / reviewed', 'href' => '/incidents?tab=open',
                 'tone' => $openIncidents > 0 ? 'warning' : 'success',
                 'spark' => $this->dailyCounts(clone $incidents, 'created_at', $days),
-            ],
-            [
-                'key' => 'cd', 'label' => 'CD discrepancies', 'value' => $openCd,
-                'caption' => 'Open controlled-drug', 'href' => '/medications?tab=controlled',
-                'tone' => $openCd > 0 ? 'critical' : 'success',
-                'spark' => $this->dailyCounts(clone $cd, 'created_at', $days),
             ],
             [
                 'key' => 'mar', 'label' => 'MAR exceptions', 'value' => $marExceptions,
@@ -158,6 +143,19 @@ class ComplianceMetricsService
                 'spark' => $this->dailyCounts(clone $audit, 'created_at', $days),
             ],
         ];
+
+        if ($canViewControlled) {
+            $cd = $this->controlledDiscrepancyQuery($viewer, $medicationSiteIds);
+            $openCd = (clone $cd)->where('status', 'open')->count();
+            array_splice($kpis, 1, 0, [[
+                'key' => 'cd', 'label' => 'CD discrepancies', 'value' => $openCd,
+                'caption' => 'Open controlled-drug', 'href' => '/medications?tab=controlled',
+                'tone' => $openCd > 0 ? 'critical' : 'success',
+                'spark' => $this->dailyCounts(clone $cd, 'created_at', $days),
+            ]]);
+        }
+
+        return $kpis;
     }
 
     /**
@@ -233,6 +231,7 @@ class ComplianceMetricsService
         $actionableAlerts = function () use ($viewer): Builder {
             $query = ControlRoomAlert::query()->actionable();
             $this->siteAccess->applyAlertScope($query, $viewer, self::CONTROL_ROOM_SITE_BYPASS_PERMISSIONS);
+            $this->alertAccess->applyControlledMedicationContentScope($query, $viewer);
 
             return $query;
         };
@@ -261,6 +260,7 @@ class ComplianceMetricsService
             $viewer,
             self::CONTROL_ROOM_SITE_BYPASS_PERMISSIONS,
         );
+        $this->alertAccess->applyControlledMedicationContentScope($alertTrendQuery, $viewer);
         $alertTrend = $alertTrendQuery
             ->where('triggered_at', '>=', Carbon::now()->subDays(14))
             ->selectRaw('DATE(triggered_at) as d, COUNT(*) as total')
@@ -285,6 +285,7 @@ class ComplianceMetricsService
         $days = $this->days($period);
         $from = Carbon::now()->subDays($days);
         $fromMar = Carbon::now()->subDays(min($days, 30));
+        $medicationSiteIds = $this->medicationSiteIds($viewer);
 
         $incidents = ClientIncident::query();
         $this->siteAccess->applyClientIncidentScope($incidents, $viewer, self::INCIDENT_SITE_BYPASS_PERMISSIONS);
@@ -297,11 +298,7 @@ class ComplianceMetricsService
             ->values()
             ->all();
 
-        $marTrend = $this->scopeClientOwned(
-            ClientMedicationAdministration::query(),
-            $viewer,
-            self::MEDICATION_SITE_BYPASS_PERMISSIONS,
-        )
+        $marTrend = $this->medicationAdministrationQuery($viewer, $medicationSiteIds)
             ->where('scheduled_for', '>=', $fromMar)
             ->selectRaw("DATE(scheduled_for) as d,
                 SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given_total,
@@ -321,19 +318,18 @@ class ComplianceMetricsService
             ->values()
             ->all();
 
-        $cdTrend = $this->scopeClientOwned(
-            ClientControlledDrugDiscrepancy::query(),
-            $viewer,
-            self::MEDICATION_SITE_BYPASS_PERMISSIONS,
-        )
-            ->where('created_at', '>=', $from)
-            ->selectRaw('DATE(created_at) as d, COUNT(*) as total')
-            ->groupBy('d')
-            ->orderBy('d')
-            ->get()
-            ->map(fn ($r) => ['date' => (string) $r->d, 'total' => (int) $r->total])
-            ->values()
-            ->all();
+        $cdTrend = [];
+        if ($viewer->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
+            $cdTrend = $this->controlledDiscrepancyQuery($viewer, $medicationSiteIds)
+                ->where('created_at', '>=', $from)
+                ->selectRaw('DATE(created_at) as d, COUNT(*) as total')
+                ->groupBy('d')
+                ->orderBy('d')
+                ->get()
+                ->map(fn ($r) => ['date' => (string) $r->d, 'total' => (int) $r->total])
+                ->values()
+                ->all();
+        }
 
         return [
             'incidentBySeverity' => $incidentBySeverity,
@@ -352,6 +348,55 @@ class ComplianceMetricsService
         ));
     }
 
+    /** @return array<int, int> */
+    private function medicationSiteIds(User $viewer): array
+    {
+        return $this->siteAccess->accessibleSiteIds(
+            $viewer,
+            MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+        );
+    }
+
+    /** @param array<int, int> $siteIds */
+    private function medicationAdministrationQuery(User $viewer, array $siteIds): Builder
+    {
+        $query = ClientMedicationAdministration::query()->effectiveClinicalEvidence();
+        $this->medicationScope->scopeCanonicalClientMedicationRows(
+            $query,
+            $siteIds,
+            allowNullMedication: false,
+        );
+        if (! $viewer->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
+            $this->medicationScope->scopeWithoutControlledMedicationRows($query);
+        }
+
+        return $query;
+    }
+
+    /** @param array<int, int> $siteIds */
+    private function controlledDiscrepancyQuery(User $viewer, array $siteIds): Builder
+    {
+        abort_unless(
+            $viewer->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+            403,
+        );
+        $query = ClientControlledDrugDiscrepancy::query();
+        $this->medicationScope->scopeCanonicalClientMedicationRows(
+            $query,
+            $siteIds,
+            allowNullMedication: false,
+        );
+
+        return $query;
+    }
+
+    /** @param array<int, int> $siteIds */
+    private function scopeClientOwnedForSiteIds(Builder $query, array $siteIds): Builder
+    {
+        return $query->whereHas('client', fn (Builder $clients): Builder => $clients
+            ->whereIn('site_id', $siteIds));
+    }
+
     /**
      * AuditLog is a mixed application ledger and has no universal Site column.
      * Restricted viewers see only audit rows whose canonical business record is
@@ -360,6 +405,42 @@ class ComplianceMetricsService
     private function visibleAuditActivity(User $viewer): Builder
     {
         $audit = AuditLog::query();
+        $visibleAlertIds = ControlRoomAlert::query()->select('control_room_alerts.id');
+        $this->siteAccess->applyAlertScope(
+            $visibleAlertIds,
+            $viewer,
+            self::CONTROL_ROOM_SITE_BYPASS_PERMISSIONS,
+        );
+        $this->alertAccess->applyControlledMedicationContentScope($visibleAlertIds, $viewer);
+        $alertType = (new ControlRoomAlert)->getMorphClass();
+        $audit->where(function (Builder $content) use ($alertType, $visibleAlertIds): void {
+            $content->whereNull('auditable_type')
+                ->orWhere('auditable_type', '!=', $alertType)
+                ->orWhereIn('auditable_id', $visibleAlertIds);
+        });
+
+        // The mixed ledger cannot canonically classify every historical
+        // medication action. Exclude medication families from this general
+        // aggregate for every viewer; the medication audit owns that evidence.
+        $audit->where(function (Builder $nonMedication): void {
+            $nonMedication->whereNull('auditable_type')
+                ->orWhere(function (Builder $typed): void {
+                    $typed->where('auditable_type', 'not like', '%Medication%')
+                        ->where('auditable_type', 'not like', '%ControlledDrug%');
+                });
+        })->where(function (Builder $nonMedicationAction): void {
+            $nonMedicationAction->whereNull('action')
+                ->orWhere(function (Builder $action): void {
+                    $action->where('action', 'not like', 'medication%')
+                        ->where('action', 'not like', 'meds.%')
+                        ->where('action', 'not like', 'emar.%')
+                        ->where('action', 'not like', 'clientmedication%')
+                        ->where('action', 'not like', 'clientcontrolleddrug%')
+                        ->where('action', 'not like', 'controlled_drug%')
+                        ->where('action', 'not like', 'cd.%')
+                        ->where('action', 'not like', 'cd\_%');
+                });
+        });
         if ($viewer->canDo('reports.viewAny')) {
             return $audit;
         }
@@ -378,15 +459,7 @@ class ComplianceMetricsService
             self::INCIDENT_SITE_BYPASS_PERMISSIONS,
         );
 
-        $visibleAlertIds = ControlRoomAlert::query()->select('control_room_alerts.id');
-        $this->siteAccess->applyAlertScope(
-            $visibleAlertIds,
-            $viewer,
-            self::CONTROL_ROOM_SITE_BYPASS_PERMISSIONS,
-        );
-
         $incidentType = (new ClientIncident)->getMorphClass();
-        $alertType = (new ControlRoomAlert)->getMorphClass();
         $obligationType = (new ComplianceObligation)->getMorphClass();
 
         return $audit->where(function (Builder $visible) use (

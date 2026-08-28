@@ -10,8 +10,11 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\User;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -32,6 +35,8 @@ class MedsBoardPayloadService
 
     public function __construct(
         protected MarScheduleService $scheduleService,
+        protected MedicationGovernanceScopeService $governanceScope,
+        protected UserSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -41,7 +46,7 @@ class MedsBoardPayloadService
      * @param  array<int, int>  $clientIds
      * @return Collection<int, ClientMedicationAdministration>
      */
-    public function administrationsForDay(array $clientIds, Carbon $date): Collection
+    public function administrationsForDay(array $clientIds, Carbon $date, bool $includeControlled = false): Collection
     {
         if (empty($clientIds)) {
             return collect();
@@ -50,7 +55,7 @@ class MedsBoardPayloadService
         try {
             [$dayStartUtc, $dayEndUtc] = $this->scheduleService->utcDayWindow($date);
 
-            return ClientMedicationAdministration::query()
+            return $this->canonicalAdministrations($includeControlled)
                 ->whereIn('client_id', $clientIds)
                 ->where(function ($query) use ($dayStartUtc, $dayEndUtc) {
                     $query->whereBetween('scheduled_for', [$dayStartUtc, $dayEndUtc])
@@ -100,7 +105,7 @@ class MedsBoardPayloadService
      * @param  Collection<string, ClientMedicationAdministration>  $bySlot
      * @return array<int, array<string, mixed>>
      */
-    public function scheduleForDate(array $clientIds, Carbon $date, Carbon $now, Collection $bySlot): array
+    public function scheduleForDate(array $clientIds, Carbon $date, Carbon $now, Collection $bySlot, bool $includeControlled = false): array
     {
         if (empty($clientIds)) {
             return [];
@@ -112,6 +117,7 @@ class MedsBoardPayloadService
             $medications = ClientMedication::whereIn('client_id', $clientIds)
                 ->active()
                 ->where('is_prn', false)
+                ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
                 ->where(function ($query) {
                     $query->whereNotNull('dose_times')
                         ->orWhereNotNull('frequency');
@@ -298,7 +304,7 @@ class MedsBoardPayloadService
      * @param  array<int, int>  $clientIds
      * @return array<int, array<string, mixed>>
      */
-    public function prnMedications(array $clientIds, Carbon $now): array
+    public function prnMedications(array $clientIds, Carbon $now, bool $includeControlled = false): array
     {
         if (empty($clientIds)) {
             return [];
@@ -310,19 +316,24 @@ class MedsBoardPayloadService
             $medications = ClientMedication::whereIn('client_id', $clientIds)
                 ->active()
                 ->prn()
+                ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
                 ->with('client:id,first_name,last_name')
                 ->orderBy('client_id')
                 ->orderBy('name')
                 ->get();
 
-            $lastGivenByMed = $medications->isEmpty()
+            $recentGivenByMed = $medications->isEmpty()
                 ? collect()
-                : ClientMedicationAdministration::query()
+                : $this->canonicalAdministrations($includeControlled)
                     ->whereIn('client_medication_id', $medications->pluck('id'))
                     ->where('status', 'given')
-                    ->selectRaw('client_medication_id, MAX(administered_at) as last_given_at')
+                    ->selectRaw(
+                        'client_medication_id, SUM(CASE WHEN administered_at >= ? THEN 1 ELSE 0 END) as given_count, MAX(administered_at) as last_given_at',
+                        [$now->copy()->subHours(24)],
+                    )
                     ->groupBy('client_medication_id')
-                    ->pluck('last_given_at', 'client_medication_id');
+                    ->get()
+                    ->keyBy('client_medication_id');
 
             $result = [];
 
@@ -332,10 +343,11 @@ class MedsBoardPayloadService
                 }
 
                 $maxPerDay = $med->max_per_day ? (int) $med->max_per_day : null;
-                $givenLast24h = $med->prnCountLast24Hours;
+                $recentGiven = $recentGivenByMed->get($med->id);
+                $givenLast24h = (int) ($recentGiven?->given_count ?? 0);
                 $remaining = $maxPerDay !== null ? max(0, $maxPerDay - $givenLast24h) : null;
 
-                $lastGivenRaw = $lastGivenByMed->get($med->id);
+                $lastGivenRaw = $recentGiven?->last_given_at;
                 $lastGiven = $lastGivenRaw ? Carbon::parse((string) $lastGivenRaw, 'UTC')->setTimezone($timezone) : null;
                 $minHours = $med->min_hours_between_doses ? (float) $med->min_hours_between_doses : null;
                 $nextAllowed = ($lastGiven && $minHours)
@@ -355,8 +367,8 @@ class MedsBoardPayloadService
                     'max_per_day' => $maxPerDay,
                     'given_last_24h' => $givenLast24h,
                     'remaining_today' => $remaining,
-                    'near_limit' => $med->isPrnNearLimit(),
-                    'over_limit' => $med->isPrnOverLimit(),
+                    'near_limit' => $maxPerDay !== null && $givenLast24h >= ($maxPerDay * 0.75),
+                    'over_limit' => $maxPerDay !== null && $givenLast24h >= $maxPerDay,
                     'is_controlled' => (bool) ($med->controlled_drug ?? false),
                     'requires_witness' => (bool) ($med->witness_required ?? false) || (bool) ($med->controlled_drug ?? false),
                     'min_hours_between' => $minHours,
@@ -389,21 +401,60 @@ class MedsBoardPayloadService
         return $instant->format('j M, g:i a');
     }
 
+    /** @return Builder<ClientMedicationAdministration> */
+    private function canonicalAdministrations(bool $includeControlled = false): Builder
+    {
+        $query = $this->governanceScope->scopeCanonicalClientMedicationRows(
+            ClientMedicationAdministration::query()->effectiveClinicalEvidence(),
+            null,
+            false,
+        );
+
+        if (! $includeControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($query);
+        }
+
+        return $query;
+    }
+
     /**
-     * Staff eligible to witness a controlled-drug dose (excluding the signer).
+     * Current staff eligible to witness for the clients on this board. A read-
+     * only actor never receives a witness picker, and both actor and candidate
+     * remain inside the canonical approved-Site boundary.
      *
+     * @param  array<int, int>  $clientIds
      * @return array<int, array{id: int, name: string}>
      */
-    public function witnesses(User $user): array
+    public function witnesses(User $user, array $clientIds): array
     {
+        if (! $user->canDo('medications.administer.record') || empty($clientIds)) {
+            return [];
+        }
+
         try {
-            return User::staff()
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->filter(fn (User $candidate) => $candidate->id !== $user->id
-                    && $candidate->canDo('medications.controlled.witness'))
-                ->map(fn (User $candidate) => ['id' => $candidate->id, 'name' => $candidate->name])
+            $approvedSiteIds = $this->siteAccess->accessibleSiteIds(
+                $user,
+                MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+            );
+            if ($approvedSiteIds === []) {
+                return [];
+            }
+
+            $boardSiteIds = Client::query()
+                ->whereIn('id', $clientIds)
+                ->whereIn('site_id', $approvedSiteIds)
+                ->pluck('site_id')
+                ->map(fn ($siteId) => (int) $siteId)
+                ->filter(fn (int $siteId) => $siteId > 0)
+                ->unique()
                 ->values()
+                ->all();
+            if ($boardSiteIds === []) {
+                return [];
+            }
+
+            return $this->governanceScope
+                ->controlledWitnessPicker($boardSiteIds, $user->id)
                 ->all();
         } catch (\Throwable $e) {
             report($e);

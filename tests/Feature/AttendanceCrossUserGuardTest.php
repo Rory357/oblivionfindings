@@ -1,14 +1,22 @@
 <?php
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Services\AttendanceService;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\Site;
+use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\ShiftHandoverService;
+use Database\Seeders\RbacSeeder;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->worker = User::factory()->create([
         'role' => 'support_worker',
@@ -24,14 +32,31 @@ beforeEach(function () {
         $this->worker->roles()->syncWithoutDetaching([$supportRole->id]);
         $this->otherWorker->roles()->syncWithoutDetaching([$supportRole->id]);
     }
+
+    $this->site = Site::factory()->create([
+        'is_active' => true,
+        'archived' => false,
+        'archived_at' => null,
+    ]);
+    foreach ([$this->worker, $this->otherWorker] as $worker) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
 });
 
-test('cross-user clock out attempts return 403 and write an audit row', function () {
-    $client = Client::factory()->create();
-    $serviceContext = ServiceContext::factory()->create();
+test('cross-user attendance commands conceal foreign objects without audit side effects', function () {
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
+    $serviceContext = ServiceContext::factory()->create(['site_id' => $this->site->id]);
     $shift = Shift::query()->create([
         'client_id' => $client->id,
         'service_context_id' => $serviceContext->id,
+        'site_id' => $this->site->id,
         'user_id' => $this->worker->id,
         'starts_at' => now()->subHour(),
         'ends_at' => now()->addHours(7),
@@ -45,22 +70,62 @@ test('cross-user clock out attempts return 403 and write an audit row', function
         'tenant_id' => null,
         'user_id' => $this->worker->id,
         'shift_id' => $shift->id,
+        'site_id' => $this->site->id,
         'clock_in_at' => now()->subHour(),
         'status' => 'open',
         'source' => 'manual',
         'created_by' => $this->worker->id,
     ]);
+    $auditCount = AuditLog::query()->count();
+    $missingSessionId = $session->id + 999999;
 
-    $this->actingAs($this->otherWorker)
-        ->post('/attendance/clock-out', [
-            'session_id' => $session->id,
-            'break_minutes' => 0,
-        ])
-        ->assertForbidden();
+    foreach ([$session->id, $missingSessionId] as $concealedSessionId) {
+        $this->actingAs($this->otherWorker)
+            ->post('/attendance/clock-out', [
+                'session_id' => $concealedSessionId,
+                'break_minutes' => 0,
+            ])
+            ->assertNotFound();
+    }
 
-    expect($session->fresh()->status)->toBe('open');
+    $service = app(AttendanceService::class);
 
-    $this->assertDatabaseHas('audit_logs', [
+    $handoverService = Mockery::mock(ShiftHandoverService::class);
+    $handoverService->shouldNotReceive('save');
+    app()->instance(ShiftHandoverService::class, $handoverService);
+
+    $craftedSession = $session->replicate();
+    $craftedSession->forceFill([
+        'id' => $session->id,
+        'user_id' => $this->otherWorker->id,
+    ]);
+    $craftedSession->exists = true;
+    try {
+        $service->clockOut($this->otherWorker, $craftedSession, [
+            'handover' => ['handover_notes' => 'Must remain concealed.'],
+        ]);
+        $this->fail('Clock-out accepted a stale model with mismatched canonical ownership.');
+    } catch (HttpException $exception) {
+        $this->assertSame(404, $exception->getStatusCode());
+    }
+
+    foreach (['clockOut', 'startBreak', 'endBreak'] as $command) {
+        try {
+            $service->{$command}($this->otherWorker, $session, []);
+            $this->fail("{$command} accepted another worker's attendance session.");
+        } catch (HttpException $exception) {
+            $this->assertSame(404, $exception->getStatusCode());
+        }
+    }
+
+    $session->refresh();
+    expect($session->status)->toBe('open')
+        ->and($session->clock_out_at)->toBeNull()
+        ->and($session->break_started_at)->toBeNull()
+        ->and(Timesheet::query()->where('attendance_session_id', $session->id)->exists())->toBeFalse()
+        ->and(AuditLog::query()->count())->toBe($auditCount);
+
+    $this->assertDatabaseMissing('audit_logs', [
         'action' => 'attendance.clockOut.unauthorized',
         'auditable_id' => $session->id,
         'user_id' => $this->otherWorker->id,

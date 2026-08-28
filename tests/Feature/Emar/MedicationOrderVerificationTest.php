@@ -246,7 +246,11 @@ class MedicationOrderVerificationTest extends TestCase
     public function test_high_risk_order_classes_deny_creator_self_verification_without_a_waiver(): void
     {
         $creator = $this->makeSiteUser(
-            ['medications.orders.verify'],
+            [
+                'medications.orders.verify',
+                'medications.controlled.view',
+                'medications.controlled.record',
+            ],
             $this->site,
             $this->client,
         );
@@ -435,7 +439,11 @@ class MedicationOrderVerificationTest extends TestCase
     public function test_emergency_waiver_requires_and_records_a_credentialed_same_site_approver(): void
     {
         $creator = $this->makeSiteUser(
-            ['medications.orders.verify'],
+            [
+                'medications.orders.verify',
+                'medications.controlled.view',
+                'medications.controlled.record',
+            ],
             $this->site,
             $this->client,
         );
@@ -451,13 +459,19 @@ class MedicationOrderVerificationTest extends TestCase
         ]);
 
         $this->actingAs($creator)
-            ->postJson("/emar/medications/{$medication->id}/verify", [
+            ->from('/emar/medications')
+            ->post("/emar/medications/{$medication->id}/verify", [
                 'waiver_reason' => 'Urgent first dose while the on-call verifier travels to site.',
                 'waiver_approved_by' => $unqualifiedApprover->id,
                 'waiver_approver_credential' => 'wrong-role-secret',
             ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('waiver_approver_credential');
+            ->assertSessionHasErrors('waiver_approver_credential');
+        $oldInput = session()->getOldInput();
+        $this->assertArrayNotHasKey('waiver_approver_credential', $oldInput);
+        $this->assertStringNotContainsString(
+            'wrong-role-secret',
+            json_encode($oldInput, JSON_THROW_ON_ERROR),
+        );
         $this->assertSame('pending_verification', $medication->refresh()->approval_status);
 
         $this->actingAs($creator)

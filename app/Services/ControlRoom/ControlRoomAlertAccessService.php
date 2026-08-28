@@ -5,6 +5,7 @@ namespace App\Services\ControlRoom;
 use App\Exceptions\RecoverableTaskAuthorizationException;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -35,11 +36,13 @@ final class ControlRoomAlertAccessService
             return $query->whereRaw('1 = 0');
         }
 
-        return $this->siteAccess->applyAlertScope(
+        $this->siteAccess->applyAlertScope(
             $query,
             $user,
             self::BYPASS_PERMISSIONS,
         );
+
+        return $this->applyControlledMedicationContentScope($query, $user);
     }
 
     public function applyReadableScope(Builder $query, User $user): Builder
@@ -48,11 +51,101 @@ final class ControlRoomAlertAccessService
             return $query->whereRaw('1 = 0');
         }
 
-        return $this->siteAccess->applyAlertScope(
+        $this->siteAccess->applyAlertScope(
             $query,
             $user,
             self::BYPASS_PERMISSIONS,
         );
+
+        return $this->applyControlledMedicationContentScope($query, $user);
+    }
+
+    /**
+     * Apply the controlled-medication content boundary to an alert query that
+     * already has its route capability and canonical Site scope enforced.
+     */
+    public function applyControlledMedicationContentScope(Builder $query, User $user): Builder
+    {
+        $this->loadPermissionContext($user);
+
+        if ($user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
+            return $query;
+        }
+
+        $controlledMarker = 'control_room_alerts.context->normalized_data->controlled_drug';
+
+        return $query->where(function (Builder $content) use ($controlledMarker): void {
+            $content->where($controlledMarker, false)
+                ->orWhere(function (Builder $legacyOrdinary) use ($controlledMarker): void {
+                    $legacyOrdinary->whereNull($controlledMarker);
+                    $this->whereDoesNotContainMedication($legacyOrdinary, 'control_room_alerts.source');
+                    $this->whereDoesNotContainMedication($legacyOrdinary, 'control_room_alerts.alert_type');
+                    $legacyOrdinary
+                        ->whereNull('control_room_alerts.context->normalized_data->client_medication_id')
+                        ->whereNull('control_room_alerts.context->normalized_data->medication_id')
+                        ->where(function (Builder $sourceModule): void {
+                            $sourceModule->whereNull(
+                                'control_room_alerts.context->normalized_data->source_module',
+                            );
+                            $this->whereDoesNotContainMedication(
+                                $sourceModule,
+                                'control_room_alerts.context->normalized_data->source_module',
+                                'or',
+                            );
+                        })
+                        ->where(function (Builder $incidentSource): void {
+                            $incidentSource->whereNull('control_room_alerts.context->incident_source_type');
+                            $this->whereDoesNotContainMedication(
+                                $incidentSource,
+                                'control_room_alerts.context->incident_source_type',
+                                'or',
+                            );
+                        });
+                });
+        });
+    }
+
+    private function whereDoesNotContainMedication(
+        Builder $query,
+        string $column,
+        string $boolean = 'and',
+    ): void {
+        $wrappedColumn = $query->getQuery()->getGrammar()->wrap($column);
+
+        $query->whereRaw(
+            sprintf('LOWER(%s) NOT LIKE ?', $wrappedColumn),
+            ['%medication%'],
+            $boolean,
+        );
+    }
+
+    /**
+     * Treat unmarked historical medication alerts as controlled until their
+     * canonical medication classification can be proved. Explicit false is the
+     * only marker that permits ordinary medication content.
+     */
+    public function requiresControlledMedicationPermission(ControlRoomAlert $alert): bool
+    {
+        $marker = data_get($alert->context, 'normalized_data.controlled_drug');
+        if ($marker === false) {
+            return false;
+        }
+        if ($marker !== null) {
+            return true;
+        }
+
+        return str_contains(strtolower((string) $alert->source), 'medication')
+            || str_contains(strtolower((string) $alert->alert_type), 'medication')
+            || str_contains(
+                strtolower((string) data_get($alert->context, 'normalized_data.source_module')),
+                'medication',
+            )
+            || str_contains(
+                strtolower((string) data_get($alert->context, 'incident_source_type')),
+                'medication',
+            )
+            || data_get($alert->context, 'normalized_data.client_medication_id') !== null
+            || data_get($alert->context, 'normalized_data.medication_id') !== null;
     }
 
     public function findVisible(User $user, int $alertId): ?ControlRoomAlert

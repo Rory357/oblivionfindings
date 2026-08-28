@@ -9,7 +9,13 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\ControlRoomAlert;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationReview;
+use App\Models\Site;
+use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSignalService;
+use App\Support\Medication\MedicationStockQuantity;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Medication alert generation and dashboard widget service.
@@ -37,10 +43,18 @@ use App\Services\Medication\MedicationSignalService;
  */
 class MedicationAlertService
 {
+    private const CONTROLLED_ALERT_TYPES = [
+        'controlled_discrepancy',
+        'controlled_overdue_check',
+        'controlled_loss',
+    ];
+
     public function __construct(
         protected ?MedicationSignalService $signalService = null,
+        protected ?MedicationGovernanceScopeService $governanceScope = null,
     ) {
         $this->signalService ??= app(MedicationSignalService::class);
+        $this->governanceScope ??= app(MedicationGovernanceScopeService::class);
     }
 
     /**
@@ -392,7 +406,7 @@ class MedicationAlertService
             return null;
         }
 
-        if ($stock->on_hand === 0) {
+        if (MedicationStockQuantity::equals($stock->on_hand, 0)) {
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'stock_low',
@@ -419,7 +433,7 @@ class MedicationAlertService
             return $alert->toArray();
         }
 
-        if ($stock->reorder_level && $stock->on_hand <= $stock->reorder_level) {
+        if ($stock->isLowStock()) {
             // Low stock is dashboard-only — NOT operational
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
@@ -458,7 +472,9 @@ class MedicationAlertService
                 $scheduledTime = $now->copy()->setTimeFromTimeString($time);
 
                 if ($scheduledTime->isPast() && $scheduledTime->greaterThan($cutoff)) {
-                    $recorded = ClientMedicationAdministration::where('client_medication_id', $medication->id)
+                    $recorded = ClientMedicationAdministration::query()
+                        ->effectiveClinicalEvidence()
+                        ->where('client_medication_id', $medication->id)
                         ->whereBetween('scheduled_for', [
                             $scheduledTime->copy()->subMinute(),
                             $scheduledTime->copy()->addMinute(),
@@ -509,7 +525,12 @@ class MedicationAlertService
      */
     private function checkControlledDiscrepancies(Client $client): ?array
     {
-        $openDiscrepancies = ClientControlledDrugDiscrepancy::where('client_id', $client->id)
+        $openDiscrepancies = $this->governanceScope->scopeCanonicalClientMedicationRows(
+            ClientControlledDrugDiscrepancy::query(),
+            $client->site_id ? [(int) $client->site_id] : [],
+            false,
+        )
+            ->where('client_id', $client->id)
             ->whereIn('status', ['open', 'under_review'])
             ->with('medication:id,name')
             ->get();
@@ -551,28 +572,45 @@ class MedicationAlertService
     // Dashboard widgets — unchanged, read from MedicationDashboardAlert / domain models
     // -----------------------------------------------------------------------
 
-    public function getGlobalDashboardWidgets(?int $clientId = null, bool $canViewControlled = false): array
-    {
+    /**
+     * @param  array<int, int>|null  $siteIds  Null is reserved for internal
+     *                                         unscoped callers; an explicit empty array must return zero rows.
+     */
+    public function getGlobalDashboardWidgets(
+        ?int $clientId = null,
+        ?array $siteIds = null,
+        bool $canViewControlled = false,
+    ): array {
         $widgets = [
-            'overdue_meds' => $this->getOverdueMedsWidget($clientId),
-            'prn_near_limits' => $this->getPrnNearLimitsWidget($clientId),
-            'expiring_medications' => $this->getExpiringMedicationsWidget($clientId),
-            'high_risk_medications' => $this->getHighRiskMedicationsWidget($clientId),
-            'todays_summary' => $this->getTodaysSummaryWidget($clientId),
+            'overdue_meds' => $this->getOverdueMedsWidget($clientId, $siteIds, $canViewControlled),
+            'prn_near_limits' => $this->getPrnNearLimitsWidget($clientId, $siteIds, $canViewControlled),
+            'expiring_medications' => $this->getExpiringMedicationsWidget($clientId, $siteIds, $canViewControlled),
+            'high_risk_medications' => $this->getHighRiskMedicationsWidget($clientId, $siteIds, $canViewControlled),
+            'todays_summary' => $this->getTodaysSummaryWidget($clientId, $siteIds, $canViewControlled),
         ];
 
         if ($canViewControlled) {
-            $widgets['controlled_discrepancies'] = $this->getControlledDiscrepanciesWidget($clientId);
+            $widgets['controlled_discrepancies'] = $this->getControlledDiscrepanciesWidget($clientId, $siteIds);
         }
 
         return $widgets;
     }
 
-    private function getOverdueMedsWidget(?int $clientId = null): array
-    {
+    /** @param array<int, int>|null $siteIds */
+    private function getOverdueMedsWidget(
+        ?int $clientId = null,
+        ?array $siteIds = null,
+        bool $canViewControlled = false,
+    ): array {
         $query = MedicationDashboardAlert::where('alert_type', 'overdue')
-            ->where('status', 'active')
-            ->with('client:id,first_name,last_name');
+            ->where('status', 'active');
+        if ($siteIds !== null) {
+            $query = $this->governanceScope->scopeCanonicalClientMedicationRows($query, $siteIds);
+        }
+        if (! $canViewControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($query);
+        }
+        $query->with('client:id,first_name,last_name');
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -594,11 +632,21 @@ class MedicationAlertService
         ];
     }
 
-    private function getPrnNearLimitsWidget(?int $clientId = null): array
-    {
+    /** @param array<int, int>|null $siteIds */
+    private function getPrnNearLimitsWidget(
+        ?int $clientId = null,
+        ?array $siteIds = null,
+        bool $canViewControlled = false,
+    ): array {
         $query = MedicationDashboardAlert::whereIn('alert_type', ['prn_near_limit', 'prn_over_limit'])
-            ->where('status', 'active')
-            ->with(['client:id,first_name,last_name', 'medication:id,name']);
+            ->where('status', 'active');
+        if ($siteIds !== null) {
+            $query = $this->governanceScope->scopeCanonicalClientMedicationRows($query, $siteIds);
+        }
+        if (! $canViewControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($query);
+        }
+        $query->with(['client:id,first_name,last_name', 'medication:id,name']);
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -622,10 +670,14 @@ class MedicationAlertService
         ];
     }
 
-    private function getControlledDiscrepanciesWidget(?int $clientId = null): array
+    /** @param array<int, int>|null $siteIds */
+    private function getControlledDiscrepanciesWidget(?int $clientId = null, ?array $siteIds = null): array
     {
-        $query = ClientControlledDrugDiscrepancy::whereIn('status', ['open', 'under_review'])
-            ->with(['client:id,first_name,last_name', 'medication:id,name']);
+        $query = ClientControlledDrugDiscrepancy::whereIn('status', ['open', 'under_review']);
+        if ($siteIds !== null) {
+            $query = $this->governanceScope->scopeCanonicalClientMedicationRows($query, $siteIds, false);
+        }
+        $query->with(['client:id,first_name,last_name', 'medication:id,name']);
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -649,9 +701,18 @@ class MedicationAlertService
         ];
     }
 
-    private function getExpiringMedicationsWidget(?int $clientId = null): array
-    {
+    /** @param array<int, int>|null $siteIds */
+    private function getExpiringMedicationsWidget(
+        ?int $clientId = null,
+        ?array $siteIds = null,
+        bool $canViewControlled = false,
+    ): array {
         $query = ClientMedication::active()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas(
+                'client',
+                fn ($client) => $client->whereIn('site_id', $siteIds),
+            ))
+            ->when(! $canViewControlled, fn ($query) => $query->where('controlled_drug', false))
             ->whereNotNull('end_date')
             ->where('end_date', '<=', now()->addDays(14))
             ->where('end_date', '>=', now())
@@ -678,9 +739,18 @@ class MedicationAlertService
         ];
     }
 
-    private function getHighRiskMedicationsWidget(?int $clientId = null): array
-    {
+    /** @param array<int, int>|null $siteIds */
+    private function getHighRiskMedicationsWidget(
+        ?int $clientId = null,
+        ?array $siteIds = null,
+        bool $canViewControlled = false,
+    ): array {
         $query = ClientMedication::active()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas(
+                'client',
+                fn ($client) => $client->whereIn('site_id', $siteIds),
+            ))
+            ->when(! $canViewControlled, fn ($query) => $query->where('controlled_drug', false))
             ->where('high_risk', true)
             ->with('client:id,first_name,last_name');
 
@@ -705,12 +775,21 @@ class MedicationAlertService
         ];
     }
 
-    private function getTodaysSummaryWidget(?int $clientId = null): array
-    {
+    /** @param array<int, int>|null $siteIds */
+    private function getTodaysSummaryWidget(
+        ?int $clientId = null,
+        ?array $siteIds = null,
+        bool $canViewControlled = false,
+    ): array {
         $today = now()->startOfDay();
         $tomorrow = $today->copy()->addDay();
 
         $scheduledQuery = ClientMedication::active()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas(
+                'client',
+                fn ($client) => $client->whereIn('site_id', $siteIds),
+            ))
+            ->when(! $canViewControlled, fn ($query) => $query->where('controlled_drug', false))
             ->where('is_prn', false)
             ->where(function ($q) use ($today) {
                 $q->whereNull('start_date')->orWhere('start_date', '<=', $today);
@@ -729,12 +808,21 @@ class MedicationAlertService
             $totalScheduled += count($med->dose_times ?? []);
         }
 
-        $completedQuery = ClientMedicationAdministration::where('status', 'given')
+        $completedQuery = ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
+            ->where('status', 'given')
             ->whereNotNull('scheduled_for')
             ->whereBetween('scheduled_for', [$today, $tomorrow])
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
+        if ($siteIds !== null) {
+            $completedQuery = $this->governanceScope
+                ->scopeCanonicalClientMedicationRows($completedQuery, $siteIds, false);
+        }
+        if (! $canViewControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($completedQuery);
+        }
 
         if ($clientId) {
             $completedQuery->where('client_id', $clientId);
@@ -742,17 +830,35 @@ class MedicationAlertService
 
         $completed = $completedQuery->distinct(['client_medication_id', 'scheduled_for'])->count();
 
-        $refusedQuery = ClientMedicationAdministration::where('status', 'refused')
+        $refusedQuery = ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
+            ->where('status', 'refused')
             ->whereBetween('scheduled_for', [$today, $tomorrow])
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
+        if ($siteIds !== null) {
+            $refusedQuery = $this->governanceScope
+                ->scopeCanonicalClientMedicationRows($refusedQuery, $siteIds, false);
+        }
+        if (! $canViewControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($refusedQuery);
+        }
 
-        $missedQuery = ClientMedicationAdministration::where('status', 'missed')
+        $missedQuery = ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
+            ->where('status', 'missed')
             ->whereBetween('scheduled_for', [$today, $tomorrow])
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
+        if ($siteIds !== null) {
+            $missedQuery = $this->governanceScope
+                ->scopeCanonicalClientMedicationRows($missedQuery, $siteIds, false);
+        }
+        if (! $canViewControlled) {
+            $this->governanceScope->scopeWithoutControlledMedicationRows($missedQuery);
+        }
 
         if ($clientId) {
             $refusedQuery->where('client_id', $clientId);
@@ -781,30 +887,110 @@ class MedicationAlertService
     // Alert management — retained for MedicationDashboardAlert UI compat
     // -----------------------------------------------------------------------
 
-    public function acknowledgeAlert(int $alertId, int $userId): bool
+    public function acknowledgeAlert(MedicationDashboardAlert $alert, User $actor): bool
     {
-        $alert = MedicationDashboardAlert::find($alertId);
+        return DB::transaction(function () use ($actor, $alert): bool {
+            [$lockedAlert, $lockedActor] = $this->lockCanonicalAlert($alert, $actor);
 
-        if (! $alert || $alert->status !== 'active') {
-            return false;
-        }
+            if ($lockedAlert->status === 'acknowledged') {
+                return true;
+            }
+            if ($lockedAlert->status !== 'active') {
+                return false;
+            }
 
-        $alert->acknowledge($userId);
+            $lockedAlert->acknowledge((int) $lockedActor->id);
 
-        return true;
+            return true;
+        }, 3);
     }
 
-    public function resolveAlert(int $alertId, ?string $notes = null): bool
-    {
-        $alert = MedicationDashboardAlert::find($alertId);
+    public function resolveAlert(
+        MedicationDashboardAlert $alert,
+        ?string $notes,
+        User $actor,
+    ): bool {
+        return DB::transaction(function () use ($actor, $alert, $notes): bool {
+            [$lockedAlert, $lockedActor] = $this->lockCanonicalAlert($alert, $actor);
+            $normalizedNotes = filled($notes) ? trim((string) $notes) : null;
 
-        if (! $alert) {
-            return false;
+            if ($lockedAlert->status === 'resolved') {
+                if (($lockedAlert->resolution_notes ?: null) !== $normalizedNotes) {
+                    throw ValidationException::withMessages([
+                        'resolution_notes' => 'This alert was already resolved with different resolution notes.',
+                    ]);
+                }
+
+                return true;
+            }
+            if (! in_array($lockedAlert->status, ['active', 'acknowledged'], true)) {
+                return false;
+            }
+
+            $lockedAlert->resolve($normalizedNotes);
+            AuditLogger::logOrFail('medication_dashboard_alert.resolved', $lockedAlert, [
+                'actor_id' => (int) $lockedActor->id,
+                'resolved_by' => (int) $lockedActor->id,
+            ]);
+
+            return true;
+        }, 3);
+    }
+
+    /**
+     * Snapshot immutable identity without locking, then lock the shared
+     * medication graph as Client, medication, current actor/RBAC/Profile,
+     * active Site, constrained alert.
+     *
+     * @return array{0: MedicationDashboardAlert, 1: User}
+     */
+    private function lockCanonicalAlert(MedicationDashboardAlert $snapshot, User $actor): array
+    {
+        $identity = MedicationDashboardAlert::query()
+            ->whereKey($snapshot->id)
+            ->firstOrFail(['id', 'client_id', 'client_medication_id', 'alert_type']);
+        $client = Client::query()
+            ->whereKey($identity->client_id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $medication = null;
+        if ($identity->client_medication_id !== null) {
+            $medication = ClientMedication::query()
+                ->whereKey($identity->client_medication_id)
+                ->where('client_id', $client->id)
+                ->lockForUpdate()
+                ->firstOrFail();
         }
 
-        $alert->resolve($notes);
+        $controlled = in_array((string) $identity->alert_type, self::CONTROLLED_ALERT_TYPES, true)
+            || (bool) $medication?->controlled_drug;
+        $lockedActor = $this->governanceScope->lockCurrentAlertActor(
+            $actor,
+            (int) $client->site_id,
+            $controlled,
+        );
 
-        return true;
+        Site::query()
+            ->whereKey($client->site_id)
+            ->where('is_active', true)
+            ->where('archived', false)
+            ->whereNull('archived_at')
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $lockedAlertQuery = MedicationDashboardAlert::query()
+            ->whereKey($snapshot->id)
+            ->where('client_id', $client->id)
+            ->where('alert_type', $identity->alert_type);
+        if ($identity->client_medication_id === null) {
+            $lockedAlertQuery->whereNull('client_medication_id');
+        } else {
+            $lockedAlertQuery->where('client_medication_id', $identity->client_medication_id);
+        }
+        $lockedAlert = $lockedAlertQuery->lockForUpdate()->firstOrFail();
+
+        return [$lockedAlert, $lockedActor];
     }
 
     public function clearStaleAlerts(): int

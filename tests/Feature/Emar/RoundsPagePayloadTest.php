@@ -5,8 +5,11 @@ namespace Tests\Feature\Emar;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRound;
+use App\Models\MedicationRoundTemplate;
 use App\Models\Permission;
+use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
@@ -90,6 +93,78 @@ class RoundsPagePayloadTest extends TestCase
             );
     }
 
+    public function test_assigned_record_worker_sees_only_current_work_scope_clients_in_round_projection(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        $this->seed(RbacSeeder::class);
+
+        $site = Site::factory()->create(['is_active' => true]);
+        $user = $this->makeSiteUser($site, ['medications.administer.record']);
+        $scopedClient = Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+            'first_name' => 'Visible',
+            'last_name' => 'Resident',
+        ]);
+        $sameSiteHiddenClient = Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+            'first_name' => 'HIDDEN',
+            'last_name' => 'Resident',
+        ]);
+        $this->activeShift($user, $scopedClient);
+        $visibleMedication = $this->scheduledMedication($scopedClient);
+        $visibleMedication->forceFill(['name' => 'Visible round medicine'])->saveQuietly();
+        $hiddenMedication = $this->scheduledMedication($sameSiteHiddenClient);
+        $hiddenMedication->forceFill(['name' => 'HIDDEN round medicine'])->saveQuietly();
+        $round = $this->makeRound($site, [
+            'assigned_to' => $user->id,
+            'status' => 'pending',
+        ]);
+        $scheduledFor = Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'));
+        foreach ([
+            [$scopedClient, $visibleMedication],
+            [$sameSiteHiddenClient, $hiddenMedication],
+        ] as [$client, $medication]) {
+            ClientMedicationAdministration::query()->create([
+                'client_id' => $client->id,
+                'client_medication_id' => $medication->id,
+                'medication_round_id' => $round->id,
+                'administered_by' => $user->id,
+                'scheduled_for' => $scheduledFor->copy()->utc(),
+                'administered_at' => $scheduledFor->copy()->utc(),
+                'status' => 'given',
+                'dose_given' => '1 tablet',
+            ]);
+        }
+
+        $response = $this->actingAs($user)
+            ->get(route('emar.rounds', [
+                'date' => '2026-05-04',
+                'guided' => $round->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('rounds', 1)
+                ->where('rounds.0.id', $round->id)
+                ->where('rounds.0.total_medications', 1)
+                ->where('rounds.0.given', 1)
+                ->where('rounds.0.cells', fn ($cells): bool => collect($cells)->count() === 1
+                    && (int) collect($cells)->first()['resident_id'] === (int) $scopedClient->id
+                    && collect($cells)->first()['medication_name'] === 'Visible round medicine')
+                ->where('residents', fn ($residents): bool => collect($residents)->pluck('id')->map(fn ($id): int => (int) $id)->all() === [$scopedClient->id])
+                ->where('guidedRound.items', fn ($items): bool => collect($items)->count() === 1
+                    && (int) collect($items)->first()['client_id'] === (int) $scopedClient->id
+                    && collect($items)->first()['medication_name'] === 'Visible round medicine')
+                ->where('guidedRound.progress.total', 1)
+                ->where('guidedRound.progress.given', 1)
+                ->where('activity', fn ($activity): bool => collect($activity)->count() === 1
+                    && (int) collect($activity)->first()['resident_id'] === (int) $scopedClient->id
+                    && collect($activity)->first()['medication_name'] === 'Visible round medicine'));
+
+        $this->assertStringNotContainsString('HIDDEN', $response->getContent());
+    }
+
     public function test_guided_round_direct_objects_deny_foreign_unassigned_and_off_shift_workers(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
@@ -166,6 +241,104 @@ class RoundsPagePayloadTest extends TestCase
             ->assertNotFound();
         $this->assertSame('completed', $completed->fresh()->status);
         $this->assertSame('completed', $foreign->fresh()->status);
+    }
+
+    public function test_template_payload_reconciles_site_and_active_service_context_without_leaking_names(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        $this->seed(RbacSeeder::class);
+
+        $site = Site::factory()->create(['is_active' => true]);
+        $foreignSite = Site::factory()->create(['is_active' => true]);
+        $reader = $this->makeSiteUser($site, ['medications.view']);
+        $applicationWideReader = $this->makeSiteUser($site, [
+            'medications.view',
+            'clinical.accessAllSites',
+        ]);
+        $foreignStaff = User::factory()->create(['name' => 'HIDDEN foreign template staff']);
+        $localContext = ServiceContext::factory()->create([
+            'site_id' => $site->id,
+            'is_active' => true,
+        ]);
+        $foreignContext = ServiceContext::factory()->create([
+            'site_id' => $foreignSite->id,
+            'is_active' => true,
+        ]);
+        $applicationWideContext = ServiceContext::factory()->create([
+            'site_id' => null,
+            'is_active' => true,
+        ]);
+        $inactiveContext = ServiceContext::factory()->create([
+            'site_id' => $site->id,
+            'is_active' => false,
+        ]);
+
+        $visibleTemplates = collect([
+            $this->makeTemplate('Visible local template', $site),
+            $this->makeTemplate('Visible local application-context template', $site, $applicationWideContext),
+            $this->makeTemplate('Visible local matching-context template', $site, $localContext),
+            $this->makeTemplate('Visible context-derived template', null, $localContext),
+        ]);
+        $legacyForeignAssigneeTemplate = $visibleTemplates->first();
+        $legacyForeignAssigneeTemplate
+            ->forceFill(['default_assigned_to' => $foreignStaff->id])
+            ->save();
+        $applicationWideTemplates = collect([
+            $this->makeTemplate('Application-wide no-context template'),
+            $this->makeTemplate('Application-wide context template', null, $applicationWideContext),
+        ]);
+        collect([
+            $this->makeTemplate('HIDDEN foreign Site template', $foreignSite),
+            $this->makeTemplate('HIDDEN foreign context-derived template', null, $foreignContext),
+            $this->makeTemplate('HIDDEN conflicting context template', $site, $foreignContext),
+            $this->makeTemplate('HIDDEN inactive concrete context template', $site, $inactiveContext),
+            $this->makeTemplate('HIDDEN inactive context-derived template', null, $inactiveContext),
+        ])->each(function (MedicationRoundTemplate $template) use ($foreignStaff): void {
+            $template->forceFill(['default_assigned_to' => $foreignStaff->id])->save();
+        });
+
+        $response = $this->actingAs($reader)
+            ->get(route('emar.rounds', ['date' => '2026-05-04']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('templates', function ($templates) use ($visibleTemplates, $legacyForeignAssigneeTemplate): bool {
+                    $actualIds = collect($templates)
+                        ->pluck('id')
+                        ->map(fn ($id): int => (int) $id)
+                        ->sort()
+                        ->values()
+                        ->all();
+                    $expectedIds = $visibleTemplates
+                        ->pluck('id')
+                        ->map(fn ($id): int => (int) $id)
+                        ->sort()
+                        ->values()
+                        ->all();
+
+                    $legacyRow = collect($templates)->firstWhere('id', $legacyForeignAssigneeTemplate->id);
+
+                    return $actualIds === $expectedIds
+                        && data_get($legacyRow, 'default_assigned_to') === null
+                        && data_get($legacyRow, 'default_staff') === null;
+                }));
+
+        $this->assertStringNotContainsString('HIDDEN', $response->getContent());
+        $this->assertStringNotContainsString('Application-wide no-context template', $response->getContent());
+        $this->assertStringNotContainsString('Application-wide context template', $response->getContent());
+
+        $this->actingAs($applicationWideReader)
+            ->get(route('emar.rounds', ['date' => '2026-05-04']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('templates', function ($templates) use ($applicationWideTemplates): bool {
+                    $templateIds = collect($templates)
+                        ->pluck('id')
+                        ->map(fn ($id): int => (int) $id);
+
+                    return $applicationWideTemplates->pluck('id')->every(
+                        fn ($id): bool => $templateIds->contains((int) $id),
+                    );
+                }));
     }
 
     public function test_worker_board_lists_only_assigned_rounds_at_approved_sites(): void
@@ -268,6 +441,22 @@ class RoundsPagePayloadTest extends TestCase
             'status' => 'pending',
             'total_medications' => 1,
         ], $overrides));
+    }
+
+    protected function makeTemplate(
+        string $name,
+        ?Site $site = null,
+        ?ServiceContext $serviceContext = null,
+    ): MedicationRoundTemplate {
+        return MedicationRoundTemplate::query()->create([
+            'site_id' => $site?->id,
+            'service_context_id' => $serviceContext?->id,
+            'name' => $name,
+            'scheduled_time' => '08:00',
+            'window_minutes' => 60,
+            'days_of_week' => [1, 2, 3, 4, 5, 6, 7],
+            'active' => true,
+        ]);
     }
 
     protected function scheduledMedication(Client $client): ClientMedication

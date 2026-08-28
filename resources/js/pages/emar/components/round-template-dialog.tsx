@@ -41,6 +41,12 @@ type Props = {
     onClose: () => void;
 };
 
+function positiveIntegerOrNull(value: string | number | null): number | null {
+    const parsed = Number(value);
+
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 export default function RoundTemplateDialog({
     template,
     staff,
@@ -49,16 +55,23 @@ export default function RoundTemplateDialog({
 }: Props) {
     const [step, setStep] = useState(0);
     const editing = !!template;
+    const siteRequired = !editing || template?.active !== false;
     const form = useForm({
         name: template?.name ?? '',
         scheduled_time: template?.scheduled_time ?? '08:00',
         window_minutes: template?.window_minutes ?? 60,
         days_of_week: template?.days_of_week ?? [],
-        site_id: template?.site_id ? String(template.site_id) : '',
+        site_id:
+            positiveIntegerOrNull(template?.site_id ?? null) !== null
+                ? String(template!.site_id)
+                : '',
         default_assigned_to: template?.default_assigned_to
             ? String(template.default_assigned_to)
             : '',
     });
+    const selectedSiteId = positiveIntegerOrNull(form.data.site_id);
+    const selectedSite = sites.find((site) => site.id === selectedSiteId);
+    const siteSelectionIsValid = !siteRequired || selectedSite !== undefined;
 
     const toggleDay = (iso: number) => {
         const set = new Set(form.data.days_of_week);
@@ -71,9 +84,19 @@ export default function RoundTemplateDialog({
     };
 
     const submit = () => {
+        if (!siteSelectionIsValid) {
+            form.setError(
+                'site_id',
+                'Choose a site before activating this template.',
+            );
+            setStep(2);
+
+            return;
+        }
+
         form.transform((data) => ({
             ...data,
-            site_id: data.site_id ? Number(data.site_id) : null,
+            site_id: positiveIntegerOrNull(data.site_id),
             default_assigned_to: data.default_assigned_to
                 ? Number(data.default_assigned_to)
                 : null,
@@ -111,12 +134,18 @@ export default function RoundTemplateDialog({
             {step < 3 ? (
                 <Button
                     onClick={() => setStep(step + 1)}
-                    disabled={step === 0 && !form.data.name}
+                    disabled={
+                        (step === 0 && !form.data.name) ||
+                        (step === 2 && !siteSelectionIsValid)
+                    }
                 >
                     Continue
                 </Button>
             ) : (
-                <Button onClick={submit} disabled={form.processing}>
+                <Button
+                    onClick={submit}
+                    disabled={form.processing || !siteSelectionIsValid}
+                >
                     {editing ? 'Save template' : 'Create template'}
                 </Button>
             )}
@@ -241,16 +270,37 @@ export default function RoundTemplateDialog({
                         blurb="Scope the round to a site and a default staff member."
                     />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Site" span>
+                        <Field
+                            label="Site"
+                            required={siteRequired}
+                            span
+                            error={form.errors.site_id}
+                        >
                             <SelectInput
                                 value={form.data.site_id}
-                                onChange={(v) => form.setData('site_id', v)}
-                                placeholder="All sites"
-                                options={sites.map((s) => ({
-                                    value: String(s.id),
-                                    label: s.name,
-                                }))}
+                                onChange={(value) => {
+                                    form.setData('site_id', value);
+                                    form.clearErrors('site_id');
+                                }}
+                                placeholder="Choose a site"
+                                options={sites
+                                    .filter(
+                                        (site) =>
+                                            Number.isInteger(site.id) &&
+                                            site.id > 0,
+                                    )
+                                    .map((site) => ({
+                                        value: String(site.id),
+                                        label: site.name,
+                                    }))}
                             />
+                            {!siteRequired && selectedSite === undefined && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    This inactive legacy template has no site.
+                                    Choose one before turning auto-generation
+                                    back on.
+                                </p>
+                            )}
                         </Field>
                         <Field label="Default staff (med-competent)" span>
                             <SelectInput
@@ -286,9 +336,10 @@ export default function RoundTemplateDialog({
                         <SummaryRow
                             label="Site"
                             value={
-                                sites.find(
-                                    (s) => String(s.id) === form.data.site_id,
-                                )?.name ?? 'All sites'
+                                selectedSite?.name ??
+                                (siteRequired
+                                    ? 'Site required before activation'
+                                    : 'Not assigned (inactive legacy template)')
                             }
                         />
                         <SummaryRow

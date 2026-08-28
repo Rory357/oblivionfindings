@@ -30,6 +30,7 @@ class ControlRoomNotificationService
 
     public function __construct(
         private readonly Dispatcher $dispatcher,
+        private readonly ControlRoomAlertAccessService $alertAccess,
     ) {}
 
     /**
@@ -37,7 +38,10 @@ class ControlRoomNotificationService
      */
     public function notifyAlert(ControlRoomAlert $alert, ?SignalRule $rule, ?TriageQueue $queue): void
     {
-        $users = $this->resolveUsers($rule, $queue);
+        $users = $this->authorizedRecipients(
+            $alert,
+            $this->resolveUsers($rule, $queue),
+        );
         if ($users->isEmpty()) {
             return;
         }
@@ -55,7 +59,10 @@ class ControlRoomNotificationService
         ?SignalRule $rule,
         ?TriageQueue $queue,
     ): Collection {
-        $users = $this->resolveUsers($rule, $queue);
+        $users = $this->authorizedRecipients(
+            $alert,
+            $this->resolveUsers($rule, $queue),
+        );
         $generation = $this->routingGeneration($alert, $rule, $queue, $users);
         $template = self::OUTBOX_TEMPLATE_PREFIX.$generation;
         $snapshot = $this->notificationSnapshot($alert, $rule, $queue, $generation);
@@ -164,7 +171,10 @@ class ControlRoomNotificationService
             $queue = $alert->queue_id === null
                 ? null
                 : TriageQueue::query()->find($alert->queue_id);
-            $currentUsers = $this->resolveUsers($rule, $queue);
+            $currentUsers = $this->authorizedRecipients(
+                $alert,
+                $this->resolveUsers($rule, $queue),
+            );
             $currentGeneration = $this->routingGeneration($alert, $rule, $queue, $currentUsers);
             $currentTemplate = self::OUTBOX_TEMPLATE_PREFIX.$currentGeneration;
 
@@ -187,6 +197,15 @@ class ControlRoomNotificationService
         }
 
         $user = User::query()->findOrFail($communication->target_user_id);
+        if (! $this->authorizedRecipients($alert, collect([$user]))->contains('id', $user->id)) {
+            $communication->forceFill([
+                'superseded_at' => now(),
+                'status_detail' => 'Superseded because the recipient no longer has access to this alert.',
+            ])->save();
+
+            return [];
+        }
+
         $this->dispatcher->send($user, new ControlRoomAlertNotification($alert, $snapshot));
 
         $communication->forceFill([
@@ -263,7 +282,10 @@ class ControlRoomNotificationService
             }
         }
 
-        $users = $this->resolveUsersByRoles($roles->unique()->values()->toArray());
+        $users = $this->authorizedRecipients(
+            $alert,
+            $this->resolveUsersByRoles($roles->unique()->values()->toArray()),
+        );
         if ($users->isEmpty()) {
             return;
         }
@@ -288,7 +310,10 @@ class ControlRoomNotificationService
         TriageQueue $toQueue,
     ): void {
         $roles = collect($toQueue->assigned_roles ?? []);
-        $users = $this->resolveUsersByRoles($roles->unique()->values()->toArray());
+        $users = $this->authorizedRecipients(
+            $alert,
+            $this->resolveUsersByRoles($roles->unique()->values()->toArray()),
+        );
         if ($users->isEmpty()) {
             return;
         }
@@ -310,7 +335,7 @@ class ControlRoomNotificationService
         string $purpose,
         array $extraContext = [],
     ): void {
-        foreach ($users as $user) {
+        foreach ($this->authorizedRecipients($alert, $users) as $user) {
             $user->notify(new ControlRoomAlertNotification($alert, $extraContext));
 
             Communication::create([
@@ -401,5 +426,24 @@ class ControlRoomNotificationService
 
         return User::whereIn('id', $userIds->unique()->values())
             ->get(['id', 'name', 'email']);
+    }
+
+    /**
+     * Controlled-medication alerts can contain governed context in their
+     * summaries, notes and history. Keep ordinary routing unchanged, but never
+     * persist or deliver a controlled notification to a recipient who cannot
+     * open the canonical Site-scoped alert with the exact controlled-content
+     * permission.
+     */
+    private function authorizedRecipients(ControlRoomAlert $alert, Collection $users): Collection
+    {
+        if (! $this->alertAccess->requiresControlledMedicationPermission($alert)) {
+            return $users->unique('id')->values();
+        }
+
+        return $users
+            ->unique('id')
+            ->filter(fn (User $user): bool => $this->alertAccess->canView($alert, $user))
+            ->values();
     }
 }

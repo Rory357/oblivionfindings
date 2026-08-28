@@ -36,7 +36,7 @@ class ShiftMedicationSnapshotService
      *
      * @return array<string, mixed>|null
      */
-    public function forShift(Shift $shift): ?array
+    public function forShift(Shift $shift, bool $includeControlled = false): ?array
     {
         // Full client — EnhancedMarService::build() reads many client columns.
         $shift->loadMissing('client');
@@ -52,7 +52,7 @@ class ShiftMedicationSnapshotService
         $date = $windowStart->copy()->startOfDay();
 
         // One full-day MAR build for this client, then narrow to the shift window.
-        $mar = $this->marService->build($client, $date, null, $shift->id);
+        $mar = $this->marService->build($client, $date, null, $shift->id, $includeControlled);
         $scheduled = collect(Arr::get($mar, 'scheduled', []))
             ->filter(function (array $row) use ($windowStart, $windowEnd): bool {
                 $sf = Arr::get($row, 'scheduled_for');
@@ -79,24 +79,31 @@ class ShiftMedicationSnapshotService
         $cdDue = $pending->filter(fn (array $r) => (bool) Arr::get($r, 'medication.controlled_drug'));
 
         [$startUtc, $endUtc] = [$windowStart->copy()->utc(), $windowEnd->copy()->utc()];
-        $prnGiven = ClientMedicationAdministration::query()
+        $prnGivenQuery = ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
+            ->where('client_id', $client->id)
+            ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->where('status', 'given')
+            ->whereBetween('administered_at', [$startUtc, $endUtc]);
+        $reviewsOutstandingQuery = ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
             ->where('client_id', $client->id)
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->where('status', 'given')
             ->whereBetween('administered_at', [$startUtc, $endUtc])
-            ->count();
-        $reviewsOutstanding = ClientMedicationAdministration::query()
-            ->where('client_id', $client->id)
-            ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
-            ->where('status', 'given')
-            ->whereBetween('administered_at', [$startUtc, $endUtc])
-            ->whereDoesntHave('prnEffectiveness')
-            ->count();
+            ->whereDoesntHave('prnEffectiveness');
+        if (! $includeControlled) {
+            $prnGivenQuery->whereHas('medication', fn ($query) => $query->where('controlled_drug', false));
+            $reviewsOutstandingQuery->whereHas('medication', fn ($query) => $query->where('controlled_drug', false));
+        }
+        $prnGiven = $prnGivenQuery->count();
+        $reviewsOutstanding = $reviewsOutstandingQuery->count();
 
         $omissions = $this->omissionService->omissionsForRange(
             $windowStart->copy(),
             $windowEnd->copy(),
             (int) $client->id,
+            $includeControlled,
         );
 
         return [

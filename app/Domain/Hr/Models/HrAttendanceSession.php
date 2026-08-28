@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Domain\Hr\Enums\AttendanceTimesheetSyncOutcome;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Shift;
@@ -48,11 +49,25 @@ class HrAttendanceSession extends Model
         'meta' => 'array',
     ];
 
+    private AttendanceTimesheetSyncOutcome $timesheetSyncOutcome = AttendanceTimesheetSyncOutcome::None;
+
     protected static function booted(): void
     {
         static::saving(function (self $session): void {
             app(ShiftSafetyInvariantService::class)->assertAttendanceSession($session);
         });
+    }
+
+    public function markTimesheetSyncOutcome(AttendanceTimesheetSyncOutcome $outcome): self
+    {
+        $this->timesheetSyncOutcome = $outcome;
+
+        return $this;
+    }
+
+    public function timesheetSyncOutcome(): AttendanceTimesheetSyncOutcome
+    {
+        return $this->timesheetSyncOutcome;
     }
 
     public function user(): BelongsTo

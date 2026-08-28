@@ -9,7 +9,7 @@ import OfflineStatusBanner from './components/offline-status-banner';
 import { initializeAppearance } from './hooks/use-appearance';
 import { resolveInertiaPage } from './inertia-pages';
 import { bootEmarOffline } from './lib/emar-offline';
-import { bootOfflineQueue } from './lib/offline-queue';
+import { bootOfflineQueue, setOfflineQueueActor } from './lib/offline-queue';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -42,8 +42,10 @@ createInertiaApp({
     setup({ el, App, props }) {
         const initialPageProps = props.initialPage.props as {
             appearance?: Parameters<typeof initializeAppearance>[0];
+            auth?: { user?: { id?: number | string } | null };
         };
         initializeAppearance(initialPageProps.appearance);
+        setOfflineQueueActor(initialPageProps.auth?.user?.id);
         bootEmarOffline();
         bootOfflineQueue();
         const root = createRoot(el);
@@ -51,22 +53,34 @@ createInertiaApp({
         root.render(
             <StrictMode>
                 <App {...props}>
-                    {({ Component, props: pageProps, key }) => (
-                        <>
-                            <OfflineStatusBanner />
-                            {renderInertiaPage(Component, pageProps, key)}
-                            <FlashToaster />
-                            <Toaster
-                                richColors
-                                position="top-right"
-                                style={
-                                    {
-                                        '--success-text': 'hsl(140, 100%, 18%)',
-                                    } as CSSProperties
-                                }
-                            />
-                        </>
-                    )}
+                    {({ Component, props: pageProps, key }) => {
+                        const auth = (
+                            pageProps as {
+                                auth?: {
+                                    user?: { id?: number | string } | null;
+                                };
+                            }
+                        ).auth;
+                        setOfflineQueueActor(auth?.user?.id);
+
+                        return (
+                            <>
+                                <OfflineStatusBanner />
+                                {renderInertiaPage(Component, pageProps, key)}
+                                <FlashToaster />
+                                <Toaster
+                                    richColors
+                                    position="top-right"
+                                    style={
+                                        {
+                                            '--success-text':
+                                                'hsl(140, 100%, 18%)',
+                                        } as CSSProperties
+                                    }
+                                />
+                            </>
+                        );
+                    }}
                 </App>
             </StrictMode>,
         );

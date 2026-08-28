@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class RolesController extends Controller
@@ -56,8 +59,8 @@ class RolesController extends Controller
             if ($source) {
                 $cloneRole = [
                     'id' => 0,
-                    'name' => $source->name . '_copy',
-                    'label' => $source->label . ' (Copy)',
+                    'name' => $source->name.'_copy',
+                    'label' => $source->label.' (Copy)',
                     'description' => $source->description,
                     'users_count' => 0,
                     'permission_keys' => $source->permissions->pluck('key')->values(),
@@ -88,18 +91,19 @@ class RolesController extends Controller
             'name.regex' => 'Role key must be lowercase letters, numbers, or underscores (e.g. support_worker).',
         ]);
 
-        $role = Role::create([
-            'name' => $data['name'],
-            'label' => $data['label'],
-            'description' => $data['description'] ?? null,
-            'landing_route' => $data['landing_route'] ?? null,
-        ]);
-
         $keys = collect($data['permission_keys'] ?? [])->unique()->values();
-        if ($keys->isNotEmpty()) {
-            $permissionIds = Permission::whereIn('key', $keys)->pluck('id')->all();
+        $permissionIds = Permission::whereIn('key', $keys)->pluck('id')->all();
+        $actorId = (int) $request->user()->id;
+        DB::transaction(function () use ($actorId, $data, $permissionIds): void {
+            $this->lockRoleMutationActor($actorId);
+            $role = Role::query()->create([
+                'name' => $data['name'],
+                'label' => $data['label'],
+                'description' => $data['description'] ?? null,
+                'landing_route' => $data['landing_route'] ?? null,
+            ]);
             $role->permissions()->sync($permissionIds);
-        }
+        });
 
         return redirect()->route('settings.roles.index');
     }
@@ -154,17 +158,37 @@ class RolesController extends Controller
             'name.regex' => 'Role key must be lowercase letters, numbers, or underscores (e.g. support_worker).',
         ]);
 
-        $role->update([
-            'name' => $data['name'],
-            'label' => $data['label'],
-            'description' => $data['description'] ?? null,
-            'landing_route' => $data['landing_route'] ?? null,
-        ]);
-
         $keys = collect($data['permission_keys'] ?? [])->unique()->values();
         $permissionIds = Permission::whereIn('key', $keys)->pluck('id')->all();
-        $role->permissions()->sync($permissionIds);
+        $actorId = (int) $request->user()->id;
+        $roleId = (int) $role->id;
+        DB::transaction(function () use ($actorId, $data, $permissionIds, $roleId): void {
+            $this->lockRoleMutationActor($actorId, [$roleId]);
+            $lockedRole = app(AuthorizationEvidenceLockService::class)->lockRoleMutex($roleId);
+            $lockedRole->update([
+                'name' => $data['name'],
+                'label' => $data['label'],
+                'description' => $data['description'] ?? null,
+                'landing_route' => $data['landing_route'] ?? null,
+            ]);
+            $lockedRole->permissions()->sync($permissionIds);
+        });
 
         return redirect()->route('settings.roles.index');
+    }
+
+    /** @param list<int> $additionalRoleIds */
+    private function lockRoleMutationActor(int $actorId, array $additionalRoleIds = []): User
+    {
+        $users = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+            [$actorId],
+            ['settings.access.manage'],
+            $additionalRoleIds,
+        );
+        /** @var User|null $actor */
+        $actor = $users->get($actorId);
+        abort_unless($actor?->canDo('settings.access.manage'), 403);
+
+        return $actor;
     }
 }

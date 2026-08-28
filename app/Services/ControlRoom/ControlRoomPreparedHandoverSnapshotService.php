@@ -93,6 +93,19 @@ final class ControlRoomPreparedHandoverSnapshotService
         ) {
             $this->invalid();
         }
+        $pinnedNotes = $this->notes($snapshot['pinned_notes'] ?? null);
+        $followupNotes = $this->notes($snapshot['followup_notes'] ?? null);
+        $noteAlertIds = $this->integerList($snapshot['note_alert_ids'] ?? null);
+        $referencedNoteAlertIds = collect([...$pinnedNotes, ...$followupNotes])
+            ->pluck('alert_id')
+            ->filter(fn ($id): bool => is_int($id))
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+        if ($referencedNoteAlertIds !== $noteAlertIds) {
+            $this->invalid();
+        }
 
         return [
             'prepared_by' => $preparedBy,
@@ -118,8 +131,9 @@ final class ControlRoomPreparedHandoverSnapshotService
             'carry_forward_acknowledged_at' => $this->timestamp(
                 $snapshot['carry_forward_acknowledged_at'] ?? null,
             ),
-            'pinned_notes' => $this->notes($snapshot['pinned_notes'] ?? null),
-            'followup_notes' => $this->notes($snapshot['followup_notes'] ?? null),
+            'note_alert_ids' => $noteAlertIds,
+            'pinned_notes' => $pinnedNotes,
+            'followup_notes' => $followupNotes,
         ];
     }
 
@@ -442,9 +456,17 @@ final class ControlRoomPreparedHandoverSnapshotService
             if (! is_numeric($note['id'] ?? null) || (int) $note['id'] < 1) {
                 $this->invalid();
             }
+            if (! array_key_exists('alert_id', $note)) {
+                $this->invalid();
+            }
+            $alertId = $note['alert_id'];
+            if ($alertId !== null && (! is_numeric($alertId) || (int) $alertId < 1)) {
+                $this->invalid();
+            }
 
             return [
                 'id' => (int) $note['id'],
+                'alert_id' => $alertId === null ? null : (int) $alertId,
                 'type' => $this->string($note['type'] ?? null),
                 'content' => $this->string($note['content'] ?? null),
                 'is_pinned' => (bool) ($note['is_pinned'] ?? false),

@@ -138,9 +138,9 @@ class ShiftSafetyInvariantService
             if (
                 (int) $handover->incomingShift->client_id !== (int) $handover->client_id
                 || $incomingSiteId !== $outgoingSiteId
-                || ($handover->incomingShift->user_id === null) !== ($handover->incoming_staff_id === null)
-                || ($handover->incomingShift->user_id !== null
-                    && (int) $handover->incomingShift->user_id !== (int) $handover->incoming_staff_id)
+                || ! $handover->incomingShift->user_id
+                || ! $handover->incoming_staff_id
+                || ! $handover->incomingStaff
             ) {
                 throw ValidationException::withMessages([
                     'handover' => 'The incoming Shift, staff member, Client, and Site do not match the outgoing handover.',
@@ -168,8 +168,14 @@ class ShiftSafetyInvariantService
             ]);
         }
 
-        if ($handover->status !== ShiftHandoverService::STATUS_ACKNOWLEDGED || ! $handover->incoming_shift_id) {
+        if ($handover->status !== ShiftHandoverService::STATUS_ACKNOWLEDGED) {
             return;
+        }
+
+        if (! $handover->incoming_shift_id) {
+            throw ValidationException::withMessages([
+                'handover' => 'Acknowledged handovers must belong to an exact incoming shift.',
+            ]);
         }
 
         $incomingUserId = $handover->incomingShift?->user_id;
@@ -179,9 +185,12 @@ class ShiftSafetyInvariantService
             ]);
         }
 
-        if ((int) $handover->incoming_staff_id !== (int) $incomingUserId) {
+        // incoming_staff_id is immutable submit-time provenance. Authority to
+        // acknowledge follows the currently assigned incoming Shift worker and
+        // is captured independently in acknowledged_by.
+        if ((int) $handover->acknowledged_by !== (int) $incomingUserId) {
             throw ValidationException::withMessages([
-                'handover' => 'Acknowledged handovers must match the current incoming shift assignee.',
+                'handover' => 'Acknowledged handovers must be accepted by the current incoming shift assignee.',
             ]);
         }
     }

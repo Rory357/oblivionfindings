@@ -5,6 +5,7 @@ namespace App\Domain\Hr\Services;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The canonical grant boundary for employee-intake roles.
@@ -56,33 +57,47 @@ class EmployeeRoleAssignmentService
      *
      * @throws \InvalidArgumentException
      */
-    public function assertAssignable(string $roleName, User $actor): Role
+    public function assertAssignable(int $roleId, string $roleName, User $actor): Role
     {
+        if (DB::transactionLevel() < 1) {
+            throw new \LogicException('Employee role assignment must be validated inside its identity-write transaction.');
+        }
+
         if (! $actor->canDo('hr.employees.manage')) {
             throw new \InvalidArgumentException('You are not allowed to assign the selected employee access role.');
         }
 
-        if (in_array($roleName, self::EXTERNAL_PERSONA_ROLES, true)) {
+        // EmployeeIntakeService includes this exact Role ID in the complete
+        // User/Role prefix. Fetching it by primary key is therefore reentrant;
+        // never resolve by name here because a rename plus replacement could
+        // introduce a Role that was absent from the prelocked union.
+        $role = Role::query()->whereKey($roleId)->lockForUpdate()->first();
+        if (! $role || (string) $role->name !== $roleName) {
+            throw new \InvalidArgumentException(
+                'The employee role changed while the identity write was waiting. Please retry.'
+            );
+        }
+
+        if (in_array((string) $role->name, self::EXTERNAL_PERSONA_ROLES, true)) {
             throw new \InvalidArgumentException(
                 "The '{$roleName}' role is an external portal persona and cannot be assigned through employee intake."
             );
         }
 
-        $role = $this->assignableRoles($actor)
-            ->where('name', $roleName)
-            ->first();
-        if ($role) {
-            return $role;
-        }
-
-        $requestedLevel = Role::query()->where('name', $roleName)->value('level');
-        if ($roleName === 'admin' || (int) $requestedLevel >= 100) {
+        if (! $this->isAdministrator($actor) && (int) $role->level >= 100) {
             throw new \InvalidArgumentException(
                 'Only an administrator can assign an administrator-level role.'
             );
         }
 
-        throw new \InvalidArgumentException('You are not allowed to assign the selected employee access role.');
+        if (
+            (string) $role->name === 'clinical_lead'
+            && ! $actor->canDo(self::CLINICAL_LEAD_GRANT_PERMISSION)
+        ) {
+            throw new \InvalidArgumentException('You are not allowed to assign the selected employee access role.');
+        }
+
+        return $role;
     }
 
     private function isAdministrator(User $actor): bool

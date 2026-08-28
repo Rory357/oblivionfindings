@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
 use Illuminate\Support\Collection;
 
 /**
@@ -15,13 +16,25 @@ use Illuminate\Support\Collection;
  */
 class PeopleMutationLockService
 {
+    private ?AuthorizationEvidenceLockService $authorizationEvidence = null;
+
+    public function __construct(
+        ?AuthorizationEvidenceLockService $authorizationEvidence = null,
+    ) {
+        $this->authorizationEvidence = $authorizationEvidence;
+    }
+
     /**
      * @param  iterable<int>  $userIds
      * @param  iterable<int>  $profileIds
+     * @param  iterable<int>  $additionalRoleIds
      * @return array{users: Collection<int, User>, profiles: Collection<int, HrEmployeeProfile>}
      */
-    public function lock(iterable $userIds, iterable $profileIds = []): array
-    {
+    public function lock(
+        iterable $userIds,
+        iterable $profileIds = [],
+        iterable $additionalRoleIds = [],
+    ): array {
         $userIds = collect($userIds)
             ->map(fn ($id) => (int) $id)
             ->filter(fn (int $id) => $id > 0)
@@ -35,12 +48,17 @@ class PeopleMutationLockService
             ->sort()
             ->values();
 
-        $users = User::query()
-            ->whereIn('id', $userIds)
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get()
-            ->keyBy('id');
+        $users = ($this->authorizationEvidence ?? app(AuthorizationEvidenceLockService::class))->lockForUsers(
+            $userIds,
+            ['*'],
+            collect($additionalRoleIds)
+                ->map(fn ($roleId): int => (int) $roleId)
+                ->filter(fn (int $roleId): bool => $roleId > 0)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all(),
+        );
 
         $profiles = HrEmployeeProfile::withTrashed()
             ->where(function ($query) use ($userIds, $profileIds): void {
@@ -53,6 +71,14 @@ class PeopleMutationLockService
             ->lockForUpdate()
             ->get()
             ->keyBy('id');
+        $profilesByUser = $profiles->keyBy(fn (HrEmployeeProfile $profile): int => (int) $profile->user_id);
+        $users->each(function (User $user) use ($profilesByUser): void {
+            $profile = $profilesByUser->get((int) $user->id);
+            $user->setRelation(
+                'hrEmployeeProfile',
+                $profile && ! $profile->trashed() ? $profile : null,
+            );
+        });
 
         return ['users' => $users, 'profiles' => $profiles];
     }

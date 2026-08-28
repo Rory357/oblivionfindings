@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\MedicationAdminRule;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -23,7 +26,7 @@ class OneChartSettingsTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
@@ -31,6 +34,16 @@ class OneChartSettingsTest extends TestCase
             'password' => Hash::make('admin-secret'),
         ]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->first());
+
+        $adminSite = Site::factory()->create(['is_active' => true]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $adminSite->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+            'end_date' => null,
+        ]);
 
         $serviceContext = ServiceContext::factory()->create([
             'name' => '1CHART Settings Test',
@@ -40,6 +53,7 @@ class OneChartSettingsTest extends TestCase
 
         $this->client = Client::factory()->create([
             'service_context_id' => $serviceContext->id,
+            'site_id' => $adminSite->id,
         ]);
     }
 

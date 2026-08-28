@@ -274,7 +274,7 @@ export default function AuditLog({
             {
                 icon: <Fingerprint className="h-3.5 w-3.5" />,
                 label: 'Verify integrity',
-                sub: 'Tamper-evidence check',
+                sub: 'Canonical record check',
                 onClick: () => openEvent(e, 'integrity'),
             },
             { sep: true },
@@ -412,9 +412,8 @@ export default function AuditLog({
                 .length,
         [windowEvents],
     );
-    // TODO(Gx): "N events edited since recording" is not on the index payload — integrity.edit_count
-    // is lazy-loaded per event from /emar/audit/event/{id}/integrity, so surfacing it here would mean
-    // fetching N integrity records on load. Omitted (see docs/AUDIT_TRAIL_GAP_ANALYSIS.md, Gap D).
+    // Device, network and edit-history metadata are deliberately omitted from
+    // both the index and lazy integrity response.
     const allAlerts: AuditAlert[] = [];
     if (windowOmissions > 0) {
         allAlerts.push({

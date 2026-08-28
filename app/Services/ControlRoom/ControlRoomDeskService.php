@@ -34,6 +34,7 @@ class ControlRoomDeskService
     public function __construct(
         private readonly AlertWorklistQuery $worklistQuery,
         private readonly AlertWorklistPresenter $worklistPresenter,
+        private readonly ControlRoomAlertAccessService $alertAccess,
         private readonly UserSiteAccessService $siteAccess,
         private readonly ControlRoomReportService $reports,
     ) {}
@@ -109,14 +110,14 @@ class ControlRoomDeskService
             $filters['site_id'] ?? 'all',
         );
 
-        return Cache::remember($cacheKey, now()->addSeconds(90), function () use ($from, $to, $siteScope, $filters): array {
+        return Cache::remember($cacheKey, now()->addSeconds(90), function () use ($from, $to, $siteScope, $filters, $user): array {
             return [
                 'period' => $filters['period'],
-                'volume' => $this->reports->alertVolume($from, $to, $siteScope),
-                'sla' => $this->reports->slaCompliance($from, $to, $siteScope),
-                'escalation' => $this->reports->escalationAnalysis($from, $to, $siteScope),
-                'sla_daily_trend' => $this->reports->slaDailyTrend($from, $to, $siteScope),
-                'sites' => $this->reports->siteComparison($from, $to, $siteScope),
+                'volume' => $this->reports->alertVolume($from, $to, $siteScope, $user),
+                'sla' => $this->reports->slaCompliance($from, $to, $siteScope, $user),
+                'escalation' => $this->reports->escalationAnalysis($from, $to, $siteScope, $user),
+                'sla_daily_trend' => $this->reports->slaDailyTrend($from, $to, $siteScope, $user),
+                'sites' => $this->reports->siteComparison($from, $to, $siteScope, $user),
                 'cached_for_seconds' => 90,
             ];
         });
@@ -405,7 +406,7 @@ class ControlRoomDeskService
 
     private function scopeAlerts(Builder $query, User $user, ?int $siteId): void
     {
-        $this->siteAccess->applyAlertScope($query, $user, self::BYPASS_PERMISSIONS);
+        $this->alertAccess->applyVisibleScope($query, $user);
         if ($siteId !== null) {
             $this->siteAccess->applyAlertSiteScopeForSiteIds($query, [$siteId]);
         }

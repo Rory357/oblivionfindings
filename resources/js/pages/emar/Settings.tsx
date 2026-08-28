@@ -55,7 +55,7 @@ type Props = {
     sites: { id: number; name: string }[];
     observationOptions: Option[];
     matchTypes: Option[];
-    can: { manage: boolean };
+    can: { manage: boolean; manage_global: boolean };
 };
 
 const GLOBAL_SITE = 'global';
@@ -69,9 +69,15 @@ type FormState = {
     active: boolean;
 };
 
-function blankForm(matchTypes: Option[]): FormState {
+function blankForm(
+    matchTypes: Option[],
+    sites: Props['sites'],
+    canManageGlobal: boolean,
+): FormState {
     return {
-        site_id: GLOBAL_SITE,
+        site_id: canManageGlobal
+            ? GLOBAL_SITE
+            : (sites[0]?.id.toString() ?? ''),
         match_type: matchTypes[0]?.value ?? 'medicine_name',
         match_value: '',
         requires_countersign: true,
@@ -90,7 +96,9 @@ export default function EmarSettings({
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<Rule | null>(null);
     const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState<FormState>(blankForm(matchTypes));
+    const [form, setForm] = useState<FormState>(
+        blankForm(matchTypes, sites, can.manage_global),
+    );
 
     const matchTypeLabel = (value: string) =>
         matchTypes.find((t) => t.value === value)?.label ?? value;
@@ -99,7 +107,7 @@ export default function EmarSettings({
 
     function openCreate() {
         setEditing(null);
-        setForm(blankForm(matchTypes));
+        setForm(blankForm(matchTypes, sites, can.manage_global));
         setOpen(true);
     }
 
@@ -410,9 +418,11 @@ export default function EmarSettings({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={GLOBAL_SITE}>
-                                        All sites (global)
-                                    </SelectItem>
+                                    {can.manage_global && (
+                                        <SelectItem value={GLOBAL_SITE}>
+                                            All sites (global)
+                                        </SelectItem>
+                                    )}
                                     {sites.map((site) => (
                                         <SelectItem
                                             key={site.id}

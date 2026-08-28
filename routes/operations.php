@@ -578,7 +578,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     // Medication administration corrections
     Route::post('/clients/{client}/mar/administrations/{administration}/corrections', [MedicationAdministrationCorrectionController::class, 'store'])
-        ->middleware('permission:medications.administer.correct|clients.update')
+        ->middleware('permission:medications.administer.correct')
         ->name('operations.clients.mar.administrations.corrections.store');
 
     // Break-glass emergency access
@@ -887,10 +887,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->middleware('permission:handovers.create|shifts.update|shifts.manageAny')
         ->name('operations.handovers.store');
     Route::put('/handovers/{handover}', [HandoverController::class, 'update'])
-        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny')
+        ->middleware('permission:handovers.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('operations.handovers.update');
     Route::patch('/handovers/{handover}/submit', [HandoverController::class, 'submit'])
-        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny')
+        ->middleware('permission:handovers.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('operations.handovers.submit');
     Route::patch('/handovers/{handover}/acknowledge', [HandoverController::class, 'acknowledge'])
         ->middleware('permission:handovers.viewAny|shifts.viewAny|shifts.viewAssigned|shifts.update|shifts.manageAny')

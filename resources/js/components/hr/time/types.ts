@@ -22,6 +22,8 @@ export interface TimeEntry {
     break_minutes: number;
     total_hours: number | null;
     entry_type: string;
+    can_mutate: boolean;
+    is_attendance_backed: boolean;
     status: string;
     pay_type: string;
     is_sleepover: boolean;
@@ -86,6 +88,7 @@ export interface OnNowItem {
     elapsed_minutes: number;
     pay_type: string;
     is_sleepover: boolean;
+    can_mutate: boolean;
 }
 
 export interface ExceptionItem {
@@ -100,6 +103,8 @@ export interface ExceptionItem {
     user_name?: string;
     clock_in?: string;
     entry_date?: string;
+    is_attendance_backed?: boolean;
+    can_mutate: boolean;
     action: 'correct' | 'edit' | 'view_entries';
 }
 
@@ -157,6 +162,7 @@ export interface TimeCan {
     manage?: boolean;
     approveTeam?: boolean;
     approveAny?: boolean;
+    reportAny?: boolean;
     editEntry?: boolean;
     clockOnBehalf?: boolean;
 }

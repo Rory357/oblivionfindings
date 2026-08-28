@@ -624,9 +624,10 @@ class MedicationIncidentIntegrationService
 
     public function handleControlledLossReport(
         ControlledDrugLossReport $report,
-        ?int $createdBy = null
+        ?int $createdBy = null,
+        array $syncProvenance = [],
     ): ?ClientIncident {
-        return DB::transaction(function () use ($report, $createdBy): ?ClientIncident {
+        return DB::transaction(function () use ($report, $createdBy, $syncProvenance): ?ClientIncident {
             $lockedReport = ControlledDrugLossReport::query()
                 ->with(['client', 'medication'])
                 ->lockForUpdate()
@@ -705,6 +706,10 @@ class MedicationIncidentIntegrationService
                     'reported_to_pharmacy' => (bool) $lockedReport->reported_to_pharmacy,
                     'site_id' => $client->site_id,
                     'occurred_at' => $lockedReport->discovered_at?->toIso8601String(),
+                    'client_request_uuid' => $syncProvenance['client_request_uuid'] ?? null,
+                    'captured_offline_at' => $syncProvenance['captured_offline_at'] ?? null,
+                    'origin_device_id' => $syncProvenance['origin_device_id'] ?? null,
+                    'queued_offline' => (bool) ($syncProvenance['queued_offline'] ?? false),
                 ],
             );
 

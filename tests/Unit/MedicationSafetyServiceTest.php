@@ -2,18 +2,21 @@
 
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\MedicationInteraction;
 use App\Services\MedicationSafetyService;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 beforeEach(function () {
-    $this->service = new MedicationSafetyService();
+    $this->service = new MedicationSafetyService;
 });
 
-function mockAdministrationRelation(?object $lastAdmin): HasMany
+function mockAdministrationRelation(?object $lastAdmin, int $clientId): HasMany
 {
     $relation = Mockery::mock(HasMany::class);
+    $relation->shouldReceive('effectiveClinicalEvidence')->andReturnSelf();
+    $relation->shouldReceive('where')->with('client_id', $clientId)->andReturnSelf();
     $relation->shouldReceive('where')->with('status', 'given')->andReturnSelf();
     $relation->shouldReceive('orderByDesc')->with('administered_at')->andReturnSelf();
     $relation->shouldReceive('first')->andReturn($lastAdmin);
@@ -156,8 +159,9 @@ test('checkPrnInterval blocks when minimum hours not elapsed', function () {
     ];
 
     $medication = Mockery::mock(ClientMedication::class)->makePartial();
+    $medication->client_id = 101;
     $medication->min_hours_between_doses = 4;
-    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation($lastAdmin));
+    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation($lastAdmin, 101));
 
     $result = $this->service->checkPrnInterval($medication);
 
@@ -175,8 +179,9 @@ test('checkPrnInterval does not block when minimum hours have elapsed', function
     ];
 
     $medication = Mockery::mock(ClientMedication::class)->makePartial();
+    $medication->client_id = 102;
     $medication->min_hours_between_doses = 4;
-    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation($lastAdmin));
+    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation($lastAdmin, 102));
 
     $result = $this->service->checkPrnInterval($medication);
 
@@ -185,8 +190,9 @@ test('checkPrnInterval does not block when minimum hours have elapsed', function
 
 test('checkPrnInterval does not block when no previous administrations', function () {
     $medication = Mockery::mock(ClientMedication::class)->makePartial();
+    $medication->client_id = 103;
     $medication->min_hours_between_doses = 4;
-    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation(null));
+    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation(null, 103));
 
     $result = $this->service->checkPrnInterval($medication);
 
@@ -221,13 +227,13 @@ test('performSafetyCheck includes dose validation warnings when dose exceeds pre
     // Mock allergy check - no allergies
     $allergyQuery = Mockery::mock();
     $allergyQuery->shouldReceive('where')->andReturnSelf();
-    $allergyQuery->shouldReceive('get')->andReturn(new \Illuminate\Support\Collection());
+    $allergyQuery->shouldReceive('get')->andReturn(new Collection);
 
     // Mock duplicate check - no duplicates
     $dupQuery = Mockery::mock();
     $dupQuery->shouldReceive('where')->andReturnSelf();
     $dupQuery->shouldReceive('active')->andReturnSelf();
-    $dupQuery->shouldReceive('get')->andReturn(new \Illuminate\Support\Collection());
+    $dupQuery->shouldReceive('get')->andReturn(new Collection);
 
     // Mock interaction check - no interactions
     $interactionQuery = Mockery::mock();
@@ -272,4 +278,67 @@ test('performSafetyCheck has no dose warning when dose is within range', functio
 
     $doseWarnings = collect($result['warnings'])->where('type', 'dose_exceeds_prescribed');
     expect($doseWarnings)->toHaveCount(0);
+});
+
+test('performSafetyCheck preserves controlled counterpart safety decisions while concealing identity', function () {
+    $client = Mockery::mock(Client::class)->makePartial();
+    $client->id = 1;
+
+    $medication = Mockery::mock(ClientMedication::class)->makePartial();
+    $medication->forceFill([
+        'id' => 1,
+        'name' => 'Ordinary target medication',
+        'is_prn' => false,
+        'high_risk' => false,
+        'controlled_drug' => false,
+    ]);
+    $medication->shouldReceive('isActive')->andReturn(true);
+    $medication->shouldReceive('isExpired')->andReturn(false);
+    $medication->shouldReceive('isExpiringSoon')->andReturn(false);
+
+    $controlledCounterpart = Mockery::mock(ClientMedication::class)->makePartial();
+    $controlledCounterpart->forceFill([
+        'id' => 987654,
+        'name' => 'SECRET CONTROLLED COUNTERPART',
+        'dosage' => '99 SECRET UNITS',
+        'controlled_drug' => true,
+    ]);
+    $interaction = new MedicationInteraction([
+        'medication_a' => 'Ordinary target medication',
+        'medication_b' => 'SECRET CONTROLLED COUNTERPART',
+        'severity' => 'contraindicated',
+        'description' => 'SECRET CONTROLLED INTERACTION DESCRIPTION',
+        'management' => 'SECRET CONTROLLED INTERACTION MANAGEMENT',
+    ]);
+
+    $service = Mockery::mock(MedicationSafetyService::class)->makePartial();
+    $service->shouldReceive('checkAllergies')->andReturn(['has_match' => false, 'matches' => [], 'allergy_count' => 0]);
+    $service->shouldReceive('checkDuplicates')->andReturn([
+        'has_duplicate' => true,
+        'duplicates' => [$controlledCounterpart],
+    ]);
+    $service->shouldReceive('checkInteractions')->andReturn([
+        'has_interaction' => true,
+        'interactions' => [[
+            'interaction' => $interaction,
+            'medication' => $controlledCounterpart,
+        ]],
+    ]);
+
+    $concealed = $service->performSafetyCheck($client, $medication, includeControlled: false);
+    $concealedJson = json_encode($concealed);
+    expect($concealed['blocked'])->toBeTrue()
+        ->and($concealed['block_reason'])->toBe('Contraindicated drug interaction detected')
+        ->and($concealedJson)->not->toContain('SECRET CONTROLLED COUNTERPART')
+        ->and($concealedJson)->not->toContain('99 SECRET UNITS')
+        ->and($concealedJson)->not->toContain('SECRET CONTROLLED INTERACTION DESCRIPTION')
+        ->and($concealedJson)->not->toContain('SECRET CONTROLLED INTERACTION MANAGEMENT')
+        ->and($concealedJson)->not->toContain('987654');
+
+    $visible = $service->performSafetyCheck($client, $medication, includeControlled: true);
+    $visibleJson = json_encode($visible);
+    expect($visible['blocked'])->toBeTrue()
+        ->and($visibleJson)->toContain('SECRET CONTROLLED COUNTERPART')
+        ->and($visibleJson)->toContain('SECRET CONTROLLED INTERACTION DESCRIPTION')
+        ->and($visibleJson)->toContain('987654');
 });

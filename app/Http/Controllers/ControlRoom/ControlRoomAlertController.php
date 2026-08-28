@@ -183,12 +183,7 @@ class ControlRoomAlertController extends Controller
                 && $user->canDo('incidents.create'),
             403,
         );
-        $this->siteAccess()->assertCanAccessAlert(
-            $user,
-            $alert,
-            $this->alertBypassPermissions(),
-            'You are not authorized to create an incident from this alert.',
-        );
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'type' => ['nullable', 'string', 'max:120'],
@@ -301,11 +296,8 @@ class ControlRoomAlertController extends Controller
             $freshActor = $this->freshAssignmentActor($user);
             $alerts = ControlRoomAlert::query()
                 ->whereIn('id', $data['alert_ids'])
-                ->tap(fn ($query) => $this->siteAccess()->applyAlertScope(
-                    $query,
-                    $freshActor,
-                    $this->alertBypassPermissions(),
-                ))
+                ->tap(fn ($query) => app(ControlRoomAlertAccessService::class)
+                    ->applyReadableScope($query, $freshActor))
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
@@ -745,17 +737,14 @@ class ControlRoomAlertController extends Controller
             $freshActor = $this->freshAssignmentActor($user);
             $lockedAlert = ControlRoomAlert::query()
                 ->whereKey($alert->id)
-                ->tap(fn ($query) => $this->siteAccess()->applyAlertScope(
-                    $query,
-                    $freshActor,
-                    $this->alertBypassPermissions(),
-                ))
+                ->tap(fn ($query) => app(ControlRoomAlertAccessService::class)
+                    ->applyReadableScope($query, $freshActor))
                 ->lockForUpdate()
                 ->first();
             abort_unless(
                 $lockedAlert,
                 403,
-                'You are not authorized to access alerts for this site.',
+                'You are not authorized to access this alert.',
             );
             if (! $lockedAlert->isActionable()) {
                 throw ValidationException::withMessages([

@@ -6,8 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Identity;
 use App\Models\Role;
 use App\Models\SsoGroupMapping;
+use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
 use App\Services\AzureAdGroupService;
+use App\Services\SsoGroupMappingLockService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Throwable;
 
@@ -41,7 +45,7 @@ class SsoGroupController extends Controller
             ->whereNotNull('access_token')
             ->first();
 
-        if (!$identity) {
+        if (! $identity) {
             return back()->with('error', 'No Microsoft identity found for your account. Please connect a Microsoft account first.');
         }
 
@@ -61,6 +65,7 @@ class SsoGroupController extends Controller
     public function store(Request $request)
     {
         $this->authorizeAccess($request);
+        $actorId = (int) $request->user()->id;
 
         $data = $request->validate([
             'provider' => 'required|in:microsoft,google',
@@ -71,7 +76,12 @@ class SsoGroupController extends Controller
             'auto_remove' => 'boolean',
         ]);
 
-        SsoGroupMapping::create($data);
+        DB::transaction(function () use ($actorId, $data): void {
+            app(SsoGroupMappingLockService::class)->lockMappingSet();
+            $this->lockMappingMutationActor($actorId, [(int) $data['role_id']]);
+
+            SsoGroupMapping::create($data);
+        });
 
         return back()->with('success', 'Group mapping created.');
     }
@@ -79,6 +89,8 @@ class SsoGroupController extends Controller
     public function update(Request $request, SsoGroupMapping $mapping)
     {
         $this->authorizeAccess($request);
+        $actorId = (int) $request->user()->id;
+        $mappingId = (int) $mapping->id;
 
         $data = $request->validate([
             'role_id' => 'required|exists:roles,id',
@@ -86,7 +98,18 @@ class SsoGroupController extends Controller
             'auto_remove' => 'boolean',
         ]);
 
-        $mapping->update($data);
+        DB::transaction(function () use ($actorId, $data, $mappingId): void {
+            $lockedMappings = app(SsoGroupMappingLockService::class)->lockMappingSet();
+            /** @var SsoGroupMapping|null $lockedMapping */
+            $lockedMapping = $lockedMappings->get($mappingId);
+            abort_unless($lockedMapping, 404);
+
+            $this->lockMappingMutationActor($actorId, [
+                (int) $lockedMapping->role_id,
+                (int) $data['role_id'],
+            ]);
+            $lockedMapping->update($data);
+        });
 
         return back()->with('success', 'Group mapping updated.');
     }
@@ -94,8 +117,18 @@ class SsoGroupController extends Controller
     public function destroy(Request $request, SsoGroupMapping $mapping)
     {
         $this->authorizeAccess($request);
+        $actorId = (int) $request->user()->id;
+        $mappingId = (int) $mapping->id;
 
-        $mapping->delete();
+        DB::transaction(function () use ($actorId, $mappingId): void {
+            $lockedMappings = app(SsoGroupMappingLockService::class)->lockMappingSet();
+            /** @var SsoGroupMapping|null $lockedMapping */
+            $lockedMapping = $lockedMappings->get($mappingId);
+            abort_unless($lockedMapping, 404);
+
+            $this->lockMappingMutationActor($actorId, [(int) $lockedMapping->role_id]);
+            $lockedMapping->delete();
+        });
 
         return back()->with('success', 'Group mapping deleted.');
     }
@@ -103,5 +136,20 @@ class SsoGroupController extends Controller
     private function authorizeAccess(Request $request): void
     {
         abort_unless($request->user()?->canDo('settings.access.manage'), 403);
+    }
+
+    /** @param list<int> $additionalRoleIds */
+    private function lockMappingMutationActor(int $actorId, array $additionalRoleIds): User
+    {
+        $lockedUsers = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+            [$actorId],
+            ['settings.access.manage'],
+            $additionalRoleIds,
+        );
+        /** @var User|null $actor */
+        $actor = $lockedUsers->get($actorId);
+        abort_unless($actor?->canDo('settings.access.manage'), 403);
+
+        return $actor;
     }
 }

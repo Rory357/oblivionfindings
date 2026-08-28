@@ -7,6 +7,7 @@ use App\Models\BillingEntry;
 use App\Models\Client;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Operations\ReportingService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -91,6 +92,9 @@ class ReportController extends Controller
         }
 
         $data['allowed_site_ids'] = $siteAccess->accessibleSiteIds($auth, $bypassPermissions);
+        $data['can_view_controlled_medications'] = $auth->canDo(
+            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+        );
 
         $reportData = match ($type) {
             'client-summary' => $this->clientSummary($orgId, $dateFrom, $dateTo, $data),
@@ -126,8 +130,8 @@ class ReportController extends Controller
         $query = BillingEntry::query()
             ->where('organization_id', $orgId)
             ->whereBetween('service_date', [$dateFrom, $dateTo])
-            ->when(!empty($filters['allowed_site_ids']), fn ($q) => $this->applyBillingSiteScope($q, $filters['allowed_site_ids']))
-            ->when(!empty($filters['client_id']), fn ($q) => $q->where('client_id', $filters['client_id']));
+            ->tap(fn ($q) => $this->applyBillingSiteScope($q, (array) ($filters['allowed_site_ids'] ?? [])))
+            ->when(! empty($filters['client_id']), fn ($q) => $q->where('client_id', $filters['client_id']));
 
         return [
             'total_clients' => (clone $query)->distinct('client_id')->count('client_id'),
@@ -146,8 +150,8 @@ class ReportController extends Controller
         $query = Timesheet::query()
             ->whereHas('client', fn ($q) => $q->where('organization_id', $orgId))
             ->whereBetween('work_date', [$dateFrom, $dateTo])
-            ->when(!empty($filters['allowed_site_ids']), fn ($q) => $this->applyTimesheetSiteScope($q, $filters['allowed_site_ids']))
-            ->when(!empty($filters['staff_id']), fn ($q) => $q->where('user_id', $filters['staff_id']));
+            ->tap(fn ($q) => $this->applyTimesheetSiteScope($q, (array) ($filters['allowed_site_ids'] ?? [])))
+            ->when(! empty($filters['staff_id']), fn ($q) => $q->where('user_id', $filters['staff_id']));
 
         $timesheets = (clone $query)->with('user:id,name')->get();
 
@@ -181,7 +185,7 @@ class ReportController extends Controller
         $query = BillingEntry::query()
             ->where('organization_id', $orgId)
             ->whereBetween('service_date', [$dateFrom, $dateTo])
-            ->when(!empty($filters['allowed_site_ids']), fn ($q) => $this->applyBillingSiteScope($q, $filters['allowed_site_ids']));
+            ->tap(fn ($q) => $this->applyBillingSiteScope($q, (array) ($filters['allowed_site_ids'] ?? [])));
 
         return [
             'total_entries' => (clone $query)->count(),
@@ -207,8 +211,8 @@ class ReportController extends Controller
         $query = BillingEntry::query()
             ->where('organization_id', $orgId)
             ->whereBetween('service_date', [$dateFrom, $dateTo])
-            ->when(!empty($filters['allowed_site_ids']), fn ($q) => $this->applyBillingSiteScope($q, $filters['allowed_site_ids']))
-            ->when(!empty($filters['client_id']), fn ($q) => $q->where('client_id', $filters['client_id']));
+            ->tap(fn ($q) => $this->applyBillingSiteScope($q, (array) ($filters['allowed_site_ids'] ?? [])))
+            ->when(! empty($filters['client_id']), fn ($q) => $q->where('client_id', $filters['client_id']));
 
         return [
             'total_hours' => (float) (clone $query)->sum('hours'),

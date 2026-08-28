@@ -19,7 +19,9 @@ use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertPriorityService;
 use App\Services\ControlRoom\AlertWorklistPresenter;
 use App\Services\ControlRoom\AlertWorkspaceService;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -138,7 +140,7 @@ class ControlRoomIncidentController extends Controller
     {
         $query = ControlRoomAlert::query();
         $siteAccess = $this->siteAccess();
-        $siteAccess->applyAlertScope($query, $user, $this->alertBypassPermissions());
+        app(ControlRoomAlertAccessService::class)->applyVisibleScope($query, $user);
 
         if (! empty($filters['site_id'])) {
             $siteAccess->applyAlertSiteScopeForSiteIds($query, [(int) $filters['site_id']]);
@@ -377,12 +379,29 @@ class ControlRoomIncidentController extends Controller
                 break;
 
             case 'medication_error':
-                $sourceQuery = MedicationError::query()->with('client.site');
-                $this->applyMedicationErrorScope($sourceQuery, $user);
+                $medicationScope = app(MedicationGovernanceScopeService::class);
+                $readerSiteIds = $medicationScope->readerSiteIds(
+                    $user,
+                    MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+                );
+                $sourceQuery = $medicationScope->scopeCanonicalClientMedicationRows(
+                    MedicationError::query()->with([
+                        'client.site',
+                        'medication' => fn ($query) => $query->withTrashed(),
+                    ]),
+                    $readerSiteIds,
+                );
+                if (! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
+                    $medicationScope->scopeWithoutControlledMedicationRows($sourceQuery);
+                }
                 $source = $sourceQuery->find($data['source_id']);
-                abort_unless($source, 403, 'You are not authorized to access that incident source.');
+                abort_unless($source, 404, 'The requested medication incident source was not found.');
                 $context['title'] = 'Medication Error: '.ucfirst(str_replace('_', ' ', $source->error_type ?? 'Unknown'));
                 $context['description'] = $source->description;
+                $context['normalized_data'] = [
+                    'client_medication_id' => $source->client_medication_id,
+                    'controlled_drug' => (bool) $source->medication?->controlled_drug,
+                ];
                 $alertType = 'medication_error';
                 $siteId = $source->client?->site_id;
                 $clientId = $source->client_id;
@@ -601,15 +620,6 @@ class ControlRoomIncidentController extends Controller
     protected function alertBypassPermissions(): array
     {
         return ['reports.viewAny'];
-    }
-
-    protected function applyMedicationErrorScope(Builder $query, User $user): Builder
-    {
-        return $query->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess()->applyClientScope(
-            $clientQuery,
-            $user,
-            $this->alertBypassPermissions(),
-        ));
     }
 
     protected function applySafeguardingScope(Builder $query, User $user): Builder

@@ -3,13 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Models\Client;
 use App\Models\FleetDriverSession;
 use App\Models\FleetDrivingMetric;
 use App\Models\FleetIncident;
 use App\Models\FleetTrip;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
 use App\Services\WorkstreamService;
@@ -17,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Inertia\Inertia;
 
 class StaffController extends Controller
 {
@@ -78,13 +80,13 @@ class StaffController extends Controller
 
         $rangeEnd = now()->addDays(14)->endOfDay();
 
-        $todayShifts = \App\Models\Shift::query()
+        $todayShifts = Shift::query()
             ->where('user_id', $user->id)
             ->whereBetween('starts_at', [$today, $tomorrow])
             ->orderBy('starts_at')
             ->get();
 
-        $upcomingShifts = \App\Models\Shift::query()
+        $upcomingShifts = Shift::query()
             ->where('user_id', $user->id)
             ->whereBetween('starts_at', [now(), $rangeEnd])
             ->orderBy('starts_at')
@@ -121,7 +123,7 @@ class StaffController extends Controller
             'myDayItems' => $myDayItems,
             'todayShifts' => $todayShifts,
             'upcomingShifts' => $upcomingShifts,
-            'fleet' => \Inertia\Inertia::optional(fn () => $this->buildFleetData($user)),
+            'fleet' => Inertia::optional(fn () => $this->buildFleetData($user)),
         ]);
     }
 
@@ -272,23 +274,61 @@ class StaffController extends Controller
             ? $this->currentAccessibleProfile($auth, $user->id)
             : null;
 
-        DB::transaction(function () use ($auth, $data, $profile, $profileData, $user): void {
-            $user->update([
+        $actorId = (int) $auth->id;
+        $targetId = (int) $user->id;
+        $profileId = $profile?->id;
+        $roleIds = collect($data['role_ids'] ?? [])
+            ->map(fn ($roleId): int => (int) $roleId)
+            ->filter(fn (int $roleId): bool => $roleId > 0)
+            ->unique()
+            ->sort()
+            ->values();
+        DB::transaction(function () use ($actorId, $data, $profileData, $profileId, $roleIds, $targetId): void {
+            $lockedUsers = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+                [$actorId, $targetId],
+                ['staff.update', 'sites.viewAll'],
+                $roleIds->all(),
+            );
+            /** @var User|null $lockedActor */
+            $lockedActor = $lockedUsers->get($actorId);
+            /** @var User|null $lockedUser */
+            $lockedUser = $lockedUsers->get($targetId);
+            abort_unless($lockedActor?->canDo('staff.update'), 403);
+            abort_unless($lockedUser, 404);
+            abort_if(
+                $lockedUser->hasRole('client', 'next_of_kin')
+                    || in_array($lockedUser->role, ['client', 'next_of_kin'], true),
+                404,
+            );
+            $lockedUser->update([
                 'name' => $data['name'],
                 'email' => $data['email'],
             ]);
 
             // Sync RBAC roles (optional)
             if (isset($data['role_ids'])) {
-                $user->roles()->sync($data['role_ids']);
+                $lockedUser->roles()->sync($roleIds->all());
 
                 // Keep legacy users.role in sync for existing UI checks
-                $first = $user->roles()->orderBy('id')->first();
-                $user->forceFill(['role' => $first?->name])->save();
+                $first = Role::query()
+                    ->whereIn('id', $roleIds->all())
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->first();
+                $lockedUser->forceFill(['role' => $first?->name])->save();
             }
 
-            if ($profile) {
-                $this->persistStaffProfile($profile, $user, $profileData, $auth->id);
+            if ($profileId) {
+                $profileQuery = HrEmployeeProfile::query()
+                    ->whereKey($profileId)
+                    ->where('user_id', $lockedUser->id);
+                app(UserSiteAccessService::class)->applyCurrentStaffProfileScope(
+                    $profileQuery,
+                    $lockedActor,
+                    ['sites.viewAll'],
+                );
+                $lockedProfile = $profileQuery->lockForUpdate()->firstOrFail();
+                $this->persistStaffProfile($lockedProfile, $lockedUser, $profileData, $lockedActor->id);
             }
         });
 
@@ -528,8 +568,7 @@ class StaffController extends Controller
         User $user,
         array $profileData,
         int $actorId,
-    ): void
-    {
+    ): void {
         $values = [
             'work_email' => $user->email,
             'updated_by' => $actorId,

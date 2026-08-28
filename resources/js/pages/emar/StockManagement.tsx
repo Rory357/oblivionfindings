@@ -16,7 +16,15 @@ import {
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import {
+    createMedicationMutationReplayState,
+    emarMutationWasAccepted,
+    prepareMedicationMutationReplayState,
+    submitEmarMutation,
+    type MedicationMutationReplayState,
+} from '@/lib/emar-offline';
+import {
     AdjustStockDialog,
+    ControlledPharmacyDeliveryDialog,
     NewPharmacyOrderDialog,
     ReceiveStockDialog,
     StockCountDialog,
@@ -25,6 +33,7 @@ import {
     type StockMed,
     type StockRow,
 } from '@/pages/emar/_stock-dialogs';
+import { pharmacyOrderAdvanceAction } from '@/pages/emar/medication-stock-governance';
 import { Head, router } from '@inertiajs/react';
 import {
     AlertOctagon,
@@ -47,7 +56,13 @@ import {
     User,
     X,
 } from 'lucide-react';
-import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+    useMemo,
+    useRef,
+    useState,
+    type MouseEvent as ReactMouseEvent,
+} from 'react';
+import { toast } from 'sonner';
 
 type ControlledRegisterRow = {
     id: number;
@@ -73,12 +88,14 @@ type OrderRow = {
     order_type: string | null;
     status: string;
     quantity_ordered: number | null;
-    quantity_received: number | null;
+    quantity_received: number | string | null;
     ordered_at: string | null;
     submitted_at: string | null;
     confirmed_at: string | null;
     dispensed_at: string | null;
     delivered_at: string | null;
+    batch_number: string | null;
+    batch_expiry: string | null;
 };
 
 type Props = {
@@ -102,6 +119,7 @@ type Props = {
 type Modal =
     | { type: 'order'; clientId?: number; medId?: number }
     | { type: 'receive'; medId?: number }
+    | { type: 'controlled-delivery'; order: OrderRow; item: StockRow }
     | { type: 'count'; medId?: number; controlledOnly?: boolean }
     | { type: 'adjust'; item: StockRow }
     | { type: 'detail'; item: StockRow }
@@ -167,6 +185,9 @@ export default function StockManagement({
         'all',
     );
     const [modal, setModal] = useState<Modal>(null);
+    const orderAdvanceReplay = useRef(
+        new Map<number, MedicationMutationReplayState>(),
+    );
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [dismissed, setDismissed] = useState<string[]>([]);
 
@@ -286,6 +307,9 @@ export default function StockManagement({
         e.preventDefault();
         const order = openOrderFor(s.medication_id);
         const canGovernBalance = !s.controlled || canRecordControlled;
+        const orderRow = openOrders.find(
+            (candidate) => candidate.medication_id === s.medication_id,
+        );
         const items: ShiftCtxItem[] = [
             {
                 icon: <Eye className="h-3.5 w-3.5" />,
@@ -325,11 +349,25 @@ export default function StockManagement({
                       {
                           icon: <Truck className="h-3.5 w-3.5" />,
                           label: 'Receive against order',
-                          onClick: () =>
+                          onClick: () => {
+                              if (
+                                  orderRow &&
+                                  pharmacyOrderAdvanceAction(orderRow) ===
+                                      'controlled-delivery'
+                              ) {
+                                  setModal({
+                                      type: 'controlled-delivery',
+                                      order: orderRow,
+                                      item: s,
+                                  });
+                                  return;
+                              }
+
                               setModal({
                                   type: 'receive',
                                   medId: s.medication_id,
-                              }),
+                              });
+                          },
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
@@ -534,21 +572,61 @@ export default function StockManagement({
         );
     }, [filtered]);
 
-    const advance = (id: number) =>
-        router.post(
-            `/emar/stock/pharmacy-orders/${id}/advance`,
-            {},
+    const advance = async (order: OrderRow) => {
+        if (pharmacyOrderAdvanceAction(order) === 'controlled-delivery') {
+            const item = stockItems.find(
+                (stock) => stock.medication_id === order.medication_id,
+            );
+            if (item && order.medication_id !== null) {
+                setModal({ type: 'controlled-delivery', order, item });
+                return;
+            }
+
+            router.visit('/emar/controlled');
+            return;
+        }
+
+        const currentReplay =
+            orderAdvanceReplay.current.get(order.id) ??
+            createMedicationMutationReplayState();
+        const preparedReplay = prepareMedicationMutationReplayState(
+            currentReplay,
             {
-                preserveScroll: true,
-                only: [
-                    'pharmacyOrders',
-                    'stockItems',
-                    'lowStockCount',
-                    'expiringCount',
-                    'expiredCount',
-                ],
+                pharmacy_order_id: order.id,
+                client_medication_id: order.medication_id,
+                current_status: order.status,
             },
         );
+        orderAdvanceReplay.current.set(order.id, preparedReplay);
+        try {
+            const result = await submitEmarMutation(
+                `/emar/stock/pharmacy-orders/${order.id}/advance`,
+                {
+                    expected_status: order.status,
+                    client_request_uuid: preparedReplay.uuid,
+                },
+                {
+                    action: 'stock_update',
+                    successMessage:
+                        NEXT_LABEL[order.status] ?? 'Order advanced',
+                },
+            );
+            if (emarMutationWasAccepted(result.status)) {
+                orderAdvanceReplay.current.delete(order.id);
+                router.reload({
+                    only: [
+                        'pharmacyOrders',
+                        'stockItems',
+                        'lowStockCount',
+                        'expiringCount',
+                        'expiredCount',
+                    ],
+                });
+            }
+        } catch {
+            toast.error('Could not advance the pharmacy order');
+        }
+    };
     // Site + Client round-trip to the server (the board is server-filtered on
     // those two only); search/chip/tab stay client-side over the loaded rows.
     const reload = (over: {
@@ -1228,7 +1306,7 @@ export default function StockManagement({
                                         o.status !== 'dispensed' ||
                                         !o.controlled ||
                                         canRecordControlled
-                                            ? () => advance(o.id)
+                                            ? () => advance(o)
                                             : undefined
                                     }
                                 />
@@ -1255,6 +1333,21 @@ export default function StockManagement({
                     onClose={() => setModal(null)}
                 />
             )}
+            {modal?.type === 'controlled-delivery' &&
+                modal.order.medication_id !== null && (
+                    <ControlledPharmacyDeliveryDialog
+                        order={{
+                            ...modal.order,
+                            medication_id: modal.order.medication_id,
+                            medication_name:
+                                modal.order.medication_name ??
+                                'Controlled drug',
+                        }}
+                        stockItem={modal.item}
+                        witnesses={witnesses}
+                        onClose={() => setModal(null)}
+                    />
+                )}
             {modal?.type === 'count' && (
                 <StockCountDialog
                     medications={controlledGovernedMedications}
@@ -1270,6 +1363,11 @@ export default function StockManagement({
                     <AdjustStockDialog
                         item={modal.item}
                         onClose={() => setModal(null)}
+                        onControlledCount={
+                            modal.item.controlled
+                                ? () => runCount(modal.item)
+                                : undefined
+                        }
                     />
                 )}
             {modal?.type === 'detail' && (

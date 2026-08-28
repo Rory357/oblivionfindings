@@ -358,6 +358,17 @@ function buildPortalNavItems(
     ];
 }
 
+function canAccessShiftHandovers(can?: any): boolean {
+    return (
+        !!can?.handovers?.viewAny ||
+        !!can?.shifts?.viewAny ||
+        !!can?.shifts?.manageAny ||
+        !!can?.shifts?.viewAssigned ||
+        !!can?.shifts?.update ||
+        !!can?.handovers?.create
+    );
+}
+
 function buildIconNavItems({
     role,
     can,
@@ -481,12 +492,10 @@ function buildIconNavItems({
     }
 
     const hasWorkforce =
-        !!can?.shifts?.viewAny ||
-        !!can?.shifts?.viewAssigned ||
+        canAccessShiftHandovers(can) ||
         !!can?.job_board?.viewAny ||
         !!can?.job_board?.claim ||
         !!can?.rostering?.viewAny ||
-        !!can?.handovers?.viewAny ||
         !!can?.timesheets?.viewAny ||
         !!can?.timesheets?.viewAssigned;
     if (hasWorkforce) {
@@ -512,7 +521,9 @@ function buildIconNavItems({
     const canAdminEmar =
         (can?.medications?.view && can?.medications?.ordersManage) ||
         (can?.medications?.view && can?.medications?.stockUpdate) ||
-        (can?.medications?.view && can?.medications?.controlledView) ||
+        (can?.medications?.view &&
+            can?.medications?.controlledView &&
+            can?.medications?.controlledRecord) ||
         can?.medications?.auditView ||
         can?.medications?.reportsExport ||
         can?.reports?.viewAny;
@@ -1005,7 +1016,7 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/operations/rostering?tab=availability',
             icon: Clock,
         });
-    if (can?.handovers?.viewAny || can?.shifts?.viewAny)
+    if (canAccessShiftHandovers(can))
         workforce.push({
             title: 'Handovers',
             href: '/operations/handovers',
@@ -1144,7 +1155,7 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/emar/audit',
             icon: Shield,
         });
-    if (can?.reports?.viewAny)
+    if (can?.reports?.viewAny || can?.medications?.reportsExport)
         compliance.push({
             title: 'Reports',
             href: '/emar/reports',

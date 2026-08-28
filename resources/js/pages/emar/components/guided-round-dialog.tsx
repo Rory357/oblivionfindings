@@ -17,7 +17,11 @@ import { MedsWizardDialog } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field, InfoCard, SelectInput } from '@/components/wizard/primitives';
-import { submitEmarMutation } from '@/lib/emar-offline';
+import {
+    emarMutationWasAccepted,
+    submitEmarMutation,
+} from '@/lib/emar-offline';
+import { createOfflineRequestUuid } from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
@@ -39,7 +43,7 @@ import {
     Users,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 type NotGivenReason = {
@@ -105,8 +109,13 @@ export default function GuidedRoundDialog({
     const [pulse, setPulse] = useState('');
     const [saving, setSaving] = useState(false);
     const [reRecording, setReRecording] = useState<Record<number, boolean>>({});
+    const administrationReplay = useRef({
+        uuid: createOfflineRequestUuid(),
+        fingerprint: null as string | null,
+    });
     const canRecordRound = guided.can_record && signer.med_competent;
     const canStartRound = guided.can_start && signer.med_competent;
+    const canCompleteRound = guided.can_complete && canRecordRound;
 
     const isSummary = stepIndex >= items.length;
     const item: RoundItem | undefined = items[stepIndex];
@@ -126,12 +135,20 @@ export default function GuidedRoundDialog({
 
     const goTo = (index: number) => {
         resetPanel();
+        administrationReplay.current = {
+            uuid: createOfflineRequestUuid(),
+            fingerprint: null,
+        };
         setIdentity(false);
         setStepIndex(index);
     };
 
     const startReRecord = (medicationId: number) => {
         resetPanel();
+        administrationReplay.current = {
+            uuid: createOfflineRequestUuid(),
+            fingerprint: null,
+        };
         setIdentity(false);
         setReRecording((prev) => ({ ...prev, [medicationId]: true }));
     };
@@ -168,6 +185,7 @@ export default function GuidedRoundDialog({
         if (!pending || !item) return false;
         if (pending === 'given') {
             if (item.requires_witness && !witnessedBy) return false;
+            if (item.requires_witness && !witnessCredential) return false;
             if (item.is_controlled && !quantityGiven) return false;
             if (item.requires_blood_glucose && !bloodGlucose) return false;
             if (item.requires_pulse && !pulse) return false;
@@ -187,7 +205,7 @@ export default function GuidedRoundDialog({
             return;
         }
         const medicationId = item.medication_id;
-        const payload = {
+        const materialPayload = {
             status: pending,
             scheduled_for: item.scheduled_for,
             reason: reason || null,
@@ -204,7 +222,21 @@ export default function GuidedRoundDialog({
                     ? Number(bloodGlucose)
                     : null,
             pulse_bpm: pending === 'given' && pulse ? Number(pulse) : null,
-            client_request_uuid: crypto.randomUUID(),
+        };
+        const materialFingerprint = JSON.stringify({
+            ...materialPayload,
+            witness_credential: undefined,
+        });
+        if (
+            administrationReplay.current.fingerprint !== null &&
+            administrationReplay.current.fingerprint !== materialFingerprint
+        ) {
+            administrationReplay.current.uuid = createOfflineRequestUuid();
+        }
+        administrationReplay.current.fingerprint = materialFingerprint;
+        const payload = {
+            ...materialPayload,
+            client_request_uuid: administrationReplay.current.uuid,
         };
         const advance = () => {
             setReRecording((prev) => {
@@ -219,45 +251,29 @@ export default function GuidedRoundDialog({
         };
 
         setSaving(true);
-
-        if (!navigator.onLine) {
-            try {
-                const result = await submitEmarMutation(
-                    `/emar/rounds/${round.id}/guided/items/${medicationId}`,
-                    payload,
-                    {
-                        action: 'round_admin',
-                        queuedMessage:
-                            'Dose saved on this device and queued to sync when you reconnect.',
-                    },
-                );
-
-                if (result.status === 'queued') {
-                    advance();
-                }
-            } catch {
-                toast.error('Could not save this dose offline');
-            } finally {
-                setSaving(false);
-            }
-
-            return;
-        }
-
-        router.post(
-            `/emar/rounds/${round.id}/guided/items/${medicationId}`,
-            payload,
-            {
-                preserveState: true,
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success(`Dose ${pending}`);
-                    advance();
+        try {
+            const result = await submitEmarMutation(
+                `/emar/rounds/${round.id}/guided/items/${medicationId}`,
+                payload,
+                {
+                    action: 'round_admin',
+                    allowQueueWhenOffline: !(
+                        pending === 'given' && item.requires_witness
+                    ),
+                    successMessage: `Dose ${pending}`,
+                    queuedMessage:
+                        'Dose saved on this device and queued to sync when you reconnect.',
                 },
-                onError: () => toast.error('Could not record this dose'),
-                onFinish: () => setSaving(false),
-            },
-        );
+            );
+
+            if (emarMutationWasAccepted(result.status)) {
+                advance();
+            }
+        } catch {
+            toast.error('Could not record this dose');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const finish = () => {
@@ -272,6 +288,8 @@ export default function GuidedRoundDialog({
                     toast.success('Round completed');
                     onClose();
                 },
+                onError: () =>
+                    toast.error('This round cannot be completed yet'),
                 onFinish: () => setSaving(false),
             },
         );
@@ -298,7 +316,7 @@ export default function GuidedRoundDialog({
 
     // ── Footer ──────────────────────────────────────────────────────────────
     const footer =
-        round.status === 'pending' ? (
+        round.status === 'pending' || round.status === 'partial' ? (
             <>
                 <Button variant="ghost" onClick={onClose} disabled={saving}>
                     Close
@@ -306,7 +324,9 @@ export default function GuidedRoundDialog({
                 {canStartRound ? (
                     <Button onClick={startRound} disabled={saving}>
                         <ArrowRight className="h-4 w-4" />
-                        Start round
+                        {round.status === 'partial'
+                            ? 'Resume round'
+                            : 'Start round'}
                     </Button>
                 ) : (
                     <span />
@@ -323,16 +343,20 @@ export default function GuidedRoundDialog({
                     <span />
                 )}
                 {canRecordRound ? (
-                    progress.pending === 0 ? (
+                    progress.pending === 0 && canCompleteRound ? (
                         <Button onClick={finish} disabled={saving}>
                             <Check className="h-4 w-4" />
                             Finish round
                         </Button>
-                    ) : (
+                    ) : progress.pending > 0 ? (
                         <Button onClick={goToFirstDue}>
                             <ArrowRight className="h-4 w-4" />
                             Go to next due
                         </Button>
+                    ) : (
+                        <span className="text-sm text-muted-foreground">
+                            Round completion is not available yet.
+                        </span>
                     )
                 ) : (
                     <Button variant="outline" onClick={onClose}>
@@ -384,14 +408,19 @@ export default function GuidedRoundDialog({
             onStepClick={(i) => goTo(i)}
             footer={footer}
         >
-            {round.status === 'pending' ? (
+            {round.status === 'pending' || round.status === 'partial' ? (
                 <div className="flex min-h-64 flex-col items-center justify-center gap-4 rounded-xl border bg-muted/30 p-8 text-center">
                     <Clock className="h-8 w-8 text-muted-foreground" />
                     <div>
-                        <div className="font-semibold">Ready to start</div>
+                        <div className="font-semibold">
+                            {round.status === 'partial'
+                                ? 'Ready to resume'
+                                : 'Ready to start'}
+                        </div>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Start this assigned round before recording its
-                            doses.
+                            {round.status === 'partial'
+                                ? 'Resume this assigned round before recording more doses.'
+                                : 'Start this assigned round before recording its doses.'}
                         </p>
                     </div>
                 </div>
@@ -399,6 +428,7 @@ export default function GuidedRoundDialog({
                 <SummaryPane
                     round={round}
                     progress={progress}
+                    canComplete={guided.can_complete}
                     entries={itemsToAuditEntries(items)}
                     meta={summaryMeta(guided)}
                 />
@@ -740,8 +770,8 @@ function ConfirmPanel(props: DosePaneProps) {
                 >
                     <Input
                         type="number"
-                        min={0.25}
-                        step={0.25}
+                        min={0.01}
+                        step={0.01}
                         value={quantityGiven}
                         onChange={(e) => setQuantityGiven(e.target.value)}
                         placeholder="e.g. 1"
@@ -924,15 +954,17 @@ function SummaryStat({
 function SummaryPane({
     round,
     progress,
+    canComplete,
     entries,
     meta,
 }: {
     round: GuidedRound['round'];
     progress: GuidedRound['progress'];
+    canComplete: boolean;
     entries: ReturnType<typeof itemsToAuditEntries>;
     meta: RoundAuditMeta;
 }) {
-    const done = progress.pending === 0;
+    const done = round.status === 'completed' || canComplete;
     return (
         <div className="flex flex-col gap-5">
             <div className="flex flex-col items-center gap-3 pt-1 text-center">
@@ -957,7 +989,9 @@ function SummaryPane({
                     <p className="mx-auto mt-1 max-w-[440px] text-[13px] leading-relaxed text-muted-foreground">
                         {done
                             ? `Every dose in ${round.name} has been recorded. Refusals and held doses are flagged for follow-up.`
-                            : `${progress.pending} dose${progress.pending === 1 ? '' : 's'} still to give in ${round.name}.`}
+                            : progress.pending > 0
+                              ? `${progress.pending} dose${progress.pending === 1 ? '' : 's'} still to give in ${round.name}.`
+                              : 'Round completion is not available yet.'}
                     </p>
                 </div>
             </div>

@@ -6,6 +6,7 @@ use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
+use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -28,6 +29,7 @@ class ControlRoomReportService
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
+        private readonly ControlRoomAlertAccessService $alertAccess,
     ) {
         $this->dbDriver = DB::connection()->getDriverName();
     }
@@ -35,9 +37,13 @@ class ControlRoomReportService
     /**
      * SLA compliance metrics.
      */
-    public function slaCompliance(Carbon $from, Carbon $to, int|array|null $siteId = null): array
-    {
-        $cycles = $this->slaCyclesInPeriod($from, $to, $siteId);
+    public function slaCompliance(
+        Carbon $from,
+        Carbon $to,
+        int|array|null $siteId = null,
+        ?User $viewer = null,
+    ): array {
+        $cycles = $this->slaCyclesInPeriod($from, $to, $siteId, $viewer);
         $totalWithSla = $cycles->count();
         $assessed = $cycles->where('assessed', true)->count();
         $breached = $cycles->where('breached', true)->count();
@@ -89,9 +95,13 @@ class ControlRoomReportService
      *
      * @return array<int, array{date: string, compliance_pct: int|null}>
      */
-    public function slaDailyTrend(Carbon $from, Carbon $to, int|array|null $siteId = null): array
-    {
-        return $this->slaCyclesInPeriod($from, $to, $siteId)
+    public function slaDailyTrend(
+        Carbon $from,
+        Carbon $to,
+        int|array|null $siteId = null,
+        ?User $viewer = null,
+    ): array {
+        return $this->slaCyclesInPeriod($from, $to, $siteId, $viewer)
             ->groupBy(fn (array $cycle): string => $cycle['started_at']->toDateString())
             ->sortKeys()
             ->map(function (Collection $cycles, string $date): array {
@@ -112,9 +122,13 @@ class ControlRoomReportService
     /**
      * Alert volume and distribution metrics.
      */
-    public function alertVolume(Carbon $from, Carbon $to, int|array|null $siteId = null): array
-    {
-        $query = $this->baseAlertQuery($from, $to, $siteId);
+    public function alertVolume(
+        Carbon $from,
+        Carbon $to,
+        int|array|null $siteId = null,
+        ?User $viewer = null,
+    ): array {
+        $query = $this->baseAlertQuery($from, $to, $siteId, $viewer);
 
         $total = (clone $query)->count();
         $resolved = (clone $query)->whereIn('status', ['resolved', 'closed'])->count();
@@ -162,9 +176,13 @@ class ControlRoomReportService
     /**
      * Escalation analysis metrics.
      */
-    public function escalationAnalysis(Carbon $from, Carbon $to, int|array|null $siteId = null): array
-    {
-        $query = $this->baseAlertQuery($from, $to, $siteId);
+    public function escalationAnalysis(
+        Carbon $from,
+        Carbon $to,
+        int|array|null $siteId = null,
+        ?User $viewer = null,
+    ): array {
+        $query = $this->baseAlertQuery($from, $to, $siteId, $viewer);
 
         $total = (clone $query)->count();
         $escalated = (clone $query)->where('escalation_level', '>', 0)->count();
@@ -196,13 +214,18 @@ class ControlRoomReportService
     /**
      * Workload distribution metrics.
      */
-    public function workloadDistribution(Carbon $from, Carbon $to, int|array|null $siteId = null): array
-    {
+    public function workloadDistribution(
+        Carbon $from,
+        Carbon $to,
+        int|array|null $siteId = null,
+        ?User $viewer = null,
+    ): array {
         // Active alerts per user (currently unresolved)
         $activePerUser = ControlRoomAlert::query()
             ->actionable()
             ->whereNotNull('assigned_to_user_id')
             ->tap(fn ($query) => $this->applySiteConstraint($query, $siteId))
+            ->tap(fn (Builder $query) => $this->applyViewerContentConstraint($query, $viewer))
             ->select('assigned_to_user_id', DB::raw('COUNT(*) as active_count'))
             ->groupBy('assigned_to_user_id')
             ->with('assignedTo:id,name')
@@ -218,7 +241,7 @@ class ControlRoomReportService
             ->toArray();
 
         // Alerts handled per user in period
-        $handledPerUser = $this->baseAlertQuery($from, $to, $siteId)
+        $handledPerUser = $this->baseAlertQuery($from, $to, $siteId, $viewer)
             ->whereNotNull('assigned_to_user_id')
             ->select('assigned_to_user_id', DB::raw('COUNT(*) as total_count'))
             ->groupBy('assigned_to_user_id')
@@ -237,7 +260,8 @@ class ControlRoomReportService
         // Alerts per queue (currently active)
         $perQueue = TriageQueue::active()
             ->withCount(['alerts as active_count' => fn ($q) => $q->actionable()
-                ->tap(fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId)),
+                ->tap(fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId))
+                ->tap(fn (Builder $alertQuery) => $this->applyViewerContentConstraint($alertQuery, $viewer)),
             ])
             ->orderBy('tier')
             ->get()
@@ -253,6 +277,7 @@ class ControlRoomReportService
             ->actionable()
             ->whereNull('assigned_to_user_id')
             ->tap(fn ($query) => $this->applySiteConstraint($query, $siteId))
+            ->tap(fn (Builder $query) => $this->applyViewerContentConstraint($query, $viewer))
             ->count();
 
         return [
@@ -270,12 +295,16 @@ class ControlRoomReportService
         Carbon $from,
         Carbon $to,
         int|array|null $siteId = null,
+        ?User $viewer = null,
     ): array {
         $runs = PlaybookRun::where('created_at', '>=', $from)
             ->where('created_at', '<=', $to)
-            ->when($siteId !== null, fn ($query) => $query->whereHas(
+            ->when($siteId !== null || $viewer !== null, fn ($query) => $query->whereHas(
                 'alert',
-                fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId),
+                function (Builder $alertQuery) use ($siteId, $viewer): void {
+                    $this->applySiteConstraint($alertQuery, $siteId);
+                    $this->applyViewerContentConstraint($alertQuery, $viewer);
+                },
             ))
             ->with('playbook:id,name');
 
@@ -327,12 +356,17 @@ class ControlRoomReportService
     /**
      * Site-level comparison metrics.
      */
-    public function siteComparison(Carbon $from, Carbon $to, int|array|null $siteId = null): array
-    {
+    public function siteComparison(
+        Carbon $from,
+        Carbon $to,
+        int|array|null $siteId = null,
+        ?User $viewer = null,
+    ): array {
         $query = ControlRoomAlert::query()
             ->where('triggered_at', '>=', $from)
             ->where('triggered_at', '<=', $to);
         $this->applySiteConstraint($query, $siteId);
+        $this->applyViewerContentConstraint($query, $viewer);
         $effectiveSiteExpression = $this->siteAccess->alertEffectiveSiteExpression($query);
 
         return $query
@@ -444,12 +478,17 @@ class ControlRoomReportService
     /**
      * Build a base alert query scoped to date range and optional site.
      */
-    protected function baseAlertQuery(Carbon $from, Carbon $to, int|array|null $siteId = null)
-    {
+    protected function baseAlertQuery(
+        Carbon $from,
+        Carbon $to,
+        int|array|null $siteId = null,
+        ?User $viewer = null,
+    ) {
         return ControlRoomAlert::query()
             ->where('triggered_at', '>=', $from)
             ->where('triggered_at', '<=', $to)
-            ->tap(fn ($query) => $this->applySiteConstraint($query, $siteId));
+            ->tap(fn ($query) => $this->applySiteConstraint($query, $siteId))
+            ->tap(fn (Builder $query) => $this->applyViewerContentConstraint($query, $viewer));
     }
 
     /**
@@ -493,6 +532,13 @@ class ControlRoomReportService
         );
     }
 
+    private function applyViewerContentConstraint(Builder $query, ?User $viewer): void
+    {
+        if ($viewer !== null) {
+            $this->alertAccess->applyControlledMedicationContentScope($query, $viewer);
+        }
+    }
+
     /**
      * Flatten the persisted current clock and immutable history snapshots into
      * one report row per SLA cycle. Report periods follow cycle start time, not
@@ -505,9 +551,13 @@ class ControlRoomReportService
         Carbon $from,
         Carbon $to,
         int|array|null $siteId,
+        ?User $viewer = null,
     ): Collection {
         return AlertSla::query()
-            ->whereHas('alert', fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId))
+            ->whereHas('alert', function (Builder $alertQuery) use ($siteId, $viewer): void {
+                $this->applySiteConstraint($alertQuery, $siteId);
+                $this->applyViewerContentConstraint($alertQuery, $viewer);
+            })
             ->with('alert:id,client_id,site_id,severity,status,triggered_at')
             ->get()
             ->flatMap(fn (AlertSla $sla) => $this->reportableSlaCycles($sla))

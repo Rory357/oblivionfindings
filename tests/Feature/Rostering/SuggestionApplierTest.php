@@ -60,7 +60,7 @@ it('does not bulk apply when accepted suggestions target the same shift', functi
 
     expect($results)->toMatchArray(['applied' => 0, 'stale' => 1, 'failed' => 0])
         ->and($shift->fresh()->user_id)->toBeNull()
-        ->and($duplicate->fresh()->status)->toBe(RosterSuggestion::STATUS_CONFLICTED);
+        ->and($duplicate->fresh()->status)->toBe(RosterSuggestion::STATUS_ACCEPTED);
 });
 
 it('does not bulk apply overlapping accepted suggestions for the same worker', function () {
@@ -120,7 +120,7 @@ it('does not bulk apply overlapping accepted suggestions for the same worker', f
     expect($results)->toMatchArray(['applied' => 0, 'stale' => 1, 'failed' => 0])
         ->and($firstShift->fresh()->user_id)->toBeNull()
         ->and($secondShift->fresh()->user_id)->toBeNull()
-        ->and($overlap->fresh()->status)->toBe(RosterSuggestion::STATUS_CONFLICTED);
+        ->and($overlap->fresh()->status)->toBe(RosterSuggestion::STATUS_ACCEPTED);
 });
 
 it('rejects a single stale suggestion when the shift was assigned before apply', function () {
@@ -155,5 +155,5 @@ it('rejects a single stale suggestion when the shift was assigned before apply',
     expect(fn () => (new RosterSuggestionApplier($eligibility, $lifecycle))->applyOne($suggestion, $actor))
         ->toThrow(ValidationException::class);
 
-    expect($suggestion->fresh()->status)->toBe(RosterSuggestion::STATUS_CONFLICTED);
+    expect($suggestion->fresh()->status)->toBe(RosterSuggestion::STATUS_ACCEPTED);
 });

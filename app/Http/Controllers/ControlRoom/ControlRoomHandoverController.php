@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Shift;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomHandoverScopeService;
 use App\Services\ControlRoom\ControlRoomPreparedHandoverSnapshotService;
 use App\Services\UserSiteAccessService;
@@ -19,6 +20,7 @@ class ControlRoomHandoverController extends Controller
     public function show(
         Request $request,
         Shift $shift,
+        ControlRoomAlertAccessService $alertAccess,
         ControlRoomHandoverScopeService $handoverScope,
         ControlRoomPreparedHandoverSnapshotService $preparedSnapshots,
     ) {
@@ -35,6 +37,10 @@ class ControlRoomHandoverController extends Controller
             abort_unless($this->canViewPreparedSnapshot($shift, $user), 403);
             try {
                 $snapshot = $preparedSnapshots->validated($shift);
+                if (! $this->canViewPreparedSnapshotContent($snapshot, $user, $handoverScope)) {
+                    $snapshot = null;
+                    $snapshotIssue = 'Your current access no longer covers every alert included in this handover.';
+                }
             } catch (ValidationException $exception) {
                 $snapshot = null;
                 $snapshotIssue = (string) collect($exception->errors())->flatten()->first();
@@ -108,10 +114,20 @@ class ControlRoomHandoverController extends Controller
         $openAlertsCount = $requiredAlerts->count() + (int) $carryForward['total'];
 
         $pinnedNotes = $snapshotIssue === null
-            ? $this->notes($shift, fn ($query) => $query->where('is_pinned', true))
+            ? $this->notes(
+                $shift,
+                $user,
+                $alertAccess,
+                fn ($query) => $query->where('is_pinned', true),
+            )
             : [];
         $followupNotes = $snapshotIssue === null
-            ? $this->notes($shift, fn ($query) => $query->where('requires_followup', true)->orderBy('followup_at'))
+            ? $this->notes(
+                $shift,
+                $user,
+                $alertAccess,
+                fn ($query) => $query->where('requires_followup', true)->orderBy('followup_at'),
+            )
             : [];
 
         $staff = User::staff()
@@ -145,10 +161,20 @@ class ControlRoomHandoverController extends Controller
     }
 
     /** @return list<array<string, mixed>> */
-    private function notes(Shift $shift, callable $scope): array
-    {
+    private function notes(
+        Shift $shift,
+        User $viewer,
+        ControlRoomAlertAccessService $alertAccess,
+        callable $scope,
+    ): array {
         return OperatorNote::query()
             ->where('shift_id', $shift->id)
+            ->where(function ($notes) use ($viewer, $alertAccess): void {
+                $notes->whereNull('alert_id')
+                    ->orWhereHas('alert', function ($alerts) use ($viewer, $alertAccess): void {
+                        $alertAccess->applyReadableScope($alerts, $viewer);
+                    });
+            })
             ->tap($scope)
             ->with('user:id,name')
             ->orderByDesc('created_at')
@@ -196,6 +222,29 @@ class ControlRoomHandoverController extends Controller
             ->where('auditable_id', $shift->id)
             ->where('user_id', $user->id)
             ->exists();
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private function canViewPreparedSnapshotContent(
+        array $snapshot,
+        User $user,
+        ControlRoomHandoverScopeService $handoverScope,
+    ): bool {
+        $snapshotAlertIds = collect($snapshot['required_alert_ids'])
+            ->merge($snapshot['carry_forward_alert_ids'])
+            ->merge($snapshot['note_alert_ids'])
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+        $visibleAlertIds = $handoverScope
+            ->visibleAlertIds($user, $snapshotAlertIds)
+            ->sort()
+            ->values()
+            ->all();
+
+        return $visibleAlertIds === $snapshotAlertIds;
     }
 
     /** @return array<string, mixed> */

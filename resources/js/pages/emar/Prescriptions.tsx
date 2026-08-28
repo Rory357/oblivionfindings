@@ -6,11 +6,9 @@ import {
     countersignHoursLeft,
     needsCountersign,
     orderStatusTone,
-    type ClientOption,
     type CovertAuth,
     type MedOption,
     type PrescriptionOrder,
-    type StaffOption,
 } from '@/components/emar/prescriptions/types';
 import { PageHero, type PageHeroStat } from '@/components/page';
 import {
@@ -24,11 +22,16 @@ import {
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import {
+    CancelOrderDialog,
+    clientsAllowedForPrescriberOrder,
     CountersignDialog,
     CovertDialog,
     DispenseDialog,
     LinkMarDialog,
     NewOrderDialog,
+    RevokeCovertDialog,
+    type SiteBoundClientOption,
+    type SiteBoundStaffOption,
 } from '@/pages/emar/_prescription-dialogs';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -54,24 +57,53 @@ import {
     type MouseEvent as ReactMouseEvent,
 } from 'react';
 
+type GovernedPrescriptionOrder = PrescriptionOrder & {
+    controlled_drug_snapshot: boolean | null;
+    is_open_lifecycle: boolean;
+    can_confirm: boolean;
+    can_countersign: boolean;
+    can_dispense: boolean;
+    can_link: boolean;
+    can_cancel: boolean;
+};
+
+type GovernedCovertAuth = CovertAuth & {
+    client_medication_id: number;
+    can_revoke: boolean;
+};
+
+type GovernedMedOption = MedOption & {
+    controlled_drug: boolean;
+    can_create_covert_authorisation: boolean;
+    can_link_prescriber_order: boolean;
+};
+
 type Modal =
     | { type: 'order' }
     | { type: 'covert' }
     | {
-          type: 'detail' | 'countersign' | 'dispense' | 'link';
-          order: PrescriptionOrder;
+          type: 'detail' | 'countersign' | 'dispense' | 'link' | 'cancel';
+          order: GovernedPrescriptionOrder;
       }
+    | { type: 'revoke'; authorisation: GovernedCovertAuth }
     | null;
 
 type Props = {
-    orders: PrescriptionOrder[];
-    covert: CovertAuth[];
-    clients: ClientOption[];
-    staff: StaffOption[];
-    medications: MedOption[];
+    orders: GovernedPrescriptionOrder[];
+    covert: GovernedCovertAuth[];
+    clients: SiteBoundClientOption[];
+    staff: SiteBoundStaffOption[];
+    medications: GovernedMedOption[];
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
+    can: {
+        manage_orders: boolean;
+        verify_orders: boolean;
+    };
+    can_create_manual_order: boolean;
+    can_create_covert: boolean;
+    current_user_id: number;
 };
 
 const STATUS_FILTERS = [
@@ -128,7 +160,7 @@ function ctxTag(o: PrescriptionOrder): {
     tagBg: string;
     tagColor: string;
 } {
-    if (needsCountersign(o)) {
+    if (isAwaitingCountersign(o)) {
         const hrs = countersignHoursLeft(o);
         if (hrs !== null && hrs < 0)
             return {
@@ -176,6 +208,10 @@ function ctxTag(o: PrescriptionOrder): {
     }
 }
 
+function isAwaitingCountersign(o: PrescriptionOrder): boolean {
+    return o.status === 'pending' && needsCountersign(o);
+}
+
 /** Standard empty state: icon + message + optional CTA (parity with shared idiom). */
 function EmptyState({
     icon: Icon,
@@ -211,6 +247,10 @@ export default function Prescriptions(props: Props) {
         sites,
         active_site: activeSite,
         site_brand_colour: brandColour,
+        can,
+        can_create_manual_order: canCreateManualOrder,
+        can_create_covert: canCreateCovert,
+        current_user_id: currentUserId,
     } = props;
 
     const [activeTab, setActiveTab] = useState('orders');
@@ -223,6 +263,25 @@ export default function Prescriptions(props: Props) {
     const [modal, setModal] = useState<Modal>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+    const canConfirmOrder = (order: GovernedPrescriptionOrder) =>
+        can.verify_orders && order.can_confirm && order.status === 'pending';
+    const canCountersignOrder = (order: GovernedPrescriptionOrder) =>
+        can.manage_orders &&
+        can.verify_orders &&
+        order.can_countersign &&
+        isAwaitingCountersign(order);
+    const canDispenseOrder = (order: GovernedPrescriptionOrder) =>
+        can.manage_orders &&
+        order.can_dispense &&
+        order.status === 'confirmed' &&
+        order.order_type !== 'cease';
+    const canLinkOrder = (order: GovernedPrescriptionOrder) =>
+        can.manage_orders && order.can_link && order.status === 'pending';
+    const canCancelOrder = (order: GovernedPrescriptionOrder) =>
+        can.manage_orders && order.can_cancel && order.status === 'pending';
+    const canRevokeCovert = (authorisation: GovernedCovertAuth) =>
+        can.manage_orders && authorisation.can_revoke;
 
     const onSite = (id: number | null) => {
         setSiteFilter(id);
@@ -246,23 +305,27 @@ export default function Prescriptions(props: Props) {
     // badges and alert strip always reflect the true site totals; the footer
     // search/client filters only narrow the rendered rows (parity with PRN).
     const counts = useMemo(() => {
-        const awaiting = orders.filter(needsCountersign);
+        const awaiting = orders.filter(isAwaitingCountersign);
         return {
             awaiting: awaiting.length,
             overdue: awaiting.filter((o) => (countersignHoursLeft(o) ?? 1) < 0)
                 .length,
-            active: orders.filter((o) =>
-                ['pending', 'confirmed'].includes(o.status),
+            active: orders.filter((o) => o.is_open_lifecycle).length,
+            toDispense: orders.filter(
+                (o) =>
+                    can.manage_orders &&
+                    o.can_dispense &&
+                    o.status === 'confirmed' &&
+                    o.order_type !== 'cease',
             ).length,
-            toDispense: orders.filter((o) => o.status === 'confirmed').length,
             covert: covert.length,
         };
-    }, [orders, covert]);
+    }, [orders, covert, can.manage_orders]);
 
     // Footer match — client + free-text search, applied to every tab's rows.
     const matchesFooter = useMemo(() => {
         const q = search.toLowerCase().trim();
-        return (o: PrescriptionOrder) => {
+        return (o: GovernedPrescriptionOrder) => {
             if (clientFilter && o.client_id !== clientFilter) return false;
             if (
                 q &&
@@ -285,13 +348,21 @@ export default function Prescriptions(props: Props) {
         [orders, statusFilter, matchesFooter],
     );
     const awaitingOrders = useMemo(
-        () => orders.filter((o) => needsCountersign(o) && matchesFooter(o)),
+        () =>
+            orders.filter((o) => isAwaitingCountersign(o) && matchesFooter(o)),
         [orders, matchesFooter],
     );
     const toDispense = useMemo(
         () =>
-            orders.filter((o) => o.status === 'confirmed' && matchesFooter(o)),
-        [orders, matchesFooter],
+            orders.filter(
+                (o) =>
+                    can.manage_orders &&
+                    o.can_dispense &&
+                    o.status === 'confirmed' &&
+                    o.order_type !== 'cease' &&
+                    matchesFooter(o),
+            ),
+        [orders, matchesFooter, can.manage_orders],
     );
     const dispensed = useMemo(
         () =>
@@ -314,13 +385,16 @@ export default function Prescriptions(props: Props) {
         );
     }, [covert, search, clientFilter]);
 
-    const covertFor = (o: PrescriptionOrder): CovertAuth | null =>
-        covert.find(
-            (c) =>
-                c.client_id === o.client_id &&
-                (c.medication_name ?? '').toLowerCase() ===
-                    (o.medication_name ?? '').toLowerCase(),
-        ) ?? null;
+    const covertFor = (
+        o: GovernedPrescriptionOrder,
+    ): GovernedCovertAuth | null =>
+        o.client_medication_id
+            ? (covert.find(
+                  (c) =>
+                      c.client_id === o.client_id &&
+                      c.client_medication_id === o.client_medication_id,
+              ) ?? null)
+            : null;
     const linkedMedName = (o: PrescriptionOrder): string | null =>
         o.client_medication_id
             ? (medications.find((m) => m.id === o.client_medication_id)?.name ??
@@ -379,22 +453,22 @@ export default function Prescriptions(props: Props) {
         },
     ];
 
-    const confirm = (o: PrescriptionOrder) =>
-        router.put(
-            `/emar/prescriptions/${o.id}`,
-            { status: 'confirmed' },
-            { preserveScroll: true },
-        );
-    const cancel = (o: PrescriptionOrder) =>
-        router.delete(`/emar/prescriptions/${o.id}`, { preserveScroll: true });
-    const revoke = (c: CovertAuth) =>
+    const confirm = (o: GovernedPrescriptionOrder) => {
+        if (!canConfirmOrder(o)) return;
+
         router.post(
-            `/emar/prescriptions/covert/${c.id}/revoke`,
+            `/emar/prescriptions/${o.id}/confirm`,
             {},
             { preserveScroll: true },
         );
+    };
+    const openRevoke = (c: GovernedCovertAuth) => {
+        if (!canRevokeCovert(c)) return;
 
-    const openDetail = (o: PrescriptionOrder) =>
+        setModal({ type: 'revoke', authorisation: c });
+    };
+
+    const openDetail = (o: GovernedPrescriptionOrder) =>
         setModal({ type: 'detail', order: o });
     const rowKey = (fn: () => void) => (e: ReactKeyboardEvent) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -404,7 +478,7 @@ export default function Prescriptions(props: Props) {
     };
 
     // Right-click context menu on an order row (any tab) — mirrors PRN openRowCtx.
-    const openRowCtx = (e: ReactMouseEvent, o: PrescriptionOrder) => {
+    const openRowCtx = (e: ReactMouseEvent, o: GovernedPrescriptionOrder) => {
         e.preventDefault();
         const t = ctxTag(o);
         const items: ShiftCtxItem[] = [
@@ -415,7 +489,7 @@ export default function Prescriptions(props: Props) {
                 tone: 'primary',
                 onClick: () => openDetail(o),
             },
-            ...(needsCountersign(o)
+            ...(canCountersignOrder(o)
                 ? [
                       {
                           icon: <PenTool className="h-3.5 w-3.5" />,
@@ -426,7 +500,7 @@ export default function Prescriptions(props: Props) {
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            ...(o.status === 'pending' && !needsCountersign(o)
+            ...(canConfirmOrder(o)
                 ? [
                       {
                           icon: <FileText className="h-3.5 w-3.5" />,
@@ -435,7 +509,7 @@ export default function Prescriptions(props: Props) {
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            ...(o.status === 'confirmed'
+            ...(canDispenseOrder(o)
                 ? [
                       {
                           icon: <Package className="h-3.5 w-3.5" />,
@@ -445,7 +519,7 @@ export default function Prescriptions(props: Props) {
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            ...(['pending', 'confirmed'].includes(o.status)
+            ...(canLinkOrder(o)
                 ? [
                       {
                           icon: <Link2 className="h-3.5 w-3.5" />,
@@ -466,14 +540,14 @@ export default function Prescriptions(props: Props) {
                 label: 'Open on MAR chart',
                 onClick: () => router.visit(`/clients/${o.client_id}/mar`),
             },
-            ...(['pending', 'confirmed'].includes(o.status)
+            ...(canCancelOrder(o)
                 ? [
                       { sep: true } satisfies ShiftCtxItem,
                       {
                           icon: <Ban className="h-3.5 w-3.5" />,
                           label: 'Cancel order',
                           tone: 'critical',
-                          onClick: () => cancel(o),
+                          onClick: () => setModal({ type: 'cancel', order: o }),
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
@@ -490,7 +564,7 @@ export default function Prescriptions(props: Props) {
     };
 
     // Lighter context menu for a covert authorisation card (not an order row).
-    const openCovertCtx = (e: ReactMouseEvent, c: CovertAuth) => {
+    const openCovertCtx = (e: ReactMouseEvent, c: GovernedCovertAuth) => {
         e.preventDefault();
         const items: ShiftCtxItem[] = [
             {
@@ -504,13 +578,17 @@ export default function Prescriptions(props: Props) {
                 label: 'Open on MAR chart',
                 onClick: () => router.visit(`/clients/${c.client_id}/mar`),
             },
-            { sep: true },
-            {
-                icon: <Ban className="h-3.5 w-3.5" />,
-                label: 'Revoke authorisation',
-                tone: 'critical',
-                onClick: () => revoke(c),
-            },
+            ...(canRevokeCovert(c)
+                ? [
+                      { sep: true } satisfies ShiftCtxItem,
+                      {
+                          icon: <Ban className="h-3.5 w-3.5" />,
+                          label: 'Revoke authorisation',
+                          tone: 'critical',
+                          onClick: () => openRevoke(c),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
         ];
         setCtx({
             x: e.clientX,
@@ -602,21 +680,25 @@ export default function Prescriptions(props: Props) {
                     stats={heroStats}
                     actions={
                         <>
-                            <Button
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                onClick={() => setModal({ type: 'order' })}
-                            >
-                                <Plus className="h-4 w-4" />
-                                New prescriber order
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                onClick={() => setModal({ type: 'covert' })}
-                            >
-                                <ShieldCheck className="h-4 w-4" />
-                                New covert authorisation
-                            </Button>
+                            {can.manage_orders && canCreateManualOrder && (
+                                <Button
+                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                    onClick={() => setModal({ type: 'order' })}
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    New prescriber order
+                                </Button>
+                            )}
+                            {can.manage_orders && canCreateCovert && (
+                                <Button
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                    onClick={() => setModal({ type: 'covert' })}
+                                >
+                                    <ShieldCheck className="h-4 w-4" />
+                                    New covert authorisation
+                                </Button>
+                            )}
                         </>
                     }
                     footer={
@@ -864,7 +946,9 @@ export default function Prescriptions(props: Props) {
                                                             <span className="text-status-success">
                                                                 ✓ Signed
                                                             </span>
-                                                        ) : (
+                                                        ) : canCountersignOrder(
+                                                              o,
+                                                          ) ? (
                                                             <Button
                                                                 size="sm"
                                                                 variant={
@@ -889,32 +973,45 @@ export default function Prescriptions(props: Props) {
                                                                     ? 'Overdue — sign'
                                                                     : `Sign · ${hrs}h`}
                                                             </Button>
+                                                        ) : (
+                                                            <span
+                                                                className={
+                                                                    o.status ===
+                                                                    'pending'
+                                                                        ? 'text-status-warning'
+                                                                        : 'text-muted-foreground'
+                                                                }
+                                                            >
+                                                                {o.status ===
+                                                                'pending'
+                                                                    ? 'Awaiting'
+                                                                    : 'Not signed'}
+                                                            </span>
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
                                                         <div className="flex items-center justify-end gap-1">
-                                                            {o.status ===
-                                                                'pending' &&
-                                                                !needsCountersign(
-                                                                    o,
-                                                                ) && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        onClick={(
-                                                                            e,
-                                                                        ) => {
-                                                                            e.stopPropagation();
-                                                                            confirm(
-                                                                                o,
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        Confirm
-                                                                    </Button>
-                                                                )}
-                                                            {o.status ===
-                                                                'confirmed' && (
+                                                            {canConfirmOrder(
+                                                                o,
+                                                            ) && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={(
+                                                                        e,
+                                                                    ) => {
+                                                                        e.stopPropagation();
+                                                                        confirm(
+                                                                            o,
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    Confirm
+                                                                </Button>
+                                                            )}
+                                                            {canDispenseOrder(
+                                                                o,
+                                                            ) && (
                                                                 <Button
                                                                     size="sm"
                                                                     variant="ghost"
@@ -934,11 +1031,8 @@ export default function Prescriptions(props: Props) {
                                                                     Dispense
                                                                 </Button>
                                                             )}
-                                                            {[
-                                                                'pending',
-                                                                'confirmed',
-                                                            ].includes(
-                                                                o.status,
+                                                            {canLinkOrder(
+                                                                o,
                                                             ) && (
                                                                 <Button
                                                                     size="sm"
@@ -959,11 +1053,8 @@ export default function Prescriptions(props: Props) {
                                                                     <Link2 className="h-3.5 w-3.5" />
                                                                 </Button>
                                                             )}
-                                                            {[
-                                                                'pending',
-                                                                'confirmed',
-                                                            ].includes(
-                                                                o.status,
+                                                            {canCancelOrder(
+                                                                o,
                                                             ) && (
                                                                 <Button
                                                                     size="sm"
@@ -973,8 +1064,11 @@ export default function Prescriptions(props: Props) {
                                                                         e,
                                                                     ) => {
                                                                         e.stopPropagation();
-                                                                        cancel(
-                                                                            o,
+                                                                        setModal(
+                                                                            {
+                                                                                type: 'cancel',
+                                                                                order: o,
+                                                                            },
                                                                         );
                                                                     }}
                                                                 >
@@ -1072,18 +1166,20 @@ export default function Prescriptions(props: Props) {
                                                     />
                                                 </div>
                                             </div>
-                                            <Button
-                                                className="mt-1"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setModal({
-                                                        type: 'countersign',
-                                                        order: o,
-                                                    });
-                                                }}
-                                            >
-                                                Countersign now
-                                            </Button>
+                                            {canCountersignOrder(o) && (
+                                                <Button
+                                                    className="mt-1"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setModal({
+                                                            type: 'countersign',
+                                                            order: o,
+                                                        });
+                                                    }}
+                                                >
+                                                    Countersign now
+                                                </Button>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -1221,10 +1317,15 @@ export default function Prescriptions(props: Props) {
                             <EmptyState
                                 icon={ShieldCheck}
                                 message="No active covert authorisations."
-                                cta={{
-                                    label: 'New covert authorisation',
-                                    onClick: () => setModal({ type: 'covert' }),
-                                }}
+                                cta={
+                                    can.manage_orders && canCreateCovert
+                                        ? {
+                                              label: 'New covert authorisation',
+                                              onClick: () =>
+                                                  setModal({ type: 'covert' }),
+                                          }
+                                        : undefined
+                                }
                             />
                         ) : (
                             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -1272,13 +1373,15 @@ export default function Prescriptions(props: Props) {
                                                 ? ' · Overdue'
                                                 : ''}
                                         </div>
-                                        <Button
-                                            variant="outline"
-                                            className="mt-1 text-status-critical"
-                                            onClick={() => revoke(c)}
-                                        >
-                                            Revoke authorisation
-                                        </Button>
+                                        {canRevokeCovert(c) && (
+                                            <Button
+                                                variant="outline"
+                                                className="mt-1 text-status-critical"
+                                                onClick={() => openRevoke(c)}
+                                            >
+                                                Revoke authorisation
+                                            </Button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -1338,25 +1441,33 @@ export default function Prescriptions(props: Props) {
                 )}
             </div>
 
-            {modal?.type === 'order' && (
-                <NewOrderDialog
-                    clients={clients}
-                    staff={staff}
-                    onClose={() => setModal(null)}
-                />
-            )}
-            {modal?.type === 'covert' && (
-                <CovertDialog
-                    clients={clients}
-                    medications={medications}
-                    onClose={() => setModal(null)}
-                />
-            )}
+            {can.manage_orders &&
+                canCreateManualOrder &&
+                modal?.type === 'order' && (
+                    <NewOrderDialog
+                        clients={clientsAllowedForPrescriberOrder(clients)}
+                        staff={staff}
+                        currentUserId={currentUserId}
+                        onClose={() => setModal(null)}
+                    />
+                )}
+            {can.manage_orders &&
+                canCreateCovert &&
+                modal?.type === 'covert' && (
+                    <CovertDialog
+                        clients={clients}
+                        medications={medications}
+                        onClose={() => setModal(null)}
+                    />
+                )}
             {modal?.type === 'detail' && (
                 <OrderDetailDialog
                     order={modal.order}
                     covert={covertFor(modal.order)}
                     linkedMedName={linkedMedName(modal.order)}
+                    canCountersign={canCountersignOrder(modal.order)}
+                    canDispense={canDispenseOrder(modal.order)}
+                    canLink={canLinkOrder(modal.order)}
                     onClose={() => setModal(null)}
                     onCountersign={() =>
                         setModal({ type: 'countersign', order: modal.order })
@@ -1369,26 +1480,39 @@ export default function Prescriptions(props: Props) {
                     }
                 />
             )}
-            {modal?.type === 'countersign' && (
-                <CountersignDialog
-                    order={modal.order}
-                    onClose={() => setModal(null)}
-                />
-            )}
-            {modal?.type === 'dispense' && (
+            {modal?.type === 'countersign' &&
+                canCountersignOrder(modal.order) && (
+                    <CountersignDialog
+                        order={modal.order}
+                        onClose={() => setModal(null)}
+                    />
+                )}
+            {modal?.type === 'dispense' && canDispenseOrder(modal.order) && (
                 <DispenseDialog
                     order={modal.order}
-                    staff={staff}
                     onClose={() => setModal(null)}
                 />
             )}
-            {modal?.type === 'link' && (
+            {modal?.type === 'link' && canLinkOrder(modal.order) && (
                 <LinkMarDialog
                     order={modal.order}
                     medications={medications}
                     onClose={() => setModal(null)}
                 />
             )}
+            {modal?.type === 'cancel' && canCancelOrder(modal.order) && (
+                <CancelOrderDialog
+                    order={modal.order}
+                    onClose={() => setModal(null)}
+                />
+            )}
+            {modal?.type === 'revoke' &&
+                canRevokeCovert(modal.authorisation) && (
+                    <RevokeCovertDialog
+                        authorisation={modal.authorisation}
+                        onClose={() => setModal(null)}
+                    />
+                )}
             {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
     );

@@ -3,7 +3,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { canRenderMedicationDiscontinue as canRenderClientDiscontinue } from '@/pages/clients/medical';
 import { DiscontinueDialog } from '@/pages/emar/_dialogs';
+import { canRenderMedicationDiscontinue as canRenderOperationsDiscontinue } from '@/pages/operations/clients/medical';
 
 const inertia = vi.hoisted(() => ({
     post: vi.fn(),
@@ -79,7 +81,10 @@ describe('medication order discontinuation', () => {
             expect(source).toContain('!m.ceased_at');
             expect(source).toContain('auth?.can?.medications?.view');
             expect(source).toContain('auth?.can?.medications?.ordersManage');
-            expect(source).toContain('canDiscontinue &&');
+            expect(source).toContain('canRenderMedicationDiscontinue(');
+            expect(source).toContain('can_controlled_view');
+            expect(source).toContain('can_controlled_record');
+            expect(source).toContain('medications.map');
             expect(source).not.toMatch(/medForm\.delete\(/);
             expect(source).not.toMatch(/medications\/\$\{m\.id\}`/);
         }
@@ -92,5 +97,42 @@ describe('medication order discontinuation', () => {
         expect(detailSource).toContain('maxLength={255}');
         expect(detailSource).toContain("medication.state === 'ceased'");
         expect(detailSource).toContain('medication.ceased_reason');
+    });
+
+    it('requires both controlled capabilities for a controlled discontinue affordance', () => {
+        for (const canRender of [
+            canRenderClientDiscontinue,
+            canRenderOperationsDiscontinue,
+        ]) {
+            // Base view + orders.manage remains sufficient for ordinary rows.
+            expect(
+                canRender(true, false, false, { controlled_drug: false }),
+            ).toBe(true);
+
+            // View + orders.manage + controlled.view must not disclose a
+            // controlled mutation without controlled.record as well.
+            expect(
+                canRender(true, true, false, { controlled_drug: true }),
+            ).toBe(false);
+            expect(
+                canRender(true, false, true, { controlled_drug: true }),
+            ).toBe(false);
+
+            // Exact dual controlled authority enables the row action.
+            expect(canRender(true, true, true, { controlled_drug: true })).toBe(
+                true,
+            );
+            expect(
+                canRender(true, true, true, { is_controlled_drug: true }),
+            ).toBe(true);
+
+            // Controlled authority never substitutes for the base gate.
+            expect(
+                canRender(false, true, true, { controlled_drug: false }),
+            ).toBe(false);
+            expect(
+                canRender(false, true, true, { controlled_drug: true }),
+            ).toBe(false);
+        }
     });
 });

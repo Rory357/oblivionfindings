@@ -206,4 +206,54 @@ class SignalProcessingTransitionTest extends TestCase
             'higher-severity correlated signal should raise the alert severity',
         );
     }
+
+    public function test_correlated_signal_cannot_downgrade_a_controlled_content_marker(): void
+    {
+        $shiftSignals = app(ShiftSignalService::class);
+        $type = SignalType::query()->create([
+            'code' => ShiftSignalService::TYPE_LATE_START,
+            'name' => 'Late Start',
+            'category' => 'operations',
+            'default_severity' => 'medium',
+        ]);
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'shift_operations',
+            'alert_type' => $shiftSignals->alertTypeForSignalType(ShiftSignalService::TYPE_LATE_START),
+            'severity' => 'medium',
+            'triggered_at' => now()->subMinutes(5),
+            'context' => [
+                'signal_type_code' => ShiftSignalService::TYPE_LATE_START,
+                'normalized_data' => [
+                    'shift_id' => 177,
+                    'controlled_drug' => true,
+                    'medication_name' => 'Restricted historical medicine',
+                ],
+            ],
+        ]);
+        $signal = Signal::query()->create([
+            'signal_source_id' => $this->shiftSource->id,
+            'signal_type_id' => $type->id,
+            'signal_type_code' => ShiftSignalService::TYPE_LATE_START,
+            'idempotency_key' => 'shift-177-late-start-refresh',
+            'severity_hint' => 'medium',
+            'occurred_at' => now(),
+            'payload' => [],
+            'normalized_data' => ['shift_id' => 177],
+            'status' => 'pending',
+        ]);
+        SignalRule::query()->create([
+            'name' => 'Sticky controlled classification',
+            'signal_type_id' => $type->id,
+            'signal_type_code' => ShiftSignalService::TYPE_LATE_START,
+            'priority' => 1,
+            'deduplicate' => true,
+            'dedup_window_minutes' => 30,
+            'is_active' => true,
+        ]);
+
+        $result = $this->service->process($signal);
+
+        $this->assertTrue($result?->is($alert));
+        $this->assertTrue(data_get($alert->fresh()->context, 'normalized_data.controlled_drug'));
+    }
 }

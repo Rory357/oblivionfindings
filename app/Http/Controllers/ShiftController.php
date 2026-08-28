@@ -32,6 +32,7 @@ use App\Services\CoverageReservationService;
 use App\Services\Eligibility\AssignmentEligibilityGateway;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationTimelineVisibilityService;
 use App\Services\NotificationService;
 use App\Services\ServiceContextResolver;
 use App\Services\ShiftAssignmentRecommendationService;
@@ -53,7 +54,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpFoundation\Response;
 
 class ShiftController extends Controller
 {
@@ -312,6 +312,8 @@ class ShiftController extends Controller
         $canRecordMedications = $auth->canDo('medications.administer.record');
         $canRecordControlledMedications = $canRecordMedications
             && $auth->canDo('medications.controlled.record');
+        $canAccessControlledMedications = $auth->canDo('medications.controlled.view')
+            || $canRecordControlledMedications;
         $canViewForms = $auth->canDo('custom_forms.viewAny')
             || $auth->canDo('custom_forms.submit');
         $canSubmitForms = $auth->canDo('custom_forms.submit');
@@ -351,12 +353,13 @@ class ShiftController extends Controller
 
         // Timeline events linked to this shift. Notes are split out for the
         // notes tab; the complete event stream powers the audit timeline.
-        $timelineEvents = TimelineEvent::query()
+        $timelineQuery = TimelineEvent::query()
             ->where('shift_id', $shift->id)
             ->orderByDesc('occurred_at')
             ->with(['actor:id,name'])
-            ->limit(100)
-            ->get();
+            ->limit(100);
+        app(MedicationTimelineVisibilityService::class)->applyVisibleScope($timelineQuery, $auth);
+        $timelineEvents = $timelineQuery->get();
         $noteEvents = $timelineEvents
             ->filter(fn (TimelineEvent $event) => $event->source_type === ClientNote::class
                 || in_array($event->type, ['note', 'shift_note', 'progress_note', 'handover', 'daily_note', 'quick'], true))
@@ -405,9 +408,16 @@ class ShiftController extends Controller
                 $shiftDate,
                 now($scheduleService->workerTimezone()),
                 $shift->id,
+                $canAccessControlledMedications,
             );
 
-            $shiftMedicationSummary = app(EnhancedMarService::class)->getShiftSummary($shift->id);
+            $shiftMedicationSummary = app(EnhancedMarService::class)->getShiftSummary(
+                $shift->id,
+                $canAccessControlledMedications,
+                (int) $shift->client_id,
+                (int) $shift->site_id,
+                is_numeric($shift->user_id) ? (int) $shift->user_id : null,
+            );
 
             $medicationSummary = [
                 'stats' => $mar['stats'],
@@ -1983,80 +1993,45 @@ class ShiftController extends Controller
         // Only allow assigning staff users
         $this->assertCanAssignShiftToUser($auth, (int) $data['user_id']);
 
-        $assignment = DB::transaction(function () use ($auth, $data, $shift) {
-            $lockedShift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
-            $this->assertCanAccessShift($auth, $lockedShift);
-
-            if (in_array($lockedShift->status, ['completed', 'cancelled'], true)) {
-                throw ValidationException::withMessages([
-                    'user_id' => 'This shift was changed by another scheduler and can no longer be assigned.',
-                ]);
-            }
-
-            $assignee = User::staff()->lockForUpdate()->findOrFail($data['user_id']);
-            $this->assertCanAssignShiftToUser($auth, (int) $assignee->id);
-
-            $decision = app(AssignmentEligibilityGateway::class)->decide($lockedShift, $assignee);
-            if ($decision->result?->hasBlocks()) {
-                session()->flash(
-                    'compliance_warnings',
-                    $decision->result->toArray()['compliance_warnings'] ?? [],
-                );
-            }
-            $decision->assertMayAssign(
-                'user_id',
-                'This staff member cannot be assigned to the shift.',
+        // Read-only preview for responsive warning UX. The lifecycle service
+        // repeats the complete decision after its canonical Client/Shift and
+        // current User/RBAC/Profile/Site locks; this snapshot never authorizes
+        // the write and deliberately acquires no Shift row lock.
+        $assignee = User::staff()->findOrFail($data['user_id']);
+        $decision = app(AssignmentEligibilityGateway::class)->decide($shift, $assignee);
+        if ($decision->result?->hasBlocks()) {
+            session()->flash(
+                'compliance_warnings',
+                $decision->result->toArray()['compliance_warnings'] ?? [],
             );
-
-            $overrideData = null;
-            if ($decision->isWarning()) {
-                $eligibility = $decision->result;
-                if (empty($data['override_acknowledged'])) {
-                    return back()
-                        ->with('eligibility_result', $eligibility?->toArray() ?? [])
-                        ->with('assignment_warnings', $eligibility?->warnings ?? [])
-                        ->withInput();
-                }
-
-                if (! empty($eligibility?->overrideable_warnings)) {
-                    abort_unless(
-                        $auth->canDo('shifts.overrideEligibility'),
-                        403,
-                        'You do not have permission to override eligibility warnings.',
-                    );
-
-                    if (empty(trim($data['override_reason'] ?? ''))) {
-                        return back()->withErrors([
-                            'override_reason' => 'A reason is required when overriding eligibility warnings.',
-                        ])->with('eligibility_result', $eligibility->toArray())->withInput();
-                    }
-
-                    $overrideData = [
-                        'user_id' => (int) $assignee->id,
-                        'overridden_by' => $auth->id,
-                        'override_reason' => trim($data['override_reason']),
-                        'rules_overridden' => collect($eligibility->overrideable_warnings)->pluck('rule')->values()->all(),
-                        'acknowledged_warnings' => $eligibility->overrideable_warnings,
-                    ];
-                }
-            }
-
-            $reservation = app(CoverageReservationService::class)
-                ->reserveForAssignment($lockedShift, $auth, 'assignment');
-
-            return app(ShiftLifecycleService::class)->assign(
-                $lockedShift,
-                $auth,
-                $assignee,
-                $overrideData,
-                $reservation,
-                $decision,
-            );
-        });
-
-        if ($assignment instanceof Response) {
-            return $assignment;
         }
+        $decision->assertMayAssign(
+            'user_id',
+            'This staff member cannot be assigned to the shift.',
+        );
+
+        if ($decision->isWarning() && empty($data['override_acknowledged'])) {
+            $eligibility = $decision->result;
+
+            return back()
+                ->with('eligibility_result', $eligibility?->toArray() ?? [])
+                ->with('assignment_warnings', $eligibility?->warnings ?? [])
+                ->withInput();
+        }
+
+        $overrideRequest = [
+            'override_acknowledged' => (bool) ($data['override_acknowledged'] ?? false),
+            'override_reason' => trim((string) ($data['override_reason'] ?? '')),
+        ];
+
+        $assignment = app(ShiftLifecycleService::class)->assign(
+            $shift,
+            $auth,
+            $assignee,
+            $overrideRequest,
+            eligibilityDecision: $decision,
+            reservationReason: 'assignment',
+        );
 
         return redirect($data['return_to'] ?? url('/operations/rostering'))->with('success', 'Shift assigned.');
     }
@@ -2115,29 +2090,23 @@ class ShiftController extends Controller
             }
         }
 
-        $assignee = $best ?? $fallback;
+        if (! $best && $fallback) {
+            return back()->with('warning', 'Only candidates with eligibility warnings were found. Review and assign one manually.');
+        }
 
+        $assignee = $best;
         if (! $assignee) {
             return back()->with('warning', 'No eligible candidate was found for auto-fill.');
         }
 
-        $reservation = app(CoverageReservationService::class)->reserveForAssignment($shift, $auth, 'auto_fill');
-        try {
-            app(ShiftLifecycleService::class)->assign(
-                $shift,
-                $auth,
-                $assignee,
-                null,
-                $reservation,
-            );
-        } catch (\Throwable $e) {
-            app(CoverageReservationService::class)->release($reservation);
-            throw $e;
-        }
+        app(ShiftLifecycleService::class)->assign(
+            $shift,
+            $auth,
+            $assignee,
+            reservationReason: 'auto_fill',
+        );
 
-        $message = $best
-            ? "Auto-filled with {$assignee->name}."
-            : "Auto-filled with {$assignee->name} (warnings present — review on the shift detail).";
+        $message = "Auto-filled with {$assignee->name}.";
 
         $returnTo = $data['return_to'] ?? url('/operations/rostering');
 

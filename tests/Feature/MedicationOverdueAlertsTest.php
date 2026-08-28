@@ -1,8 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
-use App\Models\Client;
 use App\Models\MedicationRound;
 use App\Models\Permission;
 use App\Models\Role;
@@ -27,8 +28,22 @@ afterEach(function () {
 });
 
 it('sends overdue medication alerts from missed scheduled slots without pending administration rows', function () {
+    $this->seed(RbacSeeder::class);
+
     $worker = User::factory()->frontlineWorker()->create();
     $site = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => now()->subYear()->toDateString(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+    $viewPermission = Permission::query()->where('key', 'medications.view')->firstOrFail();
+    $worker->permissionOverrides()->syncWithoutDetaching([
+        $viewPermission->id => ['allowed' => true],
+    ]);
     $client = Client::factory()->create([
         'site_id' => $site->id,
         'first_name' => 'Mere',
@@ -64,21 +79,20 @@ it('sends overdue medication alerts from missed scheduled slots without pending 
     Notification::assertSentTo(
         $worker,
         MedicationOverdueNotification::class,
-        fn (MedicationOverdueNotification $notification) =>
-            $notification->medication === $medication->name
+        fn (MedicationOverdueNotification $notification) => $notification->medication === $medication->name
             && $notification->clientName === 'Mere Wilson'
             && $notification->scheduledTime === '09:00'
             && $notification->clientId === $client->id,
     );
 });
 
-it('site-scopes low-stock alerts: org-wide recipients get all, site-restricted recipients only their site', function () {
+it('site-scopes low-stock alerts: explicit all-site recipients get all, site-restricted recipients only their site', function () {
     $this->seed(RbacSeeder::class);
 
     $siteA = Site::factory()->create();
     $siteB = Site::factory()->create();
 
-    // Org-wide recipient (admin holds reports.viewAny → unrestricted).
+    // The admin role holds the explicit medication Site bypass.
     $admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
     $admin->roles()->syncWithoutDetaching([Role::where('name', 'admin')->first()->id]);
 
@@ -86,7 +100,7 @@ it('site-scopes low-stock alerts: org-wide recipients get all, site-restricted r
     // medications.view. (There is no users.site_id column — site access is
     // resolved from the employee profile.)
     $siteAWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    \App\Domain\Hr\Models\HrEmployeeProfile::query()->create([
+    HrEmployeeProfile::query()->create([
         'tenant_id' => 1,
         'user_id' => $siteAWorker->id,
         'employee_number' => 'EMP-'.$siteAWorker->id,
@@ -119,4 +133,85 @@ it('site-scopes low-stock alerts: org-wide recipients get all, site-restricted r
     Notification::assertSentTo($admin, MedicationStockLowNotification::class);
     // …the Site-A-only worker does not.
     Notification::assertNotSentTo($siteAWorker, MedicationStockLowNotification::class);
+});
+
+it('fails closed when a low-stock recipient has no accessible Site even with report permission', function () {
+    $this->seed(RbacSeeder::class);
+
+    $site = Site::factory()->create();
+    $recipient = User::factory()->create(['approved_at' => now()]);
+    $permissionIds = Permission::query()
+        ->whereIn('key', ['medications.view', 'reports.viewAny'])
+        ->pluck('id');
+    $recipient->permissionOverrides()->sync(
+        $permissionIds->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all(),
+    );
+
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $medication = ClientMedication::factory()->create([
+        'client_id' => $client->id,
+        'active' => true,
+        'state' => 'active',
+    ]);
+    ClientMedicationStock::create([
+        'client_medication_id' => $medication->id,
+        'on_hand' => 1,
+        'reorder_level' => 10,
+        'unit' => 'tablets',
+    ]);
+
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+
+    Notification::assertNotSentTo($recipient, MedicationStockLowNotification::class);
+});
+
+it('conceals controlled low-stock notifications without exact controlled-view permission', function () {
+    $this->seed(RbacSeeder::class);
+
+    $site = Site::factory()->create();
+    $ordinaryRecipient = User::factory()->create(['approved_at' => now()]);
+    $controlledRecipient = User::factory()->create(['approved_at' => now()]);
+
+    foreach ([$ordinaryRecipient, $controlledRecipient] as $recipient) {
+        HrEmployeeProfile::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $recipient->id,
+            'employee_number' => 'EMP-'.$recipient->id,
+            'work_email' => $recipient->email,
+            'position_title' => 'Support Worker',
+            'position_role' => 'support_worker',
+            'employment_type' => 'full_time',
+            'start_date' => now()->subYear()->toDateString(),
+            'primary_site_id' => $site->id,
+            'is_active' => true,
+        ]);
+    }
+
+    $viewPermission = Permission::where('key', 'medications.view')->firstOrFail();
+    $controlledPermission = Permission::where('key', 'medications.controlled.view')->firstOrFail();
+    $ordinaryRecipient->permissionOverrides()->sync([$viewPermission->id => ['allowed' => true]]);
+    $controlledRecipient->permissionOverrides()->sync([
+        $viewPermission->id => ['allowed' => true],
+        $controlledPermission->id => ['allowed' => true],
+    ]);
+
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $medication = ClientMedication::factory()->create([
+        'client_id' => $client->id,
+        'name' => 'Controlled stock',
+        'controlled_drug' => true,
+        'active' => true,
+        'state' => 'active',
+    ]);
+    ClientMedicationStock::create([
+        'client_medication_id' => $medication->id,
+        'on_hand' => 1,
+        'reorder_level' => 10,
+        'unit' => 'tablets',
+    ]);
+
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+
+    Notification::assertNotSentTo($ordinaryRecipient, MedicationStockLowNotification::class);
+    Notification::assertSentTo($controlledRecipient, MedicationStockLowNotification::class);
 });

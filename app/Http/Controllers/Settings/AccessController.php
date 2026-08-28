@@ -7,7 +7,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\AuditLogger;
+use App\Services\AuthorizationEvidenceLockService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class AccessController extends Controller
@@ -31,7 +34,7 @@ class AccessController extends Controller
             $pairs = $u->permissionOverrides()
                 ->select('permissions.id', 'permissions.key', 'permission_user.allowed')
                 ->get()
-                ->mapWithKeys(fn($p) => [$p->id => (bool) $p->pivot->allowed])
+                ->mapWithKeys(fn ($p) => [$p->id => (bool) $p->pivot->allowed])
                 ->toArray();
             $userOverrides[$u->id] = $pairs;
         }
@@ -63,48 +66,25 @@ class AccessController extends Controller
             'overrides.*' => ['in:inherit,allow,deny'],
         ]);
 
-        // Roles
-        $roleIds = $data['role_ids'] ?? [];
-        $target->roles()->sync($roleIds);
+        $actorId = (int) $user->id;
+        $targetId = (int) $target->id;
+        $roleIds = $this->normalizedRoleIds($data);
+        DB::transaction(function () use ($actorId, $data, $roleIds, $targetId): void {
+            [$lockedActor, $lockedTarget] = $this->lockAccessMutationUsers($actorId, $targetId, $roleIds);
+            $this->applyAccessChanges($lockedTarget, $data);
 
-        // Keep legacy users.role in sync (the React UI still references auth.user.role
-        // and some screens list users.role).
-        $primaryRoleName = null;
-        if (!empty($roleIds)) {
-            $primaryRoleName = Role::query()
-                ->whereIn('id', $roleIds)
-                ->orderBy('id')
-                ->value('name');
-        }
-        $target->forceFill([
-            'role' => $primaryRoleName ?? ($target->role ?? 'support_worker'),
-        ])->save();
-
-        \App\Services\AuditLogger::log('rbac.roles.updated', $target, [
-            'roles' => $roleIds,
-            'changed_by' => $request->user()->id,
-        ]);
-
-        // Overrides (grant/deny wins over role perms)
-        $overrides = $data['overrides'] ?? [];
-        foreach ($overrides as $permissionId => $mode) {
-            if ($mode === 'inherit') {
-                $target->permissionOverrides()->detach($permissionId);
-                continue;
-            }
-            $allowed = $mode === 'allow';
-            $pid = (int) $permissionId;
-            // Ensure row exists, then update the pivot value.
-            $target->permissionOverrides()->syncWithoutDetaching([$pid]);
-            $target->permissionOverrides()->updateExistingPivot($pid, ['allowed' => $allowed]);
-        }
-
-        if (!empty($overrides)) {
-            \App\Services\AuditLogger::log('rbac.permission.override', $target, [
-                'overrides' => $overrides,
-                'changed_by' => $request->user()->id,
+            AuditLogger::log('rbac.roles.updated', $lockedTarget, [
+                'roles' => $data['role_ids'] ?? [],
+                'changed_by' => $lockedActor->id,
             ]);
-        }
+
+            if (! empty($data['overrides'] ?? [])) {
+                AuditLogger::log('rbac.permission.override', $lockedTarget, [
+                    'overrides' => $data['overrides'],
+                    'changed_by' => $lockedActor->id,
+                ]);
+            }
+        });
 
         return redirect()->back()->with('success', 'Access updated.');
     }
@@ -122,34 +102,44 @@ class AccessController extends Controller
             'overrides.*' => ['in:inherit,allow,deny'],
         ]);
 
-        // Roles + overrides use the same logic as update.
-        $this->applyAccessChanges($target, $data);
+        $actorId = (int) $user->id;
+        $targetId = (int) $target->id;
+        $roleIds = $this->normalizedRoleIds($data);
+        DB::transaction(function () use ($actorId, $data, $roleIds, $targetId): void {
+            [$lockedActor, $lockedTarget] = $this->lockAccessMutationUsers($actorId, $targetId, $roleIds);
+            $this->applyAccessChanges($lockedTarget, $data);
 
-        $target->forceFill([
-            'approved_at' => $target->approved_at ?? now(),
-            'approved_by' => $target->approved_by ?? $user->id,
-        ])->save();
+            $lockedTarget->forceFill([
+                'approved_at' => $lockedTarget->approved_at ?? now(),
+                'approved_by' => $lockedTarget->approved_by ?? $lockedActor->id,
+            ])->save();
 
-        \App\Services\AuditLogger::log('rbac.user.approved', $target, [
-            'approved_by' => $user->id,
-            'roles_assigned' => $data['role_ids'] ?? [],
-        ]);
+            AuditLogger::log('rbac.user.approved', $lockedTarget, [
+                'approved_by' => $lockedActor->id,
+                'roles_assigned' => $data['role_ids'] ?? [],
+            ]);
+        });
 
         return redirect()->back()->with('success', 'User approved.');
     }
 
     private function applyAccessChanges(User $target, array $data): void
     {
+        if (DB::transactionLevel() < 1) {
+            throw new \LogicException('Access changes must hold the authorization mutex.');
+        }
+
         // Roles
-        $roleIds = $data['role_ids'] ?? [];
+        $roleIds = $this->normalizedRoleIds($data);
         $target->roles()->sync($roleIds);
 
         // Keep legacy users.role in sync (React UI still references auth.user.role)
         $primaryRoleName = null;
-        if (!empty($roleIds)) {
+        if (! empty($roleIds)) {
             $primaryRoleName = Role::query()
                 ->whereIn('id', $roleIds)
                 ->orderBy('id')
+                ->lockForUpdate()
                 ->value('name');
         }
 
@@ -162,6 +152,7 @@ class AccessController extends Controller
         foreach ($overrides as $permissionId => $mode) {
             if ($mode === 'inherit') {
                 $target->permissionOverrides()->detach($permissionId);
+
                 continue;
             }
             $allowed = $mode === 'allow';
@@ -189,35 +180,65 @@ class AccessController extends Controller
             'term_end' => ['nullable', 'date', 'after:term_start'],
         ]);
 
-        $existing = BoardMember::withTrashed()
-            ->where('user_id', $data['user_id'])
-            ->first();
+        $actorId = (int) $user->id;
+        $targetId = (int) $data['user_id'];
+        $roleMap = $this->boardRoleMap();
+        $boardRoleNames = array_values(array_unique($roleMap));
+        $selectedRoleName = $roleMap[$data['board_role']] ?? 'board_member';
+        $selectedRoleId = (int) Role::query()->where('name', $selectedRoleName)->value('id');
+        abort_unless($selectedRoleId > 0, 404);
+        DB::transaction(function () use (
+            $actorId,
+            $boardRoleNames,
+            $data,
+            $selectedRoleId,
+            $selectedRoleName,
+            $targetId,
+        ): void {
+            [, $targetUser] = $this->lockAccessMutationUsers($actorId, $targetId, [$selectedRoleId]);
+            $lockedSelectedRole = Role::query()
+                ->whereKey($selectedRoleId)
+                ->lockForUpdate()
+                ->first();
+            abort_unless(
+                $lockedSelectedRole instanceof Role
+                    && (string) $lockedSelectedRole->name === $selectedRoleName,
+                409,
+                'The requested board role changed. Please retry.',
+            );
+            $currentBoardRoleIds = $targetUser->roles
+                ->filter(fn (Role $role): bool => in_array((string) $role->name, $boardRoleNames, true))
+                ->pluck('id')
+                ->map(fn ($roleId): int => (int) $roleId)
+                ->all();
+            $existing = BoardMember::withTrashed()
+                ->where('user_id', $targetId)
+                ->lockForUpdate()
+                ->first();
 
-        if ($existing) {
-            $existing->restore();
-            $existing->update([
-                'board_role' => $data['board_role'],
-                'term_start' => $data['term_start'],
-                'term_end' => $data['term_end'] ?? null,
-                'is_active' => true,
-                'is_independent' => true,
-            ]);
-        } else {
-            BoardMember::create([
-                'user_id' => $data['user_id'],
-                'board_role' => $data['board_role'],
-                'term_start' => $data['term_start'],
-                'term_end' => $data['term_end'] ?? null,
-                'is_active' => true,
-                'is_independent' => true,
-            ]);
-        }
+            if ($existing) {
+                $existing->restore();
+                $existing->update([
+                    'board_role' => $data['board_role'],
+                    'term_start' => $data['term_start'],
+                    'term_end' => $data['term_end'] ?? null,
+                    'is_active' => true,
+                    'is_independent' => true,
+                ]);
+            } else {
+                BoardMember::create([
+                    'user_id' => $targetId,
+                    'board_role' => $data['board_role'],
+                    'term_start' => $data['term_start'],
+                    'term_end' => $data['term_end'] ?? null,
+                    'is_active' => true,
+                    'is_independent' => true,
+                ]);
+            }
 
-        // Auto-assign the corresponding system role for governance permissions
-        $targetUser = User::find($data['user_id']);
-        if ($targetUser) {
-            $this->assignBoardRole($targetUser, $data['board_role']);
-        }
+            $targetUser->roles()->detach($currentBoardRoleIds);
+            $targetUser->roles()->syncWithoutDetaching([$selectedRoleId]);
+        });
 
         return redirect()->back()->with('success', 'Board member appointed.');
     }
@@ -227,52 +248,75 @@ class AccessController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('settings.access.manage'), 403);
 
-        $targetUser = $boardMember->user;
-
-        $boardMember->update(['is_active' => false]);
-        $boardMember->delete();
-
-        // Remove the board role from the user
-        if ($targetUser) {
-            $this->removeBoardRole($targetUser);
-        }
+        $actorId = (int) $user->id;
+        $targetId = (int) $boardMember->user_id;
+        $boardMemberId = (int) $boardMember->id;
+        $boardRoleNames = array_values(array_unique($this->boardRoleMap()));
+        DB::transaction(function () use ($actorId, $boardMemberId, $boardRoleNames, $targetId): void {
+            [, $targetUser] = $this->lockAccessMutationUsers($actorId, $targetId, []);
+            $currentBoardRoleIds = $targetUser->roles
+                ->filter(fn (Role $role): bool => in_array((string) $role->name, $boardRoleNames, true))
+                ->pluck('id')
+                ->map(fn ($roleId): int => (int) $roleId)
+                ->all();
+            $lockedBoardMember = BoardMember::withTrashed()
+                ->whereKey($boardMemberId)
+                ->where('user_id', $targetId)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $lockedBoardMember->update(['is_active' => false]);
+            $lockedBoardMember->delete();
+            $targetUser->roles()->detach($currentBoardRoleIds);
+        });
 
         return redirect()->back()->with('success', 'Board member removed.');
     }
 
-    /**
-     * Map board_role to system role name and assign it to the user.
-     */
-    private function assignBoardRole(User $user, string $boardRole): void
+    /** @return array<string, string> */
+    private function boardRoleMap(): array
     {
-        $roleMap = [
+        return [
             'chair' => 'board_chair',
             'secretary' => 'board_secretary',
             'treasurer' => 'board_member', // Treasurer uses board_member role
             'member' => 'board_member',
             'observer' => 'board_observer',
         ];
+    }
 
-        $systemRoleName = $roleMap[$boardRole] ?? 'board_member';
-        $role = Role::where('name', $systemRoleName)->first();
-
-        if ($role) {
-            // Remove any existing board roles first
-            $this->removeBoardRole($user);
-
-            // Add the new board role
-            $user->roles()->attach($role->id);
-        }
+    /** @return list<int> */
+    private function normalizedRoleIds(array $data): array
+    {
+        return collect($data['role_ids'] ?? [])
+            ->map(fn ($roleId): int => (int) $roleId)
+            ->filter(fn (int $roleId): bool => $roleId > 0)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
     }
 
     /**
-     * Remove all board-related roles from a user.
+     * @param  list<int>  $additionalRoleIds
+     * @return array{0: User, 1: User}
      */
-    private function removeBoardRole(User $user): void
-    {
-        $boardRoleNames = ['board_chair', 'board_secretary', 'board_member', 'board_observer'];
-        $boardRoleIds = Role::whereIn('name', $boardRoleNames)->pluck('id');
+    private function lockAccessMutationUsers(
+        int $actorId,
+        int $targetId,
+        array $additionalRoleIds,
+    ): array {
+        $lockedUsers = app(AuthorizationEvidenceLockService::class)->lockForUsers(
+            [$actorId, $targetId],
+            ['settings.access.manage'],
+            $additionalRoleIds,
+        );
+        /** @var User|null $actor */
+        $actor = $lockedUsers->get($actorId);
+        /** @var User|null $target */
+        $target = $lockedUsers->get($targetId);
+        abort_unless($actor?->canDo('settings.access.manage'), 403);
+        abort_unless($target, 404);
 
-        $user->roles()->detach($boardRoleIds);
+        return [$actor, $target];
     }
 }

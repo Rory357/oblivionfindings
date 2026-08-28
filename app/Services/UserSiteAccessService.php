@@ -19,6 +19,7 @@ use App\Models\Timesheet;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class UserSiteAccessService
 {
@@ -790,16 +791,37 @@ class UserSiteAccessService
             }
         }
 
-        if ($siteId === null || ! Site::query()
-            ->active()
-            ->notArchived()
-            ->whereNull('archived_at')
-            ->whereKey($siteId)
-            ->exists()) {
+        if ($siteId === null) {
             throw new \LogicException('Attendance-session Site provenance is unavailable.');
         }
 
-        return $siteId;
+        return $this->activeAttendanceSiteId($siteId);
+    }
+
+    /**
+     * Re-read the canonical active Site and join its row lock whenever an
+     * attendance command is already transactional. This makes Site archival
+     * serialize with attendance/projection writes without changing read-only
+     * resolver behavior.
+     */
+    public function activeAttendanceSiteId(int $siteId): int
+    {
+        $query = Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereKey($siteId);
+
+        if (DB::transactionLevel() > 0) {
+            $query->lockForUpdate();
+        }
+
+        $site = $query->first(['id']);
+        if (! $site) {
+            throw new \LogicException('Attendance-session Site provenance is unavailable.');
+        }
+
+        return (int) $site->id;
     }
 
     /**
@@ -1922,6 +1944,9 @@ SQL;
         $incomingSite = "(SELECT COALESCE(`ho_in`.`site_id`, `ho_in_client`.`site_id`) FROM `shifts` AS `ho_in` LEFT JOIN `clients` AS `ho_in_client` ON `ho_in_client`.`id` = `ho_in`.`client_id` WHERE `ho_in`.`id` = {$row}.`incoming_shift_id` LIMIT 1)";
         $authoritativeSite = "COALESCE({$outgoingSite}, {$incomingSite}, {$clientSite})";
 
+        // incoming_staff_id is immutable submit-time evidence. The incoming
+        // Shift remains the mutable authority source, so a legitimate roster
+        // reassignment must not corrupt or conceal the retained handover.
         return $query
             ->whereNotNull($query->qualifyColumn('outgoing_shift_id'))
             ->whereNotNull($query->qualifyColumn('client_id'))
@@ -1932,7 +1957,7 @@ SQL;
             ->whereRaw("({$row}.`outgoing_staff_id` IS NULL OR EXISTS (SELECT 1 FROM `users` AS `ho_out_user` WHERE `ho_out_user`.`id` = {$row}.`outgoing_staff_id`))")
             ->whereRaw("({$row}.`incoming_staff_id` IS NULL OR EXISTS (SELECT 1 FROM `users` AS `ho_in_user` WHERE `ho_in_user`.`id` = {$row}.`incoming_staff_id`))")
             ->whereRaw("({$row}.`outgoing_shift_id` IS NULL OR EXISTS (SELECT 1 FROM `shifts` AS `ho_out_shift` LEFT JOIN `clients` AS `ho_out_shift_client` ON `ho_out_shift_client`.`id` = `ho_out_shift`.`client_id` WHERE `ho_out_shift`.`id` = {$row}.`outgoing_shift_id` AND (`ho_out_shift`.`user_id` <=> {$row}.`outgoing_staff_id`) AND (`ho_out_shift`.`client_id` <=> {$row}.`client_id`) AND (`ho_out_shift`.`client_id` IS NULL OR (`ho_out_shift_client`.`site_id` IS NOT NULL AND (`ho_out_shift`.`site_id` IS NULL OR `ho_out_shift`.`site_id` = `ho_out_shift_client`.`site_id`))) AND COALESCE(`ho_out_shift`.`site_id`, `ho_out_shift_client`.`site_id`) = {$authoritativeSite}))")
-            ->whereRaw("({$row}.`incoming_shift_id` IS NULL OR EXISTS (SELECT 1 FROM `shifts` AS `ho_in_shift` LEFT JOIN `clients` AS `ho_in_shift_client` ON `ho_in_shift_client`.`id` = `ho_in_shift`.`client_id` WHERE `ho_in_shift`.`id` = {$row}.`incoming_shift_id` AND (`ho_in_shift`.`user_id` <=> {$row}.`incoming_staff_id`) AND (`ho_in_shift`.`client_id` <=> {$row}.`client_id`) AND (`ho_in_shift`.`client_id` IS NULL OR (`ho_in_shift_client`.`site_id` IS NOT NULL AND (`ho_in_shift`.`site_id` IS NULL OR `ho_in_shift`.`site_id` = `ho_in_shift_client`.`site_id`))) AND COALESCE(`ho_in_shift`.`site_id`, `ho_in_shift_client`.`site_id`) = {$authoritativeSite}))");
+            ->whereRaw("({$row}.`incoming_shift_id` IS NULL OR ({$row}.`incoming_staff_id` IS NOT NULL AND EXISTS (SELECT 1 FROM `shifts` AS `ho_in_shift` LEFT JOIN `clients` AS `ho_in_shift_client` ON `ho_in_shift_client`.`id` = `ho_in_shift`.`client_id` WHERE `ho_in_shift`.`id` = {$row}.`incoming_shift_id` AND `ho_in_shift`.`user_id` IS NOT NULL AND EXISTS (SELECT 1 FROM `users` AS `ho_current_in_user` WHERE `ho_current_in_user`.`id` = `ho_in_shift`.`user_id`) AND (`ho_in_shift`.`client_id` <=> {$row}.`client_id`) AND (`ho_in_shift`.`client_id` IS NULL OR (`ho_in_shift_client`.`site_id` IS NOT NULL AND (`ho_in_shift`.`site_id` IS NULL OR `ho_in_shift`.`site_id` = `ho_in_shift_client`.`site_id`))) AND COALESCE(`ho_in_shift`.`site_id`, `ho_in_shift_client`.`site_id`) = {$authoritativeSite})))");
     }
 
     private function applyFleetHandoverIntrinsicIntegrity(Builder $query): Builder
@@ -2036,25 +2061,32 @@ SQL;
             $message ?? self::DEFAULT_MESSAGE,
         );
 
-        foreach ([
-            [$handover->outgoing_shift_id, $handover->outgoingShift, $handover->outgoing_staff_id, $handover->outgoingStaff],
-            [$handover->incoming_shift_id, $handover->incomingShift, $handover->incoming_staff_id, $handover->incomingStaff],
-        ] as [$shiftId, $shift, $staffId, $staff]) {
-            if ($staffId !== null) {
-                abort_unless($staff, 403, $message ?? self::DEFAULT_MESSAGE);
-            }
-            if ($shiftId === null) {
-                continue;
-            }
+        abort_unless(
+            $this->nullablePositiveId($handover->outgoingShift->user_id)
+                === $this->nullablePositiveId($handover->outgoing_staff_id)
+                && $this->nullablePositiveId($handover->outgoingShift->client_id)
+                    === $this->nullablePositiveId($handover->client_id),
+            403,
+            $message ?? self::DEFAULT_MESSAGE,
+        );
+        $this->assertIntrinsicShiftRelations($handover->outgoingShift, $message);
+        $siteIds->push($this->shiftSiteId($handover->outgoingShift));
+
+        if ($handover->incoming_staff_id !== null) {
+            abort_unless($handover->incomingStaff, 403, $message ?? self::DEFAULT_MESSAGE);
+        }
+        if ($handover->incoming_shift_id !== null) {
             abort_unless(
-                $shift
-                    && $this->nullablePositiveId($shift->user_id) === $this->nullablePositiveId($staffId)
-                    && $this->nullablePositiveId($shift->client_id) === $this->nullablePositiveId($handover->client_id),
+                $handover->incoming_staff_id !== null
+                    && $handover->incomingShift
+                    && $this->nullablePositiveId($handover->incomingShift->user_id) !== null
+                    && $this->nullablePositiveId($handover->incomingShift->client_id)
+                        === $this->nullablePositiveId($handover->client_id),
                 403,
                 $message ?? self::DEFAULT_MESSAGE,
             );
-            $this->assertIntrinsicShiftRelations($shift, $message);
-            $siteIds->push($this->shiftSiteId($shift));
+            $this->assertIntrinsicShiftRelations($handover->incomingShift, $message);
+            $siteIds->push($this->shiftSiteId($handover->incomingShift));
         }
 
         $siteIds = $siteIds->filter(fn ($siteId) => $this->nullablePositiveId($siteId) !== null)
@@ -2138,7 +2170,7 @@ SQL;
 
     private function applyCurrentEmployeeProfileScope(Builder $query): Builder
     {
-        $today = now()->toDateString();
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
 
         return $query
             ->where($query->qualifyColumn('is_active'), true)
@@ -2154,12 +2186,12 @@ SQL;
 
     private function isCurrentEmployeeProfile(HrEmployeeProfile $profile): bool
     {
-        $today = now()->startOfDay();
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
 
         return ! $profile->trashed()
             && (bool) $profile->is_active
-            && ($profile->start_date === null || $profile->start_date->copy()->startOfDay()->lessThanOrEqualTo($today))
-            && ($profile->end_date === null || $profile->end_date->copy()->startOfDay()->greaterThanOrEqualTo($today));
+            && ($profile->start_date === null || $profile->start_date->toDateString() <= $today)
+            && ($profile->end_date === null || $profile->end_date->toDateString() >= $today);
     }
 
     private function nullablePositiveId(mixed $value): ?int

@@ -85,6 +85,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhook_secret',
             'private_key',
             'passphrase',
+            'read_back_witness_credential',
+            'cd_witness_credential',
+            'witness_credential',
+            'witness_1_credential',
+            'witness_2_credential',
+            'waiver_approver_credential',
         ]);
 
         $exceptions->render(function (

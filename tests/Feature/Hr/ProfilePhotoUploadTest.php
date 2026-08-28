@@ -28,13 +28,18 @@ class EndingPhotoTargetLockService extends PeopleMutationLockService
 {
     public function __construct(private readonly int $targetProfileId) {}
 
-    public function lock(iterable $userIds, iterable $profileIds = []): array
-    {
+    public function lock(
+        iterable $userIds,
+        iterable $profileIds = [],
+        iterable $additionalRoleIds = [],
+    ): array {
         HrEmployeeProfile::query()->whereKey($this->targetProfileId)->update([
-            'end_date' => now()->subDay()->toDateString(),
+            'end_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))
+                ->subDay()
+                ->toDateString(),
         ]);
 
-        return parent::lock($userIds, $profileIds);
+        return parent::lock($userIds, $profileIds, $additionalRoleIds);
     }
 }
 
@@ -81,7 +86,9 @@ function photoProfile(User $user, ?Site $site = null, array $overrides = []): Hr
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
-        'start_date' => now()->subMonth()->toDateString(),
+        'start_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))
+            ->subMonth()
+            ->toDateString(),
         'is_active' => true,
         'primary_site_id' => $site?->id,
         'secondary_site_ids' => [],
@@ -153,11 +160,15 @@ test('hidden and noncurrent photo targets are concealed before file validation',
     $hiddenProfile = photoProfile($hidden, $this->hiddenSite);
     $ended = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $endedProfile = photoProfile($ended, $this->allowedSite, [
-        'end_date' => now()->subDay()->toDateString(),
+        'end_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))
+            ->subDay()
+            ->toDateString(),
     ]);
     $future = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $futureProfile = photoProfile($future, $this->allowedSite, [
-        'start_date' => now()->addDay()->toDateString(),
+        'start_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))
+            ->addDay()
+            ->toDateString(),
     ]);
     $inactive = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $inactiveProfile = photoProfile($inactive, $this->allowedSite, ['is_active' => false]);
@@ -168,10 +179,25 @@ test('hidden and noncurrent photo targets are concealed before file validation',
     $unproven = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $unprovenProfile = photoProfile($unproven);
 
-    foreach ([$hiddenProfile, $endedProfile, $futureProfile, $inactiveProfile, $unapprovedProfile, $clientProfile, $unprovenProfile] as $concealed) {
-        $this->actingAs($this->hr)
-            ->post("/hr/directory/{$concealed->id}/photo", [])
-            ->assertNotFound();
+    $concealedProfiles = [
+        'foreign Site' => $hiddenProfile,
+        'ended employment' => $endedProfile,
+        'future employment' => $futureProfile,
+        'inactive profile' => $inactiveProfile,
+        'unapproved account' => $unapprovedProfile,
+        'client account' => $clientProfile,
+        'missing Site provenance' => $unprovenProfile,
+    ];
+
+    foreach ($concealedProfiles as $reason => $concealed) {
+        $response = $this->actingAs($this->hr)
+            ->post("/hr/directory/{$concealed->id}/photo", []);
+
+        $this->assertSame(
+            404,
+            $response->status(),
+            "The {$reason} target reached photo validation instead of being concealed.",
+        );
         expect($concealed->fresh()->profile_photo_path)->toBeNull();
     }
 
@@ -190,7 +216,9 @@ test('hidden missing noncurrent and malformed photo IDs have identical responses
     $hiddenProfile = photoProfile($hidden, $this->hiddenSite);
     $ended = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $endedProfile = photoProfile($ended, $this->allowedSite, [
-        'end_date' => now()->subDay()->toDateString(),
+        'end_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))
+            ->subDay()
+            ->toDateString(),
     ]);
     $responses = [
         $this->actingAs($this->hr)->postJson("/hr/directory/{$hiddenProfile->id}/photo", []),

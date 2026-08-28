@@ -70,6 +70,9 @@ export function OrderDetailDialog({
     order,
     covert,
     linkedMedName,
+    canCountersign = false,
+    canDispense = false,
+    canLink = false,
     onClose,
     onCountersign,
     onDispense,
@@ -80,6 +83,10 @@ export function OrderDetailDialog({
     covert: CovertAuth | null;
     /** Resolved charted-medication name for the linked MAR entry, if linked. */
     linkedMedName: string | null;
+    /** Exact server-authorised transition capabilities for this order. */
+    canCountersign?: boolean;
+    canDispense?: boolean;
+    canLink?: boolean;
     onClose: () => void;
     /** Open the countersign wizard for this order (in place). */
     onCountersign: () => void;
@@ -89,7 +96,7 @@ export function OrderDetailDialog({
     onLink: () => void;
 }) {
     const [section, setSection] = useState(0);
-    const awaiting = needsCountersign(order);
+    const awaiting = order.status === 'pending' && needsCountersign(order);
     const hrs = countersignHoursLeft(order);
     const overdue = hrs !== null && hrs < 0;
     const source = ORDER_SOURCE[order.order_type] ?? order.order_type;
@@ -98,6 +105,8 @@ export function OrderDetailDialog({
         'Not required'
     ) : order.countersigned_at ? (
         <span className="text-status-success">✓ Signed</span>
+    ) : !awaiting ? (
+        <span className="text-muted-foreground">Not signed</span>
     ) : overdue ? (
         <span className="font-semibold text-status-critical">
             Overdue by {Math.abs(hrs!)}h
@@ -132,12 +141,12 @@ export function OrderDetailDialog({
             }
             footerEnd={
                 <>
-                    {awaiting ? (
+                    {canCountersign && awaiting ? (
                         <Button type="button" onClick={onCountersign}>
                             <PenTool className="h-4 w-4" /> Countersign
                         </Button>
                     ) : null}
-                    {order.status === 'confirmed' ? (
+                    {canDispense && order.status === 'confirmed' ? (
                         <Button
                             type="button"
                             variant={awaiting ? 'outline' : 'default'}
@@ -146,7 +155,7 @@ export function OrderDetailDialog({
                             <Package className="h-4 w-4" /> Dispense
                         </Button>
                     ) : null}
-                    {['pending', 'confirmed'].includes(order.status) ? (
+                    {canLink && order.status === 'pending' ? (
                         <Button
                             type="button"
                             variant="outline"

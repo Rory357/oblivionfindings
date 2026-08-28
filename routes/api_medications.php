@@ -60,7 +60,8 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
         ->name('api.medications.supporting_attachments.delete');
 
     Route::post('/clients/{client}/mar/administrations/{administration}/corrections', [MedicationsApiController::class, 'correctAdministration'])
-        ->middleware('permission:medications.administer.correct|clients.update')
+        ->missing(static fn () => abort(404))
+        ->middleware('permission:medications.administer.correct')
         ->name('api.medications.administrations.correct');
 
     // Safety checks
@@ -78,15 +79,21 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
         ->name('api.medications.alerts.index');
 
     Route::get('/clients/{client}/alerts', [MedicationsApiController::class, 'getDashboardAlerts'])
-        ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
+        ->middleware('permission:medications.view')
         ->name('api.medications.alerts.client');
 
     Route::post('/alerts/{alertId}/acknowledge', [MedicationsApiController::class, 'acknowledgeAlert'])
-        ->middleware('permission:medications.view|clients.viewAny')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.administer.correct',
+        ])
         ->name('api.medications.alerts.acknowledge');
 
     Route::post('/alerts/{alertId}/resolve', [MedicationsApiController::class, 'resolveAlert'])
-        ->middleware('permission:medications.administer.correct|clients.update')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.administer.correct',
+        ])
         ->name('api.medications.alerts.resolve');
 
     // Mixed report endpoints stay available for ordinary report types. The
@@ -137,6 +144,6 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
         ->name('api.medications.interactions.index');
 
     Route::post('/interactions', [MedicationsApiController::class, 'createDrugInteraction'])
-        ->middleware('permission:medications.administer.correct|clients.update')
+        ->middleware('permission:medications.administer.correct')
         ->name('api.medications.interactions.store');
 });

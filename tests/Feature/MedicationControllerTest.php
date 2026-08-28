@@ -138,10 +138,13 @@ class MedicationControllerTest extends TestCase
 
         MedicationCompetencyAssessment::query()->create([
             'user_id' => $this->supportWorker->id,
+            'assessor_id' => $this->admin->id,
             'assessment_type' => 'annual',
             'status' => 'passed',
-            'assessment_date' => $this->workerNow()->toDateString(),
+            'assessment_date' => $this->workerNow()->subMonth()->toDateString(),
             'expiry_date' => $this->workerNow()->addYear()->toDateString(),
+            'assessor_declared_at' => $this->workerNow()->subMonth(),
+            'staff_acknowledged_at' => $this->workerNow()->subMonth()->addMinute(),
         ]);
     }
 
@@ -184,8 +187,41 @@ class MedicationControllerTest extends TestCase
         $witness->roles()->attach(Role::where('name', 'support_worker')->first());
         $this->assignCurrentSite($witness);
         $this->client->supportWorkers()->attach($witness->id);
+        $this->assertTrue($witness->canDo('medications.controlled.witness'));
+        $this->qualifyControlledWitness($witness);
+        Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $witness->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(7),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $witness->id,
+            'status' => 'in_progress',
+        ]);
 
         return $witness;
+    }
+
+    protected function qualifyControlledWitness(User $witness): void
+    {
+        $assessor = $witness->is($this->admin)
+            ? $this->providerManager
+            : $this->admin;
+
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $witness->id,
+            'assessor_id' => $assessor->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => $this->workerNow()->subMonth()->toDateString(),
+            'expiry_date' => $this->workerNow()->addYear()->toDateString(),
+            'assessor_declared_at' => $this->workerNow()->subMonth(),
+            'staff_acknowledged_at' => $this->workerNow()->subMonth()->addMinute(),
+            'can_witness_controlled' => true,
+        ]);
     }
 
     /**
@@ -272,24 +308,28 @@ class MedicationControllerTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  2. SUPPORT WORKER VISIBILITY - Assigned clients only
+    //  2. SUPPORT WORKER VISIBILITY - Current Site boundary
     // ══════════════════════════════════════════════════════════════
 
-    public function test_support_worker_only_sees_assigned_clients_in_medications_index(): void
+    public function test_support_worker_only_sees_clients_at_their_current_sites_in_medications_index(): void
     {
-        // The client picker now lives on the MAR chart page; both residents get
-        // an active medication so the assigned-only scoping (not the has-meds
-        // filter) is what excludes the unassigned client.
+        // The MAR picker is Site-scoped: an individual client assignment must
+        // not hide another resident at the worker's current Site, while a
+        // resident at a foreign Site remains concealed.
         $this->createMedication();
-        $unassignedClient = Client::factory()->create(['site_id' => $this->site->id]);
-        $this->createMedication(['client_id' => $unassignedClient->id]);
+        $sameSiteClient = Client::factory()->create(['site_id' => $this->site->id]);
+        $this->createMedication(['client_id' => $sameSiteClient->id]);
+        $foreignSite = Site::factory()->create();
+        $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
+        $this->createMedication(['client_id' => $foreignClient->id]);
 
         $this->actingAs($this->supportWorker)
             ->get(EmarUrl::mar())
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('clients', fn ($clients) => collect($clients)->pluck('id')->contains($this->client->id) &&
-                    ! collect($clients)->pluck('id')->contains($unassignedClient->id)
+                    collect($clients)->pluck('id')->contains($sameSiteClient->id) &&
+                    ! collect($clients)->pluck('id')->contains($foreignClient->id)
                 )
             );
     }
@@ -770,7 +810,7 @@ class MedicationControllerTest extends TestCase
                 'prn_reason' => 'Updated PRN reason',
                 'max_per_day' => 6,
                 'min_hours_between_doses' => 3,
-                'controlled_drug' => true,
+                'controlled_drug' => false,
                 'high_risk' => true,
                 'prescriber' => 'Dr Updated',
                 'route' => 'oral',
@@ -786,7 +826,7 @@ class MedicationControllerTest extends TestCase
         $this->assertSame('Updated PRN reason', $med->prn_reason);
         $this->assertSame(6, $med->max_per_day);
         $this->assertSame(3.0, $med->min_hours_between_doses);
-        $this->assertTrue($med->controlled_drug);
+        $this->assertFalse($med->controlled_drug);
         $this->assertTrue($med->high_risk);
         $this->assertSame('Dr Updated', $med->prescriber);
         $this->assertSame('capsule', $med->form);
@@ -1157,30 +1197,56 @@ class MedicationControllerTest extends TestCase
     public function test_controlled_drug_given_requires_witness(): void
     {
         $med = $this->createControlledDrug();
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $med->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
 
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
+                'witness_credential' => 'password',
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('witnessed_by');
+
+        $this->assertDatabaseMissing('client_medication_administrations', [
+            'client_medication_id' => $med->id,
+        ]);
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+        $this->assertSame(0, $med->controlledDrugEntries()->count());
     }
 
     public function test_controlled_drug_self_witness_blocked(): void
     {
         $med = $this->createControlledDrug();
+        $this->qualifyControlledWitness($this->supportWorker);
+        $this->assertTrue($this->supportWorker->canDo('medications.controlled.witness'));
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $med->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
 
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $this->supportWorker->id,
+                'witness_credential' => 'password',
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('witnessed_by');
+
+        $this->assertDatabaseMissing('client_medication_administrations', [
+            'client_medication_id' => $med->id,
+        ]);
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+        $this->assertSame(0, $med->controlledDrugEntries()->count());
     }
 
     public function test_controlled_drug_given_with_valid_witness_succeeds(): void
@@ -1188,6 +1254,11 @@ class MedicationControllerTest extends TestCase
         $this->mockNotificationService();
         $med = $this->createControlledDrug();
         $witness = $this->createWitness();
+        ClientMedicationStock::create([
+            'client_medication_id' => $med->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
 
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
@@ -1211,6 +1282,11 @@ class MedicationControllerTest extends TestCase
         $this->mockNotificationService();
         $med = $this->createControlledDrug();
         $witness = $this->createWitness();
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $med->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
 
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
@@ -1229,6 +1305,7 @@ class MedicationControllerTest extends TestCase
             'recorded_by' => $this->supportWorker->id,
             'witnessed_by' => $witness->id,
         ]);
+        $this->assertSame(9.0, (float) $stock->refresh()->on_hand);
     }
 
     public function test_controlled_drug_refused_does_not_require_witness(): void
@@ -1251,17 +1328,30 @@ class MedicationControllerTest extends TestCase
     public function test_controlled_drug_witness_must_have_witness_permission(): void
     {
         $med = $this->createControlledDrug();
+        $this->qualifyControlledWitness($this->hrUser);
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $med->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
 
         // HR user does not have medications.controlled.witness permission
+        $this->assertFalse($this->hrUser->canDo('medications.controlled.witness'));
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $this->hrUser->id,
+                'witness_credential' => 'password',
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
-            ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertNotFound();
+
+        $this->assertDatabaseMissing('client_medication_administrations', [
+            'client_medication_id' => $med->id,
+        ]);
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+        $this->assertSame(0, $med->controlledDrugEntries()->count());
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1330,10 +1420,10 @@ class MedicationControllerTest extends TestCase
     //  16. CONTROLLED DRUG STOCK - Witness & Entry/Discrepancy
     // ══════════════════════════════════════════════════════════════
 
-    public function test_controlled_stock_update_requires_witness(): void
+    public function test_generic_controlled_stock_update_is_fail_closed_and_points_to_balance_check(): void
     {
         $med = $this->createControlledDrug();
-        ClientMedicationStock::create([
+        $stock = ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
             'unit' => 'tablets',
@@ -1345,10 +1435,13 @@ class MedicationControllerTest extends TestCase
                 'reason' => 'Counted',
             ])
             ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('on_hand');
+
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
     }
 
-    public function test_controlled_stock_update_requires_reason(): void
+    public function test_guided_controlled_balance_check_requires_immediate_action_for_discrepancy(): void
     {
         $med = $this->createControlledDrug();
         $witness = $this->createWitness();
@@ -1359,34 +1452,45 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
-                'on_hand' => 8,
+            ->from('/emar/controlled')
+            ->post(route('emar.controlled.balance_check.store'), [
+                'client_medication_id' => $med->id,
+                'expected_balance' => 10,
+                'actual_balance' => 8,
                 'witnessed_by' => $witness->id,
+                'witness_credential' => 'password',
+                'discrepancy_notes' => 'Two tablets are not accounted for.',
             ])
-            ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('immediate_action_taken');
     }
 
-    public function test_controlled_stock_update_self_witness_blocked(): void
+    public function test_guided_controlled_balance_check_blocks_self_witness(): void
     {
         $med = $this->createControlledDrug();
-        ClientMedicationStock::create([
+        $this->qualifyControlledWitness($this->admin);
+        $this->assertTrue($this->admin->canDo('medications.controlled.witness'));
+        $stock = ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
             'unit' => 'tablets',
         ]);
 
         $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
-                'on_hand' => 8,
+            ->from('/emar/controlled')
+            ->post(route('emar.controlled.balance_check.store'), [
+                'client_medication_id' => $med->id,
+                'expected_balance' => 10,
+                'actual_balance' => 10,
                 'witnessed_by' => $this->admin->id,
-                'reason' => 'Counted',
+                'witness_credential' => 'password',
             ])
-            ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('witnessed_by');
+
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+        $this->assertSame(0, $med->controlledDrugEntries()->count());
     }
 
-    public function test_controlled_stock_update_creates_entry(): void
+    public function test_guided_controlled_balance_check_creates_entry(): void
     {
         $this->mockNotificationService();
         $med = $this->createControlledDrug();
@@ -1399,11 +1503,12 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
-                'on_hand' => 10,
+            ->post(route('emar.controlled.balance_check.store'), [
+                'client_medication_id' => $med->id,
+                'expected_balance' => 10,
+                'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'reason' => 'Routine stock check',
-                'unit' => 'tablets',
+                'witness_credential' => 'password',
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -1411,7 +1516,7 @@ class MedicationControllerTest extends TestCase
         $this->assertDatabaseHas('client_controlled_drug_entries', [
             'client_id' => $this->client->id,
             'client_medication_id' => $med->id,
-            'entry_type' => 'stock_count',
+            'entry_type' => 'balance_check',
             'on_hand_before' => 10,
             'on_hand_after' => 10,
             'recorded_by' => $this->admin->id,
@@ -1419,7 +1524,7 @@ class MedicationControllerTest extends TestCase
         ]);
     }
 
-    public function test_controlled_stock_update_creates_discrepancy_when_amounts_differ(): void
+    public function test_guided_controlled_balance_check_creates_discrepancy_when_amounts_differ(): void
     {
         $this->mockNotificationService();
         $med = $this->createControlledDrug();
@@ -1432,12 +1537,14 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
-                'on_hand' => 8,
+            ->post(route('emar.controlled.balance_check.store'), [
+                'client_medication_id' => $med->id,
+                'expected_balance' => 10,
+                'actual_balance' => 8,
                 'witnessed_by' => $witness->id,
-                'reason' => 'Two missing after shift change',
+                'witness_credential' => 'password',
+                'discrepancy_notes' => 'Two missing after shift change',
                 'immediate_action_taken' => 'Secured the remaining stock and escalated the discrepancy.',
-                'unit' => 'tablets',
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -1455,7 +1562,71 @@ class MedicationControllerTest extends TestCase
         ]);
     }
 
-    public function test_controlled_stock_update_no_discrepancy_when_amounts_match(): void
+    public function test_guided_controlled_balance_check_preserves_half_unit_discrepancy_provenance(): void
+    {
+        $this->mockNotificationService();
+        $med = $this->createControlledDrug();
+        $witness = $this->createWitness();
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $med->id,
+            'on_hand' => 9.5,
+            'unit' => 'tablets',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('emar.controlled.balance_check.store'), [
+                'client_medication_id' => $med->id,
+                'expected_balance' => 9.5,
+                'actual_balance' => 9,
+                'witnessed_by' => $witness->id,
+                'witness_credential' => 'password',
+                'discrepancy_notes' => 'Half tablet count variance',
+                'immediate_action_taken' => 'Secured the stock and escalated the half-tablet variance.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $entry = $med->controlledDrugEntries()->sole();
+        $discrepancy = ClientControlledDrugDiscrepancy::query()
+            ->where('client_medication_id', $med->id)
+            ->sole();
+        $this->assertSame(9.0, (float) $stock->refresh()->on_hand);
+        $this->assertSame(9.5, (float) $entry->on_hand_before);
+        $this->assertSame(9.0, (float) $entry->on_hand_after);
+        $this->assertSame(-0.5, (float) $discrepancy->difference);
+    }
+
+    public function test_guided_controlled_balance_check_rejects_excess_scale_without_mutation(): void
+    {
+        $med = $this->createControlledDrug();
+        $witness = $this->createWitness();
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $med->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->from('/emar/controlled')
+            ->post(route('emar.controlled.balance_check.store'), [
+                'client_medication_id' => $med->id,
+                'expected_balance' => 10,
+                'actual_balance' => 9.999,
+                'witnessed_by' => $witness->id,
+                'witness_credential' => 'password',
+                'discrepancy_notes' => 'Invalid precision probe',
+                'immediate_action_taken' => 'No action should be recorded.',
+            ])
+            ->assertSessionHasErrors('actual_balance');
+
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+        $this->assertSame(0, $med->controlledDrugEntries()->count());
+        $this->assertSame(0, ClientControlledDrugDiscrepancy::query()
+            ->where('client_medication_id', $med->id)
+            ->count());
+    }
+
+    public function test_guided_controlled_balance_check_creates_no_discrepancy_when_amounts_match(): void
     {
         $this->mockNotificationService();
         $med = $this->createControlledDrug();
@@ -1468,11 +1639,12 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
-                'on_hand' => 10,
+            ->post(route('emar.controlled.balance_check.store'), [
+                'client_medication_id' => $med->id,
+                'expected_balance' => 10,
+                'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'reason' => 'Routine check, all correct',
-                'unit' => 'tablets',
+                'witness_credential' => 'password',
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -1480,7 +1652,7 @@ class MedicationControllerTest extends TestCase
         $this->assertDatabaseCount('client_controlled_drug_discrepancies', 0);
     }
 
-    public function test_controlled_stock_witness_must_have_witness_permission(): void
+    public function test_guided_controlled_balance_check_conceals_ineligible_witness(): void
     {
         $med = $this->createControlledDrug();
         ClientMedicationStock::create([
@@ -1490,14 +1662,16 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
-                'on_hand' => 8,
+            ->post(route('emar.controlled.balance_check.store'), [
+                'client_medication_id' => $med->id,
+                'expected_balance' => 10,
+                'actual_balance' => 8,
                 'witnessed_by' => $this->hrUser->id,
-                'reason' => 'Check',
+                'witness_credential' => 'password',
+                'discrepancy_notes' => 'Count differs.',
                 'immediate_action_taken' => 'Secured the stock pending an authorised witness review.',
             ])
-            ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertNotFound();
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -2321,7 +2495,7 @@ class MedicationControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_auditor_can_view_reports(): void
+    public function test_auditor_with_general_report_permission_can_view_medication_reports(): void
     {
         $this->actingAs($this->auditor)
             ->get('/reports/medications')
@@ -2466,10 +2640,10 @@ class MedicationControllerTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  30. CONTROLLED STOCK - Open discrepancy blocks (unless override)
+    //  30. CONTROLLED STOCK - Guided counts and fail-closed legacy bridge
     // ══════════════════════════════════════════════════════════════
 
-    public function test_controlled_stock_blocked_when_open_discrepancy_exists_for_non_override_user(): void
+    public function test_guided_controlled_balance_check_remains_available_while_discrepancy_is_open(): void
     {
         $med = $this->createControlledDrug();
         $witness = $this->createWitness();
@@ -2494,33 +2668,33 @@ class MedicationControllerTest extends TestCase
             'status' => 'open',
         ]);
 
-        // Coordinator does not have controlled.override and does not have clients.update
-        // But the test needs a user who can do medications.controlled.record but not
-        // medications.controlled.override and not clients.update
-        // Use a support worker (who has medications.controlled.record but not override and not clients.update)
-        $stockPermission = Permission::query()->where('key', 'medications.stock.update')->firstOrFail();
-        $this->supportWorker->permissionOverrides()->syncWithoutDetaching([
-            $stockPermission->id => ['allowed' => true],
-        ]);
-        $this->supportWorker->unsetRelation('permissionOverrides')->unsetRelation('roles');
         $this->actingAs($this->supportWorker)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
-                'on_hand' => 8,
+            ->post(route('emar.controlled.balance_check.store'), [
+                'client_medication_id' => $med->id,
+                'expected_balance' => 10,
+                'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'reason' => 'Check',
-                'unit' => 'tablets',
+                'witness_credential' => 'password',
             ])
             ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('client_controlled_drug_entries', [
+            'client_medication_id' => $med->id,
+            'entry_type' => 'balance_check',
+            'recorded_by' => $this->supportWorker->id,
+            'on_hand_before' => 10,
+            'on_hand_after' => 10,
+        ]);
     }
 
-    public function test_controlled_stock_allowed_when_user_has_override_permission(): void
+    public function test_generic_controlled_stock_update_remains_fail_closed_with_override_permission(): void
     {
         $this->mockNotificationService();
         $med = $this->createControlledDrug();
         $witness = $this->createWitness();
 
-        ClientMedicationStock::create([
+        $stock = ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
             'unit' => 'tablets',
@@ -2540,7 +2714,7 @@ class MedicationControllerTest extends TestCase
             'status' => 'open',
         ]);
 
-        // Provider manager has medications.controlled.override
+        // Override authority does not reopen the legacy generic stock endpoint.
         $this->actingAs($this->providerManager)
             ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
                 'on_hand' => 9,
@@ -2550,7 +2724,10 @@ class MedicationControllerTest extends TestCase
                 'unit' => 'tablets',
             ])
             ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertSessionHasErrors('on_hand');
+
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+        $this->assertSame(0, $med->controlledDrugEntries()->count());
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -2889,7 +3066,13 @@ class MedicationControllerTest extends TestCase
         $med = ClientMedication::where('name', 'Lifecycle Med')->first();
         $this->assertNotNull($med);
 
-        // 2. Update stock
+        // 2. Verify the newly created order before it can be administered.
+        $this->actingAs($this->providerManager)
+            ->post(route('emar.medications.verify', $med))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        // 3. Update stock
         $this->actingAs($this->admin)
             ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
                 'on_hand' => 30,
@@ -2898,7 +3081,7 @@ class MedicationControllerTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        // 3. Record administration
+        // 4. Record administration
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
@@ -2909,7 +3092,7 @@ class MedicationControllerTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        // 4. Pause medication
+        // 5. Pause medication
         $this->actingAs($this->admin)
             ->put("/clients/{$this->client->id}/medical/medications/{$med->id}", [
                 'name' => 'Lifecycle Med',
@@ -2918,7 +3101,7 @@ class MedicationControllerTest extends TestCase
             ])
             ->assertRedirect();
 
-        // 5. Discontinue medication through the governed lifecycle action.
+        // 6. Discontinue medication through the governed lifecycle action.
         $this->actingAs($this->admin)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/discontinue", [
                 'reason' => 'No longer needed',
@@ -2929,7 +3112,7 @@ class MedicationControllerTest extends TestCase
         $this->assertEquals('ceased', $med->state);
         $this->assertFalse($med->active);
 
-        // 6. Legacy delete remains fail-closed and the ceased order remains.
+        // 7. Legacy delete remains fail-closed and the ceased order remains.
         $operationsPath = "/operations/clients/{$this->client->id}/medical/medications/{$med->id}";
 
         $this->actingAs($this->admin)

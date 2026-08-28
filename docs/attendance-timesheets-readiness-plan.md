@@ -2,6 +2,10 @@
 
 > Scope: stabilise and complete the existing attendance / timesheet stack so it is coherent, reliable, testable, and safe to ship incrementally. Prefer small targeted fixes over rebuilds.
 
+> **Status (2026-08-29): historical plan with one superseded security contract.** This file preserves the 30 April 2026 plan and its then-valid PR C 403 + `attendance.clockOut.unauthorized` proposal. Do not read §2 blocker 6, §3 PR C, §6's `AttendanceCrossUserGuardTest` row, or §8's “ownership audit” shorthand as the current direct-object contract.
+>
+> **Current direct-object contract:** lack of the base clocking or management action capability returns 403. For an otherwise action-authorized actor, malformed, missing, foreign-owned, wrong-Site, or corrupt `shift_id`/`session_id` values return the same generic 404 before nested payload validation. A concealed denial must not mutate attendance sessions, shifts, tasks, timesheets, or time entries and must not write an object-specific `attendance.clockOut.unauthorized` audit row. Authorized forced clock-out, administrative end, and correction mutations remain strictly audited. Current regression coverage belongs in `tests/Feature/Hr/AttendanceSessionSiteBoundaryTest.php` and the reconciled `tests/Feature/AttendanceCrossUserGuardTest.php`.
+
 ## Context
 
 Stack: Laravel 12 + Pest, Inertia + React 19, Playwright 1.59 (`tests/e2e/*.spec.ts`, `data-test` testIdAttribute, MySQL CI). Recent rostering work (commit `46ee7ba0`) is documented in [`docs/rostering-pr-map.md`](rostering-pr-map.md) and is gated behind feature flags. The attendance / timesheet area is canonical at `/attendance/*` (`routes/shifts.php:93-113`) and `/operations/timesheets/*` (`routes/operations.php:621-675`); legacy URLs 308-redirect, so the URL surface is stable.

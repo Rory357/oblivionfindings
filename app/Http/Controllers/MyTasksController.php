@@ -24,6 +24,7 @@ use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\ShiftHandoverService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskItem;
@@ -61,11 +62,13 @@ class MyTasksController extends Controller
 
         $user = $request->user();
         $userId = $user->id;
-        $canViewMedications = $user->canDo('medications.view')
-            || $user->canDo('medications.administer.record');
+        $canOpenEmar = $user->canDo('medications.view');
         $canRecordMedications = $user->canDo('medications.administer.record');
+        $canViewMedications = $canOpenEmar || $canRecordMedications;
         $canRecordControlledMedications = $canRecordMedications
             && $user->canDo('medications.controlled.record');
+        $canAccessControlledMedications = $user->canDo('medications.controlled.view')
+            || $canRecordControlledMedications;
         $workerNow = Carbon::now($this->workerTimezone());
         $queryNow = $workerNow->copy()->utc();
         $today = $workerNow->copy()->startOfDay()->utc();
@@ -96,6 +99,8 @@ class MyTasksController extends Controller
                 $workerNow,
                 $canRecordMedications,
                 $canRecordControlledMedications,
+                $canAccessControlledMedications,
+                $canOpenEmar,
             )
             : [];
 
@@ -133,7 +138,7 @@ class MyTasksController extends Controller
         // 13. Shift lifecycle hero payloads.
         $nextShiftBriefing = $clock['open_session']
             ? null
-            : $this->getNextShiftBriefing($user, $workerNow);
+            : $this->getNextShiftBriefing($user, $workerNow, $canOpenEmar, $canAccessControlledMedications);
         $previousShift = $clock['open_session'] || $nextShiftBriefing
             ? null
             : $this->getPreviousShift($user, $workerNow);
@@ -206,6 +211,9 @@ class MyTasksController extends Controller
             'can_view_medications' => $canViewMedications,
             'can_record_medications' => $canRecordMedications,
             'can_record_controlled_medications' => $canRecordControlledMedications,
+            // The admin eMAR chart has an exact medications.view boundary.
+            // Record-only workers stay on the frontline Meds Today/My Day flow.
+            'can_open_emar' => $canOpenEmar,
             // Namespaced as `my_day_labels` so it does not collide with the
             // `labels` prop shared globally by HandleInertiaRequests for
             // terminology overrides (client.singular, etc.).
@@ -687,6 +695,8 @@ class MyTasksController extends Controller
         Carbon $now,
         bool $canRecord,
         bool $canRecordControlled,
+        bool $canAccessControlled,
+        bool $canOpenEmar,
     ): array {
         if (empty($clientIds)) {
             return [];
@@ -700,6 +710,7 @@ class MyTasksController extends Controller
             $medications = ClientMedication::whereIn('client_id', $clientIds)
                 ->active()
                 ->where('is_prn', false)
+                ->when(! $canAccessControlled, fn ($query) => $query->where('controlled_drug', false))
                 ->where(function ($query) {
                     $query->whereNotNull('dose_times')
                         ->orWhereNotNull('frequency');
@@ -780,7 +791,9 @@ class MyTasksController extends Controller
                             'can_give' => $canRecord && ! $med->controlled_drug,
                             'scheduled_for' => $scheduledIso,
                             'status' => $status,
-                            'emar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
+                            'emar_url' => $canOpenEmar
+                                ? EmarUrl::mar($med->client_id, $scheduled->toDateString())
+                                : null,
                         ];
                     }
 
@@ -803,8 +816,12 @@ class MyTasksController extends Controller
         }
     }
 
-    private function getNextShiftBriefing(User $user, Carbon $workerNow): ?array
-    {
+    private function getNextShiftBriefing(
+        User $user,
+        Carbon $workerNow,
+        bool $canOpenEmar,
+        bool $canAccessControlled,
+    ): ?array {
         try {
             // 36-hour lookahead — wide enough for the desktop "Tomorrow" panel
             // (a shift starting at 07:30 tomorrow is ~22h away when viewed
@@ -838,7 +855,7 @@ class MyTasksController extends Controller
                 $user->canDo('medications.view')
                 || $user->canDo('medications.administer.record')
             )
-                ? $this->getShiftMedicationsDue($shift, $workerNow)
+                ? $this->getShiftMedicationsDue($shift, $workerNow, $canOpenEmar, $canAccessControlled)
                 : [];
             $briefing['what_to_know'] = $shift->notes;
 
@@ -902,8 +919,12 @@ class MyTasksController extends Controller
         }
     }
 
-    private function getShiftMedicationsDue(Shift $shift, Carbon $workerNow): array
-    {
+    private function getShiftMedicationsDue(
+        Shift $shift,
+        Carbon $workerNow,
+        bool $canOpenEmar,
+        bool $canAccessControlled,
+    ): array {
         if (! $shift->client_id || ! $shift->starts_at || ! $shift->ends_at) {
             return [];
         }
@@ -917,12 +938,13 @@ class MyTasksController extends Controller
                 ->where('client_id', $shift->client_id)
                 ->active()
                 ->where('is_prn', false)
+                ->when(! $canAccessControlled, fn ($query) => $query->where('controlled_drug', false))
                 ->where(function ($query) {
                     $query->whereNotNull('dose_times')
                         ->orWhereNotNull('frequency');
                 })
                 ->get()
-                ->flatMap(function (ClientMedication $medication) use ($start, $end, $scheduleService) {
+                ->flatMap(function (ClientMedication $medication) use ($start, $end, $scheduleService, $canOpenEmar) {
                     $items = [];
                     $day = $start->copy()->startOfDay();
                     $lastDay = $end->copy()->startOfDay();
@@ -934,7 +956,9 @@ class MyTasksController extends Controller
                                     'medication_name' => $medication->name,
                                     'dose' => $medication->dosage,
                                     'scheduled_for' => $scheduled->toIso8601String(),
-                                    'emar_url' => EmarUrl::mar($medication->client_id, $scheduled->toDateString()),
+                                    'emar_url' => $canOpenEmar
+                                        ? EmarUrl::mar($medication->client_id, $scheduled->toDateString())
+                                        : null,
                                 ];
                             }
                         }
@@ -975,7 +999,17 @@ class MyTasksController extends Controller
         }
 
         try {
+            $siteIds = $this->siteAccess->accessibleSiteIds(
+                $user,
+                MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+            );
+            if ($siteIds === []) {
+                return null;
+            }
+
             $round = MedicationRound::query()
+                ->whereNotNull('site_id')
+                ->whereIn('site_id', $siteIds)
                 ->whereDate('round_date', $now->toDateString())
                 ->where(function ($q) use ($user) {
                     $q->where('assigned_to', $user->id)
@@ -991,7 +1025,10 @@ class MyTasksController extends Controller
             }
 
             $service = app(GuidedRoundService::class);
-            $progress = $service->progress($round);
+            $progress = $service->progress(
+                $round,
+                $user->canDo('medications.controlled.view') || $user->canDo('medications.controlled.record'),
+            );
 
             if ($progress['total'] === 0) {
                 return null;

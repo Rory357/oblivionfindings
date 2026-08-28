@@ -6,21 +6,29 @@ use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
+use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertWorklistPresenter;
 use App\Services\ControlRoom\AlertWorkspaceService;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ControlRoomMyTasksController extends Controller
 {
+    public function __construct(
+        private readonly ControlRoomAlertAccessService $alertAccess,
+    ) {}
+
     public function __invoke(Request $request, AlertWorklistPresenter $presenter)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
 
         // My Alerts: unresolved alerts assigned to me
-        $myAlerts = ControlRoomAlert::where('assigned_to_user_id', $user->id)
+        $myAlerts = $this->visibleAlerts($user)
+            ->where('assigned_to_user_id', $user->id)
             ->unresolved()
             ->with(['sla', 'asset:id,name,asset_tag', 'client:id,first_name,last_name'])
             ->orderByRaw("CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
@@ -36,6 +44,7 @@ class ControlRoomMyTasksController extends Controller
         // My Follow-ups: operator notes I created that need followup
         $myFollowups = OperatorNote::where('user_id', $user->id)
             ->where('requires_followup', true)
+            ->whereHas('alert', fn (Builder $alert) => $this->alertAccess->applyVisibleScope($alert, $user))
             ->with(['alert:id,reference_number,alert_type,severity,status'])
             ->orderBy('followup_at')
             ->orderByDesc('created_at')
@@ -82,16 +91,19 @@ class ControlRoomMyTasksController extends Controller
         }
 
         // Stats
-        $myOpenCount = ControlRoomAlert::where('assigned_to_user_id', $user->id)
+        $myOpenCount = $this->visibleAlerts($user)
+            ->where('assigned_to_user_id', $user->id)
             ->unresolved()
             ->count();
 
-        $myResolvedToday = ControlRoomAlert::where('assigned_to_user_id', $user->id)
+        $myResolvedToday = $this->visibleAlerts($user)
+            ->where('assigned_to_user_id', $user->id)
             ->where('status', 'resolved')
             ->whereDate('resolved_at', now()->toDateString())
             ->count();
 
-        $myCritical = ControlRoomAlert::where('assigned_to_user_id', $user->id)
+        $myCritical = $this->visibleAlerts($user)
+            ->where('assigned_to_user_id', $user->id)
             ->unresolved()
             ->where('severity', 'critical')
             ->count();
@@ -127,6 +139,7 @@ class ControlRoomMyTasksController extends Controller
         $operatorNote = OperatorNote::where('id', $note)
             ->where('user_id', $user->id)
             ->where('requires_followup', true)
+            ->whereHas('alert', fn (Builder $alert) => $this->alertAccess->applyVisibleScope($alert, $user))
             ->firstOrFail();
 
         $operatorNote->update(['requires_followup' => false]);
@@ -137,5 +150,12 @@ class ControlRoomMyTasksController extends Controller
         ]);
 
         return back()->with('success', 'Follow-up completed.');
+    }
+
+    private function visibleAlerts(User $user): Builder
+    {
+        $query = ControlRoomAlert::query();
+
+        return $this->alertAccess->applyVisibleScope($query, $user);
     }
 }

@@ -14,6 +14,7 @@ use App\Models\Timesheet;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ReportControllerShowTest extends TestCase
@@ -173,6 +174,120 @@ class ReportControllerShowTest extends TestCase
                 ->where('data.total_credentials', 1)
                 ->has('clients')
             );
+    }
+
+    /**
+     * @param  array<int, string>  $zeroPaths
+     * @param  array<int, string>  $emptyPaths
+     * @param  array<string, int|float>  $expectedValues
+     */
+    #[DataProvider('noSiteReportContracts')]
+    public function test_report_aggregates_fail_closed_without_an_accessible_site(
+        string $type,
+        array $zeroPaths,
+        array $emptyPaths,
+        array $expectedValues = [],
+    ): void {
+        [, , $staff] = $this->seedReportData();
+        StaffCredential::query()->create([
+            'user_id' => $staff->id,
+            'type' => 'first_aid',
+            'issuer' => 'Red Cross NZ',
+            'issued_at' => now()->subYear(),
+            'expires_at' => now()->addYear(),
+        ]);
+
+        $response = $this->actingAs($this->manager)
+            ->get("/operations/reports/{$type}?date_from=2026-04-01&date_to=2026-04-30")
+            ->assertOk();
+        $data = $response->inertiaProps('data');
+
+        foreach ($zeroPaths as $path) {
+            $value = data_get($data, $path);
+            $this->assertNotNull($value, "Missing report value: {$type}.{$path}");
+            $this->assertSame(0.0, (float) $value, "Leaked report aggregate: {$type}.{$path}");
+        }
+
+        foreach ($emptyPaths as $path) {
+            $value = data_get($data, $path);
+            $this->assertNotNull($value, "Missing report collection: {$type}.{$path}");
+            $this->assertTrue(collect($value)->isEmpty(), "Leaked report rows: {$type}.{$path}");
+        }
+
+        foreach ($expectedValues as $path => $expected) {
+            $value = data_get($data, $path);
+            $this->assertNotNull($value, "Missing report value: {$type}.{$path}");
+            $this->assertSame((float) $expected, (float) $value, "Unexpected empty-state value: {$type}.{$path}");
+        }
+    }
+
+    public static function noSiteReportContracts(): array
+    {
+        return [
+            'client summary' => [
+                'client-summary',
+                ['total_clients', 'total_hours', 'total_billed'],
+                ['by_client'],
+            ],
+            'staff utilisation' => [
+                'staff-utilisation',
+                ['total_staff', 'total_hours'],
+                ['by_staff'],
+            ],
+            'shift analytics' => [
+                'shift-analytics',
+                [
+                    'total_shifts',
+                    'completed',
+                    'cancelled',
+                    'no_show',
+                    'assigned',
+                    'unassigned',
+                    'completion_rate',
+                    'cancellation_rate',
+                    'assignment_rate',
+                    'execution_evidence.tasks_total',
+                    'execution_evidence.tasks_completed',
+                    'execution_evidence.incidents_logged',
+                    'execution_evidence.forms_submitted',
+                    'execution_evidence.medication_records',
+                    'execution_evidence.handovers_recorded',
+                    'execution_evidence.linked_transports',
+                    'coverage_vs_actual_work.planned_shifts',
+                    'coverage_vs_actual_work.timesheets_recorded',
+                    'coverage_vs_actual_work.worked_hours',
+                    'coverage_vs_actual_work.approved_worked_hours',
+                    'cost_vs_staffing.estimated_payroll_cost',
+                    'cost_vs_staffing.billable_value',
+                    'cost_vs_staffing.operational_margin',
+                ],
+                [
+                    'by_status',
+                    'by_shift_type',
+                    'by_service_context',
+                    'by_day_of_week',
+                    'by_staff',
+                    'timesheet_statuses',
+                    'historical_site_breakdown',
+                ],
+            ],
+            'billing' => [
+                'billing',
+                ['total_entries', 'total_amount'],
+                ['by_status', 'by_rate_type'],
+            ],
+            'compliance' => [
+                'compliance',
+                ['total_staff', 'total_credentials', 'expired_count', 'expiring_soon_count', 'valid_count'],
+                ['by_type', 'expired_details'],
+                ['compliance_rate' => 100],
+            ],
+            'service hours' => [
+                'service-hours',
+                ['total_hours', 'total_entries'],
+                ['by_client', 'by_site'],
+            ],
+        ];
     }
 
     public function test_unauthorised_and_unknown_report_types_are_rejected(): void

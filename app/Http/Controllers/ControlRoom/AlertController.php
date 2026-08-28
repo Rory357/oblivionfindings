@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\ControlRoom\AlertWorkspaceService;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
@@ -51,8 +52,8 @@ class AlertController extends Controller
         $query->where('source', 'like', 'integration_%');
 
         // Site access scoping
-        $siteAccess = app(UserSiteAccessService::class);
-        $siteAccess->applyAlertScope($query, $user, ['reports.viewAny']);
+        $alertAccess = app(ControlRoomAlertAccessService::class);
+        $alertAccess->applyVisibleScope($query, $user);
 
         // Filters — same set as ControlRoomAlertController
         $status = $request->input('status');
@@ -151,7 +152,7 @@ class AlertController extends Controller
         // Stats — scoped to integration sources only. The tab counts mirror the
         // worklist, which hides currently-snoozed alerts.
         $statsBase = ControlRoomAlert::where('source', 'like', 'integration_%');
-        $siteAccess->applyAlertScope($statsBase, $user, ['reports.viewAny']);
+        $alertAccess->applyVisibleScope($statsBase, $user);
 
         $stats = [
             'total' => (clone $statsBase)->notSnoozed()->count(),
@@ -322,11 +323,9 @@ class AlertController extends Controller
     {
         abort_unless(Str::startsWith($alert->source ?? '', 'integration_'), 404);
 
-        app(UserSiteAccessService::class)->assertCanAccessAlert(
-            $user,
+        app(ControlRoomAlertAccessService::class)->assertCanView(
             $alert,
-            $this->alertBypassPermissions(),
-            'You are not authorized to access alerts for this site.',
+            $user,
         );
     }
 }

@@ -1,11 +1,16 @@
 <?php
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Models\HrTimeEntryAmendment;
 use App\Models\AuditLog;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 /*
  * Session correction — the "fix a missed clock-out" wizard. Managers
@@ -16,7 +21,8 @@ use App\Models\User;
  */
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
 
     $this->worker = User::factory()->create([
         'role' => 'support_worker',
@@ -36,6 +42,17 @@ beforeEach(function () {
         Permission::query()->where('key', 'timesheets.viewAny')->first(),
     ])->filter()->mapWithKeys(fn (Permission $p) => [$p->id => ['allowed' => true]])->all();
     $this->manager->permissionOverrides()->syncWithoutDetaching($overrides);
+
+    foreach ([$this->worker, $this->manager] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
 });
 
 function correctableSessionFor(User $user, array $attributes = []): HrAttendanceSession
@@ -43,10 +60,33 @@ function correctableSessionFor(User $user, array $attributes = []): HrAttendance
     return HrAttendanceSession::query()->create(array_merge([
         'tenant_id' => null,
         'user_id' => $user->id,
+        'site_id' => $user->hrEmployeeProfile()->value('primary_site_id'),
         'clock_in_at' => now()->subHours(20),
         'status' => 'open',
         'source' => 'manual',
         'created_by' => $user->id,
+    ], $attributes));
+}
+
+function correctableEntryFor(HrAttendanceSession $session, array $attributes = []): HrTimeEntry
+{
+    return HrTimeEntry::query()->create(array_merge([
+        'user_id' => $session->user_id,
+        'shift_id' => $session->shift_id,
+        'attendance_session_id' => $session->id,
+        'site_id' => $session->site_id,
+        'client_id' => $session->shift?->client_id,
+        'entry_date' => $session->clock_in_at->copy()
+            ->setTimezone(config('app.worker_timezone', config('app.timezone', 'UTC')))
+            ->toDateString(),
+        'clock_in' => $session->clock_in_at,
+        'clock_out' => $session->clock_out_at,
+        'break_minutes' => (int) ($session->break_minutes ?? 0),
+        'entry_type' => 'clock',
+        'status' => $session->clock_out_at ? 'submitted' : 'active',
+        'source_type' => 'attendance',
+        'source_id' => $session->id,
+        'created_by' => $session->user_id,
     ], $attributes));
 }
 
@@ -91,6 +131,10 @@ it('lets a manager rewrite an already-closed session and recalculate its timeshe
         'status' => 'closed',
         'closed_by' => $this->worker->id,
     ]);
+    $entry = correctableEntryFor($session, [
+        'break_minutes' => 45,
+        'total_hours' => 7.25,
+    ]);
     $newOut = now()->subHours(4);
 
     $this->actingAs($this->manager)
@@ -109,6 +153,33 @@ it('lets a manager rewrite an already-closed session and recalculate its timeshe
     $timesheet = Timesheet::query()->where('attendance_session_id', $session->id)->first();
     expect($timesheet)->not->toBeNull()
         ->and($timesheet->ends_at->timestamp)->toBe($newOut->timestamp);
+
+    expect($entry->refresh()->clock_out?->timestamp)->toBe($newOut->timestamp)
+        ->and($entry->break_minutes)->toBe(15)
+        ->and((float) $entry->total_hours)->toBe(5.75)
+        ->and($entry->status)->toBe('submitted')
+        ->and(HrTimeEntryAmendment::query()->where('hr_time_entry_id', $entry->id)->count())->toBe(2);
+});
+
+it('backfills canonical Site before correcting legacy shiftless payroll projections', function () {
+    $session = correctableSessionFor($this->worker, ['site_id' => null]);
+    $entry = correctableEntryFor($session, ['site_id' => null]);
+    $clockOutAt = now()->subHours(12);
+
+    $this->actingAs($this->manager)
+        ->post("/attendance/sessions/{$session->id}/correct", [
+            'clock_out_at' => $clockOutAt->toIso8601String(),
+            'break_minutes' => 30,
+            'reason' => 'Backfill the retained Site before correcting payroll projections.',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $timesheet = Timesheet::query()->where('attendance_session_id', $session->id)->sole();
+    expect((int) $session->refresh()->site_id)->toBe($this->site->id)
+        ->and((int) $timesheet->site_id)->toBe($this->site->id)
+        ->and((int) $entry->refresh()->site_id)->toBe($this->site->id)
+        ->and($entry->clock_out?->timestamp)->toBe($clockOutAt->timestamp);
 });
 
 it('returns a submitted timesheet to draft so corrected hours re-enter approval', function () {
@@ -148,7 +219,12 @@ it('refuses to correct a session whose timesheet is already approved', function 
     $timesheet = Timesheet::query()->where('attendance_session_id', $session->id)->firstOrFail();
     $timesheet->forceFill(['status' => 'approved'])->saveQuietly();
 
-    $originalOut = $session->fresh()->clock_out_at;
+    $entry = HrTimeEntry::query()->where('attendance_session_id', $session->id)->sole();
+    $originalSession = $session->fresh()->getAttributes();
+    $originalTimesheet = $timesheet->fresh()->getAttributes();
+    $originalEntry = $entry->getAttributes();
+    $auditCount = AuditLog::query()->where('action', 'attendance.session.corrected')->count();
+    $amendmentCount = HrTimeEntryAmendment::query()->where('hr_time_entry_id', $entry->id)->count();
 
     $this->actingAs($this->manager)
         ->post("/attendance/sessions/{$session->id}/correct", [
@@ -157,15 +233,27 @@ it('refuses to correct a session whose timesheet is already approved', function 
         ])
         ->assertSessionHasErrors('correct_session');
 
-    expect($session->fresh()->clock_out_at->timestamp)->toBe($originalOut->timestamp);
+    expect($session->fresh()->getAttributes())->toBe($originalSession)
+        ->and($timesheet->fresh()->getAttributes())->toBe($originalTimesheet)
+        ->and($entry->fresh()->getAttributes())->toBe($originalEntry)
+        ->and(AuditLog::query()->where('action', 'attendance.session.corrected')->count())->toBe($auditCount)
+        ->and(HrTimeEntryAmendment::query()->where('hr_time_entry_id', $entry->id)->count())->toBe($amendmentCount);
 });
 
-it('refuses workers correcting someone else’s session', function () {
+it('conceals another worker session from a self-service correction', function () {
     $otherWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $supportRole = Role::query()->where('name', 'support_worker')->first();
     if ($supportRole) {
         $otherWorker->roles()->syncWithoutDetaching([$supportRole->id]);
     }
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $otherWorker->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
     $session = correctableSessionFor($otherWorker);
 
     $this->actingAs($this->worker)
@@ -173,9 +261,64 @@ it('refuses workers correcting someone else’s session', function () {
             'clock_out_at' => now()->subHours(2)->toIso8601String(),
             'reason' => 'Not mine to fix',
         ])
-        ->assertForbidden();
+        ->assertNotFound();
 
     expect($session->fresh()->status)->toBe('open');
+});
+
+it('requires manage-any plus canonical Site scope and conceals missing ids', function () {
+    $foreignSite = Site::factory()->create();
+    $foreignWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $foreignWorker->id,
+        'primary_site_id' => $foreignSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+    $reportsBypass = Permission::query()->where('key', 'reports.viewAny')->firstOrFail();
+    $this->manager->permissionOverrides()->syncWithoutDetaching([
+        $reportsBypass->id => ['allowed' => false],
+    ]);
+    $session = correctableSessionFor($foreignWorker);
+    $payload = [
+        'clock_out_at' => now()->subHours(2)->toIso8601String(),
+        'reason' => 'Foreign Site must stay concealed',
+    ];
+
+    $this->actingAs($this->manager)
+        ->post("/attendance/sessions/{$session->id}/correct", $payload)
+        ->assertNotFound();
+
+    $this->actingAs($this->manager)
+        ->post('/attendance/sessions/999999999/correct', $payload)
+        ->assertNotFound();
+
+    expect($session->fresh()->status)->toBe('open');
+});
+
+it('rolls back the correction and timesheet when its strict audit write fails', function () {
+    $session = correctableSessionFor($this->worker);
+    AuditLog::creating(function (AuditLog $log): void {
+        if ($log->action === 'attendance.session.corrected') {
+            throw new RuntimeException('Injected correction audit failure.');
+        }
+    });
+    $this->withoutExceptionHandling();
+
+    expect(fn () => $this->actingAs($this->worker)
+        ->post("/attendance/sessions/{$session->id}/correct", [
+            'clock_out_at' => now()->subHours(2)->toIso8601String(),
+            'break_minutes' => 15,
+            'reason' => 'This correction must roll back',
+        ]))
+        ->toThrow(RuntimeException::class, 'Injected correction audit failure.');
+
+    $session->refresh();
+    expect($session->status)->toBe('open')
+        ->and($session->clock_out_at)->toBeNull()
+        ->and(Timesheet::query()->where('attendance_session_id', $session->id)->exists())->toBeFalse();
 });
 
 it('requires a reason and rejects a clock-out before clock-in', function () {

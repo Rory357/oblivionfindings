@@ -32,6 +32,8 @@ class MedicationScopeAuthorizationTest extends TestCase
 
     private User $worker;
 
+    private User $assessor;
+
     private Site $site;
 
     private ServiceContext $serviceContext;
@@ -63,6 +65,10 @@ class MedicationScopeAuthorizationTest extends TestCase
             'role' => 'support_worker',
             'approved_at' => now(),
         ]);
+        $this->assessor = User::factory()->create([
+            'role' => 'clinical_lead',
+            'approved_at' => now(),
+        ]);
         $this->worker->roles()->syncWithoutDetaching([
             Role::query()->where('name', 'support_worker')->firstOrFail()->id,
         ]);
@@ -78,13 +84,18 @@ class MedicationScopeAuthorizationTest extends TestCase
             'start_date' => today()->subYear(),
             'end_date' => null,
             'is_active' => true,
+            'created_by' => $this->worker->id,
+            'updated_by' => $this->worker->id,
         ]);
         MedicationCompetencyAssessment::query()->create([
             'user_id' => $this->worker->id,
+            'assessor_id' => $this->assessor->id,
             'assessment_type' => 'annual',
             'status' => 'passed',
             'assessment_date' => today(),
             'expiry_date' => today()->addYear(),
+            'assessor_declared_at' => now()->subDay(),
+            'staff_acknowledged_at' => now()->subDay()->addMinute(),
         ]);
 
         $this->client = Client::factory()->create([
@@ -151,7 +162,9 @@ class MedicationScopeAuthorizationTest extends TestCase
 
         $this->actingAs($this->worker)
             ->post('/meds/today/record', $this->scheduledPayload([
+                'client_request_uuid' => '410e9264-31de-432e-93a1-d4a920e5b3b4',
                 'captured_offline_at' => now()->toIso8601String(),
+                'origin_device_id' => 'scope-test-device',
                 'queued_offline' => true,
             ]))
             ->assertForbidden();
@@ -192,8 +205,6 @@ class MedicationScopeAuthorizationTest extends TestCase
             'status' => 'given',
             'scheduled_for' => now()->toIso8601String(),
             'client_request_uuid' => $uuid,
-            'captured_offline_at' => now()->toIso8601String(),
-            'origin_device_id' => 'scope-test-device',
             'queued_offline' => false,
         ];
 
@@ -204,9 +215,11 @@ class MedicationScopeAuthorizationTest extends TestCase
 
         $this->actingAs($this->worker)
             ->postJson("/emar/rounds/{$round->id}/guided/items/{$otherMedication->id}", $payload)
-            ->assertUnprocessable()
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('error_field', 'client_request_uuid');
+            ->assertConflict()
+            ->assertJsonPath(
+                'errors.client_request_uuid.0',
+                'This submission identifier was already used with different medication administration details.',
+            );
 
         $this->assertDatabaseCount('client_medication_administrations', 1);
         $this->assertSame(1, $this->administrationTimelineCount());
@@ -244,6 +257,85 @@ class MedicationScopeAuthorizationTest extends TestCase
 
         $this->assertDatabaseCount('medication_prn_effectiveness', 0);
         $this->assertDatabaseCount('break_glass_access_events', 0);
+    }
+
+    public function test_prn_effectiveness_accepts_only_the_canonical_effective_administration_row(): void
+    {
+        $prn = ClientMedication::factory()->create([
+            'client_id' => $this->client->id,
+            'is_prn' => true,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+        ]);
+        $original = ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $prn->id,
+            'service_context_id' => $this->serviceContext->id,
+            'administered_by' => $this->worker->id,
+            'administered_at' => now()->subHour(),
+            'status' => 'given',
+        ]);
+        $makeCorrection = function (string $status, ?Carbon $approvedAt = null) use ($original): ClientMedicationAdministration {
+            return ClientMedicationAdministration::query()->create([
+                'client_id' => $original->client_id,
+                'client_medication_id' => $original->client_medication_id,
+                'service_context_id' => $original->service_context_id,
+                'administered_by' => $this->worker->id,
+                'administered_at' => $original->administered_at,
+                'status' => 'given',
+                'is_correction' => true,
+                'corrected_of_id' => $original->id,
+                'correction_status' => $status,
+                'correction_approved_at' => $approvedAt,
+            ]);
+        };
+        $pending = $makeCorrection('pending');
+        $rejected = $makeCorrection('rejected', now()->subMinutes(3));
+        $olderApproved = $makeCorrection('approved', now()->subMinutes(2));
+        $winner = $makeCorrection('approved', now()->subMinute());
+        $payload = ['effectiveness' => 'effective'];
+
+        foreach ([
+            ['meds.today.prn_effect', $original],
+            ['emar.prn_effectiveness.store', $pending],
+            ['meds.today.prn_effect', $rejected],
+            ['emar.prn_effectiveness.store', $olderApproved],
+        ] as [$routeName, $administration]) {
+            $this->actingAs($this->worker)
+                ->post(route($routeName), [
+                    ...$payload,
+                    'client_medication_administration_id' => $administration->id,
+                ])
+                ->assertNotFound();
+        }
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+
+        $this->actingAs($this->worker)
+            ->post(route('meds.today.prn_effect'), [
+                ...$payload,
+                'client_medication_administration_id' => $winner->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('medication_prn_effectiveness', [
+            'client_medication_administration_id' => $winner->id,
+            'effectiveness' => 'effective',
+        ]);
+        $this->actingAs($this->worker)
+            ->post(route('emar.prn_effectiveness.store'), [
+                'client_medication_administration_id' => $winner->id,
+                'effectiveness' => 'partially_effective',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('medication_prn_effectiveness', [
+            'client_medication_administration_id' => $winner->id,
+            'effectiveness' => 'partially_effective',
+        ]);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 1);
     }
 
     public function test_canonical_finite_break_glass_allows_and_audits_an_otherwise_off_shift_dose(): void
@@ -455,35 +547,76 @@ class MedicationScopeAuthorizationTest extends TestCase
             }
 
             try {
+                $userIds = [$this->worker->id, $this->assessor->id];
+                $clientIds = [$this->client->id, $otherClient->id];
+                $profileIds = DB::table('hr_employee_profiles')
+                    ->whereIn('user_id', $userIds)
+                    ->pluck('id')
+                    ->map(fn ($profileId): int => (int) $profileId)
+                    ->all();
+                $assessmentIds = DB::table('medication_competency_assessments')
+                    ->where('user_id', $this->worker->id)
+                    ->pluck('id')
+                    ->map(fn ($assessmentId): int => (int) $assessmentId)
+                    ->all();
+
+                DB::table('audit_logs')
+                    ->where(function ($audits) use ($assessmentIds, $clientIds, $profileIds): void {
+                        $audits
+                            ->whereIn('client_id', $clientIds)
+                            ->orWhere(function ($siteAudits): void {
+                                $siteAudits
+                                    ->where('auditable_type', $this->site->getMorphClass())
+                                    ->where('auditable_id', $this->site->id);
+                            })
+                            ->orWhere(function ($contextAudits): void {
+                                $contextAudits
+                                    ->where('auditable_type', $this->serviceContext->getMorphClass())
+                                    ->where('auditable_id', $this->serviceContext->id);
+                            })
+                            ->orWhere(function ($profileAudits) use ($profileIds): void {
+                                $profileAudits
+                                    ->where('auditable_type', (new HrEmployeeProfile)->getMorphClass())
+                                    ->whereIn('auditable_id', $profileIds);
+                            })
+                            ->orWhere(function ($assessmentAudits) use ($assessmentIds): void {
+                                $assessmentAudits
+                                    ->where('auditable_type', (new MedicationCompetencyAssessment)->getMorphClass())
+                                    ->whereIn('auditable_id', $assessmentIds);
+                            });
+                    })
+                    ->delete();
+
                 DB::table('break_glass_access_events')->whereIn(
                     'break_glass_access_id',
                     DB::table('client_break_glass_accesses')->where('user_id', $this->worker->id)->select('id'),
                 )->delete();
                 DB::table('client_break_glass_accesses')->where('user_id', $this->worker->id)->delete();
                 DB::table('medication_prn_effectiveness')
-                    ->whereIn('client_id', [$this->client->id, $otherClient->id])
+                    ->whereIn('client_id', $clientIds)
                     ->delete();
                 DB::table('client_medication_administrations')
-                    ->whereIn('client_id', [$this->client->id, $otherClient->id])
+                    ->whereIn('client_id', $clientIds)
                     ->delete();
                 DB::table('shift_clients')->where('shift_id', $this->shift->id)->delete();
                 DB::table('shifts')->where('id', $this->shift->id)->delete();
                 DB::table('medication_competency_assessments')->where('user_id', $this->worker->id)->delete();
-                DB::table('client_user')->whereIn('client_id', [$this->client->id, $otherClient->id])->delete();
+                DB::table('client_user')->whereIn('client_id', $clientIds)->delete();
                 DB::table('medication_prescriber_orders')
-                    ->whereIn('client_id', [$this->client->id, $otherClient->id])
+                    ->whereIn('client_id', $clientIds)
                     ->delete();
                 DB::table('client_medications')
-                    ->whereIn('client_id', [$this->client->id, $otherClient->id])
+                    ->whereIn('client_id', $clientIds)
                     ->delete();
                 DB::table('timeline_events')
-                    ->whereIn('client_id', [$this->client->id, $otherClient->id])
+                    ->whereIn('client_id', $clientIds)
                     ->delete();
-                DB::table('clients')->whereIn('id', [$this->client->id, $otherClient->id])->delete();
-                DB::table('permission_user')->where('user_id', $this->worker->id)->delete();
-                DB::table('role_user')->where('user_id', $this->worker->id)->delete();
+                DB::table('clients')->whereIn('id', $clientIds)->delete();
+                DB::table('permission_user')->whereIn('user_id', $userIds)->delete();
+                DB::table('role_user')->whereIn('user_id', $userIds)->delete();
+                DB::table('hr_employee_profile_versions')->whereIn('employee_profile_id', $profileIds)->delete();
                 DB::table('hr_employee_profiles')->where('user_id', $this->worker->id)->delete();
-                DB::table('users')->where('id', $this->worker->id)->delete();
+                DB::table('users')->whereIn('id', $userIds)->delete();
                 DB::table('sites')->where('id', $this->site->id)->delete();
                 DB::table('service_contexts')->where('id', $this->serviceContext->id)->delete();
             } finally {
