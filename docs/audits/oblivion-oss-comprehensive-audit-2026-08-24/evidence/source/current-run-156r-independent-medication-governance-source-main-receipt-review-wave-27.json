@@ -1,0 +1,277 @@
+{
+  "schema_version": "run-156r-independent-medication-governance-source-main-receipt-review-wave-27-v1",
+  "run_id": "RUN-156R-INDEPENDENT-MEDICATION-GOVERNANCE-SOURCE-MAIN-RECEIPT-REVIEW-WAVE-27",
+  "generated_on": "2026-08-29",
+  "status": "GO_THREE_PART_TWO_CHECKPOINT_SOURCE_RECEIPT_REVIEW_REPORTING_ONLY_ZERO_REMEDIATION_OR_DOWNSTREAM_CREDIT",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false,
+    "authorization_boundary": "APPROVED_SITES_ROLES_PERMISSIONS_CANONICAL_OWNERSHIP_DIRECT_OBJECT_CONCEALMENT_PRIVACY"
+  },
+  "scope": "Three distinct read-only review lanes checked the committed RUN156 local Git/source receipt; the reviews were coordinated rather than blind or isolated, and no medication finding or remediation outcome is selected.",
+  "pins": {
+    "review_checkpoint_commit": "33ee55b84944fab3e52eee3c3e303c4c30eb4a44",
+    "review_checkpoint_tree": "b0559420ba2e9ebe4146cb1bbf796aa60bd79dfc",
+    "producer_generation_checkpoint_commit": "86b232cb14967c63ff345ac5208ec6d4c379f24f",
+    "producer_generation_checkpoint_tree": "5444cf4131451642b0d2d144f28f5c04dffa7445",
+    "producer_generator": {
+      "path": "generators/materialize-run-156-medication-governance-source-main-receipt-wave-27.py",
+      "sha256": "e611f494567ce966e5c678a9579bb26278da0a87d814b649ccf973b102bcd4ea",
+      "blob_id": "0caeb16bf63e0d6b4cd084c539a6d74c303d6cfb",
+      "bytes": 35600,
+      "lines": 779
+    },
+    "producer_receipt": {
+      "path": "evidence/source/current-run-156-medication-governance-source-main-receipt-wave-27.json",
+      "sha256": "56094f7e83acf8000d0b680d751cc3d27e8627916eef45173002b43207091e76",
+      "blob_id": "38e69aa0897cc8b8f7d55363f5bc1ed491411095",
+      "bytes": 16444,
+      "lines": 330
+    },
+    "review_materializer": "generators/materialize-independent-medication-governance-source-main-receipt-review-wave-27.py",
+    "review_materializer_sha256": "fc2498be1f1e6539c1dcb898e424c47599588388522e8496f82ef70f3754b915",
+    "review_materializer_blob_id": "451638c20d15424ac1d49cffbf3814c6696b0a2c"
+  },
+  "producer_commit_review": {
+    "commit": "33ee55b84944fab3e52eee3c3e303c4c30eb4a44",
+    "tree": "b0559420ba2e9ebe4146cb1bbf796aa60bd79dfc",
+    "parent": "86b232cb14967c63ff345ac5208ec6d4c379f24f",
+    "parent_tree": "5444cf4131451642b0d2d144f28f5c04dffa7445",
+    "subject": "docs(audit): receipt medication governance source",
+    "changed_paths": 2,
+    "added_paths": 2,
+    "lines_added": 1109,
+    "lines_deleted": 0,
+    "name_status_sha256": "e2cbd043b8f19ac5f337e77a604f04fd6b2cda82f3539d5c970a5ad73960985b",
+    "path_list_sha256": "24ffb750f01566ad590db79ad810ae30689e9ffb6fc23c5c55d75f02b944d7b1",
+    "numstat_sha256": "254f0815696ba1b40f1df468f750ea0e4e80fc356f9b7d020f5f1fa78cbe1abb",
+    "generator": {
+      "path": "generators/materialize-run-156-medication-governance-source-main-receipt-wave-27.py",
+      "sha256": "e611f494567ce966e5c678a9579bb26278da0a87d814b649ccf973b102bcd4ea",
+      "blob_id": "0caeb16bf63e0d6b4cd084c539a6d74c303d6cfb",
+      "bytes": 35600,
+      "lines": 779
+    },
+    "receipt": {
+      "path": "evidence/source/current-run-156-medication-governance-source-main-receipt-wave-27.json",
+      "sha256": "56094f7e83acf8000d0b680d751cc3d27e8627916eef45173002b43207091e76",
+      "blob_id": "38e69aa0897cc8b8f7d55363f5bc1ed491411095",
+      "bytes": 16444,
+      "lines": 330
+    },
+    "exact_two_added_audit_files": true
+  },
+  "review_process_disclosure": {
+    "review_record_materializer": "/root",
+    "review_records_materialized_by_one_generator": true,
+    "reviewer_evidence_lanes": [
+      "/root/run154_builder_review",
+      "/root",
+      "/root/run154_surface_review"
+    ],
+    "cross_reviewer_coordination_occurred": true,
+    "blind_or_isolated_reviews_claimed": false,
+    "independence_boundary": "DISTINCT_READ_ONLY_REVIEW_LANES_WITH_COORDINATION_DISCLOSED"
+  },
+  "review_records": [
+    {
+      "review_id": "RUN156R-REVIEW-MECHANICAL-PROVENANCE",
+      "reviewer_lane": "/root/run154_builder_review",
+      "review_type": "MECHANICAL_PROVENANCE_AND_IN_MEMORY_REPLAY",
+      "review_evidence_collection_performed_without_writes": true,
+      "cross_reviewer_coordination_disclosed": true,
+      "record_materialized_by": "/root",
+      "independence_boundary": "DISTINCT_REVIEW_LANE_NOT_BLIND_OR_ISOLATED",
+      "verdict": "GO",
+      "discrepancies": 0,
+      "evidence": {
+        "producer_commit": {
+          "commit": "33ee55b84944fab3e52eee3c3e303c4c30eb4a44",
+          "tree": "b0559420ba2e9ebe4146cb1bbf796aa60bd79dfc",
+          "parent": "86b232cb14967c63ff345ac5208ec6d4c379f24f",
+          "parent_tree": "5444cf4131451642b0d2d144f28f5c04dffa7445",
+          "subject": "docs(audit): receipt medication governance source",
+          "changed_paths": 2,
+          "added_paths": 2,
+          "lines_added": 1109,
+          "lines_deleted": 0,
+          "name_status_sha256": "e2cbd043b8f19ac5f337e77a604f04fd6b2cda82f3539d5c970a5ad73960985b",
+          "path_list_sha256": "24ffb750f01566ad590db79ad810ae30689e9ffb6fc23c5c55d75f02b944d7b1",
+          "numstat_sha256": "254f0815696ba1b40f1df468f750ea0e4e80fc356f9b7d020f5f1fa78cbe1abb",
+          "generator": {
+            "path": "generators/materialize-run-156-medication-governance-source-main-receipt-wave-27.py",
+            "sha256": "e611f494567ce966e5c678a9579bb26278da0a87d814b649ccf973b102bcd4ea",
+            "blob_id": "0caeb16bf63e0d6b4cd084c539a6d74c303d6cfb",
+            "bytes": 35600,
+            "lines": 779
+          },
+          "receipt": {
+            "path": "evidence/source/current-run-156-medication-governance-source-main-receipt-wave-27.json",
+            "sha256": "56094f7e83acf8000d0b680d751cc3d27e8627916eef45173002b43207091e76",
+            "blob_id": "38e69aa0897cc8b8f7d55363f5bc1ed491411095",
+            "bytes": 16444,
+            "lines": 330
+          },
+          "exact_two_added_audit_files": true
+        },
+        "sealed_replay": {
+          "method": "IN_MEMORY_WRITE_INTERCEPT_AT_SEALED_PARENT_CHECKPOINT",
+          "sealed_checkpoint_commit": "86b232cb14967c63ff345ac5208ec6d4c379f24f",
+          "sealed_checkpoint_tree": "5444cf4131451642b0d2d144f28f5c04dffa7445",
+          "direct_current_head_execution_expected": false,
+          "direct_current_head_execution_guard_reason": "Producer intentionally requires HEAD at its sealed parent and its two output paths untracked.",
+          "filesystem_write_performed": false,
+          "byte_identical": true,
+          "bytes": 16444,
+          "sha256": "56094f7e83acf8000d0b680d751cc3d27e8627916eef45173002b43207091e76"
+        }
+      },
+      "seal_sha256": "dde3ab682d8a60d1f68fcbf5667c0e80d08c163148f3197c21567f166b8139b5"
+    },
+    {
+      "review_id": "RUN156R-REVIEW-TOPOLOGY-BLOB",
+      "reviewer_lane": "/root",
+      "review_type": "TWO_CHECKPOINT_TOPOLOGY_AND_BLOB_RECONSTRUCTION",
+      "review_evidence_collection_performed_without_writes": true,
+      "cross_reviewer_coordination_disclosed": true,
+      "record_materialized_by": "/root",
+      "independence_boundary": "DISTINCT_REVIEW_LANE_NOT_BLIND_OR_ISOLATED",
+      "verdict": "GO",
+      "discrepancies": 0,
+      "evidence": {
+        "historical_merge_payload_paths": 359,
+        "historical_merge_added_paths": 87,
+        "historical_merge_modified_paths": 272,
+        "historical_merge_lines_added": 76238,
+        "historical_merge_lines_deleted": 9031,
+        "effective_unchanged_merge_payload_blobs": 358,
+        "effective_superseded_merge_payload_blobs": 1,
+        "sole_superseded_path": "resources/js/pages/my-day/index.tsx",
+        "post_merge_my_day_changed_paths": 3,
+        "post_merge_my_day_lines_added": 38,
+        "post_merge_my_day_lines_deleted": 23,
+        "effective_payload_path_blob_manifest_sha256": "fb0dfc61a391d93887a880426a26cf02f5cc8617396077870ec1456fe6216234",
+        "post_merge_my_day_transition_manifest_sha256": "2577f6f8dec59baa120230aa4a8d5884e0cd01f752b744e54c360118ddbda2cc",
+        "later_audit_only_commits": 3,
+        "later_audit_only_changed_paths": 12,
+        "non_audit_tracked_entries": 12784,
+        "non_audit_tree_manifest_sha256": "016f4f12e8482ec11fcfdcaaec793417df35463deb90ee49d0c806e7ca7a0ea2",
+        "effective_non_audit_source_stable_through_receipt_checkpoint": true,
+        "historical_merge_tree_presented_as_effective_tree": false,
+        "all_359_merge_payload_blobs_claimed_current": false
+      },
+      "seal_sha256": "e82533c2094d8cf32c05a92dffc0db3225d3ed90b55b3fd0f75c42f3da5c02e9"
+    },
+    {
+      "review_id": "RUN156R-REVIEW-SEMANTIC-BOUNDARY",
+      "reviewer_lane": "/root/run154_surface_review",
+      "review_type": "PROVISIONAL_ORIGIN_AND_ZERO_CREDIT_BOUNDARY",
+      "review_evidence_collection_performed_without_writes": true,
+      "cross_reviewer_coordination_disclosed": true,
+      "record_materialized_by": "/root",
+      "independence_boundary": "DISTINCT_REVIEW_LANE_NOT_BLIND_OR_ISOLATED",
+      "verdict": "GO",
+      "discrepancies": 0,
+      "evidence": {
+        "provisional_record_count": 3,
+        "canonical_record_sha256": {
+          "MED-RBAC-01": "aa35c543ac25d15d074b344abd6ce8750975717f6c6e229d36986256c5a301ea",
+          "MED-CD-SCOPE-01": "dd86bf94f3b4d894e95c56c95a9409ce803b8d82d108cdd3c42f3343e348cd21",
+          "MED-CD-ATOMICITY-01": "9ba4f430ee59efea414b42a8633c1c969a2fd4428fbf3fef173fb5548cc8e7f1"
+        },
+        "audited_application_reference_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "all_records_reference_only_provisional": true,
+        "all_record_credit_fields_false": true,
+        "producer_origin_boundary": "LOCAL_REMOTE_TRACKING_OBSERVATION_ONLY",
+        "producer_origin_fetch_performed": false,
+        "producer_remote_currency_verified": false,
+        "producer_publication_or_push_verified": false,
+        "producer_checkpoint_local_ahead": 179,
+        "producer_checkpoint_local_behind": 0,
+        "review_checkpoint_local_ahead": 180,
+        "review_checkpoint_local_behind": 0,
+        "one_ahead_delta_is_the_committed_run_156_receipt": true,
+        "literal_complete_in_merge_subject_is_vcs_metadata_only": true,
+        "remediation_or_finding_outcome_inherited": false,
+        "artifact_completion_is_receipt_artifact_only": true,
+        "audit_completion_credit": false
+      },
+      "seal_sha256": "769bb4eb71508c297242f1dd7dfcd039f262d7899394392f76cad1b395d22fc0"
+    }
+  ],
+  "decision": {
+    "verdict": "GO",
+    "independent_reviews": 3,
+    "distinct_reviewer_lanes": 3,
+    "blind_or_isolated_reviews": false,
+    "discrepancies": 0,
+    "reporting_materialization_authorized": true,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "noninheritance_boundary": {
+    "historical_merge_completion_subject_inherited_as_outcome": false,
+    "all_359_merge_payload_blobs_claimed_current": false,
+    "my_day_fix_recredited_as_medication_remediation": false,
+    "provisional_records_promoted": false,
+    "producer_artifact_completion_inherited_as_audit_completion": false,
+    "producer_local_origin_observation_inherited_as_remote_currency": false
+  },
+  "mutation_attestation": {
+    "run_156r_writes_only_generator_and_receipt": true,
+    "producer_files_changed": false,
+    "application_source_changed": false,
+    "tests_or_coverage_executed": false,
+    "browser_or_runtime_started": false,
+    "database_or_external_system_changed": false,
+    "findings_reports_dashboard_matrix_or_register_changed": false
+  },
+  "credit_boundary": {
+    "INDEPENDENT_SOURCE_RECEIPT_REVIEW_FOR_REPORTING": true,
+    "git_source_integration_receipt_recredit": false,
+    "application_source_mutation": false,
+    "remediation_or_defect_closure": false,
+    "finding": false,
+    "final_finding": false,
+    "priority_promotion": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_or_workflow": false,
+    "executed_tests": false,
+    "test_coverage": false,
+    "coverage_completion": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "origin_currency_correctness": false,
+    "origin_currency_coverage": false,
+    "remote_currency": false,
+    "publication_or_push": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "feature_completion": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-medication-governance-source-main-receipt-review-wave-27.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-156r-independent-medication-governance-source-main-receipt-review-wave-27.json"
+  ]
+}
