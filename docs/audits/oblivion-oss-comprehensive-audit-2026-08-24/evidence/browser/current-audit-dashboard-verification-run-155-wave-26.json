@@ -1,0 +1,429 @@
+{
+  "schema_version": "run-155-audit-dashboard-verification-wave-26-v1",
+  "run_id": "RUN-155-AUDIT-DASHBOARD-VERIFICATION-WAVE-26",
+  "generated_on": "2026-08-29",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false
+  },
+  "scope": "Exact RUN154-generated audit-dashboard artifact only; not the application UI or runtime.",
+  "pins": {
+    "checkpoint_commit": "df0f3758131433b91da7c6d3cfb485c3d917d7ef",
+    "checkpoint_tree": "c93f4f46576ad75847a0c98269b3f3cf7856c8c0",
+    "dashboard_html": {
+      "sha256": "7b01f79ed706dc407da445345ea6a5da1a9c0c774657341a3986cb58d0d37f64",
+      "blob_id": "0792fcfea39c485b42039891415d0cd98bc66cd0",
+      "bytes": 224633
+    },
+    "dashboard_generator": {
+      "sha256": "11efb61559203bb965e73862bf4279d555b1122e669f7f7038cfe7c12ec1cf2e",
+      "blob_id": "64304bbd708c0eb617413b10270de997f465676a",
+      "bytes": 341686
+    },
+    "run_154_reporting_receipt": {
+      "sha256": "c5e782984c743186305b70fc2430d7dc56aede62621066ca159c96c3484f9ef8",
+      "blob_id": "02029f60da21e5202224b3b6d5738b811886b572"
+    },
+    "receipt_materializer": "generators/materialize-run-155-audit-dashboard-verification-wave-26.py",
+    "receipt_materializer_sha256": "1f2bd52237f28cb11f79e4fa65d1f0a82889fd313fbee08d4e222816a7147139",
+    "receipt_materializer_blob_id": "8b9604e3c316be98c33bc0e1d97e2aea4f0fba9c"
+  },
+  "lineage": {
+    "required_artifacts": 12,
+    "verified_artifacts": 12,
+    "all_current_hashes_match": true,
+    "all_links_and_hashes_visible": true,
+    "artifacts": [
+      {
+        "key": "run151_materializer",
+        "path": "generators/materialize-run-151-audit-dashboard-verification-wave-25.py",
+        "sha256": "e3f939f00bdf68cc47543e4e75658cbe5c0f7ad096583068ab4950a491cc1fe8",
+        "blob_id": "4160a24ef7656558bf531d620bb7d459b399f7af",
+        "bytes": 20944,
+        "link_and_hash_visible": true
+      },
+      {
+        "key": "run151_receipt",
+        "path": "evidence/browser/current-audit-dashboard-verification-run-151-wave-25.json",
+        "sha256": "15b4ef5de5fc9029af9ff74dcb02dd1e52177695fd367ea9347c3a8b3c9f20c0",
+        "blob_id": "46005aa66142dc5c6d9d055e9b504dde26b0977d",
+        "bytes": 11955,
+        "link_and_hash_visible": true
+      },
+      {
+        "key": "run152_cohort_generator",
+        "path": "generators/build-outcome-neutral-fleet-vehicle-register-index-route-action-cohort-wave-26.py",
+        "sha256": "7b3e6501d3fe806e7bb27be8d20236467496e20e101d42a9efc0741e67f0e336",
+        "blob_id": "7171cc58de0152219fc3fad83ca93385f333e80a",
+        "bytes": 26147,
+        "link_and_hash_visible": true
+      },
+      {
+        "key": "run152_cohort",
+        "path": "evidence/source/root-run-152-outcome-neutral-fleet-vehicle-register-index-route-action-cohort-wave-26.json",
+        "sha256": "5e987d8727896183aadf30b9000ed56b318e2f4c8935b6d77e3600999105eac4",
+        "blob_id": "a7e8e85e36dd4d07cc8653922cabd47e422f41ab",
+        "bytes": 40758,
+        "link_and_hash_visible": true
+      },
+      {
+        "key": "run152r_review_materializer",
+        "path": "generators/materialize-independent-outcome-neutral-fleet-vehicle-register-index-route-action-review-wave-26.py",
+        "sha256": "ecf6c7aa7c68d1b7936086316927057726797f7fa61d3b76af0c7435844f4597",
+        "blob_id": "458b582ca79f2b747c49e1e40a0cafe5415b9661",
+        "bytes": 20149,
+        "link_and_hash_visible": true
+      },
+      {
+        "key": "run152r_review",
+        "path": "evidence/source/raw-run-152r-independent-outcome-neutral-fleet-vehicle-register-index-route-action-review-wave-26.json",
+        "sha256": "43697db4e3a5743d6dc9b47a3e80c6ec5c528dba17c2e99a4a13f95933c899d8",
+        "blob_id": "6302d5e4e0d6e9a522e464eb99692ddc4a0f0c5d",
+        "bytes": 24147,
+        "link_and_hash_visible": true
+      },
+      {
+        "key": "run153_overlay_generator",
+        "path": "generators/integrate-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.py",
+        "sha256": "00b90c5932614eaf67cbca29c860924fad67190605bbf476fdc285174831ea83",
+        "blob_id": "c46a48c87203410951715006c8253c84851e9d76",
+        "bytes": 23969,
+        "link_and_hash_visible": true
+      },
+      {
+        "key": "run153_overlay",
+        "path": "evidence/source/current-run-153-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.json",
+        "sha256": "9b7e382f83787d807de8d752ecb3e6524280c707899aba78d47082765272e815",
+        "blob_id": "818b891cff9965193c60d83d0580c21a48d1a682",
+        "bytes": 35844,
+        "link_and_hash_visible": true
+      },
+      {
+        "key": "run153r_overlay_review_materializer",
+        "path": "generators/materialize-independent-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-review-wave-26.py",
+        "sha256": "6fb94e5382120e4d74b1a4b28fbdc75141e248f4585e850825e6f302d3d741ef",
+        "blob_id": "0c5551cefeaf89e04c427079c1f7659e130e83f7",
+        "bytes": 25747,
+        "link_and_hash_visible": true
+      },
+      {
+        "key": "run153r_overlay_review",
+        "path": "evidence/source/current-run-153r-independent-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-review-wave-26.json",
+        "sha256": "7f1da8394a8054f01f34fb943a3fba6601bf70ea06d69cf97033f2208edf4461",
+        "blob_id": "20bb3580ba2cb60205694d52aa72e16cd2f2a423",
+        "bytes": 37946,
+        "link_and_hash_visible": true
+      },
+      {
+        "key": "run154_reporting_materializer",
+        "path": "generators/materialize-run-154-reviewed-fleet-vehicle-register-index-route-action-reporting-wave-26.py",
+        "sha256": "79c66ced5ab48ecb9a89c6a4ba153a27702596e7bad70d3cf5d158065cfbc871",
+        "blob_id": "f018d0e046bfd07c997bcbe504da8a781874efa8",
+        "bytes": 68706,
+        "link_and_hash_visible": true
+      },
+      {
+        "key": "run154_reporting_receipt",
+        "path": "evidence/source/current-run-154-reviewed-fleet-vehicle-register-index-route-action-reporting-wave-26.json",
+        "sha256": "c5e782984c743186305b70fc2430d7dc56aede62621066ca159c96c3484f9ef8",
+        "blob_id": "02029f60da21e5202224b3b6d5738b811886b572",
+        "bytes": 20029,
+        "link_and_hash_visible": true
+      }
+    ]
+  },
+  "verification_method": {
+    "in_app_browser": {
+      "tool": "Codex in-app Browser semantic DOM inspection, rendered semantic snapshots, navigation exercise, console inspection, and one compact transient screenshot inspection",
+      "target_url": "http://127.0.0.1:8771/audit-dashboard.html?v=main-df0f3758-7b01f79e#progress",
+      "cachebuster": "main-df0f3758-7b01f79e",
+      "response_probe": "Read-only local HTTP GET against the same cache-busted artifact URL",
+      "response_status": 200,
+      "response_content_type": "text/html",
+      "response_bytes": 224633,
+      "response_sha256": "7b01f79ed706dc407da445345ea6a5da1a9c0c774657341a3986cb58d0d37f64",
+      "exact_dashboard_loaded": true,
+      "semantic_dom_inspection_completed": true,
+      "rendered_semantic_snapshots_inspected": 4,
+      "rendered_semantic_snapshots_geometry_verified": "4/4",
+      "responsive_visual_inspection": "4/4 semantic snapshots plus one compact transient screenshot",
+      "all_navigation_links_exercised": true,
+      "navigation_only": true,
+      "transient_compact_screenshots_inspected": 1,
+      "screenshot_per_viewport_claimed": false,
+      "screenshot_retained": false,
+      "application_or_external_state_changed": false
+    },
+    "static_validation": "Parsed exact local HTML bytes; resolved local files, authored IDs, anchors, and adjacent displayed file hashes.",
+    "materializer_byte_identical_runs_required": 2
+  },
+  "verification": {
+    "state": "GO_FOR_EXACT_AUDIT_ARTIFACT_FACTS_ONLY",
+    "viewports_required": 4,
+    "viewports_verified": 4,
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual_browser_viewport": "1440x900",
+        "observed_document_client": "1425x900",
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0,
+        "navigation_needing_bounded_horizontal_scroll": false,
+        "unintended_offscreen_elements": 0
+      },
+      {
+        "requested": "1280x800",
+        "actual_browser_viewport": "1280x800",
+        "observed_document_client": "1265x800",
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0,
+        "navigation_needing_bounded_horizontal_scroll": false,
+        "unintended_offscreen_elements": 0
+      },
+      {
+        "requested": "1024x768",
+        "actual_browser_viewport": "1024x768",
+        "observed_document_client": "1009x768",
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 1,
+        "tables_with_unbounded_overflow": 0,
+        "navigation_needing_bounded_horizontal_scroll": false,
+        "unintended_offscreen_elements": 0
+      },
+      {
+        "requested": "390x844",
+        "actual_browser_viewport": "390x844",
+        "observed_document_client": "375x844",
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 9,
+        "tables_with_unbounded_overflow": 0,
+        "navigation_needing_bounded_horizontal_scroll": true,
+        "unintended_offscreen_elements": 0
+      }
+    ],
+    "font_loaded_at_all_viewports": true,
+    "responsive_visual_inspection": "4/4",
+    "navigation_outer_overflow_x": "auto",
+    "mobile_navigation_scroll_required": true,
+    "desktop_and_tablet_navigation_scroll_required": false,
+    "headings": 24,
+    "tables": 9,
+    "table_wraps": 9,
+    "anchor_elements": 692,
+    "artifact_authored_ids": 10,
+    "duplicate_authored_ids": [],
+    "hash_anchor_occurrences": 10,
+    "unique_hash_anchors": 10,
+    "anchors": "10/10",
+    "anchor_failures": [],
+    "local_link_occurrences": 682,
+    "unique_local_links": 379,
+    "local_link_failures": [],
+    "pre_materialization_forward_reference": {
+      "href": "evidence/browser/current-audit-dashboard-verification-run-155-wave-26.json",
+      "excluded_from_pre_materialization_failure": true,
+      "resolved_after_receipt_materialization": true
+    },
+    "adjacent_hash_pair_occurrences": 583,
+    "unique_adjacent_hash_path_hash_pairs": 307,
+    "hash_bearing_link_failures": [],
+    "navigation_targets": "10/10",
+    "navigation_labels_include_run_154": true,
+    "navigation_links_exercised_at": "1440x900",
+    "navigation_exercise_method": "semantic locators; smooth scroll allowed to settle before target checks",
+    "navigation_links": [
+      {
+        "label": "Progress",
+        "target": "#progress",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "RUN-154",
+        "target": "#checkpoint",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Pages",
+        "target": "#pages",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Static census",
+        "target": "#static-census",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Runtime gates",
+        "target": "#runtime",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Benchmarks",
+        "target": "#benchmarks",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Modules",
+        "target": "#modules",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Provisional findings",
+        "target": "#findings",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Architecture",
+        "target": "#architecture",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Gaps",
+        "target": "#gaps",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      }
+    ],
+    "dom_ids_observed": 11,
+    "browser_injected_ids": [
+      "codex-browser-sidebar-comments-root"
+    ],
+    "duplicate_authored_ids_observed": 0,
+    "console_warnings": 0,
+    "console_errors": 0,
+    "page_errors": 0,
+    "exact_visible_static_boundary_check_count": 38,
+    "exact_visible_static_boundary_checks": {
+      "current_owner_counts_664_307_357_95": true,
+      "bounded_residual_3265": true,
+      "queue_118_reviewed_389_pending_411_without_ownership": true,
+      "benchmark_mapping_2_of_340": true,
+      "final_no_match_or_ncm_0_of_340": true,
+      "benchmark_unresolved_338": true,
+      "selected_route_action_identity_exact": true,
+      "observation_fleet_viewany_authority": true,
+      "observation_approved_site_list_export_filter": true,
+      "observation_aggregate_scope": true,
+      "observation_live_telemetry_privacy": true,
+      "observation_show_concealment_nontransfer": true,
+      "observation_negative_path_execution": true,
+      "reviewer_a_visibility_disclosed": true,
+      "reviewer_b_visibility_disclosed": true,
+      "distinct_reviewers_no_consultation": true,
+      "existing_page_owner_not_inherited_or_recredited": true,
+      "historical_sentinel_not_inherited_or_recredited": true,
+      "neighbor_noninheritance": true,
+      "queue_index_82_context_only": true,
+      "queue_index_83_unresolved": true,
+      "twelve_provisional_findings_separate": true,
+      "run_151_verification_nontransfer": true,
+      "one_operating_organisation_multiple_sites": true,
+      "gate_4_open": true,
+      "all_application_runtime_test_benchmark_final_finding_completion_credit_zero": true,
+      "exact_lineage_run151_materializer_link_and_hash": true,
+      "exact_lineage_run151_receipt_link_and_hash": true,
+      "exact_lineage_run152_cohort_generator_link_and_hash": true,
+      "exact_lineage_run152_cohort_link_and_hash": true,
+      "exact_lineage_run152r_review_materializer_link_and_hash": true,
+      "exact_lineage_run152r_review_link_and_hash": true,
+      "exact_lineage_run153_overlay_generator_link_and_hash": true,
+      "exact_lineage_run153_overlay_link_and_hash": true,
+      "exact_lineage_run153r_overlay_review_materializer_link_and_hash": true,
+      "exact_lineage_run153r_overlay_review_link_and_hash": true,
+      "exact_lineage_run154_reporting_materializer_link_and_hash": true,
+      "exact_lineage_run154_reporting_receipt_link_and_hash": true
+    },
+    "prohibited_stale_current_text": {
+      "run_001_through_150_current_checkpoint": false,
+      "run_071_through_150_current_checkpoint": false,
+      "current_fleet_daily_check": false,
+      "current_daily_check": false,
+      "stale_663_owner_checkpoint": false,
+      "stale_94_bridges": false,
+      "stale_queue_117_390": false,
+      "stale_without_ownership_412": false,
+      "stale_current_daily_check_observation": false
+    },
+    "browser_only_facts_not_supplied": []
+  },
+  "worktree_boundary": {
+    "expected_status_count": 3,
+    "expected_porcelain_statuses": [
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-155-wave-26.json",
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-155-audit-dashboard-verification-wave-26.py",
+      "M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html"
+    ],
+    "exact_match_required": true
+  },
+  "mutation_attestation": {
+    "run_155_materializer_writes_only_receipt": true,
+    "application_source_changed": false,
+    "application_runtime_started": false,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "database_changed": false,
+    "application_tests_or_build_run": false
+  },
+  "credit_boundary": {
+    "exact_audit_dashboard_artifact": true,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_or_workflow": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "executed_tests": false,
+    "new_benchmark_mapping": false,
+    "new_final_no_match_or_NCM": false,
+    "final_finding": false,
+    "feature_completion": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false
+}
