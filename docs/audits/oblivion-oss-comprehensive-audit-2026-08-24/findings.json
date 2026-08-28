@@ -1,7 +1,7 @@
 {
   "schema_version": "oblivion_audit_findings_v1_provisional",
   "audit_status": "PROVISIONAL_SOURCE_CLAIMS_MATERIALIZED_ZERO_FINAL_FINDING_CREDIT",
-  "generated_on": "2026-08-27",
+  "generated_on": "2026-08-29",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
@@ -165,7 +165,17 @@
     "run_149_fleet_daily_check_overlay_sha256": "12a52c434ecd18a5c6a644378070aa5ab046f5e7080726b983ded8d9c7377a55",
     "run_149r_fleet_daily_check_overlay_review_materializer_sha256": "bd09980ac26a7e9d026eda518f1964f8a2a87ea75fecf271981e4017e8dcd57c",
     "run_149r_fleet_daily_check_overlay_review_sha256": "545694fc1b7bd5f4af244617fb421ece1265fe6e6f2cad2ca834115e7a9e75a2",
-    "run_150_reporting_materializer_sha256": "8927a0e203203a739a8c8bb3d0e04dda5f1ebe55a9915fc9fcab6a9c4a73bcc4"
+    "run_150_reporting_materializer_sha256": "8927a0e203203a739a8c8bb3d0e04dda5f1ebe55a9915fc9fcab6a9c4a73bcc4",
+    "run_151_dashboard_verification_sha256": "15b4ef5de5fc9029af9ff74dcb02dd1e52177695fd367ea9347c3a8b3c9f20c0",
+    "run_152_fleet_vehicle_register_index_cohort_generator_sha256": "7b3e6501d3fe806e7bb27be8d20236467496e20e101d42a9efc0741e67f0e336",
+    "run_152_fleet_vehicle_register_index_cohort_sha256": "5e987d8727896183aadf30b9000ed56b318e2f4c8935b6d77e3600999105eac4",
+    "run_152r_fleet_vehicle_register_index_review_materializer_sha256": "ecf6c7aa7c68d1b7936086316927057726797f7fa61d3b76af0c7435844f4597",
+    "run_152r_fleet_vehicle_register_index_review_sha256": "43697db4e3a5743d6dc9b47a3e80c6ec5c528dba17c2e99a4a13f95933c899d8",
+    "run_153_fleet_vehicle_register_index_overlay_generator_sha256": "00b90c5932614eaf67cbca29c860924fad67190605bbf476fdc285174831ea83",
+    "run_153_fleet_vehicle_register_index_overlay_sha256": "9b7e382f83787d807de8d752ecb3e6524280c707899aba78d47082765272e815",
+    "run_153r_fleet_vehicle_register_index_overlay_review_materializer_sha256": "6fb94e5382120e4d74b1a4b28fbdc75141e248f4585e850825e6f302d3d741ef",
+    "run_153r_fleet_vehicle_register_index_overlay_review_sha256": "7f1da8394a8054f01f34fb943a3fba6601bf70ea06d69cf97033f2208edf4461",
+    "run_154_reporting_materializer_sha256": "79c66ced5ab48ecb9a89c6a4ba153a27702596e7bad70d3cf5d158065cfbc871"
   },
   "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
   "denominators": {
@@ -223,28 +233,29 @@
     "backend_semantic_async_role_rows": 197,
     "backend_semantic_async_unique_paths": 189,
     "backend_whole_file_semantically_reviewed": 0,
-    "static_source_feature_ownership_records": 663,
-    "static_source_feature_ownership_route_records": 306,
+    "static_source_feature_ownership_records": 664,
+    "static_source_feature_ownership_route_records": 307,
     "static_source_feature_ownership_page_records": 357,
     "static_source_feature_ownership_distinct_feature_ids": 256,
-    "static_controller_action_bridges": 94,
-    "bounded_static_source_ownership_percent": "16.874523",
-    "bounded_static_source_residual_records": 3266,
+    "static_controller_action_bridges": 95,
+    "bounded_static_source_ownership_percent": "16.899975",
+    "bounded_static_source_residual_records": 3265,
     "direct_exact_queue_records": 507,
-    "direct_exact_queue_pending_unreviewed": 390,
+    "direct_exact_queue_pending_unreviewed": 389,
     "static_source_feature_ownership_distinct_H_feature_ids": 234,
     "static_source_feature_ownership_distinct_D_feature_ids": 22,
     "static_source_feature_ownership_route_distinct_feature_ids": 64,
     "static_source_feature_ownership_page_distinct_feature_ids": 242,
     "static_source_feature_ownership_route_page_feature_overlap": 50,
-    "direct_exact_queue_reviewed": 117,
-    "direct_exact_queue_owned": 95,
+    "direct_exact_queue_reviewed": 118,
+    "direct_exact_queue_owned": 96,
     "direct_exact_queue_shared": 10,
-    "direct_exact_queue_without_ownership": 412,
+    "direct_exact_queue_without_ownership": 411,
     "direct_exact_queue_alias": 5,
     "direct_exact_queue_dead_or_noncanonical": 0,
     "direct_exact_queue_evidence_gap": 7,
-    "benchmark_unresolved": 338
+    "benchmark_unresolved": 338,
+    "bounded_static_source_residual_route_records": 2894
   },
   "current_benchmark_mapping": {
     "run_id": "RUN-145-FINANCE-INVOICE-FX-BENCHMARK-MAPPING-WAVE-24",
@@ -2798,6 +2809,18 @@
       "application_browser_credit": false,
       "audit_complete": false,
       "superseded_by_run_150_dashboard": true
+    },
+    "run_151": {
+      "run_id": "RUN-151-AUDIT-DASHBOARD-VERIFICATION-WAVE-25",
+      "receipt_sha256": "15b4ef5de5fc9029af9ff74dcb02dd1e52177695fd367ea9347c3a8b3c9f20c0",
+      "status": "AUDIT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+      "viewports": "4/4",
+      "navigation": "10/10",
+      "unique_local_links": "367/367",
+      "visible_boundary_checks": "42/42",
+      "application_browser_credit": false,
+      "audit_complete": false,
+      "superseded_by_run_154_dashboard": true
     }
   },
   "current_designated_application_access_preflight": {
@@ -2878,17 +2901,17 @@
     "run_id": "RUN-090-DIRECT-EXACT-ROUTE-PAGE-REVIEW-QUEUE-WAVE-11",
     "status": "CANDIDATE_QUEUE_PARTIALLY_REVIEWED_NO_WHOLESALE_OWNERSHIP_CREDIT",
     "records": 507,
-    "reviewed_queue_surfaces": 117,
-    "owned_queue_surfaces": 95,
+    "reviewed_queue_surfaces": 118,
+    "owned_queue_surfaces": 96,
     "shared_queue_surfaces": 10,
     "alias_queue_surfaces": 5,
     "dead_or_noncanonical_queue_surfaces": 0,
     "evidence_gap_queue_surfaces": 7,
-    "pending_unreviewed": 390,
-    "without_ownership": 412,
+    "pending_unreviewed": 389,
+    "without_ownership": 411,
     "wholesale_ownership_authorized": false,
-    "reconciled_through_overlay_run_id": "RUN-149-REVIEWED-OUTCOME-NEUTRAL-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-25",
-    "reconciled_through_review_run_id": "RUN-149R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-25"
+    "reconciled_through_overlay_run_id": "RUN-153-REVIEWED-OUTCOME-NEUTRAL-FLEET-VEHICLE-REGISTER-INDEX-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-26",
+    "reconciled_through_review_run_id": "RUN-153R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-VEHICLE-REGISTER-INDEX-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-26"
   },
   "historical_run_098_route_controller_only_ownership_review": {
     "run_id": "RUN-098R-INDEPENDENT-REVIEWED-ROUTE-CONTROLLER-ONLY-OWNERSHIP-OVERLAY-WAVE-12",
@@ -6154,6 +6177,1104 @@
     }
   },
   "current_static_source_feature_ownership": {
+    "schema_version": "run-153-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26-v1",
+    "run_id": "RUN-153-REVIEWED-OUTCOME-NEUTRAL-FLEET-VEHICLE-REGISTER-INDEX-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-26",
+    "status": "ONE_REVIEWED_FLEET_VEHICLE_REGISTER_INDEX_ROUTE_ACTION_OWNER_AND_BRIDGE_INTEGRATED_STATIC_ONLY",
+    "generated_on": "2026-08-27",
+    "pins": {
+      "checkpoint_commit": "12ac4a435deceb364ad0f23e97fad0677dfa1d1c",
+      "checkpoint_tree": "dfead8751310ceed65566e8c1148cfd1061056fd",
+      "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+      "subtrees": {
+        "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+        "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+        "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+        "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+        "tests_tree": "fef0122b31fdccbe2f9f805f7515666c74e2880a"
+      },
+      "generator": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.py",
+      "generator_sha256": "00b90c5932614eaf67cbca29c860924fad67190605bbf476fdc285174831ea83",
+      "generator_blob_id": "c46a48c87203410951715006c8253c84851e9d76",
+      "baseline": "evidence/source/current-run-149-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.json",
+      "baseline_sha256": "12a52c434ecd18a5c6a644378070aa5ab046f5e7080726b983ded8d9c7377a55",
+      "baseline_blob_id": "c5f0a3bda99167f66650d63bfdb35e18d8ed93b5",
+      "baseline_review": "evidence/source/current-run-149r-independent-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-review-wave-25.json",
+      "baseline_review_sha256": "545694fc1b7bd5f4af244617fb421ece1265fe6e6f2cad2ca834115e7a9e75a2",
+      "baseline_review_blob_id": "66f0faa0b1894160e299fecd2e1c43962a3138d7",
+      "baseline_review_materializer": "generators/materialize-independent-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-review-wave-25.py",
+      "baseline_review_materializer_sha256": "bd09980ac26a7e9d026eda518f1964f8a2a87ea75fecf271981e4017e8dcd57c",
+      "baseline_review_materializer_blob_id": "8947c8e02aa766d752aa1c7cd345e62d2ff8fa2b",
+      "cohort": "evidence/source/root-run-152-outcome-neutral-fleet-vehicle-register-index-route-action-cohort-wave-26.json",
+      "cohort_sha256": "5e987d8727896183aadf30b9000ed56b318e2f4c8935b6d77e3600999105eac4",
+      "cohort_blob_id": "a7e8e85e36dd4d07cc8653922cabd47e422f41ab",
+      "cohort_generator_sha256": "7b3e6501d3fe806e7bb27be8d20236467496e20e101d42a9efc0741e67f0e336",
+      "cohort_generator_blob_id": "7171cc58de0152219fc3fad83ca93385f333e80a",
+      "review": "evidence/source/raw-run-152r-independent-outcome-neutral-fleet-vehicle-register-index-route-action-review-wave-26.json",
+      "review_sha256": "43697db4e3a5743d6dc9b47a3e80c6ec5c528dba17c2e99a4a13f95933c899d8",
+      "review_blob_id": "6302d5e4e0d6e9a522e464eb99692ddc4a0f0c5d",
+      "review_materializer_sha256": "ecf6c7aa7c68d1b7936086316927057726797f7fa61d3b76af0c7435844f4597",
+      "review_materializer_blob_id": "458b582ca79f2b747c49e1e40a0cafe5415b9661",
+      "inputs": {
+        "generators/integrate-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.py": "b5c7f04cd44ecd73dda9c7fe4a9e2e8616c68674cdc52d393ec696b06ad2327e",
+        "evidence/source/current-run-149-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.json": "12a52c434ecd18a5c6a644378070aa5ab046f5e7080726b983ded8d9c7377a55",
+        "generators/materialize-independent-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-review-wave-25.py": "bd09980ac26a7e9d026eda518f1964f8a2a87ea75fecf271981e4017e8dcd57c",
+        "evidence/source/current-run-149r-independent-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-review-wave-25.json": "545694fc1b7bd5f4af244617fb421ece1265fe6e6f2cad2ca834115e7a9e75a2",
+        "generators/build-outcome-neutral-fleet-vehicle-register-index-route-action-cohort-wave-26.py": "7b3e6501d3fe806e7bb27be8d20236467496e20e101d42a9efc0741e67f0e336",
+        "evidence/source/root-run-152-outcome-neutral-fleet-vehicle-register-index-route-action-cohort-wave-26.json": "5e987d8727896183aadf30b9000ed56b318e2f4c8935b6d77e3600999105eac4",
+        "generators/materialize-independent-outcome-neutral-fleet-vehicle-register-index-route-action-review-wave-26.py": "ecf6c7aa7c68d1b7936086316927057726797f7fa61d3b76af0c7435844f4597",
+        "evidence/source/raw-run-152r-independent-outcome-neutral-fleet-vehicle-register-index-route-action-review-wave-26.json": "43697db4e3a5743d6dc9b47a3e80c6ec5c528dba17c2e99a4a13f95933c899d8",
+        "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
+        "03-feature-to-benchmark-matrix.csv": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0"
+      },
+      "input_map_sha256": "6c44f09f8e9fb21427bd1957907901c22557a6e6ce1f6925979a62b942378172"
+    },
+    "architecture_rule": "One operating organisation across multiple Sites. Exact roles/capabilities, approved Sites, canonical ownership, direct-object concealment and privacy are the authorization boundary; no tenant design or tenant-isolation credit.",
+    "baseline": {
+      "source_owner_records": 663,
+      "route_owner_records": 306,
+      "page_owner_records": 357,
+      "static_controller_action_bridges": 94,
+      "reviewed_queue_surface_rows": 117,
+      "pending_unreviewed_queue_surface_rows": 390,
+      "post_commit_review": {
+        "run_id": "RUN-149R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-25",
+        "status": "GO_THREE_PART_POST_COMMIT_REVIEW_COMPLETE_REPORTING_ONLY_ZERO_NEW_OR_DOWNSTREAM_CREDIT",
+        "producer_sha256": "12a52c434ecd18a5c6a644378070aa5ab046f5e7080726b983ded8d9c7377a55",
+        "producer_blob_id": "c5f0a3bda99167f66650d63bfdb35e18d8ed93b5",
+        "producer_generator_sha256": "b5c7f04cd44ecd73dda9c7fe4a9e2e8616c68674cdc52d393ec696b06ad2327e",
+        "producer_generator_blob_id": "e8d9d1c9889be589a22db6dfea53d3122adce247",
+        "independent_overlay_review_for_reporting": true,
+        "new_or_current_or_downstream_credit": false
+      }
+    },
+    "reviewed_overlay": {
+      "producer_run_id": "RUN-152-OUTCOME-NEUTRAL-FLEET-VEHICLE-REGISTER-INDEX-ROUTE-ACTION-COHORT-WAVE-26",
+      "review_run_id": "RUN-152R-INDEPENDENT-OUTCOME-NEUTRAL-FLEET-VEHICLE-REGISTER-INDEX-ROUTE-ACTION-REVIEW-WAVE-26",
+      "reviewed_route_actions": 1,
+      "owner_route_actions": 1,
+      "accepted_source_owner_records": 1,
+      "accepted_route_owner_records": 1,
+      "accepted_page_owner_records": 0,
+      "accepted_controller_action_bridges": 1,
+      "new_distinct_feature_ids": 0,
+      "current_static_overlay_credit_applied": true,
+      "correctness_or_downstream_credit_authorized": false,
+      "final_finding_credit_authorized": false
+    },
+    "provisional_assurance_observation_preservation": {
+      "observations": [
+        {
+          "observation_id": "RUN152R-ASSURANCE-FLEET-VIEWANY-AUTHORITY",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "exact_read_export_telemetry_authority",
+          "loci": [
+            "routes/fleet-assets.php:34-52",
+            "app/Http/Controllers/FleetAssets/VehicleController.php:60-245"
+          ],
+          "observation": "The exact authority intended by fleet.viewAny for CSV export and live telemetry projection is not established.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "077e2f0d1580b70ad572df3226e1da4fa6322c10583188788440d2cc6ceb7b20"
+        },
+        {
+          "observation_id": "RUN152R-ASSURANCE-APPROVED-SITE-LIST-EXPORT-FILTER",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "approved_site_list_export_raw_filter_and_options",
+          "loci": [
+            "app/Http/Controllers/FleetAssets/VehicleController.php:60-245",
+            "app/Services/UserSiteAccessService.php:1-1625"
+          ],
+          "observation": "The vehicle list, CSV path, raw site_id filter and all active-Site options are not visibly constrained through the canonical approved-Site boundary.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "13cc4da3222634da515f86767edd40e9de79bf03dc6f64c595c1f8ebf4aa4a4b"
+        },
+        {
+          "observation_id": "RUN152R-ASSURANCE-AGGREGATE-SCOPE",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "aggregate_scope",
+          "loci": [
+            "app/Http/Controllers/FleetAssets/VehicleController.php:60-245",
+            "app/Services/UserSiteAccessService.php:1598"
+          ],
+          "observation": "Only alert aggregation is visibly passed through applyAlertScope; the remaining vehicle, compliance and status aggregates lack equivalent proved scope.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "343beb84e06d5e822e852337508773eb62b67a60f4ae0ea1eb03ff30df1855dd"
+        },
+        {
+          "observation_id": "RUN152R-ASSURANCE-LIVE-TELEMETRY-PRIVACY",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "live_telemetry_and_privacy",
+          "loci": [
+            "app/Http/Controllers/FleetAssets/VehicleController.php:60-245",
+            "resources/js/pages/fleet-assets/vehicles/index.tsx:1-430"
+          ],
+          "observation": "Authorization and privacy for home-Site, coordinates, speed, battery and related live state projections are not established for every fleet.viewAny holder.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "c847b15576fdebcde4e8518cbddb40c4f2c32b516140d7c7a8ffa0235a05b982"
+        },
+        {
+          "observation_id": "RUN152R-ASSURANCE-SHOW-CONCEALMENT-NONTRANSFER",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "adjacent_show_direct_object_concealment_nontransfer",
+          "loci": [
+            "app/Policies/AssetPolicy.php:1-75",
+            "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php:1125-1184",
+            "app/Http/Controllers/FleetAssets/VehicleController.php:247"
+          ],
+          "observation": "Direct-object concealment semantics for the adjacent show action do not transfer to the selected index route or prove list/export/filter scope.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "a58eb26698ef55b329e1c9dec331214dad04ed97e477f032c04b01b23da068fa"
+        },
+        {
+          "observation_id": "RUN152R-ASSURANCE-NEGATIVE-PATH-EXECUTION",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "ordinary_viewer_foreign_site_execution",
+          "loci": [
+            "tests/Feature/FleetAssets/FleetHeroRolloutContractTest.php:58-110",
+            "tests/Feature/FleetAssets/FleetControlRoomAlertHeroScopeTest.php:26-59",
+            "tests/Browser/Fleet/FleetPermissionsTest.php:170-195"
+          ],
+          "observation": "No executed ordinary-viewer foreign-Site list, export, raw-filter or aggregate non-disclosure proof is present in this source-only review.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "6c72b2c793b2caa99b0ff6481f71b4beb8be4a6eb4c9996d8e58d392b9b6afce"
+        }
+      ],
+      "observation_count": 6,
+      "provisional_source_observations_only": true,
+      "correctness_credit_authorized": false,
+      "final_finding_credit_authorized": false
+    },
+    "reviewer_lineage": {
+      "independent_candidate_reviews": [
+        {
+          "review_id": "RUN152R-INDEPENDENT-REVIEW-A",
+          "reviewer_role": "fresh semantic route-action reviewer A",
+          "blinded_review": false,
+          "nonblinding_reason": "prior outcome visible in team status",
+          "prior_outcome_visible_in_team_status": true,
+          "reviewer_b_consulted": false,
+          "fresh_committed_source_trace": true,
+          "reported_matrix_locus": "03-feature-to-benchmark-matrix.csv:94",
+          "normalized_matrix_locus": "03-feature-to-benchmark-matrix.csv:108",
+          "matrix_locus_correction": "NON_MATERIAL_STALE_LOCATOR_CORRECTED_TO_EXACT_CAP_FLEET_VEHICLE_REGISTER_LINE",
+          "independent_from_cohort_producer": true,
+          "other_candidate_reviewer_consulted": false,
+          "independent_evidence_trace_completed": true,
+          "review_method": "FRESH_PINNED_STATIC_SEMANTIC_TRACE_NO_EXECUTION",
+          "reported_review_hash": "24f9a0ccf4681997827ee992ea72a66bcd1e053c55f1f2671fc2b3c716b1e610",
+          "canonical_candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+          "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+          "queue_index_zero_based": 81,
+          "queue_id": "RUN090-ROUTE-0082",
+          "queue_canonical_key": "route|RUN077-ROUTE-0690",
+          "route_record_id": "RUN077-ROUTE-0690",
+          "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+          "action_key": "RUN077-ROUTE-0690|app/Http/Controllers/FleetAssets/VehicleController.php:index|CAP-FLEET-VEHICLE-REGISTER",
+          "outcome": "OWNER_ROUTE_ACTION",
+          "confidence": "HIGH_STATIC_IDENTITY_ONLY",
+          "identity_basis": "EXACT_LITERAL_ROUTE_NAME_PLUS_UNIQUE_CONTROLLER_INDEX_PLUS_DIRECT_VEHICLE_QUERY_AND_RENDER",
+          "source_loci": [
+            "03-feature-to-benchmark-matrix.csv:108",
+            "routes/fleet-assets.php:34-52",
+            "app/Http/Controllers/FleetAssets/VehicleController.php:31-245",
+            "resources/js/pages/fleet-assets/vehicles/index.tsx:1-430"
+          ],
+          "rationale": "The exact GET route resolves uniquely to VehicleController::index, which directly builds the vehicle register query and renders the canonical vehicle register page. This establishes only narrow static route/action ownership.",
+          "denied_alternatives": {
+            "SHARED_RELATION": "Models, services, page and callers are dependencies or context, not co-owners of this exact route action.",
+            "EVIDENCE_GAP": "The exact route, unique action, Asset::vehicles query and literal render close narrow static ownership; correctness remains separate."
+          },
+          "ownership_material_expansion": {
+            "status": "NONE_REQUIRED_FOR_NARROW_STATIC_OWNERSHIP",
+            "paths": []
+          },
+          "route_ownership_authorized_for_later_overlay": true,
+          "controller_action_bridge_authorized_for_later_overlay": true,
+          "owner_source_record_key": "route|RUN077-ROUTE-0690|CAP-FLEET-VEHICLE-REGISTER",
+          "bridge_key": [
+            "app/Http/Controllers/FleetAssets/VehicleController.php",
+            "index",
+            "CAP-FLEET-VEHICLE-REGISTER"
+          ],
+          "page_ownership_authorized": false,
+          "existing_page_owner_inherited_or_recredited": false,
+          "historical_sentinel_inherited_or_rewritten": false,
+          "neighbor_identity_or_outcome_inherited": false,
+          "current_overlay_credit_awarded": false,
+          "correctness_or_downstream_credit_authorized": false,
+          "reviewer_wrote_files": false,
+          "review_record_sha256": "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292"
+        },
+        {
+          "review_id": "RUN152R-INDEPENDENT-REVIEW-B",
+          "reviewer_role": "fresh semantic route-action reviewer B",
+          "blinded_review": false,
+          "nonblinding_reason": "prior self-assessment visible",
+          "prior_self_assessment_visible": true,
+          "reviewer_a_consulted": false,
+          "reviewer_a_outcome_visible": false,
+          "external_session_consulted": false,
+          "fresh_committed_source_trace": true,
+          "reported_matrix_locus": "03-feature-to-benchmark-matrix.csv:108",
+          "normalized_matrix_locus": "03-feature-to-benchmark-matrix.csv:108",
+          "reported_candidate_hash_basis": "queue_record_self_seal",
+          "reported_candidate_hash_basis_value": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+          "candidate_hash_basis_difference": "NON_MATERIAL_LABEL_OR_BASIS_DIFFERENCE_RECONCILED_TO_CANONICAL_COHORT_RECORD",
+          "independent_from_cohort_producer": true,
+          "other_candidate_reviewer_consulted": false,
+          "independent_evidence_trace_completed": true,
+          "review_method": "FRESH_PINNED_STATIC_SEMANTIC_TRACE_NO_EXECUTION",
+          "reported_review_hash": "2d540694691db267013856b9ebe1d0b398a2b0b0f24d9fec2b06c5fc2bf56820",
+          "canonical_candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+          "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+          "queue_index_zero_based": 81,
+          "queue_id": "RUN090-ROUTE-0082",
+          "queue_canonical_key": "route|RUN077-ROUTE-0690",
+          "route_record_id": "RUN077-ROUTE-0690",
+          "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+          "action_key": "RUN077-ROUTE-0690|app/Http/Controllers/FleetAssets/VehicleController.php:index|CAP-FLEET-VEHICLE-REGISTER",
+          "outcome": "OWNER_ROUTE_ACTION",
+          "confidence": "HIGH_STATIC_IDENTITY_ONLY",
+          "identity_basis": "EXACT_LITERAL_ROUTE_NAME_PLUS_UNIQUE_CONTROLLER_INDEX_PLUS_DIRECT_VEHICLE_QUERY_AND_RENDER",
+          "source_loci": [
+            "03-feature-to-benchmark-matrix.csv:108",
+            "routes/fleet-assets.php:34-52",
+            "app/Http/Controllers/FleetAssets/VehicleController.php:31-245",
+            "resources/js/pages/fleet-assets/vehicles/index.tsx:1-430"
+          ],
+          "rationale": "A fresh committed trace links the unique vehicles index route to VehicleController::index, Asset::vehicles and the exact Inertia page. Page ownership and correctness are not inherited.",
+          "denied_alternatives": {
+            "SHARED_RELATION": "Models, services, page and callers are dependencies or context, not co-owners of this exact route action.",
+            "EVIDENCE_GAP": "The exact route, unique action, Asset::vehicles query and literal render close narrow static ownership; correctness remains separate."
+          },
+          "ownership_material_expansion": {
+            "status": "NONE_REQUIRED_FOR_NARROW_STATIC_OWNERSHIP",
+            "paths": []
+          },
+          "route_ownership_authorized_for_later_overlay": true,
+          "controller_action_bridge_authorized_for_later_overlay": true,
+          "owner_source_record_key": "route|RUN077-ROUTE-0690|CAP-FLEET-VEHICLE-REGISTER",
+          "bridge_key": [
+            "app/Http/Controllers/FleetAssets/VehicleController.php",
+            "index",
+            "CAP-FLEET-VEHICLE-REGISTER"
+          ],
+          "page_ownership_authorized": false,
+          "existing_page_owner_inherited_or_recredited": false,
+          "historical_sentinel_inherited_or_rewritten": false,
+          "neighbor_identity_or_outcome_inherited": false,
+          "current_overlay_credit_awarded": false,
+          "correctness_or_downstream_credit_authorized": false,
+          "reviewer_wrote_files": false,
+          "review_record_sha256": "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+        }
+      ],
+      "synthesis_review": {
+        "synthesis_id": "RUN152R-INDEPENDENT-REVIEW-SYNTHESIS",
+        "verdict": "GO_ACCEPT_1_OWNER_ROUTE_ACTION_FOR_BOUNDED_LATER_INTEGRATION",
+        "accepted_independent_review_ids": [
+          "RUN152R-INDEPENDENT-REVIEW-A",
+          "RUN152R-INDEPENDENT-REVIEW-B"
+        ],
+        "accepted_independent_review_record_sha256s": [
+          "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292",
+          "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+        ],
+        "canonical_candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+        "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+        "reviewer_a_stale_matrix_line_94_corrected_to_exact_line_108": true,
+        "reviewer_a_locator_correction_material": false,
+        "reviewer_b_reported_exact_matrix_line_108": true,
+        "reviewer_b_hash_basis_difference_reconciled": true,
+        "reviewer_b_hash_basis_difference_material": false,
+        "outcome_variables": {
+          "O": 1,
+          "S": 0,
+          "E": 0
+        },
+        "independent_reviews_reconciled": true,
+        "outcome_discrepancies": 0,
+        "material_identity_discrepancies": 0,
+        "page_credit_discrepancies": 0,
+        "hard_stop_discrepancies": 0,
+        "ownership_material_expansion_required": false,
+        "provisional_assurance_observation_count": 6,
+        "provisional_assurance_observations_sha256": "c0c5c36fe36b5f0d98e9ed7952eb673bdc3faa045732ae1c824ee86763714b6d",
+        "route_ownership_authorized": true,
+        "controller_action_bridge_authorized": true,
+        "page_ownership_authorized": false,
+        "bounded_overlay_integration_authorized_later_only": true,
+        "current_overlay_credit_awarded": false,
+        "correctness_or_downstream_credit_authorized": false,
+        "synthesizer_wrote_files": false,
+        "synthesis_record_sha256": "79658aa2ed0f4c9ebeaaf6277a25117caa36f4617818c49fa7bdcf562c3e8e70"
+      },
+      "action_decision": {
+        "candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+        "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+        "accepted_independent_review_ids": [
+          "RUN152R-INDEPENDENT-REVIEW-A",
+          "RUN152R-INDEPENDENT-REVIEW-B"
+        ],
+        "accepted_independent_review_record_sha256s": [
+          "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292",
+          "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+        ],
+        "synthesis_record_sha256": "79658aa2ed0f4c9ebeaaf6277a25117caa36f4617818c49fa7bdcf562c3e8e70",
+        "queue_index_zero_based": 81,
+        "queue_id": "RUN090-ROUTE-0082",
+        "route_record_id": "RUN077-ROUTE-0690",
+        "literal_route_name": "fleet-assets.vehicles.index",
+        "controller_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "controller_method": "index",
+        "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+        "outcome": "OWNER_ROUTE_ACTION",
+        "confidence": "HIGH_STATIC_IDENTITY_ONLY_2_OF_2_PLUS_SYNTHESIS",
+        "route_ownership_authorized_for_later_overlay": true,
+        "controller_action_bridge_authorized_for_later_overlay": true,
+        "page_ownership_authorized": false,
+        "existing_page_owner_inherited_or_recredited": false,
+        "historical_sentinel_inherited_or_rewritten": false,
+        "neighbor_identity_or_outcome_inherited": false,
+        "current_overlay_credit_awarded": false,
+        "correctness_or_downstream_credit_authorized": false,
+        "provisional_assurance_observation_ids": [
+          "RUN152R-ASSURANCE-FLEET-VIEWANY-AUTHORITY",
+          "RUN152R-ASSURANCE-APPROVED-SITE-LIST-EXPORT-FILTER",
+          "RUN152R-ASSURANCE-AGGREGATE-SCOPE",
+          "RUN152R-ASSURANCE-LIVE-TELEMETRY-PRIVACY",
+          "RUN152R-ASSURANCE-SHOW-CONCEALMENT-NONTRANSFER",
+          "RUN152R-ASSURANCE-NEGATIVE-PATH-EXECUTION"
+        ],
+        "decision_record_sha256": "5608a702268ab10f5bf74de2f75cdf4c19a91785d1790f908441c11730bc47ed"
+      }
+    },
+    "source_packet_boundary": {
+      "original_source_review_complete": false,
+      "original_source_packet_completeness_claimed": false,
+      "original_material_dependency_semantics_complete": false,
+      "original_known_expansion_adjudicated": false,
+      "original_packet_retroactively_described_as_complete": false,
+      "ownership_material_expansion_required": false,
+      "correctness_only_observations_authorize_no_credit": true
+    },
+    "combined_counts": {
+      "source_owner_records": 664,
+      "route_owner_records": 307,
+      "page_owner_records": 357,
+      "distinct_feature_ids": 256,
+      "distinct_H_feature_ids": 234,
+      "distinct_D_feature_ids": 22,
+      "route_distinct_feature_ids": 64,
+      "page_distinct_feature_ids": 242,
+      "route_page_feature_overlap": 50,
+      "static_controller_action_bridges": 95,
+      "bounded_static_source_denominator": 3929,
+      "bounded_static_source_ownership_percent": "16.899975",
+      "bounded_static_source_residual_records": 3265,
+      "residual_explicit_unmapped_routes": 2894,
+      "semantic_shared_routes": 12,
+      "reviewed_alias_routes": 5,
+      "reviewed_dead_routes": 0,
+      "evidence_gap_routes_tagged_within_residual": 7,
+      "residual_unadjudicated_page_roots": 345,
+      "semantic_shared_page_roots": 9,
+      "reviewed_alias_page_roots": 0,
+      "reviewed_dead_page_roots": 0,
+      "evidence_gap_page_roots_tagged_within_residual": 1
+    },
+    "queue_accounting": {
+      "direct_exact_queue_records": 507,
+      "reviewed_queue_surface_rows": 118,
+      "owner_queue_surface_rows": 96,
+      "shared_queue_surface_rows": 10,
+      "alias_queue_surface_rows": 5,
+      "dead_queue_surface_rows": 0,
+      "evidence_gap_queue_surface_rows": 7,
+      "pending_unreviewed_queue_surface_rows": 389,
+      "queue_surfaces_without_ownership": 411,
+      "new_reviewed_route_surface_rows": 1,
+      "new_owner_route_surface_rows": 1
+    },
+    "queue_boundary": {
+      "preceding_index_80_not_recredited": true,
+      "index_82_reviewed_context_not_recredited": true,
+      "selected_index_81_integrated": true,
+      "next_unresolved_index": 83,
+      "next_unresolved_queue_id": "RUN090-ROUTE-0084",
+      "next_unresolved_route_record_id": "RUN077-ROUTE-0692",
+      "next_unresolved_queue_record_sha256": "d29353be38d964311d6586311d654c13dc2a39da9b7bcdb8a6a75d69fa511731",
+      "reviewed_key_count": 118,
+      "reviewed_key_list_sha256": "2b0612a3dc8ca47d3e5d12877677e1c85598364cf61bfda1ea5c20232ae029f5"
+    },
+    "noninheritance_boundary": {
+      "existing_page_owner_id": "PAGE-ROOT-07E63287EC196468",
+      "existing_page_owner_record_sha256": "071be3674cfd4d743b32a70ac2ad63c84af38a11aab563b98393f22332282028",
+      "existing_page_owner_reconciliation_source": "evidence/source/root-run-152-outcome-neutral-fleet-vehicle-register-index-route-action-cohort-wave-26.json",
+      "page_owner_not_inherited_or_recredited": true,
+      "historical_route_record_id": "RUN077-ROUTE-0690",
+      "historical_route_classification": "EXPLICIT_UNMAPPED_SENTINEL",
+      "historical_sentinel_record_sha256": "876cc424a505e7b07c08e18c8c5efcbe6ddd7a9a330400055baed769469d11db",
+      "historical_sentinel_reconciliation_source": "evidence/source/root-run-152-outcome-neutral-fleet-vehicle-register-index-route-action-cohort-wave-26.json",
+      "historical_sentinel_preserved_not_rewritten_or_credited": true,
+      "neighbor_identity_or_outcome_not_inherited": true
+    },
+    "overlay_source_records": [
+      {
+        "overlay_mapping_id": "RUN153-ROUTE-01",
+        "candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+        "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+        "decision_record_sha256": "5608a702268ab10f5bf74de2f75cdf4c19a91785d1790f908441c11730bc47ed",
+        "surface": "ROUTE_SOURCE_RECORD",
+        "source_record_id": "RUN077-ROUTE-0690",
+        "source_record_key": "route|RUN077-ROUTE-0690|CAP-FLEET-VEHICLE-REGISTER",
+        "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+        "feature_class": "H",
+        "module": "Fleet & Assets",
+        "user_job": "Maintain vehicles and vehicle-specific state",
+        "source": {
+          "route_file": "routes/fleet-assets.php",
+          "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+          "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+          "source_key": "routes/fleet-assets.php:51:9:get:7",
+          "source_anchor": "routes/fleet-assets.php:51",
+          "source_locator": "routes/fleet-assets.php:51:9:get",
+          "route_method": "get",
+          "literal_uri": "/vehicles",
+          "literal_route_name": "fleet-assets.vehicles.index",
+          "action_expression": "[VehicleController::class, 'index']",
+          "statement_excerpt": "Route::get('/vehicles', [VehicleController::class, 'index'])->name('fleet-assets.vehicles.index');",
+          "statement_sha256": "930b098f1dc5c103fc23ab6086f690d9a0dc1d30a69edf331479cd21b0a2b3ce"
+        },
+        "review_outcome": "OWNER_ROUTE_ACTION",
+        "review_rationale": "Two independent reviews and synthesis establish narrow static ownership of the exact vehicles index route/action; no page or correctness outcome is inherited.",
+        "static_source_feature_ownership_credit": true,
+        "credit_boundary": {
+          "page_ownership": false,
+          "framework_route_reachability": false,
+          "canonical_object_ownership_correctness": false,
+          "approved_site_scope_correctness": false,
+          "permission_correctness": false,
+          "privacy_correctness": false,
+          "direct_object_correctness": false,
+          "query_projection_correctness": false,
+          "runtime": false,
+          "database": false,
+          "build": false,
+          "application_browser": false,
+          "executed_tests": false,
+          "benchmark": false,
+          "final_finding": false,
+          "completion": false,
+          "audit_complete": false
+        },
+        "overlay_row_sha256": "24f25dc0239b4d6c19b98a0be9bb59229652d7f6c5611164a460cfe468aeefc8"
+      }
+    ],
+    "new_static_controller_action_bridges": [
+      {
+        "bridge_id": "RUN153-BRIDGE-01",
+        "candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+        "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+        "decision_record_sha256": "5608a702268ab10f5bf74de2f75cdf4c19a91785d1790f908441c11730bc47ed",
+        "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+        "route_record_id": "RUN077-ROUTE-0690",
+        "controller_fqcn": "App\\Http\\Controllers\\FleetAssets\\VehicleController",
+        "controller_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "controller_file_sha256": "478a1a0a33868536fc3b2baf5db2d06732ddb5fa16094997a5128dc2267b5239",
+        "controller_file_blob_id": "49897a4f91a2484c0633c6a575f554ed725acb1f",
+        "method": "index",
+        "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:60",
+        "method_review_slice_sha256": "92e5cfea63e7ce6b1c3c784cc4ac3a4ebae2c89ca5a0d65bba9b2119743b9191",
+        "review_outcome": "OWNER_ROUTE_ACTION",
+        "static_controller_action_bridge_credit": true,
+        "page_ownership_credit": false,
+        "correctness_credit": false,
+        "runtime_credit": false,
+        "application_browser_credit": false,
+        "executed_test_credit": false,
+        "final_finding_credit": false,
+        "completion_credit": false,
+        "bridge_row_sha256": "3fdac0897d7565ad7d7f6e99174565e67253cd3e92c91493b3b47565d555dcb3"
+      }
+    ],
+    "reviewed_non_owner_outcomes": [],
+    "identity": {
+      "prior_source_record_key_list_sha256": "b8cea49502df5597bcd46726e5bcf25130dcb760d8ad14ab69c36207634f1b84",
+      "combined_source_record_key_list_sha256": "93e9ab12d9441ec6f568221db39c4d215c41cb9fc642219a2697e70df79e84c2",
+      "prior_bridge_key_list_sha256": "6e69d7888d98e221f6552a86cf1efd7a19074650c6655a1466cf8a77c4882e28",
+      "combined_bridge_key_list_sha256": "3ad7591c68727b4d8f724fd819b91d8a5b775cb76072f4e20f05e8cf458e2c0e",
+      "prior_reviewed_queue_key_list_sha256": "7bfbc1ab7c57b332b7a4673499713d581ea0b03dc24436ae7dae3dc7413838f6",
+      "combined_reviewed_queue_key_list_sha256": "2b0612a3dc8ca47d3e5d12877677e1c85598364cf61bfda1ea5c20232ae029f5",
+      "new_overlay_source_records_sha256": "5d7d88fb45e1bd416b0f78032b74c5ffc470e42cc4431f75e230fdebb4925624",
+      "new_action_bridges_sha256": "3a9909de6aefe0cecaf00eddf41309da8c2932989507b92f6a3ee050ec9db4a9",
+      "review_record_sha256s": [
+        "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292",
+        "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+      ],
+      "synthesis_record_sha256": "79658aa2ed0f4c9ebeaaf6277a25117caa36f4617818c49fa7bdcf562c3e8e70",
+      "decision_record_sha256": "5608a702268ab10f5bf74de2f75cdf4c19a91785d1790f908441c11730bc47ed",
+      "observation_record_sha256s": [
+        "077e2f0d1580b70ad572df3226e1da4fa6322c10583188788440d2cc6ceb7b20",
+        "13cc4da3222634da515f86767edd40e9de79bf03dc6f64c595c1f8ebf4aa4a4b",
+        "343beb84e06d5e822e852337508773eb62b67a60f4ae0ea1eb03ff30df1855dd",
+        "c847b15576fdebcde4e8518cbddb40c4f2c32b516140d7c7a8ffa0235a05b982",
+        "a58eb26698ef55b329e1c9dec331214dad04ed97e477f032c04b01b23da068fa",
+        "6c72b2c793b2caa99b0ff6481f71b4beb8be4a6eb4c9996d8e58d392b9b6afce"
+      ]
+    },
+    "outcome_conservation": {
+      "reviewed_outcomes_equation": "1 = 1 owner + 0 shared + 0 evidence gap",
+      "bounded_source_equation": "3929 = 664 owner + 3265 non-owner residual",
+      "owner_surface_equation": "664 = 307 route + 357 page",
+      "feature_union_equation": "256 = 64 route + 242 page - 50 overlap",
+      "route_universe_equation": "3218 = 307 owner + 12 shared + 5 alias + 0 dead + 2894 residual",
+      "page_universe_equation": "711 = 357 owner + 9 shared + 0 alias + 0 dead + 345 residual",
+      "queue_equation": "507 = 118 reviewed + 389 pending",
+      "reviewed_queue_equation": "118 = 96 owner + 10 shared + 5 alias + 0 dead + 7 evidence gap",
+      "queue_without_ownership_equation": "411 = 389 pending + 10 shared + 5 alias + 0 dead + 7 evidence gap"
+    },
+    "credit_boundary": {
+      "STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_1_RECORD": true,
+      "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_1_ACTION": true,
+      "static_page_feature_ownership": false,
+      "frontend_caller_ownership": false,
+      "complete_route_page_feature_crosswalk": false,
+      "framework_route_reachability": false,
+      "canonical_object_ownership_correctness": false,
+      "approved_site_scope_correctness": false,
+      "permission_correctness": false,
+      "privacy_correctness": false,
+      "direct_object_correctness": false,
+      "query_projection_correctness": false,
+      "runtime": false,
+      "database": false,
+      "build": false,
+      "application_browser": false,
+      "responsive_application": false,
+      "executed_tests": false,
+      "application_source_mutation": false,
+      "matrix_mutation": false,
+      "benchmark": false,
+      "final_no_match_or_NCM": false,
+      "ease": false,
+      "release": false,
+      "pass": false,
+      "final_finding": false,
+      "feature_completion": false,
+      "completion": false,
+      "gate_4": false,
+      "audit_complete": false
+    },
+    "mutation_attestation": {
+      "application_source_changed": false,
+      "test_files_changed": false,
+      "matrix_changed": false,
+      "reports_changed": false,
+      "dashboard_generator_changed": false,
+      "dashboard_html_changed": false,
+      "runtime_or_external_system_changed": false,
+      "audit_artifacts_only": true,
+      "only_expected_run153_artifacts_present": true
+    },
+    "artifact_completion_test_met": true,
+    "audit_completion_test_met": false,
+    "wrote_files": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.py",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-153-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.json"
+    ],
+    "review_run_id": "RUN-153R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-VEHICLE-REGISTER-INDEX-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-26",
+    "independent_overlay_review_summary": {
+      "decision": {
+        "verdict": "GO",
+        "independent_reviews": 3,
+        "independently_sealed_review_records": true,
+        "discrepancies": 0,
+        "reporting_materialization_authorized": true,
+        "provisional_source_observation_reporting_authorized": true,
+        "gate_4_complete": false
+      },
+      "review_records": [
+        {
+          "record": {
+            "review_id": "RUN153R-INDEPENDENT-MECHANICAL-PROVENANCE-REPLAY-REVIEW",
+            "reviewer_task_path": "/root/fleet_reporting_pattern_research",
+            "review_scope": "HISTORICAL_COMMIT_PROVENANCE_FORMAT_INPUTS_AND_IN_MEMORY_REPLAY",
+            "reviewed_on": "2026-08-29",
+            "verdict": "GO",
+            "confidence": "HIGH",
+            "producer_commit": "8c179fe14840ff1093c455bfb943f3c9ba60e59b",
+            "producer_tree": "2ad599448435f2eacdabc0cc0ee2b95d98dfe817",
+            "producer_parent": "12ac4a435deceb364ad0f23e97fad0677dfa1d1c",
+            "producer_parent_tree": "dfead8751310ceed65566e8c1148cfd1061056fd",
+            "review_checkpoint_commit": "c5c0ad0903d2e2e2229d5d0090fc0a69a2206f0f",
+            "producer_is_review_checkpoint_ancestor": true,
+            "audit_subtree_committed_drift_since_producer": 0,
+            "commit_diff": {
+              "files": 2,
+              "name_status": [
+                "A\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-153-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.json",
+                "A\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.py"
+              ],
+              "audit_artifacts_only": true
+            },
+            "generator": {
+              "sha256": "00b90c5932614eaf67cbca29c860924fad67190605bbf476fdc285174831ea83",
+              "blob_id": "c46a48c87203410951715006c8253c84851e9d76",
+              "bytes": 23969,
+              "lines": 218
+            },
+            "output": {
+              "sha256": "9b7e382f83787d807de8d752ecb3e6524280c707899aba78d47082765272e815",
+              "blob_id": "818b891cff9965193c60d83d0580c21a48d1a682",
+              "bytes": 35844,
+              "lines": 614,
+              "strict_json": true,
+              "lf_no_bom_terminal_lf": true
+            },
+            "inputs": {
+              "count": 10,
+              "map_sha256": "6c44f09f8e9fb21427bd1957907901c22557a6e6ce1f6925979a62b942378172",
+              "all_current_sha256s_match": true
+            },
+            "replay": {
+              "mode": "IN_MEMORY_WRITE_INTERCEPT",
+              "byte_identical": true,
+              "sha256": "9b7e382f83787d807de8d752ecb3e6524280c707899aba78d47082765272e815"
+            },
+            "reviewer_wrote_files": false,
+            "wrote_files": []
+          },
+          "record_sha256": "cb2cf5900df3745f87f17cbcdd1a43d3a99c4ca6617ecbacb3ca16067bf371e6"
+        },
+        {
+          "record": {
+            "review_id": "RUN153R-INDEPENDENT-LINEAGE-IDENTITY-SEAL-REVIEW",
+            "reviewer_task_path": "/root/run153_lineage_review",
+            "review_scope": "RUN152_RUN152R_LINEAGE_IDENTITY_AND_ALL_EMBEDDED_SEALS",
+            "reviewed_on": "2026-08-29",
+            "verdict": "GO",
+            "confidence": "HIGH",
+            "producer_commit": "8c179fe14840ff1093c455bfb943f3c9ba60e59b",
+            "candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+            "independent_review_record_sha256s": [
+              "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292",
+              "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+            ],
+            "synthesis_record_sha256": "79658aa2ed0f4c9ebeaaf6277a25117caa36f4617818c49fa7bdcf562c3e8e70",
+            "decision_record_sha256": "5608a702268ab10f5bf74de2f75cdf4c19a91785d1790f908441c11730bc47ed",
+            "identity_sha256": "ad29336ca5fe61c84ab136d5a12dc7c98f63d88fdd76db931050986187f51145",
+            "reviewer_lineage_sha256": "622aade4f51b3831c832da567e9ee88eaaaf4df5f748daef91a7e5d6c4ccde11",
+            "source_packet_boundary_sha256": "0cb962e7ccf02609a8f2e359db9a29706f9b3f0d7093a271c779c8009df8c31e",
+            "all_embedded_self_seals_valid": true,
+            "nonblinding_disclosure_preserved_by_exact_reviewer_records": true,
+            "reviewer_wrote_files": false,
+            "wrote_files": []
+          },
+          "record_sha256": "02df4c41e8e19135b103e052f444ed5d948a808ced754dcafd993bdd6d599ac7"
+        },
+        {
+          "record": {
+            "review_id": "RUN153R-INDEPENDENT-ACCOUNTING-SITE-NONINHERITANCE-REVIEW",
+            "reviewer_task_path": "/root/run153r_pattern_research",
+            "review_scope": "COUNT_QUEUE_SITE_BOUNDARY_NONINHERITANCE_AND_CREDIT_PARTITION",
+            "reviewed_on": "2026-08-29",
+            "verdict": "GO",
+            "confidence": "HIGH",
+            "producer_commit": "8c179fe14840ff1093c455bfb943f3c9ba60e59b",
+            "verified_totals": {
+              "source_owners": 664,
+              "route_owners": 307,
+              "page_owners": 357,
+              "controller_action_bridges": 95,
+              "reviewed_queue_rows": 118,
+              "pending_queue_rows": 389,
+              "queue_rows_without_ownership": 411
+            },
+            "combined_counts_sha256": "3062c4b905dac9ef15c9cbafa9604a3ae243f8e1ac05aeb94bc64537c3981425",
+            "queue_accounting_sha256": "1c2bcdade0c93af0bccdc40f0855e9e8d288022aa962e80181d079ddea52c336",
+            "queue_boundary_sha256": "036cbbc845ce6e0fd673b8f178bce7f3a7aabc494fa414de52a1d572fd8ad7b9",
+            "noninheritance_sha256": "79a83eb10baf60cbeb17e547154f4bad15336ed5be1788002405e628ca82f131",
+            "provisional_observations": 6,
+            "single_organisation_multi_site_boundary_preserved": true,
+            "producer_positive_credit_keys": [
+              "STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_1_RECORD",
+              "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_1_ACTION"
+            ],
+            "review_adds_no_source_owner_bridge_page_correctness_or_downstream_credit": true,
+            "reviewer_wrote_files": false,
+            "wrote_files": []
+          },
+          "record_sha256": "75e8acf8bc5c47717b73527c42bd26579996b9792c779cd22fe55d7357a88d93"
+        }
+      ],
+      "synthesis_review": {
+        "review_id": "RUN153R-THREE-PART-POST-COMMIT-SYNTHESIS",
+        "reviewer_task_path": "/root",
+        "verdict": "GO",
+        "accepted_record_sha256s": [
+          "cb2cf5900df3745f87f17cbcdd1a43d3a99c4ca6617ecbacb3ca16067bf371e6",
+          "02df4c41e8e19135b103e052f444ed5d948a808ced754dcafd993bdd6d599ac7",
+          "75e8acf8bc5c47717b73527c42bd26579996b9792c779cd22fe55d7357a88d93"
+        ],
+        "independently_sealed_review_records": true,
+        "distinct_reviewer_task_paths": true,
+        "blinded_reviews": false,
+        "nonblinding_disclosure_preserved": true,
+        "independent_evidence_recomputation": true,
+        "discrepancies": 0,
+        "reporting_materialization_authorized": true,
+        "provisional_observations_may_be_reported_as_provisional_only": true,
+        "new_ownership_or_bridge_credit": false,
+        "page_site_permission_privacy_direct_object_or_correctness_credit": false,
+        "runtime_browser_test_benchmark_final_ncm_or_completion_credit": false,
+        "reviewer_wrote_files": false,
+        "synthesis_record_sha256": "5b2d288d008c3aee1a1cfbb53bd392d8a6e9ee4c1c70a4e5be0328e1dce6cdb4"
+      },
+      "verified_reviewer_lineage": {
+        "independent_candidate_reviews": [
+          {
+            "review_id": "RUN152R-INDEPENDENT-REVIEW-A",
+            "reviewer_role": "fresh semantic route-action reviewer A",
+            "blinded_review": false,
+            "nonblinding_reason": "prior outcome visible in team status",
+            "prior_outcome_visible_in_team_status": true,
+            "reviewer_b_consulted": false,
+            "fresh_committed_source_trace": true,
+            "reported_matrix_locus": "03-feature-to-benchmark-matrix.csv:94",
+            "normalized_matrix_locus": "03-feature-to-benchmark-matrix.csv:108",
+            "matrix_locus_correction": "NON_MATERIAL_STALE_LOCATOR_CORRECTED_TO_EXACT_CAP_FLEET_VEHICLE_REGISTER_LINE",
+            "independent_from_cohort_producer": true,
+            "other_candidate_reviewer_consulted": false,
+            "independent_evidence_trace_completed": true,
+            "review_method": "FRESH_PINNED_STATIC_SEMANTIC_TRACE_NO_EXECUTION",
+            "reported_review_hash": "24f9a0ccf4681997827ee992ea72a66bcd1e053c55f1f2671fc2b3c716b1e610",
+            "canonical_candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+            "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+            "queue_index_zero_based": 81,
+            "queue_id": "RUN090-ROUTE-0082",
+            "queue_canonical_key": "route|RUN077-ROUTE-0690",
+            "route_record_id": "RUN077-ROUTE-0690",
+            "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+            "action_key": "RUN077-ROUTE-0690|app/Http/Controllers/FleetAssets/VehicleController.php:index|CAP-FLEET-VEHICLE-REGISTER",
+            "outcome": "OWNER_ROUTE_ACTION",
+            "confidence": "HIGH_STATIC_IDENTITY_ONLY",
+            "identity_basis": "EXACT_LITERAL_ROUTE_NAME_PLUS_UNIQUE_CONTROLLER_INDEX_PLUS_DIRECT_VEHICLE_QUERY_AND_RENDER",
+            "source_loci": [
+              "03-feature-to-benchmark-matrix.csv:108",
+              "routes/fleet-assets.php:34-52",
+              "app/Http/Controllers/FleetAssets/VehicleController.php:31-245",
+              "resources/js/pages/fleet-assets/vehicles/index.tsx:1-430"
+            ],
+            "rationale": "The exact GET route resolves uniquely to VehicleController::index, which directly builds the vehicle register query and renders the canonical vehicle register page. This establishes only narrow static route/action ownership.",
+            "denied_alternatives": {
+              "SHARED_RELATION": "Models, services, page and callers are dependencies or context, not co-owners of this exact route action.",
+              "EVIDENCE_GAP": "The exact route, unique action, Asset::vehicles query and literal render close narrow static ownership; correctness remains separate."
+            },
+            "ownership_material_expansion": {
+              "status": "NONE_REQUIRED_FOR_NARROW_STATIC_OWNERSHIP",
+              "paths": []
+            },
+            "route_ownership_authorized_for_later_overlay": true,
+            "controller_action_bridge_authorized_for_later_overlay": true,
+            "owner_source_record_key": "route|RUN077-ROUTE-0690|CAP-FLEET-VEHICLE-REGISTER",
+            "bridge_key": [
+              "app/Http/Controllers/FleetAssets/VehicleController.php",
+              "index",
+              "CAP-FLEET-VEHICLE-REGISTER"
+            ],
+            "page_ownership_authorized": false,
+            "existing_page_owner_inherited_or_recredited": false,
+            "historical_sentinel_inherited_or_rewritten": false,
+            "neighbor_identity_or_outcome_inherited": false,
+            "current_overlay_credit_awarded": false,
+            "correctness_or_downstream_credit_authorized": false,
+            "reviewer_wrote_files": false,
+            "review_record_sha256": "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292"
+          },
+          {
+            "review_id": "RUN152R-INDEPENDENT-REVIEW-B",
+            "reviewer_role": "fresh semantic route-action reviewer B",
+            "blinded_review": false,
+            "nonblinding_reason": "prior self-assessment visible",
+            "prior_self_assessment_visible": true,
+            "reviewer_a_consulted": false,
+            "reviewer_a_outcome_visible": false,
+            "external_session_consulted": false,
+            "fresh_committed_source_trace": true,
+            "reported_matrix_locus": "03-feature-to-benchmark-matrix.csv:108",
+            "normalized_matrix_locus": "03-feature-to-benchmark-matrix.csv:108",
+            "reported_candidate_hash_basis": "queue_record_self_seal",
+            "reported_candidate_hash_basis_value": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+            "candidate_hash_basis_difference": "NON_MATERIAL_LABEL_OR_BASIS_DIFFERENCE_RECONCILED_TO_CANONICAL_COHORT_RECORD",
+            "independent_from_cohort_producer": true,
+            "other_candidate_reviewer_consulted": false,
+            "independent_evidence_trace_completed": true,
+            "review_method": "FRESH_PINNED_STATIC_SEMANTIC_TRACE_NO_EXECUTION",
+            "reported_review_hash": "2d540694691db267013856b9ebe1d0b398a2b0b0f24d9fec2b06c5fc2bf56820",
+            "canonical_candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+            "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+            "queue_index_zero_based": 81,
+            "queue_id": "RUN090-ROUTE-0082",
+            "queue_canonical_key": "route|RUN077-ROUTE-0690",
+            "route_record_id": "RUN077-ROUTE-0690",
+            "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+            "action_key": "RUN077-ROUTE-0690|app/Http/Controllers/FleetAssets/VehicleController.php:index|CAP-FLEET-VEHICLE-REGISTER",
+            "outcome": "OWNER_ROUTE_ACTION",
+            "confidence": "HIGH_STATIC_IDENTITY_ONLY",
+            "identity_basis": "EXACT_LITERAL_ROUTE_NAME_PLUS_UNIQUE_CONTROLLER_INDEX_PLUS_DIRECT_VEHICLE_QUERY_AND_RENDER",
+            "source_loci": [
+              "03-feature-to-benchmark-matrix.csv:108",
+              "routes/fleet-assets.php:34-52",
+              "app/Http/Controllers/FleetAssets/VehicleController.php:31-245",
+              "resources/js/pages/fleet-assets/vehicles/index.tsx:1-430"
+            ],
+            "rationale": "A fresh committed trace links the unique vehicles index route to VehicleController::index, Asset::vehicles and the exact Inertia page. Page ownership and correctness are not inherited.",
+            "denied_alternatives": {
+              "SHARED_RELATION": "Models, services, page and callers are dependencies or context, not co-owners of this exact route action.",
+              "EVIDENCE_GAP": "The exact route, unique action, Asset::vehicles query and literal render close narrow static ownership; correctness remains separate."
+            },
+            "ownership_material_expansion": {
+              "status": "NONE_REQUIRED_FOR_NARROW_STATIC_OWNERSHIP",
+              "paths": []
+            },
+            "route_ownership_authorized_for_later_overlay": true,
+            "controller_action_bridge_authorized_for_later_overlay": true,
+            "owner_source_record_key": "route|RUN077-ROUTE-0690|CAP-FLEET-VEHICLE-REGISTER",
+            "bridge_key": [
+              "app/Http/Controllers/FleetAssets/VehicleController.php",
+              "index",
+              "CAP-FLEET-VEHICLE-REGISTER"
+            ],
+            "page_ownership_authorized": false,
+            "existing_page_owner_inherited_or_recredited": false,
+            "historical_sentinel_inherited_or_rewritten": false,
+            "neighbor_identity_or_outcome_inherited": false,
+            "current_overlay_credit_awarded": false,
+            "correctness_or_downstream_credit_authorized": false,
+            "reviewer_wrote_files": false,
+            "review_record_sha256": "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+          }
+        ],
+        "synthesis_review": {
+          "synthesis_id": "RUN152R-INDEPENDENT-REVIEW-SYNTHESIS",
+          "verdict": "GO_ACCEPT_1_OWNER_ROUTE_ACTION_FOR_BOUNDED_LATER_INTEGRATION",
+          "accepted_independent_review_ids": [
+            "RUN152R-INDEPENDENT-REVIEW-A",
+            "RUN152R-INDEPENDENT-REVIEW-B"
+          ],
+          "accepted_independent_review_record_sha256s": [
+            "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292",
+            "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+          ],
+          "canonical_candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+          "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+          "reviewer_a_stale_matrix_line_94_corrected_to_exact_line_108": true,
+          "reviewer_a_locator_correction_material": false,
+          "reviewer_b_reported_exact_matrix_line_108": true,
+          "reviewer_b_hash_basis_difference_reconciled": true,
+          "reviewer_b_hash_basis_difference_material": false,
+          "outcome_variables": {
+            "O": 1,
+            "S": 0,
+            "E": 0
+          },
+          "independent_reviews_reconciled": true,
+          "outcome_discrepancies": 0,
+          "material_identity_discrepancies": 0,
+          "page_credit_discrepancies": 0,
+          "hard_stop_discrepancies": 0,
+          "ownership_material_expansion_required": false,
+          "provisional_assurance_observation_count": 6,
+          "provisional_assurance_observations_sha256": "c0c5c36fe36b5f0d98e9ed7952eb673bdc3faa045732ae1c824ee86763714b6d",
+          "route_ownership_authorized": true,
+          "controller_action_bridge_authorized": true,
+          "page_ownership_authorized": false,
+          "bounded_overlay_integration_authorized_later_only": true,
+          "current_overlay_credit_awarded": false,
+          "correctness_or_downstream_credit_authorized": false,
+          "synthesizer_wrote_files": false,
+          "synthesis_record_sha256": "79658aa2ed0f4c9ebeaaf6277a25117caa36f4617818c49fa7bdcf562c3e8e70"
+        },
+        "action_decision": {
+          "candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+          "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+          "accepted_independent_review_ids": [
+            "RUN152R-INDEPENDENT-REVIEW-A",
+            "RUN152R-INDEPENDENT-REVIEW-B"
+          ],
+          "accepted_independent_review_record_sha256s": [
+            "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292",
+            "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+          ],
+          "synthesis_record_sha256": "79658aa2ed0f4c9ebeaaf6277a25117caa36f4617818c49fa7bdcf562c3e8e70",
+          "queue_index_zero_based": 81,
+          "queue_id": "RUN090-ROUTE-0082",
+          "route_record_id": "RUN077-ROUTE-0690",
+          "literal_route_name": "fleet-assets.vehicles.index",
+          "controller_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+          "controller_method": "index",
+          "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+          "outcome": "OWNER_ROUTE_ACTION",
+          "confidence": "HIGH_STATIC_IDENTITY_ONLY_2_OF_2_PLUS_SYNTHESIS",
+          "route_ownership_authorized_for_later_overlay": true,
+          "controller_action_bridge_authorized_for_later_overlay": true,
+          "page_ownership_authorized": false,
+          "existing_page_owner_inherited_or_recredited": false,
+          "historical_sentinel_inherited_or_rewritten": false,
+          "neighbor_identity_or_outcome_inherited": false,
+          "current_overlay_credit_awarded": false,
+          "correctness_or_downstream_credit_authorized": false,
+          "provisional_assurance_observation_ids": [
+            "RUN152R-ASSURANCE-FLEET-VIEWANY-AUTHORITY",
+            "RUN152R-ASSURANCE-APPROVED-SITE-LIST-EXPORT-FILTER",
+            "RUN152R-ASSURANCE-AGGREGATE-SCOPE",
+            "RUN152R-ASSURANCE-LIVE-TELEMETRY-PRIVACY",
+            "RUN152R-ASSURANCE-SHOW-CONCEALMENT-NONTRANSFER",
+            "RUN152R-ASSURANCE-NEGATIVE-PATH-EXECUTION"
+          ],
+          "decision_record_sha256": "5608a702268ab10f5bf74de2f75cdf4c19a91785d1790f908441c11730bc47ed"
+        }
+      },
+      "credit_boundary": {
+        "INDEPENDENT_OVERLAY_REVIEW_FOR_REPORTING": true,
+        "new_source_ownership": false,
+        "new_route_ownership": false,
+        "new_page_ownership": false,
+        "new_controller_action_bridge": false,
+        "direct_exact_queue_review": false,
+        "current_overlay_ownership_credit": false,
+        "prior_or_neighbor_context_inherited_or_recredited": false,
+        "frontend_caller_ownership": false,
+        "next_queue_record_selected_or_credited": false,
+        "complete_route_page_feature_crosswalk": false,
+        "framework_route_reachability": false,
+        "canonical_object_ownership_correctness": false,
+        "approved_site_scope_correctness": false,
+        "permission_correctness": false,
+        "privacy_correctness": false,
+        "direct_object_correctness": false,
+        "query_projection_correctness": false,
+        "runtime": false,
+        "database": false,
+        "build": false,
+        "application_browser": false,
+        "responsive_application": false,
+        "visual_application_workflow": false,
+        "executed_tests": false,
+        "application_source_mutation": false,
+        "matrix_mutation": false,
+        "benchmark": false,
+        "final_no_match_or_NCM": false,
+        "ease": false,
+        "release": false,
+        "pass": false,
+        "final_finding": false,
+        "feature_completion": false,
+        "completion": false,
+        "gate_4": false,
+        "audit_complete": false
+      }
+    }
+  },
+  "current_provisional_source_observations": {
+    "run_id": "RUN-153-REVIEWED-OUTCOME-NEUTRAL-FLEET-VEHICLE-REGISTER-INDEX-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-26",
+    "observations": [
+      {
+        "observation_id": "RUN152R-ASSURANCE-FLEET-VIEWANY-AUTHORITY",
+        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+        "category": "exact_read_export_telemetry_authority",
+        "loci": [
+          "routes/fleet-assets.php:34-52",
+          "app/Http/Controllers/FleetAssets/VehicleController.php:60-245"
+        ],
+        "observation": "The exact authority intended by fleet.viewAny for CSV export and live telemetry projection is not established.",
+        "correctness_credit_authorized": false,
+        "final_finding_credit_authorized": false,
+        "observation_record_sha256": "077e2f0d1580b70ad572df3226e1da4fa6322c10583188788440d2cc6ceb7b20"
+      },
+      {
+        "observation_id": "RUN152R-ASSURANCE-APPROVED-SITE-LIST-EXPORT-FILTER",
+        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+        "category": "approved_site_list_export_raw_filter_and_options",
+        "loci": [
+          "app/Http/Controllers/FleetAssets/VehicleController.php:60-245",
+          "app/Services/UserSiteAccessService.php:1-1625"
+        ],
+        "observation": "The vehicle list, CSV path, raw site_id filter and all active-Site options are not visibly constrained through the canonical approved-Site boundary.",
+        "correctness_credit_authorized": false,
+        "final_finding_credit_authorized": false,
+        "observation_record_sha256": "13cc4da3222634da515f86767edd40e9de79bf03dc6f64c595c1f8ebf4aa4a4b"
+      },
+      {
+        "observation_id": "RUN152R-ASSURANCE-AGGREGATE-SCOPE",
+        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+        "category": "aggregate_scope",
+        "loci": [
+          "app/Http/Controllers/FleetAssets/VehicleController.php:60-245",
+          "app/Services/UserSiteAccessService.php:1598"
+        ],
+        "observation": "Only alert aggregation is visibly passed through applyAlertScope; the remaining vehicle, compliance and status aggregates lack equivalent proved scope.",
+        "correctness_credit_authorized": false,
+        "final_finding_credit_authorized": false,
+        "observation_record_sha256": "343beb84e06d5e822e852337508773eb62b67a60f4ae0ea1eb03ff30df1855dd"
+      },
+      {
+        "observation_id": "RUN152R-ASSURANCE-LIVE-TELEMETRY-PRIVACY",
+        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+        "category": "live_telemetry_and_privacy",
+        "loci": [
+          "app/Http/Controllers/FleetAssets/VehicleController.php:60-245",
+          "resources/js/pages/fleet-assets/vehicles/index.tsx:1-430"
+        ],
+        "observation": "Authorization and privacy for home-Site, coordinates, speed, battery and related live state projections are not established for every fleet.viewAny holder.",
+        "correctness_credit_authorized": false,
+        "final_finding_credit_authorized": false,
+        "observation_record_sha256": "c847b15576fdebcde4e8518cbddb40c4f2c32b516140d7c7a8ffa0235a05b982"
+      },
+      {
+        "observation_id": "RUN152R-ASSURANCE-SHOW-CONCEALMENT-NONTRANSFER",
+        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+        "category": "adjacent_show_direct_object_concealment_nontransfer",
+        "loci": [
+          "app/Policies/AssetPolicy.php:1-75",
+          "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php:1125-1184",
+          "app/Http/Controllers/FleetAssets/VehicleController.php:247"
+        ],
+        "observation": "Direct-object concealment semantics for the adjacent show action do not transfer to the selected index route or prove list/export/filter scope.",
+        "correctness_credit_authorized": false,
+        "final_finding_credit_authorized": false,
+        "observation_record_sha256": "a58eb26698ef55b329e1c9dec331214dad04ed97e477f032c04b01b23da068fa"
+      },
+      {
+        "observation_id": "RUN152R-ASSURANCE-NEGATIVE-PATH-EXECUTION",
+        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+        "category": "ordinary_viewer_foreign_site_execution",
+        "loci": [
+          "tests/Feature/FleetAssets/FleetHeroRolloutContractTest.php:58-110",
+          "tests/Feature/FleetAssets/FleetControlRoomAlertHeroScopeTest.php:26-59",
+          "tests/Browser/Fleet/FleetPermissionsTest.php:170-195"
+        ],
+        "observation": "No executed ordinary-viewer foreign-Site list, export, raw-filter or aggregate non-disclosure proof is present in this source-only review.",
+        "correctness_credit_authorized": false,
+        "final_finding_credit_authorized": false,
+        "observation_record_sha256": "6c72b2c793b2caa99b0ff6481f71b4beb8be4a6eb4c9996d8e58d392b9b6afce"
+      }
+    ],
+    "observation_count": 6,
+    "provisional_source_observations_only": true,
+    "correctness_credit_authorized": false,
+    "final_finding_credit_authorized": false,
+    "separate_from_provisional_finding_records": true,
+    "provisional_finding_record_count_unchanged": 12
+  },
+  "historical_run_149_outcome_neutral_fleet_daily_vehicle_check_store_route_action_ownership": {
     "schema_version": "run-149-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25-v1",
     "run_id": "RUN-149-REVIEWED-OUTCOME-NEUTRAL-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-25",
     "status": "ONE_REVIEWED_FLEET_DAILY_VEHICLE_CHECK_STORE_ROUTE_ACTION_OWNER_AND_BRIDGE_INTEGRATED_STATIC_ONLY",
@@ -7360,7 +8481,7 @@
       }
     }
   },
-  "current_outcome_neutral_fleet_daily_vehicle_check_store_route_action_ownership_review": {
+  "historical_run_149_outcome_neutral_fleet_daily_vehicle_check_store_route_action_ownership_review": {
     "run_id": "RUN-149R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-25",
     "status": "GO_THREE_PART_POST_COMMIT_REVIEW_COMPLETE_REPORTING_ONLY_ZERO_NEW_OR_DOWNSTREAM_CREDIT",
     "decision": {
@@ -7943,69 +9064,547 @@
       "audit_complete": false
     }
   },
-  "current_provisional_source_observations": {
-    "run_id": "RUN-149-REVIEWED-OUTCOME-NEUTRAL-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-25",
-    "observations": [
+  "current_outcome_neutral_fleet_vehicle_register_index_route_action_ownership_review": {
+    "run_id": "RUN-153R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-VEHICLE-REGISTER-INDEX-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-26",
+    "status": "GO_THREE_PART_POST_COMMIT_REVIEW_COMPLETE_REPORTING_ONLY_ZERO_NEW_OR_DOWNSTREAM_CREDIT",
+    "decision": {
+      "verdict": "GO",
+      "independent_reviews": 3,
+      "independently_sealed_review_records": true,
+      "discrepancies": 0,
+      "reporting_materialization_authorized": true,
+      "provisional_source_observation_reporting_authorized": true,
+      "gate_4_complete": false
+    },
+    "review_records": [
       {
-        "observation_id": "RUN148R-ASSURANCE-MUTATION-CAPABILITY",
-        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
-        "category": "exact_mutation_capability",
-        "loci": [
-          "routes/fleet-assets.php:40-47",
-          "app/Http/Middleware/EnsurePermission.php:11-27"
-        ],
-        "observation": "The selected POST sits inside a read-labelled OR permission group accepting fleet.viewAny, assets.viewAny, or assets.viewAssigned; an exact daily-check mutation capability is not established.",
-        "correctness_credit_authorized": false,
-        "final_finding_credit_authorized": false,
-        "observation_record_sha256": "75e037324c539ef056da7017c67b2d7edd6b8ddcd6060825530a405d375e2259"
+        "record": {
+          "review_id": "RUN153R-INDEPENDENT-MECHANICAL-PROVENANCE-REPLAY-REVIEW",
+          "reviewer_task_path": "/root/fleet_reporting_pattern_research",
+          "review_scope": "HISTORICAL_COMMIT_PROVENANCE_FORMAT_INPUTS_AND_IN_MEMORY_REPLAY",
+          "reviewed_on": "2026-08-29",
+          "verdict": "GO",
+          "confidence": "HIGH",
+          "producer_commit": "8c179fe14840ff1093c455bfb943f3c9ba60e59b",
+          "producer_tree": "2ad599448435f2eacdabc0cc0ee2b95d98dfe817",
+          "producer_parent": "12ac4a435deceb364ad0f23e97fad0677dfa1d1c",
+          "producer_parent_tree": "dfead8751310ceed65566e8c1148cfd1061056fd",
+          "review_checkpoint_commit": "c5c0ad0903d2e2e2229d5d0090fc0a69a2206f0f",
+          "producer_is_review_checkpoint_ancestor": true,
+          "audit_subtree_committed_drift_since_producer": 0,
+          "commit_diff": {
+            "files": 2,
+            "name_status": [
+              "A\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-153-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.json",
+              "A\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.py"
+            ],
+            "audit_artifacts_only": true
+          },
+          "generator": {
+            "sha256": "00b90c5932614eaf67cbca29c860924fad67190605bbf476fdc285174831ea83",
+            "blob_id": "c46a48c87203410951715006c8253c84851e9d76",
+            "bytes": 23969,
+            "lines": 218
+          },
+          "output": {
+            "sha256": "9b7e382f83787d807de8d752ecb3e6524280c707899aba78d47082765272e815",
+            "blob_id": "818b891cff9965193c60d83d0580c21a48d1a682",
+            "bytes": 35844,
+            "lines": 614,
+            "strict_json": true,
+            "lf_no_bom_terminal_lf": true
+          },
+          "inputs": {
+            "count": 10,
+            "map_sha256": "6c44f09f8e9fb21427bd1957907901c22557a6e6ce1f6925979a62b942378172",
+            "all_current_sha256s_match": true
+          },
+          "replay": {
+            "mode": "IN_MEMORY_WRITE_INTERCEPT",
+            "byte_identical": true,
+            "sha256": "9b7e382f83787d807de8d752ecb3e6524280c707899aba78d47082765272e815"
+          },
+          "reviewer_wrote_files": false,
+          "wrote_files": []
+        },
+        "record_sha256": "cb2cf5900df3745f87f17cbcdd1a43d3a99c4ca6617ecbacb3ca16067bf371e6"
       },
       {
-        "observation_id": "RUN148R-ASSURANCE-SITE-DIRECT-OBJECT",
-        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
-        "category": "approved_site_canonical_vehicle_direct_object_concealment",
-        "loci": [
-          "app/Http/Controllers/FleetAssets/DailyCheckController.php:136-140",
-          "app/Policies/AssetPolicy.php:17-21",
-          "app/Policies/AssetPolicy.php:74-87",
-          "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php:1125-1184"
-        ],
-        "observation": "The store action validates raw assets.id existence but does not resolve a canonical vehicle through approved Sites, AssetPolicy, or a concealment-aware access service before mutation.",
-        "correctness_credit_authorized": false,
-        "final_finding_credit_authorized": false,
-        "observation_record_sha256": "2dd0f37e66d40ed1ec16f2e7206b2ec85f79ee96fab3f77081a12774c41a5c8a"
+        "record": {
+          "review_id": "RUN153R-INDEPENDENT-LINEAGE-IDENTITY-SEAL-REVIEW",
+          "reviewer_task_path": "/root/run153_lineage_review",
+          "review_scope": "RUN152_RUN152R_LINEAGE_IDENTITY_AND_ALL_EMBEDDED_SEALS",
+          "reviewed_on": "2026-08-29",
+          "verdict": "GO",
+          "confidence": "HIGH",
+          "producer_commit": "8c179fe14840ff1093c455bfb943f3c9ba60e59b",
+          "candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+          "independent_review_record_sha256s": [
+            "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292",
+            "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+          ],
+          "synthesis_record_sha256": "79658aa2ed0f4c9ebeaaf6277a25117caa36f4617818c49fa7bdcf562c3e8e70",
+          "decision_record_sha256": "5608a702268ab10f5bf74de2f75cdf4c19a91785d1790f908441c11730bc47ed",
+          "identity_sha256": "ad29336ca5fe61c84ab136d5a12dc7c98f63d88fdd76db931050986187f51145",
+          "reviewer_lineage_sha256": "622aade4f51b3831c832da567e9ee88eaaaf4df5f748daef91a7e5d6c4ccde11",
+          "source_packet_boundary_sha256": "0cb962e7ccf02609a8f2e359db9a29706f9b3f0d7093a271c779c8009df8c31e",
+          "all_embedded_self_seals_valid": true,
+          "nonblinding_disclosure_preserved_by_exact_reviewer_records": true,
+          "reviewer_wrote_files": false,
+          "wrote_files": []
+        },
+        "record_sha256": "02df4c41e8e19135b103e052f444ed5d948a808ced754dcafd993bdd6d599ac7"
       },
       {
-        "observation_id": "RUN148R-ASSURANCE-TEMPLATE-DAY-CONCURRENCY",
-        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
-        "category": "template_authority_and_daily_run_concurrency",
-        "loci": [
-          "app/Http/Controllers/FleetAssets/DailyCheckController.php:142-186",
-          "database/migrations/2026_03_22_100300_create_fleet_maintenance_tables.php:11-33"
-        ],
-        "observation": "Template first-or-create and same-day run check/update-or-create are not shown under an exact template authority, transaction, lock, or database uniqueness invariant.",
-        "correctness_credit_authorized": false,
-        "final_finding_credit_authorized": false,
-        "observation_record_sha256": "7e412be31bb5a46d186988e1b8fed78e2a7515a1bfc311482af422f41e57d1f1"
-      },
-      {
-        "observation_id": "RUN148R-ASSURANCE-MUTATION-TEST-COVERAGE",
-        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
-        "category": "representative_role_site_negative_path_execution",
-        "loci": [
-          "tests/Feature/FleetAssets/FleetHeroRolloutContractTest.php:58-100",
-          "tests/Browser/Fleet/FleetTest.php:66-73"
-        ],
-        "observation": "Frozen tests cover GET rendering/compliance or a browser smoke only; no exact selected POST route-name/path mutation assertion was found or executed.",
-        "correctness_credit_authorized": false,
-        "final_finding_credit_authorized": false,
-        "observation_record_sha256": "a8ee50e527ec347ea8b17a4b6069988e9da77d723f72376c9b4042981d82ae7e"
+        "record": {
+          "review_id": "RUN153R-INDEPENDENT-ACCOUNTING-SITE-NONINHERITANCE-REVIEW",
+          "reviewer_task_path": "/root/run153r_pattern_research",
+          "review_scope": "COUNT_QUEUE_SITE_BOUNDARY_NONINHERITANCE_AND_CREDIT_PARTITION",
+          "reviewed_on": "2026-08-29",
+          "verdict": "GO",
+          "confidence": "HIGH",
+          "producer_commit": "8c179fe14840ff1093c455bfb943f3c9ba60e59b",
+          "verified_totals": {
+            "source_owners": 664,
+            "route_owners": 307,
+            "page_owners": 357,
+            "controller_action_bridges": 95,
+            "reviewed_queue_rows": 118,
+            "pending_queue_rows": 389,
+            "queue_rows_without_ownership": 411
+          },
+          "combined_counts_sha256": "3062c4b905dac9ef15c9cbafa9604a3ae243f8e1ac05aeb94bc64537c3981425",
+          "queue_accounting_sha256": "1c2bcdade0c93af0bccdc40f0855e9e8d288022aa962e80181d079ddea52c336",
+          "queue_boundary_sha256": "036cbbc845ce6e0fd673b8f178bce7f3a7aabc494fa414de52a1d572fd8ad7b9",
+          "noninheritance_sha256": "79a83eb10baf60cbeb17e547154f4bad15336ed5be1788002405e628ca82f131",
+          "provisional_observations": 6,
+          "single_organisation_multi_site_boundary_preserved": true,
+          "producer_positive_credit_keys": [
+            "STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_1_RECORD",
+            "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_1_ACTION"
+          ],
+          "review_adds_no_source_owner_bridge_page_correctness_or_downstream_credit": true,
+          "reviewer_wrote_files": false,
+          "wrote_files": []
+        },
+        "record_sha256": "75e8acf8bc5c47717b73527c42bd26579996b9792c779cd22fe55d7357a88d93"
       }
     ],
-    "observation_count": 4,
-    "provisional_source_observations_only": true,
-    "correctness_credit_authorized": false,
-    "final_finding_credit_authorized": false,
-    "separate_from_provisional_finding_records": true,
-    "provisional_finding_record_count_unchanged": 12
+    "synthesis_review": {
+      "review_id": "RUN153R-THREE-PART-POST-COMMIT-SYNTHESIS",
+      "reviewer_task_path": "/root",
+      "verdict": "GO",
+      "accepted_record_sha256s": [
+        "cb2cf5900df3745f87f17cbcdd1a43d3a99c4ca6617ecbacb3ca16067bf371e6",
+        "02df4c41e8e19135b103e052f444ed5d948a808ced754dcafd993bdd6d599ac7",
+        "75e8acf8bc5c47717b73527c42bd26579996b9792c779cd22fe55d7357a88d93"
+      ],
+      "independently_sealed_review_records": true,
+      "distinct_reviewer_task_paths": true,
+      "blinded_reviews": false,
+      "nonblinding_disclosure_preserved": true,
+      "independent_evidence_recomputation": true,
+      "discrepancies": 0,
+      "reporting_materialization_authorized": true,
+      "provisional_observations_may_be_reported_as_provisional_only": true,
+      "new_ownership_or_bridge_credit": false,
+      "page_site_permission_privacy_direct_object_or_correctness_credit": false,
+      "runtime_browser_test_benchmark_final_ncm_or_completion_credit": false,
+      "reviewer_wrote_files": false,
+      "synthesis_record_sha256": "5b2d288d008c3aee1a1cfbb53bd392d8a6e9ee4c1c70a4e5be0328e1dce6cdb4"
+    },
+    "verified_counts": {
+      "source_owner_records": 664,
+      "route_owner_records": 307,
+      "page_owner_records": 357,
+      "distinct_feature_ids": 256,
+      "distinct_H_feature_ids": 234,
+      "distinct_D_feature_ids": 22,
+      "route_distinct_feature_ids": 64,
+      "page_distinct_feature_ids": 242,
+      "route_page_feature_overlap": 50,
+      "static_controller_action_bridges": 95,
+      "bounded_static_source_denominator": 3929,
+      "bounded_static_source_ownership_percent": "16.899975",
+      "bounded_static_source_residual_records": 3265,
+      "residual_explicit_unmapped_routes": 2894,
+      "semantic_shared_routes": 12,
+      "reviewed_alias_routes": 5,
+      "reviewed_dead_routes": 0,
+      "evidence_gap_routes_tagged_within_residual": 7,
+      "residual_unadjudicated_page_roots": 345,
+      "semantic_shared_page_roots": 9,
+      "reviewed_alias_page_roots": 0,
+      "reviewed_dead_page_roots": 0,
+      "evidence_gap_page_roots_tagged_within_residual": 1
+    },
+    "verified_queue_accounting": {
+      "direct_exact_queue_records": 507,
+      "reviewed_queue_surface_rows": 118,
+      "owner_queue_surface_rows": 96,
+      "shared_queue_surface_rows": 10,
+      "alias_queue_surface_rows": 5,
+      "dead_queue_surface_rows": 0,
+      "evidence_gap_queue_surface_rows": 7,
+      "pending_unreviewed_queue_surface_rows": 389,
+      "queue_surfaces_without_ownership": 411,
+      "new_reviewed_route_surface_rows": 1,
+      "new_owner_route_surface_rows": 1
+    },
+    "verified_reviewer_lineage": {
+      "independent_candidate_reviews": [
+        {
+          "review_id": "RUN152R-INDEPENDENT-REVIEW-A",
+          "reviewer_role": "fresh semantic route-action reviewer A",
+          "blinded_review": false,
+          "nonblinding_reason": "prior outcome visible in team status",
+          "prior_outcome_visible_in_team_status": true,
+          "reviewer_b_consulted": false,
+          "fresh_committed_source_trace": true,
+          "reported_matrix_locus": "03-feature-to-benchmark-matrix.csv:94",
+          "normalized_matrix_locus": "03-feature-to-benchmark-matrix.csv:108",
+          "matrix_locus_correction": "NON_MATERIAL_STALE_LOCATOR_CORRECTED_TO_EXACT_CAP_FLEET_VEHICLE_REGISTER_LINE",
+          "independent_from_cohort_producer": true,
+          "other_candidate_reviewer_consulted": false,
+          "independent_evidence_trace_completed": true,
+          "review_method": "FRESH_PINNED_STATIC_SEMANTIC_TRACE_NO_EXECUTION",
+          "reported_review_hash": "24f9a0ccf4681997827ee992ea72a66bcd1e053c55f1f2671fc2b3c716b1e610",
+          "canonical_candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+          "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+          "queue_index_zero_based": 81,
+          "queue_id": "RUN090-ROUTE-0082",
+          "queue_canonical_key": "route|RUN077-ROUTE-0690",
+          "route_record_id": "RUN077-ROUTE-0690",
+          "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+          "action_key": "RUN077-ROUTE-0690|app/Http/Controllers/FleetAssets/VehicleController.php:index|CAP-FLEET-VEHICLE-REGISTER",
+          "outcome": "OWNER_ROUTE_ACTION",
+          "confidence": "HIGH_STATIC_IDENTITY_ONLY",
+          "identity_basis": "EXACT_LITERAL_ROUTE_NAME_PLUS_UNIQUE_CONTROLLER_INDEX_PLUS_DIRECT_VEHICLE_QUERY_AND_RENDER",
+          "source_loci": [
+            "03-feature-to-benchmark-matrix.csv:108",
+            "routes/fleet-assets.php:34-52",
+            "app/Http/Controllers/FleetAssets/VehicleController.php:31-245",
+            "resources/js/pages/fleet-assets/vehicles/index.tsx:1-430"
+          ],
+          "rationale": "The exact GET route resolves uniquely to VehicleController::index, which directly builds the vehicle register query and renders the canonical vehicle register page. This establishes only narrow static route/action ownership.",
+          "denied_alternatives": {
+            "SHARED_RELATION": "Models, services, page and callers are dependencies or context, not co-owners of this exact route action.",
+            "EVIDENCE_GAP": "The exact route, unique action, Asset::vehicles query and literal render close narrow static ownership; correctness remains separate."
+          },
+          "ownership_material_expansion": {
+            "status": "NONE_REQUIRED_FOR_NARROW_STATIC_OWNERSHIP",
+            "paths": []
+          },
+          "route_ownership_authorized_for_later_overlay": true,
+          "controller_action_bridge_authorized_for_later_overlay": true,
+          "owner_source_record_key": "route|RUN077-ROUTE-0690|CAP-FLEET-VEHICLE-REGISTER",
+          "bridge_key": [
+            "app/Http/Controllers/FleetAssets/VehicleController.php",
+            "index",
+            "CAP-FLEET-VEHICLE-REGISTER"
+          ],
+          "page_ownership_authorized": false,
+          "existing_page_owner_inherited_or_recredited": false,
+          "historical_sentinel_inherited_or_rewritten": false,
+          "neighbor_identity_or_outcome_inherited": false,
+          "current_overlay_credit_awarded": false,
+          "correctness_or_downstream_credit_authorized": false,
+          "reviewer_wrote_files": false,
+          "review_record_sha256": "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292"
+        },
+        {
+          "review_id": "RUN152R-INDEPENDENT-REVIEW-B",
+          "reviewer_role": "fresh semantic route-action reviewer B",
+          "blinded_review": false,
+          "nonblinding_reason": "prior self-assessment visible",
+          "prior_self_assessment_visible": true,
+          "reviewer_a_consulted": false,
+          "reviewer_a_outcome_visible": false,
+          "external_session_consulted": false,
+          "fresh_committed_source_trace": true,
+          "reported_matrix_locus": "03-feature-to-benchmark-matrix.csv:108",
+          "normalized_matrix_locus": "03-feature-to-benchmark-matrix.csv:108",
+          "reported_candidate_hash_basis": "queue_record_self_seal",
+          "reported_candidate_hash_basis_value": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+          "candidate_hash_basis_difference": "NON_MATERIAL_LABEL_OR_BASIS_DIFFERENCE_RECONCILED_TO_CANONICAL_COHORT_RECORD",
+          "independent_from_cohort_producer": true,
+          "other_candidate_reviewer_consulted": false,
+          "independent_evidence_trace_completed": true,
+          "review_method": "FRESH_PINNED_STATIC_SEMANTIC_TRACE_NO_EXECUTION",
+          "reported_review_hash": "2d540694691db267013856b9ebe1d0b398a2b0b0f24d9fec2b06c5fc2bf56820",
+          "canonical_candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+          "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+          "queue_index_zero_based": 81,
+          "queue_id": "RUN090-ROUTE-0082",
+          "queue_canonical_key": "route|RUN077-ROUTE-0690",
+          "route_record_id": "RUN077-ROUTE-0690",
+          "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+          "action_key": "RUN077-ROUTE-0690|app/Http/Controllers/FleetAssets/VehicleController.php:index|CAP-FLEET-VEHICLE-REGISTER",
+          "outcome": "OWNER_ROUTE_ACTION",
+          "confidence": "HIGH_STATIC_IDENTITY_ONLY",
+          "identity_basis": "EXACT_LITERAL_ROUTE_NAME_PLUS_UNIQUE_CONTROLLER_INDEX_PLUS_DIRECT_VEHICLE_QUERY_AND_RENDER",
+          "source_loci": [
+            "03-feature-to-benchmark-matrix.csv:108",
+            "routes/fleet-assets.php:34-52",
+            "app/Http/Controllers/FleetAssets/VehicleController.php:31-245",
+            "resources/js/pages/fleet-assets/vehicles/index.tsx:1-430"
+          ],
+          "rationale": "A fresh committed trace links the unique vehicles index route to VehicleController::index, Asset::vehicles and the exact Inertia page. Page ownership and correctness are not inherited.",
+          "denied_alternatives": {
+            "SHARED_RELATION": "Models, services, page and callers are dependencies or context, not co-owners of this exact route action.",
+            "EVIDENCE_GAP": "The exact route, unique action, Asset::vehicles query and literal render close narrow static ownership; correctness remains separate."
+          },
+          "ownership_material_expansion": {
+            "status": "NONE_REQUIRED_FOR_NARROW_STATIC_OWNERSHIP",
+            "paths": []
+          },
+          "route_ownership_authorized_for_later_overlay": true,
+          "controller_action_bridge_authorized_for_later_overlay": true,
+          "owner_source_record_key": "route|RUN077-ROUTE-0690|CAP-FLEET-VEHICLE-REGISTER",
+          "bridge_key": [
+            "app/Http/Controllers/FleetAssets/VehicleController.php",
+            "index",
+            "CAP-FLEET-VEHICLE-REGISTER"
+          ],
+          "page_ownership_authorized": false,
+          "existing_page_owner_inherited_or_recredited": false,
+          "historical_sentinel_inherited_or_rewritten": false,
+          "neighbor_identity_or_outcome_inherited": false,
+          "current_overlay_credit_awarded": false,
+          "correctness_or_downstream_credit_authorized": false,
+          "reviewer_wrote_files": false,
+          "review_record_sha256": "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+        }
+      ],
+      "synthesis_review": {
+        "synthesis_id": "RUN152R-INDEPENDENT-REVIEW-SYNTHESIS",
+        "verdict": "GO_ACCEPT_1_OWNER_ROUTE_ACTION_FOR_BOUNDED_LATER_INTEGRATION",
+        "accepted_independent_review_ids": [
+          "RUN152R-INDEPENDENT-REVIEW-A",
+          "RUN152R-INDEPENDENT-REVIEW-B"
+        ],
+        "accepted_independent_review_record_sha256s": [
+          "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292",
+          "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+        ],
+        "canonical_candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+        "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+        "reviewer_a_stale_matrix_line_94_corrected_to_exact_line_108": true,
+        "reviewer_a_locator_correction_material": false,
+        "reviewer_b_reported_exact_matrix_line_108": true,
+        "reviewer_b_hash_basis_difference_reconciled": true,
+        "reviewer_b_hash_basis_difference_material": false,
+        "outcome_variables": {
+          "O": 1,
+          "S": 0,
+          "E": 0
+        },
+        "independent_reviews_reconciled": true,
+        "outcome_discrepancies": 0,
+        "material_identity_discrepancies": 0,
+        "page_credit_discrepancies": 0,
+        "hard_stop_discrepancies": 0,
+        "ownership_material_expansion_required": false,
+        "provisional_assurance_observation_count": 6,
+        "provisional_assurance_observations_sha256": "c0c5c36fe36b5f0d98e9ed7952eb673bdc3faa045732ae1c824ee86763714b6d",
+        "route_ownership_authorized": true,
+        "controller_action_bridge_authorized": true,
+        "page_ownership_authorized": false,
+        "bounded_overlay_integration_authorized_later_only": true,
+        "current_overlay_credit_awarded": false,
+        "correctness_or_downstream_credit_authorized": false,
+        "synthesizer_wrote_files": false,
+        "synthesis_record_sha256": "79658aa2ed0f4c9ebeaaf6277a25117caa36f4617818c49fa7bdcf562c3e8e70"
+      },
+      "action_decision": {
+        "candidate_record_sha256": "08f334132340f905b012aea8f45be46ca2248e83c7eb05ecd1247e4d47e50321",
+        "queue_record_self_seal_sha256": "c15a3e4371f5d063066b013b824205c24d1ab6126f49aea3d266e9b897b146de",
+        "accepted_independent_review_ids": [
+          "RUN152R-INDEPENDENT-REVIEW-A",
+          "RUN152R-INDEPENDENT-REVIEW-B"
+        ],
+        "accepted_independent_review_record_sha256s": [
+          "6b32e5f6b388858216d94eb23933e6fee9faf509a2373730b4db84d160650292",
+          "37126f001e5dd1c0a5a8a6b8a854d74309e1df3fb776da63afe0d7ac78d3cae7"
+        ],
+        "synthesis_record_sha256": "79658aa2ed0f4c9ebeaaf6277a25117caa36f4617818c49fa7bdcf562c3e8e70",
+        "queue_index_zero_based": 81,
+        "queue_id": "RUN090-ROUTE-0082",
+        "route_record_id": "RUN077-ROUTE-0690",
+        "literal_route_name": "fleet-assets.vehicles.index",
+        "controller_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "controller_method": "index",
+        "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+        "outcome": "OWNER_ROUTE_ACTION",
+        "confidence": "HIGH_STATIC_IDENTITY_ONLY_2_OF_2_PLUS_SYNTHESIS",
+        "route_ownership_authorized_for_later_overlay": true,
+        "controller_action_bridge_authorized_for_later_overlay": true,
+        "page_ownership_authorized": false,
+        "existing_page_owner_inherited_or_recredited": false,
+        "historical_sentinel_inherited_or_rewritten": false,
+        "neighbor_identity_or_outcome_inherited": false,
+        "current_overlay_credit_awarded": false,
+        "correctness_or_downstream_credit_authorized": false,
+        "provisional_assurance_observation_ids": [
+          "RUN152R-ASSURANCE-FLEET-VIEWANY-AUTHORITY",
+          "RUN152R-ASSURANCE-APPROVED-SITE-LIST-EXPORT-FILTER",
+          "RUN152R-ASSURANCE-AGGREGATE-SCOPE",
+          "RUN152R-ASSURANCE-LIVE-TELEMETRY-PRIVACY",
+          "RUN152R-ASSURANCE-SHOW-CONCEALMENT-NONTRANSFER",
+          "RUN152R-ASSURANCE-NEGATIVE-PATH-EXECUTION"
+        ],
+        "decision_record_sha256": "5608a702268ab10f5bf74de2f75cdf4c19a91785d1790f908441c11730bc47ed"
+      }
+    },
+    "verified_provisional_assurance_observations": {
+      "observations": [
+        {
+          "observation_id": "RUN152R-ASSURANCE-FLEET-VIEWANY-AUTHORITY",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "exact_read_export_telemetry_authority",
+          "loci": [
+            "routes/fleet-assets.php:34-52",
+            "app/Http/Controllers/FleetAssets/VehicleController.php:60-245"
+          ],
+          "observation": "The exact authority intended by fleet.viewAny for CSV export and live telemetry projection is not established.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "077e2f0d1580b70ad572df3226e1da4fa6322c10583188788440d2cc6ceb7b20"
+        },
+        {
+          "observation_id": "RUN152R-ASSURANCE-APPROVED-SITE-LIST-EXPORT-FILTER",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "approved_site_list_export_raw_filter_and_options",
+          "loci": [
+            "app/Http/Controllers/FleetAssets/VehicleController.php:60-245",
+            "app/Services/UserSiteAccessService.php:1-1625"
+          ],
+          "observation": "The vehicle list, CSV path, raw site_id filter and all active-Site options are not visibly constrained through the canonical approved-Site boundary.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "13cc4da3222634da515f86767edd40e9de79bf03dc6f64c595c1f8ebf4aa4a4b"
+        },
+        {
+          "observation_id": "RUN152R-ASSURANCE-AGGREGATE-SCOPE",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "aggregate_scope",
+          "loci": [
+            "app/Http/Controllers/FleetAssets/VehicleController.php:60-245",
+            "app/Services/UserSiteAccessService.php:1598"
+          ],
+          "observation": "Only alert aggregation is visibly passed through applyAlertScope; the remaining vehicle, compliance and status aggregates lack equivalent proved scope.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "343beb84e06d5e822e852337508773eb62b67a60f4ae0ea1eb03ff30df1855dd"
+        },
+        {
+          "observation_id": "RUN152R-ASSURANCE-LIVE-TELEMETRY-PRIVACY",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "live_telemetry_and_privacy",
+          "loci": [
+            "app/Http/Controllers/FleetAssets/VehicleController.php:60-245",
+            "resources/js/pages/fleet-assets/vehicles/index.tsx:1-430"
+          ],
+          "observation": "Authorization and privacy for home-Site, coordinates, speed, battery and related live state projections are not established for every fleet.viewAny holder.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "c847b15576fdebcde4e8518cbddb40c4f2c32b516140d7c7a8ffa0235a05b982"
+        },
+        {
+          "observation_id": "RUN152R-ASSURANCE-SHOW-CONCEALMENT-NONTRANSFER",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "adjacent_show_direct_object_concealment_nontransfer",
+          "loci": [
+            "app/Policies/AssetPolicy.php:1-75",
+            "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php:1125-1184",
+            "app/Http/Controllers/FleetAssets/VehicleController.php:247"
+          ],
+          "observation": "Direct-object concealment semantics for the adjacent show action do not transfer to the selected index route or prove list/export/filter scope.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "a58eb26698ef55b329e1c9dec331214dad04ed97e477f032c04b01b23da068fa"
+        },
+        {
+          "observation_id": "RUN152R-ASSURANCE-NEGATIVE-PATH-EXECUTION",
+          "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+          "category": "ordinary_viewer_foreign_site_execution",
+          "loci": [
+            "tests/Feature/FleetAssets/FleetHeroRolloutContractTest.php:58-110",
+            "tests/Feature/FleetAssets/FleetControlRoomAlertHeroScopeTest.php:26-59",
+            "tests/Browser/Fleet/FleetPermissionsTest.php:170-195"
+          ],
+          "observation": "No executed ordinary-viewer foreign-Site list, export, raw-filter or aggregate non-disclosure proof is present in this source-only review.",
+          "correctness_credit_authorized": false,
+          "final_finding_credit_authorized": false,
+          "observation_record_sha256": "6c72b2c793b2caa99b0ff6481f71b4beb8be4a6eb4c9996d8e58d392b9b6afce"
+        }
+      ],
+      "observation_count": 6,
+      "provisional_source_observations_only": true,
+      "correctness_credit_authorized": false,
+      "final_finding_credit_authorized": false
+    },
+    "verified_queue_boundary": {
+      "preceding_index_80_not_recredited": true,
+      "index_82_reviewed_context_not_recredited": true,
+      "selected_index_81_integrated": true,
+      "next_unresolved_index": 83,
+      "next_unresolved_queue_id": "RUN090-ROUTE-0084",
+      "next_unresolved_route_record_id": "RUN077-ROUTE-0692",
+      "next_unresolved_queue_record_sha256": "d29353be38d964311d6586311d654c13dc2a39da9b7bcdb8a6a75d69fa511731",
+      "reviewed_key_count": 118,
+      "reviewed_key_list_sha256": "2b0612a3dc8ca47d3e5d12877677e1c85598364cf61bfda1ea5c20232ae029f5"
+    },
+    "verified_noninheritance": {
+      "existing_page_owner_id": "PAGE-ROOT-07E63287EC196468",
+      "existing_page_owner_record_sha256": "071be3674cfd4d743b32a70ac2ad63c84af38a11aab563b98393f22332282028",
+      "existing_page_owner_reconciliation_source": "evidence/source/root-run-152-outcome-neutral-fleet-vehicle-register-index-route-action-cohort-wave-26.json",
+      "page_owner_not_inherited_or_recredited": true,
+      "historical_route_record_id": "RUN077-ROUTE-0690",
+      "historical_route_classification": "EXPLICIT_UNMAPPED_SENTINEL",
+      "historical_sentinel_record_sha256": "876cc424a505e7b07c08e18c8c5efcbe6ddd7a9a330400055baed769469d11db",
+      "historical_sentinel_reconciliation_source": "evidence/source/root-run-152-outcome-neutral-fleet-vehicle-register-index-route-action-cohort-wave-26.json",
+      "historical_sentinel_preserved_not_rewritten_or_credited": true,
+      "neighbor_identity_or_outcome_not_inherited": true
+    },
+    "credit_boundary": {
+      "INDEPENDENT_OVERLAY_REVIEW_FOR_REPORTING": true,
+      "new_source_ownership": false,
+      "new_route_ownership": false,
+      "new_page_ownership": false,
+      "new_controller_action_bridge": false,
+      "direct_exact_queue_review": false,
+      "current_overlay_ownership_credit": false,
+      "prior_or_neighbor_context_inherited_or_recredited": false,
+      "frontend_caller_ownership": false,
+      "next_queue_record_selected_or_credited": false,
+      "complete_route_page_feature_crosswalk": false,
+      "framework_route_reachability": false,
+      "canonical_object_ownership_correctness": false,
+      "approved_site_scope_correctness": false,
+      "permission_correctness": false,
+      "privacy_correctness": false,
+      "direct_object_correctness": false,
+      "query_projection_correctness": false,
+      "runtime": false,
+      "database": false,
+      "build": false,
+      "application_browser": false,
+      "responsive_application": false,
+      "visual_application_workflow": false,
+      "executed_tests": false,
+      "application_source_mutation": false,
+      "matrix_mutation": false,
+      "benchmark": false,
+      "final_no_match_or_NCM": false,
+      "ease": false,
+      "release": false,
+      "pass": false,
+      "final_finding": false,
+      "feature_completion": false,
+      "completion": false,
+      "gate_4": false,
+      "audit_complete": false
+    }
   }
 }
