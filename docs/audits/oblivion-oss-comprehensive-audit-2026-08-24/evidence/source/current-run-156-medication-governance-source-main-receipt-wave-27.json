@@ -1,0 +1,330 @@
+{
+  "schema_version": "run-156-medication-governance-source-main-receipt-wave-27-v1",
+  "run_id": "RUN-156-MEDICATION-GOVERNANCE-SOURCE-MAIN-RECEIPT-WAVE-27",
+  "generated_on": "2026-08-29",
+  "status": "TWO_CHECKPOINT_MEDICATION_SOURCE_INTEGRATION_RECEIPT_358_OF_359_MERGE_PATHS_EFFECTIVE_ONE_SUPERSEDED_ZERO_OUTCOME_CREDIT",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false,
+    "authorization_boundary": "APPROVED_SITES_ROLES_PERMISSIONS_CANONICAL_OWNERSHIP_DIRECT_OBJECT_CONCEALMENT_PRIVACY"
+  },
+  "scope": "Git-object receipt for the historical medication-governance merge payload and the later effective application-source checkpoint only.",
+  "pins": {
+    "receipt_checkpoint_commit": "86b232cb14967c63ff345ac5208ec6d4c379f24f",
+    "receipt_checkpoint_tree": "5444cf4131451642b0d2d144f28f5c04dffa7445",
+    "historical_merge_commit": "cd5d34e6b8aa7e494808745041ec1dfa187dc101",
+    "historical_merge_tree": "6ec8b3f01618c806e2466b18ef21d54c81d4534b",
+    "effective_application_commit": "c5c0ad0903d2e2e2229d5d0090fc0a69a2206f0f",
+    "effective_application_tree": "4d5bb5f8106e49568fd7a9d2a067f46505c29ea5",
+    "run_155_dashboard_materializer": {
+      "path": "generators/materialize-run-155-audit-dashboard-verification-wave-26.py",
+      "sha256": "1f2bd52237f28cb11f79e4fa65d1f0a82889fd313fbee08d4e222816a7147139",
+      "blob_id": "8b9604e3c316be98c33bc0e1d97e2aea4f0fba9c"
+    },
+    "run_155_dashboard_receipt": {
+      "path": "evidence/browser/current-audit-dashboard-verification-run-155-wave-26.json",
+      "sha256": "576605975af18a35be413e48e4da042e6bae706fc2438c9e7cfa89b5c9394fe3",
+      "blob_id": "1f8e21521f4247f39cd23dff258909e4bbcc96ce"
+    },
+    "materializer": "generators/materialize-run-156-medication-governance-source-main-receipt-wave-27.py",
+    "materializer_sha256": "e611f494567ce966e5c678a9579bb26278da0a87d814b649ccf973b102bcd4ea",
+    "materializer_blob_id": "0caeb16bf63e0d6b4cd084c539a6d74c303d6cfb"
+  },
+  "two_checkpoint_rule": {
+    "historical_merge_payload_checkpoint": "cd5d34e6b8aa7e494808745041ec1dfa187dc101",
+    "effective_application_source_checkpoint": "c5c0ad0903d2e2e2229d5d0090fc0a69a2206f0f",
+    "historical_merge_tree_is_not_presented_as_the_effective_application_tree": true,
+    "all_359_historical_merge_payload_blobs_claimed_current": false,
+    "effective_source_uses_358_unchanged_merge_payload_blobs_and_one_superseding_blob": true
+  },
+  "historical_merge_checkpoint": {
+    "merge_commit": "cd5d34e6b8aa7e494808745041ec1dfa187dc101",
+    "merge_tree": "6ec8b3f01618c806e2466b18ef21d54c81d4534b",
+    "parent_1": "64d2a0814d571f583a1dda0dcf53554a8992d4b5",
+    "parent_1_tree": "163b880fb750506bbbba60befb602c6fca0c6252",
+    "parent_2": "389b4fadbbd6c99ec7eec4cdd1a5a47d940da1ee",
+    "parent_2_tree": "963ac503e4ce0a5e7652c26d3bec9c3ebf06595e",
+    "common_base": "8c179fe14840ff1093c455bfb943f3c9ba60e59b",
+    "common_base_tree": "2ad599448435f2eacdabc0cc0ee2b95d98dfe817",
+    "commits_since_common_base": 7,
+    "ordered_commits": [
+      "9c55c589d21108b5d04e32622037a7d9709e3901",
+      "64d2a0814d571f583a1dda0dcf53554a8992d4b5",
+      "71d6313a0c39c7d7da4c1b3d45534ea45c16909d",
+      "e6e0d4a7ad7e7c485aa9633fb9bada23d623e142",
+      "dc6303585df1f90d9027ca4d03699dbb5c3a4b45",
+      "389b4fadbbd6c99ec7eec4cdd1a5a47d940da1ee",
+      "cd5d34e6b8aa7e494808745041ec1dfa187dc101"
+    ],
+    "ordered_commit_list_sha256": "15cacf7011ea39862d67a03d325ae9d76ef98a50b137dc9f97d542c7227c671a"
+  },
+  "historical_merge_payload": {
+    "first_parent_payload": {
+      "paths": 359,
+      "added_paths": 87,
+      "modified_paths": 272,
+      "deleted_or_renamed_paths": 0,
+      "lines_added": 76238,
+      "lines_deleted": 9031,
+      "name_status_sha256": "3e322e6d04c24aa789237625ec92ca69b180c12e5bda545b525bc74214b7fb5a",
+      "path_list_sha256": "c1355ec1533b99236297d427c6395ebae38656f8b2318b9dba5db2cb1dccb5be",
+      "path_blob_manifest_sha256": "aed709ff56b37fecb1be9fb9f9fa1cca3f4922d0e22c3abaf3ceafee5b694a3f"
+    },
+    "common_base_cumulative": {
+      "paths": 394,
+      "added_paths": 90,
+      "modified_paths": 304,
+      "deleted_or_renamed_paths": 0,
+      "lines_added": 81375,
+      "lines_deleted": 10154,
+      "name_status_sha256": "4b0b4a03087f83128c9373b78268d63ac653b20dae9f8830f30c1ca445a12032",
+      "path_list_sha256": "cdd376e77a73ee3c44ac6a6a681d1e8ac70ed93ad681940c091a84f7e2b765ac"
+    }
+  },
+  "effective_application_checkpoint": {
+    "commit": "c5c0ad0903d2e2e2229d5d0090fc0a69a2206f0f",
+    "tree": "4d5bb5f8106e49568fd7a9d2a067f46505c29ea5",
+    "parent": "cd5d34e6b8aa7e494808745041ec1dfa187dc101",
+    "effective_subtrees": {
+      "app": "af164e03ecf3d9d439535be614984f3494688569",
+      "bootstrap": "df6189abe5ab5343d88674c199c4ce46e6152a57",
+      "database": "341446159b5d8f6e303db9e9cddabfd446b0e034",
+      "resources": "f8d9a36a11f3579716d090642ccd2dddf09a4fa4",
+      "resources/js": "776359c5b8b06a55fcf5fe4464bc3e00d01248e5",
+      "routes": "9392e22e4c472610da98977bec4e112092d223b9",
+      "tests": "d05c50ac79105f337a055a82b3e78056de8b62ed"
+    },
+    "historical_merge_payload_paths": 359,
+    "historical_merge_payload_blobs_unchanged": 358,
+    "historical_merge_payload_blobs_superseded": 1,
+    "superseded_merge_payload_paths": [
+      "resources/js/pages/my-day/index.tsx"
+    ],
+    "unchanged_path_list_sha256": "4f2b3b5d47be4c475b3ddc0b1791880d617806958a1a2f80f975eb4323b5f76c",
+    "effective_payload_state_manifest_sha256": "7341ad07d6a31c378464907b336603eab1b27c147c0aab6c6430fa387a5586a6",
+    "effective_payload_path_blob_manifest_sha256": "fb0dfc61a391d93887a880426a26cf02f5cc8617396077870ec1456fe6216234"
+  },
+  "post_merge_my_day_delta": {
+    "paths": [
+      {
+        "path": "resources/js/pages/my-day/components/whats-next-rail.tsx",
+        "historical_merge_blob": "98071a97cb19f45426ecdc31beb1d7b91b4949f1",
+        "effective_blob": "af084e912beab5be7cd95b866d545306af024647",
+        "historical_merge_bytes": 7464,
+        "effective_bytes": 7514,
+        "historical_merge_sha256": "12d6cdaec189fb5c3b085af31e53a843f9235d97168ad756596f85daf670a6dd",
+        "effective_sha256": "2691cdd0d1d29b00525fe067fc3cec6b554479f48ebbde60f79e6d25a1ace55d",
+        "classification": "POST_MERGE_ADJACENT_PATH"
+      },
+      {
+        "path": "resources/js/pages/my-day/index-audit-fixes.test.tsx",
+        "historical_merge_blob": "90323a2a7885d4e21f4768c12756d87482514cb5",
+        "effective_blob": "89df3b6cd8137710cfa0cb6d891295be67557de1",
+        "historical_merge_bytes": 8680,
+        "effective_bytes": 9025,
+        "historical_merge_sha256": "e3a9b805ff86142342db93a53963ca91514864ed314f4d07abd2eae3ccb8fe43",
+        "effective_sha256": "c94352936b81cf06567755f72285e22c5beff6c13b21c0df04e4fbb9a221a193",
+        "classification": "POST_MERGE_ADJACENT_PATH"
+      },
+      {
+        "path": "resources/js/pages/my-day/index.tsx",
+        "historical_merge_blob": "b454ee22f9f18db6d53eec39ac7e92158b345916",
+        "effective_blob": "85ab102d1c6cd2bc96d322dc4aefe7b5254e2e21",
+        "historical_merge_bytes": 64800,
+        "effective_bytes": 65002,
+        "historical_merge_sha256": "7df2b1b25cb3b3c57eeba7e8b4fc66f4c78f4268317d42d7e42dcd376607ce4b",
+        "effective_sha256": "d6d4fb72aa328be312c0ef402603c77fcc6d915b66c0637b7d563d2a27e38ec4",
+        "classification": "MERGE_PAYLOAD_SUPERSEDED_AT_EFFECTIVE_CHECKPOINT"
+      }
+    ],
+    "path_count": 3,
+    "modified_paths": 3,
+    "lines_added": 38,
+    "lines_deleted": 23,
+    "name_status_sha256": "028a6ac7f0e67cb799870b59090cd5261a6d865d6c58642d0f09ac3e1d89e8f3",
+    "path_list_sha256": "80c4e5354819f0258e8510ca4790dbc86180a8a946d17c3aeca91d4271fb3aa0",
+    "transition_manifest_sha256": "2577f6f8dec59baa120230aa4a8d5884e0cd01f752b744e54c360118ddbda2cc",
+    "merge_payload_overlap_paths": [
+      "resources/js/pages/my-day/index.tsx"
+    ],
+    "post_merge_adjacent_paths": [
+      "resources/js/pages/my-day/components/whats-next-rail.tsx",
+      "resources/js/pages/my-day/index-audit-fixes.test.tsx"
+    ]
+  },
+  "later_audit_only_lineage": {
+    "effective_application_is_ancestor_of_receipt_checkpoint": true,
+    "commits_after_effective_application_checkpoint": 3,
+    "ordered_commits": [
+      {
+        "commit": "3e9407f9fac197d3ed075782187c35ee11db4d2e",
+        "tree": "698d8c810dd00f8cc81d8e90d687bbc31c014ab7",
+        "parent": "c5c0ad0903d2e2e2229d5d0090fc0a69a2206f0f",
+        "changed_paths": 2,
+        "name_status": [
+          "A\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-153r-independent-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-review-wave-26.json",
+          "A\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-review-wave-26.py"
+        ],
+        "audit_root_only": true
+      },
+      {
+        "commit": "df0f3758131433b91da7c6d3cfb485c3d917d7ef",
+        "tree": "c93f4f46576ad75847a0c98269b3f3cf7856c8c0",
+        "parent": "3e9407f9fac197d3ed075782187c35ee11db4d2e",
+        "changed_paths": 7,
+        "name_status": [
+          "M\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/00-executive-summary.md",
+          "M\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/01-repository-module-map.md",
+          "M\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/13-unresolved-questions-and-evidence-gaps.md",
+          "A\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-154-reviewed-fleet-vehicle-register-index-route-action-reporting-wave-26.json",
+          "M\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/findings.json",
+          "M\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py",
+          "A\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-154-reviewed-fleet-vehicle-register-index-route-action-reporting-wave-26.py"
+        ],
+        "audit_root_only": true
+      },
+      {
+        "commit": "86b232cb14967c63ff345ac5208ec6d4c379f24f",
+        "tree": "5444cf4131451642b0d2d144f28f5c04dffa7445",
+        "parent": "df0f3758131433b91da7c6d3cfb485c3d917d7ef",
+        "changed_paths": 3,
+        "name_status": [
+          "M\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+          "A\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-155-wave-26.json",
+          "A\tdocs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-155-audit-dashboard-verification-wave-26.py"
+        ],
+        "audit_root_only": true
+      }
+    ],
+    "ordered_commit_list_sha256": "59c84bb0277edc3f91d12b073eb12b8cd1925c2fbd8a4ff48acf1e7b4907c00b",
+    "merge_commits_after_effective_application_checkpoint": 0,
+    "cumulative_changed_paths": 12,
+    "cumulative_added_paths": 6,
+    "cumulative_modified_paths": 6,
+    "cumulative_lines_added": 6010,
+    "cumulative_lines_deleted": 1217,
+    "cumulative_name_status_sha256": "6b47f14508a8e648baa6158bf45f6327362870c74d5cd8b978214cd8ab0139a5",
+    "cumulative_path_list_sha256": "bb753bca3d4c88193f5dcef7aeac5900aae2be8069816f3768e21605970fa84a",
+    "all_later_paths_inside_exact_audit_root": true,
+    "non_audit_tracked_entries": 12784,
+    "non_audit_tree_manifest_sha256": "016f4f12e8482ec11fcfdcaaec793417df35463deb90ee49d0c806e7ca7a0ea2",
+    "effective_and_receipt_checkpoint_non_audit_manifests_equal": true
+  },
+  "provisional_finding_reference_boundary": {
+    "findings_path": "findings.json",
+    "findings_sha256": "acdbbeba11e342ba2f6feb6c16854a8b0f116d37a73b0f6f3eb768c7e5b1faf2",
+    "findings_blob_id": "7c7216aade53e1b4075bbcb3080319d69a172bdc",
+    "reference_count": 3,
+    "records": [
+      {
+        "id": "MED-RBAC-01",
+        "canonical_record_sha256": "aa35c543ac25d15d074b344abd6ce8750975717f6c6e229d36986256c5a301ea",
+        "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+        "audited_application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "reference_only": true,
+        "promoted_or_rebased_by_run_156": false,
+        "final_finding_credit": false,
+        "completion_credit": false
+      },
+      {
+        "id": "MED-CD-SCOPE-01",
+        "canonical_record_sha256": "dd86bf94f3b4d894e95c56c95a9409ce803b8d82d108cdd3c42f3343e348cd21",
+        "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+        "audited_application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "reference_only": true,
+        "promoted_or_rebased_by_run_156": false,
+        "final_finding_credit": false,
+        "completion_credit": false
+      },
+      {
+        "id": "MED-CD-ATOMICITY-01",
+        "canonical_record_sha256": "9ba4f430ee59efea414b42a8633c1c969a2fd4428fbf3fef173fb5548cc8e7f1",
+        "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+        "audited_application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "reference_only": true,
+        "promoted_or_rebased_by_run_156": false,
+        "final_finding_credit": false,
+        "completion_credit": false
+      }
+    ],
+    "historical_audited_application_pin": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "historical_audited_application_pin_preserved": true,
+    "finding_register_mutated_by_run_156": false,
+    "finding_or_priority_promotion_authorized": false
+  },
+  "local_only_origin_attestation": {
+    "boundary": "LOCAL_REMOTE_TRACKING_OBSERVATION_ONLY",
+    "scope_wording": "unfetched local remote-tracking observation only; no current remote state, publication, or push is verified",
+    "observed_local_remote_tracking_ref": "origin/main",
+    "observed_local_remote_tracking_ref_sha": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+    "observed_at_local_checkpoint_commit": "86b232cb14967c63ff345ac5208ec6d4c379f24f",
+    "local_ahead": 179,
+    "local_behind": 0,
+    "fetch_performed": false,
+    "remote_currency_verified": false,
+    "publication_or_push_verified": false
+  },
+  "mutation_attestation": {
+    "run_156_writes_only_generator_and_receipt": true,
+    "application_source_changed": false,
+    "test_files_changed": false,
+    "findings_changed": false,
+    "reports_changed": false,
+    "dashboard_generator_changed": false,
+    "dashboard_html_changed": false,
+    "matrix_or_benchmark_register_changed": false,
+    "runtime_or_external_system_changed": false,
+    "database_changed": false,
+    "browser_started": false,
+    "tests_or_coverage_executed": false,
+    "audit_artifacts_only": true
+  },
+  "credit_boundary": {
+    "GIT_SOURCE_INTEGRATION_RECEIPT": true,
+    "source_merge_or_change_recredit": false,
+    "application_source_mutation": false,
+    "remediation_or_defect_closure": false,
+    "finding": false,
+    "final_finding": false,
+    "priority_promotion": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_or_workflow": false,
+    "executed_tests": false,
+    "test_coverage": false,
+    "coverage_completion": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "origin_currency_correctness": false,
+    "origin_currency_coverage": false,
+    "remote_currency": false,
+    "publication_or_push": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "feature_completion": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-156-medication-governance-source-main-receipt-wave-27.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-156-medication-governance-source-main-receipt-wave-27.json"
+  ]
+}
