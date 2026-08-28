@@ -1,0 +1,315 @@
+{
+  "schema_version": "run-157-reviewed-medication-governance-source-main-receipt-reporting-wave-27-v1",
+  "run_id": "RUN-157-REVIEWED-MEDICATION-GOVERNANCE-SOURCE-MAIN-RECEIPT-REPORTING-WAVE-27",
+  "generated_on": "2026-08-29",
+  "status": "REPORTING_MATERIALIZED_REVIEWED_MEDICATION_SOURCE_RECEIPT_TWO_CHECKPOINT_358_OF_359_THREE_PROVISIONAL_REFERENCES_ZERO_REMEDIATION_FINDING_OR_COMPLETION_CREDIT",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false,
+    "authorization_boundary": "APPROVED_SITES_ROLES_PERMISSIONS_CANONICAL_OWNERSHIP_DIRECT_OBJECT_CONCEALMENT_PRIVACY"
+  },
+  "scope": "Reporting-only materialization of the independently reviewed RUN156 two-checkpoint local Git/source receipt; no medication outcome is selected.",
+  "pins": {
+    "reporting_checkpoint_commit": "81abe37faa126f98ce47c7ca90cf569fe9c43c0d",
+    "reporting_checkpoint_tree": "19f262b9cf14714c3ea204a9ed78c4d590098b41",
+    "historical_audited_application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "historical_audited_application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "historical_merge_commit": "cd5d34e6b8aa7e494808745041ec1dfa187dc101",
+    "effective_application_commit": "c5c0ad0903d2e2e2229d5d0090fc0a69a2206f0f",
+    "run_156_generation_checkpoint_commit": "86b232cb14967c63ff345ac5208ec6d4c379f24f",
+    "run_156_producer_commit": "33ee55b84944fab3e52eee3c3e303c4c30eb4a44",
+    "run_156r_commit": "81abe37faa126f98ce47c7ca90cf569fe9c43c0d",
+    "observed_local_remote_tracking_ref": "origin/main",
+    "observed_local_remote_tracking_ref_sha": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+    "committed_lineage": {
+      "generators/materialize-run-155-audit-dashboard-verification-wave-26.py": {
+        "path": "generators/materialize-run-155-audit-dashboard-verification-wave-26.py",
+        "sha256": "1f2bd52237f28cb11f79e4fa65d1f0a82889fd313fbee08d4e222816a7147139",
+        "blob_id": "8b9604e3c316be98c33bc0e1d97e2aea4f0fba9c",
+        "bytes": 23854,
+        "lines": 366
+      },
+      "evidence/browser/current-audit-dashboard-verification-run-155-wave-26.json": {
+        "path": "evidence/browser/current-audit-dashboard-verification-run-155-wave-26.json",
+        "sha256": "576605975af18a35be413e48e4da042e6bae706fc2438c9e7cfa89b5c9394fe3",
+        "blob_id": "1f8e21521f4247f39cd23dff258909e4bbcc96ce",
+        "bytes": 17688,
+        "lines": 429
+      },
+      "generators/materialize-run-156-medication-governance-source-main-receipt-wave-27.py": {
+        "path": "generators/materialize-run-156-medication-governance-source-main-receipt-wave-27.py",
+        "sha256": "e611f494567ce966e5c678a9579bb26278da0a87d814b649ccf973b102bcd4ea",
+        "blob_id": "0caeb16bf63e0d6b4cd084c539a6d74c303d6cfb",
+        "bytes": 35600,
+        "lines": 779
+      },
+      "evidence/source/current-run-156-medication-governance-source-main-receipt-wave-27.json": {
+        "path": "evidence/source/current-run-156-medication-governance-source-main-receipt-wave-27.json",
+        "sha256": "56094f7e83acf8000d0b680d751cc3d27e8627916eef45173002b43207091e76",
+        "blob_id": "38e69aa0897cc8b8f7d55363f5bc1ed491411095",
+        "bytes": 16444,
+        "lines": 330
+      },
+      "generators/materialize-independent-medication-governance-source-main-receipt-review-wave-27.py": {
+        "path": "generators/materialize-independent-medication-governance-source-main-receipt-review-wave-27.py",
+        "sha256": "fc2498be1f1e6539c1dcb898e424c47599588388522e8496f82ef70f3754b915",
+        "blob_id": "451638c20d15424ac1d49cffbf3814c6696b0a2c",
+        "bytes": 25584,
+        "lines": 607
+      },
+      "evidence/source/current-run-156r-independent-medication-governance-source-main-receipt-review-wave-27.json": {
+        "path": "evidence/source/current-run-156r-independent-medication-governance-source-main-receipt-review-wave-27.json",
+        "sha256": "01945390f1d2c8a70dfcef6ea7327aa9f63c84f543dec5a6d8c67c7625dd032a",
+        "blob_id": "1fe1f8d9d59a8729cb9c19f71a33b48d59df1e99",
+        "bytes": 13268,
+        "lines": 277
+      }
+    },
+    "materializer": {
+      "path": "generators/materialize-run-157-reviewed-medication-governance-source-main-receipt-reporting-wave-27.py",
+      "sha256": "5e55f6380b8fdfce02262b328b545e6fc2a3230f028d3eac706f893d2d3720d7",
+      "blob_id": "4ede57dcef28ff49806c2a58fd4773353e782001",
+      "bytes": 35189,
+      "lines": 822
+    }
+  },
+  "baseline_outputs": {
+    "00-executive-summary.md": {
+      "sha256": "11f449632cab9da5919bbb24077be791c4ee6f03fb6c7e527d151f4bec9ac878",
+      "blob_id": "9024281f34e88d81ade8178c165d9361db0c2ffa",
+      "bytes": 104119,
+      "lines": 464
+    },
+    "01-repository-module-map.md": {
+      "sha256": "8ec132f9e16c194ad605c7c559702674e68c907015b295a50b8929168a810586",
+      "blob_id": "4c8e82d4da85910100602b89962c30d834c0a485",
+      "bytes": 29167,
+      "lines": 206
+    },
+    "13-unresolved-questions-and-evidence-gaps.md": {
+      "sha256": "ce1f10a42c66b469fec8d36e69d02f740418faebaea1b4fc738183ecb0bc619d",
+      "blob_id": "c1df75b4e700f8507445b6a2cf35c5a7f5fd2e77",
+      "bytes": 26056,
+      "lines": 83
+    },
+    "generators/build-current-audit-dashboard.py": {
+      "sha256": "11efb61559203bb965e73862bf4279d555b1122e669f7f7038cfe7c12ec1cf2e",
+      "blob_id": "64304bbd708c0eb617413b10270de997f465676a",
+      "bytes": 341686,
+      "lines": 2909
+    }
+  },
+  "outputs": {
+    "00-executive-summary.md": {
+      "sha256": "1749878cddd5a57bda17a261b3f40065aea51c0a8b03a996d0d4016133f86a2d",
+      "blob_id": "a8b41f6f06edb33848b296ef6f01fd2583bf68f6",
+      "bytes": 108142,
+      "lines": 474
+    },
+    "01-repository-module-map.md": {
+      "sha256": "e31bf7b7edd2ddbb3f6f01e0f8e89c6437d23a83962aa5f817eabb4a22d1584b",
+      "blob_id": "3afc1c6498cbe80922c44b6b8dadbfe898417460",
+      "bytes": 31351,
+      "lines": 212
+    },
+    "13-unresolved-questions-and-evidence-gaps.md": {
+      "sha256": "d2bbc7824e99c99427f29668449692b8db0bea068805c289e1734f348672773e",
+      "blob_id": "d2ad5b5d16f71dc4de5e7567033ca1bae8bb0344",
+      "bytes": 27786,
+      "lines": 85
+    },
+    "generators/build-current-audit-dashboard.py": {
+      "sha256": "ad8da48d9308c7b0ce2df076e44f8d748d6e47132b9b02f4d98449434b8851f7",
+      "blob_id": "2059768eed7430630063e3daa3213e942540ab6b",
+      "bytes": 364303,
+      "lines": 3145
+    }
+  },
+  "verified_run_155_dashboard_boundary": {
+    "run_id": "RUN-155-AUDIT-DASHBOARD-VERIFICATION-WAVE-26",
+    "status": "AUDIT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+    "dashboard_sha256": "7b01f79ed706dc407da445345ea6a5da1a9c0c774657341a3986cb58d0d37f64",
+    "viewports_verified": 4,
+    "visible_boundary_checks": 38,
+    "navigation_targets": "10/10",
+    "unique_local_links": 379,
+    "superseded_exact_artifact_only": true,
+    "proof_transfers_to_run_157_dashboard_or_application": false
+  },
+  "verified_run_156_two_checkpoint_receipt": {
+    "run_id": "RUN-156-MEDICATION-GOVERNANCE-SOURCE-MAIN-RECEIPT-WAVE-27",
+    "status": "TWO_CHECKPOINT_MEDICATION_SOURCE_INTEGRATION_RECEIPT_358_OF_359_MERGE_PATHS_EFFECTIVE_ONE_SUPERSEDED_ZERO_OUTCOME_CREDIT",
+    "historical_merge_payload_paths": 359,
+    "historical_merge_added_paths": 87,
+    "historical_merge_modified_paths": 272,
+    "effective_unchanged_merge_payload_blobs": 358,
+    "effective_superseded_merge_payload_blobs": 1,
+    "sole_superseded_path": "resources/js/pages/my-day/index.tsx",
+    "post_merge_my_day_delta_paths": 3,
+    "later_audit_only_commits": 3,
+    "later_audit_only_changed_paths": 12,
+    "non_audit_tracked_entries": 12784,
+    "all_359_payload_blobs_claimed_current": false,
+    "historical_merge_tree_presented_as_effective_tree": false,
+    "producer_positive_credit_keys": [
+      "GIT_SOURCE_INTEGRATION_RECEIPT"
+    ]
+  },
+  "verified_run_156r_review": {
+    "run_id": "RUN-156R-INDEPENDENT-MEDICATION-GOVERNANCE-SOURCE-MAIN-RECEIPT-REVIEW-WAVE-27",
+    "status": "GO_THREE_PART_TWO_CHECKPOINT_SOURCE_RECEIPT_REVIEW_REPORTING_ONLY_ZERO_REMEDIATION_OR_DOWNSTREAM_CREDIT",
+    "verdict": "GO",
+    "distinct_review_lanes": 3,
+    "cross_reviewer_coordination_disclosed": true,
+    "blind_or_isolated_reviews": false,
+    "single_record_materializer": "/root",
+    "discrepancies": 0,
+    "reporting_materialization_authorized": true,
+    "gate_4_complete": false,
+    "audit_complete": false,
+    "review_positive_credit_keys": [
+      "INDEPENDENT_SOURCE_RECEIPT_REVIEW_FOR_REPORTING"
+    ]
+  },
+  "verified_medication_reference_boundary": {
+    "reference_count": 3,
+    "historical_audited_application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "canonical_record_sha256": {
+      "MED-RBAC-01": "aa35c543ac25d15d074b344abd6ce8750975717f6c6e229d36986256c5a301ea",
+      "MED-CD-SCOPE-01": "dd86bf94f3b4d894e95c56c95a9409ce803b8d82d108cdd3c42f3343e348cd21",
+      "MED-CD-ATOMICITY-01": "9ba4f430ee59efea414b42a8633c1c969a2fd4428fbf3fef173fb5548cc8e7f1"
+    },
+    "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+    "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+    "reference_only": true,
+    "semantic_adjudication_or_rebase": false,
+    "promotion_remediation_verification_or_closure": false,
+    "all_record_credit_fields_false": true,
+    "independent_semantic_current_source_review_complete": false
+  },
+  "reporting_assertions": {
+    "source_owner_records": 664,
+    "route_owner_records": 307,
+    "page_owner_records": 357,
+    "controller_action_bridges": 95,
+    "bounded_static_source_residual_records": 3265,
+    "queue_reviewed": 118,
+    "queue_pending": 389,
+    "queue_without_ownership": 411,
+    "provisional_findings": 12,
+    "benchmark_mapped": "2/340",
+    "final_no_match_or_ncm": "0/340",
+    "benchmark_unresolved": 338,
+    "all_counts_unchanged_by_run_157": true
+  },
+  "local_only_origin_attestation": {
+    "boundary": "LOCAL_REMOTE_TRACKING_OBSERVATION_ONLY",
+    "scope_wording": "unfetched local remote-tracking observation only; no current remote state, publication, or push is verified",
+    "observed_local_remote_tracking_ref": "origin/main",
+    "observed_local_remote_tracking_ref_sha": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+    "producer_observed_at_checkpoint_commit": "86b232cb14967c63ff345ac5208ec6d4c379f24f",
+    "producer_checkpoint_local_ahead": 179,
+    "producer_checkpoint_local_behind": 0,
+    "reporting_observed_at_checkpoint_commit": "81abe37faa126f98ce47c7ca90cf569fe9c43c0d",
+    "reporting_checkpoint_local_ahead": 181,
+    "reporting_checkpoint_local_behind": 0,
+    "fetch_performed": false,
+    "remote_currency_verified": false,
+    "publication_or_push_verified": false
+  },
+  "reporting_boundary": {
+    "tracked_reporting_surfaces_changed": [
+      "00-executive-summary.md",
+      "01-repository-module-map.md",
+      "13-unresolved-questions-and-evidence-gaps.md",
+      "generators/build-current-audit-dashboard.py"
+    ],
+    "tracked_reporting_surface_count": 4,
+    "dashboard_builder_source_changed": true,
+    "dashboard_builder_executed": false,
+    "dashboard_html_changed": false,
+    "run_155_remains_last_exact_dashboard_verification": true,
+    "fresh_run_158_dashboard_verification_required": true,
+    "findings_changed": false,
+    "matrix_changed": false,
+    "benchmark_register_changed": false,
+    "application_source_changed": false
+  },
+  "noninheritance_boundary": {
+    "historical_merge_completion_subject_inherited_as_outcome": false,
+    "all_359_merge_payload_blobs_claimed_current": false,
+    "my_day_fix_recredited_as_medication_remediation": false,
+    "provisional_medication_records_promoted_or_rebased": false,
+    "run_156_receipt_credit_recredited": false,
+    "run_156r_review_credit_recredited": false,
+    "run_155_browser_proof_transferred": false,
+    "local_origin_observation_inherited_as_remote_currency": false
+  },
+  "mutation_attestation": {
+    "run_157_change_set_is_exactly_six_audit_paths": true,
+    "materializer_runtime_writes_only_receipt": true,
+    "pre_materialized_surface_edits_rewritten_by_materializer": false,
+    "application_source_changed": false,
+    "findings_changed": false,
+    "matrix_or_benchmark_register_changed": false,
+    "dashboard_html_changed": false,
+    "browser_server_php_database_or_external_system_started": false,
+    "tests_or_coverage_executed": false
+  },
+  "credit_boundary": {
+    "REPORTING_REFRESH_FOR_REVIEWED_MEDICATION_SOURCE_RECEIPT": true,
+    "git_source_integration_receipt_recredit": false,
+    "independent_source_receipt_review_recredit": false,
+    "application_source_mutation": false,
+    "medication_semantic_adjudication": false,
+    "remediation_or_defect_closure": false,
+    "finding": false,
+    "final_finding": false,
+    "priority_promotion": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_or_workflow": false,
+    "executed_tests": false,
+    "test_coverage": false,
+    "coverage_completion": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "origin_currency_correctness": false,
+    "origin_currency_coverage": false,
+    "remote_currency": false,
+    "publication_or_push": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "feature_completion": false,
+    "completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/00-executive-summary.md",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/01-repository-module-map.md",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/13-unresolved-questions-and-evidence-gaps.md",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-157-reviewed-medication-governance-source-main-receipt-reporting-wave-27.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-157-reviewed-medication-governance-source-main-receipt-reporting-wave-27.json"
+  ],
+  "receipt_self_seal_sha256": "4ae13ccd1ea5909b5e240aa0f07d93c8b6e46b13e13880f505e7e1b6e37f2aa2"
+}
