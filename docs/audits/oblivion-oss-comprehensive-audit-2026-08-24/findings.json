@@ -1,10 +1,14 @@
 {
-  "schema_version": "oblivion_audit_findings_v1_provisional",
-  "audit_status": "PROVISIONAL_SOURCE_CLAIMS_MATERIALIZED_ZERO_FINAL_FINDING_CREDIT",
+  "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
+  "audit_status": "ELEVEN_PROVISIONAL_ONE_HISTORICAL_ALREADY_FIXED_ZERO_FINAL_FINDING_CREDIT",
   "generated_on": "2026-08-29",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "current_adjudicated_application_commit": "4f57ad4202df90ded375961437879822a908627b",
+    "current_adjudicated_application_tree": "ee79b8d2733d09da2fd97992ac2a04e862159505",
+    "run_159_med_rbac_adjudication_sha256": "bc666ded05774b03b849743436cec47cbdb260c8ab763cf502e71c804af7fd8e",
+    "run_159r_independent_artifact_review_sha256": "be0651adf9edfbf7694ac535908cf43a5631675bcf6d5264add68fe947437d18",
     "audit_checkpoint_parent": "35a5228b26c54684718495c33281b24c0992de02",
     "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
     "base_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
@@ -183,11 +187,17 @@
     "human_features": 300,
     "system_data_features": 40,
     "canonical_submodules": null,
-    "provisional_source_claim_floor": 12
+    "historical_discovery_claim_records": 12,
+    "current_provisional_source_claims": 11,
+    "historical_already_fixed_records": 1
   },
   "counts": {
-    "provisional_source_claims": 12,
-    "provisional_P1": 12,
+    "retained_claim_records": 12,
+    "provisional_source_claims": 11,
+    "provisional_P1": 11,
+    "historical_already_fixed": 1,
+    "bounded_tests_executed": 73,
+    "bounded_test_assertions": 1481,
     "final_P0": 0,
     "final_P1": 0,
     "complete_prompt_finding_schema": 0,
@@ -284,22 +294,47 @@
       "audit_completion": 0
     }
   },
-  "credit_boundary": "Field presence and explicit null/sentinel values make the provisional records reviewable; they do not satisfy the final finding-quality gate.",
+  "credit_boundary": "Eleven current provisional records and one retained historical already-fixed record remain reviewable. RUN-159 bounded test evidence retires only MED-RBAC-01 from the current provisional queue and does not satisfy any final finding, benchmark, browser, ease, Pass, feature-completion, or audit-completion gate.",
   "reconciliation": {
-    "provisional_ids_unique": true,
+    "retained_record_ids_unique": true,
+    "current_provisional_ids_unique": true,
+    "retained_record_count": 12,
+    "current_provisional_count": 11,
+    "historical_already_fixed_count": 1,
     "every_primary_feature_id_in_canonical_matrix": true,
     "final_ids_cross_file_reconciled": false,
-    "reason": "There are no final finding IDs; provisional links do not satisfy the cross-file final-finding gate."
+    "reason": "There are no final finding IDs. The retained MED-RBAC-01 identity is historical and already fixed on current main; the other 11 records remain provisional and none satisfies the cross-file final-finding gate."
   },
   "records": [
     {
       "id": "MED-RBAC-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
       "related_feature_ids": [
         "CAP-MED-DESTRUCTION-LIFECYCLE",
         "CAP-MED-STOCK-MOVEMENT"
       ],
+      "historical_provenance": {
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "canonical_pre_adjudication_record_sha256": "aa35c543ac25d15d074b344abd6ce8750975717f6c6e229d36986256c5a301ea",
+        "classification": "REAL_HISTORICAL_BROAD_ORDERS_MANAGE_ROUTE_EXPOSURE",
+        "route_anchor": "routes/emar.php: medications.orders.manage group containing controlled entries, balance checks, destruction, receipt, and adjustment",
+        "historical_risk": "Possible controlled-medication action-authority bypass, with resident safety and governed-register integrity consequences.",
+        "preserved_identity_only": true
+      },
+      "current_adjudication": {
+        "application_commit": "4f57ad4202df90ded375961437879822a908627b",
+        "application_tree": "ee79b8d2733d09da2fd97992ac2a04e862159505",
+        "verdict": "ALREADY_FIXED",
+        "scope": "MED-RBAC exact controlled and stock capability separation only",
+        "run_159_receipt": "evidence/runtime/current-run-159-med-rbac-already-fixed-adjudication-wave-28.json",
+        "run_159_receipt_sha256": "bc666ded05774b03b849743436cec47cbdb260c8ab763cf502e71c804af7fd8e",
+        "run_159r_review": "evidence/runtime/current-run-159r-independent-med-rbac-adjudication-review-wave-28.json",
+        "run_159r_review_sha256": "be0651adf9edfbf7694ac535908cf43a5631675bcf6d5264add68fe947437d18",
+        "application_remediation_required": false,
+        "application_source_changed_by_adjudication": false,
+        "separate_med_cd_scope_or_atomicity_inherited": false
+      },
       "passes": [
         "P1",
         "P5",
@@ -313,15 +348,15 @@
       },
       "actor_and_job": {
         "actor": "Controlled-drug register owner",
-        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "secondary_actors": "Orders-only, stock-only, controlled recorder, controlled witness, global-Site, wrong-Site, and direct-ID adversarial actors in bounded tests",
         "job": "Maintain the controlled-drug register and balance",
-        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+        "status": "BOUNDED_TEST_ACTORS_VALIDATED_NOT_REPRESENTATIVE_SIGNED_IN_BROWSER"
       },
       "route_url": {
-        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "route_paths": "routes/emar.php:30-395",
+        "route_names": "emar.controlled.entries.store; emar.controlled.balance_check.store; emar.controlled.discrepancies.resolve; emar.destructions.store; emar.destructions.void; emar.pharmacy_orders.controlled_delivery; emar.pharmacy_orders.store; emar.pharmacy_orders.update; emar.pharmacy_orders.advance; emar.stock.update; emar.stock.receive; emar.stock.adjust",
+        "route_paths": "routes/emar.php:176-267",
         "raw_route_path_field": "routes/emar.php:30-395",
-        "status": "SOURCE_LOCATOR_ONLY"
+        "status": "CURRENT_EXACT_CAPABILITY_ROUTE_GROUPS_SOURCE_REVIEWED"
       },
       "frontend_anchor": {
         "page_files": "resources/js/pages/emar/ControlledDrugs.tsx:662-745",
@@ -343,25 +378,27 @@
         "shared_component_or_variant": null,
         "overlay_trigger": null,
         "internal_baseline": null,
-        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+        "status": "NOT_ADJUDICATED_FOR_THIS_RETAINED_HISTORICAL_RECORD"
       },
       "backend_anchor": {
         "matrix_anchors": "app/Http/Controllers/Emar/EmarController.php:4023-4121; app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1; app/Services/Medication/MedicationScopeDecisionService.php:40-221",
         "claim_anchors": [
-          "routes/emar.php:30-395",
-          "app/Http/Controllers/Emar/EmarController.php:4023-4121"
+          "routes/emar.php:176-267",
+          "app/Http/Controllers/Emar/EmarController.php:881; 4138-4159; 6174-6315; 6694-7515; 7978-8385; 8547-8798",
+          "app/Services/Medication/MedicationGovernanceScopeService.php:36-50; 387-523; 872-1107; 1312-1666"
         ],
-        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
-        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+        "controller_request_service_model_policy_job_event_migration": "BOUNDED_ROUTE_CONTROLLER_SERVICE_ROLE_AND_WRITE_SINK_REVIEW",
+        "application_commit": "4f57ad4202df90ded375961437879822a908627b"
       },
       "current_behaviour": {
-        "classification": "SOURCE_INFERRED_PROVISIONAL",
-        "summary": "Broad medications.orders.manage routing appears to reach controlled-drug, destruction, and stock operations even though dedicated controlled capabilities exist; cited controller methods do not visibly enforce the exact controlled action capability.",
-        "runtime_observed": false
+        "classification": "ALREADY_FIXED_CURRENT_MAIN_BOUNDED_VERIFIED",
+        "summary": "The historical broad orders-manage exposure no longer exists on current main. Controlled register, balance, discrepancy, destruction, and controlled-delivery mutations require medications.controlled.record; stock mutations require medications.stock.update; controller and governance-service rechecks preserve exact action authority, approved-Site scope, canonical ownership, direct-object concealment, witness qualification, and authorization before replay lookup.",
+        "runtime_observed": true,
+        "runtime_scope": "73 bounded tests and 1,481 assertions on disposable per-process MySQL schemas; no representative signed-in application browser, full suite, coverage, or operation-level concurrent same-UUID race"
       },
       "current_workflow": {
-        "matrix_summary": "Static canonical identity only: Maintain the controlled-drug register and balance. Representative-role completion was not executed.",
-        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+        "matrix_summary": "Exact capability, Site/direct-ID denial, witness, serial replay, and positive duty boundaries were source-reviewed and bounded-test verified for MED-RBAC-01 only.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "BOUNDED_AUTHORIZATION_AND_NO_EFFECT_PATHS_EXECUTED; REPRESENTATIVE_BROWSER_EASE_AND_OPERATION_LEVEL_CONCURRENCY_NOT_EXECUTED"
       },
       "ease_evidence": {
         "status": "NOT_MEASURED",
@@ -375,17 +412,27 @@
         "task_script": "task-scripts/cap-med-cd-register-balance.md"
       },
       "evidence": {
-        "source_claim_record": "evidence/source/current-feature-discovery-wave-01.json",
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-01.json (historical discovery input)",
+        "current_adjudication_receipt": "evidence/runtime/current-run-159-med-rbac-already-fixed-adjudication-wave-28.json",
+        "independent_artifact_review": "evidence/runtime/current-run-159r-independent-med-rbac-adjudication-review-wave-28.json",
         "claim_anchors": [
-          "routes/emar.php:30-395",
-          "app/Http/Controllers/Emar/EmarController.php:4023-4121"
+          "routes/emar.php:176-267",
+          "app/Http/Controllers/Emar/EmarController.php",
+          "app/Services/Medication/MedicationGovernanceScopeService.php"
         ],
-        "tests_executed": 0,
+        "test_commands_executed": 3,
+        "tests_executed": 73,
+        "assertions": 1481,
+        "feature_tests": 71,
+        "feature_test_assertions": 1441,
+        "architecture_tests": 2,
+        "architecture_test_assertions": 40,
         "browser_cells": 0,
-        "database_checks": 0
+        "database_checks": 2,
+        "database_cleanup": "configured base absent and zero effective per-process prefix matches after execution"
       },
-      "problem_root_cause": "The provisional source review found broad order-management routing adjacent to narrower controlled-action capabilities; exact enforcement remains unverified.",
-      "impact": "Possible controlled-medication action-authority bypass, with resident safety and governed-register integrity consequences.",
+      "problem_root_cause": "Historical route grouping placed controlled-drug and stock mutations behind broad medications.orders.manage despite narrower dedicated capabilities. Current main separates those routes and rechecks exact capability inside governed canonical scopes.",
+      "impact": "Historical high-risk authorization concern; no current orders-manage-only bypass reproduced in complete bounded source accounting or the executed MED-RBAC test slice.",
       "benchmark": {
         "official_repository": null,
         "inspected_ref": null,
@@ -401,7 +448,7 @@
       ],
       "better_oblivion_design": {
         "proposal": null,
-        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+        "status": "NOT_REQUIRED_ALREADY_FIXED_CURRENT_MAIN_NO_REMEDIATION_PROPOSED"
       },
       "target_ease": {
         "scores": null,
@@ -414,56 +461,50 @@
       ],
       "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
       "priority": "P1",
-      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "priority_status": "HISTORICAL_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT",
       "effort": {
         "size": null,
         "assumptions": null,
         "status": "NOT_ESTIMATED"
       },
       "dependencies_sequence": [
-        "Independent source review at the audited application pin",
-        "Independently trace every controlled-drug, destruction and stock command to its exact capability, then execute allowed and denied role/Site/witness cases.",
-        "Only then decide whether a native remediation contract is warranted"
+        "Completed: three independent current-source reviews at 4f57ad4202df90ded375961437879822a908627b",
+        "Completed: bounded allowed and denied exact permission, Site, direct-ID, witness, and replay cases",
+        "Retained non-inherited gap: operation-level concurrent same-UUID races belong to separate atomicity review"
       ],
       "confidence": {
-        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
-        "evidence_gap": "Independently trace every controlled-drug, destruction and stock command to its exact capability, then execute allowed and denied role/Site/witness cases."
+        "level": "HIGH_FOR_ALREADY_FIXED_MED_RBAC_DISPOSITION",
+        "evidence_gap": "Representative signed-in browser, full suite/coverage, and operation-level concurrent same-UUID testing remain unexecuted and do not reopen the original broad-permission finding."
       },
       "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
-      "interim_safeguard": "Do not treat the broad orders permission as evidence that controlled actions are authorised; require manual role review before any production remediation decision.",
+      "interim_safeguard": "Preserve exact medications.controlled.record, medications.stock.update, approved-Site, canonical ownership, direct-object concealment, and witness boundaries; do not reintroduce orders.manage as controlled or stock action authority.",
       "acceptance_criteria": {
-        "given_when_then": null,
-        "status": "NOT_FINAL; REQUIRED GATE: Independently trace every controlled-drug, destruction and stock command to its exact capability, then execute allowed and denied role/Site/witness cases."
+        "given_when_then": "Given orders-only, exact-capability, wrong-Site/direct-ID, global-Site, and controlled-witness actors, when controlled and stock mutation routes are invoked, then broad orders authority is denied without effects, exact duties succeed only within canonical approved-Site scope, and global Site authority never replaces action authority.",
+        "status": "BOUNDED_MET_FOR_HISTORICAL_CLAIM_RETIREMENT_NOT_FINAL_FINDING_OR_FEATURE_COMPLETION"
       },
       "validation_plan": {
-        "required": "Independently trace every controlled-drug, destruction and stock command to its exact capability, then execute allowed and denied role/Site/witness cases.",
-        "unit": "NOT_PLANNED_TO_EXACT_CASES",
-        "feature": "NOT_EXECUTED",
-        "architecture": "NOT_EXECUTED",
-        "e2e": "BLOCKED",
+        "required": "Retain exact route/controller/service capability separation and bounded regression coverage; treat concurrency and scope as separate claims.",
+        "unit": "NOT_SEPARATELY_REQUIRED_FOR_THIS_RETIREMENT",
+        "feature": "EXECUTED_71_TESTS_1441_ASSERTIONS",
+        "architecture": "EXECUTED_2_TESTS_40_ASSERTIONS",
+        "e2e": "NOT_EXECUTED",
         "visual_accessibility": "BLOCKED",
-        "performance_concurrency": "NOT_EXECUTED",
+        "performance_concurrency": "OPERATION_LEVEL_SAME_UUID_RACE_NOT_EXECUTED_OR_CREDITED",
         "representative_user": "NOT_EXECUTED"
       },
-      "finalization_blockers": [
-        "Independent current-source review",
-        "Exact final feature/finding ownership confirmation",
-        "Safe attributable runtime and/or browser validation where applicable",
-        "Target-specific benchmark or exhaustive final no-match adjudication",
-        "Complete observable acceptance criteria and validation plan"
-      ],
+      "finalization_blockers": [],
       "independent_review": {
-        "status": "NOT_COMPLETED",
-        "reviewer": null,
-        "disagreements": null,
-        "reconciliation": null
+        "status": "COMPLETED_UNANIMOUS_ALREADY_FIXED_PLUS_EXACT_ARTIFACT_GO",
+        "reviewer": "/root/med_rbac_source_verifier; /root/med_rbac_history_tests; /root/med_rbac_adversarial; /root/run159_receipt_reviewer",
+        "disagreements": "The exact-artifact reviewer found an initial effective per-process database cleanup disclosure gap; root corrected it and the reviewer reopened the final bytes.",
+        "reconciliation": "Three independent static lanes returned ALREADY_FIXED. The bounded root runtime passed 73 tests/1,481 assertions. The corrected exact RUN-159 artifact pair received GO."
       },
       "unresolved_fields": [
-        "final exact route/page/action ownership where a sentinel remains",
         "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
         "observed workflow and ten-dimension current/target ease measures",
         "target-specific benchmark or exhaustive final no-match",
-        "native design, effort, final acceptance criteria and executable validation cases"
+        "operation-level concurrent same-UUID same/different-payload race",
+        "full-suite coverage and representative signed-in application browser"
       ],
       "completion_credit": false,
       "credit": {

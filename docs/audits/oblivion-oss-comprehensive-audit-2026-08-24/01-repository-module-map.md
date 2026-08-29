@@ -89,7 +89,7 @@ RUN-110 adds exactly two page owners, zero route owners, and zero controller-act
 
 RUN-110R verifies exact final bytes, canonical IDs, queue reconciliation, and all boundaries with zero discrepancies. These relations establish bounded static page ownership and explicit reviewed-shared classification only; they do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, privacy or lifecycle behaviour, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
 
-## RUN-113–157 reviewed route/action, page-ownership, medication-source, and reporting lineage
+## RUN-113–160 reviewed route/action, page-ownership, medication-source, runtime, and reporting lineage
 
 RUN-113/R–151 remain historical reviewed ownership, reporting, benchmark-mapping, and exact-dashboard checkpoints. RUN-152/R independently review `fleet-assets.vehicles.index` / RUN077-ROUTE-0690 / `VehicleController::index` for `CAP-FLEET-VEHICLE-REGISTER`. Neither candidate reviewer is described as blinded: reviewer A had prior team-status visibility, reviewer B had prior self-assessment visibility, and neither consulted the other.
 
@@ -97,13 +97,17 @@ RUN-153/R integrate and independently verify exactly one route record and one co
 
 The cumulative bounded ledger is 664 source owners (307 route + 357 page) across 256 FEATURE-IDs (234 H + 22 D), with 95 action bridges. Route accounting is 3,218 = 307 owners + 12 shared + 5 aliases + 2,894 residual; page accounting is 711 = 357 owners + 9 shared + 345 residual. Queue accounting is 507 total, 118 reviewed, 96 owned, 10 shared, 5 aliases, 0 dead, 7 evidence gaps, 389 pending, and 411 without ownership.
 
-Six RUN-152R observations remain provisional source observations, not final findings: list/export/filter Site scope, aggregate scope, live telemetry privacy, authority, show-concealment nontransfer, and ordinary-viewer negative-path execution remain unproved. They do not alter the separate 12 provisional finding records. RUN-154 reports the static overlay only; framework reachability, approved-Site/permission/privacy/direct-object/query/telemetry correctness, runtime, build, application browser, executed tests, benchmark-final, Pass, final-finding, feature-completion, and audit-completion gates remain open or zero-credit.
+Six RUN-152R observations remain provisional source observations, not final findings: list/export/filter Site scope, aggregate scope, live telemetry privacy, authority, show-concealment nontransfer, and ordinary-viewer negative-path execution remain unproved. At RUN-154 they did not alter the separate 12 provisional finding records. RUN-154 reports the static overlay only; framework reachability, approved-Site/permission/privacy/direct-object/query/telemetry correctness, runtime, build, application browser, executed tests, benchmark-final, Pass, final-finding, feature-completion, and audit-completion gates remain open or zero-credit.
 
 RUN-155 verifies only the exact RUN-154 audit-dashboard artifact at four required viewports; that receipt is now immutable history and grants no application-browser, responsive-application, runtime, test, finding, or completion credit.
 
 RUN-156/R establish and independently review a two-checkpoint medication-governance local Git/source receipt. The historical merge at `cd5d34e6b8aa7e494808745041ec1dfa187dc101` contains 359 first-parent payload paths (87 added and 272 modified). At effective application checkpoint `c5c0ad0903d2e2e2229d5d0090fc0a69a2206f0f`, 358 payload blobs remain unchanged and only `resources/js/pages/my-day/index.tsx` is superseded; the complete post-merge My Day delta contains three paths. The three later commits through `86b232cb14967c63ff345ac5208ec6d4c379f24f` are audit-root-only and preserve the 12,784-entry non-audit manifest.
 
 The three RUN-156R review lanes were coordinated rather than blind or isolated, and the single `/root` record materializer is disclosed. They return GO with zero discrepancies and authorize reporting only. The origin evidence is an **unfetched local remote-tracking observation only**: `origin/main` was locally observed at `20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4`, the sealed RUN-156 checkpoint was 179 ahead and 0 behind, and no fetch, remote currency, publication, or push is verified. RUN-157 reports only this bounded receipt class; all 664/307/357/95 Fleet ownership and bridge counts, 118/389 queue accounting, 2/340 benchmark mapping, 0/340 final no-match/NCM, 338 unresolved targets, and 12 provisional findings remain unchanged. A fresh RUN-158 audit-dashboard verification remains required after the RUN-157 rebuild.
+
+RUN-158 verifies that exact RUN-157 dashboard as an audit artifact only. RUN-159/R then independently adjudicate `MED-RBAC-01` at fetched current main `4f57ad4202df90ded375961437879822a908627b`: three static reviewers return unanimous `ALREADY_FIXED`, 73 bounded tests / 1,481 assertions pass across exact permission, Site/direct-ID, witness, replay, positive-duty, and static UI capability boundaries, and the configured MySQL base plus all per-process effective schemas are absent after cleanup. The exact receipt reviewer required a correction to effective-schema cleanup disclosure and returned GO after reopening the corrected bytes. No application source changed and no remediation was required.
+
+RUN-160 preserves all 12 historical record IDs while changing the live status arithmetic to **11 current provisional P1 claims + 1 historical already-fixed record + 0 final P0/P1 findings**. This retires only the historical broad-orders-permission claim. `MED-CD-SCOPE-01`, `MED-CD-ATOMICITY-01`, operation-level concurrent same-UUID races, browser/ease, modules, Passes, release, and completion receive no inherited credit. Ownership, queue, matrix, and benchmark counts remain 664/307/357/95, 118/389, 2/340 mapped, 0/340 final no-match/NCM, and 338 unresolved. The rebuilt dashboard requires fresh RUN-161 verification.
 
 ## Candidate register
 
@@ -200,9 +204,9 @@ The expanded production frontend census covers 1,761 JS/TS files and establishes
 The required `02-eight-pass-coverage-ledger.csv` now has one provisional row per route file. It makes Pass gaps explicit but is not yet the canonical module/submodule ledger; every row remains incomplete across the eight-pass gate.
 
 
-## Provisional P1 source claims
+## Current claim status
 
-`MED-RBAC-01`, `MED-CD-SCOPE-01`, and `MED-CD-ATOMICITY-01` remain reference-only provisional P1 source claims pinned to historical audited application commit `a0493442b9e392d324055c35bf25b69421dc2d35`. RUN-156/R verifies receipt construction and Git/source provenance only; it does not semantically adjudicate, rebase, promote, remediate, verify, or close any of the three records and awards no finding or correctness credit. Each still requires independent semantic current-source review. The RBAC and scope claims additionally require representative role/Site/direct-ID failure evidence, while the atomicity claim requires transaction, lock-order, retry, and concurrency evidence before closure or production-readiness can be claimed.
+The register retains 12 historical claim identities. Eleven remain `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`, including `MED-CD-SCOPE-01` and `MED-CD-ATOMICITY-01`. `MED-RBAC-01` is now `HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING`: RUN-159/R preserve the real `a0493442…` defect, verify current exact controlled/stock capability separation at `4f57ad4…`, and authorize retirement from the current provisional queue. This is neither a final finding nor module/Pass completion and grants no benchmark, browser, ease, release, or audit-completion credit.
 
 ## Evidence boundary
 

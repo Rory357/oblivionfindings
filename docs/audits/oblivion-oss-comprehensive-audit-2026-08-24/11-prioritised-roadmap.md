@@ -1,6 +1,6 @@
 # 11 — Prioritised audit-completion roadmap
 
-> This is an evidence-closure roadmap, not authorisation to remediate the application. Priority labels on the 12 source claims remain provisional until their independent and runtime gates are satisfied.
+> This is an evidence-closure roadmap. The register retains 12 historical identities: 11 current provisional claims and one historical already-fixed `MED-RBAC-01` record. Priority labels on the 11 active claims remain provisional until their independent and runtime gates are satisfied.
 
 Architecture constraint: One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.
 
@@ -9,7 +9,7 @@ Architecture constraint: One operating organisation across multiple Sites; Site 
 - Do not present the audit as comprehensive or complete; keep every static, browser, benchmark, ease and finding credit boundary visible.
 - Operationally reconcile safety-critical medication and safeguarding records through existing governed processes; this does not assert that a defect has occurred.
 - Review sensitive governance/privacy exports and webhook destinations under their exact action authority; never treat broad Site visibility as action permission.
-- Preserve the no-copy boundary and do not implement fixes in this audit run.
+- Preserve the no-copy boundary; verify a current issue before any narrow native remediation and keep application, audit, publication, and completion evidence separate.
 
 ## Dependency waves
 
@@ -23,7 +23,7 @@ Architecture constraint: One operating organisation across multiple Sites; Site 
 
 ## Highest-risk provisional review order
 
-1. Medication exact authority, canonical scope and register/stock atomicity (`MED-*`).
+1. Medication canonical scope and register/stock atomicity (`MED-CD-SCOPE-01`, `MED-CD-ATOMICITY-01`); exact broad-permission authority claim `MED-RBAC-01` is already fixed on current main.
 2. Safeguarding intake, alert identity and durable projection (`SAFE-*`).
 3. Webhook destination enforcement (`SET-API-WEBHOOK-DESTINATION-01`).
 4. Privacy report domain capability and H&S Site scope (`PRIV-*`, `HS-*`).
@@ -35,7 +35,6 @@ This order is risk-led, not a final remediation sequence. Each item must first p
 
 | Provisional ID | Feature/module | Proposed evidence owner | Effort | Interim safeguard | Exit test |
 |---|---|---|---|---|---|
-| `MED-RBAC-01` | `CAP-MED-CD-REGISTER-BALANCE` / eMAR | independent source reviewer + task-specific runtime/browser reviewer | NOT_ESTIMATED | Do not treat the broad orders permission as evidence that controlled actions are authorised; require manual role review before any production remediation decision. | Independently trace every controlled-drug, destruction and stock command to its exact capability, then execute allowed and denied role/Site/witness cases. |
 | `MED-CD-SCOPE-01` | `CAP-MED-DESTRUCTION-LIFECYCLE` / eMAR | independent source reviewer + task-specific runtime/browser reviewer | NOT_ESTIMATED | Treat controlled-drug and destruction requests with mixed identifiers as high-risk until the canonical scope path is independently proven. | Prove owner-first canonical scope reconciliation and concealed foreign-Site/direct-ID denial for Client, medication, Site and witness combinations. |
 | `MED-CD-ATOMICITY-01` | `CAP-MED-CD-REGISTER-BALANCE` / eMAR | independent source reviewer + task-specific runtime/browser reviewer | NOT_ESTIMATED | Use existing reconciliation controls and investigate any register/stock mismatch; this audit does not assert that a mismatch has occurred. | Independently prove transaction boundaries, parent-to-child lock order, rollback, retry and concurrent balance assertions. |
 | `GOV-EXECUTIVE-VISIBILITY-01` | `CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE` / Governance | independent source reviewer + task-specific runtime/browser reviewer | NOT_ESTIMATED | Do not use the provisional claim as proof of disclosure; restrict operational review of sensitive meetings to explicitly authorised audiences pending verification. | Independent policy review and negative direct-ID, calendar, committee, executive-session, picker, and attachment tests. |
@@ -49,6 +48,10 @@ This order is risk-led, not a final remediation sequence. Each item must first p
 | `SET-API-WEBHOOK-DESTINATION-01` | `CAP-INT-OUTBOUND-WEBHOOK-CONNECTION` / Integrations | independent source reviewer + task-specific runtime/browser reviewer | NOT_ESTIMATED | Administrators should use only approved public webhook destinations pending independent destination-policy verification. | Independent security review plus authorized loopback, private, reserved, metadata, redirect, DNS-rebinding, and egress-control tests. |
 
 No application owner, delivery effort or remediation design is assigned by this audit. Those fields remain deliberately unresolved until a claim becomes a final finding.
+
+## Historical adjudication removed from the active queue
+
+`MED-RBAC-01` is retained as a historical P1 issue identity but is not a current provisional or final finding. RUN-159/R reproduced the historical broad `medications.orders.manage` condition at `a0493442…`, verified exact controlled/stock capability separation on current `4f57ad4…`, passed 73 bounded tests / 1,481 assertions, and received exact-artifact GO after cleanup disclosure correction. No application change was required. This outcome grants no closure to `MED-CD-SCOPE-01`, `MED-CD-ATOMICITY-01`, the eMAR module, any Pass, benchmark, browser/ease, release, or audit completion.
 
 ## Required inputs and decisions
 
