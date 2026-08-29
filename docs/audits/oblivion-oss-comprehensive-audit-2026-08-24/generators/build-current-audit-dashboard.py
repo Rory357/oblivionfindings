@@ -8,12 +8,14 @@ import hashlib
 import html
 import json
 import os
+import subprocess
 from collections import Counter
 from pathlib import Path
 from string import Template
 
 
 AUDIT_DIR = Path(__file__).resolve().parents[1]
+REPO_ROOT = AUDIT_DIR.parents[2]
 HISTORICAL_RUN_080_MATRIX_SHA256 = "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390"
 HISTORICAL_RUN_070_REGISTER_SHA256 = "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91"
 CURRENT_RUN_145_MATRIX_SHA256 = "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0"
@@ -59,9 +61,25 @@ def sha256_file(relative: str) -> str:
 
 def git_blob_id(relative: str) -> str:
     payload = (AUDIT_DIR / relative).read_bytes()
+    return git_blob_id_bytes(payload)
+
+
+def git_blob_id_bytes(payload: bytes) -> str:
     return hashlib.sha1(
         f"blob {len(payload)}\0".encode("ascii") + payload
     ).hexdigest()
+
+
+def git_file_at_commit(commit: str, relative: str) -> bytes:
+    repo_relative = (AUDIT_DIR / relative).relative_to(REPO_ROOT).as_posix()
+    result = subprocess.run(
+        ["git", "show", f"{commit}:{repo_relative}"],
+        cwd=REPO_ROOT,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    return result.stdout
 
 
 def text_file_metrics(relative: str) -> tuple[int, int]:
@@ -3021,7 +3039,15 @@ assert run_163_reporting["pins"]["reporting_input_tree"] == "8519736eab338600856
 assert run_163_reporting["pins"]["application_commit"] == run_162_pins["application_commit"]
 assert run_163_reporting["pins"]["application_tree"] == run_162_pins["repository_tree_at_application_commit"]
 assert run_163_reporting["pins"]["reporting_materializer"]["sha256"] == sha256_file("generators/materialize-run-163-med-cd-scope-remediation-reporting-wave-29.py")
-assert run_163_reporting["pins"]["dashboard_generator"]["sha256"] == sha256_file("generators/build-current-audit-dashboard.py")
+run_163_builder_pin = run_163_reporting["pins"]["dashboard_generator"]
+run_163_builder_bytes = git_file_at_commit(
+    "1cdec6bd48b096c0569f0e85d8e0e8f444b61062",
+    run_163_builder_pin["path"],
+)
+assert hashlib.sha256(run_163_builder_bytes).hexdigest() == run_163_builder_pin["sha256"]
+assert git_blob_id_bytes(run_163_builder_bytes) == run_163_builder_pin["git_blob_id"]
+assert len(run_163_builder_bytes) == run_163_builder_pin["bytes"]
+assert run_163_builder_bytes.count(b"\n") == run_163_builder_pin["lines"]
 assert run_163_reporting["pins"]["unchanged_run_161_dashboard"]["sha256"] == dashboard_run_161["pins"]["dashboard_html"]["sha256"]
 run_163_transition = run_163_reporting["reporting_transition"]
 assert run_163_transition["finding_id"] == "MED-CD-SCOPE-01"
@@ -3137,7 +3163,7 @@ TEMPLATE = Template(r"""<!doctype html>
     header{background:linear-gradient(135deg,#1c2140 0%,#3f399f 100%);color:#fff;padding:28px max(20px,calc((100vw - 1180px)/2)) 32px}.eyebrow{font-size:.78rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#cbc9ff}.hero{display:flex;gap:24px;align-items:end;justify-content:space-between}.hero h1{font-size:clamp(1.8rem,4vw,3rem);line-height:1.08;margin:7px 0 8px;max-width:820px}.hero p{margin:0;color:#e5e4ff;max-width:780px}.badge{display:inline-flex;white-space:nowrap;align-items:center;border:1px solid #f2c675;background:#3e2b18;color:#ffe5b5;border-radius:999px;padding:9px 13px;font-weight:800}
     nav{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:4;overflow:auto}nav div{max-width:1180px;margin:auto;display:flex;gap:20px;padding:11px 20px;white-space:nowrap}nav a{color:#39445a;font-weight:700;text-decoration:none}main{max-width:1180px;margin:0 auto;padding:24px 20px 64px}.notice{background:var(--warnbg);border-left:5px solid #e58d22;padding:14px 16px;border-radius:10px;margin-bottom:22px;color:#633000}
     .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card,.panel{background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:14px}.card{padding:17px}.card strong{display:block;font-size:1.65rem;line-height:1.15}.card span{display:block;color:var(--muted);margin-top:5px}.card small{display:block;margin-top:9px;color:#717d90}.panel{min-width:0;padding:20px;margin-top:20px}.panel h2{font-size:1.25rem;margin:0 0 5px}.panel>p{color:var(--muted);margin:0 0 16px}.table-wrap{max-width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:10px}table{width:100%;border-collapse:collapse;min-width:680px}th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{background:#f7f8fc;color:#414d62;font-size:.82rem}tr:last-child td{border-bottom:0}.zero{color:#a03920;font-weight:800}.partial{color:var(--warn);font-weight:800}.split{display:grid;grid-template-columns:1.15fr .85fr;gap:20px}.split>*{min-width:0}.list{margin:0;padding-left:20px}.list li,.list code{overflow-wrap:anywhere}.list li+li{margin-top:8px}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.88em;overflow-wrap:anywhere}.footer{color:var(--muted);font-size:.88rem;margin-top:24px;overflow-wrap:anywhere}
-    @media(max-width:900px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.split{grid-template-columns:1fr}.hero{align-items:flex-start;flex-direction:column}.badge{align-self:flex-start}}@media(max-width:520px){header{padding:22px 16px 26px}main{padding:18px 14px 48px}.cards{grid-template-columns:1fr 1fr;gap:10px}.card{padding:14px}.card strong{font-size:1.35rem}.panel{padding:16px}.badge{white-space:normal}nav div{padding-inline:16px}}
+    @media(max-width:900px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.split{grid-template-columns:1fr}.hero{align-items:flex-start;flex-direction:column}.badge{align-self:flex-start}}@media(max-width:520px){header{padding:22px 16px 26px}main{padding:18px 14px 48px}.cards{grid-template-columns:1fr 1fr;gap:10px}.card{padding:14px}.card strong{font-size:1.35rem}.panel{padding:16px}.notice,.panel>p{overflow-wrap:anywhere}.badge{white-space:normal}nav div{padding-inline:16px}}
   </style>
 </head>
 <body>
@@ -3340,6 +3366,10 @@ run_163_template_rewrites = [
     ),
     ("RUN-001 through RUN-160 are represented by audit artifacts.", "RUN-001 through RUN-163 are represented by audit artifacts."),
     (
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits; no represented wave grants current-source application runtime, signed-in browser, executed-test, ease, release, Pass, final-finding, feature-completion, or audit-completion credit.",
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from the separately bounded RUN-159 MED-RBAC and RUN-162 MED-CD-SCOPE executions, no represented wave grants broader or full-suite application runtime or coverage; no represented wave grants signed-in application-browser, ease, release, Pass, final-finding, feature-completion, or audit-completion credit.",
+    ),
+    (
         "<li>RUN-160: live register reconciled MED-RBAC-01 from current provisional to retained historical already-fixed · $finding_count current provisional P1 + $historical_fixed_count historical already-fixed · fresh RUN-161 dashboard verification required</li>",
         "<li>RUN-160: live register reconciled MED-RBAC-01 from current provisional to retained historical already-fixed</li><li>RUN-161: exact RUN-160 dashboard verified at 4/4 viewports · 63/63 visible checks · 10/10 navigation · 395/395 local resources · zero application credit</li><li>RUN-162: five MED-CD-SCOPE defects reproduced and narrowly remediated · $med_cd_tests focused tests / $med_cd_assertions assertions · application <span class=\"mono\">$application_short</span> and tree <span class=\"mono\">$application_tree_short</span> integrated · application commit published · full-suite green false</li><li>RUN-162R: exact remediation receipt GO · retirement-reporting authorization · zero live-register or downstream credit</li><li>RUN-163: live register reconciled MED-CD-SCOPE-01 from current provisional to retained historical remediated · $finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · fresh RUN-164 dashboard verification required</li>",
     ),
@@ -3405,6 +3435,10 @@ run_163_template_rewrites = [
     (
         "The linked RUN-161 receipt must record",
         "The linked RUN-164 receipt must record",
+    ),
+    (
+        "12 retained claim identities split into $finding_count current provisional P1 and $historical_fixed_count historical already-fixed, RUN-159's",
+        "12 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated, RUN-159's",
     ),
     (
         "RUN-159's $bounded_tests tests / $bounded_assertions assertions and ALREADY_FIXED evidence, RUN-159R retirement-reporting authorization, RUN-160's exact MED-RBAC-only current-to-historical reconciliation, no scope/atomicity inheritance",
@@ -3729,6 +3763,7 @@ current_visible_boundaries = [
     '<a href="#findings">Finding status</a>',
     "10 current provisional P1 + 1 historical already-fixed + 1 historical remediated",
     "12 retained claim identities",
+    "12 retained claim identities split into 10 current provisional P1, 1 historical already-fixed, and 1 historical remediated",
     "<strong>5</strong><span>focused MED-CD-SCOPE tests",
     "separate RUN-159 MED-RBAC 73/1,481",
     "73 bounded tests / 1,481 assertions",
@@ -3746,6 +3781,7 @@ current_visible_boundaries = [
     "RUN-162 establishes MED-CD-SCOPE-01 reproduction/remediation/runtime/integration/application-commit publication",
     "RUN-162R alone authorizes retirement reporting",
     "RUN-163 alone changes the MED-CD-SCOPE live status",
+    "Apart from the separately bounded RUN-159 MED-RBAC and RUN-162 MED-CD-SCOPE executions",
     "two broader INR failures reproduce at base",
     "full-suite green false",
     "inherits no transaction, retry, rollback, lock-order, fractional-value, operation-level concurrency",
@@ -3770,6 +3806,7 @@ assert "Fresh RUN-161 audit-reporting correction" not in dashboard
 assert "RUN-158–160 current adjudication checkpoint" not in dashboard
 assert "MED-CD-SCOPE-01 and MED-CD-ATOMICITY-01 remain separate current provisional claims" not in dashboard
 assert "RUN-160 reports 12 retained identities" not in dashboard
+assert "10 current provisional P1 and 1 historical already-fixed, RUN-159" not in dashboard
 assert "latest bounded MED-RBAC adjudication" not in dashboard
 for stale_attribution in (
     "RUN-159/R retire only historical MED-RBAC",
@@ -3785,6 +3822,7 @@ for stale_attribution in (
     "RUN-162/R remediates MED-CD-SCOPE-01",
     "MED-CD-SCOPE-01 closed",
     "MED-CD-SCOPE-01 final finding",
+    "no represented wave grants current-source application runtime, signed-in browser, executed-test",
 ):
     assert stale_attribution not in dashboard
 

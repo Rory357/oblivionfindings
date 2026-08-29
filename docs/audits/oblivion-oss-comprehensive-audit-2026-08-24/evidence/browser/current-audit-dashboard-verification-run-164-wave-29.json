@@ -1,0 +1,542 @@
+{
+  "schema_version": "run-164-audit-dashboard-verification-wave-29-v1",
+  "run_id": "RUN-164-AUDIT-DASHBOARD-VERIFICATION-WAVE-29",
+  "generated_on": "2026-08-30",
+  "status": "AUDIT_DASHBOARD_MOBILE_OVERFLOW_AND_SEMANTIC_BOUNDARIES_CORRECTED_EXACT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_OR_COMPLETION_CREDIT",
+  "architecture_rule": "Oblivion Findings is one operating organisation across multiple Sites. Authorization remains Site access, exact roles/permissions, canonical ownership, direct-object denial, and privacy; no tenant boundary is introduced.",
+  "scope": "Exact corrected RUN163-generated audit-dashboard artifact, its builder's mobile overflow, historical-pin, bounded-execution wording, and complete 10+1+1 forward-gate corrections, static links/hashes, and fresh in-app browser evidence only; not the application UI or application browser.",
+  "pins": {
+    "run_163_checkpoint_commit": "1cdec6bd48b096c0569f0e85d8e0e8f444b61062",
+    "run_163_checkpoint_tree": "b3623930ea5cdf1058b158195693aa210ccf30a8",
+    "run_163_checkpoint_parent": "adc80d437781bc5f2f4a3f072e86b51fb10a1c7d",
+    "application_commit": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+    "application_tree": "7b2b5688c90e4da28725e70e38e50fd445f1b4c4",
+    "baseline_dashboard_html": {
+      "path": "audit-dashboard.html",
+      "sha256": "c27d0535885c68984b96bf1fbbb91f65f303a8ed8b9255742df9d8f0788370b3",
+      "blob_id": "5bb2c6fff53a1e6440359a51546db30dbf7ecc0b",
+      "bytes": 244814,
+      "lines": 78
+    },
+    "dashboard_html": {
+      "path": "audit-dashboard.html",
+      "sha256": "04fe2430810557f4fe61630f877efc7f827f6bcb1e265ac470ffd2bf277bcbbd",
+      "blob_id": "6ddb0bd03425679e0e9c1f5748860cdcc6cd17b3",
+      "bytes": 253337,
+      "lines": 78
+    },
+    "baseline_dashboard_generator": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "027e4be334936aca7db20f7c23ea10e5f24531bda9b3e800d68dee2db4ca7a6f",
+      "blob_id": "cddf73cc81d388f25a154370a8172c6d7ce7c0fc",
+      "bytes": 427092,
+      "lines": 3805
+    },
+    "dashboard_generator": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "0c5ea8d8885ed21ca45fc1a54400757e87cb17d12d27fd6e9a298b8f427d1667",
+      "blob_id": "7b1276d9c4d82af0c7aec7ced8c91cbdd824b5d3",
+      "bytes": 429489,
+      "lines": 3843
+    },
+    "materializer": {
+      "path": "generators/materialize-run-164-audit-dashboard-verification-wave-29.py",
+      "sha256": "5f9de09fed4dec440095497d21ebaa3e4ae91279899ca8d2e6bd0a7a0019e3ca",
+      "blob_id": "a875985399e04edbbf175e106204d96d52f9edff",
+      "bytes": 41854,
+      "lines": 954
+    },
+    "run_163_generator": {
+      "path": "generators/materialize-run-163-med-cd-scope-remediation-reporting-wave-29.py",
+      "sha256": "f62b48cba349e0f50eec25830ac96c70b7ccc281f673c2dba93af9d59796f067",
+      "blob_id": "ef7516fc1c3bb0433bce05753e0a2d4168512532",
+      "bytes": 23627,
+      "lines": 478
+    },
+    "run_163_receipt": {
+      "path": "evidence/source/current-run-163-med-cd-scope-remediation-reporting-wave-29.json",
+      "sha256": "a0403ff218b8267fbbc8aa009b353e94975956b826c1215289525bf65299c4ac",
+      "blob_id": "c2905815ea3092f0ce9b883f0e5da6621aea6d3e",
+      "bytes": 13703,
+      "lines": 335,
+      "receipt_self_seal_sha256": "5683bfe946083b12d1bb1f39cc71526b96eda76faaba8cb230cfb3e73c1b8fe0"
+    }
+  },
+  "lineage": {
+    "predecessor": "RUN-163-MED-CD-SCOPE-01-REMEDIATION-REPORTING-WAVE-29",
+    "current": "RUN-164-AUDIT-DASHBOARD-VERIFICATION-WAVE-29",
+    "current_effective_application_commit_remains": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+    "bounded_execution_lineage": {
+      "run_159_med_rbac": {
+        "application_commit": "4f57ad4202df90ded375961437879822a908627b",
+        "application_tree": "ee79b8d2733d09da2fd97992ac2a04e862159505",
+        "tests": 73,
+        "assertions": 1481,
+        "shared_with_run_162_denominator": false
+      },
+      "run_162_med_cd_scope": {
+        "application_and_test_commit": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+        "application_tree": "7b2b5688c90e4da28725e70e38e50fd445f1b4c4",
+        "focused_tests": 5,
+        "focused_assertions": 48,
+        "related_controller_command_tests_passed": 102,
+        "broader_failures_reproduced_at_base": 2,
+        "full_suite_green": false,
+        "shared_with_run_159_denominator": false
+      }
+    },
+    "run_163_reporting_commit_remains": "1cdec6bd48b096c0569f0e85d8e0e8f444b61062",
+    "current_run_164_commit_not_self_claimed": true,
+    "lineage_links_and_adjacent_hashes_verified": [
+      {
+        "path": "generators/materialize-run-161-audit-dashboard-verification-wave-28.py",
+        "sha256": "a0970afe9672e878f5a813e59e9d51ee0c95c6e953c4fe3bd8a175e85e6209b9"
+      },
+      {
+        "path": "evidence/browser/current-audit-dashboard-verification-run-161-wave-28.json",
+        "sha256": "dc62fe1a6242dc42e0f9f75b278a0fbf042a667279ca3a4fdabb279d361613e3"
+      },
+      {
+        "path": "generators/materialize-run-162-med-cd-scope-remediation-wave-29.py",
+        "sha256": "d305638441b8ff366fa5fbc5a00bcc2b81658bf2611a5633ad79fdb4b63f5fb4"
+      },
+      {
+        "path": "evidence/runtime/current-run-162-med-cd-scope-remediation-wave-29.json",
+        "sha256": "21564caa435927d89d994a091383409e627c44170304f6ff2a5d5c897c858958"
+      },
+      {
+        "path": "generators/materialize-independent-run-162-med-cd-scope-remediation-review-wave-29.py",
+        "sha256": "c5278e5b80cd4c8c3c159a8ce3e6ae98788ad2dc9d9a1087820f910c7b203ab2"
+      },
+      {
+        "path": "evidence/runtime/current-run-162r-independent-med-cd-scope-remediation-review-wave-29.json",
+        "sha256": "7a1decaccfde2246163daef3dbec285b6a5a1a5019d2411615cc7e003660ff78"
+      },
+      {
+        "path": "generators/materialize-run-163-med-cd-scope-remediation-reporting-wave-29.py",
+        "sha256": "f62b48cba349e0f50eec25830ac96c70b7ccc281f673c2dba93af9d59796f067"
+      },
+      {
+        "path": "evidence/source/current-run-163-med-cd-scope-remediation-reporting-wave-29.json",
+        "sha256": "a0403ff218b8267fbbc8aa009b353e94975956b826c1215289525bf65299c4ac"
+      }
+    ]
+  },
+  "dashboard_issue_and_correction": {
+    "audit_artifact_issue_id": "AUDIT-DASHBOARD-RUN164-CORRECTIONS-01",
+    "pre_correction_artifact_sha256": "195809c92573341e9a7369e2d0154f948913e614b9f5656c53b63c8ba6a034ae",
+    "pre_correction_artifact_bytes": 253140,
+    "observed_viewport": "390x844",
+    "pre_correction_root_client_width": 375,
+    "pre_correction_root_scroll_width": 428,
+    "pre_correction_page_overflow_px": 53,
+    "cause": "the slash-delimited reproduction/remediation/runtime/integration/application-commit token in the RUN-071–163 current reporting checkpoint notice did not break within the 375 px document width, producing 428 px scroll width (53 px overflow) at 390x844",
+    "css_correction": ".notice,.panel>p{overflow-wrap:anywhere}",
+    "css_breakpoint": "max-width:520px",
+    "historical_pin_correction": "validate RUN163's builder pin against the exact builder bytes stored at RUN163 commit 1cdec6bd48b096c0569f0e85d8e0e8f444b61062, not against the evolving current builder",
+    "semantic_boundary_corrections": [
+      {
+        "superseded_artifact_sha256": "55b7dba1b69c39757b9f548f4338a4a27a1d1940e0b23b035d5e83481f304fc9",
+        "superseded_artifact_bytes": 253180,
+        "issue": "the global evidence-wave boundary incorrectly said no represented wave grants current-source runtime or executed-test credit despite the separately bounded RUN-159 and RUN-162 executions",
+        "old_visible_wording": "no represented wave grants current-source application runtime, signed-in browser, executed-test",
+        "corrected_visible_wording": "Apart from the separately bounded RUN-159 MED-RBAC and RUN-162 MED-CD-SCOPE executions, no represented wave grants broader or full-suite application runtime or coverage",
+        "superseded_browser_evidence_transferred": false
+      },
+      {
+        "superseded_artifact_sha256": "3dbe85c212c57fc7e2cfd278b9221817e1fd8ae4d5c002d8dc076039bbd42728",
+        "superseded_artifact_bytes": 253311,
+        "issue": "the RUN-164 forward gate described 12 retained identities but listed only 10 current provisional and 1 historical already-fixed, omitting the 1 historical remediated identity",
+        "corrected_visible_wording": "12 retained claim identities split into 10 current provisional P1, 1 historical already-fixed, and 1 historical remediated",
+        "superseded_browser_evidence_transferred": false
+      }
+    ],
+    "post_correction_page_overflow_px": 0,
+    "post_correction_mobile_table_scrollers": 10,
+    "narrow_native_audit_artifact_fix": true
+  },
+  "reported_finding_boundary": {
+    "retained_claim_records": 12,
+    "current_provisional_P1": 10,
+    "historical_already_fixed": 1,
+    "historical_remediated": 1,
+    "final_P0": 0,
+    "final_P1": 0,
+    "med_rbac_bounded_execution": "73 tests / 1,481 assertions",
+    "med_cd_scope_focused_execution": "5 tests / 48 assertions",
+    "execution_denominators_are_separate": true,
+    "benchmark_mapped": 2,
+    "final_no_match_or_NCM": 0,
+    "benchmark_unresolved": 338
+  },
+  "noninheritance_boundary": {
+    "med_cd_atomicity_remains_provisional": true,
+    "transaction_credit_inherited": false,
+    "retry_credit_inherited": false,
+    "rollback_credit_inherited": false,
+    "lock_order_credit_inherited": false,
+    "fractional_value_credit_inherited": false,
+    "operation_level_concurrency_credit_inherited": false,
+    "run_159_and_run_162_test_denominators_combined_as_one_execution": false,
+    "application_browser_credit_inferred_from_audit_dashboard": false
+  },
+  "remote_state_boundary": {
+    "observed_before_run_164_commit": true,
+    "local_head": "1cdec6bd48b096c0569f0e85d8e0e8f444b61062",
+    "local_origin_main_tracking_ref": "1cdec6bd48b096c0569f0e85d8e0e8f444b61062",
+    "authoritative_remote_main_observed_by_run_163_push": "1cdec6bd48b096c0569f0e85d8e0e8f444b61062",
+    "run_164_publication_claimed_by_this_precommit_receipt": false
+  },
+  "root_browser_resource_cleanup": {
+    "temporary_in_app_browser_tab_closed": true,
+    "temporary_viewport_override_reset_before_close": true,
+    "remaining_controlled_tabs": 0,
+    "local_http_server_pid": 1728,
+    "local_http_server_port": 43164,
+    "local_http_server_stopped": true,
+    "residual_listener_count": 0,
+    "server_process_exists_after_cleanup": false
+  },
+  "verification_method": {
+    "browser_observed_on": "2026-08-30",
+    "browser": "Codex in-app Browser with explicit viewport capability and locator clicks",
+    "local_http_target": "http://127.0.0.1:43164/audit-dashboard.html",
+    "cache_busted_target": "http://127.0.0.1:43164/audit-dashboard.html?run164=04fe2430",
+    "cache_busted_http_response": {
+      "status": 200,
+      "bytes": 253337,
+      "sha256": "04fe2430810557f4fe61630f877efc7f827f6bcb1e265ac470ffd2bf277bcbbd",
+      "content_type": "text/html"
+    },
+    "materializer_browser_execution_performed": false,
+    "materializer_server_execution_performed": false,
+    "materializer_serializes_root_observations_only": true
+  },
+  "verification": {
+    "dashboard_builder_final_byte_identical_runs_observed_by_root": 2,
+    "dashboard_builder_final_runs_byte_identical": true,
+    "dashboard_builder_python": "C:\\Users\\steph\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+    "noncreditable_attempts": [
+      {
+        "attempt": "python Store alias invoked twice",
+        "result": "Python was not found; dashboard unchanged",
+        "counted_as_builder_execution": false
+      },
+      {
+        "attempt": "pre-correction first ten-link browser sweep",
+        "result": "browser action window timed out before evidence serialization",
+        "counted_as_navigation_evidence": false
+      },
+      {
+        "attempt": "first builder run after CSS edit",
+        "result": "failed closed on RUN163 current-file self-pin before HTML write",
+        "counted_as_builder_execution": false
+      },
+      {
+        "attempt": "post-mobile-fix 55b7dba1 full browser sweep",
+        "result": "invalidated by the later bounded-execution semantic wording correction; evidence does not transfer to changed HTML bytes",
+        "counted_as_exact_artifact_evidence": false
+      },
+      {
+        "attempt": "post-runtime-wording 3dbe85c2 full browser sweep",
+        "result": "invalidated by the later complete 10+1+1 forward-gate correction; evidence does not transfer to changed HTML bytes",
+        "counted_as_exact_artifact_evidence": false
+      },
+      {
+        "attempt": "final 04fe2430 first ten-link sweep",
+        "result": "timed out before result serialization and reset the browser control connection; the later chunked 10/10 sweep is the only credited final navigation evidence",
+        "counted_as_navigation_evidence": false
+      }
+    ],
+    "pre_correction_browser_issue_received_credit": false,
+    "viewports_required": 4,
+    "viewports_verified": 4,
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual_browser_viewport": "1440x900",
+        "root_client_width": 1425,
+        "root_scroll_width": 1425,
+        "body_scroll_width": 1425,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1425,
+        "navigation_scroll_width": 1425,
+        "active_table_scrollers": 0,
+        "wide_tables": 0
+      },
+      {
+        "requested": "1280x800",
+        "actual_browser_viewport": "1280x800",
+        "root_client_width": 1265,
+        "root_scroll_width": 1265,
+        "body_scroll_width": 1265,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1265,
+        "navigation_scroll_width": 1265,
+        "active_table_scrollers": 0,
+        "wide_tables": 0
+      },
+      {
+        "requested": "1024x768",
+        "actual_browser_viewport": "1024x768",
+        "root_client_width": 1009,
+        "root_scroll_width": 1009,
+        "body_scroll_width": 1009,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1009,
+        "navigation_scroll_width": 1009,
+        "active_table_scrollers": 1,
+        "wide_tables": 0
+      },
+      {
+        "requested": "390x844",
+        "actual_browser_viewport": "390x844",
+        "root_client_width": 375,
+        "root_scroll_width": 375,
+        "body_scroll_width": 375,
+        "page_overflow_px": 0,
+        "navigation_client_width": 375,
+        "navigation_scroll_width": 922,
+        "active_table_scrollers": 10,
+        "wide_tables": 10
+      }
+    ],
+    "font_loaded_at_all_viewports": true,
+    "main_visible_at_all_viewports": true,
+    "navigation_bounded_at_all_viewports": true,
+    "tables_bounded_at_all_viewports": true,
+    "page_overflow_zero_at_all_final_viewports": true,
+    "navigation_clicks_required": 10,
+    "navigation_clicks_passed": 10,
+    "navigation_results": [
+      {
+        "label": "Progress",
+        "href": "#progress",
+        "browser_click_performed": true,
+        "resulting_hash": "#progress",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "RUN-163",
+        "href": "#checkpoint",
+        "browser_click_performed": true,
+        "resulting_hash": "#checkpoint",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Pages",
+        "href": "#pages",
+        "browser_click_performed": true,
+        "resulting_hash": "#pages",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Static census",
+        "href": "#static-census",
+        "browser_click_performed": true,
+        "resulting_hash": "#static-census",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Runtime gates",
+        "href": "#runtime",
+        "browser_click_performed": true,
+        "resulting_hash": "#runtime",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Benchmarks",
+        "href": "#benchmarks",
+        "browser_click_performed": true,
+        "resulting_hash": "#benchmarks",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Modules",
+        "href": "#modules",
+        "browser_click_performed": true,
+        "resulting_hash": "#modules",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Finding status",
+        "href": "#findings",
+        "browser_click_performed": true,
+        "resulting_hash": "#findings",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Architecture",
+        "href": "#architecture",
+        "browser_click_performed": true,
+        "resulting_hash": "#architecture",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Gaps",
+        "href": "#gaps",
+        "browser_click_performed": true,
+        "resulting_hash": "#gaps",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      }
+    ],
+    "console_warning_entries": 0,
+    "console_error_entries": 0,
+    "uncaught_page_error_entries": 0,
+    "cache_busted_warning_or_error_entries": 0,
+    "authored_ids": 10,
+    "duplicate_authored_ids": [],
+    "heading_elements": 26,
+    "table_elements": 10,
+    "table_wrappers": 10,
+    "anchor_elements": 743,
+    "anchor_elements_rendered_in_browser": 743,
+    "hash_anchor_occurrences": 10,
+    "unique_hash_anchors": 10,
+    "missing_hash_targets": [],
+    "local_resource_link_occurrences": 733,
+    "unique_local_resources": 403,
+    "prewrite_missing_local_resources": [],
+    "prewrite_missing_resource_is_intentional_unhashed_forward_receipt": true,
+    "post_materialization_local_resources": "403/403",
+    "post_materialization_local_resource_failures": [],
+    "adjacent_hash_pair_occurrences": 631,
+    "unique_adjacent_hash_path_hash_pairs": 331,
+    "unique_adjacent_hash_paths": 331,
+    "hash_bearing_file_occurrences_verified": 629,
+    "unique_hash_bearing_file_paths_verified": 330,
+    "historical_directory_bundle_digest_occurrences": 2,
+    "historical_directory_bundle_digest_paths": [
+      "task-scripts/"
+    ],
+    "hash_bearing_link_failures": [],
+    "run_164_forward_receipt_link_occurrences": 1,
+    "run_164_forward_receipt_link_adjacent_hash_occurrences": 0,
+    "visible_static_checks_required": 33,
+    "visible_static_checks_passed": 33,
+    "visible_static_checks": {
+      "run_163": true,
+      "finding_split": true,
+      "retained_identities": true,
+      "med_cd_scope_runtime": true,
+      "med_cd_scope_related_runtime": true,
+      "med_rbac_runtime": true,
+      "separate_test_denominators": true,
+      "forward_gate_finding_split": true,
+      "current_checkpoint": true,
+      "historical_fixed_wording": true,
+      "historical_remediated_wording": true,
+      "med_scope_identity": true,
+      "med_atomicity_identity": true,
+      "base_reproduced_failures": true,
+      "full_suite_false": true,
+      "atomicity_noninheritance": true,
+      "fresh_run_164": true,
+      "application_pin": true,
+      "tree_pin": true,
+      "owner_arithmetic": true,
+      "action_bridges": true,
+      "queue_arithmetic": true,
+      "benchmark_mapped": true,
+      "benchmark_ncm": true,
+      "benchmark_unresolved": true,
+      "architecture": true,
+      "completion_false": true,
+      "run_159r_attribution": true,
+      "run_160_attribution": true,
+      "run_162_attribution": true,
+      "run_162r_attribution": true,
+      "run_163_attribution": true,
+      "bounded_execution_exception": true
+    },
+    "prohibited_visible_phrase_hits": []
+  },
+  "worktree_boundary": {
+    "branch": "main",
+    "checkpoint_index_clean": true,
+    "expected_tracked_changes": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py"
+    ],
+    "expected_untracked_materializer": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-164-audit-dashboard-verification-wave-29.py",
+    "expected_untracked_receipt_after_write": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-164-wave-29.json",
+    "git_diff_check": "PASS",
+    "python_ast_parse_builder": "PASS",
+    "python_ast_parse_materializer": "PASS",
+    "pycache_paths": 0
+  },
+  "mutation_attestation": {
+    "application_files_changed_by_run_164": 0,
+    "reporting_markdown_changed_by_run_164": 0,
+    "findings_json_changed_by_run_164": false,
+    "dashboard_builder_changed_by_run_164": true,
+    "dashboard_html_changed_by_run_164": true,
+    "run_164_materializer_added": true,
+    "run_164_receipt_added": true,
+    "materializer_writes_only_receipt": true,
+    "browser_started_by_materializer": false,
+    "server_started_by_materializer": false
+  },
+  "credit_boundary": {
+    "audit_dashboard_run_164_corrections": true,
+    "exact_audit_dashboard_artifact": true,
+    "application_source": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "application_runtime": false,
+    "application_tests": false,
+    "test_coverage": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "finding": false,
+    "final_finding": false,
+    "ease": false,
+    "release": false,
+    "Pass": false,
+    "feature_completion": false,
+    "completion": false,
+    "audit_completion": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-164-audit-dashboard-verification-wave-29.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-164-wave-29.json"
+  ],
+  "receipt_self_seal_sha256": "0405b5be4c38f75b803da2776b975e816fa27cabe2483c2cafd5c6a04ce55c74"
+}
