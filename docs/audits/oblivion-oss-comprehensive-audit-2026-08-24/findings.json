@@ -294,7 +294,7 @@
       "audit_completion": 0
     }
   },
-  "credit_boundary": "Eleven current provisional records and one retained historical already-fixed record remain reviewable. RUN-159 bounded test evidence retires only MED-RBAC-01 from the current provisional queue and does not satisfy any final finding, benchmark, browser, ease, Pass, feature-completion, or audit-completion gate.",
+  "credit_boundary": "Eleven current provisional records and one retained historical already-fixed record remain reviewable. RUN-159 establishes the MED-RBAC-01 ALREADY_FIXED disposition, RUN-159R independently authorizes retirement reporting, and RUN-160 alone reclassifies MED-RBAC-01 from current provisional to retained historical already fixed. This does not satisfy any final finding, benchmark, browser, ease, Pass, feature-completion, or audit-completion gate.",
   "reconciliation": {
     "retained_record_ids_unique": true,
     "current_provisional_ids_unique": true,

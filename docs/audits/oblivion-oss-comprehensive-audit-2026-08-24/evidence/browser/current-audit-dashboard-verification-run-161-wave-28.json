@@ -1,0 +1,759 @@
+{
+  "schema_version": "run-161-audit-dashboard-verification-wave-28-v1",
+  "run_id": "RUN-161-AUDIT-DASHBOARD-VERIFICATION-WAVE-28",
+  "generated_on": "2026-08-29",
+  "status": "AUDIT_REPORTING_ATTRIBUTION_CORRECTED_EXACT_ARTIFACT_VERIFIED_ZERO_APPLICATION_CREDIT",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false,
+    "authorization_boundary": "APPROVED_SITES_ROLES_PERMISSIONS_CANONICAL_OWNERSHIP_DIRECT_OBJECT_CONCEALMENT_PRIVACY"
+  },
+  "scope": "Exact audit-only RUN161 attribution correction across the executive summary, repository module map, live findings register, dashboard builder, and dashboard, plus exact corrected dashboard artifact verification; not the application UI, application browser, medication runtime, or application execution.",
+  "pins": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "checkpoint_commit": "1ff92f28ffbb939d48d300cffbc8f33ab4489d93",
+    "checkpoint_tree": "b035b9ba02155e5e33e0cdcaab342dd21a2a961e",
+    "checkpoint_parent": "bbf587870909d8f3f0ba4de89bb7a50eeab8a3e3",
+    "current_application_commit": "4f57ad4202df90ded375961437879822a908627b",
+    "current_application_tree": "ee79b8d2733d09da2fd97992ac2a04e862159505",
+    "historical_audit_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "baseline_dashboard_html": {
+      "sha256": "1b0747372d70254f9761177c151fb8dba38090d4a2fae919a0ed0ee91431e2b3",
+      "blob_id": "6cec2d70cc6c4c7596e8d5f1c096b3419cbf8524",
+      "bytes": 235542,
+      "lines": 77
+    },
+    "dashboard_html": {
+      "sha256": "c27d0535885c68984b96bf1fbbb91f65f303a8ed8b9255742df9d8f0788370b3",
+      "blob_id": "5bb2c6fff53a1e6440359a51546db30dbf7ecc0b",
+      "bytes": 244814,
+      "lines": 78
+    },
+    "baseline_dashboard_generator": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "0d23faac294a3dc950788e0c8614c0b8473f9ddb960be2e9e13440626d91c865",
+      "blob_id": "9b89784b41177a09405a8094cc7c507e6965d594",
+      "bytes": 387187,
+      "lines": 3417
+    },
+    "dashboard_generator": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "d77c1ced750c7661fae2d7033b083f69ca75e1be70036f8e9b3a4d87baf61585",
+      "blob_id": "b037d9af06fdf9c62f7fb0bd06a8b2cdae14b38e",
+      "bytes": 389526,
+      "lines": 3432
+    },
+    "run_160_materializer": {
+      "path": "generators/materialize-run-160-med-rbac-already-fixed-reporting-wave-28.py",
+      "sha256": "2b224ceb98e2889f436ed266576db96f814847db4a49770d382ecabbc2b01ec6",
+      "blob_id": "946cef04795ca2540033811afb554992b9c90383",
+      "bytes": 39480,
+      "lines": 615
+    },
+    "run_160_receipt": {
+      "path": "evidence/source/current-run-160-med-rbac-already-fixed-reporting-wave-28.json",
+      "sha256": "d5ff3afb23812ddffc7c5c864e745e8685471e3bae2f89171867dd764eafae52",
+      "blob_id": "44d4231cebf99f322d6a9513db623d9c34707dcb",
+      "bytes": 15753,
+      "lines": 375,
+      "receipt_self_seal_sha256": "e3904cbdfcfb514a08402e80dff3c77f0999dba51e12146c6a8770ea814144ad"
+    },
+    "receipt_materializer": {
+      "path": "generators/materialize-run-161-audit-dashboard-verification-wave-28.py",
+      "sha256": "a0970afe9672e878f5a813e59e9d51ee0c95c6e953c4fe3bd8a175e85e6209b9",
+      "blob_id": "14b4664df7577ee94aa19ebcb2cc2d79d67ba75c",
+      "bytes": 58488,
+      "lines": 1397
+    }
+  },
+  "lineage": {
+    "required_artifacts": 8,
+    "verified_artifacts": 8,
+    "all_current_hashes_match": true,
+    "all_links_and_hashes_visible": true,
+    "artifacts": [
+      {
+        "path": "generators/materialize-run-158-audit-dashboard-verification-wave-27.py",
+        "sha256": "e5d2bb3dd0a0cfd3db1f24ea859813c107b10767cf4e22f12aa8842d37103e49",
+        "blob_id": "09cb906d08310313db61a2fef8c194bbf3a62f47",
+        "bytes": 38017,
+        "lines": 977,
+        "link_visible": true,
+        "hash_visible": true
+      },
+      {
+        "path": "evidence/browser/current-audit-dashboard-verification-run-158-wave-27.json",
+        "sha256": "4b3cf785c5d9f4f0f0263b90ddc722818d1d8fdb4e9bf89bd44f1fec117752fb",
+        "blob_id": "3268066ca3204e9c9d3233c2497ce88183b54d85",
+        "bytes": 19841,
+        "lines": 527,
+        "link_visible": true,
+        "hash_visible": true
+      },
+      {
+        "path": "generators/materialize-run-159-med-rbac-already-fixed-adjudication-wave-28.py",
+        "sha256": "cfd37697847c57a5e8116adb5836945daf21208fb00d0885abf7f3d594379ae7",
+        "blob_id": "3f0965f58ea4855f76288d662616b0ad6b7d9964",
+        "bytes": 23846,
+        "lines": 472,
+        "link_visible": true,
+        "hash_visible": true
+      },
+      {
+        "path": "evidence/runtime/current-run-159-med-rbac-already-fixed-adjudication-wave-28.json",
+        "sha256": "bc666ded05774b03b849743436cec47cbdb260c8ab763cf502e71c804af7fd8e",
+        "blob_id": "116664410ebeb4fa97ed93e7badbd7537c9a4b5d",
+        "bytes": 17319,
+        "lines": 379,
+        "link_visible": true,
+        "hash_visible": true
+      },
+      {
+        "path": "generators/materialize-independent-run-159-med-rbac-adjudication-review-wave-28.py",
+        "sha256": "bc1ef82dfe6459b726acf2567d6d976dbefb8cf869441e32eb0cb02c626a6b5e",
+        "blob_id": "1d028d1f90876453e88d578ee9b70b06cc2fd311",
+        "bytes": 10808,
+        "lines": 249,
+        "link_visible": true,
+        "hash_visible": true
+      },
+      {
+        "path": "evidence/runtime/current-run-159r-independent-med-rbac-adjudication-review-wave-28.json",
+        "sha256": "be0651adf9edfbf7694ac535908cf43a5631675bcf6d5264add68fe947437d18",
+        "blob_id": "531218a89947b42bf9137a0d588d29c617ee96f0",
+        "bytes": 3368,
+        "lines": 78,
+        "link_visible": true,
+        "hash_visible": true
+      },
+      {
+        "path": "generators/materialize-run-160-med-rbac-already-fixed-reporting-wave-28.py",
+        "sha256": "2b224ceb98e2889f436ed266576db96f814847db4a49770d382ecabbc2b01ec6",
+        "blob_id": "946cef04795ca2540033811afb554992b9c90383",
+        "bytes": 39480,
+        "lines": 615,
+        "link_visible": true,
+        "hash_visible": true
+      },
+      {
+        "path": "evidence/source/current-run-160-med-rbac-already-fixed-reporting-wave-28.json",
+        "sha256": "d5ff3afb23812ddffc7c5c864e745e8685471e3bae2f89171867dd764eafae52",
+        "blob_id": "44d4231cebf99f322d6a9513db623d9c34707dcb",
+        "bytes": 15753,
+        "lines": 375,
+        "link_visible": true,
+        "hash_visible": true
+      }
+    ]
+  },
+  "reporting_attribution_correction": {
+    "status": "CORRECTED_EXACT_RUN_ATTRIBUTION_WITH_COUNTS_AND_DISPOSITIONS_UNCHANGED",
+    "historical_run_159_run_159r_and_run_160_receipts_mutated": false,
+    "historical_run_160_surface_hashes_preserved_in_run_160_receipt": true,
+    "historical_run_160_surface_hashes_are_pre_correction_checkpoint": true,
+    "changed_committed_surfaces": 5,
+    "changed_source_surfaces": {
+      "findings.json": {
+        "baseline": {
+          "sha256": "fd27711496bb381b79ed6c42c7bbd4abedccdbd0d90f5059aab75075ea822b02",
+          "blob_id": "fd69f61fbc01f927cd0e73ee1d1d39059b9c1254",
+          "bytes": 523609,
+          "lines": 9651
+        },
+        "current": {
+          "sha256": "c78810ff3b8acf36d2334abccecbe17fa8386d943b9fc6e8f3c9cf2541887abb",
+          "blob_id": "75c5340780152f0ce366c1626736d7c5462c996b",
+          "bytes": 523745,
+          "lines": 9651
+        }
+      },
+      "00-executive-summary.md": {
+        "baseline": {
+          "sha256": "22defb3ef6738740d03d097c5b0f7c2f5cba74df387ad7b02bac00a9a8cae18f",
+          "blob_id": "cb7bb0cb3806a81ea86328126f84f7a4ad30d990",
+          "bytes": 111652,
+          "lines": 484
+        },
+        "current": {
+          "sha256": "3f8f1c23156075f91dcacc846dc2ed5311928491a57b55caf3e5fb8efa1be3fa",
+          "blob_id": "5b49516bd0d08f59f8f256ed328e0de2d1b9ee5d",
+          "bytes": 111916,
+          "lines": 484
+        }
+      },
+      "01-repository-module-map.md": {
+        "baseline": {
+          "sha256": "0304defc69c33481f1163f639f579fc283856f80446d0d5bfa570174e77fa4a7",
+          "blob_id": "c82eeb84db39b9e17f4111c47b7ce078d727afbd",
+          "bytes": 32538,
+          "lines": 216
+        },
+        "current": {
+          "sha256": "c80fc0a180b4bd41aa26f38a067964594eed885918a466bb17c2079a0a2af43a",
+          "blob_id": "9c32c1786a8cdd07fb89f921f06f6d4eb6b1292f",
+          "bytes": 32768,
+          "lines": 216
+        }
+      },
+      "generators/build-current-audit-dashboard.py": {
+        "baseline": {
+          "sha256": "0d23faac294a3dc950788e0c8614c0b8473f9ddb960be2e9e13440626d91c865",
+          "blob_id": "9b89784b41177a09405a8094cc7c507e6965d594",
+          "bytes": 387187,
+          "lines": 3417
+        },
+        "current": {
+          "sha256": "d77c1ced750c7661fae2d7033b083f69ca75e1be70036f8e9b3a4d87baf61585",
+          "blob_id": "b037d9af06fdf9c62f7fb0bd06a8b2cdae14b38e",
+          "bytes": 389526,
+          "lines": 3432
+        }
+      }
+    },
+    "dashboard": {
+      "baseline": {
+        "sha256": "1b0747372d70254f9761177c151fb8dba38090d4a2fae919a0ed0ee91431e2b3",
+        "blob_id": "6cec2d70cc6c4c7596e8d5f1c096b3419cbf8524",
+        "bytes": 235542,
+        "lines": 77
+      },
+      "current": {
+        "sha256": "c27d0535885c68984b96bf1fbbb91f65f303a8ed8b9255742df9d8f0788370b3",
+        "blob_id": "5bb2c6fff53a1e6440359a51546db30dbf7ecc0b",
+        "bytes": 244814,
+        "lines": 78
+      }
+    },
+    "correct_attribution": {
+      "run_159": "ESTABLISHES_MED_RBAC_ALREADY_FIXED_DISPOSITION",
+      "run_159r": "INDEPENDENTLY_AUTHORIZES_RETIREMENT_REPORTING",
+      "run_160": "ALONE_RECLASSIFIES_CURRENT_PROVISIONAL_TO_RETAINED_HISTORICAL_ALREADY_FIXED"
+    },
+    "finding_counts_changed": false,
+    "finding_dispositions_changed": false,
+    "benchmark_counts_changed": false,
+    "application_source_changed": false,
+    "stale_attribution_phrases_absent_from_corrected_dashboard": true
+  },
+  "invalidated_pre_correction_run_161_candidate": {
+    "publication_status": "UNCOMMITTED_SUPERSEDED_SEMANTIC_NO_GO",
+    "exact_bytes": {
+      "dashboard_html": {
+        "sha256": "990b3978539bd961ee58a6aff2feeb19ced170d2e9293b90f38c293577b1eef0",
+        "blob_id": "4541ffe49f39aec2f93d596f2a990bd5538f4f74",
+        "bytes": 243138,
+        "lines": 78
+      },
+      "materializer": {
+        "sha256": "d28bc8fa3b5989d2dcdec3741e0df2e359b2b84d7bc356a80e18756a365a1652",
+        "blob_id": "896c7b984a52908eb7d164965f07e1fa6fead799",
+        "bytes": 45366,
+        "lines": 1123
+      },
+      "receipt": {
+        "sha256": "a18a62cb872153fffa8d7079ce408172a37189d102588b03036f6272dba4f6c8",
+        "blob_id": "e582082a7bab61aff485155ef3f75aa1d589c9a8",
+        "bytes": 23060,
+        "lines": 609,
+        "receipt_self_seal_sha256": "07919f58e417efa3200274f863c6db21475967faa928af2529aedc8d28d650d8"
+      }
+    },
+    "mechanical_checks_had_passed_before_semantic_no_go": true,
+    "semantic_no_go_reason": "The candidate attributed live-register retirement to RUN159/R; RUN159 established the ALREADY_FIXED disposition, RUN159R independently authorized retirement reporting, and RUN160 alone reconciled the live register.",
+    "browser_facts_transferred_to_corrected_artifact": false,
+    "mechanical_go_transferred_to_corrected_artifact": false,
+    "credit_transferred_to_corrected_artifact": false
+  },
+  "reported_finding_boundary": {
+    "retained_historical_claim_identities": 12,
+    "current_provisional_P1": 11,
+    "historical_already_fixed": 1,
+    "historical_already_fixed_id": "MED-RBAC-01",
+    "current_final_P0": 0,
+    "current_final_P1": 0,
+    "run_159_bounded_MED_RBAC_tests_reported_not_reexecuted": 73,
+    "run_159_bounded_MED_RBAC_assertions_reported_not_reexecuted": 1481,
+    "benchmark_mapped": 2,
+    "final_no_match_or_NCM": 0,
+    "benchmark_unresolved": 338,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "noninheritance_boundary": {
+    "MED_RBAC_01_only_already_fixed_disposition": true,
+    "MED_CD_SCOPE_01_retired_or_credited": false,
+    "MED_CD_ATOMICITY_01_retired_or_credited": false,
+    "run_159_runtime_reexecuted_or_recredited": false,
+    "run_160_reporting_recredited": false,
+    "run_161_attribution_correction_changes_finding_or_completion_credit": false,
+    "run_158_dashboard_proof_transferred": false,
+    "invalidated_pre_correction_run_161_browser_proof_transferred": false,
+    "application_browser_credit_inferred": false
+  },
+  "remote_state_boundary": {
+    "local_origin_main_observed_equal_to_checkpoint": true,
+    "ahead": 0,
+    "behind": 0,
+    "fetch_performed_by_run_161": false,
+    "remote_currency_verified_by_run_161": false,
+    "publication_or_push_performed_by_run_161": false
+  },
+  "root_browser_resource_cleanup": {
+    "temporary_in_app_browser_tab_closed": true,
+    "temporary_viewport_override_reset_before_close": true,
+    "local_http_server_port": 43163,
+    "local_http_server_stopped_before_artifact_close": true,
+    "post_stop_listener_count": 0,
+    "post_stop_server_process_count": 0
+  },
+  "verification_method": {
+    "in_app_browser": {
+      "facts_supplied_by_root": true,
+      "target_url": "http://127.0.0.1:43163/audit-dashboard.html?run=161&sha=c27d0535885c",
+      "cachebuster_used": true,
+      "cachebuster": "run=161&sha=c27d0535885c",
+      "response_probe": "Read-only local HTTP GET against the exact artifact URL",
+      "response_status": 200,
+      "response_content_type": "text/html",
+      "response_bytes": 244814,
+      "response_sha256": "c27d0535885c68984b96bf1fbbb91f65f303a8ed8b9255742df9d8f0788370b3",
+      "exact_dashboard_loaded": true,
+      "four_viewports_observed": true,
+      "all_navigation_links_actually_clicked": true,
+      "read_only_navigation_and_layout_inspection": true,
+      "application_or_external_state_changed": false
+    },
+    "static_validation": "Parsed exact local HTML bytes; resolved local resources, authored IDs, anchors, adjacent displayed hashes, and committed lineage.",
+    "materializer_browser_execution_performed": false,
+    "materializer_byte_identical_runs_required": 2,
+    "dashboard_builder_byte_identical_runs_observed_by_root": 2
+  },
+  "verification": {
+    "state": "GO_FOR_EXACT_AUDIT_ARTIFACT_FACTS_ONLY",
+    "viewports_required": 4,
+    "viewports_verified": 4,
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual_browser_viewport": "1440x900",
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "page_scroll_width": 1425,
+        "page_client_width": 1425,
+        "table_wraps": 10,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0,
+        "main_visible": true,
+        "navigation_dom_resolved": true,
+        "navigation_overflow_x": "auto",
+        "navigation_scroll_width": 1425,
+        "navigation_client_width": 1425,
+        "navigation_needing_bounded_horizontal_scroll": false,
+        "font_status": "loaded"
+      },
+      {
+        "requested": "1280x800",
+        "actual_browser_viewport": "1280x800",
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "page_scroll_width": 1265,
+        "page_client_width": 1265,
+        "table_wraps": 10,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0,
+        "main_visible": true,
+        "navigation_dom_resolved": true,
+        "navigation_overflow_x": "auto",
+        "navigation_scroll_width": 1265,
+        "navigation_client_width": 1265,
+        "navigation_needing_bounded_horizontal_scroll": false,
+        "font_status": "loaded"
+      },
+      {
+        "requested": "1024x768",
+        "actual_browser_viewport": "1024x768",
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "page_scroll_width": 1009,
+        "page_client_width": 1009,
+        "table_wraps": 10,
+        "tables_needing_bounded_horizontal_scroll": 1,
+        "tables_with_unbounded_overflow": 0,
+        "main_visible": true,
+        "navigation_dom_resolved": true,
+        "navigation_overflow_x": "auto",
+        "navigation_scroll_width": 1009,
+        "navigation_client_width": 1009,
+        "navigation_needing_bounded_horizontal_scroll": false,
+        "font_status": "loaded"
+      },
+      {
+        "requested": "390x844",
+        "actual_browser_viewport": "390x844",
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "page_scroll_width": 375,
+        "page_client_width": 375,
+        "table_wraps": 10,
+        "tables_needing_bounded_horizontal_scroll": 10,
+        "tables_with_unbounded_overflow": 0,
+        "main_visible": true,
+        "navigation_dom_resolved": true,
+        "navigation_overflow_x": "auto",
+        "navigation_scroll_width": 922,
+        "navigation_client_width": 375,
+        "navigation_needing_bounded_horizontal_scroll": true,
+        "font_status": "loaded"
+      }
+    ],
+    "font_loaded_at_all_viewports": true,
+    "main_visible_at_all_viewports": true,
+    "navigation_dom_resolved_at_all_viewports": true,
+    "navigation_outer_overflow_x": "auto",
+    "mobile_navigation_scroll_required": true,
+    "desktop_and_tablet_navigation_scroll_required": false,
+    "headings": 26,
+    "tables": 10,
+    "table_wraps": 10,
+    "anchor_elements": 726,
+    "anchor_elements_visible_in_browser": 726,
+    "all_anchor_elements_visible_in_browser": true,
+    "artifact_authored_ids": 10,
+    "dom_ids_observed": 11,
+    "browser_injected_ids": [
+      "codex-browser-sidebar-comments-root"
+    ],
+    "duplicate_authored_ids": [],
+    "duplicate_authored_ids_observed": 0,
+    "hash_anchor_occurrences": 10,
+    "unique_hash_anchors": 10,
+    "anchors": "10/10",
+    "anchor_failures": [],
+    "local_resource_link_occurrences": 716,
+    "unique_local_resources": 395,
+    "pre_materialization_forward_reference": {
+      "href": "evidence/browser/current-audit-dashboard-verification-run-161-wave-28.json",
+      "missing_before_first_materialization": true,
+      "prewrite_state_accepts_existing_receipt_on_rerun": true,
+      "excluded_from_pre_materialization_failure": true,
+      "resolved_after_receipt_materialization": true
+    },
+    "post_materialization_local_resources": "395/395",
+    "post_materialization_local_resource_failures": [],
+    "adjacent_hash_pair_occurrences": 615,
+    "unique_adjacent_hash_path_hash_pairs": 323,
+    "unique_adjacent_hash_paths": 323,
+    "hash_bearing_file_occurrences_verified": 613,
+    "unique_hash_bearing_file_paths_verified": 322,
+    "historical_directory_bundle_digest_occurrences_not_file_hashes": 2,
+    "historical_directory_bundle_digest_paths": [
+      "task-scripts/"
+    ],
+    "hash_bearing_link_failures": [],
+    "navigation_targets": "10/10",
+    "navigation_labels_include_run_160": true,
+    "navigation_labels_include_finding_status": true,
+    "navigation_exercise_method": "actual browser clicks against same-document anchors",
+    "navigation_links": [
+      {
+        "label": "Progress",
+        "target": "#progress",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "RUN-160",
+        "target": "#checkpoint",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Pages",
+        "target": "#pages",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Static census",
+        "target": "#static-census",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Runtime gates",
+        "target": "#runtime",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Benchmarks",
+        "target": "#benchmarks",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Modules",
+        "target": "#modules",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Finding status",
+        "target": "#findings",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Architecture",
+        "target": "#architecture",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Gaps",
+        "target": "#gaps",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      }
+    ],
+    "console_log_entries": 0,
+    "console_warnings": 0,
+    "console_errors": 0,
+    "page_errors": 0,
+    "exact_visible_static_boundary_check_count": 63,
+    "exact_visible_static_boundary_checks": {
+      "title": true,
+      "main_visible": true,
+      "no_completion_claim": true,
+      "h1": true,
+      "run160_nav": true,
+      "finding_status_nav": true,
+      "navigation_10": true,
+      "run160_checkpoint_heading": true,
+      "adjudication_checkpoint_heading": true,
+      "one_org_multiple_sites": true,
+      "site_permission_boundary": true,
+      "owners_664": true,
+      "routes_307_pages_357": true,
+      "bridges_95": true,
+      "residual_3265": true,
+      "queue_118_389": true,
+      "queue_411": true,
+      "benchmark_2_of_340": true,
+      "ncm_0_of_340": true,
+      "benchmark_338": true,
+      "retained_claims_12": true,
+      "provisional_findings_11": true,
+      "historical_fixed_1": true,
+      "zero_final_findings": true,
+      "med_tests_73": true,
+      "med_assertions_1481": true,
+      "no_full_suite_coverage": true,
+      "run158_superseded": true,
+      "run158_viewports": true,
+      "run158_visible_checks": true,
+      "run158_nav_checks": true,
+      "run158_links": true,
+      "run158_zero_errors": true,
+      "historical_med_pin": true,
+      "current_med_pin": true,
+      "med_historical_fixed": true,
+      "med_rbac_disposition_established": true,
+      "run159r_retirement_reporting_authorized": true,
+      "run160_live_register_reconciled": true,
+      "checkpoint_role_attribution_exact": true,
+      "separate_run159_run159r_rows": true,
+      "three_reviews": true,
+      "runtime_73_1481": true,
+      "exact_receipt_go": true,
+      "no_application_change": true,
+      "no_scope_atomicity_inheritance": true,
+      "scope_separate": true,
+      "scope_no_inheritance": true,
+      "run160_split_after_reconciliation": true,
+      "run160_materializer_hash": true,
+      "run160_receipt_hash": true,
+      "run161_heading": true,
+      "run161_link": true,
+      "run161_four_viewports": true,
+      "run161_artifact_only": true,
+      "no_application_browser_credit": true,
+      "gate4_false": true,
+      "audit_completion_false": true,
+      "current_browser_zero": true,
+      "cleanup_bounded": true,
+      "reporting_not_runtime": true,
+      "old_queue_ambiguity_absent": true,
+      "stale_provisional_12_current_absent": true
+    },
+    "supplemental_static_boundary_check_count": 58,
+    "supplemental_static_boundary_checks": {
+      "current_owner_counts_664_307_357_95": true,
+      "bounded_residual_3265": true,
+      "queue_118_389": true,
+      "queue_without_ownership_411": true,
+      "benchmark_mapping_2_of_340": true,
+      "final_ncm_0_of_340": true,
+      "benchmark_unresolved_338": true,
+      "retained_identity_split_12_11_1": true,
+      "current_provisional_11": true,
+      "historical_already_fixed_1": true,
+      "none_final": true,
+      "one_org_multiple_sites": true,
+      "site_authorization_boundary": true,
+      "gate_4_false": true,
+      "audit_completion_false": true,
+      "run158_exact_superseded_artifact": true,
+      "run158_four_viewports": true,
+      "run158_visible_checks": true,
+      "run158_navigation": true,
+      "run158_links": true,
+      "run158_zero_errors": true,
+      "run158_proof_nontransfer": true,
+      "historical_a049_pin": true,
+      "current_application_4f57_pin": true,
+      "med_rbac_historical_identity": true,
+      "med_scope_separate_identity": true,
+      "med_atomicity_separate_identity": true,
+      "med_rbac_already_fixed": true,
+      "run159_establishes_already_fixed_disposition": true,
+      "run159r_authorizes_retirement_reporting": true,
+      "run160_alone_reclassifies_live_register": true,
+      "checkpoint_role_attribution_exact": true,
+      "separate_run159_run159r_rows": true,
+      "three_current_source_reviews": true,
+      "bounded_med_runtime": true,
+      "exact_receipt_go": true,
+      "no_application_change": true,
+      "med_rbac_only_remediation_scope": true,
+      "no_current_bypass": true,
+      "exact_capabilities_current": true,
+      "no_scope_atomicity_inheritance": true,
+      "scope_atomicity_remain_separate": true,
+      "scope_atomicity_no_inherited_credit": true,
+      "cleanup_bounded": true,
+      "run160_live_split": true,
+      "run160_materializer_hash": true,
+      "run160_receipt_hash": true,
+      "run160_materializer_link": true,
+      "run160_receipt_link": true,
+      "fresh_run161_required": true,
+      "run161_receipt_link": true,
+      "run161_exact_attribution_correction_scope": true,
+      "run161_four_viewports": true,
+      "run161_artifact_only": true,
+      "no_application_browser_credit": true,
+      "no_full_suite_or_coverage_credit": true,
+      "run159_bounded_execution_only": true,
+      "current_source_browser_zero": true
+    },
+    "browser_only_facts_not_supplied": []
+  },
+  "worktree_boundary": {
+    "expected_status_count": 7,
+    "expected_porcelain_statuses": [
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-161-wave-28.json",
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-161-audit-dashboard-verification-wave-28.py",
+      "M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/00-executive-summary.md",
+      "M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/01-repository-module-map.md",
+      "M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+      "M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/findings.json",
+      "M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py"
+    ],
+    "exact_match_required": true
+  },
+  "mutation_attestation": {
+    "run_161_change_set_is_exactly_three_reporting_surfaces_dashboard_builder_html_materializer_and_receipt": true,
+    "run_161_materializer_writes_only_receipt": true,
+    "dashboard_html_pre_materialized": true,
+    "dashboard_builder_changed_by_run_161": true,
+    "audit_reporting_attribution_corrected_by_run_161": true,
+    "dashboard_builder_executed_twice_byte_identically_by_root": true,
+    "application_source_changed": false,
+    "application_runtime_started_by_materializer": false,
+    "browser_started_by_materializer": false,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "database_changed": false,
+    "application_tests_or_build_run_by_materializer": false
+  },
+  "credit_boundary": {
+    "audit_reporting_attribution_correction": true,
+    "exact_audit_dashboard_artifact": true,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_or_workflow": false,
+    "application_source_mutation": false,
+    "application_remediation": false,
+    "medication_semantic_adjudication": false,
+    "med_cd_scope_disposition": false,
+    "med_cd_atomicity_disposition": false,
+    "remediation_or_defect_closure": false,
+    "run_159_source_review_recredit": false,
+    "run_159_bounded_test_evidence_recredit": false,
+    "run_159r_exact_review_recredit": false,
+    "run_160_reporting_recredit": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "executed_tests": false,
+    "full_test_suite": false,
+    "test_coverage": false,
+    "new_benchmark_mapping": false,
+    "new_final_no_match_or_NCM": false,
+    "finding": false,
+    "final_finding": false,
+    "final_P0": false,
+    "final_P1": false,
+    "priority_promotion": false,
+    "module_completion": false,
+    "origin_currency_correctness": false,
+    "origin_currency_coverage": false,
+    "remote_currency": false,
+    "publication_or_push": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "feature_completion": false,
+    "completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/00-executive-summary.md",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/01-repository-module-map.md",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/findings.json",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-161-audit-dashboard-verification-wave-28.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-161-wave-28.json"
+  ],
+  "receipt_self_seal_sha256": "a136494b7da9843e21f123247320d499a695624c29e29c91b45cf6299fb59582"
+}
