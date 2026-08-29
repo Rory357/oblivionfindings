@@ -1,0 +1,308 @@
+{
+  "schema_version": "run-162-med-cd-scope-remediation-wave-29-v1",
+  "run_id": "RUN-162-MED-CD-SCOPE-01-REMEDIATION-WAVE-29",
+  "status": "REPRODUCED_CURRENT_SCOPE_DEFECTS_REMEDIATED_PUBLISHED_AND_BOUNDED_VERIFIED_REPORTING_NOT_YET_AUTHORIZED_ZERO_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "materialized_on": "2026-08-29",
+  "architecture_boundary": "One operating organisation across multiple Sites; exact permissions, approved-Site access, canonical ownership, direct-object concealment, privacy, and consent are the boundaries.",
+  "pins": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "historical_audited_application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "historical_med_cd_scope_record_canonical_sha256": "dd86bf94f3b4d894e95c56c95a9409ce803b8d82d108cdd3c42f3343e348cd21",
+    "effective_application_base_commit": "4f57ad4202df90ded375961437879822a908627b",
+    "effective_application_base_tree": "ee79b8d2733d09da2fd97992ac2a04e862159505",
+    "effective_application_base_to_vcs_parent_audit_root_only": true,
+    "effective_application_base_to_vcs_parent_path_count": 17,
+    "application_parent": "500f4ab9bc7b2952a80913f1fb2d71cab5946005",
+    "application_commit": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+    "repository_tree_at_application_commit": "7b2b5688c90e4da28725e70e38e50fd445f1b4c4",
+    "tree_scope": "FULL_REPOSITORY_TREE_AT_APPLICATION_COMMIT",
+    "stable_patch_id": "09bc6f401235fa70b5f9da90aef226b2b7aa2d73",
+    "application_commit_subject": "fix(emar): enforce canonical controlled drug scope",
+    "application_remote_publication_observed": {
+      "remote": "origin",
+      "branch": "main",
+      "published_commit": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+      "push_exit_code": 0,
+      "verification_command": "git ls-remote origin refs/heads/main",
+      "verification_exit_code": 0,
+      "remote_observed_tip": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+      "force_push": false
+    },
+    "materializer": {
+      "path": "generators/materialize-run-162-med-cd-scope-remediation-wave-29.py",
+      "sha256": "d305638441b8ff366fa5fbc5a00bcc2b81658bf2611a5633ad79fdb4b63f5fb4",
+      "git_blob_id": "4798f25dd906fe0a25cf35fbbbd97ea17ba71255",
+      "bytes": 19724,
+      "lines": 410
+    },
+    "application_source_and_regression_tests": [
+      {
+        "path": "app/Console/Commands/EscalateOverdueControlledChecks.php",
+        "sha256": "946497da98faa179c5b701bc861718064c90e6794aa9d6088698412a18bf5afa",
+        "git_blob_id": "8e30374d00dde93d505e927e67a283756a8c6fce",
+        "bytes": 3080,
+        "lines": 85,
+        "insertions": 13,
+        "deletions": 3
+      },
+      {
+        "path": "app/Http/Controllers/Emar/EmarController.php",
+        "sha256": "91047e8fa6068860fd133abf228fe0d3092d1c4a4296e58736cfd430686866d6",
+        "git_blob_id": "c347d69a71b8bdf657129faba8df06d4212968b6",
+        "bytes": 434064,
+        "lines": 8921,
+        "insertions": 27,
+        "deletions": 15
+      },
+      {
+        "path": "app/Services/MedicationOverviewService.php",
+        "sha256": "de6c3596090891dc9ccc0c8681bd323a7942e0487e37d9394ed4f8c36b998049",
+        "git_blob_id": "7e2d049bb05fe2623e319fe42f1586fed11fb1b6",
+        "bytes": 45021,
+        "lines": 1045,
+        "insertions": 5,
+        "deletions": 2
+      },
+      {
+        "path": "tests/Feature/Emar/ControlledDrugsTest.php",
+        "sha256": "4f0007b36820a82b8fac71911a603a3af33fbb2ca5b479e07376f360c09cfbd5",
+        "git_blob_id": "d88a108ffa72e58215a3584d42d71e115e7aba27",
+        "bytes": 58169,
+        "lines": 1370,
+        "insertions": 72,
+        "deletions": 0
+      },
+      {
+        "path": "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php",
+        "sha256": "7367b2b06dde1eb4b8d7d772c30315f7b5ebd52f595f1d31f2df017e1a13f635",
+        "git_blob_id": "b9f3a8589296e9760df7758d9c3c131ae358f353",
+        "bytes": 108478,
+        "lines": 2463,
+        "insertions": 23,
+        "deletions": 0
+      },
+      {
+        "path": "tests/Feature/Emar/MedicationOverviewServiceTest.php",
+        "sha256": "f6127775c7615740fb34d7e82d89668ff4086c21420501f7675c719d933e3060",
+        "git_blob_id": "4c2341ea8e3e8a2631c8c928b819f964f82319a3",
+        "bytes": 8213,
+        "lines": 238,
+        "insertions": 35,
+        "deletions": 0
+      },
+      {
+        "path": "tests/Feature/Emar/StockManagementTest.php",
+        "sha256": "a5948c1bf4d462fa4a7ef9ac853c6521d35f156058f348a8a1dc29546bc83360",
+        "git_blob_id": "04fe4d9f4951fee538928274161ed7eda4402712",
+        "bytes": 39654,
+        "lines": 959,
+        "insertions": 59,
+        "deletions": 0
+      }
+    ]
+  },
+  "issue_first_disposition": {
+    "finding_id": "MED-CD-SCOPE-01",
+    "historical_claim_reproduced_on_historical_pin": true,
+    "current_main_genuine_related_defects_reproduced_before_fix": 5,
+    "new_discovery_stopped_after_confirmation": true,
+    "stable_branch": "codex/med-cd-scope-01",
+    "isolated_worktree": "C:/w/mcd162",
+    "verdict": "REPRODUCED_AND_REMEDIATED_CURRENT_MAIN",
+    "red_cases": [
+      {
+        "id": "RUN162-RED-DISCREPANCY-VALIDATION-ORACLE",
+        "test": "MedicationGovernanceAuthorizationTest::test_med_cd_scope_discrepancy_resolution_conceals_foreign_objects_before_validation",
+        "pre_fix_observation": "foreign existing ID returned 302 validation response while missing ID returned 404",
+        "expected_contract": "foreign existing and missing direct IDs both return the exact concealed 404 body before payload validation, with no mutation or audit effect"
+      },
+      {
+        "id": "RUN162-RED-CONTROLLED-PROJECTION",
+        "test": "ControlledDrugsTest::test_med_cd_scope_reconciliation_ignores_noncanonical_client_medication_balance_checks",
+        "pre_fix_observation": "same-Site wrong-client row replaced the canonical last-check timestamp: expected 2026-08-21, observed 2026-08-28",
+        "expected_contract": "last-check aggregation includes only rows whose Client and client_medication ownership reconcile canonically"
+      },
+      {
+        "id": "RUN162-RED-STOCK-PROJECTION",
+        "test": "StockManagementTest::test_med_cd_scope_stock_register_ignores_noncanonical_balance_checks_and_discrepancies",
+        "pre_fix_observation": "same-Site wrong-client balance was projected: expected 11, observed 99",
+        "expected_contract": "stock balance, witness, timestamp, and discrepancy projections exclude noncanonical rows"
+      },
+      {
+        "id": "RUN162-RED-OVERVIEW-SUPPRESSION",
+        "test": "keeps med cd scope balance checks due when today entry has noncanonical ownership",
+        "pre_fix_observation": "same-Site wrong-client today row suppressed the canonical medication due item",
+        "expected_contract": "checked-today exclusion is canonical before due-item projection"
+      },
+      {
+        "id": "RUN162-RED-SCHEDULED-ESCALATION-SUPPRESSION",
+        "test": "ControlledDrugsTest::test_med_cd_scope_overdue_command_ignores_noncanonical_recent_balance_checks",
+        "pre_fix_observation": "same-Site wrong-client recent row suppressed the expected overdue alert",
+        "expected_contract": "internal all-Site scheduling retains canonical ownership even when no reader Site filter is supplied"
+      }
+    ],
+    "red_execution_boundary": {
+      "all_five_cases_executed_red_before_their_fix": true,
+      "exact_historical_shell_command_text_retained": false,
+      "nonfabrication_note": "The exact earlier red-run shell strings were not retained; this receipt records the executed test identities and observed mismatches without reconstructing commands."
+    }
+  },
+  "remediation": {
+    "summary": "Apply the existing canonical medication-row scope before controlled, stock, overview, and scheduled last-check/discrepancy projections, and authorize a discrepancy object before validating its payload.",
+    "production_files": 3,
+    "regression_test_files": 4,
+    "changed_paths": 7,
+    "insertions": 234,
+    "deletions": 20,
+    "routes_pages_components_copy_or_layout_changed": false,
+    "third_party_source_assets_wording_or_layout_copied": false,
+    "single_tenant_multi_site_boundary_preserved": true
+  },
+  "runtime_execution": {
+    "root_builder_lane_only": true,
+    "disposable_database": {
+      "configured_name": "oa162_audit_final",
+      "testcase_managed_effective_schema_prefix": "oa162_",
+      "production_or_user_data_used": false,
+      "notifications_webhooks_or_integrations_sent": false
+    },
+    "advanced_main_focused_command": {
+      "command": "$env:DB_DATABASE='oa162_audit_final'; php artisan test --compact tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php tests/Feature/Emar/ControlledDrugsTest.php tests/Feature/Emar/StockManagementTest.php tests/Feature/Emar/MedicationOverviewServiceTest.php --filter='med.cd.scope'",
+      "exit_code": 0,
+      "tests": 5,
+      "assertions": 48,
+      "duration_seconds": 149.85
+    },
+    "earlier_isolated_worktree_focused_replay": {
+      "exit_code": 0,
+      "tests": 5,
+      "assertions": 48,
+      "duration_seconds": 144.63
+    },
+    "broader_bounded_execution": {
+      "files": [
+        "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php",
+        "tests/Feature/Emar/ControlledDrugsTest.php",
+        "tests/Feature/Emar/StockManagementTest.php",
+        "tests/Feature/Emar/DestructionsTest.php",
+        "tests/Feature/Emar/MedicationOverviewServiceTest.php"
+      ],
+      "directly_related_controller_and_command_tests_passed": 102,
+      "combined_passed": 108,
+      "combined_assertions": 1454,
+      "combined_failed": 2,
+      "baseline_failures": [
+        "it surfaces an INR-out-of-range item...",
+        "severity sort raises ValueError because no critical INR item exists"
+      ],
+      "baseline_replay_at_base_commit": {
+        "file": "tests/Feature/Emar/MedicationOverviewServiceTest.php",
+        "same_failures": 2,
+        "passed": 5,
+        "assertions": 48,
+        "classification": "BASE_REPRODUCED_FAILURES_NOT_ATTRIBUTED_TO_RUN162_FULL_SUITE_GREEN_FALSE"
+      },
+      "full_suite_or_coverage_credit": false
+    },
+    "format_command": {
+      "command": "vendor/bin/pint --test app/Console/Commands/EscalateOverdueControlledChecks.php app/Http/Controllers/Emar/EmarController.php app/Services/MedicationOverviewService.php tests/Feature/Emar/ControlledDrugsTest.php tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php tests/Feature/Emar/MedicationOverviewServiceTest.php tests/Feature/Emar/StockManagementTest.php",
+      "exit_code": 0,
+      "result": "passed"
+    },
+    "syntax_command": {
+      "command": "$paths=@('app/Console/Commands/EscalateOverdueControlledChecks.php','app/Http/Controllers/Emar/EmarController.php','app/Services/MedicationOverviewService.php','tests/Feature/Emar/ControlledDrugsTest.php','tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php','tests/Feature/Emar/MedicationOverviewServiceTest.php','tests/Feature/Emar/StockManagementTest.php'); foreach($path in $paths){ php -l $path }",
+      "exit_code": 0,
+      "files_passed": 7
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  },
+  "cleanup_evidence": {
+    "schema_query_command": "php artisan tinker --% --execute=\"echo json_encode(DB::select('SELECT schema_name FROM information_schema.schemata WHERE LEFT(schema_name,6) = \\'oa162_\\' ORDER BY schema_name'));\"",
+    "schema_query_exit_code": 0,
+    "matching_schema_count": 0,
+    "matching_schemas": [],
+    "owned_php_process_count": 0,
+    "owned_listener_count": 0,
+    "main_worktree_clean_before_audit_writes": true,
+    "isolated_worktree_clean_before_audit_writes": true
+  },
+  "independent_static_reviews": {
+    "reviewer_count": 3,
+    "unanimous_verdict": "GO",
+    "reviewers": [
+      {
+        "lane": "/root/run162_scope_adversarial",
+        "verdict": "GO",
+        "scope": "current diff and adjacent controlled-drug read projections",
+        "executed_tests": false,
+        "wrote_files": false
+      },
+      {
+        "lane": "/root/run162_scope_source",
+        "verdict": "GO",
+        "scope": "source construction, command container resolution, canonical helper semantics, and minimality",
+        "executed_tests": false,
+        "wrote_files": false
+      },
+      {
+        "lane": "/root/run162_scope_history_tests",
+        "verdict": "GO",
+        "scope": "historical defect, command regression red/green validity, and noninheritance",
+        "executed_tests": false,
+        "wrote_files": false
+      }
+    ],
+    "exact_receipt_review_completed": false,
+    "retirement_reporting_authorized": false
+  },
+  "noninheritance_boundary": {
+    "med_rbac_disposition_recredited": false,
+    "med_cd_atomicity_disposition_or_concurrency_credit": false,
+    "benchmark_mapping_or_NCM_changed": false,
+    "ownership_inventory_or_matrix_changed_by_run_162": false,
+    "application_browser_or_ease_credit": false,
+    "final_finding_or_feature_completion_credit": false
+  },
+  "credit_boundary": {
+    "historical_condition_confirmed": true,
+    "current_related_defects_reproduced": true,
+    "application_remediation": true,
+    "bounded_runtime": true,
+    "application_commit_integrated": true,
+    "application_commit_published": true,
+    "finding_retirement_reporting": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "full_feature_or_module": false,
+    "pass": false,
+    "release": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-162-med-cd-scope-remediation-wave-29.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-162-med-cd-scope-remediation-wave-29.json"
+  ],
+  "receipt_self_seal_sha256": "273361ee1794f1224a4ba4f952890fa08ab968a48bc7c33ea57a2f41e783c612"
+}

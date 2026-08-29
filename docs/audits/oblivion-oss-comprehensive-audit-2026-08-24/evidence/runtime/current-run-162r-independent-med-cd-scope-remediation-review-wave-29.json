@@ -1,0 +1,105 @@
+{
+  "schema_version": "run-162r-independent-med-cd-scope-remediation-review-wave-29-v1",
+  "run_id": "RUN-162R-INDEPENDENT-MED-CD-SCOPE-01-REMEDIATION-RECEIPT-REVIEW-WAVE-29",
+  "status": "GO_EXACT_RUN162_ARTIFACT_REVIEW_RETIREMENT_REPORTING_AUTHORIZED_ZERO_DOWNSTREAM_CREDIT",
+  "materialized_on": "2026-08-29",
+  "pins": {
+    "application_commit": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+    "repository_tree_at_application_commit": "7b2b5688c90e4da28725e70e38e50fd445f1b4c4",
+    "producer_generator": {
+      "path": "generators/materialize-run-162-med-cd-scope-remediation-wave-29.py",
+      "sha256": "d305638441b8ff366fa5fbc5a00bcc2b81658bf2611a5633ad79fdb4b63f5fb4",
+      "git_blob_id": "4798f25dd906fe0a25cf35fbbbd97ea17ba71255",
+      "bytes": 19724,
+      "lines": 410
+    },
+    "producer_receipt": {
+      "path": "evidence/runtime/current-run-162-med-cd-scope-remediation-wave-29.json",
+      "sha256": "21564caa435927d89d994a091383409e627c44170304f6ff2a5d5c897c858958",
+      "git_blob_id": "d1c0f2d16d8899ad80ffdb5d0261003a760e1147",
+      "bytes": 14584,
+      "lines": 308,
+      "receipt_self_seal_sha256": "273361ee1794f1224a4ba4f952890fa08ab968a48bc7c33ea57a2f41e783c612"
+    },
+    "review_materializer": {
+      "path": "generators/materialize-independent-run-162-med-cd-scope-remediation-review-wave-29.py",
+      "sha256": "c5278e5b80cd4c8c3c159a8ce3e6ae98788ad2dc9d9a1087820f910c7b203ab2",
+      "git_blob_id": "ee0c65c9759adddd322d7614e28c8a73b89a05e0",
+      "bytes": 10486,
+      "lines": 240
+    }
+  },
+  "review": {
+    "reviewer_lane": "/root/run162_scope_source",
+    "supporting_seal_lane": "/root/run162_scope_source/run162_artifact_seal",
+    "blinded_or_isolated": false,
+    "root_authored_review_record": true,
+    "reviewer_executed_materializer_tests_browser_or_database": false,
+    "reviewer_wrote_files": false,
+    "checks": {
+      "strict_json_zero_duplicate_keys": true,
+      "lf_no_bom_no_trailing_whitespace": true,
+      "pretty_json_round_trip": true,
+      "canonical_self_seal": true,
+      "commit_tree_parent_subject_patch_id": true,
+      "audit_only_intervening_paths": true,
+      "seven_path_order_numstat_blob_sha_bytes_lines": true,
+      "authoritative_remote_main_tip": true,
+      "red_command_nonfabrication_disclosure": true,
+      "runtime_and_base_replay_arithmetic": true,
+      "cleanup_boundary": true,
+      "credit_noninheritance": true
+    },
+    "discrepancies": []
+  },
+  "decision": {
+    "verdict": "GO",
+    "blocking_discrepancies": 0,
+    "retirement_reporting_authorized": true,
+    "authorized_reporting_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "authorized_live_count_delta": {
+      "retained_claim_records": 0,
+      "current_provisional_source_claims": -1,
+      "historical_already_fixed_records": 0,
+      "historical_remediated_records": 1,
+      "final_P0": 0,
+      "final_P1": 0,
+      "benchmark_mapped": 0,
+      "final_no_match_or_NCM": 0,
+      "benchmark_unresolved": 0
+    }
+  },
+  "credit_boundary": {
+    "independent_exact_artifact_review_for_retirement_reporting": true,
+    "application_remediation_reexecution": false,
+    "runtime_reexecution": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "final_finding": false,
+    "pass": false,
+    "release": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-run-162-med-cd-scope-remediation-review-wave-29.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-162r-independent-med-cd-scope-remediation-review-wave-29.json"
+  ],
+  "receipt_self_seal_sha256": "1c66ba88642675da1c7cb695cad01de0ec8a23ab9a238989c6df90beb13c484b"
+}
