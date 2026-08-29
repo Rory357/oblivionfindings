@@ -1,0 +1,715 @@
+<?php
+
+namespace Tests\Feature\Emar;
+
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
+use App\Models\ClientControlledDrugEntry;
+use App\Models\ClientMedication;
+use App\Models\ClientMedicationStock;
+use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationIdempotencyResult;
+use App\Models\Permission;
+use App\Models\Shift;
+use App\Models\Site;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
+use RuntimeException;
+use Symfony\Component\Process\Process;
+use Tests\TestCase;
+
+/**
+ * Outcome-neutral runtime probe for MED-CD-ATOMICITY-01.
+ *
+ * This file is intentionally temporary audit instrumentation. It exercises the
+ * current production controller through independent PHP/MySQL connections and
+ * is removed after the bounded adjudication run unless it exposes a defect.
+ */
+#[Group('mysql-serial')]
+class ControlledDrugAtomicityConcurrencyTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_competing_controlled_register_writes_are_single_effect_and_atomic(): void
+    {
+        $connection = DB::connection();
+        $this->assertSame('mysql', $connection->getDriverName());
+
+        $fixture = $this->fixture();
+        $database = $connection->getDatabaseName();
+        $requestUuids = [
+            'same' => Str::uuid()->toString(),
+            'changed' => Str::uuid()->toString(),
+            'stale_a' => Str::uuid()->toString(),
+            'stale_b' => Str::uuid()->toString(),
+        ];
+
+        // Publish fixtures so the independent workers can observe one exact
+        // aggregate. The helper restores the transaction expected by
+        // RefreshDatabase after each deliberately committed contention gate.
+        $connection->commit();
+
+        try {
+            $samePayload = $this->entryPayload(
+                $fixture['client'],
+                $fixture['medications']['same'],
+                $fixture['witness'],
+                $requestUuids['same'],
+                'Identical concurrent replay.',
+            );
+            $sameResults = $this->race(
+                $connection,
+                $database,
+                $fixture['client'],
+                $fixture['actor'],
+                $fixture['medications']['same'],
+                [$requestUuids['same']],
+                $samePayload,
+                $samePayload,
+            );
+
+            $this->assertSame(
+                [200, 200],
+                $this->statuses($sameResults),
+                json_encode($sameResults, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+            );
+            $this->assertSame(['duplicate', 'processed'], $this->syncStatuses($sameResults));
+            $sameProcessed = collect($sameResults)->first(
+                fn (array $result): bool => ($result['body']['sync']['status'] ?? null) === 'processed',
+            );
+            $sameDuplicate = collect($sameResults)->first(
+                fn (array $result): bool => ($result['body']['sync']['status'] ?? null) === 'duplicate',
+            );
+            $this->assertTrue($sameProcessed['body']['success'] ?? false);
+            $this->assertTrue($sameDuplicate['body']['success'] ?? false);
+            $this->assertFalse($sameProcessed['body']['sync']['duplicate'] ?? true);
+            $this->assertTrue($sameDuplicate['body']['sync']['duplicate'] ?? false);
+            $sameEntry = ClientControlledDrugEntry::query()
+                ->where('client_medication_id', $fixture['medications']['same']->id)
+                ->sole();
+            $this->assertNotNull($sameProcessed['entry_id']);
+            $this->assertNotNull($sameDuplicate['entry_id']);
+            $this->assertSame($sameEntry->id, $sameProcessed['entry_id']);
+            $this->assertSame($sameEntry->id, $sameDuplicate['entry_id']);
+            $this->assertSame('9.00', (string) $fixture['stocks']['same']->refresh()->on_hand);
+            $sameReplay = MedicationIdempotencyResult::query()
+                ->where('scope', 'emar-controlled-entry')
+                ->where('request_uuid', $requestUuids['same'])
+                ->whereNull('expires_at')
+                ->sole();
+            $this->assertSame($sameEntry->id, (int) $sameReplay->response_payload['entry']['id']);
+            $this->assertEntryAudit($sameEntry, $requestUuids['same']);
+
+            $changedPayloadA = $this->entryPayload(
+                $fixture['client'],
+                $fixture['medications']['changed'],
+                $fixture['witness'],
+                $requestUuids['changed'],
+                'Concurrent payload A.',
+            );
+            $changedPayloadB = [
+                ...$changedPayloadA,
+                'quantity' => '2.00',
+                'on_hand_after' => '8.00',
+            ];
+            $changedResults = $this->race(
+                $connection,
+                $database,
+                $fixture['client'],
+                $fixture['actor'],
+                $fixture['medications']['changed'],
+                [$requestUuids['changed']],
+                $changedPayloadA,
+                $changedPayloadB,
+            );
+
+            $this->assertSame(
+                [200, 409],
+                $this->statuses($changedResults),
+                json_encode($changedResults, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+            );
+            $this->assertSame(['conflict', 'processed'], $this->syncStatuses($changedResults));
+            $changedConflict = collect($changedResults)->firstWhere('status', 409);
+            $changedProcessed = collect($changedResults)->firstWhere('status', 200);
+            $this->assertSame(
+                'This controlled-drug entry request was already used for a different target or payload. Please submit it again with a new request identifier.',
+                $changedConflict['body']['error'] ?? null,
+            );
+            $this->assertFalse($changedConflict['body']['success'] ?? true);
+            $this->assertFalse($changedConflict['body']['sync']['duplicate'] ?? true);
+            $this->assertNull($changedConflict['entry_id']);
+            $this->assertTrue($changedProcessed['body']['success'] ?? false);
+            $this->assertFalse($changedProcessed['body']['sync']['duplicate'] ?? true);
+            $changedEntry = ClientControlledDrugEntry::query()
+                ->where('client_medication_id', $fixture['medications']['changed']->id)
+                ->sole();
+            $this->assertSame($changedEntry->id, $changedProcessed['entry_id']);
+            $this->assertSame($changedProcessed['submitted_quantity'], (string) $changedEntry->quantity);
+            $this->assertSame($changedProcessed['submitted_on_hand_after'], (string) $changedEntry->on_hand_after);
+            $this->assertSame($changedProcessed['submitted_on_hand_after'], (string) $fixture['stocks']['changed']->refresh()->on_hand);
+            $changedReplay = MedicationIdempotencyResult::query()
+                ->where('scope', 'emar-controlled-entry')
+                ->where('request_uuid', $requestUuids['changed'])
+                ->whereNull('expires_at')
+                ->sole();
+            $this->assertSame($changedEntry->id, (int) $changedReplay->response_payload['entry']['id']);
+            $this->assertEntryAudit($changedEntry, $requestUuids['changed']);
+
+            $stalePayloadA = $this->entryPayload(
+                $fixture['client'],
+                $fixture['medications']['stale'],
+                $fixture['witness'],
+                $requestUuids['stale_a'],
+                'Concurrent stale candidate A.',
+            );
+            $stalePayloadB = [
+                ...$stalePayloadA,
+                'client_request_uuid' => $requestUuids['stale_b'],
+            ];
+            $staleResults = $this->race(
+                $connection,
+                $database,
+                $fixture['client'],
+                $fixture['actor'],
+                $fixture['medications']['stale'],
+                [$requestUuids['stale_a'], $requestUuids['stale_b']],
+                $stalePayloadA,
+                $stalePayloadB,
+            );
+
+            $this->assertSame(
+                [200, 409],
+                $this->statuses($staleResults),
+                json_encode($staleResults, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+            );
+            $this->assertSame(['conflict', 'processed'], $this->syncStatuses($staleResults));
+            $staleConflict = collect($staleResults)->firstWhere('status', 409);
+            $staleProcessed = collect($staleResults)->firstWhere('status', 200);
+            $this->assertSame(
+                'Controlled drug stock changed before this entry could be applied. Please review the current balance before recording it again.',
+                $staleConflict['body']['error'] ?? null,
+            );
+            $this->assertFalse($staleConflict['body']['success'] ?? true);
+            $this->assertFalse($staleConflict['body']['sync']['duplicate'] ?? true);
+            $this->assertNull($staleConflict['entry_id']);
+            $this->assertTrue($staleProcessed['body']['success'] ?? false);
+            $this->assertFalse($staleProcessed['body']['sync']['duplicate'] ?? true);
+            $staleEntry = ClientControlledDrugEntry::query()
+                ->where('client_medication_id', $fixture['medications']['stale']->id)
+                ->sole();
+            $this->assertSame($staleEntry->id, $staleProcessed['entry_id']);
+            $this->assertSame('9.00', (string) $fixture['stocks']['stale']->refresh()->on_hand);
+            $this->assertSame(1, MedicationIdempotencyResult::query()
+                ->where('scope', 'emar-controlled-entry')
+                ->whereIn('request_uuid', [$requestUuids['stale_a'], $requestUuids['stale_b']])
+                ->whereNull('expires_at')
+                ->count());
+            $winningStaleUuid = collect($staleResults)
+                ->firstWhere('status', 200)['body']['sync']['client_request_uuid'] ?? null;
+            $losingStaleUuid = collect([$requestUuids['stale_a'], $requestUuids['stale_b']])
+                ->first(fn (string $uuid): bool => $uuid !== $winningStaleUuid);
+            $this->assertContains($winningStaleUuid, [$requestUuids['stale_a'], $requestUuids['stale_b']]);
+            $this->assertSame($winningStaleUuid, $staleProcessed['body']['sync']['client_request_uuid'] ?? null);
+            $this->assertSame($losingStaleUuid, $staleConflict['body']['sync']['client_request_uuid'] ?? null);
+            $winningReplay = MedicationIdempotencyResult::query()
+                ->where('scope', 'emar-controlled-entry')
+                ->where('request_uuid', $winningStaleUuid)
+                ->sole();
+            $this->assertSame($staleEntry->id, (int) $winningReplay->response_payload['entry']['id']);
+            $this->assertSame(0, MedicationIdempotencyResult::query()
+                ->where('scope', 'emar-controlled-entry')
+                ->where('request_uuid', $losingStaleUuid)
+                ->count());
+            $this->assertEntryAudit($staleEntry, $winningStaleUuid);
+
+            $this->assertSame(3, ClientControlledDrugEntry::query()
+                ->where('client_id', $fixture['client']->id)
+                ->count());
+            $this->assertSame(3, DB::table('audit_logs')
+                ->where('client_id', $fixture['client']->id)
+                ->where('action', 'medications.controlled.entry.record')
+                ->count());
+        } finally {
+            while ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+
+            DB::table('audit_logs')->where('id', '>', $fixture['audit_baseline_id'])->delete();
+            DB::table('medication_idempotency_results')
+                ->whereIn('request_uuid', array_values($requestUuids))
+                ->delete();
+            DB::table('client_controlled_drug_entries')->where('client_id', $fixture['client']->id)->delete();
+            DB::table('client_medication_stocks')
+                ->whereIn('client_medication_id', collect($fixture['medications'])->pluck('id'))
+                ->delete();
+            DB::table('client_medications')->where('client_id', $fixture['client']->id)->delete();
+            DB::table('shifts')->where('client_id', $fixture['client']->id)->delete();
+            DB::table('medication_competency_assessments')->where('user_id', $fixture['witness']->id)->delete();
+            DB::table('hr_employee_profiles')
+                ->whereIn('user_id', [$fixture['actor']->id, $fixture['witness']->id])
+                ->delete();
+            DB::table('permission_user')
+                ->whereIn('user_id', [$fixture['actor']->id, $fixture['witness']->id])
+                ->delete();
+            DB::table('users')->whereIn('id', [$fixture['actor']->id, $fixture['witness']->id])->delete();
+            DB::table('clients')->where('id', $fixture['client']->id)->delete();
+            DB::table('sites')->where('id', $fixture['site']->id)->delete();
+            DB::table('permissions')->whereIn('id', $fixture['permission_ids'])->delete();
+
+            $connection->beginTransaction();
+        }
+    }
+
+    /**
+     * @return array{site: Site, client: Client, actor: User, witness: User, medications: array<string, ClientMedication>, stocks: array<string, ClientMedicationStock>, permission_ids: array<int, int>, audit_baseline_id: int}
+     */
+    private function fixture(): array
+    {
+        $auditBaselineId = (int) (DB::table('audit_logs')->max('id') ?? 0);
+        $permissions = collect([
+            'medications.controlled.record',
+            'medications.controlled.witness',
+        ])->mapWithKeys(function (string $key): array {
+            $permission = Permission::query()->create([
+                'key' => $key,
+                'description' => $key,
+                'group' => 'Medications',
+                'module' => 'medications',
+            ]);
+
+            return [$key => $permission];
+        });
+
+        $site = Site::factory()->create([
+            'type' => 'house',
+            'is_active' => true,
+            'archived' => false,
+            'archived_at' => null,
+        ]);
+        $actor = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $witness = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $actor->permissionOverrides()->attach($permissions['medications.controlled.record']->id, ['allowed' => true]);
+        $witness->permissionOverrides()->attach($permissions['medications.controlled.witness']->id, ['allowed' => true]);
+
+        foreach ([$actor, $witness] as $staffMember) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $staffMember->id,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+                'is_active' => true,
+                'start_date' => now()->subYear()->toDateString(),
+                'end_date' => null,
+            ]);
+        }
+
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $witness->id,
+            'assessor_id' => $actor->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => today()->subMonth(),
+            'expiry_date' => today()->addYear(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_witness_controlled' => true,
+        ]);
+
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'service_context_id' => null,
+            'user_id' => $witness->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHour(),
+            'status' => 'in_progress',
+            'created_by' => $actor->id,
+        ]);
+
+        $medications = [];
+        $stocks = [];
+        foreach (['same', 'changed', 'stale'] as $key) {
+            $medications[$key] = ClientMedication::query()->create([
+                'client_id' => $client->id,
+                'name' => 'Atomicity probe '.ucfirst($key),
+                'dosage' => '10mg',
+                'frequency' => 'PRN',
+                'controlled_drug' => true,
+                'is_prn' => true,
+                'active' => true,
+                'state' => 'active',
+                'approval_status' => 'verified',
+            ]);
+            $stocks[$key] = ClientMedicationStock::query()->create([
+                'client_medication_id' => $medications[$key]->id,
+                'on_hand' => 10,
+                'unit' => 'tablets',
+            ]);
+        }
+
+        return compact('site', 'client', 'actor', 'witness', 'medications', 'stocks') + [
+            'permission_ids' => $permissions->pluck('id')->map(fn (int $id): int => $id)->values()->all(),
+            'audit_baseline_id' => $auditBaselineId,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function entryPayload(
+        Client $client,
+        ClientMedication $medication,
+        User $witness,
+        string $requestUuid,
+        string $notes,
+    ): array {
+        return [
+            'client_medication_id' => $medication->id,
+            'client_id' => $client->id,
+            'medication_name' => $medication->name,
+            'entry_type' => 'administration',
+            'quantity' => '1.00',
+            'on_hand_before' => '10.00',
+            'on_hand_after' => '9.00',
+            'witnessed_by' => $witness->id,
+            'witness_credential' => 'password',
+            'notes' => $notes,
+            'client_request_uuid' => $requestUuid,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payloadA
+     * @param  array<string, mixed>  $payloadB
+     * @param  array<int, string>  $requestUuids
+     * @return array<int, array{pid: int, connection_id: int, status: int, entry_id: int|null, body: array<string, mixed>}>
+     */
+    private function race(
+        $connection,
+        string $database,
+        Client $client,
+        User $actor,
+        ClientMedication $medication,
+        array $requestUuids,
+        array $payloadA,
+        array $payloadB,
+    ): array {
+        $token = Str::uuid()->toString();
+        $readyA = sys_get_temp_dir().DIRECTORY_SEPARATOR."med-cd-atomicity-ready-a-{$token}";
+        $readyB = sys_get_temp_dir().DIRECTORY_SEPARATOR."med-cd-atomicity-ready-b-{$token}";
+        $enteredA = sys_get_temp_dir().DIRECTORY_SEPARATOR."med-cd-atomicity-entered-a-{$token}";
+        $enteredB = sys_get_temp_dir().DIRECTORY_SEPARATOR."med-cd-atomicity-entered-b-{$token}";
+        $go = sys_get_temp_dir().DIRECTORY_SEPARATOR."med-cd-atomicity-go-{$token}";
+        $release = sys_get_temp_dir().DIRECTORY_SEPARATOR."med-cd-atomicity-release-{$token}";
+        $processes = [];
+        $auditCountBefore = DB::table('audit_logs')
+            ->where('client_id', $client->id)
+            ->where('action', 'medications.controlled.entry.record')
+            ->count();
+
+        try {
+            $processes[] = $this->startWorker($readyA, $enteredA, $go, $release, $actor, $payloadA, $database);
+            $processes[] = $this->startWorker($readyB, $enteredB, $go, $release, $actor, $payloadB, $database);
+            $this->waitForFiles([$readyA, $readyB]);
+            $readyStates = array_map(
+                static fn (string $path): array => json_decode(
+                    (string) file_get_contents($path),
+                    true,
+                    flags: JSON_THROW_ON_ERROR,
+                ),
+                [$readyA, $readyB],
+            );
+            $workerPids = array_map(static fn (array $state): int => (int) $state['pid'], $readyStates);
+            $connectionIds = array_map(static fn (array $state): int => (int) $state['connection_id'], $readyStates);
+            $this->assertCount(2, array_unique($workerPids), 'Workers must be distinct operating-system processes.');
+            $this->assertCount(2, array_unique($connectionIds), 'Workers must use distinct MySQL connections.');
+            $this->assertSame([$database, $database], array_column($readyStates, 'database'));
+
+            file_put_contents($go, 'go');
+            $this->waitForWorkerFiles([$enteredA, $enteredB], $processes);
+            $enteredStates = array_map(
+                static fn (string $path): array => json_decode(
+                    (string) file_get_contents($path),
+                    true,
+                    flags: JSON_THROW_ON_ERROR,
+                ),
+                [$enteredA, $enteredB],
+            );
+            foreach ($enteredStates as $enteredState) {
+                $this->assertSame($client->id, (int) $enteredState['client_id']);
+                $this->assertSame(1, (int) $enteredState['client_lock_queries']);
+                $this->assertStringContainsString('clients', strtolower((string) $enteredState['first_lock_sql']));
+                $this->assertStringContainsString('for update', strtolower((string) $enteredState['first_lock_sql']));
+            }
+
+            foreach ($processes as $process) {
+                $this->assertTrue($process->isRunning(), 'Controlled-register worker did not pause at the canonical Client lock boundary.');
+            }
+            $this->assertSame(0, ClientControlledDrugEntry::query()
+                ->where('client_medication_id', $medication->id)
+                ->count());
+            $this->assertSame('10.00', (string) ClientMedicationStock::query()
+                ->where('client_medication_id', $medication->id)
+                ->sole()
+                ->on_hand);
+            $this->assertSame($auditCountBefore, DB::table('audit_logs')
+                ->where('client_id', $client->id)
+                ->where('action', 'medications.controlled.entry.record')
+                ->count());
+            $this->assertSame(0, MedicationIdempotencyResult::query()
+                ->where('scope', 'emar-controlled-entry')
+                ->whereIn('request_uuid', $requestUuids)
+                ->count());
+
+            file_put_contents($release, 'release');
+
+            $results = [];
+            foreach ($processes as $process) {
+                $process->wait();
+                $this->assertTrue(
+                    $process->isSuccessful(),
+                    trim($process->getErrorOutput()) ?: 'Controlled-register concurrency worker failed.',
+                );
+                $results[] = json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR);
+            }
+            $this->assertEqualsCanonicalizing($workerPids, array_column($results, 'pid'));
+            $this->assertEqualsCanonicalizing($connectionIds, array_column($results, 'connection_id'));
+            $this->assertSame([$database, $database], array_column($results, 'database'));
+
+            return $results;
+        } finally {
+            while ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+            foreach ($processes as $process) {
+                if ($process->isRunning()) {
+                    $process->stop(1);
+                }
+            }
+            foreach ([$readyA, $readyB, $enteredA, $enteredB, $go, $release] as $path) {
+                if (is_file($path)) {
+                    unlink($path);
+                }
+            }
+        }
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function startWorker(
+        string $readyPath,
+        string $enteredPath,
+        string $goPath,
+        string $releasePath,
+        User $actor,
+        array $payload,
+        string $database,
+    ): Process {
+        $worker = <<<'PHP'
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$actor = App\Models\User::query()->findOrFail((int) $argv[2]);
+$payload = json_decode(base64_decode($argv[3], true), true, flags: JSON_THROW_ON_ERROR);
+$request = Illuminate\Http\Request::create('/emar/controlled/entries', 'POST', $payload);
+$request->headers->set('Accept', 'application/json');
+$request->headers->set('X-Requested-With', 'XMLHttpRequest');
+$request->setUserResolver(static fn () => $actor);
+$app->instance('request', $request);
+$auth = $app->make('auth');
+$auth->guard()->setUser($actor);
+$auth->shouldUse((string) config('auth.defaults.guard', 'web'));
+$connection = Illuminate\Support\Facades\DB::connection();
+$connectionId = (int) $connection->selectOne('SELECT CONNECTION_ID() AS connection_id')->connection_id;
+$database = $connection->getDatabaseName();
+$clientLockQueries = 0;
+$firstLockSql = '';
+$connection->beforeExecuting(function (string $query, array $bindings) use (
+    &$clientLockQueries,
+    &$firstLockSql,
+    $payload,
+    $argv,
+): void {
+    if ($firstLockSql !== '') {
+        return;
+    }
+
+    $normalized = strtolower($query);
+    $hasClientBinding = collect($bindings)->contains(
+        static fn (mixed $binding): bool => (is_int($binding) || is_string($binding))
+            && (int) $binding === (int) $payload['client_id'],
+    );
+    if (preg_match('/\\bfrom\\s+`?clients`?\\b/i', $query) !== 1
+        || ! str_contains($normalized, 'for update')
+        || ! $hasClientBinding) {
+        return;
+    }
+
+    $clientLockQueries++;
+    $firstLockSql = $query;
+    file_put_contents($argv[5], json_encode([
+        'client_id' => (int) $payload['client_id'],
+        'client_lock_queries' => $clientLockQueries,
+        'first_lock_sql' => $firstLockSql,
+    ], JSON_THROW_ON_ERROR));
+    $deadline = microtime(true) + 15;
+    while (! is_file($argv[7])) {
+        if (microtime(true) >= $deadline) {
+            throw new RuntimeException('Timed out waiting for the controlled-register Client-lock release barrier.');
+        }
+        usleep(10_000);
+    }
+});
+file_put_contents($argv[4], json_encode([
+    'pid' => getmypid(),
+    'connection_id' => $connectionId,
+    'database' => $database,
+], JSON_THROW_ON_ERROR));
+$deadline = microtime(true) + 15;
+while (! is_file($argv[6])) {
+    if (microtime(true) >= $deadline) {
+        throw new RuntimeException('Timed out waiting for the controlled-register race gate.');
+    }
+    usleep(10_000);
+}
+try {
+    $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
+    $response = $kernel->handle($request);
+    $body = json_decode((string) $response->getContent(), true);
+    echo json_encode([
+        'pid' => getmypid(),
+        'connection_id' => $connectionId,
+        'database' => $database,
+        'status' => $response->getStatusCode(),
+        'entry_id' => isset($body['entry']['id']) ? (int) $body['entry']['id'] : null,
+        'submitted_quantity' => (string) $payload['quantity'],
+        'submitted_on_hand_after' => (string) $payload['on_hand_after'],
+        'body' => is_array($body) ? $body : [],
+    ], JSON_THROW_ON_ERROR);
+    $kernel->terminate($request, $response);
+} catch (Throwable $exception) {
+    echo json_encode([
+        'pid' => getmypid(),
+        'connection_id' => $connectionId,
+        'database' => $database,
+        'status' => 599,
+        'entry_id' => null,
+        'submitted_quantity' => (string) $payload['quantity'],
+        'submitted_on_hand_after' => (string) $payload['on_hand_after'],
+        'body' => [
+            'exception' => $exception::class,
+            'message' => $exception->getMessage(),
+        ],
+    ], JSON_THROW_ON_ERROR);
+}
+PHP;
+
+        $process = new Process(
+            [
+                PHP_BINARY,
+                '-r',
+                $worker,
+                base_path(),
+                (string) $actor->id,
+                base64_encode(json_encode($payload, JSON_THROW_ON_ERROR)),
+                $readyPath,
+                $enteredPath,
+                $goPath,
+                $releasePath,
+            ],
+            base_path(),
+            [
+                'APP_ENV' => 'testing',
+                'DB_CONNECTION' => 'mysql',
+                'DB_DATABASE' => $database,
+                'CACHE_STORE' => 'array',
+                'SESSION_DRIVER' => 'array',
+                'QUEUE_CONNECTION' => 'sync',
+                'MAIL_MAILER' => 'array',
+            ],
+        );
+        $process->setTimeout(60);
+        $process->start();
+
+        return $process;
+    }
+
+    /**
+     * @param  array<int, string>  $paths
+     * @param  array<int, Process>  $processes
+     */
+    private function waitForWorkerFiles(array $paths, array $processes): void
+    {
+        $deadline = microtime(true) + 15;
+        while (collect($paths)->contains(fn (string $path): bool => ! is_file($path))) {
+            foreach ($processes as $process) {
+                if (! $process->isRunning()) {
+                    $diagnostic = trim($process->getOutput().' '.$process->getErrorOutput());
+                    throw new RuntimeException('A controlled-register worker exited before the Client-lock barrier: '.$diagnostic);
+                }
+            }
+            if (microtime(true) >= $deadline) {
+                $diagnostic = collect($processes)
+                    ->map(fn (Process $process): string => trim($process->getOutput().' '.$process->getErrorOutput()))
+                    ->filter()
+                    ->implode(' | ');
+                throw new RuntimeException('Controlled-register workers did not reach the Client-lock barrier. '.$diagnostic);
+            }
+            usleep(10_000);
+        }
+    }
+
+    /** @param  array<int, string>  $paths */
+    private function waitForFiles(array $paths): void
+    {
+        $deadline = microtime(true) + 15;
+        while (collect($paths)->contains(fn (string $path): bool => ! is_file($path))) {
+            if (microtime(true) >= $deadline) {
+                throw new RuntimeException('Controlled-register concurrency workers did not become ready.');
+            }
+            usleep(10_000);
+        }
+    }
+
+    /**
+     * @param  array<int, array{pid: int, connection_id: int, database: string, status: int, entry_id: int|null, submitted_quantity: string, submitted_on_hand_after: string, body: array<string, mixed>}>  $results
+     * @return array<int, int>
+     */
+    private function statuses(array $results): array
+    {
+        $statuses = array_map(static fn (array $result): int => $result['status'], $results);
+        sort($statuses);
+
+        return $statuses;
+    }
+
+    /**
+     * @param  array<int, array{pid: int, connection_id: int, database: string, status: int, entry_id: int|null, submitted_quantity: string, submitted_on_hand_after: string, body: array<string, mixed>}>  $results
+     * @return array<int, string>
+     */
+    private function syncStatuses(array $results): array
+    {
+        $statuses = array_map(
+            static fn (array $result): string => (string) ($result['body']['sync']['status'] ?? 'missing'),
+            $results,
+        );
+        sort($statuses);
+
+        return $statuses;
+    }
+
+    private function assertEntryAudit(ClientControlledDrugEntry $entry, string $requestUuid): void
+    {
+        $audit = DB::table('audit_logs')
+            ->where('action', 'medications.controlled.entry.record')
+            ->where('auditable_type', ClientControlledDrugEntry::class)
+            ->where('auditable_id', $entry->id)
+            ->sole();
+        $meta = json_decode((string) $audit->meta, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame($entry->client_id, (int) $audit->client_id);
+        $this->assertSame($entry->client_medication_id, (int) $meta['client_medication_id']);
+        $this->assertSame($requestUuid, $meta['client_request_uuid'] ?? null);
+    }
+
+}
