@@ -1,8 +1,8 @@
 # 07 — Module and feature findings
 
-> Status: in progress. This file materializes all 340 frozen canonical static feature identities and 12 retained historical claim records: **11 current provisional P1 claims + 1 historical already-fixed record + 0 final P0/P1 findings**. RUN-159 supplies 73 bounded tests / 1,481 assertions for `MED-RBAC-01` only. Exactly **2 target-specific static benchmark-mapping credits** remain; no browser, ease, final-no-match/NCM, Pass, feature-completion, or audit-completion credit follows.
+> Status: in progress. This file materializes all 340 frozen canonical static feature identities and 12 retained historical claim records: **10 current provisional P1 claims + 1 historical already-fixed record + 1 historical remediated record + 0 final P0/P1 findings**. RUN-159 supplies 73 bounded tests / 1,481 assertions for `MED-RBAC-01`; RUN-162 separately supplies 5 focused tests / 48 assertions for `MED-CD-SCOPE-01`. Exactly **2 target-specific static benchmark-mapping credits** remain; no application-browser, ease, final-no-match/NCM, Pass, feature-completion, or audit-completion credit follows.
 
-Historical frozen discovery pin: `a0493442b9e392d324055c35bf25b69421dc2d35` (tree `f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1`). Current MED-RBAC adjudication pin: `4f57ad4202df90ded375961437879822a908627b` (tree `ee79b8d2733d09da2fd97992ac2a04e862159505`).
+Historical frozen discovery pin: `a0493442b9e392d324055c35bf25b69421dc2d35` (tree `f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1`). MED-RBAC adjudication pin: `4f57ad4202df90ded375961437879822a908627b` (tree `ee79b8d2733d09da2fd97992ac2a04e862159505`). MED-CD-SCOPE remediation pin: `0b1920dade9251d617f3cb0b69da5c0202b5a6bf` (full repository tree `7b2b5688c90e4da28725e70e38e50fd445f1b4c4`).
 Governing prompt SHA-256: `4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f`.
 
 Architecture rule: One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.
@@ -61,7 +61,7 @@ RUN-082 establishes reproducible static candidate relations and route-file regis
 |---|---:|---:|
 | Frozen canonical feature identities | 340 / 340 (300 H, 40 D) | static identity only |
 | Feature rows represented below | 340 / 340 | reporting presence only |
-| Claim records | 12 retained identities = 11 current provisional P1 + 1 historical already-fixed | 0 final P0/P1 |
+| Claim records | 12 retained identities = 10 current provisional P1 + 1 historical already-fixed + 1 historical remediated | 0 final P0/P1 |
 | Verified target-specific benchmark mappings / final no-matches or NCMs | 2 / 340 mappings · 0 / 340 final no-matches/NCMs · 338 unresolved | 2 mapping-only; 0 other credit |
 | Validated H task/ease rows | 0 / 300 | 0 |
 | Modules with all P1–P8 complete | 0 / 29 frozen feature modules | 0 |
@@ -100,9 +100,9 @@ File presence is not audit completion. A feature row with no linked claim record
 | Security Devices | 11 | 1 | 12 | none materialized | 0 |
 | Sites & Locations | 15 | 1 | 16 | none materialized | 0 |
 | Workforce | 13 | 0 | 13 | none materialized | 0 |
-| eMAR | 16 | 1 | 17 | MED-CD-ATOMICITY-01; MED-CD-ATOMICITY-01 (related); MED-CD-SCOPE-01; MED-CD-SCOPE-01 (related); MED-RBAC-01 (historical already fixed); MED-RBAC-01 (historical related) | 0 |
+| eMAR | 16 | 1 | 17 | MED-CD-ATOMICITY-01; MED-CD-ATOMICITY-01 (related); MED-CD-SCOPE-01 (historical remediated); MED-CD-SCOPE-01 (historical related); MED-RBAC-01 (historical already fixed); MED-RBAC-01 (historical related) | 0 |
 
-## Claim records — 11 current provisional + 1 historical already fixed
+## Claim records — 10 current provisional + 1 historical already fixed + 1 historical remediated
 
 ### MED-RBAC-01 — CAP-MED-CD-REGISTER-BALANCE — historical already fixed
 
@@ -117,22 +117,24 @@ File presence is not audit completion. A feature row with no linked claim record
 - Application change: none; no remediation was required because current main already contains the exact-capability fix.
 - Evidence: `evidence/runtime/current-run-159-med-rbac-already-fixed-adjudication-wave-28.json`; independent exact-artifact review `evidence/runtime/current-run-159r-independent-med-rbac-adjudication-review-wave-28.json`.
 
-### MED-CD-SCOPE-01 — CAP-MED-DESTRUCTION-LIFECYCLE
+### MED-CD-SCOPE-01 — CAP-MED-DESTRUCTION-LIFECYCLE — historical remediated
 
-- Status: `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`; priority label `P1` is provisional.
-- Pass lenses: P1, P2, P5, P6, P7; none is complete from this claim.
+- Status: `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`; the retained `P1` label describes the historical risk and is excluded from current provisional and final priority counts.
+- Pass lenses: P1, P2, P5, P6, P7; the bounded remediation disposition does not complete any full feature Pass.
 - Module/submodule: eMAR / CANONICAL_STATIC_IDENTITY_DENOMINATOR.
 - Actor/job: Medication destruction owner — Record and, under authority, void a medication destruction.
-- Route loci: routes/emar.php:139-141; routes/emar.php:217-218.
+- Historical provenance: the real `a0493442…` canonical-scope condition remains preserved under its stable ID. RUN-162 reproduces five current related defects before remediation.
+- Current pin: `0b1920dade9251d617f3cb0b69da5c0202b5a6bf`; exact seven-path application/test patch, 234 insertions / 20 deletions, fast-forward integrated and observed at authoritative remote `main`.
+- Route loci: controlled and stock pages, discrepancy resolution, and scheduled controlled-check escalation; no route, page, component, UX, layout, or wording change.
 - Frontend loci: resources/js/pages/emar/Destructions.tsx.
-- Backend claim anchors: app/Http/Controllers/Emar/EmarController.php:4732-4826; app/Services/Medication/MedicationScopeDecisionService.php:374-547.
-- Source-inferred current behaviour: Controlled-drug and destruction paths appear to accept independently supplied client, medication, Site, or witness identifiers without consistently routing every relationship through the canonical medication scope decision service before disclosure or mutation.
-- Root-cause hypothesis: The provisional source review found independently supplied identifiers whose canonical relationship checks were not established at every boundary.
-- Potential impact: Possible foreign-Site or mismatched Client/medication/witness disclosure or mutation, affecting privacy and medication safety.
-- Interim evidence safeguard: Treat controlled-drug and destruction requests with mixed identifiers as high-risk until the canonical scope path is independently proven.
-- Required finalization gate: Prove owner-first canonical scope reconciliation and concealed foreign-Site/direct-ID denial for Client, medication, Site and witness combinations.
+- Backend remediation anchors: app/Http/Controllers/Emar/EmarController.php:1928-1937, 2481-2500, 8559-8573; app/Services/MedicationOverviewService.php:536-544; app/Console/Commands/EscalateOverdueControlledChecks.php:41-50; canonical helper app/Services/Medication/MedicationGovernanceScopeService.php:199-226. Regression loci: tests/Feature/Emar/ControlledDrugsTest.php:644 and 1282; MedicationGovernanceAuthorizationTest.php:266; MedicationOverviewServiceTest.php:89; StockManagementTest.php:102.
+- Remediated behaviour: canonical Client/client-medication ownership is applied before controlled, stock, overview, and scheduled aggregation/projection; foreign and missing discrepancy direct IDs share the concealed 404 boundary before payload validation. Internal all-Site scheduling omits the reader Site filter only and retains canonical ownership.
+- Runtime: exact advanced-main command passes 5 focused tests / 48 assertions in 149.85 seconds on disposable `oa162_audit_final`; schema/process/listener cleanup is zero. A broader bounded run passes 102 related controller/command tests; two INR failures reproduce at the base checkpoint, so full-suite/coverage green remains false.
+- Independent review: three static lanes return GO; RUN-162R independently verifies the exact RUN-162 seal, manifest, patch identity, runtime arithmetic, cleanup, remote tip, and noninheritance boundary and authorizes reporting only.
+- Noninheritance: `MED-CD-ATOMICITY-01`, transaction/retry/rollback/fractional-value/concurrency, benchmark, browser, ease, module, Pass, release, final-finding, feature-completion, and audit-completion credit remain open or false.
 - Browser/visual/ease: blocked or not measured; no screenshot, task, 4/5 score or finding credit.
 - Benchmark/no-copy: no target-specific mapping or final no-match; any eventual proposal must be an original native Oblivion design.
+- Evidence: `evidence/runtime/current-run-162-med-cd-scope-remediation-wave-29.json`; independent exact-artifact review `evidence/runtime/current-run-162r-independent-med-cd-scope-remediation-review-wave-29.json`.
 
 ### MED-CD-ATOMICITY-01 — CAP-MED-CD-REGISTER-BALANCE
 

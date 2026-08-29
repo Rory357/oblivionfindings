@@ -1,0 +1,335 @@
+{
+  "schema_version": "run-163-med-cd-scope-remediation-reporting-wave-29-v1",
+  "run_id": "RUN-163-MED-CD-SCOPE-01-REMEDIATION-REPORTING-WAVE-29",
+  "status": "MED_CD_SCOPE_HISTORICAL_REMEDIATION_REPORTING_MATERIALIZED_DASHBOARD_RUN164_REQUIRED_ZERO_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "materialized_on": "2026-08-29",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false,
+    "authorization_boundary": "Site access, exact action permissions, canonical ownership, consent, privacy, and direct-object denial"
+  },
+  "pins": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "reporting_input_commit": "adc80d437781bc5f2f4a3f072e86b51fb10a1c7d",
+    "reporting_input_tree": "8519736eab3386008563bd5fc7786941ab2d21f2",
+    "reporting_input_parent": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+    "application_commit": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+    "application_tree": "7b2b5688c90e4da28725e70e38e50fd445f1b4c4",
+    "run_161_receipt_sha256": "dc62fe1a6242dc42e0f9f75b278a0fbf042a667279ca3a4fdabb279d361613e3",
+    "run_162_receipt_sha256": "21564caa435927d89d994a091383409e627c44170304f6ff2a5d5c897c858958",
+    "run_162r_receipt_sha256": "7a1decaccfde2246163daef3dbec285b6a5a1a5019d2411615cc7e003660ff78",
+    "reporting_materializer": {
+      "path": "generators/materialize-run-163-med-cd-scope-remediation-reporting-wave-29.py",
+      "sha256": "f62b48cba349e0f50eec25830ac96c70b7ccc281f673c2dba93af9d59796f067",
+      "git_blob_id": "ef7516fc1c3bb0433bce05753e0a2d4168512532",
+      "bytes": 23627,
+      "lines": 478
+    },
+    "baseline_findings": {
+      "sha256": "c78810ff3b8acf36d2334abccecbe17fa8386d943b9fc6e8f3c9cf2541887abb",
+      "med_cd_scope_record_canonical_sha256": "dd86bf94f3b4d894e95c56c95a9409ce803b8d82d108cdd3c42f3343e348cd21"
+    },
+    "current_findings": {
+      "path": "findings.json",
+      "sha256": "2e044b2d480890e4e1b60d71120103f602947821bc8745aa116037c90f97f645",
+      "git_blob_id": "27812a5a16e0ce066884f1953cfebcc180a00ba3",
+      "bytes": 529665,
+      "lines": 9693
+    },
+    "dashboard_generator": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "027e4be334936aca7db20f7c23ea10e5f24531bda9b3e800d68dee2db4ca7a6f",
+      "git_blob_id": "cddf73cc81d388f25a154370a8172c6d7ce7c0fc",
+      "bytes": 427092,
+      "lines": 3805
+    },
+    "unchanged_run_161_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "c27d0535885c68984b96bf1fbbb91f65f303a8ed8b9255742df9d8f0788370b3",
+      "git_blob_id": "5bb2c6fff53a1e6440359a51546db30dbf7ecc0b",
+      "bytes": 244814,
+      "lines": 78
+    }
+  },
+  "lineage_roles": {
+    "run_161": "verifies only the exact RUN-160 audit-dashboard artifact",
+    "run_162": "establishes MED-CD-SCOPE reproduction, narrow application/test remediation, bounded runtime, integration, and application-commit publication",
+    "run_162r": "independently authorizes retirement reporting only",
+    "run_163": "alone changes the live findings register and reporting status",
+    "run_164": "required fresh audit-dashboard rebuild and four-viewport verification"
+  },
+  "reporting_transition": {
+    "finding_id": "MED-CD-SCOPE-01",
+    "authorized_by_run_162r": true,
+    "status_before": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+    "status_after": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "counts_before": {
+      "retained_claim_records": 12,
+      "provisional_source_claims": 11,
+      "historical_already_fixed": 1,
+      "historical_remediated": 0,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "counts_after": {
+      "retained_claim_records": 12,
+      "provisional_source_claims": 10,
+      "historical_already_fixed": 1,
+      "historical_remediated": 1,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "unchanged_non_target_record_count": 11,
+    "unchanged_non_target_record_hashes": {
+      "GOV-BOARD-PACK-VISIBILITY-01": "78292106d28b8ee8bf8e050aa89741d79b54522cff844a1b482c4b556c5c4c3f",
+      "GOV-EXECUTIVE-VISIBILITY-01": "316f7b85d61e16da4eeeb17c6a5b50a8ccdacbe4c443ec86370226268af4d175",
+      "GOV-RESOLUTION-QUORUM-01": "eaf59bfe06b52f012c1a82bbb9a63139208f9840af7a84a26545bca8c81b30dd",
+      "HS-REGISTER-SITE-SCOPE-01": "369da912ef9004ea3a7696280dcdf04051e6dca14087f0c6b185986ef1b9ec02",
+      "MED-CD-ATOMICITY-01": "9ba4f430ee59efea414b42a8633c1c969a2fd4428fbf3fef173fb5548cc8e7f1",
+      "MED-RBAC-01": "3aeac2fd6d69cc84cae814773912eea1bcc9417c3daedb8f08d1ac7d959069cb",
+      "PRIV-REPORT-DOMAIN-RBAC-01": "d0c2d60c324469933b989e4dfc1060c395521a9132c95b5939a231f3a34a2ac5",
+      "SAFE-ALERT-DEDUP-IDENTITY-01": "360386fe1222c75437c2f6140f0860679f67c63f4fe1e95fe5e8bdcc985030a8",
+      "SAFE-INTAKE-CANONICAL-SCOPE-01": "57e33e6c75f33ff2449e5504a7ee8fd6c3e22588d7eb373c2b36bdc5765ee42b",
+      "SAFE-PROJECTION-DURABILITY-01": "6476e684b7ad18453a7dda24545353aefc5816eea537e4b0124df7c09bc71f1e",
+      "SET-API-WEBHOOK-DESTINATION-01": "ad3ad1b1ca4f26020ee468f544506f2aa5c0fb2228ff5b908d1815680da12474"
+    },
+    "baseline_target_record_canonical_sha256": "dd86bf94f3b4d894e95c56c95a9409ce803b8d82d108cdd3c42f3343e348cd21",
+    "current_target_record_canonical_sha256": "c6839938c8c645e59715ce7184e4a833fe516f7403ff1acd896b76a066b48037",
+    "reporting_surface_paths": [
+      "00-executive-summary.md",
+      "01-repository-module-map.md",
+      "07-module-findings.md",
+      "11-prioritised-roadmap.md",
+      "12-native-build-and-do-not-copy-register.md",
+      "13-unresolved-questions-and-evidence-gaps.md",
+      "findings.json",
+      "generators/build-current-audit-dashboard.py"
+    ]
+  },
+  "claim_specific_runtime_accounting": {
+    "med_rbac": {
+      "tests": 73,
+      "assertions": 1481,
+      "run": "RUN-159"
+    },
+    "med_cd_scope_focused": {
+      "tests": 5,
+      "assertions": 48,
+      "run": "RUN-162"
+    },
+    "reconciliation_arithmetic_only": {
+      "tests": 78,
+      "assertions": 1529
+    },
+    "overlapping_broader_run_162": {
+      "directly_related_controller_and_command_tests_passed": 102,
+      "combined_passed": 108,
+      "combined_assertions": 1454,
+      "combined_failed": 2,
+      "base_reproduced_failures_not_attributed_to_run_162": true,
+      "full_suite_green": false
+    }
+  },
+  "reporting_manifest": [
+    {
+      "path": "00-executive-summary.md",
+      "sha256": "164d40811a7dfab54c5760981cee2db2408baf6b422bd48c697f9b984dbf41f8",
+      "git_blob_id": "3925c810164d8f4d22c6c6b4fef4c89e646c7726",
+      "bytes": 116350,
+      "lines": 498
+    },
+    {
+      "path": "01-repository-module-map.md",
+      "sha256": "67d3c187aead0535497ec47c980f4a74bbe986e9cf0ccb5bf5e4b7f8742bf58b",
+      "git_blob_id": "3ec950f7ecead3949172165c9f48493d2c3a6932",
+      "bytes": 34244,
+      "lines": 220
+    },
+    {
+      "path": "07-module-findings.md",
+      "sha256": "85e32c04acac50f89b396c92fd026be29ff1e4c6b21a415f2f145612f4d3afe9",
+      "git_blob_id": "d74d7411bb6674203d38b2187c1cdb5294e26923",
+      "bytes": 346653,
+      "lines": 800
+    },
+    {
+      "path": "11-prioritised-roadmap.md",
+      "sha256": "461a8d48b018b8347e73dea6788dfb57cdddebf4353299bcb50d2631f0014677",
+      "git_blob_id": "976c3add7bbc1a899a0a7c8c46903cd2e2875efc",
+      "bytes": 10786,
+      "lines": 63
+    },
+    {
+      "path": "12-native-build-and-do-not-copy-register.md",
+      "sha256": "b3e6fad88cbf05309e5030d37e19697f0737a6734ee67f84f9adc176a021e685",
+      "git_blob_id": "0bfffc3fca90fc2dbbc81203b64efd88f7c81ef3",
+      "bytes": 114270,
+      "lines": 499
+    },
+    {
+      "path": "13-unresolved-questions-and-evidence-gaps.md",
+      "sha256": "2a5bdeece49de37f084694607e0c36fa56f534b399105ecea41276e93bb510e1",
+      "git_blob_id": "4cb8398a2125a6e96c2dd4ff9c7c18e89fda31ed",
+      "bytes": 30863,
+      "lines": 89
+    },
+    {
+      "path": "findings.json",
+      "sha256": "2e044b2d480890e4e1b60d71120103f602947821bc8745aa116037c90f97f645",
+      "git_blob_id": "27812a5a16e0ce066884f1953cfebcc180a00ba3",
+      "bytes": 529665,
+      "lines": 9693
+    },
+    {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "027e4be334936aca7db20f7c23ea10e5f24531bda9b3e800d68dee2db4ca7a6f",
+      "git_blob_id": "cddf73cc81d388f25a154370a8172c6d7ce7c0fc",
+      "bytes": 427092,
+      "lines": 3805
+    }
+  ],
+  "preservation_boundary": {
+    "paths": [
+      {
+        "path": "02-eight-pass-coverage-ledger.csv",
+        "sha256": "ee4dc3126113884b4b8661dc3a3d13ac6a61b9661b2cace58fe82dcbe1d2a4a6",
+        "git_blob_id": "15fa304f839cacd35005848f3841dd740d2cf4cc",
+        "bytes": 29396,
+        "lines": 39
+      },
+      {
+        "path": "03-feature-to-benchmark-matrix.csv",
+        "sha256": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+        "git_blob_id": "1f5fdab3ae80ae4ec1b9bc4ee47eef695bdd5416",
+        "bytes": 557989,
+        "lines": 341
+      },
+      {
+        "path": "04-workflow-usability-scorecard.csv",
+        "sha256": "ea6879340229541c198b5ac654bde6d26d38eaefdd29ff66e1026263f9546faa",
+        "git_blob_id": "b3afe88d2e9e62bbc2dcd3f1a5bf4af2fb82c4fa",
+        "bytes": 855259,
+        "lines": 301
+      },
+      {
+        "path": "05-browser-visual-coverage-matrix.csv",
+        "sha256": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84",
+        "git_blob_id": "0bafaae0142327cfa6a6cdeda90b9163562fc654",
+        "bytes": 8973775,
+        "lines": 2813
+      },
+      {
+        "path": "06-open-source-benchmark-register.csv",
+        "sha256": "5a3898855f1ffffb1a493496a57f6532bdc464552e4577c9e7c97f83c9793884",
+        "git_blob_id": "f96ef7ac1f6e19f614bdce8d663cfd08ec795995",
+        "bytes": 350420,
+        "lines": 99
+      },
+      {
+        "path": "08-cross-module-journeys.md",
+        "sha256": "ef4471ba75ac9080e4565989e4b038bf7d0ad306cad1984019882457517c853c",
+        "git_blob_id": "d48c9022d124186fe301a757e3ec8f9d86371031",
+        "bytes": 53981,
+        "lines": 309
+      },
+      {
+        "path": "09-ui-ux-accessibility-visual-consistency.md",
+        "sha256": "27fa04e15cbd0eedb92514835884d0344db09f279a2295cea94ae0d1071a6e7c",
+        "git_blob_id": "b919b27b7c64abd6faf9bdaa97783f6e64ac107d",
+        "bytes": 9449,
+        "lines": 123
+      },
+      {
+        "path": "10-architecture-data-integration-security.md",
+        "sha256": "ca5667b1c042024f32f320254baf063dd4bcd2c4b12972cf2aac29c02d782b22",
+        "git_blob_id": "8e78b5d3cb2467db37a8186ff07ab2c1608ee05d",
+        "bytes": 18532,
+        "lines": 191
+      },
+      {
+        "path": "inventory.json",
+        "sha256": "46cd688dd9543b186a608e950754abe9e30389a792156719f8a999130dfca5fa",
+        "git_blob_id": "4f7cca5ec277edeac52c553818e35545219711c5",
+        "bytes": 2580297,
+        "lines": 96004
+      },
+      {
+        "path": "task-scripts",
+        "git_tree_id": "5fc91eccaf48c71fef7dfe1f4af1d41192a5eeff",
+        "working_tree_diff": "NONE",
+        "untracked_entries": 0
+      },
+      {
+        "path": "audit-dashboard.html",
+        "sha256": "c27d0535885c68984b96bf1fbbb91f65f303a8ed8b9255742df9d8f0788370b3",
+        "git_blob_id": "5bb2c6fff53a1e6440359a51546db30dbf7ecc0b",
+        "bytes": 244814,
+        "lines": 78
+      }
+    ],
+    "all_preserved_byte_identical_to_reporting_input_commit": true,
+    "ownership_counts_664_307_357_95_unchanged": true,
+    "queue_counts_118_reviewed_389_pending_unchanged": true,
+    "benchmark_2_of_340_mapped_0_of_340_ncm_338_unresolved_unchanged": true
+  },
+  "dashboard_forward_gate": {
+    "required_run": "RUN-164",
+    "dashboard_html_changed_by_run_163": false,
+    "unchanged_dashboard_sha256": "c27d0535885c68984b96bf1fbbb91f65f303a8ed8b9255742df9d8f0788370b3",
+    "fresh_four_viewport_verification_required": true,
+    "required_viewports": [
+      "1440x900",
+      "1280x800",
+      "1024x768",
+      "390x844"
+    ],
+    "future_receipt_link_is_unhashed_to_avoid_cycle": true
+  },
+  "publication_boundary": {
+    "run_162_application_commit_publication_observed": true,
+    "run_163_audit_artifact_push_or_publication_performed_by_materializer": false,
+    "run_163_publication_claim": false
+  },
+  "noninheritance_boundary": {
+    "med_cd_atomicity_transaction_retry_rollback_lock_order_fractional_or_operation_concurrency": false,
+    "application_browser": false,
+    "full_suite_or_coverage": false,
+    "benchmark_or_final_no_match_NCM": false,
+    "final_finding": false,
+    "feature_module_or_pass_completion": false
+  },
+  "credit_boundary": {
+    "live_findings_register_and_reporting_status": true,
+    "application_source_or_tests": false,
+    "application_runtime_reexecution": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "pass": false,
+    "release": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "evidence/source/current-run-163-med-cd-scope-remediation-reporting-wave-29.json"
+  ],
+  "receipt_self_seal_sha256": "5683bfe946083b12d1bb1f39cc71526b96eda76faaba8cb230cfb3e73c1b8fe0"
+}

@@ -1,6 +1,6 @@
 # 11 — Prioritised audit-completion roadmap
 
-> This is an evidence-closure roadmap. The register retains 12 historical identities: 11 current provisional claims and one historical already-fixed `MED-RBAC-01` record. Priority labels on the 11 active claims remain provisional until their independent and runtime gates are satisfied.
+> This is an evidence-closure roadmap. The register retains 12 historical identities: 10 current provisional claims, one historical already-fixed `MED-RBAC-01` record, and one historical remediated `MED-CD-SCOPE-01` record. Priority labels on the 10 active claims remain provisional until their independent and runtime gates are satisfied.
 
 Architecture constraint: One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.
 
@@ -23,7 +23,7 @@ Architecture constraint: One operating organisation across multiple Sites; Site 
 
 ## Highest-risk provisional review order
 
-1. Medication canonical scope and register/stock atomicity (`MED-CD-SCOPE-01`, `MED-CD-ATOMICITY-01`); exact broad-permission authority claim `MED-RBAC-01` is already fixed on current main.
+1. Medication register/stock atomicity (`MED-CD-ATOMICITY-01`); exact broad-permission authority `MED-RBAC-01` is already fixed and canonical scope `MED-CD-SCOPE-01` is remediated on current main.
 2. Safeguarding intake, alert identity and durable projection (`SAFE-*`).
 3. Webhook destination enforcement (`SET-API-WEBHOOK-DESTINATION-01`).
 4. Privacy report domain capability and H&S Site scope (`PRIV-*`, `HS-*`).
@@ -35,7 +35,6 @@ This order is risk-led, not a final remediation sequence. Each item must first p
 
 | Provisional ID | Feature/module | Proposed evidence owner | Effort | Interim safeguard | Exit test |
 |---|---|---|---|---|---|
-| `MED-CD-SCOPE-01` | `CAP-MED-DESTRUCTION-LIFECYCLE` / eMAR | independent source reviewer + task-specific runtime/browser reviewer | NOT_ESTIMATED | Treat controlled-drug and destruction requests with mixed identifiers as high-risk until the canonical scope path is independently proven. | Prove owner-first canonical scope reconciliation and concealed foreign-Site/direct-ID denial for Client, medication, Site and witness combinations. |
 | `MED-CD-ATOMICITY-01` | `CAP-MED-CD-REGISTER-BALANCE` / eMAR | independent source reviewer + task-specific runtime/browser reviewer | NOT_ESTIMATED | Use existing reconciliation controls and investigate any register/stock mismatch; this audit does not assert that a mismatch has occurred. | Independently prove transaction boundaries, parent-to-child lock order, rollback, retry and concurrent balance assertions. |
 | `GOV-EXECUTIVE-VISIBILITY-01` | `CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE` / Governance | independent source reviewer + task-specific runtime/browser reviewer | NOT_ESTIMATED | Do not use the provisional claim as proof of disclosure; restrict operational review of sensitive meetings to explicitly authorised audiences pending verification. | Independent policy review and negative direct-ID, calendar, committee, executive-session, picker, and attachment tests. |
 | `GOV-BOARD-PACK-VISIBILITY-01` | `CAP-GOV-BOARD-PACK-DISTRIBUTION` / Governance | independent source reviewer + task-specific runtime/browser reviewer | NOT_ESTIMATED | Keep board-pack distribution explicitly recipient-controlled and avoid assuming broad governance visibility is equivalent to receipt. | Independent policy review and recipient/non-recipient negative tests including executive packs and supplementary attachments. |
@@ -47,11 +46,13 @@ This order is risk-led, not a final remediation sequence. Each item must first p
 | `SAFE-PROJECTION-DURABILITY-01` | `CAP-SAFE-TERMINAL-PROJECTION` / Safeguarding | independent source reviewer + task-specific runtime/browser reviewer | NOT_ESTIMATED | Reconcile committed safeguarding concerns against H&S and Control Room projections until durable recovery is proven. | Inject H&S and Control Room projection failures, verify durable retry/reconciliation ownership, and assert idempotent recovery. |
 | `SET-API-WEBHOOK-DESTINATION-01` | `CAP-INT-OUTBOUND-WEBHOOK-CONNECTION` / Integrations | independent source reviewer + task-specific runtime/browser reviewer | NOT_ESTIMATED | Administrators should use only approved public webhook destinations pending independent destination-policy verification. | Independent security review plus authorized loopback, private, reserved, metadata, redirect, DNS-rebinding, and egress-control tests. |
 
-No application owner, delivery effort or remediation design is assigned by this audit. Those fields remain deliberately unresolved until a claim becomes a final finding.
+No application owner, delivery effort or remediation design is assigned to the 10 active provisional claims. Those fields remain deliberately unresolved until a claim becomes independently actionable; RUN-162's completed native remediation is retained separately below and does not transfer.
 
-## Historical adjudication removed from the active queue
+## Historical adjudications removed from the active queue
 
-`MED-RBAC-01` is retained as a historical P1 issue identity but is not a current provisional or final finding. RUN-159/R reproduced the historical broad `medications.orders.manage` condition at `a0493442…`, verified exact controlled/stock capability separation on current `4f57ad4…`, passed 73 bounded tests / 1,481 assertions, and received exact-artifact GO after cleanup disclosure correction. No application change was required. This outcome grants no closure to `MED-CD-SCOPE-01`, `MED-CD-ATOMICITY-01`, the eMAR module, any Pass, benchmark, browser/ease, release, or audit completion.
+`MED-RBAC-01` is retained as a historical P1 issue identity but is not a current provisional or final finding. RUN-159/R reproduced the historical broad `medications.orders.manage` condition at `a0493442…`, verified exact controlled/stock capability separation on current `4f57ad4…`, passed 73 bounded tests / 1,481 assertions, and received exact-artifact GO after cleanup disclosure correction. No application change was required.
+
+`MED-CD-SCOPE-01` is retained as a historical remediated P1 issue identity but is not a current provisional or final finding. RUN-162 reproduces five current related scope defects, integrates and publishes the seven-path native fix at `0b1920d…`, passes 5 focused tests / 48 assertions on advanced main, and records zero disposable-schema/process/listener residue. RUN-162R independently returns GO and authorizes RUN-163 reporting. This outcome grants no transaction/retry/concurrency closure to `MED-CD-ATOMICITY-01` and no module, Pass, benchmark, application-browser/ease, release, feature-completion, or audit-completion credit.
 
 ## Required inputs and decisions
 

@@ -1,14 +1,18 @@
 {
   "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
-  "audit_status": "ELEVEN_PROVISIONAL_ONE_HISTORICAL_ALREADY_FIXED_ZERO_FINAL_FINDING_CREDIT",
+  "audit_status": "TEN_PROVISIONAL_ONE_HISTORICAL_ALREADY_FIXED_ONE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
   "generated_on": "2026-08-29",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
-    "current_adjudicated_application_commit": "4f57ad4202df90ded375961437879822a908627b",
-    "current_adjudicated_application_tree": "ee79b8d2733d09da2fd97992ac2a04e862159505",
+    "med_rbac_adjudicated_application_commit": "4f57ad4202df90ded375961437879822a908627b",
+    "med_rbac_adjudicated_application_tree": "ee79b8d2733d09da2fd97992ac2a04e862159505",
     "run_159_med_rbac_adjudication_sha256": "bc666ded05774b03b849743436cec47cbdb260c8ab763cf502e71c804af7fd8e",
     "run_159r_independent_artifact_review_sha256": "be0651adf9edfbf7694ac535908cf43a5631675bcf6d5264add68fe947437d18",
+    "med_cd_scope_remediated_application_commit": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+    "med_cd_scope_remediated_repository_tree": "7b2b5688c90e4da28725e70e38e50fd445f1b4c4",
+    "run_162_med_cd_scope_remediation_sha256": "21564caa435927d89d994a091383409e627c44170304f6ff2a5d5c897c858958",
+    "run_162r_independent_artifact_review_sha256": "7a1decaccfde2246163daef3dbec285b6a5a1a5019d2411615cc7e003660ff78",
     "audit_checkpoint_parent": "35a5228b26c54684718495c33281b24c0992de02",
     "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
     "base_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
@@ -188,16 +192,23 @@
     "system_data_features": 40,
     "canonical_submodules": null,
     "historical_discovery_claim_records": 12,
-    "current_provisional_source_claims": 11,
-    "historical_already_fixed_records": 1
+    "current_provisional_source_claims": 10,
+    "historical_already_fixed_records": 1,
+    "historical_remediated_records": 1
   },
   "counts": {
     "retained_claim_records": 12,
-    "provisional_source_claims": 11,
-    "provisional_P1": 11,
+    "provisional_source_claims": 10,
+    "provisional_P1": 10,
     "historical_already_fixed": 1,
-    "bounded_tests_executed": 73,
-    "bounded_test_assertions": 1481,
+    "historical_remediated": 1,
+    "bounded_disposition_tests_passed": 78,
+    "bounded_disposition_assertions": 1529,
+    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE; excludes the overlapping broader RUN-162 execution",
+    "med_rbac_bounded_tests": 73,
+    "med_rbac_bounded_test_assertions": 1481,
+    "med_cd_scope_focused_tests": 5,
+    "med_cd_scope_focused_test_assertions": 48,
     "final_P0": 0,
     "final_P1": 0,
     "complete_prompt_finding_schema": 0,
@@ -294,16 +305,17 @@
       "audit_completion": 0
     }
   },
-  "credit_boundary": "Eleven current provisional records and one retained historical already-fixed record remain reviewable. RUN-159 establishes the MED-RBAC-01 ALREADY_FIXED disposition, RUN-159R independently authorizes retirement reporting, and RUN-160 alone reclassifies MED-RBAC-01 from current provisional to retained historical already fixed. This does not satisfy any final finding, benchmark, browser, ease, Pass, feature-completion, or audit-completion gate.",
+  "credit_boundary": "Ten current provisional records, one retained historical already-fixed record, and one retained historical remediated record remain reviewable. RUN-159 establishes the MED-RBAC-01 ALREADY_FIXED disposition, RUN-159R authorizes its reporting, and RUN-160 reclassifies it. RUN-162 establishes MED-CD-SCOPE-01 reproduction, remediation, bounded runtime, integration, and publication; RUN-162R independently authorizes retirement reporting; RUN-163 alone reconciles that live record. This does not satisfy any final finding, benchmark, application-browser, ease, Pass, feature-completion, or audit-completion gate.",
   "reconciliation": {
     "retained_record_ids_unique": true,
     "current_provisional_ids_unique": true,
     "retained_record_count": 12,
-    "current_provisional_count": 11,
+    "current_provisional_count": 10,
     "historical_already_fixed_count": 1,
+    "historical_remediated_count": 1,
     "every_primary_feature_id_in_canonical_matrix": true,
     "final_ids_cross_file_reconciled": false,
-    "reason": "There are no final finding IDs. The retained MED-RBAC-01 identity is historical and already fixed on current main; the other 11 records remain provisional and none satisfies the cross-file final-finding gate."
+    "reason": "There are no final finding IDs. MED-RBAC-01 is retained as historical already fixed; MED-CD-SCOPE-01 is retained as historical remediated on current main; the other 10 records remain provisional. None satisfies the cross-file final-finding gate."
   },
   "records": [
     {
@@ -519,12 +531,34 @@
     },
     {
       "id": "MED-CD-SCOPE-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-MED-DESTRUCTION-LIFECYCLE",
       "related_feature_ids": [
         "CAP-MED-CD-REGISTER-BALANCE",
         "CAP-MED-STOCK-MOVEMENT"
       ],
+      "historical_provenance": {
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "canonical_pre_adjudication_record_sha256": "dd86bf94f3b4d894e95c56c95a9409ce803b8d82d108cdd3c42f3343e348cd21",
+        "classification": "REAL_HISTORICAL_CANONICAL_CONTROLLED_DRUG_SCOPE_CONDITION",
+        "historical_risk": "Possible foreign-Site or mismatched Client, medication, Site, witness, aggregate, or direct-object disclosure or mutation affecting privacy and medication safety.",
+        "preserved_identity_only": true
+      },
+      "current_adjudication": {
+        "application_commit": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+        "repository_tree": "7b2b5688c90e4da28725e70e38e50fd445f1b4c4",
+        "verdict": "REPRODUCED_AND_REMEDIATED",
+        "scope": "MED-CD-SCOPE canonical Client, medication, Site, projection, direct-ID, and internal all-Site scheduling boundaries only",
+        "run_162_receipt": "evidence/runtime/current-run-162-med-cd-scope-remediation-wave-29.json",
+        "run_162_receipt_sha256": "21564caa435927d89d994a091383409e627c44170304f6ff2a5d5c897c858958",
+        "run_162r_review": "evidence/runtime/current-run-162r-independent-med-cd-scope-remediation-review-wave-29.json",
+        "run_162r_review_sha256": "7a1decaccfde2246163daef3dbec285b6a5a1a5019d2411615cc7e003660ff78",
+        "application_remediation_required": true,
+        "application_source_changed": true,
+        "integrated_to_main": true,
+        "published_to_origin_main": true,
+        "separate_med_cd_atomicity_inherited": false
+      },
       "passes": [
         "P1",
         "P2",
@@ -539,15 +573,15 @@
       },
       "actor_and_job": {
         "actor": "Medication destruction owner",
-        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "secondary_actors": "Canonical owner, same-Site wrong-client, foreign/missing direct-ID, governed reader, and internal scheduled-command actors in bounded tests",
         "job": "Record and, under authority, void a medication destruction",
-        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+        "status": "BOUNDED_TEST_ACTORS_VALIDATED_NOT_REPRESENTATIVE_SIGNED_IN_BROWSER"
       },
       "route_url": {
-        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_names": "emar.controlled; emar.stock; emar.controlled.discrepancies.resolve; scheduled command medications:escalate-controlled-checks",
         "route_paths": "routes/emar.php:139-141; routes/emar.php:217-218",
         "raw_route_path_field": "routes/emar.php:139-141; routes/emar.php:217-218",
-        "status": "SOURCE_LOCATOR_ONLY"
+        "status": "BOUNDED_CURRENT_SOURCE_AND_RUNTIME_SCOPE_ONLY"
       },
       "frontend_anchor": {
         "page_files": "resources/js/pages/emar/Destructions.tsx",
@@ -569,25 +603,28 @@
         "shared_component_or_variant": null,
         "overlay_trigger": null,
         "internal_baseline": null,
-        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+        "status": "NOT_ADJUDICATED_FOR_THIS_RETAINED_HISTORICAL_RECORD"
       },
       "backend_anchor": {
         "matrix_anchors": "app/Http/Controllers/Emar/EmarController.php:4023",
         "claim_anchors": [
-          "app/Http/Controllers/Emar/EmarController.php:4732-4826",
-          "app/Services/Medication/MedicationScopeDecisionService.php:374-547"
+          "app/Http/Controllers/Emar/EmarController.php:1928-1937; 2481-2500; 8559-8573",
+          "app/Services/MedicationOverviewService.php:536-544",
+          "app/Console/Commands/EscalateOverdueControlledChecks.php:41-50",
+          "app/Services/Medication/MedicationGovernanceScopeService.php:199-226"
         ],
-        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
-        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+        "controller_request_service_model_policy_job_event_migration": "BOUNDED_CONTROLLER_SERVICE_COMMAND_QUERY_PROJECTION_AND_REGRESSION_REVIEW",
+        "application_commit": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf"
       },
       "current_behaviour": {
-        "classification": "SOURCE_INFERRED_PROVISIONAL",
-        "summary": "Controlled-drug and destruction paths appear to accept independently supplied client, medication, Site, or witness identifiers without consistently routing every relationship through the canonical medication scope decision service before disclosure or mutation.",
-        "runtime_observed": false
+        "classification": "REMEDIATED_CURRENT_MAIN_BOUNDED_VERIFIED",
+        "summary": "Current controlled and stock projections, overview checked-today suppression, and scheduled overdue escalation apply canonical Client/client-medication ownership before aggregation or projection. Discrepancy resolution authorizes and conceals the direct object before validating its payload. Internal all-Site scheduling omits only the reader Site filter and retains canonical ownership.",
+        "runtime_observed": true,
+        "runtime_scope": "Five focused MED-CD-SCOPE regression tests and 48 assertions passed on advanced main using a disposable MySQL schema; 102 related controller/command tests also passed in a broader bounded run. Two INR overview failures reproduced at the base checkpoint; full-suite green and coverage remain false."
       },
       "current_workflow": {
-        "matrix_summary": "Static canonical identity only: Record and, under authority, void a medication destruction. Representative-role completion was not executed.",
-        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+        "matrix_summary": "Bounded canonical scope remediation covers controlled/stock projections, overview due items, scheduled escalation, and discrepancy direct-object validation order; representative signed-in workflow was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "BOUNDED_CANONICAL_POSITIVE_AND_NO_EFFECT_NEGATIVE_PATHS_EXECUTED; REPRESENTATIVE_BROWSER_EASE_AND_OPERATION_LEVEL_CONCURRENCY_NOT_EXECUTED"
       },
       "ease_evidence": {
         "status": "NOT_MEASURED",
@@ -601,17 +638,27 @@
         "task_script": "task-scripts/cap-med-destruction-lifecycle.md"
       },
       "evidence": {
-        "source_claim_record": "evidence/source/current-feature-discovery-wave-01.json",
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-01.json (historical discovery input)",
+        "current_remediation_receipt": "evidence/runtime/current-run-162-med-cd-scope-remediation-wave-29.json",
+        "independent_artifact_review": "evidence/runtime/current-run-162r-independent-med-cd-scope-remediation-review-wave-29.json",
         "claim_anchors": [
-          "app/Http/Controllers/Emar/EmarController.php:4732-4826",
-          "app/Services/Medication/MedicationScopeDecisionService.php:374-547"
+          "app/Http/Controllers/Emar/EmarController.php:1928-1937; 2481-2500; 8559-8573",
+          "app/Services/MedicationOverviewService.php:536-544",
+          "app/Console/Commands/EscalateOverdueControlledChecks.php:41-50",
+          "tests/Feature/Emar/ControlledDrugsTest.php:644; 1282",
+          "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php:266",
+          "tests/Feature/Emar/MedicationOverviewServiceTest.php:89",
+          "tests/Feature/Emar/StockManagementTest.php:102"
         ],
-        "tests_executed": 0,
+        "test_commands_executed": 1,
+        "tests_executed": 5,
+        "assertions": 48,
         "browser_cells": 0,
-        "database_checks": 0
+        "database_checks": 1,
+        "database_cleanup": "configured oa162_audit_final and every matching oa162_ effective schema absent after execution; zero owned PHP processes or listeners"
       },
-      "problem_root_cause": "The provisional source review found independently supplied identifiers whose canonical relationship checks were not established at every boundary.",
-      "impact": "Possible foreign-Site or mismatched Client/medication/witness disclosure or mutation, affecting privacy and medication safety.",
+      "problem_root_cause": "Several read-side aggregates and projections filtered supplied identifiers but did not first reconcile ClientControlledDrugEntry or discrepancy rows to the exact canonical client_medications owner; discrepancy validation also ran before direct-object authorization.",
+      "impact": "Before remediation, forged same-Site ownership mismatches could distort controlled balances, timestamps, discrepancies, due work, or scheduled alerts, and malformed foreign discrepancy requests exposed a validation-versus-404 existence oracle.",
       "benchmark": {
         "official_repository": null,
         "inspected_ref": null,
@@ -626,8 +673,8 @@
         "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
       ],
       "better_oblivion_design": {
-        "proposal": null,
-        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+        "proposal": "Reuse the native canonical medication-row scope at every affected projection and authorize the governed discrepancy object before request validation.",
+        "status": "IMPLEMENTED_NATIVELY_WITHOUT_BENCHMARK_OR_DESIGN_CREDIT"
       },
       "target_ease": {
         "scores": null,
@@ -640,56 +687,51 @@
       ],
       "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
       "priority": "P1",
-      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "priority_status": "HISTORICAL_REMEDIATED_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT",
       "effort": {
         "size": null,
         "assumptions": null,
         "status": "NOT_ESTIMATED"
       },
       "dependencies_sequence": [
-        "Independent source review at the audited application pin",
-        "Prove owner-first canonical scope reconciliation and concealed foreign-Site/direct-ID denial for Client, medication, Site and witness combinations.",
-        "Only then decide whether a native remediation contract is warranted"
+        "Completed: five current related defects reproduced before their fixes",
+        "Completed: narrow canonical scope and authorization-order remediation integrated and published at 0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+        "Completed: five focused tests / 48 assertions plus three independent static reviews and exact-artifact GO",
+        "Retained non-inherited gap: transaction, retry, and operation-level concurrency belong to MED-CD-ATOMICITY-01"
       ],
       "confidence": {
-        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
-        "evidence_gap": "Prove owner-first canonical scope reconciliation and concealed foreign-Site/direct-ID denial for Client, medication, Site and witness combinations."
+        "level": "HIGH_FOR_BOUNDED_MED_CD_SCOPE_REMEDIATION_DISPOSITION",
+        "evidence_gap": "Representative signed-in application browser, full-suite/coverage, ease, target-specific benchmark, and operation-level concurrency remain unexecuted or unadjudicated."
       },
       "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
-      "interim_safeguard": "Treat controlled-drug and destruction requests with mixed identifiers as high-risk until the canonical scope path is independently proven.",
+      "interim_safeguard": "Preserve canonical Client/client-medication reconciliation before every controlled-drug aggregate or projection and preserve authorization-before-validation for governed direct objects.",
       "acceptance_criteria": {
-        "given_when_then": null,
-        "status": "NOT_FINAL; REQUIRED GATE: Prove owner-first canonical scope reconciliation and concealed foreign-Site/direct-ID denial for Client, medication, Site and witness combinations."
+        "given_when_then": "Given canonical and same-Site wrong-client controlled-drug rows plus foreign and missing discrepancy IDs, when controlled, stock, overview, scheduled escalation, and discrepancy-resolution paths execute, then only canonical rows affect state and projections, foreign and missing IDs share the concealed 404 boundary before validation, and no unauthorized mutation or audit effect occurs.",
+        "status": "BOUNDED_MET_FOR_HISTORICAL_CLAIM_REMEDIATION_NOT_FINAL_FINDING_OR_FEATURE_COMPLETION"
       },
       "validation_plan": {
-        "required": "Prove owner-first canonical scope reconciliation and concealed foreign-Site/direct-ID denial for Client, medication, Site and witness combinations.",
-        "unit": "NOT_PLANNED_TO_EXACT_CASES",
-        "feature": "NOT_EXECUTED",
-        "architecture": "NOT_EXECUTED",
-        "e2e": "BLOCKED",
+        "required": "Retain focused canonical projection, scheduled-command, direct-object concealment, and no-effect regression coverage; keep atomicity separate.",
+        "unit": "NOT_SEPARATELY_REQUIRED_FOR_THIS_REMEDIATION",
+        "feature": "EXECUTED_5_TESTS_48_ASSERTIONS_ON_ADVANCED_MAIN",
+        "architecture": "THREE_INDEPENDENT_STATIC_GO_REVIEWS_PLUS_EXACT_ARTIFACT_GO",
+        "e2e": "NOT_EXECUTED",
         "visual_accessibility": "BLOCKED",
-        "performance_concurrency": "NOT_EXECUTED",
+        "performance_concurrency": "NOT_EXECUTED_OR_CREDITED_SEPARATE_MED_CD_ATOMICITY_CLAIM",
         "representative_user": "NOT_EXECUTED"
       },
-      "finalization_blockers": [
-        "Independent current-source review",
-        "Exact final feature/finding ownership confirmation",
-        "Safe attributable runtime and/or browser validation where applicable",
-        "Target-specific benchmark or exhaustive final no-match adjudication",
-        "Complete observable acceptance criteria and validation plan"
-      ],
+      "finalization_blockers": [],
       "independent_review": {
-        "status": "NOT_COMPLETED",
-        "reviewer": null,
-        "disagreements": null,
-        "reconciliation": null
+        "status": "COMPLETED_THREE_STATIC_GO_PLUS_EXACT_ARTIFACT_GO",
+        "reviewer": "/root/run162_scope_adversarial; /root/run162_scope_source; /root/run162_scope_history_tests; /root/run162_scope_source/run162_artifact_seal",
+        "disagreements": "None blocking. The exact-artifact review independently recomputed the seal, seven-path manifest, patch identity, remote main tip, runtime arithmetic, base-reproduced failure wording, and credit boundaries.",
+        "reconciliation": "RUN-162 establishes reproduction/remediation evidence. RUN-162R alone authorizes retirement reporting; RUN-163 alone changes the live register."
       },
       "unresolved_fields": [
-        "final exact route/page/action ownership where a sentinel remains",
         "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
         "observed workflow and ten-dimension current/target ease measures",
         "target-specific benchmark or exhaustive final no-match",
-        "native design, effort, final acceptance criteria and executable validation cases"
+        "operation-level concurrency, retry, rollback and fractional-value evidence retained under MED-CD-ATOMICITY-01",
+        "full-suite coverage and representative signed-in application browser"
       ],
       "completion_credit": false,
       "credit": {

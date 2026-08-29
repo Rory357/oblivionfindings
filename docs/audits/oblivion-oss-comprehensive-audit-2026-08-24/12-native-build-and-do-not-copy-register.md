@@ -26,7 +26,7 @@ Historical labels such as `Native benchmark`, `Reject` or `Separate future decis
 | Claim record | Neutral need available | External target mapped | Native design proposed | Copy boundary | Current disposition |
 |---|---|---:|---:|---|---|
 | `MED-RBAC-01` | historical generic baseline needs only; no current target chain | 0 | 0 | no source/assets/wording/layout copied | already fixed on current main; no new native design or remediation proposed; historical identity retained; zero mapping/design credit |
-| `MED-CD-SCOPE-01` | 3 source-independent baseline needs, not target-specific | 0 | 0 | no source/assets/wording/layout copied | provisional claim; design deferred |
+| `MED-CD-SCOPE-01` | 3 source-independent baseline needs, not target-specific | 0 | 1 bounded native remediation; 0 benchmark-derived design credit | no source/assets/wording/layout copied | historical issue remediated at `0b1920d…`; canonical scope reused natively; zero mapping/final-finding/module/completion credit |
 | `MED-CD-ATOMICITY-01` | 3 source-independent baseline needs, not target-specific | 0 | 0 | no source/assets/wording/layout copied | provisional claim; design deferred |
 | `GOV-EXECUTIVE-VISIBILITY-01` | 3 source-independent baseline needs, not target-specific | 0 | 0 | no source/assets/wording/layout copied | provisional claim; design deferred |
 | `GOV-BOARD-PACK-VISIBILITY-01` | 3 source-independent baseline needs, not target-specific | 0 | 0 | no source/assets/wording/layout copied | provisional claim; design deferred |
@@ -38,7 +38,7 @@ Historical labels such as `Native benchmark`, `Reject` or `Separate future decis
 | `SAFE-PROJECTION-DURABILITY-01` | 3 source-independent baseline needs, not target-specific | 0 | 0 | no source/assets/wording/layout copied | provisional claim; design deferred |
 | `SET-API-WEBHOOK-DESTINATION-01` | 3 source-independent baseline needs, not target-specific | 0 | 0 | no source/assets/wording/layout copied | provisional claim; design deferred |
 
-The baseline needs above are generic safety/ownership requirements, not a completed benchmark-derived neutral specification. `MED-RBAC-01` required no proposal because RUN-159/R adjudicated the historical condition already fixed on current main. For the 11 active claims, a native proposal remains prohibited from final credit until its target-specific clean-room chain and current finding are both complete.
+The baseline needs above are generic safety/ownership requirements, not a completed benchmark-derived neutral specification. `MED-RBAC-01` required no proposal because RUN-159/R adjudicated the historical condition already fixed on current main. `MED-CD-SCOPE-01` required and received a narrow native remediation under the explicit issue-first override; RUN-162 records that no third-party source, assets, wording, or distinctive layout were copied, and RUN-162R independently reviews the exact remediation receipt, but neither supplies benchmark-derived design credit. For the 10 active claims, a native proposal remains prohibited from final credit until its target-specific clean-room chain and current finding are both complete.
 
 ## 340-target no-copy coverage register
 

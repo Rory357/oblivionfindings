@@ -109,6 +109,10 @@ RUN-158 verifies that exact RUN-157 dashboard as an audit artifact only. RUN-159
 
 RUN-160 preserves all 12 historical record IDs while changing the live status arithmetic to **11 current provisional P1 claims + 1 historical already-fixed record + 0 final P0/P1 findings**. This retires only the historical broad-orders-permission claim. `MED-CD-SCOPE-01`, `MED-CD-ATOMICITY-01`, operation-level concurrent same-UUID races, browser/ease, modules, Passes, release, and completion receive no inherited credit. Ownership, queue, matrix, and benchmark counts remain 664/307/357/95, 118/389, 2/340 mapped, 0/340 final no-match/NCM, and 338 unresolved. The rebuilt dashboard requires fresh RUN-161 verification.
 
+RUN-161 verifies that exact RUN-160 dashboard and fixes attribution without transferring evidence. RUN-162 then establishes `MED-CD-SCOPE-01` reproduction, remediation, bounded runtime, integration, and application-commit publication at commit `0b1920dade9251d617f3cb0b69da5c0202b5a6bf` / full repository tree `7b2b5688c90e4da28725e70e38e50fd445f1b4c4`. The seven-path patch applies native canonical medication-row scope before controlled, stock, overview, and scheduled projections and moves discrepancy payload validation behind governed direct-object authorization. Five focused tests / 48 assertions pass on advanced main; all matching disposable schemas and owned processes/listeners are absent afterward. RUN-162R independently reviews the exact remediation receipt and authorizes retirement reporting only; RUN-163 alone changes the live status.
+
+RUN-163 preserves all 12 identities while changing the live arithmetic to **10 current provisional P1 claims + 1 historical already-fixed record + 1 historical remediated record + 0 final P0/P1 findings**. Only `MED-CD-SCOPE-01` moves to retained historical remediated. `MED-CD-ATOMICITY-01`, full-suite/coverage, representative application browser, ease, modules, Passes, release, Gate 4, and completion remain open or zero-credit. Ownership, queue, matrix, and benchmark counts remain exactly 664/307/357/95, 118/389, 2/340 mapped, 0/340 final no-match/NCM, and 338 unresolved. The rebuilt dashboard requires fresh RUN-164 verification.
+
 ## Candidate register
 
 | # | ID | Module | Class | User job | Canonical owner |
@@ -206,7 +210,7 @@ The required `02-eight-pass-coverage-ledger.csv` now has one provisional row per
 
 ## Current claim status
 
-The register retains 12 historical claim identities. Eleven remain `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`, including `MED-CD-SCOPE-01` and `MED-CD-ATOMICITY-01`. `MED-RBAC-01` is now `HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING`: RUN-159 preserves the real `a0493442…` defect, verifies current exact controlled/stock capability separation at `4f57ad4…`, and establishes the ALREADY_FIXED disposition; RUN-159R independently authorizes retirement reporting; RUN-160 alone reclassifies the identity from current provisional to retained historical already fixed. This is neither a final finding nor module/Pass completion and grants no benchmark, browser, ease, release, or audit-completion credit.
+The register retains 12 historical claim identities. Ten remain `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`, including `MED-CD-ATOMICITY-01`. `MED-RBAC-01` remains `HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING` through RUN-159/R and RUN-160. `MED-CD-SCOPE-01` is `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`: RUN-162 establishes the reproduced-and-remediated source/runtime/integration/publication evidence, RUN-162R independently authorizes reporting, and RUN-163 alone reclassifies the live record. Neither retained status is a final finding or module/Pass completion, and neither grants benchmark, application-browser, ease, release, or audit-completion credit.
 
 ## Evidence boundary
 
