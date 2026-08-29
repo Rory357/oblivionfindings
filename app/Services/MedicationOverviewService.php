@@ -533,8 +533,11 @@ class MedicationOverviewService
     private function cdBalanceCheckItems(Carbon $date): Collection
     {
         // Active controlled meds whose latest balance-check CD entry is not today.
-        $checkedTodayMedIds = ClientControlledDrugEntry::where('entry_type', 'balance_check')
-            ->whereIn('client_id', $this->allowedClientIds())
+        $checkedTodayMedIds = $this->canonicalMedicationRows(
+            ClientControlledDrugEntry::where('entry_type', 'balance_check')
+                ->whereIn('client_id', $this->allowedClientIds()),
+            false,
+        )
             ->whereDate('recorded_at', $date)
             ->pluck('client_medication_id')
             ->filter()

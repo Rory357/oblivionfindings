@@ -5,6 +5,7 @@ namespace Tests\Feature\Emar;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
 use App\Models\Client;
+use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
@@ -95,6 +96,64 @@ class StockManagementTest extends TestCase
                 ->where('pharmacyOrders.0.medication_id', $med->id)
                 ->where('pharmacyOrders.0.controlled', true)
                 ->has('sites')
+            );
+    }
+
+    public function test_med_cd_scope_stock_register_ignores_noncanonical_balance_checks_and_discrepancies(): void
+    {
+        ['user' => $user, 'site' => $site, 'client' => $client, 'med' => $med] = $this->seedStock(true);
+        $legitimateAt = now()->subDays(8)->startOfMinute();
+        $noncanonicalAt = now()->subDay()->startOfMinute();
+        $otherClient = Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+        ]);
+        $otherWitness = User::factory()->create(['name' => 'Noncanonical Witness']);
+
+        ClientControlledDrugEntry::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $med->id,
+            'entry_type' => 'balance_check',
+            'unit' => 'tablets',
+            'on_hand_before' => '11.00',
+            'on_hand_after' => '11.00',
+            'recorded_at' => $legitimateAt,
+            'recorded_by' => $user->id,
+            'witnessed_by' => $user->id,
+        ]);
+        ClientControlledDrugEntry::query()->create([
+            'client_id' => $otherClient->id,
+            'client_medication_id' => $med->id,
+            'entry_type' => 'balance_check',
+            'unit' => 'tablets',
+            'on_hand_before' => '99.00',
+            'on_hand_after' => '99.00',
+            'recorded_at' => $noncanonicalAt,
+            'recorded_by' => $otherWitness->id,
+            'witnessed_by' => $otherWitness->id,
+        ]);
+        ClientControlledDrugDiscrepancy::query()->create([
+            'client_id' => $otherClient->id,
+            'client_medication_id' => $med->id,
+            'on_hand_before' => '12.00',
+            'on_hand_after' => '99.00',
+            'difference' => '87.00',
+            'reason' => 'Noncanonical mismatch',
+            'reported_at' => $noncanonicalAt,
+            'reported_by' => $otherWitness->id,
+            'witnessed_by' => $otherWitness->id,
+            'status' => 'open',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/emar/stock?site_id='.$site->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('controlledRegister', 1)
+                ->where('controlledRegister.0.register_balance', 11)
+                ->where('controlledRegister.0.last_check_at', $legitimateAt->toIso8601String())
+                ->where('controlledRegister.0.last_check_witness', $user->name)
+                ->where('controlledRegister.0.discrepancy', null)
             );
     }
 

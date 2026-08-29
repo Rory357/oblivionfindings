@@ -641,6 +641,50 @@ class ControlledDrugsTest extends TestCase
             );
     }
 
+    public function test_med_cd_scope_reconciliation_ignores_noncanonical_client_medication_balance_checks(): void
+    {
+        ['user' => $user, 'witness' => $witness, 'site' => $site, 'client' => $client, 'med' => $med] = $this->setupCd();
+        $legitimateAt = now()->subDays(8)->startOfMinute();
+        $noncanonicalAt = now()->subDay()->startOfMinute();
+        $otherClient = Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+        ]);
+
+        ClientControlledDrugEntry::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $med->id,
+            'entry_type' => 'balance_check',
+            'unit' => 'tablets',
+            'on_hand_before' => '10.00',
+            'on_hand_after' => '10.00',
+            'recorded_at' => $legitimateAt,
+            'recorded_by' => $user->id,
+            'witnessed_by' => $witness->id,
+        ]);
+        ClientControlledDrugEntry::query()->create([
+            'client_id' => $otherClient->id,
+            'client_medication_id' => $med->id,
+            'entry_type' => 'balance_check',
+            'unit' => 'tablets',
+            'on_hand_before' => '10.00',
+            'on_hand_after' => '10.00',
+            'recorded_at' => $noncanonicalAt,
+            'recorded_by' => $user->id,
+            'witnessed_by' => $witness->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get('/emar/controlled?site_id='.$site->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('medications', 1)
+                ->where('medications.0.last_balance_check_at', $legitimateAt->toIso8601String())
+                ->where('medications.0.days_since_check', 8)
+                ->where('medications.0.overdue_check', true)
+            );
+    }
+
     public function test_client_filter_scopes_medications(): void
     {
         ['user' => $user, 'client' => $client] = $this->setupCd();
@@ -1233,6 +1277,34 @@ class ControlledDrugsTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame('resolved', $alert->fresh()->status);
+    }
+
+    public function test_med_cd_scope_overdue_command_ignores_noncanonical_recent_balance_checks(): void
+    {
+        ['user' => $user, 'witness' => $witness, 'site' => $site, 'med' => $med] = $this->setupCd();
+        $otherClient = Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+        ]);
+        ClientControlledDrugEntry::query()->create([
+            'client_id' => $otherClient->id,
+            'client_medication_id' => $med->id,
+            'entry_type' => 'balance_check',
+            'unit' => 'tablets',
+            'on_hand_before' => '10.00',
+            'on_hand_after' => '10.00',
+            'recorded_at' => now(),
+            'recorded_by' => $user->id,
+            'witnessed_by' => $witness->id,
+        ]);
+
+        $this->artisan('emar:escalate-overdue-cd-checks')->assertExitCode(0);
+
+        $this->assertDatabaseHas('medication_dashboard_alerts', [
+            'client_medication_id' => $med->id,
+            'alert_type' => 'controlled_overdue_check',
+            'status' => 'active',
+        ]);
     }
 
     public function test_cd_entry_classifies_schedule_on_medication(): void

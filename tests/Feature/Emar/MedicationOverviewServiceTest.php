@@ -2,6 +2,7 @@
 
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
+use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -83,6 +84,40 @@ it('surfaces an open CD discrepancy in the action centre', function () {
         ->and($cd['severity'])->toBe('critical')
         ->and($cd['category'])->toBe('controlled')
         ->and($cd['code'])->toBe('CD');
+});
+
+it('keeps med cd scope balance checks due when today entry has noncanonical ownership', function () {
+    $user = User::factory()->create();
+    $owner = makeOverviewClient();
+    $otherClient = Client::factory()->create([
+        'site_id' => $owner->site_id,
+        'first_name' => 'Other',
+        'last_name' => 'Resident',
+    ]);
+    $medication = ClientMedication::factory()->create([
+        'client_id' => $owner->id,
+        'name' => 'Morphine sulfate',
+        'controlled_drug' => true,
+        'active' => true,
+        'state' => 'active',
+    ]);
+    ClientControlledDrugEntry::query()->create([
+        'client_id' => $otherClient->id,
+        'client_medication_id' => $medication->id,
+        'entry_type' => 'balance_check',
+        'on_hand_before' => '10.00',
+        'on_hand_after' => '10.00',
+        'recorded_at' => now(),
+        'recorded_by' => $user->id,
+    ]);
+
+    $feed = app(MedicationOverviewService::class)->actionCentre(today());
+    $due = collect($feed)->firstWhere('id', 'cdbal-'.$medication->id);
+
+    expect($due)->not->toBeNull()
+        ->and($due['type'])->toBe('cd_balance')
+        ->and($due['client_id'])->toBe($owner->id)
+        ->and($due['summary'])->toContain('no balance count recorded today');
 });
 
 it('surfaces an overdue medication review in the action centre', function () {

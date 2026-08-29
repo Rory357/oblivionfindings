@@ -263,6 +263,29 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         $this->assertSame($beforeLocalStock, (string) $context['local_stock']->fresh()->on_hand);
     }
 
+    public function test_med_cd_scope_discrepancy_resolution_conceals_foreign_objects_before_validation(): void
+    {
+        $context = $this->context();
+        $actor = $this->userWithPermissions([
+            MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
+        ], $context['local_site']);
+        $before = $this->stateSnapshot($context);
+
+        $foreign = $this->actingAs($actor)->post(
+            route('emar.controlled.discrepancies.resolve', $context['foreign_discrepancy']),
+            ['resolution_notes' => ['invalid-before-scope']],
+        )->assertNotFound();
+        $missing = $this->actingAs($actor)->post(
+            route('emar.controlled.discrepancies.resolve', 999999),
+            ['resolution_notes' => ['invalid-before-scope']],
+        )->assertNotFound();
+
+        $this->assertSame($missing->getContent(), $foreign->getContent());
+        $this->assertSame($before, $this->stateSnapshot($context));
+        $this->assertSame('open', $context['foreign_discrepancy']->fresh()->status);
+        $this->assertNull($context['foreign_discrepancy']->fresh()->resolved_at);
+    }
+
     public function test_emar_reader_matrix_conceals_foreign_site_client_and_medication_ids(): void
     {
         $context = $this->context();

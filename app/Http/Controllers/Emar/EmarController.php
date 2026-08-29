@@ -1925,9 +1925,13 @@ class EmarController extends Controller
         // (a MedicationDashboardAlert via MedicationAlertService) does not exist yet —
         // the page derives the overdue count live from overdue_check below, which covers
         // the UI; only the background escalation remains. See docs/CONTROLLED_GAP_ANALYSIS.md.
-        $lastChecks = ClientControlledDrugEntry::query()
-            ->where('entry_type', 'balance_check')
-            ->whereIn('client_medication_id', $controlledMedications->pluck('id')->all())
+        $lastChecks = $this->governanceScope->scopeCanonicalClientMedicationRows(
+            ClientControlledDrugEntry::query()
+                ->where('entry_type', 'balance_check')
+                ->whereIn('client_medication_id', $controlledMedications->pluck('id')->all()),
+            $readerSiteIds,
+            false,
+        )
             ->selectRaw('client_medication_id, MAX(recorded_at) as last_at')
             ->groupBy('client_medication_id')
             ->pluck('last_at', 'client_medication_id');
@@ -2474,16 +2478,24 @@ class EmarController extends Controller
         $controlledMedIds = $canViewControlled
             ? $stockModels->filter(fn ($s) => $s->medication?->controlled_drug)->pluck('client_medication_id')->filter()->values()
             : collect();
-        $lastChecks = ClientControlledDrugEntry::query()
-            ->whereIn('client_medication_id', $controlledMedIds)
-            ->where('entry_type', 'balance_check')
+        $lastChecks = $this->governanceScope->scopeCanonicalClientMedicationRows(
+            ClientControlledDrugEntry::query()
+                ->whereIn('client_medication_id', $controlledMedIds)
+                ->where('entry_type', 'balance_check'),
+            $readerSiteIds,
+            false,
+        )
             ->with('witnessedBy:id,name')
             ->latest('recorded_at')
             ->get()
             ->groupBy('client_medication_id');
-        $openDiscrepancies = ClientControlledDrugDiscrepancy::query()
-            ->whereIn('client_medication_id', $controlledMedIds)
-            ->whereIn('status', ['open', 'under_review'])
+        $openDiscrepancies = $this->governanceScope->scopeCanonicalClientMedicationRows(
+            ClientControlledDrugDiscrepancy::query()
+                ->whereIn('client_medication_id', $controlledMedIds)
+                ->whereIn('status', ['open', 'under_review']),
+            $readerSiteIds,
+            false,
+        )
             ->get()
             ->groupBy('client_medication_id');
 
@@ -8548,18 +8560,18 @@ class EmarController extends Controller
     {
         $this->assertMedicationCapability($request, 'medications.controlled.record');
 
-        $validated = $request->validate([
-            'resolution_notes' => 'required|string|max:2000',
-            'resolution_action' => 'nullable|string|max:255',
-        ]);
-
         $actor = $request->user();
         abort_unless($actor, 403);
 
         return $this->governanceScope->forDiscrepancy(
             $actor,
             $discrepancy,
-            function (Client $client, ?ClientMedication $medication, ClientControlledDrugDiscrepancy $lockedDiscrepancy) use ($validated, $actor) {
+            function (Client $client, ?ClientMedication $medication, ClientControlledDrugDiscrepancy $lockedDiscrepancy) use ($request, $actor) {
+                $validated = $request->validate([
+                    'resolution_notes' => 'required|string|max:2000',
+                    'resolution_action' => 'nullable|string|max:255',
+                ]);
+
                 if (! in_array($lockedDiscrepancy->status, ['open', 'under_review'], true)) {
                     return redirect()->back()->withErrors(['resolution_notes' => 'This discrepancy has already been resolved.']);
                 }

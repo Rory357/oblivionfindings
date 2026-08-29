@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\MedicationDashboardAlert;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -20,6 +21,11 @@ class EscalateOverdueControlledChecks extends Command
 
     protected $description = 'Raise a dashboard alert for controlled drugs with no balance check in the last N days (default 7).';
 
+    public function __construct(private readonly MedicationGovernanceScopeService $governanceScope)
+    {
+        parent::__construct();
+    }
+
     public function handle(): int
     {
         $days = max(1, (int) $this->option('days'));
@@ -32,9 +38,13 @@ class EscalateOverdueControlledChecks extends Command
             ->get();
 
         // Last balance check per controlled drug (one grouped query).
-        $lastChecks = ClientControlledDrugEntry::query()
-            ->where('entry_type', 'balance_check')
-            ->whereIn('client_medication_id', $medications->pluck('id')->all())
+        $lastChecks = $this->governanceScope->scopeCanonicalClientMedicationRows(
+            ClientControlledDrugEntry::query()
+                ->where('entry_type', 'balance_check')
+                ->whereIn('client_medication_id', $medications->pluck('id')->all()),
+            null,
+            false,
+        )
             ->selectRaw('client_medication_id, MAX(recorded_at) as last_at')
             ->groupBy('client_medication_id')
             ->pluck('last_at', 'client_medication_id');
