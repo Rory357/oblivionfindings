@@ -1,0 +1,78 @@
+{
+  "schema_version": "run-159r-independent-med-rbac-adjudication-review-wave-28-v1",
+  "run_id": "RUN-159R-INDEPENDENT-MED-RBAC-01-ADJUDICATION-RECEIPT-REVIEW-WAVE-28",
+  "status": "GO_EXACT_RUN159_ARTIFACT_REVIEW_RETIREMENT_REPORTING_AUTHORIZED_ZERO_DOWNSTREAM_CREDIT",
+  "generated_at": "2026-08-29T18:45:00+12:00",
+  "pins": {
+    "application_commit": "4f57ad4202df90ded375961437879822a908627b",
+    "application_tree": "ee79b8d2733d09da2fd97992ac2a04e862159505",
+    "producer_generator": {
+      "path": "generators/materialize-run-159-med-rbac-already-fixed-adjudication-wave-28.py",
+      "sha256": "cfd37697847c57a5e8116adb5836945daf21208fb00d0885abf7f3d594379ae7",
+      "blob_id": "3f0965f58ea4855f76288d662616b0ad6b7d9964",
+      "bytes": 23846,
+      "lines": 472
+    },
+    "producer_receipt": {
+      "path": "evidence/runtime/current-run-159-med-rbac-already-fixed-adjudication-wave-28.json",
+      "sha256": "bc666ded05774b03b849743436cec47cbdb260c8ab763cf502e71c804af7fd8e",
+      "blob_id": "116664410ebeb4fa97ed93e7badbd7537c9a4b5d",
+      "bytes": 17319,
+      "lines": 379
+    }
+  },
+  "review": {
+    "reviewer_lane": "/root/run159_receipt_reviewer",
+    "review_record_materialized_by": "/root",
+    "review_scope": "EXACT_CURRENT_RUN159_GENERATOR_RECEIPT_SOURCE_PINS_ARITHMETIC_DATABASE_CLEANUP_OUTCOME_AND_CREDIT_BOUNDARY",
+    "review_process": {
+      "read_only": true,
+      "writes": false,
+      "tests_executed": false,
+      "browser_executed": false,
+      "database_operations_executed": false,
+      "blind_or_isolated_review_claimed": false,
+      "root_shared_current_hash_and_correction_context": true,
+      "reviewer_found_and_required_effective_schema_cleanup_disclosure_correction": true,
+      "corrected_bytes_reopened_before_final_verdict": true
+    },
+    "checks": {
+      "prompt_commit_tree_main_origin_and_source_test_pins": "PASS",
+      "historical_record_and_ancestry_boundaries": "PASS",
+      "reviewer_record_review_set_and_command_set_hashes": "PASS",
+      "test_and_duration_arithmetic": "PASS_73_TESTS_1481_ASSERTIONS_450_72_SECONDS",
+      "configured_base_and_effective_process_schema_cleanup": "PASS_ZERO_RESIDUE",
+      "historical_defect_and_current_exact_capability_disposition": "PASS_ALREADY_FIXED",
+      "separate_med_cd_concurrency_browser_and_downstream_noninheritance": "PASS",
+      "single_organisation_multiple_Sites_wording": "PASS"
+    },
+    "verdict": "GO",
+    "blocking_discrepancies": [],
+    "reporting_authorized": true,
+    "root_materialized_review_record_sha256": "09b1b84c9de4a77c94020fca9894442275c0fd429cf45567b74f42d5d95d471e"
+  },
+  "decision": {
+    "verdict": "GO",
+    "blocking_discrepancies": 0,
+    "retirement_reporting_authorized": true,
+    "application_remediation_authorized": false,
+    "final_finding_authorized": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "credit_boundary": {
+    "independent_exact_artifact_review_for_retirement_reporting": true,
+    "application_remediation": false,
+    "runtime_reexecution": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "final_finding": false,
+    "pass": false,
+    "release": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false
+}
