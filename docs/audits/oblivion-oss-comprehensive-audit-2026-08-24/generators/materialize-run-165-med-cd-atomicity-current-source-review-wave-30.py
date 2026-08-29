@@ -27,8 +27,10 @@ GENERATED_AT = "2026-08-30T03:10:00+12:00"
 MATERIALIZER = "generators/materialize-run-165-med-cd-atomicity-current-source-review-wave-30.py"
 OUTPUT = "evidence/source/current-run-165-med-cd-atomicity-current-source-review-wave-30.json"
 
-APPLICATION_COMMIT = "cf0090ec97242776eea30a2875756446f42862f9"
-APPLICATION_TREE = "b1c932d1c5c19e9e2ea655da5964dd1c5e9c41f3"
+APPLICATION_COMMIT = "03b9eca32308815eb0e93e81963daa3570bf3a86"
+APPLICATION_TREE = "edffb0d10e6b519e91758da7ca9722e12611e94e"
+REVIEWED_SOURCE_CHECKPOINT = "cf0090ec97242776eea30a2875756446f42862f9"
+REVIEWED_SOURCE_TREE = "b1c932d1c5c19e9e2ea655da5964dd1c5e9c41f3"
 HISTORICAL_APPLICATION_COMMIT = "a0493442b9e392d324055c35bf25b69421dc2d35"
 HISTORICAL_APPLICATION_TREE = "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
 EFFECTIVE_APPLICATION_COMMIT = "0b1920dade9251d617f3cb0b69da5c0202b5a6bf"
@@ -36,6 +38,10 @@ EFFECTIVE_APPLICATION_TREE = "7b2b5688c90e4da28725e70e38e50fd445f1b4c4"
 PROMPT_SHA256 = "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
 HISTORICAL_RECORD_SHA256 = "9ba4f430ee59efea414b42a8633c1c969a2fd4428fbf3fef173fb5548cc8e7f1"
 TEMPORARY_HARNESS = "tests/Feature/Emar/ControlledDrugAtomicityConcurrencyTest.php"
+MATERIALIZER_REPOSITORY_PATH = f"{AUDIT_PREFIX}{MATERIALIZER}"
+OUTPUT_REPOSITORY_PATH = f"{AUDIT_PREFIX}{OUTPUT}"
+EXPECTED_DIRTY_PATHS = {MATERIALIZER_REPOSITORY_PATH, OUTPUT_REPOSITORY_PATH, TEMPORARY_HARNESS}
+HARNESS_PIN = ("49bbc43ca9caa470e10992751f3e2b7080cde6cf6ff554994ce85e0956b5d807", "f87f011bd6441f3cafcfc1528378e21f180d6570", 31845, 715)
 
 SOURCE_PINS = {
     "routes/emar.php": ("369d592aa532a988018d7b48f78d97f41500836762a662f8b714838b7dfeb8c9", "f7ea398d5cbfdeaadd7fdab41f417e26ac170ff7", 27108, 456),
@@ -113,17 +119,21 @@ def validate_repository_boundary() -> None:
     assert git("log", "-1", "--format=%T") == APPLICATION_TREE
     assert git("rev-parse", "main") == APPLICATION_COMMIT
     assert git("rev-parse", "origin/main") == APPLICATION_COMMIT
+    assert git("log", "-1", "--format=%T", REVIEWED_SOURCE_CHECKPOINT) == REVIEWED_SOURCE_TREE
+    assert all(
+        path.replace("\\", "/").startswith(AUDIT_PREFIX)
+        for path in git("diff", "--name-only", REVIEWED_SOURCE_CHECKPOINT, "HEAD", "--").splitlines()
+    )
     assert git("log", "-1", "--format=%T", EFFECTIVE_APPLICATION_COMMIT) == EFFECTIVE_APPLICATION_TREE
     assert run_git("merge-base", "--is-ancestor", EFFECTIVE_APPLICATION_COMMIT, "HEAD", check=False).returncode == 0
     rows = [row for row in git("status", "--porcelain=v1", "--untracked-files=all").splitlines() if row]
-    allowed_exact = {TEMPORARY_HARNESS}
     for row in rows:
         path = status_path(row)
-        assert path in allowed_exact or path.startswith(AUDIT_PREFIX), (row, path)
+        assert path in EXPECTED_DIRTY_PATHS, (row, path)
     for path in git("diff", "--name-only", "HEAD", "--").splitlines():
-        assert path.replace("\\", "/").startswith(AUDIT_PREFIX), path
+        assert path.replace("\\", "/") in EXPECTED_DIRTY_PATHS, path
     for path in git("diff", "--cached", "--name-only", "HEAD", "--").splitlines():
-        assert path.replace("\\", "/").startswith(AUDIT_PREFIX), path
+        assert path.replace("\\", "/") in EXPECTED_DIRTY_PATHS, path
     diff_check = run_git("diff", "--check", "HEAD", "--", check=False)
     assert diff_check.returncode == 0 and diff_check.stdout == b"" and diff_check.stderr == b""
 
@@ -201,7 +211,16 @@ def validate_source() -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
         "app/Http/Controllers/Emar/EmarController.php:8439",
         "app/Services/EnhancedMarService.php:2096",
     ]
-    return observed, {"historical_record": historical_record, "sink_rows": sink_rows, "lineage_records": lineage_records}
+    harness_record = file_record(TEMPORARY_HARNESS)
+    assert tuple(harness_record[key] for key in ("sha256", "blob_id", "bytes", "lines")) == HARNESS_PIN
+    materializer_record = file_record(MATERIALIZER_REPOSITORY_PATH)
+    return observed, {
+        "historical_record": historical_record,
+        "sink_rows": sink_rows,
+        "lineage_records": lineage_records,
+        "temporary_harness_record": harness_record,
+        "materializer_record": materializer_record,
+    }
 
 
 def reviewer(lane: str, role: str, verdict: str, coverage: list[str], limitations: list[str]) -> dict[str, Any]:
@@ -209,7 +228,7 @@ def reviewer(lane: str, role: str, verdict: str, coverage: list[str], limitation
         "reviewer_lane": lane,
         "role": role,
         "verdict": verdict,
-        "pinned_application_commit": APPLICATION_COMMIT,
+        "pinned_reviewed_source_checkpoint": REVIEWED_SOURCE_CHECKPOINT,
         "read_only": True,
         "application_writes": False,
         "runtime_credit": False,
@@ -260,6 +279,8 @@ def build_receipt(source_records: dict[str, dict[str, Any]], derived: dict[str, 
             "governing_prompt_sha256": PROMPT_SHA256,
             "application_commit": APPLICATION_COMMIT,
             "application_tree": APPLICATION_TREE,
+            "reviewed_source_checkpoint": REVIEWED_SOURCE_CHECKPOINT,
+            "reviewed_source_tree": REVIEWED_SOURCE_TREE,
             "main_commit": APPLICATION_COMMIT,
             "origin_main_commit": APPLICATION_COMMIT,
             "historical_audited_application_commit": HISTORICAL_APPLICATION_COMMIT,
@@ -267,6 +288,8 @@ def build_receipt(source_records: dict[str, dict[str, Any]], derived: dict[str, 
             "effective_application_commit": EFFECTIVE_APPLICATION_COMMIT,
             "effective_application_tree": EFFECTIVE_APPLICATION_TREE,
             "historical_med_cd_atomicity_record_canonical_sha256": HISTORICAL_RECORD_SHA256,
+            "materializer": {"path": MATERIALIZER, **derived["materializer_record"]},
+            "temporary_untracked_harness": {"path": TEMPORARY_HARNESS, **derived["temporary_harness_record"]},
             "source_files": source_records,
             "run164_lineage_files": derived["lineage_records"],
         },
@@ -310,6 +333,14 @@ def build_receipt(source_records: dict[str, dict[str, Any]], derived: dict[str, 
             "requirement": "exact-byte attributable real HTTP-kernel two-process MySQL race covering same UUID same payload, same UUID different payload, and distinct UUID stale before-balance",
             "runtime_outcome_selected_by_run165": False,
         },
+        "write_boundary": {
+            "observed_changed_paths": sorted(EXPECTED_DIRTY_PATHS),
+            "wrote_files": [OUTPUT],
+            "materializer_runtime_writes_only_receipt": True,
+            "materializer_did_not_write_itself": True,
+            "materializer_did_not_write_temporary_harness": True,
+            "application_files_written": [],
+        },
         "credit_boundary": {
             "independent_current_source_review": True,
             "historical_claim_retirement_authorized": False,
@@ -338,13 +369,25 @@ def build_receipt(source_records: dict[str, dict[str, Any]], derived: dict[str, 
     payload["review_process"]["review_set_sha256"] = canonical_sha256(reviewers)
     payload["artifact_completion_test_met"] = True
     payload["audit_completion_test_met"] = False
+    payload["receipt_self_seal_sha256"] = canonical_sha256(payload)
     return payload
+
+
+def validate_receipt(payload: dict[str, Any]) -> None:
+    assert [key for key, value in payload["credit_boundary"].items() if value] == ["independent_current_source_review"]
+    assert payload["write_boundary"]["wrote_files"] == [OUTPUT]
+    assert payload["write_boundary"]["materializer_runtime_writes_only_receipt"] is True
+    seal = payload["receipt_self_seal_sha256"]
+    without_seal = dict(payload)
+    del without_seal["receipt_self_seal_sha256"]
+    assert seal == canonical_sha256(without_seal)
 
 
 def main() -> None:
     validate_repository_boundary()
     source_records, derived = validate_source()
     payload = build_receipt(source_records, derived)
+    validate_receipt(payload)
     output_path = AUDIT / OUTPUT
     output_bytes = (json.dumps(payload, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -358,12 +401,15 @@ def main() -> None:
         if temporary.exists():
             temporary.unlink()
     assert output_path.read_bytes() == output_bytes
-    assert strict_json(output_path) == payload
+    written = strict_json(output_path)
+    assert written == payload
+    validate_receipt(written)
     print(json.dumps({
         "run_id": RUN_ID,
         "status": STATUS,
         "output": OUTPUT,
         "sha256": sha256_bytes(output_bytes),
+        "receipt_self_seal_sha256": payload["receipt_self_seal_sha256"],
         "runtime_credit": False,
         "audit_complete": False,
     }, sort_keys=True))
