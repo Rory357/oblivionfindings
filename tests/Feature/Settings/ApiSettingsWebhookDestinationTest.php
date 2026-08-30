@@ -187,6 +187,7 @@ it('fails closed before following a cross-host redirect', function () {
 
 it('preserves the intentional same-application internal probe', function () {
     config()->set('app.url', 'http://localhost');
+    config()->set('inertia.ssr.enabled', false);
     Http::fake();
 
     $storeResponse = $this->actingAs(apiSettingsWebhookAdmin())
