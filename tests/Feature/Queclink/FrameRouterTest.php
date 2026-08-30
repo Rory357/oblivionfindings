@@ -24,6 +24,21 @@ beforeEach(function () {
     $this->state = new ConnectionState('192.0.2.10:54321');
 });
 
+it('makes the first connection identity immutable', function () {
+    $state = new ConnectionState('192.0.2.10:54321');
+    $state->bind('864696060004173', 10);
+
+    // Repeating the same resolved identity is idempotent.
+    $state->bind('864696060004173', 10);
+
+    expect($state->imei)->toBe('864696060004173')
+        ->and($state->queclinkDeviceId)->toBe(10)
+        ->and($state->isBoundTo('864696060004173'))->toBeTrue()
+        ->and($state->isBoundTo('867963069916998'))->toBeFalse()
+        ->and(fn () => $state->bind('867963069916998', 11))
+        ->toThrow(LogicException::class, 'A Queclink connection identity cannot be rebound.');
+});
+
 it('auto-creates an unknown IMEI in the pending tray and acknowledges a report frame', function () {
     $frame = '+RESP:GTFRI,8020090100,864696060004173,GV500CG,11985,10,1,1,0.0,0,118.5,117.129306,31.839292,20230808022509,0460,0001,DF5C,02A90902,01,15,0.0,20230808022510,0119$';
 
@@ -56,6 +71,107 @@ it('answers a heartbeat with +SACK even for an unpaired pending device', functio
     expect(QueclinkRawFrame::count())->toBe(2);
     expect(QueclinkRawFrame::inbound()->first()->command_word)->toBe('GTHBD');
     expect(QueclinkRawFrame::outbound()->first()->frame_type)->toBe('SACK');
+});
+
+it('accepts repeated frames from the device already bound to the connection', function () {
+    $first = $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+    $boundDeviceId = $this->state->queclinkDeviceId;
+
+    $second = $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075752,09D0$',
+        $this->state,
+    );
+
+    expect($first)->toBe(['+SACK:GTHBD,8020090100,09CF$'])
+        ->and($second)->toBe(['+SACK:GTHBD,8020090100,09D0$'])
+        ->and($this->state->imei)->toBe('864696060004173')
+        ->and($this->state->queclinkDeviceId)->toBe($boundDeviceId)
+        ->and($this->state->framesIn)->toBe(2)
+        ->and($this->state->framesOut)->toBe(2)
+        ->and(QueclinkRawFrame::query()->count())->toBe(4)
+        ->and(QueclinkDevice::query()->count())->toBe(1);
+});
+
+it('rejects a second IMEI before device state ACK telemetry or command side effects', function () {
+    $otherAsset = Asset::factory()->create(['category' => 'vehicle']);
+    $otherCanonicalDevice = Device::factory()->tracking()->create([
+        'provider' => 'queclink',
+        'imei' => '867963069916998',
+        'device_uid' => '867963069916998',
+        'category' => 'vehicle_tracker',
+    ]);
+    DeviceAssetLink::query()->create([
+        'device_id' => $otherCanonicalDevice->id,
+        'asset_id' => $otherAsset->id,
+        'link_type' => LinkType::InstalledIn,
+        'linked_at' => now(),
+    ]);
+    $otherDevice = QueclinkDevice::query()->create([
+        'imei' => '867963069916998',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+        'device_id' => $otherCanonicalDevice->id,
+    ]);
+    $queued = QueclinkPendingCommand::query()->create([
+        'queclink_device_id' => $otherDevice->id,
+        'imei' => $otherDevice->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gl30meu,1,,,,,0041$',
+        'serial_number' => '0041',
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+    ]);
+    $sent = QueclinkPendingCommand::query()->create([
+        'queclink_device_id' => $otherDevice->id,
+        'imei' => $otherDevice->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gl30meu,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_SENT,
+        'sent_at' => now()->subSecond(),
+    ]);
+
+    $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    $boundDeviceId = $this->state->queclinkDeviceId;
+    $lastActivityAt = $this->state->lastActivityAt;
+    $framesIn = $this->state->framesIn;
+    $framesOut = $this->state->framesOut;
+    $rawFrameCount = QueclinkRawFrame::query()->count();
+
+    expect(fn () => $this->router->handleInbound(
+        '+RESP:GTFRI,970204,867963069916998,GL30MEU,11985,10,1,1,42.5,180,118.5,174.7633,-36.8485,20230808022509,0460,0001,DF5C,02A90902,01,15,0.0,20230808022510,0120$',
+        $this->state,
+    ))->toThrow(IntakeRejected::class, 'Queclink intake rejected.');
+
+    expect(fn () => $this->router->handleInbound(
+        '+ACK:GTRTO,970204,867963069916998,GL30MEU,GPS,0042,20230811125617,0A6A$',
+        $this->state,
+    ))->toThrow(IntakeRejected::class, 'Queclink intake rejected.');
+
+    $otherDevice->refresh();
+    $queued->refresh();
+    $sent->refresh();
+
+    expect($this->state->imei)->toBe('864696060004173')
+        ->and($this->state->queclinkDeviceId)->toBe($boundDeviceId)
+        ->and($this->state->lastActivityAt)->toBe($lastActivityAt)
+        ->and($this->state->framesIn)->toBe($framesIn)
+        ->and($this->state->framesOut)->toBe($framesOut)
+        ->and(QueclinkRawFrame::query()->count())->toBe($rawFrameCount)
+        ->and(QueclinkDevice::query()->count())->toBe(2)
+        ->and($otherDevice->connection_state)->toBe(QueclinkDevice::CONN_DISCONNECTED)
+        ->and($otherDevice->current_session_id)->toBeNull()
+        ->and($otherDevice->last_seen_at)->toBeNull()
+        ->and($queued->status)->toBe(QueclinkPendingCommand::STATUS_QUEUED)
+        ->and($queued->sent_at)->toBeNull()
+        ->and($sent->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($sent->acked_at)->toBeNull()
+        ->and(FleetTelemetryEvent::query()->count())->toBe(0);
 });
 
 it('routes a paired device into the Fleet telemetry pipeline', function () {

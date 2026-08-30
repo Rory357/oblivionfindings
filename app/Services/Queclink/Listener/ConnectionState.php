@@ -2,6 +2,8 @@
 
 namespace App\Services\Queclink\Listener;
 
+use LogicException;
+
 /**
  * Per-TCP-connection runtime state.
  *
@@ -48,8 +50,21 @@ class ConnectionState
 
     public function bind(string $imei, int $queclinkDeviceId): void
     {
+        if ($this->imei !== null || $this->queclinkDeviceId !== null) {
+            if ($this->imei === $imei && $this->queclinkDeviceId === $queclinkDeviceId) {
+                return;
+            }
+
+            throw new LogicException('A Queclink connection identity cannot be rebound.');
+        }
+
         $this->imei = $imei;
         $this->queclinkDeviceId = $queclinkDeviceId;
+    }
+
+    public function isBoundTo(string $imei): bool
+    {
+        return $this->imei !== null && hash_equals($this->imei, $imei);
     }
 
     public function touch(): void
