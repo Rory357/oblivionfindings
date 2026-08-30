@@ -9,6 +9,8 @@ final class MetricCurrentSummary extends Model
 {
     protected $table = 'monitoring_metric_current_summaries';
 
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+
     protected $fillable = [
         'series_id',
         'value',

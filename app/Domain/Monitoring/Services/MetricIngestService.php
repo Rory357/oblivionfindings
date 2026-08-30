@@ -202,8 +202,28 @@ final class MetricIngestService
                 return [$this->summaryForReceipt($receipt, $lockedSeries, $current, $observedAt), null];
             }
 
+            $timeConflict = MetricPointReceipt::query()
+                ->where('series_id', $lockedSeries->id)
+                ->where('observed_at', $observedAt->format('Y-m-d H:i:s.u'))
+                ->where('idempotency_key', '!=', $idempotencyKey)
+                ->lockForUpdate()
+                ->exists();
+            if ($timeConflict) {
+                throw new LogicException(
+                    'Metric point time is bound to different receipt evidence and requires reconciliation.',
+                );
+            }
+
             if ($current !== null
                 && hash_equals((string) $current->last_idempotency_key, $idempotencyKey)) {
+                if ($current->observed_at === null
+                    || ! $current->observed_at->equalTo($observedAt)) {
+                    // Older writers could pair a late point's key with a newer
+                    // current tuple. Preserve the point receipt, but clear the
+                    // incoherent tuple key before later writers encounter it.
+                    $current->forceFill(['last_idempotency_key' => null])->save();
+                }
+
                 MetricPointReceipt::query()->create([
                     'idempotency_key' => $idempotencyKey,
                     'series_id' => $lockedSeries->id,
@@ -253,11 +273,12 @@ final class MetricIngestService
                 || $observedAt->greaterThan($lockedSeries->last_point_at)
                     ? $observedAt
                     : $lockedSeries->last_point_at;
-            $lockedSeries->save();
+            if ($lockedSeries->isDirty(['first_point_at', 'last_point_at'])) {
+                $lockedSeries->save();
+            }
 
             $attributes = [
                 'sample_count' => ($current?->sample_count ?? 0) + 1,
-                'last_idempotency_key' => $idempotencyKey,
                 'storage_state' => 'available',
                 'storage_checked_at' => now(),
             ];
@@ -266,6 +287,7 @@ final class MetricIngestService
                 $attributes['value'] = $value;
                 $attributes['statistics'] = $statistics === [] ? null : $statistics;
                 $attributes['observed_at'] = $observedAt;
+                $attributes['last_idempotency_key'] = $idempotencyKey;
             }
 
             return [MetricCurrentSummary::query()->updateOrCreate(

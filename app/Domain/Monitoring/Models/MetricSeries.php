@@ -12,6 +12,8 @@ final class MetricSeries extends Model
 {
     protected $table = 'monitoring_metric_series';
 
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+
     protected $fillable = [
         'site_id',
         'device_id',
