@@ -4372,7 +4372,7 @@ for old, new in run_172_semantic_attribution_rewrites:
 run_174_template_rewrites = [
     (
         "the MED-RBAC already-fixed adjudication is pinned to <span class=\"mono\">$med_rbac_application_short</span>, the bounded MED-CD-SCOPE remediation to application <span class=\"mono\">$application_short</span> and tree <span class=\"mono\">$application_tree_short</span>, and the bounded manual-entry MED-CD-ATOMICITY source adjudication to <span class=\"mono\">$atomicity_application_short</span>",
-        "the earlier bounded MED-RBAC, MED-CD-SCOPE, and MED-CD-ATOMICITY dispositions remain pinned, while SAFE concern-identity remediation is integrated only on local main <span class=\"mono\">$safe_merge_short</span> and remains unpublished from origin/main <span class=\"mono\">$safe_origin_short</span>",
+        "the MED-RBAC already-fixed adjudication remains pinned to <span class=\"mono\">$med_rbac_application_short</span>, the bounded MED-CD-SCOPE remediation to application <span class=\"mono\">$application_short</span> and tree <span class=\"mono\">$application_tree_short</span>, and the bounded manual-entry MED-CD-ATOMICITY source adjudication to <span class=\"mono\">$atomicity_application_short</span>, while SAFE concern-identity remediation is integrated only on local main <span class=\"mono\">$safe_merge_short</span> and remains unpublished from origin/main <span class=\"mono\">$safe_origin_short</span>",
     ),
     ('href="#checkpoint">RUN-171</a>', 'href="#checkpoint">RUN-174</a>'),
     ("RUN-071–171 current reporting checkpoint:", "RUN-071–174 current reporting checkpoint:"),

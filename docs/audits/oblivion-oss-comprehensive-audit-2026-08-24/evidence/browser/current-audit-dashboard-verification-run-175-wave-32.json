@@ -1,0 +1,656 @@
+{
+  "schema_version": "run-175-audit-dashboard-verification-wave-32-v1",
+  "run_id": "RUN-175-AUDIT-DASHBOARD-VERIFICATION-WAVE-32",
+  "generated_on": "2026-08-30",
+  "status": "AUDIT_DASHBOARD_RUN174_EXACT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_MED_PIN_CORRECTED_LOCAL_ONLY_ZERO_APPLICATION_PUBLICATION_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false,
+    "authorization_boundary": "Site access, exact roles/permissions, canonical ownership, privacy, and direct-object denial"
+  },
+  "scope": "Exact corrected RUN-174 dashboard, one-line exact medication-pin preservation in its builder, and bounded audit-artifact verification only",
+  "pins": {
+    "governing_prompt_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "run_174_checkpoint_commit": "3cc6852cc03e20f4dc390b506e3899f55c31dbdc",
+    "run_174_checkpoint_tree": "8639a7ddd7514e842bb93f450ea6d46622672d0c",
+    "run_174_checkpoint_parent": "b8bb062320733a1dd6721a54f20d7eef4d914cae",
+    "origin_main_before_run_175_commit": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead": 4,
+    "local_main_behind": 0,
+    "effective_local_application_merge_commit": "705db2dc3ba05a8fdf647cd28bdc9c226a694068",
+    "effective_local_application_merge_tree": "59b4fc58567f64bc80ff3d2e47b52860ce44cb02",
+    "safe_baseline_commit": "e488bd3edcda0f154f87e8bbed972f14db409b82",
+    "safe_baseline_tree": "9e93b8aea4f4b907cde3dc59dd0520fba5bd7080",
+    "safe_fix_commit": "dc04067e304adebb47335d4f65e8c61061ec6e29",
+    "safe_fix_tree": "15a2e4b47788e9f2779030ec6d4d9ca7c1022727",
+    "run_174_materializer": {
+      "path": "generators/materialize-run-174-safe-alert-dedup-identity-remediation-reporting-wave-32.py",
+      "sha256": "b0d6894979126709c4db18226a046940029d05a16d297257b9f1e58ee7db61c1",
+      "git_blob_id": "de0887e98320c25ffd6fdaf2e6d1496143182247",
+      "bytes": 37215,
+      "lines": 900
+    },
+    "run_174_receipt": {
+      "path": "evidence/source/current-run-174-safe-alert-dedup-identity-remediation-reporting-wave-32.json",
+      "sha256": "5d5e2ea892a1d89f7175a1842bef325637bd3c5f1da43563c31aa5fe5a840d18",
+      "git_blob_id": "1bab343b68cea316ab2667fa0a0751fbe7d6c369",
+      "bytes": 13370,
+      "lines": 328,
+      "receipt_self_seal_sha256": "f50f447a81080dd39a644f93ff7d9546645e3cad4a2238c3cf2723f873f7af9c"
+    },
+    "run_174_committed_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "8a944241b432d42814abecbffa68a23ecf9369903d63c112d6460fedf27c1f79",
+      "git_blob_id": "13beddd417bfc3265f8ba8d58284d4d7a0211d6a",
+      "bytes": 573865,
+      "lines": 4937
+    },
+    "run_172_frozen_dashboard_at_run_174_checkpoint": {
+      "path": "audit-dashboard.html",
+      "sha256": "79bb5c671606ca6f596bba6d9a0649ceed9acc549ec57174c6a1102ea22d3f47",
+      "git_blob_id": "a4daa6ea9d1ba91caf77aa875e4c7bc752dabbac",
+      "bytes": 270828,
+      "lines": 78
+    },
+    "run_175_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "c6406e0b5e63facca149c8ab506a382b663ee9b76bcb5c2010353f2884a2c1e7",
+      "git_blob_id": "2ce4790af6645457fd6c76e57b2f5aed654e1e26",
+      "bytes": 574175,
+      "lines": 4937
+    },
+    "run_175_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "8586a2cb3cc6c248788ea71ecc20c2e0c4785fd5a7a5a00fa11d2ee48f48490c",
+      "git_blob_id": "1c1c521b674bcc12b5227aff1418a49ba0ace06a",
+      "bytes": 280930,
+      "lines": 78
+    },
+    "run_175_receipt_materializer": {
+      "path": "generators/materialize-run-175-audit-dashboard-verification-wave-32.py",
+      "sha256": "bbe96e058059c2fde5bed93fc6fe214b05ce65bd8d4a9417a9a769618bfcbe87",
+      "git_blob_id": "2e9bb9676ce8500284578c7c77bb441ebdb42b41",
+      "bytes": 41978,
+      "lines": 853
+    }
+  },
+  "lineage": {
+    "run_172": "verifies only the now-superseded RUN-171 dashboard",
+    "run_173": "establishes SAFE remediation, bounded runtime, local-main integration, and nonpublication",
+    "run_173r": "independently authorizes bounded SAFE retirement reporting only",
+    "run_174": "reclassifies SAFE and reports 8+2+2 with 83/1,589 unique bounded execution",
+    "run_175": "restores exact MED-RBAC, MED-CD-SCOPE, and MED-CD-ATOMICITY pin wording in the builder and verifies only the resulting audit artifact",
+    "historical_9_plus_2_plus_1_visible_only_as_superseded_lineage": true
+  },
+  "dashboard_generation_and_med_pin_correction": {
+    "committed_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "8a944241b432d42814abecbffa68a23ecf9369903d63c112d6460fedf27c1f79",
+      "git_blob_id": "13beddd417bfc3265f8ba8d58284d4d7a0211d6a",
+      "bytes": 573865,
+      "lines": 4937
+    },
+    "final_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "c6406e0b5e63facca149c8ab506a382b663ee9b76bcb5c2010353f2884a2c1e7",
+      "git_blob_id": "2ce4790af6645457fd6c76e57b2f5aed654e1e26",
+      "bytes": 574175,
+      "lines": 4937
+    },
+    "committed_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "79bb5c671606ca6f596bba6d9a0649ceed9acc549ec57174c6a1102ea22d3f47",
+      "git_blob_id": "a4daa6ea9d1ba91caf77aa875e4c7bc752dabbac",
+      "bytes": 270828,
+      "lines": 78
+    },
+    "final_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "8586a2cb3cc6c248788ea71ecc20c2e0c4785fd5a7a5a00fa11d2ee48f48490c",
+      "git_blob_id": "1c1c521b674bcc12b5227aff1418a49ba0ace06a",
+      "bytes": 280930,
+      "lines": 78
+    },
+    "builder_change": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "binary_diff_sha256": "ae2e373100a3693573ef1d24c773c49e4c60ce5e9a2239df8be6b7513378f421",
+      "numstat": {
+        "added": 1,
+        "deleted": 1
+      }
+    },
+    "dashboard_change": {
+      "path": "audit-dashboard.html",
+      "binary_diff_sha256": "fc3cf0a89b67dee56928a2475ffe0991cf5e7e8e8b797179db80bce21395aff7",
+      "numstat": {
+        "added": 20,
+        "deleted": 20
+      }
+    },
+    "correction_scope": "one-line preservation of MED-RBAC 4f57ad4202df, MED-CD-SCOPE 0b1920dade92/tree 7b2b5688c90e, and MED-CD-ATOMICITY source-adjudication cf0090ec9724 pin attribution",
+    "correction_expands_medication_credit": false,
+    "final_builder_runs_observed": 2,
+    "final_builder_runs_byte_identical": true,
+    "independent_semantic_static_review": {
+      "result": "GO",
+      "findings": [],
+      "dashboard_sha256": "8586a2cb3cc6c248788ea71ecc20c2e0c4785fd5a7a5a00fa11d2ee48f48490c",
+      "builder_sha256": "c6406e0b5e63facca149c8ab506a382b663ee9b76bcb5c2010353f2884a2c1e7",
+      "visible_static_checks": "79/79",
+      "adjacent_file_hashes": "691/691",
+      "browser_credit": false,
+      "reviewer_file_changes": []
+    },
+    "application_source_or_product_test_change": false,
+    "credit_effect": "audit-dashboard attribution correctness and exact-artifact verification only"
+  },
+  "verification_method": {
+    "browser": "Codex in-app browser",
+    "served_from": "temporary loopback-only Python HTTP server on 127.0.0.1:43175",
+    "target_url": "http://127.0.0.1:43175/audit-dashboard.html?v=main-3cc6852c-8586a2cb#progress",
+    "cachebuster": "main-3cc6852c-8586a2cb",
+    "response_status": 200,
+    "response_content_type": "text/html",
+    "response_bytes": 280930,
+    "response_sha256": "8586a2cb3cc6c248788ea71ecc20c2e0c4785fd5a7a5a00fa11d2ee48f48490c",
+    "external_testing": false,
+    "desktop_and_mobile_visual_inspection": "GO on final SHA",
+    "viewport_override_reset_after_test": true,
+    "browser_tab_closed_after_test": true
+  },
+  "verification": {
+    "dashboard_builder_final_byte_identical_runs_observed": 2,
+    "dashboard_builder_final_runs_byte_identical": true,
+    "receipt_materializer_final_byte_identical_runs_required": 2,
+    "noncreditable_attempts": [
+      {
+        "attempt": "initial corrected-builder self-check",
+        "result": "missing exact cf0090ec9724 MED-CD-ATOMICITY source-adjudication pin; all three medication pins were restored before final generation",
+        "counted_as_generation_or_artifact_evidence": false
+      },
+      {
+        "attempt": "initial ten-link navigation batch",
+        "result": "timed out; only later final-SHA 3+3+4 batches are credited",
+        "counted_as_navigation_evidence": false
+      }
+    ],
+    "viewports_required": 4,
+    "viewports_verified": 4,
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual_browser_viewport": "1440x900",
+        "root_client_width": 1425,
+        "root_scroll_width": 1425,
+        "body_scroll_width": 1425,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1425,
+        "navigation_scroll_width": 1425,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 0,
+        "table_wrappers": 10,
+        "table_wrappers_with_overflow_x_auto": 10
+      },
+      {
+        "requested": "1280x800",
+        "actual_browser_viewport": "1280x800",
+        "root_client_width": 1265,
+        "root_scroll_width": 1265,
+        "body_scroll_width": 1265,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1265,
+        "navigation_scroll_width": 1265,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 0,
+        "table_wrappers": 10,
+        "table_wrappers_with_overflow_x_auto": 10
+      },
+      {
+        "requested": "1024x768",
+        "actual_browser_viewport": "1024x768",
+        "root_client_width": 1009,
+        "root_scroll_width": 1009,
+        "body_scroll_width": 1009,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1009,
+        "navigation_scroll_width": 1009,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 1,
+        "table_wrappers": 10,
+        "table_wrappers_with_overflow_x_auto": 10
+      },
+      {
+        "requested": "390x844",
+        "actual_browser_viewport": "390x844",
+        "root_client_width": 375,
+        "root_scroll_width": 375,
+        "body_scroll_width": 375,
+        "page_overflow_px": 0,
+        "navigation_client_width": 375,
+        "navigation_scroll_width": 922,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 10,
+        "table_wrappers": 10,
+        "table_wrappers_with_overflow_x_auto": 10
+      }
+    ],
+    "font_loaded_at_all_viewports": true,
+    "main_visible_at_all_viewports": true,
+    "navigation_bounded_at_all_viewports": true,
+    "navigation_scroll_contained_at_mobile": true,
+    "tables_bounded_at_all_viewports": true,
+    "table_wrappers_overflow_auto_at_all_viewports": true,
+    "page_overflow_zero_at_all_final_viewports": true,
+    "screens_visually_go": true,
+    "navigation_clicks_required": 10,
+    "navigation_clicks_passed": 10,
+    "navigation_credited_batch_sizes": [
+      3,
+      3,
+      4
+    ],
+    "navigation_results": [
+      {
+        "label": "Progress",
+        "href": "#progress",
+        "credited_batch": 1,
+        "browser_click_performed": true,
+        "resulting_hash": "#progress",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "RUN-174",
+        "href": "#checkpoint",
+        "credited_batch": 1,
+        "browser_click_performed": true,
+        "resulting_hash": "#checkpoint",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Pages",
+        "href": "#pages",
+        "credited_batch": 1,
+        "browser_click_performed": true,
+        "resulting_hash": "#pages",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Static census",
+        "href": "#static-census",
+        "credited_batch": 2,
+        "browser_click_performed": true,
+        "resulting_hash": "#static-census",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Runtime gates",
+        "href": "#runtime",
+        "credited_batch": 2,
+        "browser_click_performed": true,
+        "resulting_hash": "#runtime",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Benchmarks",
+        "href": "#benchmarks",
+        "credited_batch": 2,
+        "browser_click_performed": true,
+        "resulting_hash": "#benchmarks",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Modules",
+        "href": "#modules",
+        "credited_batch": 3,
+        "browser_click_performed": true,
+        "resulting_hash": "#modules",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Finding status",
+        "href": "#findings",
+        "credited_batch": 3,
+        "browser_click_performed": true,
+        "resulting_hash": "#findings",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Architecture",
+        "href": "#architecture",
+        "credited_batch": 3,
+        "browser_click_performed": true,
+        "resulting_hash": "#architecture",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Gaps",
+        "href": "#gaps",
+        "credited_batch": 3,
+        "browser_click_performed": true,
+        "resulting_hash": "#gaps",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      }
+    ],
+    "console_warning_entries": 0,
+    "console_error_entries": 0,
+    "uncaught_page_error_entries": 0,
+    "browser_dev_log_entries": 0,
+    "authored_ids": 10,
+    "browser_dom_ids": 11,
+    "browser_injected_ids": [
+      "codex-browser-sidebar-comments-root"
+    ],
+    "duplicate_authored_ids": [],
+    "heading_elements": 26,
+    "table_elements": 10,
+    "table_wrappers": 10,
+    "anchor_elements": 812,
+    "anchor_elements_rendered_in_browser": 812,
+    "hash_anchor_occurrences": 10,
+    "unique_hash_anchors": 10,
+    "missing_hash_targets": [],
+    "local_resource_link_occurrences": 802,
+    "unique_local_resources": 435,
+    "prewrite_non_forward_local_resources": "434/434",
+    "prewrite_non_forward_local_resource_failures": [],
+    "run_175_forward_receipt_is_intentional_unhashed_self_link": true,
+    "post_materialization_local_resources": "435/435",
+    "post_materialization_local_resource_failures": [],
+    "adjacent_hash_pair_occurrences": 693,
+    "unique_adjacent_hash_path_hash_pairs": 362,
+    "unique_adjacent_hash_paths": 362,
+    "hash_bearing_file_occurrences_verified": 691,
+    "unique_hash_bearing_file_paths_verified": 361,
+    "historical_directory_bundle_digest_occurrences": 2,
+    "historical_directory_bundle_digest_paths": [
+      "task-scripts/"
+    ],
+    "hash_bearing_link_failures": [],
+    "run_175_generator_link_occurrences": 2,
+    "run_175_generator_link_adjacent_hash_occurrences": 0,
+    "run_175_forward_receipt_link_occurrences": 3,
+    "run_175_forward_receipt_link_adjacent_hash_occurrences": 0,
+    "visible_static_checks_required": 79,
+    "visible_static_checks_passed": 79,
+    "visible_static_checks": {
+      "<a href=\"#checkpoint\">RUN-174</a>": true,
+      "<a href=\"#findings\">Finding status</a>": true,
+      "665 owners · 308 routes + 357 pages · 96 bridges": true,
+      "119 reviewed / 388 pending": true,
+      "97 owned / 410 without ownership": true,
+      "16.925426%": true,
+      "3,264 records remain": true,
+      "RUN-172–174 SAFE alert dedup remediation and reporting checkpoint": true,
+      "fleet-assets.vehicles.alerts-config": true,
+      "RUN090-ROUTE-0084 / RUN077-ROUTE-0692": true,
+      "VehicleController::alertsConfig": true,
+      "CAP-FLEET-VEHICLE-REGISTER": true,
+      "index 83 integrated": true,
+      "next index 84 RUN090-ROUTE-0085 / RUN077-ROUTE-0693": true,
+      "fleet-assets.trips.index": true,
+      "three provisional-not-final observations": true,
+      "RUN-168: exact RUN-167 dashboard verified at 4/4 viewports": true,
+      "RUN-169/R: queue index 83 Fleet alerts-config candidate independently reviewed OWNER": true,
+      "RUN-170: exactly one route owner and one action bridge integrated": true,
+      "RUN-170R: three sealed post-commit GO reviews": true,
+      "RUN-171: live static ledger reported": true,
+      "RUN-172: exact RUN-171 dashboard verified at 4/4 viewports": true,
+      "RUN-173: SAFE concern-identity defect reproduced and remediated in exactly two transferred paths": true,
+      "RUN-173R: exact remediation artifacts independently reviewed GO": true,
+      "RUN-174: SAFE record reclassified in place": true,
+      "9 current provisional P1 + 2 historical already-fixed + 1 historical remediated": true,
+      "8 current provisional P1 + 2 historical already-fixed + 2 historical remediated": true,
+      "12 retained claim identities": true,
+      "83 / 1,589": true,
+      "83/1,589 unique bounded total": true,
+      "SAFE-ALERT-DEDUP-IDENTITY-01": true,
+      "post-merge SAFE alert-dedup tests / 60 assertions": true,
+      "4 failed + 1 warning-pass / 10 assertions": true,
+      "supporting 28/73 bridge and 3/5 HsEvent evidence reported separately": true,
+      "6 terminal-fixture failures occurred before bridge/dedup execution": true,
+      "30-minute dedup window": true,
+      "+5 minutes stays idempotent": true,
+      "+31-minute lifecycle remains unchanged": true,
+      "e488bd3edcda": true,
+      "dc04067e304a": true,
+      "705db2dc3ba0": true,
+      "c39b07654705": true,
+      "a8d813f1878c6a720f5308f28e5a591f90097961444876f93fcfe5a9262e909a": true,
+      "not published to origin/main": true,
+      "3 claim-specific test functions / 146 assertions / 3 synchronized two-process races": true,
+      "excluded from both the historical 78/1,529 and current 83/1,589 totals": true,
+      "supporting 43/716 overlaps": true,
+      "73 bounded tests / 1,481 assertions": true,
+      "5 focused tests / 48 assertions": true,
+      "3 independent current-source ALREADY_FIXED reviews": true,
+      "historical issue · already fixed on current main · not a final finding": true,
+      "historical issue · already fixed on current main only for the bounded manual-entry register/stock clause · residual compound scope unadjudicated · not a final finding": true,
+      "historical issue · remediated on current main · not a final finding": true,
+      "historical issue · remediated on local main · not published to origin/main · 30-minute dedup contract and +31-minute lifecycle preserved · not a final finding": true,
+      "MED-CD-SCOPE-01": true,
+      "MED-CD-ATOMICITY-01": true,
+      "RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution without application or product-test change": true,
+      "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated": true,
+      "two broader INR failures reproduce at base": true,
+      "full-suite green false": true,
+      "Fresh RUN-175 audit-dashboard verification required": true,
+      "cf0090ec9724": true,
+      "0b1920dade92": true,
+      "7b2b5688c90e": true,
+      "2/340 mappings": true,
+      "0/340 final no-match/NCM": true,
+      "338 unresolved targets": true,
+      "one operating organisation across multiple Sites": true,
+      "Gate 4 and audit completion false": true,
+      "RUN-153/R establish the historical 664 bounded source-owner records (307 routes + 357 pages)": true,
+      "at that historical checkpoint 116 queue rows were reviewed, 391 remained pending, and 413 remained without ownership": true,
+      "662 historical cumulative owner records": true,
+      "RUN-170/R current Fleet alerts-config route/action ownership": true,
+      "RUN-090 frozen denominator / RUN-170R current accounting": true,
+      "index 83 is integrated and index 84 fleet-assets.trips.index is next": true,
+      "RUN-168 verifies that exact dashboard": true,
+      "RUN-172 verifies only the superseded RUN-171 HTML": true,
+      "dashboard HTML unchanged · fresh RUN-175 required": true,
+      "visible 665/308/357 ownership, 96 bridges, 119/388 queue accounting, 97 owned/410 without ownership": true
+    },
+    "prohibited_visible_phrase_hits": {},
+    "single_organisation_multi_site_wording_present": true,
+    "tenant_word_present": false
+  },
+  "reported_finding_boundary": {
+    "retained_claim_records": 12,
+    "current_provisional_source_claims": 8,
+    "historical_already_fixed_records": 2,
+    "historical_remediated_records": 2,
+    "superseded_pre_run_174_split": {
+      "current_provisional_source_claims": 9,
+      "historical_already_fixed_records": 2,
+      "historical_remediated_records": 1,
+      "current_credit": false
+    },
+    "final_P0": 0,
+    "final_P1": 0,
+    "safe_alert_dedup_identity_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED_NOT_FINAL_FINDING",
+    "safe_contract": "single-organisation multi-Site identity; 30-minute window, +5-minute retry idempotency, unchanged +31-minute lifecycle"
+  },
+  "bounded_execution_accounting": {
+    "med_rbac": {
+      "tests": 73,
+      "assertions": 1481
+    },
+    "med_scope": {
+      "tests": 5,
+      "assertions": 48
+    },
+    "safe_post_merge_unique_increment": {
+      "tests": 5,
+      "assertions": 60,
+      "counted_once": true
+    },
+    "unique_total": {
+      "tests": 83,
+      "assertions": 1589
+    },
+    "excluded_from_unique_total": {
+      "safe_red": {
+        "failed": 4,
+        "warning_pass": 1,
+        "assertions_reported": 10
+      },
+      "safe_isolated_green_replay": {
+        "tests": 5,
+        "assertions": 60
+      },
+      "supporting_control_room_bridge": {
+        "tests": 28,
+        "assertions": 73
+      },
+      "adjacent_hs_event_safeguarding": {
+        "tests": 3,
+        "assertions": 5
+      },
+      "pre_bridge_terminal_fixture_failures": 6,
+      "med_cd_atomicity_claim_specific": "3 test functions / 146 assertions / 3 synchronized two-process races",
+      "med_cd_atomicity_supporting_overlap": "43 tests / 716 assertions"
+    },
+    "red_warning_or_terminal_failure_credit": false,
+    "supporting_or_adjacent_recredit": false
+  },
+  "static_ownership_boundary": {
+    "owner_records": 665,
+    "route_owners": 308,
+    "page_owners": 357,
+    "action_bridges": 96,
+    "queue_total": 507,
+    "queue_reviewed": 119,
+    "queue_pending": 388,
+    "queue_owned": 97,
+    "queue_without_ownership": 410,
+    "next_zero_based_index": 84,
+    "next_route": "fleet-assets.trips.index",
+    "correctness_credit": false
+  },
+  "noninheritance_boundary": {
+    "application_source_or_product_test": false,
+    "application_runtime_reexecution": false,
+    "application_browser": false,
+    "consumer_caller_service_model_page_or_neighbor": false,
+    "safe_red_isolated_green_supporting_or_terminal_runs": false,
+    "timeless_retry_within_window_escalation_or_unused_parameter": false,
+    "balance_check_destruction_sibling_writer_deadlock_retry_or_stress": false,
+    "benchmark_mapping_or_final_no_match_NCM": false,
+    "ease": false,
+    "final_finding": false,
+    "feature_module_or_pass_completion": false,
+    "release_publication_or_audit_completion": false
+  },
+  "root_browser_resource_cleanup": {
+    "temporary_loopback_port": 43175,
+    "temporary_server_pid": 6288,
+    "listeners_after_cleanup": 0,
+    "exact_pid_present_after_cleanup": false,
+    "matching_python_http_server_processes_after_cleanup": 0,
+    "browser_viewport_override_reset": true,
+    "browser_tab_closed": true
+  },
+  "worktree_boundary": {
+    "expected_final_status_count": 4,
+    "expected_final_porcelain_statuses": [
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-175-wave-32.json",
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-175-audit-dashboard-verification-wave-32.py",
+      "M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+      "M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py"
+    ],
+    "no_staged_paths": true,
+    "git_diff_check_clean": true,
+    "exact_match_required": true
+  },
+  "mutation_attestation": {
+    "sequence_paths": [
+      "audit-dashboard.html",
+      "generators/build-current-audit-dashboard.py",
+      "generators/materialize-run-175-audit-dashboard-verification-wave-32.py",
+      "evidence/browser/current-audit-dashboard-verification-run-175-wave-32.json"
+    ],
+    "receipt_materializer_persistent_write_scope": [
+      "evidence/browser/current-audit-dashboard-verification-run-175-wave-32.json"
+    ],
+    "application_paths_changed": [],
+    "product_test_paths_changed": [],
+    "findings_register_changed_by_run_175": false,
+    "run_174_human_readable_source_reporting_surfaces_changed_by_run_175": false,
+    "audit_dashboard_html_changed_by_run_175": true,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "database_changed": false,
+    "application_tests_or_build_run": false
+  },
+  "remote_state_boundary": {
+    "origin_main_before_run_175_commit": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead_before_run_175_commit": 4,
+    "local_main_behind_before_run_175_commit": 0,
+    "safe_application_merge_remains_local_only": true,
+    "push_or_publication_performed_by_materializer": false,
+    "publication_claim": false
+  },
+  "credit_boundary": {
+    "audit_dashboard_run_175_med_pin_correction": true,
+    "exact_audit_dashboard_artifact": true,
+    "application_source_or_tests": false,
+    "application_runtime": false,
+    "application_browser": false,
+    "publication": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "pass": false,
+    "release": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "run_175_sequence_written_paths": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-175-audit-dashboard-verification-wave-32.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-175-wave-32.json"
+  ],
+  "receipt_self_seal_sha256": "8ae9223300ef5851bd432da467a5ae7dba2e0460ff69291188039da0dfad7ae4"
+}
