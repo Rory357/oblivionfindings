@@ -4021,7 +4021,10 @@ assert dashboard_run_178["verification"]["post_materialization_local_resources"]
 assert {key for key, value in dashboard_run_178["credit_boundary"].items() if value} == {
     "exact_audit_dashboard_artifact",
 }
-run_178_dashboard_payload = (AUDIT_DIR / "audit-dashboard.html").read_bytes()
+run_178_dashboard_payload = git_file_at_commit(
+    "0975bf1cd3355da1f30e84056ae53107bd9b5bfc",
+    "audit-dashboard.html",
+)
 assert hashlib.sha256(run_178_dashboard_payload).hexdigest() == "70472c39504600f8c0b26b9ce05eb0f3e5903f1c6e9445163dba0581a2382600"
 
 assert sha256_file("generators/build-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.py") == "61c895a305f743f102765c9f86d38843c3ce61bcc1a8684a672aa2d7cd6ee157"
@@ -5434,7 +5437,7 @@ current_visible_boundaries = [
     "RUN-090 frozen denominator / RUN-180R current accounting",
     "index 83 is not recredited, index 84 fleet-assets.trips.index is integrated, and index 85 fleet-assets.trips.playback is next",
     "RUN-168 verifies that exact dashboard",
-    "RUN-175 verifies only the superseded RUN-174 HTML",
+    "RUN-178 verifies only the superseded RUN-177 HTML",
     "dashboard HTML unchanged · fresh RUN-182 required",
     "visible 666/309/357 ownership, 97 bridges, 120/387 queue accounting, 98 owned/409 without ownership",
 ]
