@@ -64,6 +64,15 @@ class FrameRouter
             throw new IntakeRejected('invalid_direction');
         }
 
+        // The first identified device owns this TCP connection for its full
+        // lifetime. Reject identity hopping before activity counters, device
+        // state, raw evidence, ACK correlation, telemetry, or command access.
+        if ($state->imei !== null
+            && $frame->imei !== null
+            && ! $state->isBoundTo($frame->imei)) {
+            throw new IntakeRejected('invalid_frame');
+        }
+
         // Only a complete, protocol-valid, device-originated frame keeps a
         // connection alive. Partial bytes and empty delimiters remain bounded
         // by the connection's accepted-frame idle deadline.
