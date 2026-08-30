@@ -22,6 +22,7 @@ CURRENT_RUN_145_MATRIX_SHA256 = "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6
 CURRENT_RUN_145_REGISTER_SHA256 = "5a3898855f1ffffb1a493496a57f6532bdc464552e4577c9e7c97f83c9793884"
 CURRENT_RUN_145_RECEIPT_SHA256 = "8306a8aefe0a490ebf206d0c4716d92930326988f19e0ed495a3c2d0002c7cf9"
 CURRENT_RUN_156R_COMMIT = "81abe37faa126f98ce47c7ca90cf569fe9c43c0d"
+RUN_167_REPORTING_COMMIT = "66fa21bfa3a59205fec9a8a756dc211a8510e419"
 CURRENT_RUN_146_MUTATED_PATHS = {
     "00-executive-summary.md",
     "03-feature-to-benchmark-matrix.csv",
@@ -3297,19 +3298,23 @@ assert run_167_reporting["pins"]["reviewed_source_commit"] == run_165_source_rev
 assert run_167_reporting["pins"]["reviewed_source_tree"] == run_165_source_review["pins"]["reviewed_source_tree"]
 run_167_materializer_pin = run_167_reporting["pins"]["reporting_materializer"]
 assert run_167_materializer_pin["path"] == "generators/materialize-run-167-med-cd-atomicity-reporting-wave-30.py"
-assert run_167_materializer_pin["sha256"] == sha256_file(run_167_materializer_pin["path"])
-assert run_167_materializer_pin["git_blob_id"] == git_blob_id(run_167_materializer_pin["path"])
-assert (run_167_materializer_pin["bytes"], run_167_materializer_pin["lines"]) == text_file_metrics(run_167_materializer_pin["path"])
+run_167_materializer_payload = git_file_at_commit(RUN_167_REPORTING_COMMIT, run_167_materializer_pin["path"])
+assert run_167_materializer_pin["sha256"] == hashlib.sha256(run_167_materializer_payload).hexdigest()
+assert run_167_materializer_pin["git_blob_id"] == git_blob_id_bytes(run_167_materializer_payload)
+assert (run_167_materializer_pin["bytes"], run_167_materializer_pin["lines"]) == (len(run_167_materializer_payload), run_167_materializer_payload.count(b"\n"))
 run_167_builder_pin = run_167_reporting["pins"]["dashboard_generator"]
 assert run_167_builder_pin["path"] == "generators/build-current-audit-dashboard.py"
-assert run_167_builder_pin["sha256"] == sha256_file(run_167_builder_pin["path"])
-assert run_167_builder_pin["git_blob_id"] == git_blob_id(run_167_builder_pin["path"])
-assert (run_167_builder_pin["bytes"], run_167_builder_pin["lines"]) == text_file_metrics(run_167_builder_pin["path"])
+run_167_builder_payload = git_file_at_commit(RUN_167_REPORTING_COMMIT, run_167_builder_pin["path"])
+assert run_167_builder_pin["sha256"] == hashlib.sha256(run_167_builder_payload).hexdigest()
+assert run_167_builder_pin["git_blob_id"] == git_blob_id_bytes(run_167_builder_payload)
+assert (run_167_builder_pin["bytes"], run_167_builder_pin["lines"]) == (len(run_167_builder_payload), run_167_builder_payload.count(b"\n"))
 run_167_dashboard_pin = run_167_reporting["pins"]["unchanged_run_164_dashboard"]
 assert run_167_dashboard_pin["path"] == "audit-dashboard.html"
 assert run_167_dashboard_pin["sha256"] == "04fe2430810557f4fe61630f877efc7f827f6bcb1e265ac470ffd2bf277bcbbd"
-assert run_167_dashboard_pin["git_blob_id"] == git_blob_id(run_167_dashboard_pin["path"])
-assert (run_167_dashboard_pin["bytes"], run_167_dashboard_pin["lines"]) == text_file_metrics(run_167_dashboard_pin["path"])
+run_167_dashboard_payload = git_file_at_commit(RUN_167_REPORTING_COMMIT, run_167_dashboard_pin["path"])
+assert run_167_dashboard_pin["sha256"] == hashlib.sha256(run_167_dashboard_payload).hexdigest()
+assert run_167_dashboard_pin["git_blob_id"] == git_blob_id_bytes(run_167_dashboard_payload)
+assert (run_167_dashboard_pin["bytes"], run_167_dashboard_pin["lines"]) == (len(run_167_dashboard_payload), run_167_dashboard_payload.count(b"\n"))
 run_167_transition = run_167_reporting["reporting_transition"]
 assert run_167_transition["finding_id"] == "MED-CD-ATOMICITY-01"
 assert run_167_transition["authorized_by_run_166r"] is True
@@ -3382,22 +3387,37 @@ assert len(required_artifacts) == 18
 assert len(required_present) == 18
 assert required_missing == []
 
+atomicity_row_status = (
+    "historical issue · already fixed on current main only for the bounded manual-entry register/stock clause "
+    "· residual compound scope unadjudicated · not a final finding"
+)
 finding_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td class=\"partial\">{}</td></tr>".format(
         html.escape(row["id"]),
         html.escape(historical_discovery_claims[row["id"]]),
         (
-            "historical issue · already fixed on current main · not a final finding"
-            if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+            atomicity_row_status
+            if row["id"] == "MED-CD-ATOMICITY-01"
             else (
-                "historical issue · remediated on current main · not a final finding"
-                if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
-                else "current provisional P1 · independent review pending"
+                "historical issue · already fixed on current main · not a final finding"
+                if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                else (
+                    "historical issue · remediated on current main · not a final finding"
+                    if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                    else "current provisional P1 · independent review pending"
+                )
             )
         ),
     )
     for row in live_findings
 )
+expected_atomicity_row = (
+    '<tr><td class="mono">MED-CD-ATOMICITY-01</td><td>'
+    f'{html.escape(historical_discovery_claims["MED-CD-ATOMICITY-01"])}</td>'
+    f'<td class="partial">{atomicity_row_status}</td></tr>'
+)
+assert expected_atomicity_row in finding_rows
+assert finding_rows.count(atomicity_row_status) == 1
 
 architecture_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td>{}</td><td class=\"partial\">source-only; promotion gate open</td></tr>".format(
@@ -4170,6 +4190,7 @@ current_visible_boundaries = [
     "RUN-164–167 current atomicity adjudication and reporting checkpoint",
     "3 independent current-source ALREADY_FIXED reviews",
     "historical issue · already fixed on current main · not a final finding",
+    "historical issue · already fixed on current main only for the bounded manual-entry register/stock clause · residual compound scope unadjudicated · not a final finding",
     "historical issue · remediated on current main · not a final finding",
     "MED-CD-SCOPE-01",
     "MED-CD-ATOMICITY-01",
@@ -4230,7 +4251,8 @@ for stale_attribution in (
 
 output_path = AUDIT_DIR / "audit-dashboard.html"
 output_bytes = (dashboard.rstrip() + "\n").encode("utf-8")
-temporary_path = output_path.with_name(f".{output_path.name}.tmp-run167-dashboard")
+assert output_path.read_bytes() in (run_167_dashboard_payload, output_bytes)
+temporary_path = output_path.with_name(f".{output_path.name}.tmp-run168-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"
 try:
     with temporary_path.open("xb") as handle:
