@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Domain\Hr\Exceptions\UnsafeWebhookDestination;
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
+use App\Services\Integration\GovernedWebhookProbeService;
 use Illuminate\Contracts\Http\Kernel;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Throwable;
 
@@ -44,6 +45,10 @@ class ApiSettingsController extends Controller
         'leave.requested',
         'leave.approved',
     ];
+
+    public function __construct(
+        private readonly GovernedWebhookProbeService $webhookProbe,
+    ) {}
 
     public function index(Request $request)
     {
@@ -139,6 +144,16 @@ class ApiSettingsController extends Controller
             'events.*' => ['string', 'in:'.implode(',', self::AVAILABLE_EVENTS)],
         ]);
 
+        if (! $this->isSameApplicationUrl($validated['url'], $request)) {
+            try {
+                $validated['url'] = $this->webhookProbe->canonicalize($validated['url']);
+            } catch (UnsafeWebhookDestination) {
+                throw ValidationException::withMessages([
+                    'url' => 'Webhook destination is not approved.',
+                ]);
+            }
+        }
+
         $plainSecret = $this->generateToken('whsec_', 24);
         $webhooks = $this->loadStoredArray(self::WEBHOOKS_KEY);
         $record = [
@@ -191,9 +206,13 @@ class ApiSettingsController extends Controller
             'sent_at' => now()->toIso8601String(),
         ];
         $url = (string) ($record['url'] ?? '');
-        $status = $this->isSameApplicationUrl($url, $request)
-            ? $this->probeInternalWebhook($url, $payload)
-            : $this->probeExternalWebhook($url, $payload);
+        try {
+            $status = $this->isSameApplicationUrl($url, $request)
+                ? $this->probeInternalWebhook($url, $payload)
+                : $this->webhookProbe->probe($url, $payload);
+        } catch (Throwable) {
+            $status = null;
+        }
 
         if (! $this->responseLooksSuccessful($status ?? 0)) {
             return response()->json([
@@ -318,19 +337,6 @@ class ApiSettingsController extends Controller
         return $status >= 200 && $status < 400;
     }
 
-    private function probeExternalWebhook(string $url, array $payload): ?int
-    {
-        foreach (['POST', 'HEAD', 'GET'] as $method) {
-            $status = $this->attemptExternalWebhookRequest($method, $url, $payload);
-
-            if ($this->responseLooksSuccessful($status ?? 0)) {
-                return $status;
-            }
-        }
-
-        return null;
-    }
-
     private function probeInternalWebhook(string $url, array $payload): ?int
     {
         foreach (['POST', 'HEAD', 'GET'] as $method) {
@@ -342,23 +348,6 @@ class ApiSettingsController extends Controller
         }
 
         return null;
-    }
-
-    private function attemptExternalWebhookRequest(string $method, string $url, array $payload): ?int
-    {
-        try {
-            $pendingRequest = Http::timeout(5)->acceptJson();
-
-            $response = match ($method) {
-                'POST' => $pendingRequest->asJson()->post($url, $payload),
-                'HEAD' => $pendingRequest->head($url),
-                default => $pendingRequest->get($url),
-            };
-
-            return $response->status();
-        } catch (ConnectionException) {
-            return null;
-        }
     }
 
     private function attemptInternalWebhookRequest(string $method, string $url, array $payload): ?int
