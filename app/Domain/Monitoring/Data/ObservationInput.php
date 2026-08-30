@@ -3,6 +3,7 @@
 namespace App\Domain\Monitoring\Data;
 
 use App\Domain\Monitoring\Enums\MonitorState;
+use App\Domain\Monitoring\Models\MonitorObservation;
 use Carbon\CarbonImmutable;
 
 final readonly class ObservationInput
@@ -20,4 +21,18 @@ final readonly class ObservationInput
         public ?string $message = null,
         public array $metrics = [],
     ) {}
+
+    public static function fromObservation(MonitorObservation $observation): self
+    {
+        return new self(
+            sourceKey: (string) $observation->source_key,
+            state: $observation->state,
+            observedAt: CarbonImmutable::instance($observation->observed_at),
+            value: $observation->value === null ? null : (float) $observation->value,
+            unit: $observation->unit,
+            latencyMs: $observation->latency_ms,
+            message: $observation->message,
+            metrics: is_array($observation->metrics) ? $observation->metrics : [],
+        );
+    }
 }

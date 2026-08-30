@@ -61,6 +61,8 @@ final class MonitoringObservationIngestor
                 return new ObservationResult($existing, true, false, $state, $state, null);
             }
 
+            [$metricDataClass, $metricPrivacyClass] = $this->metricClassification($locked);
+
             $observation = MonitorObservation::create([
                 'monitor_id' => $locked->id,
                 'source_key' => $input->sourceKey,
@@ -70,8 +72,11 @@ final class MonitoringObservationIngestor
                 'latency_ms' => $input->latencyMs,
                 'message' => $input->message,
                 'metrics' => $input->metrics,
+                'metric_data_class' => $metricDataClass,
+                'metric_privacy_class' => $metricPrivacyClass,
                 'observed_at' => $input->observedAt,
                 'ingested_at' => now(),
+                'metrics_projected_at' => null,
             ]);
 
             $effectiveFrom = $locked->effective_state ?? $locked->current_state;
@@ -131,13 +136,101 @@ final class MonitoringObservationIngestor
             );
         });
 
-        $this->projectMetrics($monitor, $input, $siteId);
+        $this->completeMetricProjection(
+            monitorId: (int) $monitor->getKey(),
+            observationId: (int) $result->observation->getKey(),
+            siteId: $siteId,
+            deviceId: $deviceId,
+            collectorReference: $collectorReference,
+        );
+        $result->observation->refresh();
 
         return $result;
     }
 
-    private function projectMetrics(Monitor $monitor, ObservationInput $input, int $siteId): void
-    {
+    private function completeMetricProjection(
+        int $monitorId,
+        int $observationId,
+        int $siteId,
+        int $deviceId,
+        mixed $collectorReference,
+    ): void {
+        $monitor = Monitor::query()
+            ->with(['device', 'collector'])
+            ->findOrFail($monitorId);
+        if ((int) $monitor->device_id !== $deviceId || $monitor->device === null) {
+            throw new RuntimeScopeViolation('Metric projection device does not match its canonical monitor.');
+        }
+
+        $this->scopeGuard->assertCollectorReference($monitor, $collectorReference);
+        $this->scopeGuard->assertCanonicalSite($monitor, $siteId);
+
+        $observation = MonitorObservation::query()->findOrFail($observationId);
+        $this->assertProjectionProvenance($monitor, $observation, $siteId, $deviceId);
+        if ($observation->metrics_projected_at !== null) {
+            return;
+        }
+
+        [$dataClass, $privacyClass] = $this->storedMetricClassification($observation);
+
+        $this->projectMetrics(
+            $monitor,
+            ObservationInput::fromObservation($observation),
+            $siteId,
+            $dataClass,
+            $privacyClass,
+        );
+
+        $sealedAt = now();
+        $sealed = MonitorObservation::query()
+            ->whereKey($observation->getKey())
+            ->whereNull('metrics_projected_at')
+            ->update([
+                'metrics_projected_at' => $sealedAt,
+                'updated_at' => $sealedAt,
+            ]);
+        if ($sealed === 0) {
+            $current = MonitorObservation::query()->find($observation->getKey());
+            if ($current === null || $current->metrics_projected_at === null) {
+                throw new \LogicException('Monitoring metric projection could not be sealed.');
+            }
+        }
+    }
+
+    private function assertProjectionProvenance(
+        Monitor $monitor,
+        MonitorObservation $observation,
+        int $siteId,
+        int $deviceId,
+    ): void {
+        if ((int) $observation->monitor_id !== (int) $monitor->id) {
+            throw new RuntimeScopeViolation('Metric projection observation does not match its canonical monitor.');
+        }
+
+        if (! MonitorObservation::supportsProvenanceColumns()) {
+            return;
+        }
+
+        $observationCollectorId = $observation->collector_id === null
+            ? null
+            : (int) $observation->collector_id;
+        $monitorCollectorId = $monitor->collector_id === null
+            ? null
+            : (int) $monitor->collector_id;
+        if ((int) $observation->device_id !== $deviceId
+            || (int) $observation->site_id !== $siteId
+            || $observationCollectorId !== $monitorCollectorId) {
+            throw new RuntimeScopeViolation('Metric projection observation provenance no longer matches its canonical scope.');
+        }
+    }
+
+    private function projectMetrics(
+        Monitor $monitor,
+        ObservationInput $input,
+        int $siteId,
+        string $dataClass,
+        string $privacyClass,
+    ): void {
         if (! is_string(config('monitoring.storage.timeseries.url'))
             || config('monitoring.storage.timeseries.url') === '') {
             return;
@@ -147,13 +240,6 @@ final class MonitoringObservationIngestor
         if ($monitor->device === null) {
             throw new RuntimeScopeViolation('Metric projection requires a canonical Device.');
         }
-        $domain = (string) $monitor->device->domain;
-        [$dataClass, $privacyClass] = match ($domain) {
-            'tracking' => ['tracking_telemetry', 'sensitive'],
-            'iot_healthcare' => ['healthcare_telemetry', 'sensitive'],
-            'security' => ['security_telemetry', 'restricted'],
-            default => ['operational', 'standard'],
-        };
         $dimensions = array_filter([
             'if_index' => $input->metrics['if_index'] ?? $input->metrics['interface_index'] ?? null,
             'interface' => $input->metrics['interface_name'] ?? $input->metrics['if_name'] ?? null,
@@ -195,6 +281,42 @@ final class MonitoringObservationIngestor
                 privacyClass: $privacyClass,
             ), (int) $monitor->id);
         }
+    }
+
+    /** @return array{string, string} */
+    private function metricClassification(Monitor $monitor): array
+    {
+        if ($monitor->device === null) {
+            throw new RuntimeScopeViolation('Metric classification requires a canonical Device.');
+        }
+
+        return match ((string) $monitor->device->domain) {
+            'tracking' => ['tracking_telemetry', 'sensitive'],
+            'iot_healthcare' => ['healthcare_telemetry', 'sensitive'],
+            'security' => ['security_telemetry', 'restricted'],
+            default => ['operational', 'standard'],
+        };
+    }
+
+    /** @return array{string, string} */
+    private function storedMetricClassification(MonitorObservation $observation): array
+    {
+        $dataClass = $observation->metric_data_class;
+        $privacyClass = $observation->metric_privacy_class;
+        $expectedPrivacyClass = match ($dataClass) {
+            'tracking_telemetry', 'healthcare_telemetry' => 'sensitive',
+            'security_telemetry' => 'restricted',
+            'operational' => 'standard',
+            default => null,
+        };
+        if (! is_string($dataClass)
+            || ! is_string($privacyClass)
+            || $expectedPrivacyClass === null
+            || ! hash_equals($expectedPrivacyClass, $privacyClass)) {
+            throw new RuntimeScopeViolation('Metric projection classification is missing or invalid.');
+        }
+
+        return [$dataClass, $privacyClass];
     }
 
     private function unitForMetric(string $metric): string
