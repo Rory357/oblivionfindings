@@ -242,6 +242,11 @@ dashboard_run_161 = read_json_strict("evidence/browser/current-audit-dashboard-v
 run_162_remediation = read_json_strict("evidence/runtime/current-run-162-med-cd-scope-remediation-wave-29.json")
 run_162r_review = read_json_strict("evidence/runtime/current-run-162r-independent-med-cd-scope-remediation-review-wave-29.json")
 run_163_reporting = read_json_strict("evidence/source/current-run-163-med-cd-scope-remediation-reporting-wave-29.json")
+dashboard_run_164 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-164-wave-29.json")
+run_165_source_review = read_json_strict("evidence/source/current-run-165-med-cd-atomicity-current-source-review-wave-30.json")
+run_166_adjudication = read_json_strict("evidence/runtime/current-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.json")
+run_166r_review = read_json_strict("evidence/runtime/current-run-166r-independent-med-cd-atomicity-adjudication-review-wave-30.json")
+run_167_reporting = read_json_strict("evidence/source/current-run-167-med-cd-atomicity-reporting-wave-30.json")
 findings_register = read_json_strict("findings.json")
 assert sha256_file("evidence/source/current-canonical-feature-identity-wave-01.json") == "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
 assert sha256_file("evidence/source/current-canonical-identity-agent-register.json") == "21ebd8b004b5ade11aa01281958cda2be2ca966d1fb7c46576e039fab5f47baf"
@@ -567,6 +572,149 @@ run_162r_payload_without_seal = dict(run_162r_review)
 run_162r_seal = run_162r_payload_without_seal.pop("receipt_self_seal_sha256")
 assert canonical_sha256(run_162r_payload_without_seal) == run_162r_seal
 assert all(value is False for value in run_162r_review["completion_boundary"].values())
+
+current_run_164_166r_artifact_pins = {
+    "generators/materialize-run-164-audit-dashboard-verification-wave-29.py": (
+        "5f9de09fed4dec440095497d21ebaa3e4ae91279899ca8d2e6bd0a7a0019e3ca",
+        "a875985399e04edbbf175e106204d96d52f9edff",
+        41854,
+        954,
+    ),
+    "evidence/browser/current-audit-dashboard-verification-run-164-wave-29.json": (
+        "d343a1fad55788da33be0745471258acbe9a5ca01739b03205a194fa279ed45b",
+        "026c943bbe286b228e092a0ef0702b52d92827de",
+        22929,
+        542,
+    ),
+    "generators/materialize-run-165-med-cd-atomicity-current-source-review-wave-30.py": (
+        "ccc8d49b793ca1980272f93ca77c870e29de72256100d4a5595cc114a4d010ea",
+        "a8fec73f84b8e6c1208647839bdc47904db6758a",
+        22581,
+        419,
+    ),
+    "evidence/source/current-run-165-med-cd-atomicity-current-source-review-wave-30.json": (
+        "83257b5689f69885be2ed53bee8c0250b62d0e159f5b71dc0382282bb12a81c0",
+        "07c446cbf89cf5fdcc435e2fa814e48a69a2e925",
+        13240,
+        288,
+    ),
+    "generators/materialize-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.py": (
+        "662a8629a6ffda759e1d471b56230d1944ab2663f6f292cdf74604c22342a845",
+        "34963e6c93d1fd3a975432c84bd8975a187efc19",
+        30738,
+        579,
+    ),
+    "evidence/runtime/current-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.json": (
+        "c334495fa7cf7303ae70dccff475b7a9583b927bf06ee822f1a13bd347a84a46",
+        "bed3743d2191c86d4526236b78bea896a0b60574",
+        21939,
+        485,
+    ),
+    "evidence/runtime/harnesses/run-166-controlled-drug-atomicity-concurrency-test.php.txt": (
+        "49bbc43ca9caa470e10992751f3e2b7080cde6cf6ff554994ce85e0956b5d807",
+        "f87f011bd6441f3cafcfc1528378e21f180d6570",
+        31845,
+        715,
+    ),
+    "generators/materialize-independent-run-166-med-cd-atomicity-adjudication-review-wave-30.py": (
+        "c68a95e98c277eaab39c046aa0972c905e22ad4809108112194fdc84202989b1",
+        "11c0becd82ef53e2819bdf60085c3e8eecb90829",
+        19652,
+        381,
+    ),
+    "evidence/runtime/current-run-166r-independent-med-cd-atomicity-adjudication-review-wave-30.json": (
+        "fa899d56b13b584ccd103996c6a46407b105f968b0d769eae5be69a5f47b7d21",
+        "b0c2c1d95ab0d5fa68285d80bae337912c2659f1",
+        9134,
+        195,
+    ),
+}
+for path, (expected_sha256, expected_blob, expected_bytes, expected_lines) in current_run_164_166r_artifact_pins.items():
+    assert sha256_file(path) == expected_sha256
+    assert git_blob_id(path) == expected_blob
+    assert text_file_metrics(path) == (expected_bytes, expected_lines)
+
+assert dashboard_run_164["schema_version"] == "run-164-audit-dashboard-verification-wave-29-v1"
+assert dashboard_run_164["run_id"] == "RUN-164-AUDIT-DASHBOARD-VERIFICATION-WAVE-29"
+assert dashboard_run_164["status"] == "AUDIT_DASHBOARD_MOBILE_OVERFLOW_AND_SEMANTIC_BOUNDARIES_CORRECTED_EXACT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_OR_COMPLETION_CREDIT"
+run_164_verification = dashboard_run_164["verification"]
+assert run_164_verification["viewports_verified"] == run_164_verification["viewports_required"] == 4
+assert run_164_verification["navigation_clicks_passed"] == run_164_verification["navigation_clicks_required"] == 10
+assert run_164_verification["post_materialization_local_resources"] == "403/403"
+assert run_164_verification["visible_static_checks_passed"] == run_164_verification["visible_static_checks_required"] == 33
+assert run_164_verification["page_overflow_zero_at_all_final_viewports"] is True
+assert run_164_verification["duplicate_authored_ids"] == []
+assert run_164_verification["console_warning_entries"] == run_164_verification["console_error_entries"] == run_164_verification["uncaught_page_error_entries"] == 0
+assert {key for key, value in dashboard_run_164["credit_boundary"].items() if value} == {
+    "audit_dashboard_run_164_corrections",
+    "exact_audit_dashboard_artifact",
+}
+run_164_payload_without_seal = dict(dashboard_run_164)
+run_164_seal = run_164_payload_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_164_payload_without_seal) == run_164_seal == "0405b5be4c38f75b803da2776b975e816fa27cabe2483c2cafd5c6a04ce55c74"
+assert all(value is False for value in dashboard_run_164["completion_boundary"].values())
+
+assert run_165_source_review["schema_version"] == "run-165-med-cd-atomicity-current-source-review-wave-30-v1"
+assert run_165_source_review["run_id"] == "RUN-165-MED-CD-ATOMICITY-01-CURRENT-SOURCE-REVIEW-WAVE-30"
+assert run_165_source_review["status"] == "CURRENT_MAIN_STRUCTURAL_ATOMICITY_GO_ALREADY_FIXED_CANDIDATE_EXACT_RUNTIME_GATE_REQUIRED_ZERO_FINDING_OR_COMPLETION_CREDIT"
+assert run_165_source_review["pins"]["reviewed_source_checkpoint"] == "cf0090ec97242776eea30a2875756446f42862f9"
+assert run_165_source_review["pins"]["reviewed_source_tree"] == "b1c932d1c5c19e9e2ea655da5964dd1c5e9c41f3"
+assert run_165_source_review["compound_record_boundary"]["bounded_clause_adjudicated_here"] == "manual storeCDEntry register/stock atomicity only"
+assert run_165_source_review["current_source_condition"]["source_disposition"] == "ALREADY_FIXED_CANDIDATE_RUNTIME_GATE_REQUIRED"
+assert {key for key, value in run_165_source_review["credit_boundary"].items() if value} == {"independent_current_source_review"}
+run_165_payload_without_seal = dict(run_165_source_review)
+run_165_seal = run_165_payload_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_165_payload_without_seal) == run_165_seal == "8de90b3d923add5d4e1601561c9abb2b19e39b68aff79d74072b1edac1031212"
+assert all(value is False for value in run_165_source_review["completion_boundary"].values())
+
+assert run_166_adjudication["schema_version"] == "run-166-med-cd-atomicity-already-fixed-adjudication-wave-30-v1"
+assert run_166_adjudication["run_id"] == "RUN-166-MED-CD-ATOMICITY-01-ALREADY-FIXED-ADJUDICATION-WAVE-30"
+assert run_166_adjudication["status"] == "ALREADY_FIXED_BOUNDED_MANUAL_CD_ENTRY_ATOMICITY_SOURCE_RUNTIME_GO_RUN166R_REQUIRED_ZERO_FINAL_FINDING_OR_COMPLETION_CREDIT"
+assert run_166_adjudication["historical_and_current_disposition"]["verdict"] == "ALREADY_FIXED"
+assert run_166_adjudication["historical_and_current_disposition"]["bounded_clause"] == "manual POST /emar/controlled/entries register and stock atomicity"
+run_166_runtime = run_166_adjudication["runtime_execution"]
+run_166_claim_totals = run_166_runtime["claim_specific_totals"]
+assert run_166_claim_totals["test_functions_passed"] == 3
+assert run_166_claim_totals["assertions_across_command_outputs"] == 146
+assert run_166_claim_totals["race_subscenarios"] == 3
+assert run_166_runtime["supporting_governance_command"]["tests_passed"] == 43
+assert run_166_runtime["supporting_governance_command"]["assertions"] == 716
+assert run_166_runtime["cleanup"]["matching_schema_count"] == 0
+assert run_166_runtime["cleanup"]["owned_php_processes"] == run_166_runtime["cleanup"]["owned_php_listeners"] == run_166_runtime["cleanup"]["owned_barrier_files"] == 0
+assert run_166_adjudication["compound_record_boundary"] == {
+    "manual_store_cd_entry_register_stock_atomicity_adjudicated": True,
+    "store_balance_check_adjudicated": False,
+    "destruction_relationship_checks_adjudicated": False,
+    "delivery_stock_adjustment_loss_report_or_sibling_writer_adjudicated": False,
+    "transient_deadlock_retry_adjudicated": False,
+    "stress_or_repeated_schedule_evidence": False,
+    "residual_scope_must_remain_explicit_after_reporting": True,
+}
+assert {key for key, value in run_166_adjudication["credit_boundary"].items() if value} == {
+    "historical_condition_source_confirmed",
+    "current_source_already_fixed_adjudication",
+    "bounded_med_cd_atomicity_runtime_execution",
+    "provisional_claim_retirement_authorized",
+}
+run_166_payload_without_seal = dict(run_166_adjudication)
+run_166_seal = run_166_payload_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_166_payload_without_seal) == run_166_seal == "11f66f0c27fe4143a94451f140a8ae3a293617a6d1357f9180540a0641e05fea"
+assert all(value is False for value in run_166_adjudication["completion_boundary"].values())
+
+assert run_166r_review["schema_version"] == "run-166r-independent-med-cd-atomicity-adjudication-review-wave-30-v1"
+assert run_166r_review["run_id"] == "RUN-166R-INDEPENDENT-MED-CD-ATOMICITY-01-ADJUDICATION-REVIEW-WAVE-30"
+assert run_166r_review["status"] == "GO_EXACT_RUN166_ARTIFACT_REVIEW_RETIREMENT_REPORTING_AUTHORIZED_ZERO_DOWNSTREAM_CREDIT"
+assert run_166r_review["decision"]["verdict"] == "GO"
+assert run_166r_review["decision"]["blocking_discrepancies"] == 0
+assert run_166r_review["decision"]["retirement_reporting_authorized"] is True
+assert run_166r_review["decision"]["authorized_reporting_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+assert run_166r_review["decision"]["required_post_reporting_counts"]["provisional_source_claims"] == 9
+assert run_166r_review["decision"]["required_post_reporting_counts"]["historical_already_fixed"] == 2
+assert {key for key, value in run_166r_review["credit_boundary"].items() if value} == {"independent_exact_artifact_review_for_retirement_reporting"}
+run_166r_payload_without_seal = dict(run_166r_review)
+run_166r_seal = run_166r_payload_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_166r_payload_without_seal) == run_166r_seal == "4f4b301aaec50ad2c716cafd1c5c6516aab5a63561bb00746f91af6bd555ab67"
+assert all(value is False for value in run_166r_review["completion_boundary"].values())
 
 assert dashboard_run_155["schema_version"] == "run-155-audit-dashboard-verification-wave-26-v1"
 assert dashboard_run_155["run_id"] == "RUN-155-AUDIT-DASHBOARD-VERIFICATION-WAVE-26"
@@ -2846,6 +2994,17 @@ for label, path in (
     ("RUN-162R independent remediation review", "evidence/runtime/current-run-162r-independent-med-cd-scope-remediation-review-wave-29.json"),
     ("RUN-163 MED-CD-SCOPE remediation-reporting materializer", "generators/materialize-run-163-med-cd-scope-remediation-reporting-wave-29.py"),
     ("RUN-163 MED-CD-SCOPE remediation-reporting receipt", "evidence/source/current-run-163-med-cd-scope-remediation-reporting-wave-29.json"),
+    ("RUN-164 exact RUN-163 audit-dashboard verification materializer", "generators/materialize-run-164-audit-dashboard-verification-wave-29.py"),
+    ("RUN-164 exact RUN-163 audit-dashboard verification", "evidence/browser/current-audit-dashboard-verification-run-164-wave-29.json"),
+    ("RUN-165 MED-CD-ATOMICITY current-source review materializer", "generators/materialize-run-165-med-cd-atomicity-current-source-review-wave-30.py"),
+    ("RUN-165 MED-CD-ATOMICITY current-source review", "evidence/source/current-run-165-med-cd-atomicity-current-source-review-wave-30.json"),
+    ("RUN-166 MED-CD-ATOMICITY already-fixed adjudication materializer", "generators/materialize-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.py"),
+    ("RUN-166 MED-CD-ATOMICITY already-fixed adjudication", "evidence/runtime/current-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.json"),
+    ("RUN-166 MED-CD-ATOMICITY immutable concurrency harness", "evidence/runtime/harnesses/run-166-controlled-drug-atomicity-concurrency-test.php.txt"),
+    ("RUN-166R independent exact-adjudication review materializer", "generators/materialize-independent-run-166-med-cd-atomicity-adjudication-review-wave-30.py"),
+    ("RUN-166R independent exact-adjudication review", "evidence/runtime/current-run-166r-independent-med-cd-atomicity-adjudication-review-wave-30.json"),
+    ("RUN-167 MED-CD-ATOMICITY already-fixed reporting materializer", "generators/materialize-run-167-med-cd-atomicity-reporting-wave-30.py"),
+    ("RUN-167 MED-CD-ATOMICITY already-fixed reporting receipt", "evidence/source/current-run-167-med-cd-atomicity-reporting-wave-30.json"),
 ):
     if path not in checkpoint_paths:
         checkpoint_evidence.append((label, path))
@@ -2988,8 +3147,20 @@ historical_discovery_claims = {row["finding_id"]: row["source_claim"] for row in
 assert len(historical_discovery_claims) == 12
 
 assert findings_register["schema_version"] == "oblivion_audit_findings_v2_mixed_current_status"
-assert findings_register["audit_status"] == "TEN_PROVISIONAL_ONE_HISTORICAL_ALREADY_FIXED_ONE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
+assert findings_register["audit_status"] == "NINE_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_ONE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
+assert findings_register["generated_on"] == "2026-08-30"
 assert findings_register["architecture_rule"] == "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries."
+findings_pins = findings_register["pins"]
+assert findings_pins["governing_prompt_sha256"] == "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
+assert findings_pins["audit_checkpoint_parent"] == "35a5228b26c54684718495c33281b24c0992de02"
+assert findings_pins["med_cd_atomicity_adjudicated_application_commit"] == run_165_source_review["pins"]["reviewed_source_checkpoint"]
+assert findings_pins["med_cd_atomicity_adjudicated_application_tree"] == run_165_source_review["pins"]["reviewed_source_tree"]
+assert findings_pins["run_165_med_cd_atomicity_source_review_sha256"] == current_run_164_166r_artifact_pins["evidence/source/current-run-165-med-cd-atomicity-current-source-review-wave-30.json"][0]
+assert findings_pins["run_166_med_cd_atomicity_adjudication_sha256"] == current_run_164_166r_artifact_pins["evidence/runtime/current-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.json"][0]
+assert findings_pins["run_166_atomicity_harness_snapshot_sha256"] == current_run_164_166r_artifact_pins["evidence/runtime/harnesses/run-166-controlled-drug-atomicity-concurrency-test.php.txt"][0]
+assert findings_pins["run_166r_independent_artifact_review_sha256"] == current_run_164_166r_artifact_pins["evidence/runtime/current-run-166r-independent-med-cd-atomicity-adjudication-review-wave-30.json"][0]
+assert findings_pins["run_166_repository_commit"] == "bbd9b05b03da6d98deed033471412a05cc31d6d7"
+assert findings_pins["run_166_repository_tree"] == "f5e2f69d3ab02c42583daef8eb62f8732a12a584"
 live_findings = findings_register["records"]
 assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 12
 assert {row["id"] for row in live_findings} == set(historical_discovery_claims)
@@ -3005,12 +3176,44 @@ historical_remediated_findings = [
     row for row in live_findings
     if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
 ]
-assert len(provisional_findings) == findings_register["counts"]["provisional_source_claims"] == 10
-assert len(historical_fixed_findings) == findings_register["counts"]["historical_already_fixed"] == 1
+assert len(provisional_findings) == findings_register["counts"]["provisional_source_claims"] == 9
+assert len(historical_fixed_findings) == findings_register["counts"]["historical_already_fixed"] == 2
 assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 1
-assert historical_fixed_findings[0]["id"] == "MED-RBAC-01"
-assert historical_fixed_findings[0]["current_adjudication"]["verdict"] == "ALREADY_FIXED"
-assert historical_fixed_findings[0]["current_adjudication"]["separate_med_cd_scope_or_atomicity_inherited"] is False
+historical_fixed_by_id = {row["id"]: row for row in historical_fixed_findings}
+assert set(historical_fixed_by_id) == {"MED-RBAC-01", "MED-CD-ATOMICITY-01"}
+assert historical_fixed_by_id["MED-RBAC-01"]["current_adjudication"]["verdict"] == "ALREADY_FIXED"
+assert historical_fixed_by_id["MED-RBAC-01"]["current_adjudication"]["separate_med_cd_scope_or_atomicity_inherited"] is False
+atomicity_finding = historical_fixed_by_id["MED-CD-ATOMICITY-01"]
+assert atomicity_finding["historical_provenance"]["canonical_pre_adjudication_record_sha256"] == "9ba4f430ee59efea414b42a8633c1c969a2fd4428fbf3fef173fb5548cc8e7f1"
+assert atomicity_finding["current_adjudication"]["verdict"] == "ALREADY_FIXED"
+assert atomicity_finding["current_adjudication"]["scope"] == "manual POST /emar/controlled/entries register and stock atomicity only"
+assert atomicity_finding["current_adjudication"]["application_commit"] == run_165_source_review["pins"]["reviewed_source_checkpoint"]
+assert atomicity_finding["current_adjudication"]["application_tree"] == run_165_source_review["pins"]["reviewed_source_tree"]
+assert atomicity_finding["current_adjudication"]["effective_application_commit"] == run_166_adjudication["pins"]["effective_application_commit"]
+assert atomicity_finding["current_adjudication"]["effective_application_tree"] == run_166_adjudication["pins"]["effective_application_tree"]
+assert atomicity_finding["current_adjudication"]["run_165_source_review_sha256"] == current_run_164_166r_artifact_pins["evidence/source/current-run-165-med-cd-atomicity-current-source-review-wave-30.json"][0]
+assert atomicity_finding["current_adjudication"]["run_166_receipt_sha256"] == current_run_164_166r_artifact_pins["evidence/runtime/current-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.json"][0]
+assert atomicity_finding["current_adjudication"]["run_166r_review_sha256"] == current_run_164_166r_artifact_pins["evidence/runtime/current-run-166r-independent-med-cd-atomicity-adjudication-review-wave-30.json"][0]
+assert atomicity_finding["current_adjudication"]["immutable_harness_snapshot_sha256"] == current_run_164_166r_artifact_pins["evidence/runtime/harnesses/run-166-controlled-drug-atomicity-concurrency-test.php.txt"][0]
+assert atomicity_finding["current_adjudication"]["application_remediation_required"] is False
+assert atomicity_finding["current_adjudication"]["application_source_changed_by_adjudication"] is False
+assert atomicity_finding["current_adjudication"]["product_test_integrated_by_adjudication"] is False
+assert atomicity_finding["current_adjudication"]["residual_compound_scope_inherited"] is False
+atomicity_residual = atomicity_finding["residual_unadjudicated_scope"]
+assert atomicity_residual["manual_store_cd_entry_register_stock_atomicity_adjudicated"] is True
+assert all(
+    atomicity_residual[key] is False
+    for key in (
+        "store_balance_check_adjudicated",
+        "destruction_relationship_checks_adjudicated",
+        "delivery_stock_adjustment_loss_report_or_sibling_writer_adjudicated",
+        "forced_transient_deadlock_retry_adjudicated",
+        "stress_or_repeated_schedule_adjudicated",
+        "supporting_43_test_716_assertion_overlap_grants_denominator_credit",
+        "rollback_test_balance_check_half_grants_balance_check_credit",
+    )
+)
+assert atomicity_residual["must_remain_explicit_without_inherited_credit"] is True
 assert historical_remediated_findings[0]["id"] == "MED-CD-SCOPE-01"
 assert historical_remediated_findings[0]["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED"
 assert historical_remediated_findings[0]["current_adjudication"]["application_commit"] == run_162_pins["application_commit"]
@@ -3020,15 +3223,20 @@ assert all(row["completion_credit"] is False for row in live_findings)
 assert all(all(value is False for value in row["credit"].values()) for row in live_findings)
 assert findings_register["counts"]["bounded_disposition_tests_passed"] == 78
 assert findings_register["counts"]["bounded_disposition_assertions"] == 1529
-assert findings_register["counts"]["bounded_disposition_sum_basis"] == "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE; excludes the overlapping broader RUN-162 execution"
+assert findings_register["counts"]["bounded_disposition_sum_basis"] == "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE only; excludes RUN-166 MED-CD-ATOMICITY commands and every overlapping supporting execution"
 assert findings_register["counts"]["med_rbac_bounded_tests"] == 73
 assert findings_register["counts"]["med_rbac_bounded_test_assertions"] == 1481
 assert findings_register["counts"]["med_cd_scope_focused_tests"] == 5
 assert findings_register["counts"]["med_cd_scope_focused_test_assertions"] == 48
+assert findings_register["counts"]["med_cd_atomicity_claim_specific_test_functions"] == 3
+assert findings_register["counts"]["med_cd_atomicity_claim_specific_assertions"] == 146
+assert findings_register["counts"]["med_cd_atomicity_race_subscenarios"] == 3
+assert findings_register["counts"]["med_cd_atomicity_supporting_tests"] == 43
+assert findings_register["counts"]["med_cd_atomicity_supporting_assertions"] == 716
 assert findings_register["counts"]["final_P0"] == findings_register["counts"]["final_P1"] == 0
 assert findings_register["reconciliation"]["retained_record_count"] == 12
-assert findings_register["reconciliation"]["current_provisional_count"] == 10
-assert findings_register["reconciliation"]["historical_already_fixed_count"] == 1
+assert findings_register["reconciliation"]["current_provisional_count"] == 9
+assert findings_register["reconciliation"]["historical_already_fixed_count"] == 2
 assert findings_register["reconciliation"]["historical_remediated_count"] == 1
 
 assert run_163_reporting["schema_version"] == "run-163-med-cd-scope-remediation-reporting-wave-29-v1"
@@ -3078,6 +3286,68 @@ run_163_payload_without_seal = dict(run_163_reporting)
 run_163_seal = run_163_payload_without_seal.pop("receipt_self_seal_sha256")
 assert canonical_sha256(run_163_payload_without_seal) == run_163_seal
 assert all(value is False for value in run_163_reporting["completion_boundary"].values())
+
+assert run_167_reporting["schema_version"] == "run-167-med-cd-atomicity-reporting-wave-30-v1"
+assert run_167_reporting["run_id"] == "RUN-167-MED-CD-ATOMICITY-01-ALREADY-FIXED-REPORTING-WAVE-30"
+assert run_167_reporting["status"] == "MED_CD_ATOMICITY_HISTORICAL_ALREADY_FIXED_REPORTING_MATERIALIZED_DASHBOARD_RUN168_REQUIRED_ZERO_FINAL_FINDING_OR_COMPLETION_CREDIT"
+assert run_167_reporting["pins"]["reporting_input_commit"] == "47242053b960ae4af6c669ad24fa013497df0ae8"
+assert run_167_reporting["pins"]["reporting_input_tree"] == "65fe18971ff4e5b0475186b99001d96a22ae178b"
+assert run_167_reporting["pins"]["reporting_input_parent"] == "bbd9b05b03da6d98deed033471412a05cc31d6d7"
+assert run_167_reporting["pins"]["reviewed_source_commit"] == run_165_source_review["pins"]["reviewed_source_checkpoint"]
+assert run_167_reporting["pins"]["reviewed_source_tree"] == run_165_source_review["pins"]["reviewed_source_tree"]
+run_167_materializer_pin = run_167_reporting["pins"]["reporting_materializer"]
+assert run_167_materializer_pin["path"] == "generators/materialize-run-167-med-cd-atomicity-reporting-wave-30.py"
+assert run_167_materializer_pin["sha256"] == sha256_file(run_167_materializer_pin["path"])
+assert run_167_materializer_pin["git_blob_id"] == git_blob_id(run_167_materializer_pin["path"])
+assert (run_167_materializer_pin["bytes"], run_167_materializer_pin["lines"]) == text_file_metrics(run_167_materializer_pin["path"])
+run_167_builder_pin = run_167_reporting["pins"]["dashboard_generator"]
+assert run_167_builder_pin["path"] == "generators/build-current-audit-dashboard.py"
+assert run_167_builder_pin["sha256"] == sha256_file(run_167_builder_pin["path"])
+assert run_167_builder_pin["git_blob_id"] == git_blob_id(run_167_builder_pin["path"])
+assert (run_167_builder_pin["bytes"], run_167_builder_pin["lines"]) == text_file_metrics(run_167_builder_pin["path"])
+run_167_dashboard_pin = run_167_reporting["pins"]["unchanged_run_164_dashboard"]
+assert run_167_dashboard_pin["path"] == "audit-dashboard.html"
+assert run_167_dashboard_pin["sha256"] == "04fe2430810557f4fe61630f877efc7f827f6bcb1e265ac470ffd2bf277bcbbd"
+assert run_167_dashboard_pin["git_blob_id"] == git_blob_id(run_167_dashboard_pin["path"])
+assert (run_167_dashboard_pin["bytes"], run_167_dashboard_pin["lines"]) == text_file_metrics(run_167_dashboard_pin["path"])
+run_167_transition = run_167_reporting["reporting_transition"]
+assert run_167_transition["finding_id"] == "MED-CD-ATOMICITY-01"
+assert run_167_transition["authorized_by_run_166r"] is True
+assert run_167_transition["authorized_scope"] == "manual POST /emar/controlled/entries register and stock atomicity only"
+assert run_167_transition["status_before"] == "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING"
+assert run_167_transition["status_after"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+assert run_167_transition["counts_before"] == {
+    "retained_claim_records": 12,
+    "provisional_source_claims": 10,
+    "historical_already_fixed": 1,
+    "historical_remediated": 1,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_167_transition["counts_after"] == {
+    "retained_claim_records": 12,
+    "provisional_source_claims": 9,
+    "historical_already_fixed": 2,
+    "historical_remediated": 1,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_167_transition["claim_specific_runtime_denominator"] == {
+    "test_functions": 3,
+    "assertions": 146,
+    "race_subscenarios": 3,
+    "supporting_tests_not_aggregated": 43,
+    "supporting_assertions_not_aggregated": 716,
+    "added_to_existing_78_test_1529_assertion_total": False,
+}
+assert run_167_reporting["dashboard_forward_gate"]["required_run"] == "RUN-168"
+assert run_167_reporting["dashboard_forward_gate"]["dashboard_html_changed_by_run_167"] is False
+assert run_167_reporting["dashboard_forward_gate"]["fresh_four_viewport_verification_required"] is True
+assert {key for key, value in run_167_reporting["credit_boundary"].items() if value} == {"live_findings_register_and_reporting_status"}
+run_167_payload_without_seal = dict(run_167_reporting)
+run_167_seal = run_167_payload_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_167_payload_without_seal) == run_167_seal
+assert all(value is False for value in run_167_reporting["completion_boundary"].values())
 
 required_artifacts = [
     "00-executive-summary.md", "01-repository-module-map.md",
@@ -3242,12 +3512,16 @@ medication_record_items = "".join(
         html.escape(row["canonical_record_sha256"]),
         html.escape(row["audited_application_commit"]),
         (
-            "historical issue already fixed on current main; MED-RBAC-only bounded adjudication"
-            if live_findings_by_id[row["id"]]["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+            "historical issue already fixed on current main; bounded manual-entry MED-CD-ATOMICITY adjudication only; residual compound scope unadjudicated"
+            if row["id"] == "MED-CD-ATOMICITY-01"
             else (
+                "historical issue already fixed on current main; MED-RBAC-only bounded adjudication"
+                if live_findings_by_id[row["id"]]["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                else (
                 "historical issue remediated on current main; MED-CD-SCOPE-only bounded remediation"
                 if live_findings_by_id[row["id"]]["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
-                else "current reference-only provisional claim; no disposition inherited from MED-RBAC or MED-CD-SCOPE"
+                    else "current reference-only provisional claim; no disposition inherited from any medication-governance record"
+                )
             )
         ),
     )
@@ -3469,6 +3743,123 @@ for old, new in run_163_template_rewrites:
     expected_count = run_163_rewrite_expected_counts.get(old, 1)
     assert current_template_text.count(old) == expected_count, f"Expected {expected_count} RUN-163 template rewrite target(s): {old}"
     current_template_text = current_template_text.replace(old, new)
+
+run_167_template_rewrites = [
+    (
+        "the MED-RBAC already-fixed adjudication is pinned to <span class=\"mono\">$med_rbac_application_short</span>, while the latest bounded MED-CD-SCOPE remediation is pinned to application <span class=\"mono\">$application_short</span> and full repository tree <span class=\"mono\">$application_tree_short</span>",
+        "the MED-RBAC already-fixed adjudication is pinned to <span class=\"mono\">$med_rbac_application_short</span>, the bounded MED-CD-SCOPE remediation to application <span class=\"mono\">$application_short</span> and tree <span class=\"mono\">$application_tree_short</span>, and the bounded manual-entry MED-CD-ATOMICITY source adjudication to <span class=\"mono\">$atomicity_application_short</span>",
+    ),
+    ('href="#checkpoint">RUN-163</a>', 'href="#checkpoint">RUN-167</a>'),
+    ("RUN-071–163 current reporting checkpoint:", "RUN-071–167 current reporting checkpoint:"),
+    ("RUN-071–163 completion-gate checkpoint", "RUN-071–167 completion-gate checkpoint"),
+    (
+        "RUN-160 reclassifies MED-RBAC-01 from current provisional to retained historical already-fixed; RUN-161 verifies that exact dashboard; RUN-162 establishes MED-CD-SCOPE reproduction, narrow remediation, bounded runtime, integration, and application-commit publication; RUN-162R independently authorizes retirement reporting; RUN-163 alone reclassifies MED-CD-SCOPE-01 from current provisional to retained historical remediated and reports the live $finding_count + $historical_fixed_count + $historical_remediated_count split.",
+        "RUN-160 reclassifies MED-RBAC-01; RUN-161 verifies that dashboard; RUN-162/R establish and authorize MED-CD-SCOPE remediation reporting; RUN-163 reclassifies MED-CD-SCOPE-01; RUN-164 verifies that dashboard; RUN-165 establishes the manual-entry atomicity source candidate; RUN-166 establishes its bounded ALREADY_FIXED source/runtime disposition; RUN-166R independently authorizes retirement reporting; RUN-167 alone reclassifies the bounded manual-entry MED-CD-ATOMICITY-01 clause and reports the live $finding_count + $historical_fixed_count + $historical_remediated_count split.",
+    ),
+    (
+        "Current-source framework reachability beyond the bounded MED-RBAC and MED-CD-SCOPE slices, application browser, rendered visual, full-suite coverage, ease, release, Pass, final-finding, feature-completion, broader remote-currency, audit-artifact publication, and audit-completion remain open.",
+        "Current-source framework reachability beyond the bounded MED-RBAC, MED-CD-SCOPE, and manual-entry MED-CD-ATOMICITY slices; residual atomicity compound scope; application browser; rendered visual; full-suite coverage; ease; release; Pass; final-finding; feature-completion; broader remote-currency; audit-artifact publication; and audit-completion remain open.",
+    ),
+    (
+        "Attributable authenticated access keeps the application-browser lane NO-GO; RUN-159 establishes only bounded MED-RBAC MySQL execution, and RUN-162 separately establishes the bounded MED-CD-SCOPE remediation/runtime/integration/publication slice at its exact application commit and tree.",
+        "Attributable authenticated access keeps the application-browser lane NO-GO; RUN-159 establishes bounded MED-RBAC MySQL execution, RUN-162 separately establishes bounded MED-CD-SCOPE remediation/runtime/integration/publication, and RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution without application or product-test change.",
+    ),
+    (
+        "RUN-157 materializes its historical reporting checkpoint; RUN-158 verifies that exact dashboard; RUN-159 establishes the MED-RBAC-01 ALREADY_FIXED disposition after bounded source/runtime evidence; RUN-159R independently authorizes retirement reporting; RUN-160 alone reconciles that live status; RUN-161 verifies the exact RUN-160 dashboard; RUN-162 establishes MED-CD-SCOPE-01 reproduction/remediation/runtime/integration/application-commit publication; RUN-162R independently authorizes its retirement reporting; RUN-163 alone reconciles the MED-CD-SCOPE live status without changing Fleet ownership, direct-exact review-queue, benchmark, or completion counts.",
+        "RUN-157 materializes historical reporting; RUN-158 verifies that dashboard; RUN-159 establishes and RUN-159R authorizes MED-RBAC already-fixed reporting; RUN-160 reconciles that live status; RUN-161 verifies that dashboard; RUN-162 establishes and RUN-162R authorizes MED-CD-SCOPE remediation reporting; RUN-163 reconciles that live status; RUN-164 verifies that dashboard; RUN-165 establishes source-only manual-entry atomicity review; RUN-166 establishes its bounded ALREADY_FIXED runtime disposition without remediation; RUN-166R independently authorizes retirement reporting; RUN-167 alone reconciles the bounded atomicity live status without changing Fleet ownership, direct-exact review-queue, benchmark, final-finding, or completion counts.",
+    ),
+    (
+        "Medication correctness outside the bounded MED-RBAC already-fixed and MED-CD-SCOPE remediated dispositions, application-browser, full-suite/coverage, ease, release, Pass, final-finding, feature-completion, broader remote-currency, audit-artifact publication, and audit-completion credit remain zero.",
+        "Medication correctness outside the bounded MED-RBAC already-fixed, MED-CD-SCOPE remediated, and manual-entry MED-CD-ATOMICITY already-fixed dispositions—including balance-check, destruction, sibling-writer, forced-deadlock-retry, and stress scope—remains unadjudicated or zero-credit; application-browser, full-suite/coverage, ease, release, Pass, final-finding, feature-completion, broader remote-currency, audit-artifact publication, and audit-completion credit remain zero.",
+    ),
+    (
+        "RUN-160 alone changes MED-RBAC in the live queue; RUN-161 verifies its dashboard; RUN-162 establishes only MED-CD-SCOPE reproduction/remediation/runtime/integration/application-commit publication; RUN-162R alone authorizes retirement reporting; RUN-163 alone changes the MED-CD-SCOPE live status to $historical_remediated_count historical remediated, leaving $finding_count provisional plus $historical_fixed_count historical already-fixed while every Fleet ownership, direct-exact review-queue, benchmark, final-finding, and completion count remains unchanged.",
+        "RUN-160 alone changes MED-RBAC in the live queue; RUN-161 verifies its dashboard; RUN-162/R establish and authorize MED-CD-SCOPE remediation reporting; RUN-163 changes that live status; RUN-164 verifies its dashboard; RUN-165/166 establish source and bounded runtime for the manual-entry atomicity ALREADY_FIXED disposition; RUN-166R authorizes reporting; RUN-167 alone changes the bounded atomicity live status, leaving $finding_count provisional plus $historical_fixed_count historical already-fixed plus $historical_remediated_count historical remediated while every Fleet ownership, direct-exact review-queue, benchmark, final-finding, and completion count remains unchanged.",
+    ),
+    ("RUN-001 through RUN-163 are represented by audit artifacts.", "RUN-001 through RUN-167 are represented by audit artifacts."),
+    (
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from the separately bounded RUN-159 MED-RBAC and RUN-162 MED-CD-SCOPE executions, no represented wave grants broader or full-suite application runtime or coverage; no represented wave grants signed-in application-browser, ease, release, Pass, final-finding, feature-completion, or audit-completion credit.",
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from separately bounded RUN-159 MED-RBAC, RUN-162 MED-CD-SCOPE, and RUN-166 manual-entry MED-CD-ATOMICITY executions, no represented wave grants broader or full-suite application runtime or coverage; no represented wave grants signed-in application-browser, ease, release, Pass, final-finding, feature-completion, or audit-completion credit.",
+    ),
+    (
+        "<li>RUN-160: live register reconciled MED-RBAC-01 from current provisional to retained historical already-fixed</li><li>RUN-161: exact RUN-160 dashboard verified at 4/4 viewports · 63/63 visible checks · 10/10 navigation · 395/395 local resources · zero application credit</li><li>RUN-162: five MED-CD-SCOPE defects reproduced and narrowly remediated · $med_cd_tests focused tests / $med_cd_assertions assertions · application <span class=\"mono\">$application_short</span> and tree <span class=\"mono\">$application_tree_short</span> integrated · application commit published · full-suite green false</li><li>RUN-162R: exact remediation receipt GO · retirement-reporting authorization · zero live-register or downstream credit</li><li>RUN-163: live register reconciled MED-CD-SCOPE-01 from current provisional to retained historical remediated · $finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · fresh RUN-164 dashboard verification required</li>",
+        "<li>RUN-160: live register reconciled MED-RBAC-01 from current provisional to retained historical already-fixed</li><li>RUN-161: exact RUN-160 dashboard verified at 4/4 viewports · 63/63 visible checks · 10/10 navigation · 395/395 local resources · zero application credit</li><li>RUN-162: five MED-CD-SCOPE defects reproduced and narrowly remediated · $med_cd_tests focused tests / $med_cd_assertions assertions · application <span class=\"mono\">$application_short</span> and tree <span class=\"mono\">$application_tree_short</span> integrated · application commit published · full-suite green false</li><li>RUN-162R: exact remediation receipt GO · retirement-reporting authorization · zero live-register or downstream credit</li><li>RUN-163: live register reconciled MED-CD-SCOPE-01 from current provisional to retained historical remediated</li><li>RUN-164: exact RUN-163 dashboard verified at 4/4 viewports · 33/33 visible checks · 10/10 navigation · 403/403 local resources · zero application credit</li><li>RUN-165: source-only bounded manual-entry atomicity already-fixed candidate · zero runtime outcome</li><li>RUN-166: bounded manual-entry ALREADY_FIXED adjudication · $atomicity_tests test functions / $atomicity_assertions assertions / $atomicity_races synchronized races · no application or product-test change</li><li>RUN-166R: exact receipt and harness GO · retirement-reporting authorization only</li><li>RUN-167: live register reconciled bounded MED-CD-ATOMICITY-01 from current provisional to retained historical already-fixed · $finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · fresh RUN-168 dashboard verification required</li>",
+    ),
+    (
+        "<li><span class=\"partial\">$med_rbac_tests</span> bounded MED-RBAC tests / $med_rbac_assertions assertions</li><li><span class=\"partial\">$med_cd_tests</span> focused MED-CD-SCOPE tests / $med_cd_assertions assertions; separate denominators · no full-suite or coverage credit</li>",
+        "<li><span class=\"partial\">$med_rbac_tests</span> bounded MED-RBAC tests / $med_rbac_assertions assertions</li><li><span class=\"partial\">$med_cd_tests</span> focused MED-CD-SCOPE tests / $med_cd_assertions assertions</li><li><span class=\"partial\">$atomicity_tests</span> MED-CD-ATOMICITY test functions / $atomicity_assertions assertions / $atomicity_races synchronized races; separately reported, not added to 78/1,529 · supporting $atomicity_supporting_tests/$atomicity_supporting_assertions overlaps · no full-suite or coverage credit</li>",
+    ),
+    (
+        "RUN-151, RUN-155, RUN-158, and RUN-161 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-163 dashboard.",
+        "RUN-151, RUN-155, RUN-158, RUN-161, and RUN-164 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-167 dashboard.",
+    ),
+    (
+        "<li><a href=\"evidence/browser/current-audit-dashboard-verification-run-158-wave-27.json\">Superseded RUN-158 verification GO</a></li><li><a href=\"evidence/browser/current-audit-dashboard-verification-run-161-wave-28.json\">Superseded RUN-161 verification GO</a></li></ul>",
+        "<li><a href=\"evidence/browser/current-audit-dashboard-verification-run-158-wave-27.json\">Superseded RUN-158 verification GO</a></li><li><a href=\"evidence/browser/current-audit-dashboard-verification-run-161-wave-28.json\">Superseded RUN-161 verification GO</a></li><li><a href=\"evidence/browser/current-audit-dashboard-verification-run-164-wave-29.json\">Superseded RUN-164 verification GO</a></li></ul>",
+    ),
+    (
+        "<div class=\"card\"><strong class=\"partial\">$finding_count</strong><span>current provisional P1 claims</span><small>$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · none final</small></div><div class=\"card\"><strong>$med_cd_tests</strong><span>focused MED-CD-SCOPE tests</span><small>$med_cd_assertions assertions · separate RUN-159 MED-RBAC $med_rbac_tests/$med_rbac_assertions · no full-suite credit</small></div>",
+        "<div class=\"card\"><strong class=\"partial\">$finding_count</strong><span>current provisional P1 claims</span><small>$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · none final</small></div><div class=\"card\"><strong>$atomicity_tests</strong><span>MED-CD-ATOMICITY test functions</span><small>$atomicity_assertions assertions · $atomicity_races synchronized races · separate from existing 78/1,529</small></div>",
+    ),
+    ("RUN-161–163 current remediation and reporting checkpoint", "RUN-164–167 current atomicity adjudication and reporting checkpoint"),
+    (
+        "<tr><td>RUN-160 MED-RBAC live reporting</td><td><strong>11 current provisional P1 + 1 historical already-fixed · 12 retained identities</strong></td><td class=\"partial\">MED-RBAC-01 reclassified; exact dashboard later verified by RUN-161</td></tr><tr><td>RUN-161 exact dashboard verification</td><td><strong>4/4 viewports · 63/63 visible checks · 10/10 navigation · 395/395 local resources</strong></td><td class=\"partial\">exact superseded RUN-160 audit artifact only · zero application credit</td></tr><tr><td>RUN-162 MED-CD-SCOPE remediation</td><td><strong>5 defects · $med_cd_tests focused tests / $med_cd_assertions assertions · $med_cd_related_tests related controller/command tests pass</strong></td><td class=\"partial\">reproduction/remediation/runtime/integration/application-commit publication only · two broader INR failures reproduce at base · full-suite green false</td></tr><tr><td>RUN-162R exact receipt review</td><td><strong>exact receipt GO · zero discrepancies</strong></td><td class=\"partial\">retirement reporting authorized · live-register reconciliation belongs to RUN-163</td></tr><tr><td>RUN-163 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · 12 retained identities</strong></td><td class=\"partial\">MED-CD-SCOPE-01 reclassified · Gate 4 and audit completion false · exact regenerated dashboard requires RUN-164 verification</td></tr>",
+        "<tr><td>RUN-160 MED-RBAC live reporting</td><td><strong>11 current provisional P1 + 1 historical already-fixed · 12 retained identities</strong></td><td class=\"partial\">MED-RBAC-01 reclassified; exact dashboard later verified by RUN-161</td></tr><tr><td>RUN-161 exact dashboard verification</td><td><strong>4/4 viewports · 63/63 visible checks · 10/10 navigation · 395/395 local resources</strong></td><td class=\"partial\">exact superseded RUN-160 audit artifact only · zero application credit</td></tr><tr><td>RUN-162 MED-CD-SCOPE remediation</td><td><strong>5 defects · $med_cd_tests focused tests / $med_cd_assertions assertions · $med_cd_related_tests related controller/command tests pass</strong></td><td class=\"partial\">reproduction/remediation/runtime/integration/application-commit publication only · two broader INR failures reproduce at base · full-suite green false</td></tr><tr><td>RUN-162R exact receipt review</td><td><strong>exact receipt GO · zero discrepancies</strong></td><td class=\"partial\">retirement reporting authorized · live-register reconciliation belongs to RUN-163</td></tr><tr><td>RUN-163 live reporting</td><td><strong>10 current provisional P1 + 1 historical already-fixed + 1 historical remediated · 12 retained identities</strong></td><td class=\"partial\">MED-CD-SCOPE-01 reclassified; exact dashboard later verified by RUN-164</td></tr><tr><td>RUN-164 exact dashboard verification</td><td><strong>4/4 viewports · 33/33 visible checks · 10/10 navigation · 403/403 local resources</strong></td><td class=\"partial\">exact superseded RUN-163 audit artifact only · zero application credit</td></tr><tr><td>RUN-165 source review</td><td><strong>manual entry source-only ALREADY_FIXED candidate</strong></td><td class=\"partial\">runtime outcome not selected</td></tr><tr><td>RUN-166 bounded atomicity adjudication</td><td><strong>$atomicity_tests test functions / $atomicity_assertions assertions / $atomicity_races synchronized races</strong></td><td class=\"partial\">manual entry only · supporting $atomicity_supporting_tests/$atomicity_supporting_assertions not aggregated · no app/test change</td></tr><tr><td>RUN-166R exact artifact review</td><td><strong>exact producer/receipt/harness GO · zero discrepancies</strong></td><td class=\"partial\">retirement reporting authorized · live reconciliation belongs to RUN-167</td></tr><tr><td>RUN-167 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · 12 retained identities</strong></td><td class=\"partial\">bounded MED-CD-ATOMICITY-01 reclassified · Gate 4 and audit completion false · exact regenerated dashboard requires RUN-168 verification</td></tr>",
+    ),
+    (
+        "The register retains 12 historical claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count is historical already fixed on current main, and $historical_remediated_count is historical remediated on current main. None is a final finding or closed completion gate.",
+        "The register retains 12 historical claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count is historical remediated on current main. None is a final finding or closed completion gate.",
+    ),
+    (
+        "RUN-159 establishes bounded current-source MED-RBAC test execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution. Neither establishes full-suite, coverage, application-browser, ease, release, Pass, or completion credit.",
+        "RUN-159 establishes bounded MED-RBAC execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution. The denominators remain distinct, and none establishes full-suite, coverage, application-browser, ease, release, Pass, or completion credit.",
+    ),
+    (
+        "</tr><tr><td>RUN-162 focused MED-CD-SCOPE execution</td><td>$med_cd_tests tests / $med_cd_assertions assertions passed on advanced main; $med_cd_related_tests related controller/command tests passed in the overlapping broader lane; its 2 INR failures reproduced at base and are not attributed to RUN-162</td><td class=\"partial\">bounded MED-CD-SCOPE remediation evidence only · full-suite green false · no coverage credit</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+        "</tr><tr><td>RUN-162 focused MED-CD-SCOPE execution</td><td>$med_cd_tests tests / $med_cd_assertions assertions passed on advanced main; $med_cd_related_tests related controller/command tests passed in the overlapping broader lane; its 2 INR failures reproduced at base and are not attributed to RUN-162</td><td class=\"partial\">bounded MED-CD-SCOPE remediation evidence only · full-suite green false · no coverage credit</td></tr><tr><td>RUN-166 bounded manual-entry atomicity execution</td><td>$atomicity_tests claim-specific test functions / $atomicity_assertions assertions / $atomicity_races synchronized two-process races; supporting $atomicity_supporting_tests tests / $atomicity_supporting_assertions assertions overlap prior denominators</td><td class=\"partial\">reported separately from 78/1,529 · no balance-check, destruction, sibling-writer, forced-deadlock, stress, browser, or full-suite credit</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+    ),
+    ("task-local ignored <span class=\"mono\">vendor/</span> hydrated for RUN-159 and RUN-162 bounded lanes", "task-local ignored <span class=\"mono\">vendor/</span> hydrated for RUN-159, RUN-162, and RUN-166 bounded lanes"),
+    ("RUN-155–163 medication-governance provenance, adjudication, and remediation", "RUN-155–167 medication-governance provenance, adjudication, remediation, and reporting"),
+    (
+        "RUN-158 verifies only the exact RUN-157 dashboard; RUN-161 separately verifies only the exact now-superseded RUN-160 dashboard at 4/4 required viewports with 63/63 visible boundary checks, 10/10 navigation targets, 395/395 local resources, and zero console warnings, console errors, or page errors. Neither receipt transfers to the RUN-163 dashboard or the application.",
+        "RUN-158 verifies only the exact RUN-157 dashboard; RUN-161 verifies only the exact RUN-160 dashboard; RUN-164 separately verifies only the exact now-superseded RUN-163 dashboard at 4/4 viewports with 33/33 visible checks, 10/10 navigation targets, 403/403 local resources, and zero overflow, duplicate authored IDs, console warnings/errors, or page errors. None transfers to the RUN-167 dashboard or the application.",
+    ),
+    (
+        "RUN-162 establishes <span class=\"mono\">MED-CD-SCOPE-01</span> reproduction, narrow remediation, focused runtime, integration, and application-commit publication at <span class=\"mono\">$application_short</span> / tree <span class=\"mono\">$application_tree_short</span>; RUN-162R independently authorizes retirement reporting; RUN-163 alone records it as historical remediated. <span class=\"mono\">MED-CD-ATOMICITY-01</span> remains current provisional and inherits no transaction, retry, rollback, lock-order, fractional-value, operation-level concurrency, browser, benchmark, final-finding, Pass, or completion credit. RUN-163 reports 12 retained identities = $finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated, with $benchmark_mapped/340 mappings, $final_no_matches/340 final no-match/NCM, $benchmark_unresolved unresolved targets, Gate 4 false, and fresh RUN-164 audit-dashboard verification required.",
+        "RUN-162/R establish and authorize <span class=\"mono\">MED-CD-SCOPE-01</span> remediation reporting; RUN-163 records it as historical remediated. RUN-165/166 establish source and bounded runtime for only the manual <span class=\"mono\">POST /emar/controlled/entries</span> register/stock clause of <span class=\"mono\">MED-CD-ATOMICITY-01</span>; RUN-166R independently authorizes retirement reporting; RUN-167 alone records that bounded clause as historical already fixed. Its balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated. RUN-167 reports 12 retained identities = $finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated, with separate $atomicity_tests/$atomicity_assertions/$atomicity_races atomicity evidence, $benchmark_mapped/340 mappings, $final_no_matches/340 final no-match/NCM, $benchmark_unresolved unresolved targets, Gate 4 false, and fresh RUN-168 audit-dashboard verification required.",
+    ),
+    ("Fresh RUN-164 audit-dashboard verification required", "Fresh RUN-168 audit-dashboard verification required"),
+    (
+        "The exact RUN-163 reporting dashboard must be checked in RUN-164 at 1440×900, 1280×800, 1024×768, and 390×844.",
+        "The exact RUN-167 reporting dashboard must be checked in RUN-168 at 1440×900, 1280×800, 1024×768, and 390×844.",
+    ),
+    (
+        "RUN-162 establishes the MED-CD-SCOPE remediation/runtime/integration/application-commit publication facts, RUN-162R independently authorizes retirement reporting, and RUN-163 alone performs the live-register/reporting reconciliation; none of those supplies audit-dashboard verification for the new HTML.",
+        "RUN-165 establishes source-only manual-entry atomicity review, RUN-166 establishes its bounded ALREADY_FIXED source/runtime disposition without application or product-test change, RUN-166R independently authorizes retirement reporting, and RUN-167 alone performs the live-register/reporting reconciliation; none supplies audit-dashboard verification for the new HTML.",
+    ),
+    ("The linked RUN-164 receipt must record", "The linked RUN-168 receipt must record"),
+    (
+        "RUN-159's $med_rbac_tests tests / $med_rbac_assertions assertions and ALREADY_FIXED evidence, RUN-159R retirement-reporting authorization, RUN-160's exact MED-RBAC-only reconciliation, RUN-162's $med_cd_tests focused tests / $med_cd_assertions assertions and exact application/tree pins, RUN-162R retirement-reporting authorization, RUN-163's exact MED-CD-SCOPE-only reconciliation, atomicity noninheritance",
+        "RUN-159's $med_rbac_tests/$med_rbac_assertions MED-RBAC evidence, RUN-162's $med_cd_tests/$med_cd_assertions MED-CD-SCOPE evidence, RUN-164's exact superseded dashboard verification, RUN-165 source-only atomicity evidence, RUN-166's separately reported $atomicity_tests test functions / $atomicity_assertions assertions / $atomicity_races synchronized races plus nonaggregated $atomicity_supporting_tests/$atomicity_supporting_assertions support, RUN-166R retirement-reporting authorization, RUN-167's exact bounded atomicity reconciliation, and residual compound-scope noninheritance",
+    ),
+    ("It verifies the RUN-163 audit artifact only", "It verifies the RUN-167 audit artifact only"),
+    (
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-164-wave-29.json">RUN-164 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-168-wave-30.json">RUN-168 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+    ),
+    ("RUN-071–163 evidence lineage", "RUN-071–167 evidence lineage"),
+    (
+        "Every current raw, generated, reviewed, and integrated RUN-077–162/R source/reporting/runtime/benchmark/remediation artifact is linked with its exact SHA-256; RUN-163 is the current reporting generator execution.",
+        "Every current raw, generated, reviewed, and integrated RUN-077–166R source/reporting/runtime/benchmark/remediation artifact is linked with its exact SHA-256; RUN-167 is the current reporting generator execution.",
+    ),
+    (
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, and exact-artifact evidence through RUN-162R, reported in RUN-163, with fresh RUN-164 dashboard verification still required. Exactly two matrix rows have static benchmark-mapping credit. RUN-159 separately establishes the bounded already-fixed MED-RBAC disposition and $med_rbac_tests tests / $med_rbac_assertions assertions; RUN-162 separately establishes the bounded remediated MED-CD-SCOPE disposition and $med_cd_tests focused tests / $med_cd_assertions assertions. The denominators are not one execution, and neither grants any disposition or remediation credit to MED-CD-ATOMICITY-01 or another finding.",
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, and exact-artifact evidence through RUN-166R, reported in RUN-167, with fresh RUN-168 dashboard verification required. Exactly two matrix rows have static benchmark-mapping credit. RUN-159 separately establishes bounded MED-RBAC $med_rbac_tests/$med_rbac_assertions evidence; RUN-162 separately establishes bounded remediated MED-CD-SCOPE $med_cd_tests/$med_cd_assertions evidence; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY $atomicity_tests/$atomicity_assertions/$atomicity_races evidence. The atomicity denominator is not added to the existing 78/1,529 total, and no lane grants inherited balance-check, destruction, sibling-writer, forced-deadlock, stress, browser, benchmark, final-finding, Pass, release, feature-completion, or audit-completion credit.",
+    ),
+]
+for old, new in run_167_template_rewrites:
+    assert current_template_text.count(old) == 1, f"Expected one RUN-167 template rewrite target: {old}"
+    current_template_text = current_template_text.replace(old, new)
 TEMPLATE = Template(current_template_text)
 
 
@@ -3479,6 +3870,7 @@ dashboard = TEMPLATE.substitute(
     med_rbac_application_short=run_159_adjudication["pins"]["application_commit"][:12],
     application_short=run_162_pins["application_commit"][:12],
     application_tree_short=run_162_pins["repository_tree_at_application_commit"][:12],
+    atomicity_application_short=run_165_source_review["pins"]["reviewed_source_checkpoint"][:12],
     route_calls=f"{semantic['routes']['static_route_declaration_callsites']:,}",
     resolver_count=f"{semantic['inertia_pages']['resolver_non_test_tsx']:,}",
     page_root_count=f"{pages['recommended_denominator']['value']:,}",
@@ -3663,6 +4055,11 @@ dashboard = TEMPLATE.substitute(
     med_cd_broader_passed=run_162_runtime["broader_bounded_execution"]["combined_passed"],
     med_cd_broader_assertions=f"{run_162_runtime['broader_bounded_execution']['combined_assertions']:,}",
     med_cd_broader_failed=run_162_runtime["broader_bounded_execution"]["combined_failed"],
+    atomicity_tests=run_166_claim_totals["test_functions_passed"],
+    atomicity_assertions=run_166_claim_totals["assertions_across_command_outputs"],
+    atomicity_races=run_166_claim_totals["race_subscenarios"],
+    atomicity_supporting_tests=run_166_runtime["supporting_governance_command"]["tests_passed"],
+    atomicity_supporting_assertions=run_166_runtime["supporting_governance_command"]["assertions"],
     module_count=len(module_labels),
     module_rows=module_rows,
     finding_rows=finding_rows,
@@ -3759,33 +4156,34 @@ dashboard = TEMPLATE.substitute(
 )
 
 current_visible_boundaries = [
-    '<a href="#checkpoint">RUN-163</a>',
+    '<a href="#checkpoint">RUN-167</a>',
     '<a href="#findings">Finding status</a>',
-    "10 current provisional P1 + 1 historical already-fixed + 1 historical remediated",
+    "9 current provisional P1 + 2 historical already-fixed + 1 historical remediated",
     "12 retained claim identities",
-    "12 retained claim identities split into 10 current provisional P1, 1 historical already-fixed, and 1 historical remediated",
-    "<strong>5</strong><span>focused MED-CD-SCOPE tests",
-    "separate RUN-159 MED-RBAC 73/1,481",
+    "12 retained claim identities split into 9 current provisional P1, 2 historical already-fixed, and 1 historical remediated",
+    "<strong>3</strong><span>MED-CD-ATOMICITY test functions",
+    "3 claim-specific test functions / 146 assertions / 3 synchronized two-process races",
+    "separately reported, not added to 78/1,529",
+    "supporting 43/716 overlaps",
     "73 bounded tests / 1,481 assertions",
     "5 focused tests / 48 assertions",
-    "1,481 assertions",
-    "RUN-161–163 current remediation and reporting checkpoint",
+    "RUN-164–167 current atomicity adjudication and reporting checkpoint",
     "3 independent current-source ALREADY_FIXED reviews",
     "historical issue · already fixed on current main · not a final finding",
     "historical issue · remediated on current main · not a final finding",
     "MED-CD-SCOPE-01",
     "MED-CD-ATOMICITY-01",
-    "RUN-159 establishes the",
-    "RUN-159R independently authorizes retirement reporting",
-    "RUN-160 alone changes MED-RBAC",
-    "RUN-162 establishes MED-CD-SCOPE-01 reproduction/remediation/runtime/integration/application-commit publication",
-    "RUN-162R alone authorizes retirement reporting",
-    "RUN-163 alone changes the MED-CD-SCOPE live status",
-    "Apart from the separately bounded RUN-159 MED-RBAC and RUN-162 MED-CD-SCOPE executions",
+    "RUN-164: exact RUN-163 dashboard verified at 4/4 viewports",
+    "RUN-165: source-only bounded manual-entry atomicity already-fixed candidate",
+    "RUN-166: bounded manual-entry ALREADY_FIXED adjudication",
+    "RUN-166R: exact receipt and harness GO",
+    "RUN-167: live register reconciled bounded MED-CD-ATOMICITY-01",
+    "RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution without application or product-test change",
+    "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated",
     "two broader INR failures reproduce at base",
     "full-suite green false",
-    "inherits no transaction, retry, rollback, lock-order, fractional-value, operation-level concurrency",
-    "Fresh RUN-164 audit-dashboard verification required",
+    "Fresh RUN-168 audit-dashboard verification required",
+    "cf0090ec9724",
     "0b1920dade92",
     "7b2b5688c90e",
     "2/340 mappings",
@@ -3802,9 +4200,13 @@ assert "RUN-071–157 current reporting checkpoint" not in dashboard
 assert '<a href="#findings">Provisional findings</a>' not in dashboard
 assert "RUN-159/R" not in dashboard
 assert "11 current provisional P1 + 1 historical already-fixed" in dashboard  # preserved historical RUN-160 checkpoint only
+assert "10 current provisional P1 + 1 historical already-fixed + 1 historical remediated" in dashboard  # preserved historical RUN-163 checkpoint only
 assert "Fresh RUN-161 audit-reporting correction" not in dashboard
+assert "Fresh RUN-164 audit-dashboard verification required" not in dashboard
 assert "RUN-158–160 current adjudication checkpoint" not in dashboard
+assert "RUN-161–163 current remediation and reporting checkpoint" not in dashboard
 assert "MED-CD-SCOPE-01 and MED-CD-ATOMICITY-01 remain separate current provisional claims" not in dashboard
+assert "MED-CD-ATOMICITY-01</span> remains current provisional" not in dashboard
 assert "RUN-160 reports 12 retained identities" not in dashboard
 assert "10 current provisional P1 and 1 historical already-fixed, RUN-159" not in dashboard
 assert "latest bounded MED-RBAC adjudication" not in dashboard
@@ -3828,7 +4230,7 @@ for stale_attribution in (
 
 output_path = AUDIT_DIR / "audit-dashboard.html"
 output_bytes = (dashboard.rstrip() + "\n").encode("utf-8")
-temporary_path = output_path.with_name(f".{output_path.name}.tmp-run163-dashboard")
+temporary_path = output_path.with_name(f".{output_path.name}.tmp-run167-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"
 try:
     with temporary_path.open("xb") as handle:

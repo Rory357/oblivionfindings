@@ -1,7 +1,7 @@
 {
   "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
-  "audit_status": "TEN_PROVISIONAL_ONE_HISTORICAL_ALREADY_FIXED_ONE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
-  "generated_on": "2026-08-29",
+  "audit_status": "NINE_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_ONE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
+  "generated_on": "2026-08-30",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
@@ -13,6 +13,14 @@
     "med_cd_scope_remediated_repository_tree": "7b2b5688c90e4da28725e70e38e50fd445f1b4c4",
     "run_162_med_cd_scope_remediation_sha256": "21564caa435927d89d994a091383409e627c44170304f6ff2a5d5c897c858958",
     "run_162r_independent_artifact_review_sha256": "7a1decaccfde2246163daef3dbec285b6a5a1a5019d2411615cc7e003660ff78",
+    "med_cd_atomicity_adjudicated_application_commit": "cf0090ec97242776eea30a2875756446f42862f9",
+    "med_cd_atomicity_adjudicated_application_tree": "b1c932d1c5c19e9e2ea655da5964dd1c5e9c41f3",
+    "run_166_repository_commit": "bbd9b05b03da6d98deed033471412a05cc31d6d7",
+    "run_166_repository_tree": "f5e2f69d3ab02c42583daef8eb62f8732a12a584",
+    "run_165_med_cd_atomicity_source_review_sha256": "83257b5689f69885be2ed53bee8c0250b62d0e159f5b71dc0382282bb12a81c0",
+    "run_166_med_cd_atomicity_adjudication_sha256": "c334495fa7cf7303ae70dccff475b7a9583b927bf06ee822f1a13bd347a84a46",
+    "run_166r_independent_artifact_review_sha256": "fa899d56b13b584ccd103996c6a46407b105f968b0d769eae5be69a5f47b7d21",
+    "run_166_atomicity_harness_snapshot_sha256": "49bbc43ca9caa470e10992751f3e2b7080cde6cf6ff554994ce85e0956b5d807",
     "audit_checkpoint_parent": "35a5228b26c54684718495c33281b24c0992de02",
     "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
     "base_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
@@ -192,23 +200,29 @@
     "system_data_features": 40,
     "canonical_submodules": null,
     "historical_discovery_claim_records": 12,
-    "current_provisional_source_claims": 10,
-    "historical_already_fixed_records": 1,
+    "current_provisional_source_claims": 9,
+    "historical_already_fixed_records": 2,
     "historical_remediated_records": 1
   },
   "counts": {
     "retained_claim_records": 12,
-    "provisional_source_claims": 10,
-    "provisional_P1": 10,
-    "historical_already_fixed": 1,
+    "provisional_source_claims": 9,
+    "provisional_P1": 9,
+    "historical_already_fixed": 2,
     "historical_remediated": 1,
     "bounded_disposition_tests_passed": 78,
     "bounded_disposition_assertions": 1529,
-    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE; excludes the overlapping broader RUN-162 execution",
+    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE only; excludes RUN-166 MED-CD-ATOMICITY commands and every overlapping supporting execution",
     "med_rbac_bounded_tests": 73,
     "med_rbac_bounded_test_assertions": 1481,
     "med_cd_scope_focused_tests": 5,
     "med_cd_scope_focused_test_assertions": 48,
+    "med_cd_atomicity_claim_specific_test_functions": 3,
+    "med_cd_atomicity_claim_specific_assertions": 146,
+    "med_cd_atomicity_race_subscenarios": 3,
+    "med_cd_atomicity_supporting_tests": 43,
+    "med_cd_atomicity_supporting_assertions": 716,
+    "med_cd_atomicity_aggregation_basis": "reported separately from 78/1529 because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
     "final_P0": 0,
     "final_P1": 0,
     "complete_prompt_finding_schema": 0,
@@ -305,17 +319,17 @@
       "audit_completion": 0
     }
   },
-  "credit_boundary": "Ten current provisional records, one retained historical already-fixed record, and one retained historical remediated record remain reviewable. RUN-159 establishes the MED-RBAC-01 ALREADY_FIXED disposition, RUN-159R authorizes its reporting, and RUN-160 reclassifies it. RUN-162 establishes MED-CD-SCOPE-01 reproduction, remediation, bounded runtime, integration, and publication; RUN-162R independently authorizes retirement reporting; RUN-163 alone reconciles that live record. This does not satisfy any final finding, benchmark, application-browser, ease, Pass, feature-completion, or audit-completion gate.",
+  "credit_boundary": "Nine current provisional records, two retained historical already-fixed records, and one retained historical remediated record remain reviewable. RUN-159/R and RUN-160 establish and report the MED-RBAC-01 ALREADY_FIXED disposition. RUN-162/R and RUN-163 establish and report the MED-CD-SCOPE-01 reproduced-and-remediated disposition. RUN-165, RUN-166, and RUN-166R establish and independently authorize the MED-CD-ATOMICITY-01 ALREADY_FIXED disposition only for manual POST /emar/controlled/entries register/stock atomicity; RUN-167 alone reconciles that live record. The separately reported 3 test functions / 146 assertions / 3 synchronized races do not enlarge the existing 78/1529 bounded-disposition denominator. No final finding, benchmark, application-browser, ease, Pass, feature-completion, or audit-completion gate follows.",
   "reconciliation": {
     "retained_record_ids_unique": true,
     "current_provisional_ids_unique": true,
     "retained_record_count": 12,
-    "current_provisional_count": 10,
-    "historical_already_fixed_count": 1,
+    "current_provisional_count": 9,
+    "historical_already_fixed_count": 2,
     "historical_remediated_count": 1,
     "every_primary_feature_id_in_canonical_matrix": true,
     "final_ids_cross_file_reconciled": false,
-    "reason": "There are no final finding IDs. MED-RBAC-01 is retained as historical already fixed; MED-CD-SCOPE-01 is retained as historical remediated on current main; the other 10 records remain provisional. None satisfies the cross-file final-finding gate."
+    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01 is retained as historical remediated on current main; the other 9 records remain provisional. The atomicity record preserves explicit unadjudicated balance-check, destruction, sibling-writer, forced-deadlock-retry, and stress scope. None satisfies the cross-file final-finding gate."
   },
   "records": [
     {
@@ -746,16 +760,56 @@
     },
     {
       "id": "MED-CD-ATOMICITY-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
       "related_feature_ids": [
         "CAP-MED-DESTRUCTION-LIFECYCLE",
         "CAP-MED-STOCK-MOVEMENT"
       ],
+      "historical_provenance": {
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "canonical_pre_adjudication_record_sha256": "9ba4f430ee59efea414b42a8633c1c969a2fd4428fbf3fef173fb5548cc8e7f1",
+        "classification": "REAL_HISTORICAL_MANUAL_CONTROLLED_ENTRY_NONTRANSACTIONAL_REGISTER_STOCK_WRITE_AND_CACHE_ONLY_REPLAY",
+        "route_anchor": "POST /emar/controlled/entries via EmarController::storeCDEntry",
+        "historical_risk": "Possible divergence between the controlled-drug register, stock, strict audit provenance, and request replay under failure or concurrency.",
+        "preserved_identity_only": true
+      },
+      "current_adjudication": {
+        "application_commit": "cf0090ec97242776eea30a2875756446f42862f9",
+        "application_tree": "b1c932d1c5c19e9e2ea655da5964dd1c5e9c41f3",
+        "effective_application_commit": "0b1920dade9251d617f3cb0b69da5c0202b5a6bf",
+        "effective_application_tree": "7b2b5688c90e4da28725e70e38e50fd445f1b4c4",
+        "verdict": "ALREADY_FIXED",
+        "scope": "manual POST /emar/controlled/entries register and stock atomicity only",
+        "run_165_source_review": "evidence/source/current-run-165-med-cd-atomicity-current-source-review-wave-30.json",
+        "run_165_source_review_sha256": "83257b5689f69885be2ed53bee8c0250b62d0e159f5b71dc0382282bb12a81c0",
+        "run_166_receipt": "evidence/runtime/current-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.json",
+        "run_166_receipt_sha256": "c334495fa7cf7303ae70dccff475b7a9583b927bf06ee822f1a13bd347a84a46",
+        "run_166r_review": "evidence/runtime/current-run-166r-independent-med-cd-atomicity-adjudication-review-wave-30.json",
+        "run_166r_review_sha256": "fa899d56b13b584ccd103996c6a46407b105f968b0d769eae5be69a5f47b7d21",
+        "immutable_harness_snapshot": "evidence/runtime/harnesses/run-166-controlled-drug-atomicity-concurrency-test.php.txt",
+        "immutable_harness_snapshot_sha256": "49bbc43ca9caa470e10992751f3e2b7080cde6cf6ff554994ce85e0956b5d807",
+        "application_remediation_required": false,
+        "application_source_changed_by_adjudication": false,
+        "product_test_integrated_by_adjudication": false,
+        "residual_compound_scope_inherited": false
+      },
+      "residual_unadjudicated_scope": {
+        "manual_store_cd_entry_register_stock_atomicity_adjudicated": true,
+        "store_balance_check_adjudicated": false,
+        "destruction_relationship_checks_adjudicated": false,
+        "delivery_stock_adjustment_loss_report_or_sibling_writer_adjudicated": false,
+        "forced_transient_deadlock_retry_adjudicated": false,
+        "stress_or_repeated_schedule_adjudicated": false,
+        "supporting_43_test_716_assertion_overlap_grants_denominator_credit": false,
+        "rollback_test_balance_check_half_grants_balance_check_credit": false,
+        "must_remain_explicit_without_inherited_credit": true
+      },
       "passes": [
         "P1",
         "P2",
         "P5",
+        "P6",
         "P7"
       ],
       "module_submodule": {
@@ -765,15 +819,15 @@
       },
       "actor_and_job": {
         "actor": "Controlled-drug register owner",
-        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "secondary_actors": "Controlled recorder and qualified witness; two authenticated worker processes exercising same-UUID same-payload, same-UUID different-payload, and different-UUID stale-before-balance cases",
         "job": "Maintain the controlled-drug register and balance",
-        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+        "status": "BOUNDED_SOURCE_AND_RUNTIME_ACTORS_VALIDATED_NOT_REPRESENTATIVE_SIGNED_IN_BROWSER"
       },
       "route_url": {
-        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "route_paths": "routes/emar.php:30-395",
+        "route_names": "emar.controlled.entries.store",
+        "route_paths": "POST /emar/controlled/entries; routes/emar.php:246-248",
         "raw_route_path_field": "routes/emar.php:30-395",
-        "status": "SOURCE_LOCATOR_ONLY"
+        "status": "BOUNDED_CURRENT_SOURCE_AND_RUNTIME_ROUTE_ONLY"
       },
       "frontend_anchor": {
         "page_files": "resources/js/pages/emar/ControlledDrugs.tsx:662-745",
@@ -795,24 +849,30 @@
         "shared_component_or_variant": null,
         "overlay_trigger": null,
         "internal_baseline": null,
-        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+        "status": "NOT_ADJUDICATED_FOR_THIS_RETAINED_HISTORICAL_RECORD"
       },
       "backend_anchor": {
         "matrix_anchors": "app/Http/Controllers/Emar/EmarController.php:4023-4121; app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1; app/Services/Medication/MedicationScopeDecisionService.php:40-221",
         "claim_anchors": [
-          "app/Http/Controllers/Emar/EmarController.php:4986-5314"
+          "routes/emar.php:248",
+          "app/Http/Controllers/Emar/EmarController.php:7990-8282",
+          "app/Services/Medication/MedicationGovernanceScopeService.php:426-471; 1473-1552",
+          "app/Http/Controllers/Concerns/HandlesMedicationSync.php",
+          "app/Models/MedicationIdempotencyResult.php",
+          "app/Services/AuditLogger.php"
         ],
-        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
-        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+        "controller_request_service_model_policy_job_event_migration": "BOUNDED_ROUTE_CONTROLLER_GOVERNANCE_TRANSACTION_STOCK_AUDIT_REPLAY_AND_RUNTIME_REVIEW",
+        "application_commit": "cf0090ec97242776eea30a2875756446f42862f9"
       },
       "current_behaviour": {
-        "classification": "SOURCE_INFERRED_PROVISIONAL",
-        "summary": "Controlled-drug entry and stock update appear not to share one encompassing transaction with owner-first locking; destruction relationship checks appear later than the first mutation boundary.",
-        "runtime_observed": false
+        "classification": "ALREADY_FIXED_CURRENT_MAIN_BOUNDED_VERIFIED",
+        "summary": "The manual controlled-entry path now runs inside one three-attempt governance transaction, locks the canonical Client before the medication and stock, rejects stale before-balances, creates the register entry, updates stock, writes strict audit provenance, and publishes durable request replay before commit.",
+        "runtime_observed": true,
+        "runtime_scope": "Three separately reported claim-specific test functions, 146 assertions, and three synchronized two-process MySQL race subscenarios passed. A 43-test / 716-assertion supporting governance execution overlaps prior denominators and is not aggregated. No forced transient deadlock, stress schedule, balance-check, destruction, sibling-writer, representative browser, full-suite, or coverage credit."
       },
       "current_workflow": {
-        "matrix_summary": "Static canonical identity only: Maintain the controlled-drug register and balance. Representative-role completion was not executed.",
-        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+        "matrix_summary": "Manual controlled-entry transaction, lock order, failure rollback, fractional retry/replay, and exact operation-level race effects were source-reviewed and bounded-test verified for the manual register/stock clause only.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "BOUNDED_MANUAL_ENTRY_SUCCESS_FAILURE_RETRY_REPLAY_AND_CONCURRENT_CONFLICT_PATHS_EXECUTED; REPRESENTATIVE_BROWSER_EASE_AND_RESIDUAL_COMPOUND_WRITERS_NOT_EXECUTED"
       },
       "ease_evidence": {
         "status": "NOT_MEASURED",
@@ -826,16 +886,34 @@
         "task_script": "task-scripts/cap-med-cd-register-balance.md"
       },
       "evidence": {
-        "source_claim_record": "evidence/source/current-feature-discovery-wave-01.json",
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-01.json (historical discovery input)",
+        "current_source_review": "evidence/source/current-run-165-med-cd-atomicity-current-source-review-wave-30.json",
+        "current_adjudication_receipt": "evidence/runtime/current-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.json",
+        "independent_artifact_review": "evidence/runtime/current-run-166r-independent-med-cd-atomicity-adjudication-review-wave-30.json",
+        "immutable_race_harness_snapshot": "evidence/runtime/harnesses/run-166-controlled-drug-atomicity-concurrency-test.php.txt",
         "claim_anchors": [
-          "app/Http/Controllers/Emar/EmarController.php:4986-5314"
+          "routes/emar.php:248",
+          "app/Http/Controllers/Emar/EmarController.php:7990-8282",
+          "app/Services/Medication/MedicationGovernanceScopeService.php:426-471; 1473-1552",
+          "tests/Feature/Emar/ControlledDrugsTest.php",
+          "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php",
+          "evidence/runtime/harnesses/run-166-controlled-drug-atomicity-concurrency-test.php.txt"
         ],
-        "tests_executed": 0,
+        "test_commands_executed": 3,
+        "test_functions_executed": 3,
+        "assertions": 146,
+        "race_subscenarios": 3,
+        "supporting_tests_not_aggregated": 43,
+        "supporting_assertions_not_aggregated": 716,
+        "aggregation_boundary": "The 3/146/3 claim-specific denominator is reported separately from 78/1529; the supporting command overlaps prior denominators and the rollback test includes an uncredited balance-check half.",
+        "invalid_attempts_credit": 0,
+        "invalid_attempts_boundary": "Combined Windows batch-filter parsing, insufficient direct-controller attribution, lock-observation timeout, pre-correction assertion API failure, raw-binding instrumentation coercion, and absent-base cleanup diagnostics grant no product or finding credit.",
         "browser_cells": 0,
-        "database_checks": 0
+        "database_checks": 2,
+        "database_cleanup": "information_schema returned zero oa165_atomicity% or oa166_atomicity% schemas; the configured oa166_atomicity base returned SQLSTATE 1049, confirming absence; zero owned PHP processes, listeners, or barrier files"
       },
-      "problem_root_cause": "One encompassing owner-first transaction and lock order were not established by the provisional source slice.",
-      "impact": "Possible divergence between the controlled-drug register and physical/logical stock under failure or concurrency.",
+      "problem_root_cause": "Historically, the manual controlled-entry writer created the register row before updating stock without one encompassing database transaction and exposed only cache-backed replay. Current main places the bounded path inside the governance transaction with owner-first locks and durable replay.",
+      "impact": "Historical high-risk register/stock integrity concern; no divergence or duplicate effect was reproduced in the bounded current-main failure, retry, fractional-value, or synchronized concurrency evidence.",
       "benchmark": {
         "official_repository": null,
         "inspected_ref": null,
@@ -851,7 +929,7 @@
       ],
       "better_oblivion_design": {
         "proposal": null,
-        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+        "status": "NOT_REQUIRED_ALREADY_FIXED_CURRENT_MAIN_NO_REMEDIATION_PROPOSED"
       },
       "target_ease": {
         "scores": null,
@@ -864,56 +942,57 @@
       ],
       "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
       "priority": "P1",
-      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "priority_status": "HISTORICAL_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT",
       "effort": {
         "size": null,
         "assumptions": null,
         "status": "NOT_ESTIMATED"
       },
       "dependencies_sequence": [
-        "Independent source review at the audited application pin",
-        "Independently prove transaction boundaries, parent-to-child lock order, rollback, retry and concurrent balance assertions.",
-        "Only then decide whether a native remediation contract is warranted"
+        "Completed: three independent current-source reviews at cf0090ec97242776eea30a2875756446f42862f9",
+        "Completed: forced audit-failure rollback and fractional failure/retry/durable-replay cases",
+        "Completed: three synchronized two-process MySQL race subscenarios plus exact RUN166R artifact GO",
+        "Retained non-inherited gap: balance check, destruction relationships, delivery/adjustment/loss and sibling writers, forced transient-deadlock retry, and stress/repeated schedules"
       ],
       "confidence": {
-        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
-        "evidence_gap": "Independently prove transaction boundaries, parent-to-child lock order, rollback, retry and concurrent balance assertions."
+        "level": "HIGH_FOR_ALREADY_FIXED_BOUNDED_MANUAL_ENTRY_ATOMICITY_DISPOSITION",
+        "evidence_gap": "Residual compound writers, forced transient-deadlock retry, stress/repeated schedules, full-suite coverage, representative signed-in browser, ease, and target-specific benchmark remain unexecuted or unadjudicated."
       },
       "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
-      "interim_safeguard": "Use existing reconciliation controls and investigate any register/stock mismatch; this audit does not assert that a mismatch has occurred.",
+      "interim_safeguard": "Preserve the encompassing retried governance transaction, canonical Client-before-medication lock order, locked stock reconciliation, strict audit failure rollback, exact request fingerprinting, and durable replay publication; investigate any register/stock mismatch without assuming the residual compound scope is closed.",
       "acceptance_criteria": {
-        "given_when_then": null,
-        "status": "NOT_FINAL; REQUIRED GATE: Independently prove transaction boundaries, parent-to-child lock order, rollback, retry and concurrent balance assertions."
+        "given_when_then": "Given authenticated controlled-entry actors and canonical medication/stock state, when audit persistence fails, a fractional offline request is retried, or two workers submit same/different UUID and payload combinations against the same stale balance, then register, stock, audit, and durable replay commit exactly once for the winner, duplicates replay the same entry, conflicting fingerprints or stale balances return 409, and losing paths leave no partial effect.",
+        "status": "BOUNDED_MET_FOR_HISTORICAL_MANUAL_ENTRY_CLAIM_RETIREMENT_NOT_FINAL_FINDING_OR_FEATURE_COMPLETION"
       },
       "validation_plan": {
-        "required": "Independently prove transaction boundaries, parent-to-child lock order, rollback, retry and concurrent balance assertions.",
-        "unit": "NOT_PLANNED_TO_EXACT_CASES",
-        "feature": "NOT_EXECUTED",
-        "architecture": "NOT_EXECUTED",
-        "e2e": "BLOCKED",
+        "required": "Retain the bounded manual-entry transaction, lock-order, rollback, fractional retry/replay, and synchronized conflict regression contract; adjudicate residual compound scope separately.",
+        "unit": "NOT_SEPARATELY_REQUIRED_FOR_THIS_RETIREMENT",
+        "feature": "EXECUTED_3_CLAIM_SPECIFIC_TEST_FUNCTIONS_146_ASSERTIONS_REPORTED_SEPARATELY",
+        "architecture": "THREE_CURRENT_SOURCE_GO_REVIEWS_PLUS_TWO_RUNTIME_CRITIQUES_AND_EXACT_RUN166R_ARTIFACT_GO",
+        "e2e": "REAL_HTTP_KERNEL_TWO_PROCESS_HARNESS_EXECUTED_WITHOUT_APPLICATION_BROWSER",
         "visual_accessibility": "BLOCKED",
-        "performance_concurrency": "NOT_EXECUTED",
+        "performance_concurrency": "EXECUTED_ONE_SYNCHRONIZED_RUN_WITH_THREE_RACE_SUBSCENARIOS; NO_STRESS_OR_FORCED_TRANSIENT_DEADLOCK_CREDIT",
         "representative_user": "NOT_EXECUTED"
       },
       "finalization_blockers": [
-        "Independent current-source review",
-        "Exact final feature/finding ownership confirmation",
-        "Safe attributable runtime and/or browser validation where applicable",
-        "Target-specific benchmark or exhaustive final no-match adjudication",
-        "Complete observable acceptance criteria and validation plan"
+        "The bounded manual POST /emar/controlled/entries register/stock clause is adjudicated already fixed; storeBalanceCheck remains unadjudicated.",
+        "Destruction relationship checks and delivery, adjustment, loss-report, or other sibling controlled-drug writers remain unadjudicated.",
+        "Forced transient-deadlock retry and stress/repeated-schedule evidence remain unexecuted.",
+        "Target-specific benchmark or exhaustive final no-match, representative browser/ease, module/Pass/release, and audit-completion gates remain open."
       ],
       "independent_review": {
-        "status": "NOT_COMPLETED",
-        "reviewer": null,
-        "disagreements": null,
-        "reconciliation": null
+        "status": "COMPLETED_THREE_SOURCE_GO_TWO_RUNTIME_GO_PLUS_EXACT_RUN166R_ARTIFACT_GO",
+        "reviewer": "/root/run163_builder_analysis; /root/run163_artifact_review; /root/run165_race_harness_critic",
+        "disagreements": "No blocking discrepancy remained. Invalid and misinstrumented harness attempts were preserved as zero-credit diagnostics; reviewers authorized retirement only for the exact manual controlled-entry register/stock clause.",
+        "reconciliation": "RUN-165 establishes a current-source already-fixed candidate. RUN-166 establishes the exact bounded source/runtime ALREADY_FIXED disposition. RUN-166R independently authorizes retirement reporting; RUN-167 alone changes the live register."
       },
       "unresolved_fields": [
-        "final exact route/page/action ownership where a sentinel remains",
         "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
         "observed workflow and ten-dimension current/target ease measures",
         "target-specific benchmark or exhaustive final no-match",
-        "native design, effort, final acceptance criteria and executable validation cases"
+        "storeBalanceCheck, destruction relationship checks, delivery/adjustment/loss and sibling controlled-drug writers",
+        "forced transient-deadlock retry and stress/repeated-schedule evidence",
+        "full-suite coverage and representative signed-in application browser"
       ],
       "completion_credit": false,
       "credit": {
