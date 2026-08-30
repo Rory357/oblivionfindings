@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Presenters\FleetVehicleTechnologyProjectionPresenter;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
@@ -22,6 +23,7 @@ use App\Services\Assets\AssetMutationIntegrityService;
 use App\Services\AuditLogger;
 use App\Services\Fleet\FleetTimelineService;
 use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -30,6 +32,8 @@ use Inertia\Inertia;
 
 class VehicleController extends Controller
 {
+    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
+
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
         private readonly SecurityDevicesAccessService $deviceAccess,
@@ -561,56 +565,65 @@ class VehicleController extends Controller
 
     public function trips(Request $request)
     {
-        $user = $request->user();
-        $query = FleetTrip::query()
-            ->with([
-                'asset:id,name,asset_tag',
-                'driverSession.user:id,name',
-                'segments' => fn ($q) => $q->orderBy('seq'),
-            ])
-            ->latest('started_at');
+        $user = $request->user() ?? abort(403);
+        $visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
+        $visibleVehicles = $this->visibleTripVehiclesQuery($visibleSiteIds);
+        $visibleTrips = FleetTrip::query()->whereIn(
+            'fleet_trips.asset_id',
+            (clone $visibleVehicles)->select('assets.id'),
+        );
+        $filteredTrips = clone $visibleTrips;
 
+        $selectedVehicleId = null;
         if ($request->filled('vehicle_id')) {
-            $query->where('asset_id', (int) $request->input('vehicle_id'));
+            $selectedVehicleId = $request->integer('vehicle_id');
+        } elseif ($request->filled('asset_id')) {
+            // Legacy support
+            $selectedVehicleId = $request->integer('asset_id');
         }
 
-        // Legacy support
-        if ($request->filled('asset_id') && ! $request->filled('vehicle_id')) {
-            $query->where('asset_id', (int) $request->input('asset_id'));
+        if ($selectedVehicleId !== null) {
+            abort_unless(
+                $selectedVehicleId > 0 && (clone $visibleVehicles)->whereKey($selectedVehicleId)->exists(),
+                404,
+            );
+            $filteredTrips->where('fleet_trips.asset_id', $selectedVehicleId);
         }
 
         if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
+            $filteredTrips->where('fleet_trips.status', $request->input('status'));
         }
 
         if ($request->filled('date_from')) {
-            $query->whereDate('started_at', '>=', $request->input('date_from'));
+            $filteredTrips->whereDate('fleet_trips.started_at', '>=', $request->input('date_from'));
         }
 
         if ($request->filled('date_to')) {
-            $query->whereDate('started_at', '<=', $request->input('date_to'));
+            $filteredTrips->whereDate('fleet_trips.started_at', '<=', $request->input('date_to'));
         }
 
         if ($request->filled('search')) {
             $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('start_address', 'like', "%{$search}%")
-                    ->orWhere('end_address', 'like', "%{$search}%")
+            $filteredTrips->where(function (Builder $query) use ($search): void {
+                $query->where('fleet_trips.start_address', 'like', "%{$search}%")
+                    ->orWhere('fleet_trips.end_address', 'like', "%{$search}%")
                     ->orWhereHas('asset', fn ($sub) => $sub->where('name', 'like', "%{$search}%"));
             });
         }
 
         // CSV export
         if ($request->input('export') === 'csv') {
-            $exportQuery = clone $query;
+            $exportQuery = $this->withTripIndexRelations(clone $filteredTrips, $visibleSiteIds)
+                ->latest('fleet_trips.started_at');
 
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Vehicle', 'Driver', 'Start Time', 'End Time', 'Distance (km)', 'Duration (min)', 'Max Speed (km/h)', 'Start Address', 'End Address', 'Status']);
                 foreach ($exportQuery->lazy(200) as $trip) {
+                    $driver = $this->visibleTripDriver($trip);
                     $this->putCsv($handle, [
                         $trip->asset?->name ?? '',
-                        $trip->driverSession?->user?->name ?? '',
+                        $driver?->name ?? '',
                         optional($trip->started_at)->format('Y-m-d H:i:s'),
                         optional($trip->ended_at)->format('Y-m-d H:i:s'),
                         $trip->distance_km ?? 0,
@@ -626,16 +639,16 @@ class VehicleController extends Controller
         }
 
         // Summary stats (from the same filtered query, without pagination)
-        $totalTrips = (clone $query)->count();
-        $totalDistanceKm = round((float) (clone $query)->sum('distance_km'), 1);
-        $totalDurationS = (int) (clone $query)->sum('duration_s');
-        $avgDistanceKm = round((float) (clone $query)->avg('distance_km'), 1);
+        $totalTrips = (clone $filteredTrips)->count();
+        $totalDistanceKm = round((float) (clone $filteredTrips)->sum('distance_km'), 1);
+        $totalDurationS = (int) (clone $filteredTrips)->sum('duration_s');
+        $avgDistanceKm = round((float) (clone $filteredTrips)->avg('distance_km'), 1);
 
         // Average max speed (if column exists)
         $avgSpeedKph = 0;
         try {
             if (Schema::hasColumn('fleet_trips', 'max_speed_kph')) {
-                $avgSpeedKph = round((float) (clone $query)->avg('max_speed_kph'), 1);
+                $avgSpeedKph = round((float) (clone $filteredTrips)->avg('max_speed_kph'), 1);
             }
         } catch (\Throwable $e) {
             $avgSpeedKph = 0;
@@ -644,7 +657,7 @@ class VehicleController extends Controller
         // Active trips count
         $activeTrips = 0;
         try {
-            $activeTrips = (clone $query)->whereIn('status', ['open', 'in_progress'])->count();
+            $activeTrips = (clone $filteredTrips)->whereIn('fleet_trips.status', ['open', 'in_progress'])->count();
         } catch (\Throwable $e) {
             $activeTrips = 0;
         }
@@ -662,8 +675,7 @@ class VehicleController extends Controller
         $tripsByDay = [];
         try {
             $dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            $dayQuery = (clone $query);
-            $dayCounts = $dayQuery
+            $dayCounts = (clone $filteredTrips)
                 ->selectRaw('DAYOFWEEK(started_at) as dow, COUNT(*) as cnt')
                 ->groupByRaw('DAYOFWEEK(started_at)')
                 ->pluck('cnt', 'dow')
@@ -685,7 +697,7 @@ class VehicleController extends Controller
         // Top 5 vehicles by distance (HorizontalBarChart data)
         $topVehicles = [];
         try {
-            $topVehicles = FleetTrip::query()
+            $topVehicles = (clone $visibleTrips)
                 ->selectRaw('asset_id, SUM(distance_km) as total_km')
                 ->with('asset:id,name')
                 ->groupBy('asset_id')
@@ -705,7 +717,7 @@ class VehicleController extends Controller
         // Distance trend (last 7 trips sparkline)
         $distanceTrend = [];
         try {
-            $distanceTrend = FleetTrip::query()
+            $distanceTrend = (clone $visibleTrips)
                 ->latest('started_at')
                 ->limit(7)
                 ->pluck('distance_km')
@@ -722,10 +734,10 @@ class VehicleController extends Controller
         // dashboard definition (before 8am / after 6pm, last 7 days).
         $todayStart = now()->startOfDay();
         $hero = [
-            'trips_today' => FleetTrip::where('started_at', '>=', $todayStart)->count(),
-            'distance_today_km' => round((float) FleetTrip::where('started_at', '>=', $todayStart)->sum('distance_km'), 1),
-            'active_now' => FleetTrip::whereIn('status', ['open', 'in_progress'])->count(),
-            'after_hours_7d' => FleetTrip::where('started_at', '>=', now()->subDays(7))
+            'trips_today' => (clone $visibleTrips)->where('started_at', '>=', $todayStart)->count(),
+            'distance_today_km' => round((float) (clone $visibleTrips)->where('started_at', '>=', $todayStart)->sum('distance_km'), 1),
+            'active_now' => (clone $visibleTrips)->whereIn('status', ['open', 'in_progress'])->count(),
+            'after_hours_7d' => (clone $visibleTrips)->where('started_at', '>=', now()->subDays(7))
                 ->afterHours()
                 ->count(),
         ];
@@ -740,50 +752,55 @@ class VehicleController extends Controller
         if (! in_array($direction, ['asc', 'desc'])) {
             $direction = 'desc';
         }
-        $query->reorder()->orderBy($sort, $direction);
+        $query = $this->withTripIndexRelations(clone $filteredTrips, $visibleSiteIds)
+            ->orderBy($sort, $direction);
 
         $trips = $query->paginate(25)->withQueryString();
 
         // Get vehicles list for filter dropdown
-        $vehicles = Asset::vehicles()->orderBy('name')->get(['id', 'name'])
+        $vehicles = (clone $visibleVehicles)->orderBy('name')->get(['id', 'name'])
             ->map(fn ($v) => ['id' => $v->id, 'name' => $v->name])->values();
 
         return Inertia::render('fleet-assets/trips/index', [
             'trips' => [
-                'data' => $trips->getCollection()->map(fn ($trip) => [
-                    'id' => $trip->id,
-                    'asset' => $trip->asset ? [
-                        'id' => $trip->asset->id,
-                        'name' => $trip->asset->name,
-                        'asset_tag' => $trip->asset->asset_tag,
-                    ] : null,
-                    'driver' => $trip->driverSession?->user ? [
-                        'id' => $trip->driverSession->user->id,
-                        'name' => $trip->driverSession->user->name,
-                    ] : null,
-                    'started_at' => optional($trip->started_at)->toISOString(),
-                    'ended_at' => optional($trip->ended_at)->toISOString(),
-                    'distance_km' => $trip->distance_km,
-                    'duration_s' => $trip->duration_s,
-                    'max_speed_kph' => $trip->max_speed_kph ?? null,
-                    'status' => $trip->status,
-                    'is_personal' => (bool) $trip->is_personal,
-                    'start_address' => $trip->start_address,
-                    'end_address' => $trip->end_address,
-                    'start_latitude' => $trip->start_latitude,
-                    'start_longitude' => $trip->start_longitude,
-                    'end_latitude' => $trip->end_latitude,
-                    'end_longitude' => $trip->end_longitude,
-                    'segments' => $trip->segments->map(fn ($seg) => [
-                        'id' => $seg->id,
-                        'seq' => $seg->seq,
-                        'started_at' => optional($seg->started_at)->toISOString(),
-                        'ended_at' => optional($seg->ended_at)->toISOString(),
-                        'distance_km' => $seg->distance_km,
-                        'duration_s' => $seg->duration_s,
-                        'polyline' => $seg->polyline ? json_decode($seg->polyline, true) : null,
-                    ])->values(),
-                ])->values(),
+                'data' => $trips->getCollection()->map(function (FleetTrip $trip): array {
+                    $driver = $this->visibleTripDriver($trip);
+
+                    return [
+                        'id' => $trip->id,
+                        'asset' => $trip->asset ? [
+                            'id' => $trip->asset->id,
+                            'name' => $trip->asset->name,
+                            'asset_tag' => $trip->asset->asset_tag,
+                        ] : null,
+                        'driver' => $driver ? [
+                            'id' => $driver->id,
+                            'name' => $driver->name,
+                        ] : null,
+                        'started_at' => optional($trip->started_at)->toISOString(),
+                        'ended_at' => optional($trip->ended_at)->toISOString(),
+                        'distance_km' => $trip->distance_km,
+                        'duration_s' => $trip->duration_s,
+                        'max_speed_kph' => $trip->max_speed_kph ?? null,
+                        'status' => $trip->status,
+                        'is_personal' => (bool) $trip->is_personal,
+                        'start_address' => $trip->start_address,
+                        'end_address' => $trip->end_address,
+                        'start_latitude' => $trip->start_latitude,
+                        'start_longitude' => $trip->start_longitude,
+                        'end_latitude' => $trip->end_latitude,
+                        'end_longitude' => $trip->end_longitude,
+                        'segments' => $trip->segments->map(fn ($seg) => [
+                            'id' => $seg->id,
+                            'seq' => $seg->seq,
+                            'started_at' => optional($seg->started_at)->toISOString(),
+                            'ended_at' => optional($seg->ended_at)->toISOString(),
+                            'distance_km' => $seg->distance_km,
+                            'duration_s' => $seg->duration_s,
+                            'polyline' => $seg->polyline ? json_decode($seg->polyline, true) : null,
+                        ])->values(),
+                    ];
+                })->values(),
                 'links' => $trips->linkCollection()->toArray(),
                 'meta' => [
                     'current_page' => $trips->currentPage(),
@@ -1110,6 +1127,114 @@ class VehicleController extends Controller
         }
 
         return back()->with('success', 'Alert configuration saved.');
+    }
+
+    /** @param list<int> $siteIds */
+    private function visibleTripVehiclesQuery(array $siteIds): Builder
+    {
+        return $this->applyTripAssetSiteScope(Asset::query()->vehicles(), $siteIds);
+    }
+
+    /** @param list<int> $siteIds */
+    private function applyTripAssetSiteScope(Builder $query, array $siteIds): Builder
+    {
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $siteColumn = $query->qualifyColumn('site_id');
+        $homeSiteColumn = $query->qualifyColumn('home_site_id');
+        $clientColumn = $query->qualifyColumn('client_id');
+
+        return $query->where(function (Builder $provenance) use (
+            $siteIds,
+            $siteColumn,
+            $homeSiteColumn,
+            $clientColumn,
+        ): void {
+            $provenance->where(function (Builder $directSite) use ($siteIds, $siteColumn, $clientColumn): void {
+                $directSite->whereIn($siteColumn, $siteIds)
+                    ->where(function (Builder $clientAgreement) use ($siteColumn, $clientColumn): void {
+                        $clientAgreement->whereNull($clientColumn)
+                            ->orWhereHas('client', fn (Builder $client) => $client->whereColumn(
+                                $client->qualifyColumn('site_id'),
+                                $siteColumn,
+                            ));
+                    });
+            })->orWhere(function (Builder $homeSite) use (
+                $siteIds,
+                $siteColumn,
+                $homeSiteColumn,
+                $clientColumn,
+            ): void {
+                $homeSite->whereNull($siteColumn)
+                    ->whereIn($homeSiteColumn, $siteIds)
+                    ->where(function (Builder $clientAgreement) use ($homeSiteColumn, $clientColumn): void {
+                        $clientAgreement->whereNull($clientColumn)
+                            ->orWhereHas('client', fn (Builder $client) => $client->whereColumn(
+                                $client->qualifyColumn('site_id'),
+                                $homeSiteColumn,
+                            ));
+                    });
+            })->orWhere(function (Builder $clientSite) use (
+                $siteIds,
+                $siteColumn,
+                $homeSiteColumn,
+                $clientColumn,
+            ): void {
+                $clientSite->whereNull($siteColumn)
+                    ->whereNull($homeSiteColumn)
+                    ->whereNotNull($clientColumn)
+                    ->whereHas('client', fn (Builder $client) => $client->whereIn(
+                        $client->qualifyColumn('site_id'),
+                        $siteIds,
+                    ));
+            });
+        });
+    }
+
+    /** @param list<int> $visibleSiteIds */
+    private function withTripIndexRelations(Builder $query, array $visibleSiteIds): Builder
+    {
+        return $query->with([
+            'asset:id,name,asset_tag',
+            'driverSession.user' => function ($relation) use ($visibleSiteIds): void {
+                $this->applyHistoricalTripDriverSiteScope($relation->getQuery(), $visibleSiteIds);
+                $relation->select(['id', 'name']);
+            },
+            'segments' => fn ($segments) => $segments->orderBy('seq'),
+        ]);
+    }
+
+    /** @param list<int> $siteIds */
+    private function applyHistoricalTripDriverSiteScope(Builder $query, array $siteIds): Builder
+    {
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $profiles = HrEmployeeProfile::withTrashed()
+            ->select('user_id')
+            ->where(function (Builder $siteQuery) use ($siteIds): void {
+                $siteQuery->whereIn('primary_site_id', $siteIds);
+
+                foreach ($siteIds as $siteId) {
+                    $siteQuery->orWhereJsonContains('secondary_site_ids', $siteId);
+                }
+            });
+
+        return $query->whereIn($query->qualifyColumn('id'), $profiles);
+    }
+
+    private function visibleTripDriver(FleetTrip $trip): ?User
+    {
+        $session = $trip->driverSession;
+
+        if (! $session || (int) $session->asset_id !== (int) $trip->asset_id) {
+            return null;
+        }
+
+        return $session->user;
     }
 
     private function accessibleSite(User $user, int $siteId, bool $lockForUpdate): Site
