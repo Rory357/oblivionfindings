@@ -259,6 +259,10 @@ dashboard_run_172 = read_json_strict("evidence/browser/current-audit-dashboard-v
 run_173_remediation = read_json_strict("evidence/runtime/current-run-173-safe-alert-dedup-identity-remediation-wave-32.json")
 run_173r_review = read_json_strict("evidence/runtime/current-run-173r-independent-safe-alert-dedup-identity-remediation-review-wave-32.json")
 run_174_reporting = read_json_strict("evidence/source/current-run-174-safe-alert-dedup-identity-remediation-reporting-wave-32.json")
+dashboard_run_175 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-175-wave-32.json")
+run_176_remediation = read_json_strict("evidence/runtime/current-run-176-fleet-trip-index-site-privacy-remediation-wave-33.json")
+run_176r_review = read_json_strict("evidence/runtime/current-run-176r-independent-fleet-trip-index-site-privacy-remediation-review-wave-33.json")
+run_177_reporting = read_json_strict("evidence/source/current-run-177-fleet-trip-index-site-privacy-remediation-reporting-wave-33.json")
 findings_register = read_json_strict("findings.json")
 assert sha256_file("evidence/source/current-canonical-feature-identity-wave-01.json") == "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
 assert sha256_file("evidence/source/current-canonical-identity-agent-register.json") == "21ebd8b004b5ade11aa01281958cda2be2ca966d1fb7c46576e039fab5f47baf"
@@ -3156,6 +3160,14 @@ for label, path in (
     ("RUN-173R independent SAFE remediation review", "evidence/runtime/current-run-173r-independent-safe-alert-dedup-identity-remediation-review-wave-32.json"),
     ("RUN-174 SAFE alert dedup remediation-reporting materializer", "generators/materialize-run-174-safe-alert-dedup-identity-remediation-reporting-wave-32.py"),
     ("RUN-174 SAFE alert dedup remediation-reporting receipt", "evidence/source/current-run-174-safe-alert-dedup-identity-remediation-reporting-wave-32.json"),
+    ("RUN-175 exact RUN-174 audit-dashboard verification materializer", "generators/materialize-run-175-audit-dashboard-verification-wave-32.py"),
+    ("RUN-175 exact RUN-174 audit-dashboard verification", "evidence/browser/current-audit-dashboard-verification-run-175-wave-32.json"),
+    ("RUN-176 Fleet trip-index Site-privacy remediation materializer", "generators/materialize-run-176-fleet-trip-index-site-privacy-remediation-wave-33.py"),
+    ("RUN-176 Fleet trip-index Site-privacy remediation receipt", "evidence/runtime/current-run-176-fleet-trip-index-site-privacy-remediation-wave-33.json"),
+    ("RUN-176R independent Fleet remediation-review materializer", "generators/materialize-independent-run-176-fleet-trip-index-site-privacy-remediation-review-wave-33.py"),
+    ("RUN-176R independent Fleet remediation review", "evidence/runtime/current-run-176r-independent-fleet-trip-index-site-privacy-remediation-review-wave-33.json"),
+    ("RUN-177 Fleet trip-index Site-privacy remediation-reporting materializer", "generators/materialize-run-177-fleet-trip-index-site-privacy-remediation-reporting-wave-33.py"),
+    ("RUN-177 Fleet trip-index Site-privacy remediation-reporting receipt", "evidence/source/current-run-177-fleet-trip-index-site-privacy-remediation-reporting-wave-33.json"),
 ):
     if path not in checkpoint_paths:
         checkpoint_evidence.append((label, path))
@@ -3168,9 +3180,9 @@ checkpoint_evidence_links = "".join(
 checkpoint_evidence_links += (
     '<li><a href="task-scripts/">RUN-072 task-script directory (300 files)</a> '
     f'<code>{html.escape(usability_materialization["outputs"]["task_scripts"]["bundle_sha256"])}</code></li>'
-    '<li><a href="generators/materialize-run-175-audit-dashboard-verification-wave-32.py">RUN-175 audit-dashboard verification materializer</a> '
+    '<li><a href="generators/materialize-run-178-audit-dashboard-verification-wave-33.py">RUN-178 audit-dashboard verification materializer</a> '
     '<span>forward generator; fresh exact-artifact verification required</span></li>'
-    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-175-wave-32.json">RUN-175 audit-dashboard verification receipt</a> '
+    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-178-wave-33.json">RUN-178 audit-dashboard verification receipt</a> '
     '<span>forward receipt; intentionally unhashed to avoid an evidence cycle</span></li>'
 )
 start_ready_ids = "<br>".join(
@@ -3302,7 +3314,7 @@ historical_discovery_claims = {row["finding_id"]: row["source_claim"] for row in
 assert len(historical_discovery_claims) == 12
 
 assert findings_register["schema_version"] == "oblivion_audit_findings_v2_mixed_current_status"
-assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_TWO_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
+assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_THREE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
 assert findings_register["generated_on"] == "2026-08-30"
 assert findings_register["architecture_rule"] == "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries."
 findings_pins = findings_register["pins"]
@@ -3325,9 +3337,20 @@ assert findings_pins["safe_alert_dedup_local_main_tree"] == "59b4fc58567f64bc80f
 assert findings_pins["safe_alert_dedup_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
 assert findings_pins["run_173_safe_alert_dedup_remediation_sha256"] == "49a4fa5ad4fefa1c72e449b69150fe05de06e8f9d0055b47e93a0a3061b66e45"
 assert findings_pins["run_173r_independent_artifact_review_sha256"] == "9a19e5ccb15d955db8bf1bcd80b40a6f89306bc9945625d275f3d6f4c543e652"
+assert findings_pins["fleet_trip_index_site_privacy_baseline_commit"] == "13a7f37da9c966fa531f20e82b1bb9eac814e041"
+assert findings_pins["fleet_trip_index_site_privacy_baseline_tree"] == "e952efb7d0b1446d2c6b67bbd28339bd906d1b38"
+assert findings_pins["fleet_trip_index_site_privacy_fix_commit"] == "790bc11e3fb2b17a0eb8ba96e2cdea87ba8175b5"
+assert findings_pins["fleet_trip_index_site_privacy_fix_tree"] == "657abb07867068865f935008c2c43dea38c867c8"
+assert findings_pins["fleet_trip_index_site_privacy_local_main_merge_commit"] == "c643c9e5eecf3b4272f55ec6d5aab4b99c3e300d"
+assert findings_pins["fleet_trip_index_site_privacy_local_main_tree"] == "657abb07867068865f935008c2c43dea38c867c8"
+assert findings_pins["fleet_trip_index_site_privacy_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
+assert findings_pins["run_176_fleet_trip_index_site_privacy_remediation_sha256"] == "6e9fa6d855e6ec168d4c651921702dab8872810ddd89f6ba3cd353bf49e0c87c"
+assert findings_pins["run_176r_independent_artifact_review_sha256"] == "f1f7369306235ad7d5f318b512dca94e853d96e182ff5c63ddc509534fa545c1"
 live_findings = findings_register["records"]
-assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 12
-assert {row["id"] for row in live_findings} == set(historical_discovery_claims)
+assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 13
+assert {row["id"] for row in live_findings} == set(historical_discovery_claims) | {
+    "FLEET-TRIP-INDEX-SITE-PRIVACY-01"
+}
 provisional_findings = [
     row for row in live_findings
     if row["record_status"] == "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING"
@@ -3342,7 +3365,7 @@ historical_remediated_findings = [
 ]
 assert len(provisional_findings) == findings_register["counts"]["provisional_source_claims"] == 8
 assert len(historical_fixed_findings) == findings_register["counts"]["historical_already_fixed"] == 2
-assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 2
+assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 3
 historical_fixed_by_id = {row["id"]: row for row in historical_fixed_findings}
 assert set(historical_fixed_by_id) == {"MED-RBAC-01", "MED-CD-ATOMICITY-01"}
 assert historical_fixed_by_id["MED-RBAC-01"]["current_adjudication"]["verdict"] == "ALREADY_FIXED"
@@ -3379,7 +3402,11 @@ assert all(
 )
 assert atomicity_residual["must_remain_explicit_without_inherited_credit"] is True
 historical_remediated_by_id = {row["id"]: row for row in historical_remediated_findings}
-assert set(historical_remediated_by_id) == {"MED-CD-SCOPE-01", "SAFE-ALERT-DEDUP-IDENTITY-01"}
+assert set(historical_remediated_by_id) == {
+    "MED-CD-SCOPE-01",
+    "SAFE-ALERT-DEDUP-IDENTITY-01",
+    "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
+}
 scope_finding = historical_remediated_by_id["MED-CD-SCOPE-01"]
 assert scope_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED"
 assert scope_finding["current_adjudication"]["application_commit"] == run_162_pins["application_commit"]
@@ -3403,11 +3430,22 @@ assert all(
         "broader_safeguarding_correctness_inherited",
     )
 )
+fleet_finding = historical_remediated_by_id["FLEET-TRIP-INDEX-SITE-PRIVACY-01"]
+assert fleet_finding["feature_id"] == fleet_finding["candidate_feature_id"] == "CAP-FLEET-VEHICLE-REGISTER"
+assert fleet_finding["feature_identity_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
+assert fleet_finding["feature_id_role"] == "CANDIDATE_REPORTING_ASSOCIATION_ONLY_ZERO_STATIC_OWNERSHIP_CREDIT"
+assert fleet_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED"
+assert fleet_finding["current_adjudication"]["application_commit"] == "c643c9e5eecf3b4272f55ec6d5aab4b99c3e300d"
+assert fleet_finding["current_adjudication"]["repository_tree"] == "657abb07867068865f935008c2c43dea38c867c8"
+assert fleet_finding["current_adjudication"]["published_to_origin_main"] is False
+assert fleet_finding["route_url"]["ownership_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
+assert fleet_finding["evidence"]["tests_executed"] == 5
+assert fleet_finding["evidence"]["assertions"] == 175
 assert all(row["completion_credit"] is False for row in live_findings)
 assert all(all(value is False for value in row["credit"].values()) for row in live_findings)
-assert findings_register["counts"]["bounded_disposition_tests_passed"] == 83
-assert findings_register["counts"]["bounded_disposition_assertions"] == 1589
-assert findings_register["counts"]["bounded_disposition_sum_basis"] == "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY only; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, and every overlapping supporting execution"
+assert findings_register["counts"]["bounded_disposition_tests_passed"] == 88
+assert findings_register["counts"]["bounded_disposition_assertions"] == 1764
+assert "5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert findings_register["counts"]["med_rbac_bounded_tests"] == 73
 assert findings_register["counts"]["med_rbac_bounded_test_assertions"] == 1481
 assert findings_register["counts"]["med_cd_scope_focused_tests"] == 5
@@ -3424,11 +3462,15 @@ assert findings_register["counts"]["safe_alert_dedup_supporting_control_room_bri
 assert findings_register["counts"]["safe_alert_dedup_supporting_hs_event_tests"] == 3
 assert findings_register["counts"]["safe_alert_dedup_supporting_hs_event_assertions"] == 5
 assert findings_register["counts"]["safe_alert_dedup_terminal_fixture_failures"] == 6
+assert findings_register["counts"]["fleet_trip_index_site_privacy_focused_tests"] == 5
+assert findings_register["counts"]["fleet_trip_index_site_privacy_focused_assertions"] == 175
+assert findings_register["counts"]["fleet_trip_index_site_privacy_supporting_tests"] == 4
+assert findings_register["counts"]["fleet_trip_index_site_privacy_supporting_assertions"] == 35
 assert findings_register["counts"]["final_P0"] == findings_register["counts"]["final_P1"] == 0
-assert findings_register["reconciliation"]["retained_record_count"] == 12
+assert findings_register["reconciliation"]["retained_record_count"] == 13
 assert findings_register["reconciliation"]["current_provisional_count"] == 8
 assert findings_register["reconciliation"]["historical_already_fixed_count"] == 2
-assert findings_register["reconciliation"]["historical_remediated_count"] == 2
+assert findings_register["reconciliation"]["historical_remediated_count"] == 3
 
 assert run_163_reporting["schema_version"] == "run-163-med-cd-scope-remediation-reporting-wave-29-v1"
 assert run_163_reporting["run_id"] == "RUN-163-MED-CD-SCOPE-01-REMEDIATION-REPORTING-WAVE-29"
@@ -3708,6 +3750,248 @@ run_174_seal = run_174_without_seal.pop("receipt_self_seal_sha256")
 assert canonical_sha256(run_174_without_seal) == run_174_seal
 assert all(value is False for value in run_174_reporting["completion_boundary"].values())
 
+assert sha256_file(
+    "evidence/browser/current-audit-dashboard-verification-run-175-wave-32.json"
+) == "6ef4d3f7e1018c0e137ee485007847b1149bff9f5cf94feefebaf3eeebc09de6"
+assert dashboard_run_175["schema_version"] == "run-175-audit-dashboard-verification-wave-32-v1"
+assert dashboard_run_175["run_id"] == "RUN-175-AUDIT-DASHBOARD-VERIFICATION-WAVE-32"
+assert dashboard_run_175["verification"]["viewports_verified"] == 4
+assert dashboard_run_175["verification"]["visible_static_checks_passed"] == 79
+assert dashboard_run_175["verification"]["navigation_clicks_passed"] == 10
+assert dashboard_run_175["verification"]["unique_local_resources"] == 435
+run_175_dashboard_pin = dashboard_run_175["pins"]["run_175_dashboard"]
+assert run_175_dashboard_pin == {
+    "path": "audit-dashboard.html",
+    "sha256": "8586a2cb3cc6c248788ea71ecc20c2e0c4785fd5a7a5a00fa11d2ee48f48490c",
+    "git_blob_id": "1c1c521b674bcc12b5227aff1418a49ba0ace06a",
+    "bytes": 280930,
+    "lines": 78,
+}
+run_175_dashboard_payload = git_file_at_commit(
+    "13a7f37da9c966fa531f20e82b1bb9eac814e041",
+    run_175_dashboard_pin["path"],
+)
+assert hashlib.sha256(run_175_dashboard_payload).hexdigest() == run_175_dashboard_pin["sha256"]
+assert git_blob_id_bytes(run_175_dashboard_payload) == run_175_dashboard_pin["git_blob_id"]
+assert (len(run_175_dashboard_payload), run_175_dashboard_payload.count(b"\n")) == (
+    run_175_dashboard_pin["bytes"],
+    run_175_dashboard_pin["lines"],
+)
+dashboard_run_175_without_seal = dict(dashboard_run_175)
+dashboard_run_175_seal = dashboard_run_175_without_seal.pop("receipt_self_seal_sha256")
+assert dashboard_run_175_seal == "8ae9223300ef5851bd432da467a5ae7dba2e0460ff69291188039da0dfad7ae4"
+assert canonical_sha256(dashboard_run_175_without_seal) == dashboard_run_175_seal
+assert {
+    key for key, value in dashboard_run_175["credit_boundary"].items() if value
+} == {
+    "audit_dashboard_run_175_med_pin_correction",
+    "exact_audit_dashboard_artifact",
+}
+assert dashboard_run_175["artifact_completion_test_met"] is True
+assert dashboard_run_175["audit_completion_test_met"] is False
+assert all(value is False for value in dashboard_run_175["completion_boundary"].values())
+
+assert sha256_file(
+    "evidence/runtime/current-run-176-fleet-trip-index-site-privacy-remediation-wave-33.json"
+) == "6e9fa6d855e6ec168d4c651921702dab8872810ddd89f6ba3cd353bf49e0c87c"
+assert run_176_remediation["schema_version"] == "run-176-fleet-trip-index-site-privacy-remediation-wave-33-v1"
+assert run_176_remediation["run_id"] == "RUN-176-FLEET-TRIP-INDEX-SITE-PRIVACY-01-REMEDIATION-WAVE-33"
+assert run_176_remediation["pins"]["application_baseline_commit"] == "13a7f37da9c966fa531f20e82b1bb9eac814e041"
+assert run_176_remediation["pins"]["fix_commit"] == "790bc11e3fb2b17a0eb8ba96e2cdea87ba8175b5"
+assert run_176_remediation["pins"]["local_main_merge_commit"] == "c643c9e5eecf3b4272f55ec6d5aab4b99c3e300d"
+assert run_176_remediation["pins"]["origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
+assert run_176_remediation["pins"]["application_remote_publication_observed"] is False
+assert run_176_remediation["delegated_runtime_execution"]["post_merge_green_focused"] == {
+    "tests": 5,
+    "assertions": 175,
+    "duration_seconds": 170.48,
+    "unique_bounded_disposition_denominator_credit": True,
+}
+assert run_176_remediation["delegated_runtime_execution"]["unique_bounded_accounting"]["resulting"] == {
+    "tests": 88,
+    "assertions": 1764,
+}
+assert run_176_remediation["static_ownership_boundary"]["ownership_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
+assert run_176_remediation["static_ownership_boundary"]["next_zero_based_index"] == 84
+assert {
+    key: run_176_remediation["static_ownership_boundary"][key]
+    for key in (
+        "owner_records",
+        "route_owners",
+        "page_owners",
+        "action_bridges",
+        "queue_reviewed",
+        "queue_pending",
+        "queue_owned",
+        "queue_without_ownership",
+        "next_queue_id",
+        "next_route_record_id",
+    )
+} == {
+    "owner_records": 665,
+    "route_owners": 308,
+    "page_owners": 357,
+    "action_bridges": 96,
+    "queue_reviewed": 119,
+    "queue_pending": 388,
+    "queue_owned": 97,
+    "queue_without_ownership": 410,
+    "next_queue_id": "RUN090-ROUTE-0085",
+    "next_route_record_id": "RUN077-ROUTE-0693",
+}
+assert run_176_remediation["benchmark_boundary"] == {
+    "mapped": 2,
+    "total": 340,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338,
+    "changed_by_run_176": False,
+}
+assert {
+    key for key, value in run_176_remediation["credit_boundary"].items() if value
+} == {
+    "historical_condition_confirmed",
+    "current_defect_reproduced",
+    "application_remediation",
+    "bounded_runtime",
+    "bounded_selected_get_and_csv_execution",
+    "bounded_site_privacy_correctness",
+    "application_commit_integrated_local_main",
+}
+run_176_without_seal = dict(run_176_remediation)
+run_176_seal = run_176_without_seal.pop("receipt_self_seal_sha256")
+assert run_176_seal == "541e2cc0c0a167b48cfac6e96ab2286d9898cb737dec2eb115b41d56e74b9617"
+assert canonical_sha256(run_176_without_seal) == run_176_seal
+assert run_176_remediation["artifact_completion_test_met"] is True
+assert run_176_remediation["audit_completion_test_met"] is False
+assert all(value is False for value in run_176_remediation["completion_boundary"].values())
+
+assert sha256_file(
+    "evidence/runtime/current-run-176r-independent-fleet-trip-index-site-privacy-remediation-review-wave-33.json"
+) == "f1f7369306235ad7d5f318b512dca94e853d96e182ff5c63ddc509534fa545c1"
+assert run_176r_review["schema_version"] == "run-176r-independent-fleet-trip-index-site-privacy-remediation-review-wave-33-v1"
+assert run_176r_review["run_id"] == "RUN-176R-INDEPENDENT-FLEET-TRIP-INDEX-SITE-PRIVACY-01-REMEDIATION-REVIEW-WAVE-33"
+assert run_176r_review["decision"]["verdict"] == "GO"
+assert run_176r_review["decision"]["blocking_discrepancies"] == 0
+assert run_176r_review["decision"]["new_historical_remediated_record_reporting_authorized"] is True
+assert run_176r_review["decision"]["authorized_live_reporting_run"] == "RUN-177"
+assert run_176r_review["decision"]["authorized_resulting_lineage"] == {
+    "retained_claim_records": 13,
+    "current_provisional_source_claims": 8,
+    "historical_already_fixed_records": 2,
+    "historical_remediated_records": 3,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_176r_review["decision"]["authorized_unique_bounded_disposition_increment"] == {
+    "prior_tests": 83,
+    "prior_assertions": 1589,
+    "tests": 5,
+    "assertions": 175,
+    "resulting_tests": 88,
+    "resulting_assertions": 1764,
+    "post_merge_focused_counted_once": True,
+    "root_or_delegated_red_counted": False,
+    "isolated_replay_counted_again": False,
+    "supporting_runs_counted": False,
+}
+assert run_176r_review["decision"]["static_ownership_remains_pending"] == {
+    "ownership_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "next_zero_based_index": 84,
+    "next_queue_id": "RUN090-ROUTE-0085",
+    "next_route_record_id": "RUN077-ROUTE-0693",
+    "route_owner_authorized": False,
+    "controller_action_bridge_authorized": False,
+    "queue_advance_authorized": False,
+}
+assert {
+    key for key, value in run_176r_review["credit_boundary"].items() if value
+} == {
+    "independent_exact_artifact_review_for_new_historical_remediated_reporting"
+}
+run_176r_without_seal = dict(run_176r_review)
+run_176r_seal = run_176r_without_seal.pop("receipt_self_seal_sha256")
+assert run_176r_seal == "a596b81ded6db13d312bdcbf52deb7a3e088f8404d81c774b3f5910c86140f49"
+assert canonical_sha256(run_176r_without_seal) == run_176r_seal
+assert run_176r_review["artifact_completion_test_met"] is True
+assert run_176r_review["audit_completion_test_met"] is False
+assert all(value is False for value in run_176r_review["completion_boundary"].values())
+
+assert run_177_reporting["schema_version"] == "run-177-fleet-trip-index-site-privacy-remediation-reporting-wave-33-v1"
+assert run_177_reporting["run_id"] == "RUN-177-FLEET-TRIP-INDEX-SITE-PRIVACY-01-REMEDIATION-REPORTING-WAVE-33"
+assert run_177_reporting["reporting_transition"]["finding_id"] == "FLEET-TRIP-INDEX-SITE-PRIVACY-01"
+assert run_177_reporting["reporting_transition"]["feature_identity_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
+assert run_177_reporting["reporting_transition"]["candidate_feature_id"] == "CAP-FLEET-VEHICLE-REGISTER"
+assert run_177_reporting["reporting_transition"]["authorized_by_run_176r"] is True
+assert run_177_reporting["reporting_transition"]["transition_kind"] == "NEW_HISTORICAL_REMEDIATED_RECORD"
+assert run_177_reporting["reporting_transition"]["status_before"] == "ABSENT"
+assert run_177_reporting["reporting_transition"]["status_after"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
+assert run_177_reporting["reporting_transition"]["counts_after"] == {
+    "retained_claim_records": 13,
+    "provisional_source_claims": 8,
+    "historical_already_fixed": 2,
+    "historical_remediated": 3,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_177_reporting["reporting_transition"]["new_target_record_canonical_sha256"] == "98c82f01cf8348fc4b60a4c17feea675182dc287e4c7907174b13d44af331fab"
+assert run_177_reporting["reporting_transition"]["counts_before"] == {
+    "retained_claim_records": 12,
+    "provisional_source_claims": 8,
+    "historical_already_fixed": 2,
+    "historical_remediated": 2,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_177_reporting["reporting_transition"]["unchanged_preexisting_record_count"] == 12
+assert run_177_reporting["bounded_execution_accounting"]["unique_total"] == {
+    "tests": 88,
+    "assertions": 1764,
+}
+assert run_177_reporting["preservation_boundary"]["dashboard_byte_identical_to_reporting_input"] is True
+assert run_177_reporting["preservation_boundary"]["dashboard_sha256"] == run_175_dashboard_pin["sha256"]
+assert run_177_reporting["pins"]["unchanged_run_175_dashboard"] == run_175_dashboard_pin
+assert run_177_reporting["preservation_boundary"]["static_ownership"] == {
+    "owners": 665,
+    "routes": 308,
+    "pages": 357,
+    "controller_action_bridges": 96,
+    "ownership_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+}
+assert run_177_reporting["preservation_boundary"]["queue"] == {
+    "next_zero_based_index": 84,
+    "next_queue_id": "RUN090-ROUTE-0085",
+    "next_route_record_id": "RUN077-ROUTE-0693",
+    "reviewed": 119,
+    "pending": 388,
+    "owned": 97,
+    "without_ownership": 410,
+    "advanced_by_run_177": False,
+}
+assert run_177_reporting["preservation_boundary"]["benchmark"] == {
+    "mapped": 2,
+    "total": 340,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338,
+}
+assert run_177_reporting["publication_boundary"]["fleet_application_published"] is False
+assert run_177_reporting["publication_boundary"]["run_176_to_177_published"] is False
+assert run_177_reporting["publication_boundary"]["publication_authorized"] is False
+assert run_177_reporting["dashboard_forward_gate"]["required_run"] == "RUN-178"
+assert run_177_reporting["dashboard_forward_gate"]["dashboard_html_changed_by_run_177"] is False
+assert run_177_reporting["dashboard_forward_gate"]["unchanged_dashboard_sha256"] == run_175_dashboard_pin["sha256"]
+assert run_177_reporting["dashboard_forward_gate"]["fresh_rebuild_required"] is True
+assert run_177_reporting["dashboard_forward_gate"]["fresh_verification_required"] is True
+assert run_177_reporting["dashboard_forward_gate"]["future_receipt_link_is_unhashed_to_avoid_cycle"] is True
+assert {key for key, value in run_177_reporting["credit_boundary"].items() if value} == {
+    "live_findings_register_and_reporting_status"
+}
+run_177_without_seal = dict(run_177_reporting)
+run_177_seal = run_177_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_177_without_seal) == run_177_seal
+assert run_177_reporting["artifact_completion_test_met"] is True
+assert run_177_reporting["audit_completion_test_met"] is False
+assert all(value is False for value in run_177_reporting["completion_boundary"].values())
+
 required_artifacts = [
     "00-executive-summary.md", "01-repository-module-map.md",
     "02-eight-pass-coverage-ledger.csv", "03-feature-to-benchmark-matrix.csv",
@@ -3749,10 +4033,18 @@ safe_row_status = (
     "historical issue · remediated on local main · not published to origin/main · "
     "30-minute dedup contract and +31-minute lifecycle preserved · not a final finding"
 )
+fleet_row_status = (
+    "historical issue · remediated on local main · not published to origin/main · "
+    "candidate feature association only · route ownership PENDING_FRESH_SEMANTIC_REVIEW · "
+    "not a final finding"
+)
+finding_claim_labels = dict(historical_discovery_claims)
+finding_claim_labels["FLEET-TRIP-INDEX-SITE-PRIVACY-01"] = fleet_finding["impact"]
+assert set(finding_claim_labels) == {row["id"] for row in live_findings}
 finding_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td class=\"partial\">{}</td></tr>".format(
         html.escape(row["id"]),
-        html.escape(historical_discovery_claims[row["id"]]),
+        html.escape(finding_claim_labels[row["id"]]),
         (
             atomicity_row_status
             if row["id"] == "MED-CD-ATOMICITY-01"
@@ -3760,12 +4052,16 @@ finding_rows = "".join(
                 safe_row_status
                 if row["id"] == "SAFE-ALERT-DEDUP-IDENTITY-01"
                 else (
-                    "historical issue · already fixed on current main · not a final finding"
-                    if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                    fleet_row_status
+                    if row["id"] == "FLEET-TRIP-INDEX-SITE-PRIVACY-01"
                     else (
-                        "historical issue · remediated on current main · not a final finding"
-                        if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
-                        else "current provisional P1 · independent review pending"
+                        "historical issue · already fixed on current main · not a final finding"
+                        if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                        else (
+                            "historical issue · remediated on current main · not a final finding"
+                            if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                            else "current provisional P1 · independent review pending"
+                        )
                     )
                 )
             )
@@ -3781,6 +4077,7 @@ expected_atomicity_row = (
 assert expected_atomicity_row in finding_rows
 assert finding_rows.count(atomicity_row_status) == 1
 assert finding_rows.count(safe_row_status) == 1
+assert finding_rows.count(fleet_row_status) == 1
 
 architecture_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td>{}</td><td class=\"partial\">source-only; promotion gate open</td></tr>".format(
@@ -4472,6 +4769,100 @@ run_174_template_rewrites = [
 for old, new in run_174_template_rewrites:
     assert current_template_text.count(old) == 1, f"Expected one RUN-174 template rewrite target: {old}"
     current_template_text = current_template_text.replace(old, new)
+
+run_177_template_rewrites = [
+    ('href="#checkpoint">RUN-174</a>', 'href="#checkpoint">RUN-177</a>'),
+    ("RUN-071–174 current reporting checkpoint:", "RUN-071–177 current reporting checkpoint:"),
+    ("RUN-071–174 completion-gate checkpoint", "RUN-071–177 completion-gate checkpoint"),
+    (
+        "The current RUN-174 register splits those records into $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated.",
+        "The current RUN-177 register retains 13 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; FLEET-TRIP-INDEX-SITE-PRIVACY-01 is a new historical-remediated record with candidate-only feature association and zero static-ownership credit.",
+    ),
+    (
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from separately bounded RUN-159 MED-RBAC, RUN-162 MED-CD-SCOPE, RUN-166 manual-entry MED-CD-ATOMICITY, and RUN-173 post-merge SAFE focused executions, no represented wave grants broader or full-suite application runtime or coverage; only MED-RBAC, MED-CD-SCOPE, and post-merge SAFE contribute once to the current $unique_bounded_tests/$unique_bounded_assertions total. No represented wave grants signed-in application-browser, ease, release, Pass, publication, final-finding, feature-completion, or audit-completion credit.",
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from separately bounded RUN-159 MED-RBAC, RUN-162 MED-CD-SCOPE, RUN-166 manual-entry MED-CD-ATOMICITY, RUN-173 post-merge SAFE, and RUN-176 post-merge Fleet focused executions, no represented wave grants broader or full-suite application runtime or coverage; only MED-RBAC, MED-CD-SCOPE, post-merge SAFE, and post-merge Fleet contribute once to the current $unique_bounded_tests/$unique_bounded_assertions total. No represented wave grants signed-in application-browser, ease, release, Pass, publication, final-finding, feature-completion, or audit-completion credit.",
+    ),
+    ("RUN-001 through RUN-174 are represented by audit artifacts.", "RUN-001 through RUN-177 are represented by audit artifacts."),
+    (
+        "<li>RUN-174: SAFE record reclassified in place · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-175</li>",
+        "<li>RUN-174: SAFE record reclassified in place · historical 8 provisional + 2 already-fixed + 2 remediated · historical 83/1,589 unique bounded total</li><li>RUN-175: exact RUN-174 dashboard verified at 4/4 viewports · 79/79 visible checks · 10/10 navigation · 435/435 local resources · zero application credit</li><li>RUN-176: Fleet trip-index Site-privacy defect reproduced and remediated in exactly two transferred paths · post-merge $fleet_tests/$fleet_assertions uniquely counted · local main only · not published</li><li>RUN-176R: exact remediation artifacts independently reviewed GO · one new historical-remediated record authorized</li><li>RUN-177: Fleet trip privacy historical-remediated record added · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-178</li>",
+    ),
+    (
+        "RUN-151, RUN-155, RUN-158, RUN-161, RUN-164, RUN-168, and RUN-172 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-174 reporting sources or the RUN-175 dashboard that will be generated from them.",
+        "RUN-151, RUN-155, RUN-158, RUN-161, RUN-164, RUN-168, RUN-172, and RUN-175 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-177 reporting sources or the RUN-178 dashboard that will be generated from them.",
+    ),
+    ("RUN-172–174 SAFE alert dedup remediation and reporting checkpoint", "RUN-175–177 Fleet trip index Site privacy remediation checkpoint"),
+    (
+        "<tr><td>RUN-174 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · $unique_bounded_tests tests / $unique_bounded_assertions assertions</strong></td><td class=\"partial\">SAFE reclassified in place · zero final finding · dashboard HTML unchanged · fresh RUN-175 required</td></tr>",
+        "<tr><td>RUN-174 live reporting</td><td><strong>8 current provisional P1 + 2 historical already-fixed + 2 historical remediated · 83 tests / 1,589 assertions</strong></td><td class=\"partial\">SAFE reclassified in place · exact dashboard later verified by RUN-175</td></tr><tr><td>RUN-175 exact dashboard verification</td><td><strong>4/4 viewports · 79/79 visible checks · 10/10 navigation · 435/435 local resources</strong></td><td class=\"partial\">exact superseded RUN-174 audit artifact only · zero application credit</td></tr><tr><td>RUN-176/R Fleet remediation and review</td><td><strong>root red $fleet_root_red_failed failed / $fleet_root_red_assertions assertions · expanded red $fleet_expanded_red_failed failed / $fleet_expanded_red_assertions assertions · post-merge $fleet_tests passed / $fleet_assertions assertions · baseline $fleet_baseline_short · fix $fleet_fix_short · exact two-path merge $fleet_merge_short</strong></td><td class=\"partial\">selected GET/CSV Site privacy only · independent GO · local main not published · static ownership pending</td></tr><tr><td>RUN-177 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · $unique_bounded_tests tests / $unique_bounded_assertions assertions</strong></td><td class=\"partial\">one new Fleet historical-remediated record · zero final finding · dashboard HTML unchanged · fresh RUN-178 required</td></tr>",
+    ),
+    (
+        "<li><span class=\"partial\">$med_rbac_tests</span> bounded MED-RBAC tests / $med_rbac_assertions assertions</li><li><span class=\"partial\">$med_cd_tests</span> focused MED-CD-SCOPE tests / $med_cd_assertions assertions</li><li><span class=\"partial\">$safe_tests</span> post-merge SAFE alert-dedup tests / $safe_assertions assertions; counted once in the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total</li><li><span class=\"partial\">$atomicity_tests</span> MED-CD-ATOMICITY test functions / $atomicity_assertions assertions / $atomicity_races synchronized races; separately reported, excluded from both the historical 78/1,529 and current $unique_bounded_tests/$unique_bounded_assertions totals · supporting $atomicity_supporting_tests/$atomicity_supporting_assertions overlaps · no full-suite or coverage credit</li>",
+        "<li><span class=\"partial\">$med_rbac_tests</span> bounded MED-RBAC tests / $med_rbac_assertions assertions</li><li><span class=\"partial\">$med_cd_tests</span> focused MED-CD-SCOPE tests / $med_cd_assertions assertions</li><li><span class=\"partial\">$safe_tests</span> post-merge SAFE alert-dedup tests / $safe_assertions assertions; counted once</li><li><span class=\"partial\">$fleet_tests</span> post-merge Fleet trip-index tests / $fleet_assertions assertions; counted once in the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total</li><li><span class=\"partial\">$atomicity_tests</span> MED-CD-ATOMICITY test functions / $atomicity_assertions assertions / $atomicity_races synchronized races; separately reported and excluded · supporting $atomicity_supporting_tests/$atomicity_supporting_assertions overlaps · no full-suite or coverage credit</li>",
+    ),
+    (
+        "<div class=\"card\"><strong class=\"partial\">$finding_count</strong><span>current provisional P1 claims</span><small>$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · none final</small></div><div class=\"card\"><strong>$unique_bounded_tests / $unique_bounded_assertions</strong><span>unique bounded disposition evidence</span><small>$med_rbac_tests/$med_rbac_assertions MED-RBAC + $med_cd_tests/$med_cd_assertions MED-CD-SCOPE + $safe_tests/$safe_assertions SAFE; atomicity and support remain separate</small></div>",
+        "<div class=\"card\"><strong class=\"partial\">$finding_count</strong><span>current provisional P1 claims</span><small>$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 13 retained · none final</small></div><div class=\"card\"><strong>$unique_bounded_tests / $unique_bounded_assertions</strong><span>unique bounded disposition evidence</span><small>$med_rbac_tests/$med_rbac_assertions MED-RBAC + $med_cd_tests/$med_cd_assertions MED-CD-SCOPE + $safe_tests/$safe_assertions SAFE + $fleet_tests/$fleet_assertions Fleet; atomicity and support remain separate</small></div>",
+    ),
+    (
+        "The register retains 12 historical claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. SAFE-ALERT-DEDUP-IDENTITY-01 is remediated on local main only and is not published to origin/main. None is a final finding or closed completion gate.",
+        "The register retains 13 historical claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. SAFE-ALERT-DEDUP-IDENTITY-01 and FLEET-TRIP-INDEX-SITE-PRIVACY-01 are remediated on local main only and are not published to origin/main; the Fleet CAP association remains candidate-only and route ownership is PENDING_FRESH_SEMANTIC_REVIEW. None is a final finding or closed completion gate.",
+    ),
+    (
+        "RUN-159 establishes bounded MED-RBAC execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution; RUN-173 adds one post-merge $safe_tests/$safe_assertions SAFE focused execution to the unique bounded total. Replays, supporting suites, adjacent filters, red failures, terminal-fixture failures, and atomicity remain separate or excluded, and none establishes full-suite, coverage, application-browser, ease, release, Pass, publication, or completion credit.",
+        "RUN-159 establishes bounded MED-RBAC execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution; RUN-173 adds one post-merge $safe_tests/$safe_assertions SAFE focused execution and RUN-176 adds one post-merge $fleet_tests/$fleet_assertions Fleet focused execution to the unique bounded total. Replays, supporting suites, adjacent filters, red failures, terminal-fixture failures, and atomicity remain separate or excluded, and none establishes full-suite, coverage, application-browser, ease, release, Pass, publication, or completion credit.",
+    ),
+    (
+        "</tr><tr><td>RUN-173 SAFE alert-dedup execution</td><td>$safe_tests post-merge focused tests / $safe_assertions assertions; supporting $safe_bridge_tests/$safe_bridge_assertions bridge and $safe_hs_tests/$safe_hs_assertions HsEvent evidence reported separately; $safe_terminal_failures terminal-fixture failures occurred before bridge/dedup execution</td><td class=\"partial\">bounded concern identity and observer custody only · red and isolated-green replay not re-aggregated · supporting/adjacent/terminal evidence excluded · full-suite green false</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+        "</tr><tr><td>RUN-173 SAFE alert-dedup execution</td><td>$safe_tests post-merge focused tests / $safe_assertions assertions; supporting $safe_bridge_tests/$safe_bridge_assertions bridge and $safe_hs_tests/$safe_hs_assertions HsEvent evidence reported separately; $safe_terminal_failures terminal-fixture failures occurred before bridge/dedup execution</td><td class=\"partial\">bounded concern identity and observer custody only · red and isolated-green replay not re-aggregated · supporting/adjacent/terminal evidence excluded · full-suite green false</td></tr><tr><td>RUN-176 Fleet trip-index Site-privacy execution</td><td>$fleet_tests post-merge focused tests / $fleet_assertions assertions; supporting $fleet_supporting_tests/$fleet_supporting_assertions VehicleController regressions reported separately; root and expanded red executions and isolated green replay excluded</td><td class=\"partial\">selected GET/CSV rows, filters, aggregates, provenance, archived Sites, and nested identity only · static ownership PENDING_FRESH_SEMANTIC_REVIEW · full-suite green unproved</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+    ),
+    ("RUN-155–174 bounded disposition provenance, remediation, and reporting", "RUN-155–177 bounded disposition provenance, remediation, and reporting"),
+    ("Fresh RUN-175 audit-dashboard verification required", "Fresh RUN-178 audit-dashboard verification required"),
+    (
+        "The exact RUN-174 reporting dashboard must be generated and checked in RUN-175 at 1440×900, 1280×800, 1024×768, and 390×844.",
+        "The exact RUN-177 reporting dashboard must be generated and checked in RUN-178 at 1440×900, 1280×800, 1024×768, and 390×844.",
+    ),
+    (
+        "RUN-172 verifies only the superseded RUN-171 HTML; RUN-173 establishes the bounded SAFE remediation and local integration, RUN-173R independently authorizes retirement reporting, and RUN-174 alone changes the live register and reporting sources while preserving the verified RUN-171 HTML byte-for-byte. None supplies audit-dashboard verification for the new RUN-175 HTML.",
+        "RUN-175 verifies only the superseded RUN-174 HTML; RUN-176 establishes the bounded Fleet remediation and local integration, RUN-176R independently authorizes one new historical-remediated record, and RUN-177 alone changes the live register and reporting sources while preserving the verified RUN-175 HTML byte-for-byte. None supplies audit-dashboard verification for the new RUN-178 HTML.",
+    ),
+    ("The linked RUN-175 receipt must record", "The linked RUN-178 receipt must record"),
+    ("It verifies the RUN-174 audit artifact only", "It verifies the RUN-177 audit artifact only"),
+    (
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-175-wave-32.json">RUN-175 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-178-wave-33.json">RUN-178 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+    ),
+    ("RUN-071–174 evidence lineage", "RUN-071–177 evidence lineage"),
+    (
+        "Every current raw, generated, reviewed, and integrated RUN-077–173R source/reporting/runtime/benchmark/remediation/ownership artifact is linked with its exact SHA-256; RUN-174 is the current reporting generator execution and RUN-175 remains the fresh exact-dashboard gate.",
+        "Every current raw, generated, reviewed, and integrated RUN-077–176R source/reporting/runtime/benchmark/remediation/ownership artifact is linked with its exact SHA-256; RUN-177 is the current reporting generator execution and RUN-178 remains the fresh exact-dashboard gate.",
+    ),
+    (
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, and bounded Fleet ownership evidence through RUN-173R, reported in RUN-174, with fresh RUN-175 dashboard verification required. Exactly two matrix rows have static benchmark-mapping credit. RUN-159, RUN-162, RUN-166, and RUN-173 retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, and the post-merge SAFE $safe_tests/$safe_assertions contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. SAFE remains local-main-only and unpublished. No lane grants inherited timeless retry, terminal-fixture repair, unused escalation semantics, broader safeguarding, page, consumer, caller, service, model, selected-GET execution, browser, benchmark-final, final-finding, Pass, release, feature-completion, Gate 4, or audit-completion credit.",
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, and bounded Fleet evidence through RUN-176R, reported in RUN-177, with fresh RUN-178 dashboard verification required. Exactly two matrix rows have static benchmark-mapping credit. RUN-159, RUN-162, RUN-166, RUN-173, and RUN-176 retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, and post-merge Fleet $fleet_tests/$fleet_assertions contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. SAFE and Fleet remain local-main-only and unpublished. Fleet route ownership remains PENDING_FRESH_SEMANTIC_REVIEW. No lane grants inherited broader Fleet or safeguarding correctness, page, consumer, caller, service, model, adjacent-route execution, browser, benchmark-final, final-finding, Pass, release, feature-completion, Gate 4, or audit-completion credit.",
+    ),
+    (
+        "RUN-159's $med_rbac_tests/$med_rbac_assertions MED-RBAC evidence, RUN-162's $med_cd_tests/$med_cd_assertions MED-CD-SCOPE evidence, RUN-166's separately reported $atomicity_tests/$atomicity_assertions/$atomicity_races atomicity evidence plus nonaggregated $atomicity_supporting_tests/$atomicity_supporting_assertions support, RUN-172's exact historical dashboard verification, RUN-173's post-merge SAFE $safe_tests/$safe_assertions counted once into $unique_bounded_tests/$unique_bounded_assertions, its red $safe_red_failed-failed + $safe_red_warning_pass-warning-pass/$safe_red_assertions reproduction, excluded isolated-green replay, supporting $safe_bridge_tests/$safe_bridge_assertions bridge and $safe_hs_tests/$safe_hs_assertions HsEvent evidence, $safe_terminal_failures excluded terminal-fixture failures, local-main nonpublication, unchanged 30-minute dedup/+5-minute retry/+31-minute lifecycle contract, and explicit noninheritance for timeless retry, terminal repair, unused escalation semantics, and broader safeguarding correctness",
+        "RUN-159's $med_rbac_tests/$med_rbac_assertions MED-RBAC evidence, RUN-162's $med_cd_tests/$med_cd_assertions MED-CD-SCOPE evidence, RUN-166's separately reported $atomicity_tests/$atomicity_assertions/$atomicity_races atomicity evidence plus nonaggregated $atomicity_supporting_tests/$atomicity_supporting_assertions support, RUN-175's exact historical dashboard verification, RUN-173's post-merge SAFE $safe_tests/$safe_assertions counted once, its red $safe_red_failed-failed + $safe_red_warning_pass-warning-pass/$safe_red_assertions reproduction, excluded isolated-green replay, supporting $safe_bridge_tests/$safe_bridge_assertions bridge and $safe_hs_tests/$safe_hs_assertions HsEvent evidence, $safe_terminal_failures excluded terminal-fixture failures, unchanged 30-minute dedup/+5-minute retry/+31-minute lifecycle contract, RUN-176's post-merge Fleet $fleet_tests/$fleet_assertions counted once into $unique_bounded_tests/$unique_bounded_assertions, root red $fleet_root_red_failed/$fleet_root_red_assertions and expanded red $fleet_expanded_red_failed/$fleet_expanded_red_assertions reproduction, excluded isolated-green replay, supporting $fleet_supporting_tests/$fleet_supporting_assertions VehicleController evidence, local-main nonpublication, candidate-only CAP-FLEET-VEHICLE-REGISTER association, route ownership PENDING_FRESH_SEMANTIC_REVIEW, and explicit noninheritance for broader Fleet correctness, adjacent routes, browser, benchmark, release, and completion",
+    ),
+    (
+        "current RUN-174 split of 12 retained claim identities",
+        "current RUN-177 split of 13 retained claim identities",
+    ),
+    (
+        "12 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
+        "13 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
+    ),
+]
+run_177_rewrite_expected_counts = {
+    "current RUN-174 split of 12 retained claim identities": 2,
+}
+for old, new in run_177_template_rewrites:
+    expected_count = run_177_rewrite_expected_counts.get(old, 1)
+    assert current_template_text.count(old) == expected_count, (
+        f"Expected {expected_count} RUN-177 template rewrite target(s): {old}"
+    )
+    current_template_text = current_template_text.replace(old, new)
 TEMPLATE = Template(current_template_text)
 
 
@@ -4689,6 +5080,18 @@ dashboard = TEMPLATE.substitute(
     safe_merge_short=run_173_remediation["pins"]["local_main_merge_commit"][:12],
     safe_origin_short=run_173_remediation["pins"]["origin_main_observed"][:12],
     safe_test_sha256=run_173_remediation["pins"]["merged_source_and_regression_test"][1]["sha256"],
+    fleet_root_red_failed=run_176_remediation["delegated_runtime_execution"]["root_audit_lane_initial_red"]["failed"],
+    fleet_root_red_assertions=run_176_remediation["delegated_runtime_execution"]["root_audit_lane_initial_red"]["assertions_reported"],
+    fleet_expanded_red_failed=run_176_remediation["delegated_runtime_execution"]["baseline_expanded_red"]["failed"],
+    fleet_expanded_red_assertions=run_176_remediation["delegated_runtime_execution"]["baseline_expanded_red"]["assertions_reported"],
+    fleet_tests=run_176_remediation["delegated_runtime_execution"]["post_merge_green_focused"]["tests"],
+    fleet_assertions=run_176_remediation["delegated_runtime_execution"]["post_merge_green_focused"]["assertions"],
+    fleet_supporting_tests=run_176_remediation["delegated_runtime_execution"]["post_merge_supporting_vehicle_controller_regressions"]["tests"],
+    fleet_supporting_assertions=run_176_remediation["delegated_runtime_execution"]["post_merge_supporting_vehicle_controller_regressions"]["assertions"],
+    fleet_baseline_short=run_176_remediation["pins"]["application_baseline_commit"][:12],
+    fleet_fix_short=run_176_remediation["pins"]["fix_commit"][:12],
+    fleet_merge_short=run_176_remediation["pins"]["local_main_merge_commit"][:12],
+    fleet_origin_short=run_176_remediation["pins"]["origin_main_observed"][:12],
     module_count=len(module_labels),
     module_rows=module_rows,
     finding_rows=finding_rows,
@@ -4785,14 +5188,14 @@ dashboard = TEMPLATE.substitute(
 )
 
 current_visible_boundaries = [
-    '<a href="#checkpoint">RUN-174</a>',
+    '<a href="#checkpoint">RUN-177</a>',
     '<a href="#findings">Finding status</a>',
     "665 owners · 308 routes + 357 pages · 96 bridges",
     "119 reviewed / 388 pending",
     "97 owned / 410 without ownership",
     "16.925426%",
     "3,264 records remain",
-    "RUN-172–174 SAFE alert dedup remediation and reporting checkpoint",
+    "RUN-175–177 Fleet trip index Site privacy remediation checkpoint",
     "fleet-assets.vehicles.alerts-config",
     "RUN090-ROUTE-0084 / RUN077-ROUTE-0692",
     "VehicleController::alertsConfig",
@@ -4810,11 +5213,17 @@ current_visible_boundaries = [
     "RUN-173: SAFE concern-identity defect reproduced and remediated in exactly two transferred paths",
     "RUN-173R: exact remediation artifacts independently reviewed GO",
     "RUN-174: SAFE record reclassified in place",
+    "RUN-175: exact RUN-174 dashboard verified at 4/4 viewports",
+    "RUN-176: Fleet trip-index Site-privacy defect reproduced and remediated in exactly two transferred paths",
+    "RUN-176R: exact remediation artifacts independently reviewed GO",
+    "RUN-177: Fleet trip privacy historical-remediated record added",
     "9 current provisional P1 + 2 historical already-fixed + 1 historical remediated",
     "8 current provisional P1 + 2 historical already-fixed + 2 historical remediated",
-    "12 retained claim identities",
-    "83 / 1,589",
+    "13 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 3 historical remediated",
+    "RUN-176's post-merge Fleet 5/175 counted once into 88/1,764",
+    "88 / 1,764",
     "83/1,589 unique bounded total",
+    "88/1,764 unique bounded disposition total",
     "SAFE-ALERT-DEDUP-IDENTITY-01",
     "post-merge SAFE alert-dedup tests / 60 assertions",
     "4 failed + 1 warning-pass / 10 assertions",
@@ -4829,8 +5238,20 @@ current_visible_boundaries = [
     "c39b07654705",
     "a8d813f1878c6a720f5308f28e5a591f90097961444876f93fcfe5a9262e909a",
     "not published to origin/main",
+    "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
+    "candidate feature association only",
+    "route ownership PENDING_FRESH_SEMANTIC_REVIEW",
+    "root red 2 failed / 19 assertions",
+    "expanded red 5 failed / 55 assertions",
+    "post-merge Fleet trip-index tests / 175 assertions",
+    "supporting 4/35 VehicleController regressions reported separately",
+    "13 retained",
+    "13 historical claim identities",
+    "13a7f37da9c9",
+    "790bc11e3fb2",
+    "c643c9e5eecf",
     "3 claim-specific test functions / 146 assertions / 3 synchronized two-process races",
-    "excluded from both the historical 78/1,529 and current 83/1,589 totals",
+    "reported separately from the historical 78/1,529 and current 88/1,764",
     "supporting 43/716 overlaps",
     "73 bounded tests / 1,481 assertions",
     "5 focused tests / 48 assertions",
@@ -4845,7 +5266,7 @@ current_visible_boundaries = [
     "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated",
     "two broader INR failures reproduce at base",
     "full-suite green false",
-    "Fresh RUN-175 audit-dashboard verification required",
+    "Fresh RUN-178 audit-dashboard verification required",
     "cf0090ec9724",
     "0b1920dade92",
     "7b2b5688c90e",
@@ -4861,8 +5282,8 @@ current_visible_boundaries = [
     "RUN-090 frozen denominator / RUN-170R current accounting",
     "index 83 is integrated and index 84 fleet-assets.trips.index is next",
     "RUN-168 verifies that exact dashboard",
-    "RUN-172 verifies only the superseded RUN-171 HTML",
-    "dashboard HTML unchanged · fresh RUN-175 required",
+    "RUN-175 verifies only the superseded RUN-174 HTML",
+    "dashboard HTML unchanged · fresh RUN-178 required",
     "visible 665/308/357 ownership, 96 bridges, 119/388 queue accounting, 97 owned/410 without ownership",
 ]
 assert all(boundary in dashboard for boundary in current_visible_boundaries)
@@ -4880,7 +5301,9 @@ assert "Fresh RUN-168 audit-dashboard verification required" not in dashboard
 assert "Fresh RUN-172 audit-dashboard verification required" not in dashboard
 assert '<a href="#checkpoint">RUN-167</a>' not in dashboard
 assert '<a href="#checkpoint">RUN-171</a>' not in dashboard
+assert '<a href="#checkpoint">RUN-174</a>' not in dashboard
 assert "RUN-071–171 current reporting checkpoint" not in dashboard
+assert "RUN-071–174 current reporting checkpoint" not in dashboard
 assert "RUN-158–160 current adjudication checkpoint" not in dashboard
 assert "RUN-161–163 current remediation and reporting checkpoint" not in dashboard
 assert "MED-CD-SCOPE-01 and MED-CD-ATOMICITY-01 remain separate current provisional claims" not in dashboard
@@ -4897,6 +5320,7 @@ assert "RUN-142/R: one route row and one bridge integrated and independently ver
 assert "RUN-153/R establish 665 bounded source-owner records and 96 action bridges" not in dashboard
 assert "and fresh RUN-168 audit-dashboard verification required." not in dashboard
 assert "and fresh RUN-172 dashboard verification required." not in dashboard
+assert "Fresh RUN-175 audit-dashboard verification required" not in dashboard
 assert "visible 664/307/357 ownership, 95 bridges, 118/389 queue accounting" not in dashboard
 for stale_attribution in (
     "RUN-159/R retire only historical MED-RBAC",
@@ -4920,9 +5344,9 @@ output_path = AUDIT_DIR / "audit-dashboard.html"
 output_bytes = (dashboard.rstrip() + "\n").encode("utf-8")
 existing_output_bytes = output_path.read_bytes()
 assert (
-    existing_output_bytes in (run_172_dashboard_payload, output_bytes)
+    existing_output_bytes in (run_175_dashboard_payload, output_bytes)
 )
-temporary_path = output_path.with_name(f".{output_path.name}.tmp-run175-dashboard")
+temporary_path = output_path.with_name(f".{output_path.name}.tmp-run178-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"
 try:
     with temporary_path.open("xb") as handle:
