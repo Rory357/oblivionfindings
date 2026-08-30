@@ -23,6 +23,7 @@ CURRENT_RUN_145_REGISTER_SHA256 = "5a3898855f1ffffb1a493496a57f6532bdc464552e457
 CURRENT_RUN_145_RECEIPT_SHA256 = "8306a8aefe0a490ebf206d0c4716d92930326988f19e0ed495a3c2d0002c7cf9"
 CURRENT_RUN_156R_COMMIT = "81abe37faa126f98ce47c7ca90cf569fe9c43c0d"
 RUN_167_REPORTING_COMMIT = "66fa21bfa3a59205fec9a8a756dc211a8510e419"
+RUN_168_VERIFIED_DASHBOARD_COMMIT = "e488bd3edcda0f154f87e8bbed972f14db409b82"
 CURRENT_RUN_146_MUTATED_PATHS = {
     "00-executive-summary.md",
     "03-feature-to-benchmark-matrix.csv",
@@ -248,6 +249,12 @@ run_165_source_review = read_json_strict("evidence/source/current-run-165-med-cd
 run_166_adjudication = read_json_strict("evidence/runtime/current-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.json")
 run_166r_review = read_json_strict("evidence/runtime/current-run-166r-independent-med-cd-atomicity-adjudication-review-wave-30.json")
 run_167_reporting = read_json_strict("evidence/source/current-run-167-med-cd-atomicity-reporting-wave-30.json")
+dashboard_run_168 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-168-wave-30.json")
+fleet_vehicle_alerts_cohort = read_json_strict("evidence/source/root-run-169-outcome-neutral-fleet-vehicle-alerts-config-route-action-cohort-wave-31.json")
+fleet_vehicle_alerts_review = read_json_strict("evidence/source/raw-run-169r-independent-outcome-neutral-fleet-vehicle-alerts-config-route-action-review-wave-31.json")
+reviewed_fleet_vehicle_alerts_overlay = read_json_strict("evidence/source/current-run-170-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.json")
+reviewed_fleet_vehicle_alerts_overlay_review = read_json_strict("evidence/source/current-run-170r-independent-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-review-wave-31.json")
+run_171_reporting = read_json_strict("evidence/source/current-run-171-reviewed-fleet-vehicle-alerts-config-route-action-reporting-wave-31.json")
 findings_register = read_json_strict("findings.json")
 assert sha256_file("evidence/source/current-canonical-feature-identity-wave-01.json") == "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
 assert sha256_file("evidence/source/current-canonical-identity-agent-register.json") == "21ebd8b004b5ade11aa01281958cda2be2ca966d1fb7c46576e039fab5f47baf"
@@ -287,6 +294,16 @@ assert sha256_file("evidence/source/root-run-152-outcome-neutral-fleet-vehicle-r
 assert sha256_file("evidence/source/raw-run-152r-independent-outcome-neutral-fleet-vehicle-register-index-route-action-review-wave-26.json") == "43697db4e3a5743d6dc9b47a3e80c6ec5c528dba17c2e99a4a13f95933c899d8"
 assert sha256_file("evidence/source/current-run-153-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.json") == "9b7e382f83787d807de8d752ecb3e6524280c707899aba78d47082765272e815"
 assert sha256_file("evidence/source/current-run-153r-independent-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-review-wave-26.json") == "7f1da8394a8054f01f34fb943a3fba6601bf70ea06d69cf97033f2208edf4461"
+assert sha256_file("generators/materialize-run-168-audit-dashboard-verification-wave-30.py") == "27f77f21f1aaac195ae0ca901b4f207129fb20666fe5b8e4eccea1d2e2cf56db"
+assert sha256_file("evidence/browser/current-audit-dashboard-verification-run-168-wave-30.json") == "95f5eff21563ff010cd49f2ff6cf958825f1d1f7717066ed571e9e078dea4998"
+assert sha256_file("generators/build-outcome-neutral-fleet-vehicle-alerts-config-route-action-cohort-wave-31.py") == "ffb1dba865a50f3cdcbf4e3ce285482e062bb023145089353a68f705d0646c7e"
+assert sha256_file("evidence/source/root-run-169-outcome-neutral-fleet-vehicle-alerts-config-route-action-cohort-wave-31.json") == "2fc20f6e528adae64979a763e6f28dd86018c2ecd87bbb0b651ddf6eee158fb2"
+assert sha256_file("generators/materialize-independent-outcome-neutral-fleet-vehicle-alerts-config-route-action-review-wave-31.py") == "6cdceb0f2b25a33fba8675f614f61a2aa5692dfb0a02768887755dd8fdfa4687"
+assert sha256_file("evidence/source/raw-run-169r-independent-outcome-neutral-fleet-vehicle-alerts-config-route-action-review-wave-31.json") == "698257a0e6543d685397977d658d9681281ce6634f709ced73939c09e76f02bc"
+assert sha256_file("generators/integrate-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.py") == "c732926f3112c987fbaaf3f398bc18b3d25027c7f1495c38016237a5cb6f28a3"
+assert sha256_file("evidence/source/current-run-170-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.json") == "c739a36e1975b60d42988be3de36b9fe1ea88cf942752c90112f40ebaa04cd8d"
+assert sha256_file("generators/materialize-independent-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-review-wave-31.py") == "752d64a1fa5ef6260feff84db3698b87a34170dd4fd6afbad6f2f54f1f1a814e"
+assert sha256_file("evidence/source/current-run-170r-independent-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-review-wave-31.json") == "62474100b0c2f027fa0c15f2bb841f08ad3de058da67725a931fcafec17dd139"
 current_run_155_156r_artifact_pins = {
     "generators/materialize-run-155-audit-dashboard-verification-wave-26.py": (
         "1f2bd52237f28cb11f79e4fa65d1f0a82889fd313fbee08d4e222816a7147139",
@@ -2037,6 +2054,115 @@ assert reviewed_fleet_vehicle_register_overlay["queue_boundary"]["index_82_revie
 assert reviewed_fleet_vehicle_register_overlay["queue_boundary"]["next_unresolved_index"] == 83
 reviewed_fleet_daily_check_overlay = reviewed_fleet_vehicle_register_overlay
 fleet_observations = vehicle_observations
+
+assert dashboard_run_168["run_id"] == "RUN-168-AUDIT-DASHBOARD-VERIFICATION-WAVE-30"
+assert dashboard_run_168["verification"]["viewports_verified"] == 4
+assert dashboard_run_168["verification"]["navigation_clicks_required"] == 10
+assert dashboard_run_168["verification"]["navigation_clicks_passed"] == 10
+assert len(dashboard_run_168["verification"]["navigation_results"]) == 10
+assert all(row["pass"] for row in dashboard_run_168["verification"]["navigation_results"])
+assert dashboard_run_168["verification"]["visible_static_checks_passed"] == 39
+assert dashboard_run_168["verification"]["post_materialization_local_resources"] == "414/414"
+assert {key for key, value in dashboard_run_168["credit_boundary"].items() if value} == {
+    "audit_dashboard_run_168_builder_idempotence_correction",
+    "exact_audit_dashboard_artifact",
+}
+run_168_payload_without_seal = dict(dashboard_run_168)
+run_168_seal = run_168_payload_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_168_payload_without_seal) == run_168_seal == "252e6317bffc66e7b07c98f10dd2968c73c4f95317b3dd6d45d5a9c4f9285726"
+run_168_dashboard_pin = dashboard_run_168["pins"]["run_168_dashboard"]
+run_168_dashboard_payload = git_file_at_commit(
+    RUN_168_VERIFIED_DASHBOARD_COMMIT,
+    run_168_dashboard_pin["path"],
+)
+assert hashlib.sha256(run_168_dashboard_payload).hexdigest() == run_168_dashboard_pin["sha256"] == "80360ae152642e4f7c0c90b18c42e76fb156bf8cd34eb9df17b358170cc71b89"
+assert git_blob_id_bytes(run_168_dashboard_payload) == run_168_dashboard_pin["git_blob_id"]
+assert (len(run_168_dashboard_payload), run_168_dashboard_payload.count(b"\n")) == (
+    run_168_dashboard_pin["bytes"],
+    run_168_dashboard_pin["lines"],
+)
+
+assert fleet_vehicle_alerts_cohort["run_id"] == "RUN-169-OUTCOME-NEUTRAL-FLEET-VEHICLE-ALERTS-CONFIG-ROUTE-ACTION-COHORT-WAVE-31"
+assert fleet_vehicle_alerts_cohort["status"] == "OUTCOME_NEUTRAL_CURRENT_PIN_SOURCE_PACKET_READY_INDEPENDENT_REVIEW_REQUIRED_ZERO_OWNERSHIP_OR_CORRECTNESS_CREDIT"
+assert fleet_vehicle_alerts_review["run_id"] == "RUN-169R-INDEPENDENT-OUTCOME-NEUTRAL-FLEET-VEHICLE-ALERTS-CONFIG-ROUTE-ACTION-REVIEW-WAVE-31"
+assert fleet_vehicle_alerts_review["decision"] == "GO"
+assert reviewed_fleet_vehicle_alerts_overlay["run_id"] == "RUN-170-REVIEWED-OUTCOME-NEUTRAL-FLEET-VEHICLE-ALERTS-CONFIG-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-31"
+assert reviewed_fleet_vehicle_alerts_overlay_review["run_id"] == "RUN-170R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-VEHICLE-ALERTS-CONFIG-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-31"
+
+alerts_counts = reviewed_fleet_vehicle_alerts_overlay["combined_counts"]
+alerts_queue = reviewed_fleet_vehicle_alerts_overlay["queue_accounting"]
+assert (
+    alerts_counts["source_owner_records"],
+    alerts_counts["route_owner_records"],
+    alerts_counts["page_owner_records"],
+    alerts_counts["static_controller_action_bridges"],
+) == (665, 308, 357, 96)
+assert (
+    alerts_counts["distinct_feature_ids"],
+    alerts_counts["distinct_H_feature_ids"],
+    alerts_counts["distinct_D_feature_ids"],
+) == (256, 234, 22)
+assert (
+    alerts_counts["route_distinct_feature_ids"],
+    alerts_counts["page_distinct_feature_ids"],
+    alerts_counts["route_page_feature_overlap"],
+) == (64, 242, 50)
+assert alerts_counts["bounded_static_source_ownership_percent"] == "16.925426"
+assert (
+    alerts_counts["bounded_static_source_residual_records"],
+    alerts_counts["residual_explicit_unmapped_routes"],
+) == (3264, 2893)
+assert (
+    alerts_queue["reviewed_queue_surface_rows"],
+    alerts_queue["pending_unreviewed_queue_surface_rows"],
+    alerts_queue["owner_queue_surface_rows"],
+    alerts_queue["queue_surfaces_without_ownership"],
+) == (119, 388, 97, 410)
+assert 3929 == 665 + 3264 and 665 == 308 + 357 and 256 == 64 + 242 - 50
+assert 3218 == 308 + 12 + 5 + 0 + 2893 and 711 == 357 + 9 + 0 + 0 + 345
+assert 507 == 119 + 388 and 119 == 97 + 10 + 5 + 0 + 7 and 410 == 388 + 10 + 5 + 0 + 7
+
+alerts_boundary = reviewed_fleet_vehicle_alerts_overlay["queue_boundary"]
+assert alerts_boundary["selected_index_83_integrated"] is True
+assert (
+    alerts_boundary["next_unresolved_index"],
+    alerts_boundary["next_unresolved_queue_id"],
+    alerts_boundary["next_unresolved_route_record_id"],
+    alerts_boundary["next_unresolved_route_name"],
+    alerts_boundary["next_unresolved_action_expression"],
+) == (
+    84,
+    "RUN090-ROUTE-0085",
+    "RUN077-ROUTE-0693",
+    "fleet-assets.trips.index",
+    "[VehicleController::class, 'trips']",
+)
+assert alerts_boundary["next_unresolved_queue_record_sha256"] == "928eeec741742f8329dd7e191a71f2d5249775b6de64e6a698a72836345ca011"
+assert alerts_boundary["reviewed_key_list_sha256"] == "acfca5e54d64c54334dbd94b30104244b3d2d6722a5426439aec7a8aa62d3ab5"
+assert alerts_boundary["reviewed_key_list_canonical_json_sha256"] == "e85b37e5410c1cc861f9116061e88fb82fdb854e5dc94e56eefe1947b3a7b510"
+
+alerts_observations = reviewed_fleet_vehicle_alerts_overlay["provisional_assurance_observation_preservation"]
+assert alerts_observations["observation_count"] == len(alerts_observations["observations"]) == 3
+assert all(
+    row["status"] == "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING"
+    and not row["correctness_credit_authorized"]
+    and not row["final_finding_credit_authorized"]
+    for row in alerts_observations["observations"]
+)
+assert {key for key, value in reviewed_fleet_vehicle_alerts_overlay["credit_boundary"].items() if value} == {
+    "STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_1_RECORD",
+    "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_1_ACTION",
+}
+assert reviewed_fleet_vehicle_alerts_overlay_review["decision"]["verdict"] == "GO"
+assert reviewed_fleet_vehicle_alerts_overlay_review["decision"]["independent_reviews"] == 3
+assert reviewed_fleet_vehicle_alerts_overlay_review["decision"]["discrepancies"] == 0
+assert reviewed_fleet_vehicle_alerts_overlay_review["decision"]["reporting_materialization_authorized"] is True
+assert reviewed_fleet_vehicle_alerts_overlay_review["decision"]["gate_4_complete"] is False
+assert {key for key, value in reviewed_fleet_vehicle_alerts_overlay_review["credit_boundary"].items() if value} == {
+    "INDEPENDENT_OVERLAY_REVIEW_FOR_REPORTING"
+}
+reviewed_fleet_daily_check_overlay = reviewed_fleet_vehicle_alerts_overlay
+fleet_observations = alerts_observations
 assert 3929 == 660 + 3269
 assert 660 == 303 + 357
 assert 3218 == 303 + 12 + 5 + 2898
@@ -3006,6 +3132,18 @@ for label, path in (
     ("RUN-166R independent exact-adjudication review", "evidence/runtime/current-run-166r-independent-med-cd-atomicity-adjudication-review-wave-30.json"),
     ("RUN-167 MED-CD-ATOMICITY already-fixed reporting materializer", "generators/materialize-run-167-med-cd-atomicity-reporting-wave-30.py"),
     ("RUN-167 MED-CD-ATOMICITY already-fixed reporting receipt", "evidence/source/current-run-167-med-cd-atomicity-reporting-wave-30.json"),
+    ("RUN-168 exact RUN-167 audit-dashboard verification materializer", "generators/materialize-run-168-audit-dashboard-verification-wave-30.py"),
+    ("RUN-168 exact RUN-167 audit-dashboard verification", "evidence/browser/current-audit-dashboard-verification-run-168-wave-30.json"),
+    ("RUN-169 Fleet vehicle alerts-config cohort generator", "generators/build-outcome-neutral-fleet-vehicle-alerts-config-route-action-cohort-wave-31.py"),
+    ("RUN-169 Fleet vehicle alerts-config cohort", "evidence/source/root-run-169-outcome-neutral-fleet-vehicle-alerts-config-route-action-cohort-wave-31.json"),
+    ("RUN-169R Fleet vehicle alerts-config review materializer", "generators/materialize-independent-outcome-neutral-fleet-vehicle-alerts-config-route-action-review-wave-31.py"),
+    ("RUN-169R Fleet vehicle alerts-config review", "evidence/source/raw-run-169r-independent-outcome-neutral-fleet-vehicle-alerts-config-route-action-review-wave-31.json"),
+    ("RUN-170 Fleet vehicle alerts-config overlay generator", "generators/integrate-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.py"),
+    ("RUN-170 Fleet vehicle alerts-config one-route one-bridge overlay", "evidence/source/current-run-170-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.json"),
+    ("RUN-170R Fleet vehicle alerts-config overlay-review materializer", "generators/materialize-independent-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-review-wave-31.py"),
+    ("RUN-170R Fleet vehicle alerts-config overlay review", "evidence/source/current-run-170r-independent-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-review-wave-31.json"),
+    ("RUN-171 Fleet vehicle alerts-config reporting materializer", "generators/materialize-run-171-reviewed-fleet-vehicle-alerts-config-route-action-reporting-wave-31.py"),
+    ("RUN-171 Fleet vehicle alerts-config reporting receipt", "evidence/source/current-run-171-reviewed-fleet-vehicle-alerts-config-route-action-reporting-wave-31.json"),
 ):
     if path not in checkpoint_paths:
         checkpoint_evidence.append((label, path))
@@ -3353,6 +3491,72 @@ run_167_payload_without_seal = dict(run_167_reporting)
 run_167_seal = run_167_payload_without_seal.pop("receipt_self_seal_sha256")
 assert canonical_sha256(run_167_payload_without_seal) == run_167_seal
 assert all(value is False for value in run_167_reporting["completion_boundary"].values())
+
+assert run_171_reporting["schema_version"] == "run-171-reviewed-fleet-vehicle-alerts-config-route-action-reporting-wave-31-v1"
+assert run_171_reporting["run_id"] == "RUN-171-REVIEWED-FLEET-VEHICLE-ALERTS-CONFIG-ROUTE-ACTION-REPORTING-WAVE-31"
+assert run_171_reporting["status"] == "FLEET_VEHICLE_ALERTS_CONFIG_REVIEWED_OWNERSHIP_REPORTING_MATERIALIZED_DASHBOARD_RUN172_REQUIRED_ZERO_CORRECTNESS_OR_COMPLETION_CREDIT"
+assert run_171_reporting["pins"]["reporting_input_commit"] == "ca1c53bc3062a6fe81f2855716de13636d59ac0c"
+assert run_171_reporting["pins"]["reporting_input_tree"] == "f29a9fce70f5c6ed9b251560fda58be976b062df"
+assert run_171_reporting["pins"]["reporting_input_parent"] == "2084ca83fe8d18f145197867d3bbf73b731800c7"
+assert run_171_reporting["pins"]["application_commit"] == "e488bd3edcda0f154f87e8bbed972f14db409b82"
+assert run_171_reporting["pins"]["application_tree"] == "9e93b8aea4f4b907cde3dc59dd0520fba5bd7080"
+assert run_171_reporting["reporting_snapshot"]["combined_counts"] == {
+    "source_owner_records": 665,
+    "route_owner_records": 308,
+    "page_owner_records": 357,
+    "distinct_feature_ids": 256,
+    "distinct_H_feature_ids": 234,
+    "distinct_D_feature_ids": 22,
+    "route_distinct_feature_ids": 64,
+    "page_distinct_feature_ids": 242,
+    "route_page_feature_overlap": 50,
+    "static_controller_action_bridges": 96,
+    "bounded_static_source_denominator": 3929,
+    "bounded_static_source_ownership_percent": "16.925426",
+    "bounded_static_source_residual_records": 3264,
+    "residual_explicit_unmapped_routes": 2893,
+}
+assert run_171_reporting["reporting_snapshot"]["queue_accounting"] == {
+    "direct_exact_queue_records": 507,
+    "reviewed_queue_surface_rows": 119,
+    "owner_queue_surface_rows": 97,
+    "shared_queue_surface_rows": 10,
+    "alias_queue_surface_rows": 5,
+    "dead_queue_surface_rows": 0,
+    "evidence_gap_queue_surface_rows": 7,
+    "pending_unreviewed_queue_surface_rows": 388,
+    "queue_surfaces_without_ownership": 410,
+}
+assert run_171_reporting["queue_boundary"]["selected_index_83_integrated"] is True
+assert run_171_reporting["queue_boundary"]["next_unresolved_index"] == 84
+assert run_171_reporting["queue_boundary"]["next_unresolved_queue_id"] == "RUN090-ROUTE-0085"
+assert run_171_reporting["queue_boundary"]["next_unresolved_route_record_id"] == "RUN077-ROUTE-0693"
+assert run_171_reporting["queue_boundary"]["next_unresolved_route_name"] == "fleet-assets.trips.index"
+assert run_171_reporting["queue_boundary"]["next_unresolved_action_expression"] == "[VehicleController::class, 'trips']"
+assert run_171_reporting["provisional_source_observations"]["count"] == 3
+assert run_171_reporting["findings_boundary"] == {
+    "retained_claim_records": 12,
+    "current_provisional": 9,
+    "historical_already_fixed": 2,
+    "historical_remediated": 1,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_171_reporting["benchmark_boundary"] == {
+    "mapped": 2,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338,
+}
+assert run_171_reporting["dashboard_forward_gate"]["required_run"] == "RUN-172"
+assert run_171_reporting["dashboard_forward_gate"]["dashboard_html_changed_by_run_171"] is False
+assert run_171_reporting["dashboard_forward_gate"]["unchanged_dashboard_sha256"] == "80360ae152642e4f7c0c90b18c42e76fb156bf8cd34eb9df17b358170cc71b89"
+assert {key for key, value in run_171_reporting["credit_boundary"].items() if value} == {
+    "live_static_ownership_and_queue_reporting"
+}
+run_171_payload_without_seal = dict(run_171_reporting)
+run_171_seal = run_171_payload_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_171_payload_without_seal) == run_171_seal
+assert all(value is False for value in run_171_reporting["completion_boundary"].values())
 
 required_artifacts = [
     "00-executive-summary.md", "01-repository-module-map.md",
@@ -3880,6 +4084,81 @@ run_167_template_rewrites = [
 for old, new in run_167_template_rewrites:
     assert current_template_text.count(old) == 1, f"Expected one RUN-167 template rewrite target: {old}"
     current_template_text = current_template_text.replace(old, new)
+
+run_171_template_rewrites = [
+    ('href="#checkpoint">RUN-167</a>', 'href="#checkpoint">RUN-171</a>'),
+    ("RUN-071–167 current reporting checkpoint:", "RUN-071–171 current reporting checkpoint:"),
+    ("RUN-071–167 completion-gate checkpoint", "RUN-071–171 completion-gate checkpoint"),
+    (
+        "RUN-160 reclassifies MED-RBAC-01; RUN-161 verifies that dashboard; RUN-162/R establish and authorize MED-CD-SCOPE remediation reporting; RUN-163 reclassifies MED-CD-SCOPE-01; RUN-164 verifies that dashboard; RUN-165 establishes the manual-entry atomicity source candidate; RUN-166 establishes its bounded ALREADY_FIXED source/runtime disposition; RUN-166R independently authorizes retirement reporting; RUN-167 alone reclassifies the bounded manual-entry MED-CD-ATOMICITY-01 clause and reports the live $finding_count + $historical_fixed_count + $historical_remediated_count split.",
+        "RUN-160 reclassifies MED-RBAC-01; RUN-161 verifies that dashboard; RUN-162/R establish and authorize MED-CD-SCOPE remediation reporting; RUN-163 reclassifies MED-CD-SCOPE-01; RUN-164 verifies that dashboard; RUN-165–167 establish and report the bounded manual-entry MED-CD-ATOMICITY-01 disposition; RUN-168 verifies that dashboard; RUN-169/R independently review the Fleet alerts-config route/action owner; RUN-170 integrates exactly one route owner and bridge; RUN-170R independently authorizes reporting; RUN-171 alone reports the live 665-owner ledger while retaining the $finding_count + $historical_fixed_count + $historical_remediated_count finding split.",
+    ),
+    (
+        "RUN-157 materializes historical reporting; RUN-158 verifies that dashboard; RUN-159 establishes and RUN-159R authorizes MED-RBAC already-fixed reporting; RUN-160 reconciles that live status; RUN-161 verifies that dashboard; RUN-162 establishes and RUN-162R authorizes MED-CD-SCOPE remediation reporting; RUN-163 reconciles that live status; RUN-164 verifies that dashboard; RUN-165 establishes source-only manual-entry atomicity review; RUN-166 establishes its bounded ALREADY_FIXED runtime disposition without remediation; RUN-166R independently authorizes retirement reporting; RUN-167 alone reconciles the bounded atomicity live status without changing Fleet ownership, direct-exact review-queue, benchmark, final-finding, or completion counts.",
+        "RUN-157 materializes historical reporting; RUN-158 verifies that dashboard; RUN-159–167 establish and report the three bounded medication dispositions; RUN-168 verifies only the exact RUN-167 dashboard; RUN-169/R independently review queue index 83 as one Fleet alerts-config route/action owner after one corrected architecture locus; RUN-170 integrates exactly one route owner and bridge; RUN-170R returns three sealed GO reviews with zero discrepancies; RUN-171 alone advances Fleet ownership and queue reporting without changing findings, benchmark, correctness, runtime, application-browser, final-finding, or completion state.",
+    ),
+    (
+        "RUN-160 alone changes MED-RBAC in the live queue; RUN-161 verifies its dashboard; RUN-162/R establish and authorize MED-CD-SCOPE remediation reporting; RUN-163 changes that live status; RUN-164 verifies its dashboard; RUN-165/166 establish source and bounded runtime for the manual-entry atomicity ALREADY_FIXED disposition; RUN-166R authorizes reporting; RUN-167 alone changes the bounded atomicity live status, leaving $finding_count provisional plus $historical_fixed_count historical already-fixed plus $historical_remediated_count historical remediated while every Fleet ownership, direct-exact review-queue, benchmark, final-finding, and completion count remains unchanged.",
+        "RUN-160 alone changes MED-RBAC in the live queue; RUN-163 and RUN-167 separately report the two later bounded medication dispositions. RUN-168 verifies the exact RUN-167 dashboard. RUN-169/R establish one Fleet alerts-config route/action owner candidate, RUN-170 integrates one route owner and bridge, RUN-170R authorizes reporting only, and RUN-171 alone advances the live ledger to $static_owner_records owners, $static_owner_routes routes, $static_owner_pages pages, $static_action_bridges bridges, $queue_reviewed reviewed, and $queue_pending pending while findings remain $finding_count provisional plus $historical_fixed_count historical already-fixed plus $historical_remediated_count historical remediated and benchmark, final-finding, Gate 4, and completion state remain unchanged.",
+    ),
+    ("RUN-001 through RUN-167 are represented by audit artifacts.", "RUN-001 through RUN-171 are represented by audit artifacts."),
+    (
+        "<li>RUN-167: live register reconciled bounded MED-CD-ATOMICITY-01 from current provisional to retained historical already-fixed · $finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · fresh RUN-168 dashboard verification required</li>",
+        "<li>RUN-167: live register reconciled bounded MED-CD-ATOMICITY-01 from current provisional to retained historical already-fixed · $finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated</li><li>RUN-168: exact RUN-167 dashboard verified at 4/4 viewports · 39/39 visible checks · 10/10 navigation · 414/414 local resources · zero application credit</li><li>RUN-169/R: queue index 83 Fleet alerts-config candidate independently reviewed OWNER after one corrected architecture locus · three provisional-not-final observations · zero current or downstream credit</li><li>RUN-170: exactly one route owner and one action bridge integrated · zero page or new FEATURE-ID</li><li>RUN-170R: three sealed post-commit GO reviews · zero discrepancies · reporting authorization only</li><li>RUN-171: live static ledger reported as $static_owner_records owners / $static_owner_routes routes / $static_owner_pages pages / $static_action_bridges bridges · $queue_reviewed reviewed / $queue_pending pending / $queue_without_owner without ownership · fresh RUN-172 dashboard verification required</li>",
+    ),
+    (
+        "RUN-151, RUN-155, RUN-158, RUN-161, and RUN-164 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-167 dashboard.",
+        "RUN-151, RUN-155, RUN-158, RUN-161, RUN-164, and RUN-168 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-171 dashboard.",
+    ),
+    (
+        "<li><a href=\"evidence/browser/current-audit-dashboard-verification-run-158-wave-27.json\">Superseded RUN-158 verification GO</a></li><li><a href=\"evidence/browser/current-audit-dashboard-verification-run-161-wave-28.json\">Superseded RUN-161 verification GO</a></li><li><a href=\"evidence/browser/current-audit-dashboard-verification-run-164-wave-29.json\">Superseded RUN-164 verification GO</a></li></ul>",
+        "<li><a href=\"evidence/browser/current-audit-dashboard-verification-run-158-wave-27.json\">Superseded RUN-158 verification GO</a></li><li><a href=\"evidence/browser/current-audit-dashboard-verification-run-161-wave-28.json\">Superseded RUN-161 verification GO</a></li><li><a href=\"evidence/browser/current-audit-dashboard-verification-run-164-wave-29.json\">Superseded RUN-164 verification GO</a></li><li><a href=\"evidence/browser/current-audit-dashboard-verification-run-168-wave-30.json\">Superseded RUN-168 verification GO</a></li></ul>",
+    ),
+    ("RUN-164–167 current atomicity adjudication and reporting checkpoint", "RUN-168–171 current Fleet alerts-config ownership and reporting checkpoint"),
+    (
+        "<tr><td>RUN-167 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · 12 retained identities</strong></td><td class=\"partial\">bounded MED-CD-ATOMICITY-01 reclassified · Gate 4 and audit completion false · exact regenerated dashboard requires RUN-168 verification</td></tr>",
+        "<tr><td>RUN-167 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · 12 retained identities</strong></td><td class=\"partial\">bounded MED-CD-ATOMICITY-01 reclassified; exact dashboard later verified by RUN-168</td></tr><tr><td>RUN-168 exact dashboard verification</td><td><strong>4/4 viewports · 39/39 visible checks · 10/10 navigation · 414/414 local resources</strong></td><td class=\"partial\">exact superseded RUN-167 audit artifact only · zero application credit</td></tr><tr><td>RUN-169/R Fleet alerts-config review</td><td><strong>index 83 · RUN090-ROUTE-0084 / RUN077-ROUTE-0692 · OWNER after corrected 1–21 locus</strong></td><td class=\"partial\">one route/action candidate · three provisional-not-final observations · no current or downstream credit</td></tr><tr><td>RUN-170/R Fleet alerts-config overlay</td><td><strong>$static_owner_records owners · $static_owner_routes routes + $static_owner_pages pages · $static_action_bridges bridges</strong></td><td class=\"partial\">one route + one bridge · zero page/new-feature/correctness credit · three sealed GO reviews</td></tr><tr><td>RUN-171 live reporting</td><td><strong>$queue_reviewed reviewed / $queue_pending pending · $queue_owner owned / $queue_without_owner without ownership</strong></td><td class=\"partial\">index 83 integrated · next index 84 RUN090-ROUTE-0085 / RUN077-ROUTE-0693 · fleet-assets.trips.index · Gate 4 false · fresh RUN-172 required</td></tr>",
+    ),
+    (
+        "RUN-152R–154 Fleet vehicle-register ownership and provisional source observations",
+        "RUN-169R–171 Fleet vehicle alerts-config ownership and provisional source observations",
+    ),
+    (
+        "<span class=\"mono\">fleet-assets.vehicles.index</span> / <span class=\"mono\">RUN077-ROUTE-0690</span> / <span class=\"mono\">VehicleController::index</span> is one bounded static route/action owner for <span class=\"mono\">CAP-FLEET-VEHICLE-REGISTER</span>. RUN-153 adds one route row and one bridge, zero page rows, and no new FEATURE-ID. Existing page-owner and historical-sentinel context are not recredited; index 82 is context only and index 83 remains unresolved.",
+        "<span class=\"mono\">fleet-assets.vehicles.alerts-config</span> / <span class=\"mono\">RUN077-ROUTE-0692</span> / <span class=\"mono\">VehicleController::alertsConfig</span> is one bounded static route/action owner for <span class=\"mono\">CAP-FLEET-VEHICLE-REGISTER</span>. RUN-170 adds one route row and one bridge, zero page rows, and no new FEATURE-ID. Consumer, caller, service, model, page-owner, neighbor, correctness, and downstream context are not inherited; index 83 is integrated and index 84 remains unresolved.",
+    ),
+    (
+        "Both reviewers completed independent evidence traces and neither is represented as blinded. Reviewer A had prior team-status visibility; reviewer B had prior self-assessment visibility; neither consulted the other. The six observations below authorize no correctness or final-finding credit and remain separate from the 12 retained claim identities ($finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated).",
+        "The initial exact-artifact review withheld integration for one out-of-range architecture locus; the corrected 1–21 locus received GO. RUN-170R then records three sealed post-commit GO reviews with zero discrepancies. The three observations below authorize no correctness or final-finding credit and remain separate from the 12 retained claim identities ($finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated).",
+    ),
+    ("Fresh RUN-168 audit-dashboard verification required", "Fresh RUN-172 audit-dashboard verification required"),
+    (
+        "The exact RUN-167 reporting dashboard must be checked in RUN-168 at 1440×900, 1280×800, 1024×768, and 390×844.",
+        "The exact RUN-171 reporting dashboard must be checked in RUN-172 at 1440×900, 1280×800, 1024×768, and 390×844.",
+    ),
+    (
+        "RUN-165 establishes source-only manual-entry atomicity review, RUN-166 establishes its bounded ALREADY_FIXED source/runtime disposition without application or product-test change, RUN-166R independently authorizes retirement reporting, and RUN-167 alone performs the live-register/reporting reconciliation; none supplies audit-dashboard verification for the new HTML.",
+        "RUN-168 verifies only the superseded RUN-167 HTML; RUN-169/R establish one Fleet alerts-config route/action candidate, RUN-170 integrates the bounded owner/bridge, RUN-170R independently authorizes reporting, and RUN-171 alone performs live ownership/queue reporting; none supplies audit-dashboard verification for the new HTML.",
+    ),
+    ("The linked RUN-168 receipt must record", "The linked RUN-172 receipt must record"),
+    ("It verifies the RUN-167 audit artifact only", "It verifies the RUN-171 audit artifact only"),
+    (
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-168-wave-30.json">RUN-168 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-172-wave-31.json">RUN-172 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+    ),
+    ("RUN-071–167 evidence lineage", "RUN-071–171 evidence lineage"),
+    (
+        "Every current raw, generated, reviewed, and integrated RUN-077–166R source/reporting/runtime/benchmark/remediation artifact is linked with its exact SHA-256; RUN-167 is the current reporting generator execution.",
+        "Every current raw, generated, reviewed, and integrated RUN-077–170R source/reporting/runtime/benchmark/remediation/ownership artifact is linked with its exact SHA-256; RUN-171 is the current reporting generator execution.",
+    ),
+    (
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, and exact-artifact evidence through RUN-166R, reported in RUN-167, with fresh RUN-168 dashboard verification required. Exactly two matrix rows have static benchmark-mapping credit. RUN-159 separately establishes bounded MED-RBAC $med_rbac_tests/$med_rbac_assertions evidence; RUN-162 separately establishes bounded remediated MED-CD-SCOPE $med_cd_tests/$med_cd_assertions evidence; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY $atomicity_tests/$atomicity_assertions/$atomicity_races evidence. The atomicity denominator is not added to the existing 78/1,529 total, and no lane grants inherited balance-check, destruction, sibling-writer, forced-deadlock, stress, browser, benchmark, final-finding, Pass, release, feature-completion, or audit-completion credit.",
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, and bounded Fleet ownership evidence through RUN-170R, reported in RUN-171, with fresh RUN-172 dashboard verification required. Exactly two matrix rows have static benchmark-mapping credit. RUN-159, RUN-162, and RUN-166 retain their separate medication evidence boundaries; RUN-169/R and RUN-170/R add only one Fleet alerts-config static route owner and bridge. No lane grants inherited page, consumer, caller, service, model, correctness, selected-GET execution, browser, benchmark-final, final-finding, Pass, release, feature-completion, Gate 4, or audit-completion credit.",
+    ),
+]
+for old, new in run_171_template_rewrites:
+    assert current_template_text.count(old) == 1, f"Expected one RUN-171 template rewrite target: {old}"
+    current_template_text = current_template_text.replace(old, new)
 TEMPLATE = Template(current_template_text)
 
 
@@ -4176,8 +4455,27 @@ dashboard = TEMPLATE.substitute(
 )
 
 current_visible_boundaries = [
-    '<a href="#checkpoint">RUN-167</a>',
+    '<a href="#checkpoint">RUN-171</a>',
     '<a href="#findings">Finding status</a>',
+    "665 owners · 308 routes + 357 pages · 96 bridges",
+    "119 reviewed / 388 pending",
+    "97 owned / 410 without ownership",
+    "16.925426%",
+    "3,264 records remain",
+    "RUN-168–171 current Fleet alerts-config ownership and reporting checkpoint",
+    "fleet-assets.vehicles.alerts-config",
+    "RUN090-ROUTE-0084 / RUN077-ROUTE-0692",
+    "VehicleController::alertsConfig",
+    "CAP-FLEET-VEHICLE-REGISTER",
+    "index 83 integrated",
+    "next index 84 RUN090-ROUTE-0085 / RUN077-ROUTE-0693",
+    "fleet-assets.trips.index",
+    "three provisional-not-final observations",
+    "RUN-168: exact RUN-167 dashboard verified at 4/4 viewports",
+    "RUN-169/R: queue index 83 Fleet alerts-config candidate independently reviewed OWNER",
+    "RUN-170: exactly one route owner and one action bridge integrated",
+    "RUN-170R: three sealed post-commit GO reviews",
+    "RUN-171: live static ledger reported",
     "9 current provisional P1 + 2 historical already-fixed + 1 historical remediated",
     "12 retained claim identities",
     "12 retained claim identities split into 9 current provisional P1, 2 historical already-fixed, and 1 historical remediated",
@@ -4187,23 +4485,17 @@ current_visible_boundaries = [
     "supporting 43/716 overlaps",
     "73 bounded tests / 1,481 assertions",
     "5 focused tests / 48 assertions",
-    "RUN-164–167 current atomicity adjudication and reporting checkpoint",
     "3 independent current-source ALREADY_FIXED reviews",
     "historical issue · already fixed on current main · not a final finding",
     "historical issue · already fixed on current main only for the bounded manual-entry register/stock clause · residual compound scope unadjudicated · not a final finding",
     "historical issue · remediated on current main · not a final finding",
     "MED-CD-SCOPE-01",
     "MED-CD-ATOMICITY-01",
-    "RUN-164: exact RUN-163 dashboard verified at 4/4 viewports",
-    "RUN-165: source-only bounded manual-entry atomicity already-fixed candidate",
-    "RUN-166: bounded manual-entry ALREADY_FIXED adjudication",
-    "RUN-166R: exact receipt and harness GO",
-    "RUN-167: live register reconciled bounded MED-CD-ATOMICITY-01",
     "RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution without application or product-test change",
     "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated",
     "two broader INR failures reproduce at base",
     "full-suite green false",
-    "Fresh RUN-168 audit-dashboard verification required",
+    "Fresh RUN-172 audit-dashboard verification required",
     "cf0090ec9724",
     "0b1920dade92",
     "7b2b5688c90e",
@@ -4224,6 +4516,8 @@ assert "11 current provisional P1 + 1 historical already-fixed" in dashboard  # 
 assert "10 current provisional P1 + 1 historical already-fixed + 1 historical remediated" in dashboard  # preserved historical RUN-163 checkpoint only
 assert "Fresh RUN-161 audit-reporting correction" not in dashboard
 assert "Fresh RUN-164 audit-dashboard verification required" not in dashboard
+assert "Fresh RUN-168 audit-dashboard verification required" not in dashboard
+assert '<a href="#checkpoint">RUN-167</a>' not in dashboard
 assert "RUN-158–160 current adjudication checkpoint" not in dashboard
 assert "RUN-161–163 current remediation and reporting checkpoint" not in dashboard
 assert "MED-CD-SCOPE-01 and MED-CD-ATOMICITY-01 remain separate current provisional claims" not in dashboard
@@ -4251,8 +4545,8 @@ for stale_attribution in (
 
 output_path = AUDIT_DIR / "audit-dashboard.html"
 output_bytes = (dashboard.rstrip() + "\n").encode("utf-8")
-assert output_path.read_bytes() in (run_167_dashboard_payload, output_bytes)
-temporary_path = output_path.with_name(f".{output_path.name}.tmp-run168-dashboard")
+assert output_path.read_bytes() in (run_168_dashboard_payload, output_bytes)
+temporary_path = output_path.with_name(f".{output_path.name}.tmp-run171-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"
 try:
     with temporary_path.open("xb") as handle:
