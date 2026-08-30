@@ -10,6 +10,8 @@ final class MetricPointReceipt extends Model
 {
     protected $table = 'monitoring_metric_point_receipts';
 
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+
     protected $fillable = [
         'idempotency_key',
         'series_id',

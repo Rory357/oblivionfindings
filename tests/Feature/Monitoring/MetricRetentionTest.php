@@ -36,6 +36,7 @@ use App\Models\Site;
 use App\Support\LegacyStorageContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
@@ -211,7 +212,7 @@ it('deduplicates a timestamp and rejects a unit conflict for the same metric ide
         value: 42.5,
         unit: 'percent',
         dimensions: ['if_index' => '7'],
-        observedAt: CarbonImmutable::parse('2026-07-23T11:55:00Z'),
+        observedAt: CarbonImmutable::parse('2026-07-23T11:55:00.123456Z'),
         source: 'native_snmp',
     );
 
@@ -219,9 +220,21 @@ it('deduplicates a timestamp and rejects a unit conflict for the same metric ide
     $service->write($monitor, $sample);
     $service->write($monitor, $sample);
 
-    expect($this->store->points)->toHaveCount(1)
+    $series = MetricSeries::query()->sole();
+    $summary = MetricCurrentSummary::query()->sole();
+    $receipt = MetricPointReceipt::query()->sole();
+    expect($this->store->writeAttempts)->toBe(1)
+        ->and($this->store->points)->toHaveCount(1)
         ->and(MetricSeries::query()->count())->toBe(1)
-        ->and(MetricCurrentSummary::query()->sole()->sample_count)->toBe(1);
+        ->and($summary->sample_count)->toBe(1)
+        ->and($receipt->observed_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.123456')
+        ->and($summary->observed_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.123456')
+        ->and($series->first_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.123456')
+        ->and($series->last_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.123456');
 
     expect(fn () => $service->write($monitor, new MetricSample(
         metric: 'interface.utilisation',
@@ -241,7 +254,7 @@ it('deduplicates an exact historical replay after a newer point without rewindin
         value: 35,
         unit: 'percent',
         dimensions: ['if_index' => '7'],
-        observedAt: CarbonImmutable::parse('2026-07-23T11:50:00Z'),
+        observedAt: CarbonImmutable::parse('2026-07-23T11:50:00.123456Z'),
         source: 'native_snmp',
     );
     $newer = new MetricSample(
@@ -249,7 +262,7 @@ it('deduplicates an exact historical replay after a newer point without rewindin
         value: 55,
         unit: 'percent',
         dimensions: ['if_index' => '7'],
-        observedAt: CarbonImmutable::parse('2026-07-23T11:55:00Z'),
+        observedAt: CarbonImmutable::parse('2026-07-23T11:55:00.654321Z'),
         source: 'native_snmp',
     );
 
@@ -282,7 +295,18 @@ it('deduplicates an exact historical replay after a newer point without rewindin
         'covered_until' => CarbonImmutable::parse('2026-07-23T12:00:00Z'),
         'completed_at' => CarbonImmutable::parse('2026-07-23T12:00:00Z'),
     ]);
+    $beforeReplay = [
+        'summary_updated_at' => $summaryUpdatedAt = MetricCurrentSummary::query()
+            ->where('series_id', $series->id)
+            ->sole()
+            ->updated_at
+            ->format('Y-m-d H:i:s.u'),
+        'series_updated_at' => $series->fresh()->updated_at->format('Y-m-d H:i:s.u'),
+        'coverage_updated_at' => $coverage->fresh()->updated_at->format('Y-m-d H:i:s.u'),
+    ];
+    expect($summaryUpdatedAt)->not->toBeEmpty();
 
+    CarbonImmutable::setTestNow('2026-07-23T12:01:00Z');
     $service->write($monitor, $older);
 
     $summary = MetricCurrentSummary::query()->where('series_id', $series->id)->sole();
@@ -291,63 +315,417 @@ it('deduplicates an exact historical replay after a newer point without rewindin
         ->and(MetricPointReceipt::query()->where('series_id', $series->id)->count())->toBe(2)
         ->and($summary->sample_count)->toBe(2)
         ->and($summary->value)->toBe('55.000000')
-        ->and($summary->observed_at->toIso8601String())->toBe('2026-07-23T11:55:00+00:00')
+        ->and($summary->observed_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.654321')
         ->and($summary->last_idempotency_key)->toBe($newerPoint->idempotencyKey)
-        ->and($series->fresh()->first_point_at->toIso8601String())->toBe('2026-07-23T11:50:00+00:00')
-        ->and($series->fresh()->last_point_at->toIso8601String())->toBe('2026-07-23T11:55:00+00:00')
-        ->and($coverage->fresh()->covered_until->toIso8601String())->toBe('2026-07-23T12:00:00+00:00');
+        ->and($series->fresh()->first_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:50:00.123456')
+        ->and($series->fresh()->last_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.654321')
+        ->and($coverage->fresh()->covered_until->toIso8601String())->toBe('2026-07-23T12:00:00+00:00')
+        ->and([
+            'summary_updated_at' => $summary->updated_at->format('Y-m-d H:i:s.u'),
+            'series_updated_at' => $series->fresh()->updated_at->format('Y-m-d H:i:s.u'),
+            'coverage_updated_at' => $coverage->fresh()->updated_at->format('Y-m-d H:i:s.u'),
+        ])->toBe($beforeReplay);
 });
 
-it('backfills a late legacy replay receipt without replacing the newer current evidence', function (): void {
+it('keeps same-second late points out of the newer current evidence tuple', function (): void {
     [, , $monitor] = metricRetentionMonitor();
-    $older = new MetricSample(
-        metric: 'legacy.latest',
+    $service = app(MetricIngestService::class);
+    $newer = new MetricSample(
+        metric: 'same-second.ordering',
+        value: 90,
+        unit: 'count',
+        observedAt: CarbonImmutable::parse('2026-07-23T11:55:00.900000Z'),
+    );
+    $late = new MetricSample(
+        metric: 'same-second.ordering',
+        value: 10,
+        unit: 'count',
+        observedAt: CarbonImmutable::parse('2026-07-23T11:55:00.100000Z'),
+    );
+
+    $service->write($monitor, $newer);
+    $newerPoint = $this->store->points[0];
+    $service->write($monitor, $late);
+
+    $series = MetricSeries::query()->sole();
+    $summary = MetricCurrentSummary::query()->sole();
+    expect($this->store->writeAttempts)->toBe(2)
+        ->and($this->store->points)->toHaveCount(2)
+        ->and(MetricPointReceipt::query()->count())->toBe(2)
+        ->and(MetricPointReceipt::query()->orderBy('observed_at')->get()
+            ->map(fn (MetricPointReceipt $receipt): string => $receipt->observed_at
+                ->format('Y-m-d H:i:s.u'))
+            ->all())->toBe([
+                '2026-07-23 11:55:00.100000',
+                '2026-07-23 11:55:00.900000',
+            ])
+        ->and($summary->sample_count)->toBe(2)
+        ->and($summary->value)->toBe('90.000000')
+        ->and($summary->observed_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.900000')
+        ->and($summary->last_idempotency_key)->toBe($newerPoint->idempotencyKey)
+        ->and($series->first_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.100000')
+        ->and($series->last_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.900000');
+
+    expect(fn () => DB::table('monitoring_metric_current_summaries')
+        ->where('id', $summary->id)
+        ->update([
+            'sample_count' => 3,
+            'last_idempotency_key' => hash('sha256', 'legacy-key-only-late-point'),
+        ]))->toThrow(QueryException::class);
+
+    expect($summary->fresh()->last_idempotency_key)->toBe($newerPoint->idempotencyKey)
+        ->and($summary->fresh()->sample_count)->toBe(2)
+        ->and(MetricPointReceipt::query()->count())->toBe(2);
+});
+
+it('persists a unique point inside the retained pointer range without a no-op series update', function (): void {
+    [, , $monitor] = metricRetentionMonitor();
+    $service = app(MetricIngestService::class);
+
+    foreach ([100000 => 10, 900000 => 90, 500000 => 50] as $microseconds => $value) {
+        $service->write($monitor, new MetricSample(
+            metric: 'interior.point',
+            value: $value,
+            unit: 'count',
+            observedAt: CarbonImmutable::parse(sprintf(
+                '2026-07-23T11:55:00.%06dZ',
+                $microseconds,
+            )),
+        ));
+    }
+
+    $series = MetricSeries::query()->sole();
+    $summary = MetricCurrentSummary::query()->sole();
+    expect($this->store->writeAttempts)->toBe(3)
+        ->and(MetricPointReceipt::query()->count())->toBe(3)
+        ->and($summary->sample_count)->toBe(3)
+        ->and($summary->value)->toBe('90.000000')
+        ->and($summary->observed_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.900000')
+        ->and($series->first_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.100000')
+        ->and($series->last_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.900000');
+});
+
+it('captures canonical whole-second old-worker success before a newer point displaces it', function (): void {
+    config()->set('monitoring.storage.timeseries.url', 'https://timeseries.example.test');
+    [$site, $device, $monitor] = metricRetentionMonitor();
+    $olderObservedAt = CarbonImmutable::parse('2026-07-23T11:40:00Z');
+    $oldWorkerObservation = MonitorObservation::query()->create([
+        'monitor_id' => $monitor->id,
+        'source_key' => 'mixed-worker-old-success',
+        'state' => MonitorState::Healthy,
+        'value' => 12,
+        'unit' => 'count',
+        'metrics' => [],
+        'observed_at' => $olderObservedAt,
+        'ingested_at' => now(),
+    ])->fresh();
+    $service = app(MetricIngestService::class);
+    $oldSample = new MetricSample(
+        metric: 'monitor.value',
         value: 12,
         unit: 'count',
-        observedAt: CarbonImmutable::parse('2026-07-23T11:40:00Z'),
-    );
-    $newer = new MetricSample(
-        metric: 'legacy.latest',
-        value: 25,
-        unit: 'count',
-        observedAt: CarbonImmutable::parse('2026-07-23T11:45:00Z'),
+        observedAt: $olderObservedAt,
+        source: 'oblivion_observation',
     );
     $this->store->failOnWriteAttempt = 1;
 
-    expect(fn () => app(MetricIngestService::class)->write($monitor, $older))
-        ->toThrow(TimeSeriesUnavailable::class);
-    $this->store->failOnWriteAttempt = 2;
-    expect(fn () => app(MetricIngestService::class)->write($monitor, $newer))
-        ->toThrow(TimeSeriesUnavailable::class);
+    expect(fn () => $service->writeForDevice(
+        $device,
+        $site->id,
+        $oldSample,
+        $monitor->id,
+    ))->toThrow(TimeSeriesUnavailable::class);
 
-    [$olderPoint, $newerPoint] = $this->store->attemptedPoints;
     $series = MetricSeries::query()->sole();
-    $this->store->points = [$olderPoint, $newerPoint];
-    $series->forceFill([
-        'first_point_at' => $older->observedAt,
-        'last_point_at' => $newer->observedAt,
-    ])->save();
     $summary = MetricCurrentSummary::query()->sole();
-    $summary->forceFill([
-        'value' => 25,
-        'sample_count' => 3,
-        'observed_at' => $newer->observedAt,
-        'last_idempotency_key' => $olderPoint->idempotencyKey,
-        'storage_state' => 'available',
-    ])->save();
+    $oldPoint = $this->store->attemptedPoints[0];
+    expect(MetricPointReceipt::query()->count())->toBe(0)
+        ->and($oldWorkerObservation->metrics_projected_at)->toBeNull();
+
+    // Emulate the old binary's external success and raw summary finalisation.
     $this->store->failOnWriteAttempt = null;
+    $this->store->writeAttempts = 0;
+    $this->store->attemptedPoints = [];
+    $this->store->points = [];
+    $this->store->writePoints([$oldPoint]);
+    DB::table('monitoring_metric_series')->where('id', $series->id)->update([
+        'first_point_at' => $olderObservedAt->format('Y-m-d H:i:s.u'),
+        'last_point_at' => $olderObservedAt->format('Y-m-d H:i:s.u'),
+    ]);
+    DB::table('monitoring_metric_current_summaries')->where('id', $summary->id)->update([
+        'value' => 12,
+        'statistics' => null,
+        'sample_count' => 1,
+        'observed_at' => $olderObservedAt->format('Y-m-d H:i:s.u'),
+        'last_idempotency_key' => $oldPoint->idempotencyKey,
+        'storage_state' => 'available',
+        'storage_checked_at' => now(),
+    ]);
 
-    app(MetricIngestService::class)->write($monitor, $older);
+    $oldReceipt = MetricPointReceipt::query()->sole();
+    expect($oldReceipt->idempotency_key)->toBe($oldPoint->idempotencyKey)
+        ->and($oldReceipt->series_id)->toBe($series->id)
+        ->and($oldReceipt->observed_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:40:00.000000');
 
-    $summary = $summary->fresh();
-    expect($this->store->writeAttempts)->toBe(2)
+    $ingestor = app(MonitoringObservationIngestor::class);
+    $ingestor->ingest(
+        $monitor,
+        new ObservationInput(
+            sourceKey: 'mixed-worker-newer-success',
+            state: MonitorState::Healthy,
+            observedAt: CarbonImmutable::parse('2026-07-23T11:45:00Z'),
+            value: 25,
+            unit: 'count',
+        ),
+        $site->id,
+        $device->id,
+        null,
+    );
+    $newerPoint = collect($this->store->points)->first(
+        fn (TimeSeriesPoint $point): bool => $point->value === 25.0,
+    );
+    $target = MetricSeries::query()->create([
+        ...$series->only([
+            'site_id',
+            'device_id',
+            'monitor_id',
+            'metric',
+            'dimensions',
+            'dimensions_hash',
+            'unit',
+            'source',
+            'data_class',
+            'privacy_class',
+        ]),
+        'retention_tier' => 'hourly',
+        'external_key' => hash('sha256', 'mixed-worker-target-'.$series->id),
+    ]);
+    $coverage = MetricRollupCoverage::query()->create([
+        'source_series_id' => $series->id,
+        'target_series_id' => $target->id,
+        'target_tier' => 'hourly',
+        'covered_from' => CarbonImmutable::parse('2026-07-23T10:00:00Z'),
+        'covered_until' => CarbonImmutable::parse('2026-07-23T12:00:00Z'),
+        'completed_at' => CarbonImmutable::parse('2026-07-23T12:00:00Z'),
+    ]);
+    $coverageUpdatedAt = $coverage->updated_at->format('Y-m-d H:i:s.u');
+
+    CarbonImmutable::setTestNow('2026-07-23T12:02:00Z');
+    $recovered = $ingestor->ingest(
+        $monitor,
+        ObservationInput::fromObservation($oldWorkerObservation),
+        $site->id,
+        $device->id,
+        null,
+    );
+
+    $series->refresh();
+    $summary->refresh();
+    expect($recovered->duplicate)->toBeTrue()
+        ->and($recovered->observation->metrics_projected_at)->not->toBeNull()
+        ->and($this->store->writeAttempts)->toBe(2)
         ->and($this->store->points)->toHaveCount(2)
-        ->and(MetricPointReceipt::query()->count())->toBe(1)
-        ->and(MetricPointReceipt::query()->sole()->idempotency_key)->toBe($olderPoint->idempotencyKey)
-        ->and($summary->sample_count)->toBe(3)
+        ->and(MetricPointReceipt::query()->count())->toBe(2)
+        ->and($summary->sample_count)->toBe(2)
         ->and($summary->value)->toBe('25.000000')
-        ->and($summary->observed_at->toIso8601String())->toBe('2026-07-23T11:45:00+00:00')
-        ->and($summary->last_idempotency_key)->toBe($olderPoint->idempotencyKey);
+        ->and($summary->observed_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:45:00.000000')
+        ->and($summary->last_idempotency_key)->toBe($newerPoint->idempotencyKey)
+        ->and($series->first_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:40:00.000000')
+        ->and($series->last_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:45:00.000000')
+        ->and($coverage->fresh()->covered_until->toIso8601String())
+        ->toBe('2026-07-23T12:00:00+00:00')
+        ->and($coverage->fresh()->updated_at->format('Y-m-d H:i:s.u'))
+        ->toBe($coverageUpdatedAt);
+});
+
+it('recovers an old-worker failure once without regressing a newer point', function (): void {
+    config()->set('monitoring.storage.timeseries.url', 'https://timeseries.example.test');
+    [$site, $device, $monitor] = metricRetentionMonitor();
+    $oldWorkerObservation = MonitorObservation::query()->create([
+        'monitor_id' => $monitor->id,
+        'source_key' => 'mixed-worker-old-failure',
+        'state' => MonitorState::Healthy,
+        'value' => 12,
+        'unit' => 'count',
+        'metrics' => [],
+        'observed_at' => CarbonImmutable::parse('2026-07-23T11:40:00Z'),
+        'ingested_at' => now(),
+    ])->fresh();
+    $this->store->failOnWriteAttempt = 1;
+
+    expect(fn () => app(MetricIngestService::class)->writeForDevice(
+        $device,
+        $site->id,
+        new MetricSample(
+            metric: 'monitor.value',
+            value: 12,
+            unit: 'count',
+            observedAt: CarbonImmutable::parse('2026-07-23T11:40:00Z'),
+            source: 'oblivion_observation',
+        ),
+        $monitor->id,
+    ))->toThrow(TimeSeriesUnavailable::class);
+
+    expect(MetricPointReceipt::query()->count())->toBe(0);
+    $this->store->failOnWriteAttempt = null;
+    $ingestor = app(MonitoringObservationIngestor::class);
+    $ingestor->ingest(
+        $monitor,
+        new ObservationInput(
+            sourceKey: 'mixed-worker-newer-after-failure',
+            state: MonitorState::Healthy,
+            observedAt: CarbonImmutable::parse('2026-07-23T11:45:00Z'),
+            value: 25,
+            unit: 'count',
+        ),
+        $site->id,
+        $device->id,
+        null,
+    );
+    $newerPoint = $this->store->points[0];
+
+    $recovered = $ingestor->ingest(
+        $monitor,
+        ObservationInput::fromObservation($oldWorkerObservation),
+        $site->id,
+        $device->id,
+        null,
+    );
+
+    $summary = MetricCurrentSummary::query()->sole();
+    $series = MetricSeries::query()->sole();
+    expect($recovered->duplicate)->toBeTrue()
+        ->and($recovered->observation->metrics_projected_at)->not->toBeNull()
+        ->and($this->store->writeAttempts)->toBe(3)
+        ->and($this->store->points)->toHaveCount(2)
+        ->and(MetricPointReceipt::query()->count())->toBe(2)
+        ->and($summary->sample_count)->toBe(2)
+        ->and($summary->value)->toBe('25.000000')
+        ->and($summary->observed_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:45:00.000000')
+        ->and($summary->last_idempotency_key)->toBe($newerPoint->idempotencyKey)
+        ->and($series->first_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:40:00.000000')
+        ->and($series->last_point_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:45:00.000000');
+});
+
+it('fails closed on a poisoned pre-cutover subsecond receipt', function (): void {
+    config()->set('monitoring.storage.timeseries.url', 'https://timeseries.example.test');
+    [$site, $device, $monitor] = metricRetentionMonitor();
+    $fractionalObservedAt = CarbonImmutable::parse('2026-07-23T11:40:00.123456Z');
+    $canonicalObservedAt = CarbonImmutable::parse('2026-07-23T11:40:00Z');
+    $oldWorkerObservation = MonitorObservation::query()->create([
+        'monitor_id' => $monitor->id,
+        'source_key' => 'poisoned-subsecond-old-worker',
+        'state' => MonitorState::Healthy,
+        'value' => 12,
+        'unit' => 'count',
+        'metrics' => [],
+        'observed_at' => $fractionalObservedAt,
+        'ingested_at' => now(),
+    ])->fresh();
+    $oldSample = new MetricSample(
+        metric: 'monitor.value',
+        value: 12,
+        unit: 'count',
+        observedAt: $fractionalObservedAt,
+        source: 'oblivion_observation',
+    );
+    $service = app(MetricIngestService::class);
+    $this->store->failOnWriteAttempt = 1;
+
+    expect(fn () => $service->writeForDevice(
+        $device,
+        $site->id,
+        $oldSample,
+        $monitor->id,
+    ))->toThrow(TimeSeriesUnavailable::class);
+
+    $series = MetricSeries::query()->sole();
+    $summary = MetricCurrentSummary::query()->sole();
+    $oldPoint = $this->store->attemptedPoints[0];
+    $this->store->failOnWriteAttempt = null;
+    $this->store->writeAttempts = 0;
+    $this->store->attemptedPoints = [];
+    $this->store->points = [];
+    $this->store->writePoints([$oldPoint]);
+    MetricPointReceipt::query()->create([
+        'idempotency_key' => $oldPoint->idempotencyKey,
+        'series_id' => $series->id,
+        'observed_at' => $canonicalObservedAt,
+    ]);
+    DB::table('monitoring_metric_series')->where('id', $series->id)->update([
+        'first_point_at' => '2026-07-23 11:40:00.000000',
+        'last_point_at' => '2026-07-23 11:40:00.000000',
+    ]);
+    DB::table('monitoring_metric_current_summaries')->where('id', $summary->id)->update([
+        'value' => 12,
+        'sample_count' => 1,
+        'observed_at' => '2026-07-23 11:40:00.000000',
+        'last_idempotency_key' => $oldPoint->idempotencyKey,
+        'storage_state' => 'available',
+        'storage_checked_at' => now(),
+    ]);
+
+    $ingestor = app(MonitoringObservationIngestor::class);
+    $ingestor->ingest(
+        $monitor,
+        new ObservationInput(
+            sourceKey: 'poisoned-subsecond-newer-success',
+            state: MonitorState::Healthy,
+            observedAt: CarbonImmutable::parse('2026-07-23T11:45:00Z'),
+            value: 25,
+            unit: 'count',
+        ),
+        $site->id,
+        $device->id,
+        null,
+    );
+    $beforeRetry = [
+        'write_attempts' => $this->store->writeAttempts,
+        'points' => count($this->store->points),
+        'receipts' => MetricPointReceipt::query()->count(),
+        'sample_count' => $summary->fresh()->sample_count,
+        'value' => $summary->fresh()->value,
+        'observed_at' => $summary->fresh()->observed_at->format('Y-m-d H:i:s.u'),
+        'last_key' => $summary->fresh()->last_idempotency_key,
+    ];
+
+    expect($oldWorkerObservation->observed_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:40:00.000000')
+        ->and(fn () => $ingestor->ingest(
+            $monitor,
+            ObservationInput::fromObservation($oldWorkerObservation),
+            $site->id,
+            $device->id,
+            null,
+        ))
+        ->toThrow(LogicException::class, 'requires reconciliation');
+
+    expect([
+        'write_attempts' => $this->store->writeAttempts,
+        'points' => count($this->store->points),
+        'receipts' => MetricPointReceipt::query()->count(),
+        'sample_count' => $summary->fresh()->sample_count,
+        'value' => $summary->fresh()->value,
+        'observed_at' => $summary->fresh()->observed_at->format('Y-m-d H:i:s.u'),
+        'last_key' => $summary->fresh()->last_idempotency_key,
+    ])->toBe($beforeRetry)
+        ->and($oldWorkerObservation->fresh()->metrics_projected_at)->toBeNull();
 });
 
 it('marks external write failure as unavailable without advancing healthy evidence', function (): void {
@@ -1857,6 +2235,98 @@ it('fails closed before replay when stored observation Site provenance is no lon
         ->and(MetricPointReceipt::query()->count())->toBe(1);
 });
 
+it('bridges raw old-worker summary writes to exact value-free receipts', function (): void {
+    [$site, $device, $monitor] = metricRetentionMonitor();
+    $series = MetricSeries::query()->create([
+        'site_id' => $site->id,
+        'device_id' => $device->id,
+        'monitor_id' => $monitor->id,
+        'metric' => 'legacy.raw-summary',
+        'dimensions' => [],
+        'dimensions_hash' => hash('sha256', '[]'),
+        'unit' => 'count',
+        'source' => 'legacy_monitoring',
+        'data_class' => 'operational',
+        'privacy_class' => 'standard',
+        'retention_tier' => 'raw',
+        'external_key' => hash('sha256', 'legacy-raw-summary-series'),
+    ]);
+    $olderKey = hash('sha256', 'legacy-raw-summary-point-older');
+    $newerKey = hash('sha256', 'legacy-raw-summary-point-newer');
+
+    DB::table('monitoring_metric_current_summaries')->insert([
+        'series_id' => $series->id,
+        'value' => 10,
+        'statistics' => null,
+        'sample_count' => 1,
+        'observed_at' => '2026-07-23 11:55:00.100000',
+        'last_idempotency_key' => $olderKey,
+        'storage_state' => 'available',
+        'storage_checked_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $olderReceipt = MetricPointReceipt::query()->where('idempotency_key', $olderKey)->sole();
+    expect($olderReceipt->series_id)->toBe($series->id)
+        ->and($olderReceipt->observed_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.100000');
+
+    DB::table('monitoring_metric_current_summaries')
+        ->where('series_id', $series->id)
+        ->update([
+            'value' => 90,
+            'sample_count' => 2,
+            'observed_at' => '2026-07-23 11:55:00.900000',
+            'last_idempotency_key' => $newerKey,
+            'storage_checked_at' => now(),
+        ]);
+
+    $otherSeries = MetricSeries::query()->create([
+        ...$series->only([
+            'site_id',
+            'device_id',
+            'monitor_id',
+            'dimensions',
+            'dimensions_hash',
+            'unit',
+            'source',
+            'data_class',
+            'privacy_class',
+            'retention_tier',
+        ]),
+        'metric' => 'legacy.raw-summary-other',
+        'external_key' => hash('sha256', 'legacy-raw-summary-other-series'),
+    ]);
+
+    expect(fn () => DB::table('monitoring_metric_current_summaries')->insert([
+        'series_id' => $otherSeries->id,
+        'value' => 10,
+        'statistics' => null,
+        'sample_count' => 1,
+        'observed_at' => '2026-07-23 11:55:00.100000',
+        'last_idempotency_key' => $olderKey,
+        'storage_state' => 'available',
+        'storage_checked_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]))->toThrow(QueryException::class);
+
+    expect(MetricPointReceipt::query()->count())->toBe(2)
+        ->and(MetricPointReceipt::query()->where('idempotency_key', $olderKey)->exists())->toBeTrue()
+        ->and(MetricPointReceipt::query()->where('idempotency_key', $newerKey)->sole()
+            ->series_id)
+        ->toBe($series->id)
+        ->and(MetricPointReceipt::query()->where('idempotency_key', $newerKey)->sole()
+            ->observed_at
+            ->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:55:00.900000')
+        ->and(collect(Schema::getColumnListing('monitoring_metric_point_receipts'))->sort()->values()->all())
+        ->toBe(['created_at', 'id', 'idempotency_key', 'observed_at', 'series_id', 'updated_at'])
+        ->and(MetricCurrentSummary::query()->where('series_id', $otherSeries->id)->exists())
+        ->toBeFalse();
+});
+
 it('fails closed on a mismatched immutable receipt and stores only value-free replay metadata', function (): void {
     [, , $monitor] = metricRetentionMonitor();
     $sample = new MetricSample(
@@ -1875,11 +2345,23 @@ it('fails closed on a mismatched immutable receipt and stores only value-free re
     $receipt = MetricPointReceipt::query()->create([
         'idempotency_key' => $attempted->idempotencyKey,
         'series_id' => $series->id,
-        'observed_at' => $sample->observedAt->addSecond(),
+        'observed_at' => $sample->observedAt->addMicrosecond(),
     ]);
     $this->store->failOnWriteAttempt = null;
 
-    expect(fn () => app(MetricIngestService::class)->write($monitor, $sample))
+    expect($receipt->fresh()->observed_at->format('Y-m-d H:i:s.u'))
+        ->toBe('2026-07-23 11:30:00.000001')
+        ->and(fn () => DB::table('monitoring_metric_current_summaries')
+            ->where('series_id', $series->id)
+            ->update([
+                'value' => 91,
+                'sample_count' => 1,
+                'observed_at' => $sample->observedAt->format('Y-m-d H:i:s.u'),
+                'last_idempotency_key' => $attempted->idempotencyKey,
+                'storage_state' => 'available',
+            ]))
+        ->toThrow(QueryException::class)
+        ->and(fn () => app(MetricIngestService::class)->write($monitor, $sample))
         ->toThrow(LogicException::class, 'does not match')
         ->and($this->store->writeAttempts)->toBe(1)
         ->and(MetricCurrentSummary::query()->sole()->sample_count)->toBe(0)
@@ -1895,6 +2377,187 @@ it('fails closed on a mismatched immutable receipt and stores only value-free re
             ->where('id', $receipt->id)
             ->delete())
         ->toThrow(QueryException::class);
+});
+
+it('fails closed when a receipt key belongs to another metric series', function (): void {
+    [, , $monitor] = metricRetentionMonitor();
+    $first = new MetricSample(
+        metric: 'receipt.first-series',
+        value: 1,
+        unit: 'count',
+        observedAt: CarbonImmutable::parse('2026-07-23T11:31:00.123456Z'),
+    );
+    $second = new MetricSample(
+        metric: 'receipt.second-series',
+        value: 2,
+        unit: 'count',
+        observedAt: CarbonImmutable::parse('2026-07-23T11:32:00.654321Z'),
+    );
+    $service = app(MetricIngestService::class);
+    $this->store->failWrites = true;
+
+    expect(fn () => $service->write($monitor, $first))->toThrow(TimeSeriesUnavailable::class)
+        ->and(fn () => $service->write($monitor, $second))->toThrow(TimeSeriesUnavailable::class);
+
+    $firstSeries = MetricSeries::query()->where('metric', 'receipt.first-series')->sole();
+    $secondPoint = $this->store->attemptedPoints[1];
+    MetricPointReceipt::query()->create([
+        'idempotency_key' => $secondPoint->idempotencyKey,
+        'series_id' => $firstSeries->id,
+        'observed_at' => $second->observedAt,
+    ]);
+    $this->store->failWrites = false;
+
+    expect(fn () => $service->write($monitor, $second))
+        ->toThrow(LogicException::class, 'does not match')
+        ->and($this->store->writeAttempts)->toBe(2)
+        ->and(MetricCurrentSummary::query()
+            ->whereHas('series', fn ($query) => $query->where('metric', 'receipt.second-series'))
+            ->sole()
+            ->sample_count)->toBe(0);
+});
+
+it('installs the forward receipt bridge on an already-applied baseline schema', function (): void {
+    $baseConnection = (string) DB::getDefaultConnection();
+    $baseDatabase = DB::getDatabaseName();
+    $upgradeDatabase = $baseDatabase.'_upgrade_'.bin2hex(random_bytes(4));
+    if (preg_match(
+        '/^oblivion_findings_codex_test_[0-9]+_upgrade_[0-9a-f]{8}$/',
+        $upgradeDatabase,
+    ) !== 1) {
+        throw new RuntimeException('Refusing to create an upgrade schema outside the PID test boundary.');
+    }
+
+    $baseConfig = (array) config("database.connections.{$baseConnection}");
+    $adminConnection = 'metric_projection_upgrade_admin';
+    $upgradeConnection = 'metric_projection_upgrade';
+    config()->set("database.connections.{$adminConnection}", [
+        ...$baseConfig,
+        'database' => 'information_schema',
+    ]);
+    config()->set("database.connections.{$upgradeConnection}", [
+        ...$baseConfig,
+        'database' => $upgradeDatabase,
+    ]);
+    DB::purge($adminConnection);
+    DB::purge($upgradeConnection);
+    $databaseCreated = false;
+
+    try {
+        DB::connection($adminConnection)->statement("CREATE DATABASE `{$upgradeDatabase}`");
+        $databaseCreated = true;
+
+        Schema::connection($upgradeConnection)->create(
+            'monitoring_metric_series',
+            function (Blueprint $table): void {
+                $table->id();
+            },
+        );
+        Schema::connection($upgradeConnection)->create(
+            'monitoring_metric_point_receipts',
+            function (Blueprint $table): void {
+                $table->id();
+                $table->char('idempotency_key', 64)->unique(
+                    'monitoring_metric_point_receipts_key_uq',
+                );
+                $table->unsignedBigInteger('series_id');
+                $table->timestamp('observed_at', 6);
+                $table->timestamps(6);
+                $table->index(
+                    ['series_id', 'observed_at'],
+                    'monitoring_metric_point_receipts_series_observed_idx',
+                );
+            },
+        );
+        Schema::connection($upgradeConnection)->create(
+            'monitoring_metric_current_summaries',
+            function (Blueprint $table): void {
+                $table->id();
+                $table->unsignedBigInteger('series_id')->unique();
+                $table->decimal('value', 30, 6)->nullable();
+                $table->json('statistics')->nullable();
+                $table->unsignedBigInteger('sample_count')->default(0);
+                $table->timestamp('observed_at', 6)->nullable();
+                $table->string('last_idempotency_key', 64)->nullable();
+                $table->string('storage_state', 16)->default('unknown');
+                $table->timestamp('storage_checked_at', 6)->nullable();
+                $table->timestamps();
+            },
+        );
+        Schema::connection($upgradeConnection)->create(
+            'monitor_observations',
+            function (Blueprint $table): void {
+                $table->id();
+                $table->timestamp('metrics_projected_at', 6)->nullable();
+            },
+        );
+
+        $upgrade = DB::connection($upgradeConnection);
+        $legacyKey = hash('sha256', 'upgrade-legacy-late-key');
+        $upgrade->table('monitoring_metric_series')->insert(['id' => 1]);
+        $upgrade->table('monitoring_metric_point_receipts')->insert([
+            'idempotency_key' => $legacyKey,
+            'series_id' => 1,
+            'observed_at' => '2026-07-23 11:40:00.000000',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $upgrade->table('monitoring_metric_current_summaries')->insert([
+            'series_id' => 1,
+            'value' => 25,
+            'statistics' => null,
+            'sample_count' => 2,
+            'observed_at' => '2026-07-23 11:45:00.000000',
+            'last_idempotency_key' => $legacyKey,
+            'storage_state' => 'available',
+            'storage_checked_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $upgrade->table('monitor_observations')->insert([
+            'id' => 1,
+            'metrics_projected_at' => null,
+        ]);
+
+        DB::setDefaultConnection($upgradeConnection);
+        $migration = require database_path(
+            'migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php',
+        );
+        expect(fn () => $migration->up())
+            ->toThrow(RuntimeException::class, 'explicit reconciliation');
+        DB::table('monitor_observations')->where('id', 1)->delete();
+        $migration->up();
+
+        $triggerCount = DB::table('information_schema.TRIGGERS')
+            ->where('TRIGGER_SCHEMA', $upgradeDatabase)
+            ->whereIn('TRIGGER_NAME', [
+                'monitoring_metric_current_summaries_bi_receipt',
+                'monitoring_metric_current_summaries_bu_receipt',
+            ])
+            ->count();
+        $uniqueIndexRows = DB::table('information_schema.STATISTICS')
+            ->where('TABLE_SCHEMA', $upgradeDatabase)
+            ->where('TABLE_NAME', 'monitoring_metric_point_receipts')
+            ->where('INDEX_NAME', 'monitoring_metric_point_receipts_series_observed_uq')
+            ->get();
+
+        expect($triggerCount)->toBe(2)
+            ->and($uniqueIndexRows)->toHaveCount(2)
+            ->and($uniqueIndexRows->every(
+                fn (object $index): bool => (int) $index->NON_UNIQUE === 0,
+            ))->toBeTrue()
+            ->and(DB::table('monitoring_metric_current_summaries')->sole()
+                ->last_idempotency_key)->toBeNull()
+            ->and(DB::table('monitoring_metric_point_receipts')->sole()
+                ->idempotency_key)->toBe($legacyKey);
+    } finally {
+        DB::setDefaultConnection($baseConnection);
+        DB::purge($upgradeConnection);
+        if ($databaseCreated) {
+            DB::connection($adminConnection)->statement("DROP DATABASE `{$upgradeDatabase}`");
+        }
+        DB::purge($adminConnection);
+    }
 });
 
 /** @return array{Site, Device, Monitor} */

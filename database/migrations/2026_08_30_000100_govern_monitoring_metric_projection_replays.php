@@ -11,6 +11,31 @@ return new class extends Migration
 
     public function up(): void
     {
+        Schema::create(self::RECEIPTS_TABLE, function (Blueprint $table): void {
+            $table->id();
+            $table->char('idempotency_key', 64);
+            $table->foreignId('series_id');
+            $table->timestamp('observed_at', 6);
+            $table->timestamps(6);
+
+            $table->unique(
+                'idempotency_key',
+                'monitoring_metric_point_receipts_key_uq',
+            );
+            $table->foreign('series_id', 'monitoring_metric_point_receipts_series_fk')
+                ->references('id')->on('monitoring_metric_series')->restrictOnDelete();
+            $table->unique(
+                ['series_id', 'observed_at'],
+                'monitoring_metric_point_receipts_series_observed_uq',
+            );
+        });
+
+        $this->installMetricPointReceiptGuards();
+        $this->installCurrentSummaryReceiptBridge();
+
+        // The bridge must exist before this cutover boundary. Any old worker
+        // that completes after the boundary now persists durable receipt
+        // evidence in the same statement that advances its summary.
         $legacyObservationId = $this->captureObservationHighWaterMark();
 
         Schema::table('monitor_observations', function (Blueprint $table): void {
@@ -26,25 +51,6 @@ return new class extends Migration
         });
 
         $this->sealPreMigrationObservations($legacyObservationId);
-
-        Schema::create(self::RECEIPTS_TABLE, function (Blueprint $table): void {
-            $table->id();
-            $table->char('idempotency_key', 64);
-            $table->foreignId('series_id');
-            $table->timestamp('observed_at', 6);
-            $table->timestamps(6);
-
-            $table->unique(
-                'idempotency_key',
-                'monitoring_metric_point_receipts_key_uq',
-            );
-            $table->foreign('series_id', 'monitoring_metric_point_receipts_series_fk')
-                ->references('id')->on('monitoring_metric_series')->restrictOnDelete();
-            $table->index(
-                ['series_id', 'observed_at'],
-                'monitoring_metric_point_receipts_series_observed_idx',
-            );
-        });
 
         DB::unprepared(<<<'SQL'
             CREATE TRIGGER monitor_observations_bi_metric_projection
@@ -428,6 +434,10 @@ return new class extends Migration
             END
         SQL);
 
+    }
+
+    private function installMetricPointReceiptGuards(): void
+    {
         DB::unprepared(<<<'SQL'
             CREATE TRIGGER monitoring_metric_point_receipts_bu
             BEFORE UPDATE ON monitoring_metric_point_receipts
@@ -441,6 +451,149 @@ return new class extends Migration
             FOR EACH ROW
             SIGNAL SQLSTATE '45000'
                 SET MESSAGE_TEXT = 'Metric point receipts are immutable.'
+        SQL);
+    }
+
+    public function installCurrentSummaryReceiptBridge(): void
+    {
+        DB::unprepared(<<<'SQL'
+            CREATE TRIGGER monitoring_metric_current_summaries_bi_receipt
+            BEFORE INSERT ON monitoring_metric_current_summaries
+            FOR EACH ROW
+            BEGIN
+                DECLARE receipt_count BIGINT UNSIGNED DEFAULT 0;
+                DECLARE receipt_series_id BIGINT UNSIGNED DEFAULT NULL;
+                DECLARE receipt_observed_at DATETIME(6) DEFAULT NULL;
+                DECLARE time_receipt_count BIGINT UNSIGNED DEFAULT 0;
+
+                IF NEW.last_idempotency_key IS NOT NULL THEN
+                    IF NEW.observed_at IS NULL THEN
+                        SIGNAL SQLSTATE '45000'
+                            SET MESSAGE_TEXT = 'Metric summary receipt requires an observed time.';
+                    END IF;
+
+                    SELECT COUNT(*), MAX(series_id), MAX(observed_at)
+                        INTO receipt_count, receipt_series_id, receipt_observed_at
+                        FROM monitoring_metric_point_receipts
+                        WHERE idempotency_key = NEW.last_idempotency_key;
+
+                    SELECT COUNT(*)
+                        INTO time_receipt_count
+                        FROM monitoring_metric_point_receipts
+                        WHERE series_id = NEW.series_id
+                          AND observed_at = NEW.observed_at
+                          AND idempotency_key <> NEW.last_idempotency_key;
+
+                    IF time_receipt_count > 0 THEN
+                        SIGNAL SQLSTATE '45000'
+                            SET MESSAGE_TEXT = 'Metric point time is bound to different receipt evidence.';
+                    END IF;
+
+                    IF receipt_count = 0 THEN
+                        INSERT INTO monitoring_metric_point_receipts (
+                            idempotency_key,
+                            series_id,
+                            observed_at,
+                            created_at,
+                            updated_at
+                        ) VALUES (
+                            NEW.last_idempotency_key,
+                            NEW.series_id,
+                            NEW.observed_at,
+                            CURRENT_TIMESTAMP(6),
+                            CURRENT_TIMESTAMP(6)
+                        );
+                    ELSEIF receipt_count <> 1
+                        OR NOT (receipt_series_id <=> NEW.series_id)
+                        OR NOT (receipt_observed_at <=> NEW.observed_at)
+                    THEN
+                        SIGNAL SQLSTATE '45000'
+                            SET MESSAGE_TEXT = 'Metric summary receipt does not match its canonical point.';
+                    END IF;
+                END IF;
+            END
+        SQL);
+
+        DB::unprepared(<<<'SQL'
+            CREATE TRIGGER monitoring_metric_current_summaries_bu_receipt
+            BEFORE UPDATE ON monitoring_metric_current_summaries
+            FOR EACH ROW
+            BEGIN
+                DECLARE new_receipt_count BIGINT UNSIGNED DEFAULT 0;
+                DECLARE new_receipt_series_id BIGINT UNSIGNED DEFAULT NULL;
+                DECLARE new_receipt_observed_at DATETIME(6) DEFAULT NULL;
+                DECLARE time_receipt_count BIGINT UNSIGNED DEFAULT 0;
+
+                IF NEW.last_idempotency_key IS NOT NULL THEN
+                    IF NEW.observed_at IS NULL THEN
+                        SIGNAL SQLSTATE '45000'
+                            SET MESSAGE_TEXT = 'Metric summary receipt requires an observed time.';
+                    END IF;
+
+                    SELECT COUNT(*), MAX(series_id), MAX(observed_at)
+                        INTO new_receipt_count, new_receipt_series_id, new_receipt_observed_at
+                        FROM monitoring_metric_point_receipts
+                        WHERE idempotency_key = NEW.last_idempotency_key;
+
+                    SELECT COUNT(*)
+                        INTO time_receipt_count
+                        FROM monitoring_metric_point_receipts
+                        WHERE series_id = NEW.series_id
+                          AND observed_at = NEW.observed_at
+                          AND idempotency_key <> NEW.last_idempotency_key;
+
+                    IF time_receipt_count > 0 THEN
+                        SIGNAL SQLSTATE '45000'
+                            SET MESSAGE_TEXT = 'Metric point time is bound to different receipt evidence.';
+                    END IF;
+
+                    IF new_receipt_count > 0
+                        AND (
+                            new_receipt_count <> 1
+                            OR NOT (new_receipt_series_id <=> NEW.series_id)
+                            OR NOT (new_receipt_observed_at <=> NEW.observed_at)
+                        )
+                    THEN
+                        SIGNAL SQLSTATE '45000'
+                            SET MESSAGE_TEXT = 'Metric summary receipt does not match its canonical point.';
+                    END IF;
+
+                    IF NEW.last_idempotency_key <=> OLD.last_idempotency_key THEN
+                        IF NOT (NEW.observed_at <=> OLD.observed_at)
+                            OR NOT (NEW.value <=> OLD.value)
+                            OR NOT (NEW.statistics <=> OLD.statistics)
+                        THEN
+                            SIGNAL SQLSTATE '45000'
+                                SET MESSAGE_TEXT = 'Metric summary key and current evidence must change together.';
+                        END IF;
+                    ELSE
+                        IF new_receipt_count = 0
+                            AND (NEW.observed_at <=> OLD.observed_at)
+                            AND (NEW.value <=> OLD.value)
+                            AND (NEW.statistics <=> OLD.statistics)
+                        THEN
+                            SIGNAL SQLSTATE '45000'
+                                SET MESSAGE_TEXT = 'Legacy late metric evidence cannot replace the current key.';
+                        END IF;
+
+                        IF new_receipt_count = 0 THEN
+                            INSERT INTO monitoring_metric_point_receipts (
+                                idempotency_key,
+                                series_id,
+                                observed_at,
+                                created_at,
+                                updated_at
+                            ) VALUES (
+                                NEW.last_idempotency_key,
+                                NEW.series_id,
+                                NEW.observed_at,
+                                CURRENT_TIMESTAMP(6),
+                                CURRENT_TIMESTAMP(6)
+                            );
+                        END IF;
+                    END IF;
+                END IF;
+            END
         SQL);
     }
 
@@ -475,6 +628,8 @@ return new class extends Migration
             throw new RuntimeException('Cannot remove an incomplete metric projection seal.');
         }
 
+        DB::unprepared('DROP TRIGGER IF EXISTS monitoring_metric_current_summaries_bu_receipt');
+        DB::unprepared('DROP TRIGGER IF EXISTS monitoring_metric_current_summaries_bi_receipt');
         DB::unprepared('DROP TRIGGER IF EXISTS monitoring_metric_point_receipts_bu');
         DB::unprepared('DROP TRIGGER IF EXISTS monitoring_metric_point_receipts_bd');
         DB::unprepared('DROP TRIGGER IF EXISTS monitor_observations_bu_metric_projection');
