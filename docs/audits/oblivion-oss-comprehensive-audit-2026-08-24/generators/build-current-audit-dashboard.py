@@ -269,6 +269,10 @@ fleet_trip_index_review = read_json_strict("evidence/source/raw-run-179r-indepen
 reviewed_fleet_trip_index_overlay = read_json_strict("evidence/source/current-run-180-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-wave-34.json")
 reviewed_fleet_trip_index_overlay_review = read_json_strict("evidence/source/current-run-180r-independent-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-review-wave-34.json")
 run_181_reporting = read_json_strict("evidence/source/current-run-181-reviewed-fleet-trip-index-route-action-reporting-wave-34.json")
+dashboard_run_182 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-182-wave-34.json")
+run_183_remediation = read_json_strict("evidence/runtime/current-run-183-fleet-trip-playback-site-privacy-remediation-wave-35.json")
+run_183r_review = read_json_strict("evidence/runtime/current-run-183r-independent-fleet-trip-playback-site-privacy-remediation-review-wave-35.json")
+run_184_reporting = read_json_strict("evidence/source/current-run-184-fleet-trip-playback-site-privacy-remediation-reporting-wave-35.json")
 findings_register = read_json_strict("findings.json")
 assert sha256_file("evidence/source/current-canonical-feature-identity-wave-01.json") == "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
 assert sha256_file("evidence/source/current-canonical-identity-agent-register.json") == "21ebd8b004b5ade11aa01281958cda2be2ca966d1fb7c46576e039fab5f47baf"
@@ -3186,6 +3190,14 @@ for label, path in (
     ("RUN-180R Fleet trip-index overlay review", "evidence/source/current-run-180r-independent-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-review-wave-34.json"),
     ("RUN-181 Fleet trip-index route/action reporting materializer", "generators/materialize-run-181-reviewed-fleet-trip-index-route-action-reporting-wave-34.py"),
     ("RUN-181 Fleet trip-index route/action reporting receipt", "evidence/source/current-run-181-reviewed-fleet-trip-index-route-action-reporting-wave-34.json"),
+    ("RUN-182 exact RUN-181 audit-dashboard verification materializer", "generators/materialize-run-182-audit-dashboard-verification-wave-34.py"),
+    ("RUN-182 exact RUN-181 audit-dashboard verification", "evidence/browser/current-audit-dashboard-verification-run-182-wave-34.json"),
+    ("RUN-183 Fleet trip-playback Site-privacy remediation materializer", "generators/materialize-run-183-fleet-trip-playback-site-privacy-remediation-wave-35.py"),
+    ("RUN-183 Fleet trip-playback Site-privacy remediation receipt", "evidence/runtime/current-run-183-fleet-trip-playback-site-privacy-remediation-wave-35.json"),
+    ("RUN-183R independent Fleet trip-playback remediation-review materializer", "generators/materialize-independent-run-183-fleet-trip-playback-site-privacy-remediation-review-wave-35.py"),
+    ("RUN-183R independent Fleet trip-playback remediation review", "evidence/runtime/current-run-183r-independent-fleet-trip-playback-site-privacy-remediation-review-wave-35.json"),
+    ("RUN-184 Fleet trip-playback Site-privacy remediation-reporting materializer", "generators/materialize-run-184-fleet-trip-playback-site-privacy-remediation-reporting-wave-35.py"),
+    ("RUN-184 Fleet trip-playback Site-privacy remediation-reporting receipt", "evidence/source/current-run-184-fleet-trip-playback-site-privacy-remediation-reporting-wave-35.json"),
 ):
     if path not in checkpoint_paths:
         checkpoint_evidence.append((label, path))
@@ -3198,9 +3210,9 @@ checkpoint_evidence_links = "".join(
 checkpoint_evidence_links += (
     '<li><a href="task-scripts/">RUN-072 task-script directory (300 files)</a> '
     f'<code>{html.escape(usability_materialization["outputs"]["task_scripts"]["bundle_sha256"])}</code></li>'
-    '<li><a href="generators/materialize-run-182-audit-dashboard-verification-wave-34.py">RUN-182 audit-dashboard verification materializer</a> '
+    '<li><a href="generators/materialize-run-185-audit-dashboard-verification-wave-35.py">RUN-185 audit-dashboard verification materializer</a> '
     '<span>forward generator; fresh exact-artifact verification required</span></li>'
-    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-182-wave-34.json">RUN-182 audit-dashboard verification receipt</a> '
+    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json">RUN-185 audit-dashboard verification receipt</a> '
     '<span>forward receipt; intentionally unhashed to avoid an evidence cycle</span></li>'
 )
 start_ready_ids = "<br>".join(
@@ -3332,7 +3344,7 @@ historical_discovery_claims = {row["finding_id"]: row["source_claim"] for row in
 assert len(historical_discovery_claims) == 12
 
 assert findings_register["schema_version"] == "oblivion_audit_findings_v2_mixed_current_status"
-assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_THREE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
+assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_FOUR_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
 assert findings_register["generated_on"] == "2026-08-30"
 assert findings_register["architecture_rule"] == "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries."
 findings_pins = findings_register["pins"]
@@ -3364,10 +3376,23 @@ assert findings_pins["fleet_trip_index_site_privacy_local_main_tree"] == "657abb
 assert findings_pins["fleet_trip_index_site_privacy_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
 assert findings_pins["run_176_fleet_trip_index_site_privacy_remediation_sha256"] == "6e9fa6d855e6ec168d4c651921702dab8872810ddd89f6ba3cd353bf49e0c87c"
 assert findings_pins["run_176r_independent_artifact_review_sha256"] == "f1f7369306235ad7d5f318b512dca94e853d96e182ff5c63ddc509534fa545c1"
+assert findings_pins["fleet_trip_playback_site_privacy_baseline_commit"] == "db4196ccb3a8d9f6bcb33fb40680527d09c02dac"
+assert findings_pins["fleet_trip_playback_site_privacy_baseline_tree"] == "68052b68b070dff799d5be1d5515ec0b8472207f"
+assert findings_pins["fleet_trip_playback_site_privacy_fix_commit"] == "93e576978efae4a0112a95ed406c312f6bcadeb5"
+assert findings_pins["fleet_trip_playback_site_privacy_fix_tree"] == "f265c8476773aaceecbfe90680e59b5f4c74b205"
+assert findings_pins["fleet_trip_playback_site_privacy_advanced_main_commit"] == "0537f0f0eacafbeaf635ced4883a8bdf8e49d3f6"
+assert findings_pins["fleet_trip_playback_site_privacy_advanced_main_tree"] == "5eb8c401847f2da101922aef6c100b8e03d30b9d"
+assert findings_pins["fleet_trip_playback_site_privacy_local_main_merge_commit"] == "4038cf7fe5a789ca64e436300f2cf4b94ac16db4"
+assert findings_pins["fleet_trip_playback_site_privacy_local_main_tree"] == "b9757ccb9010564b8512c0ed47abfc553f38b697"
+assert findings_pins["fleet_trip_playback_site_privacy_stable_patch_id"] == "12c306d28e54ff88432d18b271706473ee793871"
+assert findings_pins["fleet_trip_playback_site_privacy_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
+assert findings_pins["run_183_fleet_trip_playback_site_privacy_remediation_sha256"] == "7bb1b1013cf67344c48e5a8b6e551bf3c769695e0384c2b333fb47286e53310a"
+assert findings_pins["run_183r_independent_artifact_review_sha256"] == "170245898590f6429a171bbd8a41455f096b5b43340b840294735fdbc5522640"
 live_findings = findings_register["records"]
-assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 13
+assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 14
 assert {row["id"] for row in live_findings} == set(historical_discovery_claims) | {
-    "FLEET-TRIP-INDEX-SITE-PRIVACY-01"
+    "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
+    "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
 }
 provisional_findings = [
     row for row in live_findings
@@ -3383,7 +3408,7 @@ historical_remediated_findings = [
 ]
 assert len(provisional_findings) == findings_register["counts"]["provisional_source_claims"] == 8
 assert len(historical_fixed_findings) == findings_register["counts"]["historical_already_fixed"] == 2
-assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 3
+assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 4
 historical_fixed_by_id = {row["id"]: row for row in historical_fixed_findings}
 assert set(historical_fixed_by_id) == {"MED-RBAC-01", "MED-CD-ATOMICITY-01"}
 assert historical_fixed_by_id["MED-RBAC-01"]["current_adjudication"]["verdict"] == "ALREADY_FIXED"
@@ -3424,6 +3449,7 @@ assert set(historical_remediated_by_id) == {
     "MED-CD-SCOPE-01",
     "SAFE-ALERT-DEDUP-IDENTITY-01",
     "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
+    "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
 }
 scope_finding = historical_remediated_by_id["MED-CD-SCOPE-01"]
 assert scope_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED"
@@ -3459,11 +3485,23 @@ assert fleet_finding["current_adjudication"]["published_to_origin_main"] is Fals
 assert fleet_finding["route_url"]["ownership_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
 assert fleet_finding["evidence"]["tests_executed"] == 5
 assert fleet_finding["evidence"]["assertions"] == 175
+fleet_playback_finding = historical_remediated_by_id["FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"]
+assert fleet_playback_finding["feature_id"] == fleet_playback_finding["candidate_feature_id"] == "CAP-FLEET-VEHICLE-REGISTER"
+assert fleet_playback_finding["feature_identity_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
+assert fleet_playback_finding["feature_id_role"] == "CANDIDATE_REPORTING_ASSOCIATION_ONLY_ZERO_STATIC_OWNERSHIP_CREDIT"
+assert fleet_playback_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED"
+assert fleet_playback_finding["current_adjudication"]["application_commit"] == "4038cf7fe5a789ca64e436300f2cf4b94ac16db4"
+assert fleet_playback_finding["current_adjudication"]["repository_tree"] == "b9757ccb9010564b8512c0ed47abfc553f38b697"
+assert fleet_playback_finding["current_adjudication"]["published_to_origin_main"] is False
+assert fleet_playback_finding["route_url"]["ownership_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
+assert fleet_playback_finding["evidence"]["tests_executed"] == 11
+assert fleet_playback_finding["evidence"]["assertions"] == 167
 assert all(row["completion_credit"] is False for row in live_findings)
 assert all(all(value is False for value in row["credit"].values()) for row in live_findings)
-assert findings_register["counts"]["bounded_disposition_tests_passed"] == 88
-assert findings_register["counts"]["bounded_disposition_assertions"] == 1764
+assert findings_register["counts"]["bounded_disposition_tests_passed"] == 99
+assert findings_register["counts"]["bounded_disposition_assertions"] == 1931
 assert "5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
+assert "11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert findings_register["counts"]["med_rbac_bounded_tests"] == 73
 assert findings_register["counts"]["med_rbac_bounded_test_assertions"] == 1481
 assert findings_register["counts"]["med_cd_scope_focused_tests"] == 5
@@ -3484,11 +3522,18 @@ assert findings_register["counts"]["fleet_trip_index_site_privacy_focused_tests"
 assert findings_register["counts"]["fleet_trip_index_site_privacy_focused_assertions"] == 175
 assert findings_register["counts"]["fleet_trip_index_site_privacy_supporting_tests"] == 4
 assert findings_register["counts"]["fleet_trip_index_site_privacy_supporting_assertions"] == 35
+assert findings_register["counts"]["fleet_trip_playback_site_privacy_focused_tests"] == 11
+assert findings_register["counts"]["fleet_trip_playback_site_privacy_focused_assertions"] == 167
+assert findings_register["counts"]["fleet_trip_playback_site_privacy_supporting_tests"] == 20
+assert findings_register["counts"]["fleet_trip_playback_site_privacy_supporting_assertions"] == 215
+assert findings_register["counts"]["fleet_trip_playback_site_privacy_baseline_failed"] == 3
+assert findings_register["counts"]["fleet_trip_playback_site_privacy_baseline_passed"] == 2
+assert findings_register["counts"]["fleet_trip_playback_site_privacy_baseline_assertions"] == 30
 assert findings_register["counts"]["final_P0"] == findings_register["counts"]["final_P1"] == 0
-assert findings_register["reconciliation"]["retained_record_count"] == 13
+assert findings_register["reconciliation"]["retained_record_count"] == 14
 assert findings_register["reconciliation"]["current_provisional_count"] == 8
 assert findings_register["reconciliation"]["historical_already_fixed_count"] == 2
-assert findings_register["reconciliation"]["historical_remediated_count"] == 3
+assert findings_register["reconciliation"]["historical_remediated_count"] == 4
 
 assert run_163_reporting["schema_version"] == "run-163-med-cd-scope-remediation-reporting-wave-29-v1"
 assert run_163_reporting["run_id"] == "RUN-163-MED-CD-SCOPE-01-REMEDIATION-REPORTING-WAVE-29"
@@ -4026,6 +4071,11 @@ run_178_dashboard_payload = git_file_at_commit(
     "audit-dashboard.html",
 )
 assert hashlib.sha256(run_178_dashboard_payload).hexdigest() == "70472c39504600f8c0b26b9ce05eb0f3e5903f1c6e9445163dba0581a2382600"
+run_182_dashboard_payload = git_file_at_commit(
+    "db4196ccb3a8d9f6bcb33fb40680527d09c02dac",
+    "audit-dashboard.html",
+)
+assert hashlib.sha256(run_182_dashboard_payload).hexdigest() == "8779848cc1a95ef82f2c5eba1a542e5a4784559f75ef20e9eb06696abde56457"
 
 assert sha256_file("generators/build-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.py") == "61c895a305f743f102765c9f86d38843c3ce61bcc1a8684a672aa2d7cd6ee157"
 assert sha256_file("evidence/source/root-run-179-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.json") == "5505cf17bb68d3e534116ea9d33e501e0222714b6e3779d0ec6b70f819cc3b0a"
@@ -4092,6 +4142,150 @@ assert {key for key, value in run_181_reporting["credit_boundary"].items() if va
 }
 assert all(value is False for value in run_181_reporting["completion_boundary"].values())
 
+assert dashboard_run_182["run_id"] == "RUN-182-AUDIT-DASHBOARD-VERIFICATION-WAVE-34"
+assert dashboard_run_182["pins"]["run_182_dashboard"]["sha256"] == "8779848cc1a95ef82f2c5eba1a542e5a4784559f75ef20e9eb06696abde56457"
+assert dashboard_run_182["verification"]["viewports_verified"] == 4
+assert dashboard_run_182["verification"]["navigation_clicks_passed"] == 10
+assert dashboard_run_182["verification"]["anchor_elements"] == 852
+assert dashboard_run_182["verification"]["unique_local_resources"] == 455
+assert dashboard_run_182["verification"]["visible_static_checks_required"] == 105
+assert dashboard_run_182["verification"]["visible_static_checks_passed"] == 105
+assert dashboard_run_182["artifact_completion_test_met"] is True
+assert dashboard_run_182["audit_completion_test_met"] is False
+assert sha256_file("generators/materialize-run-182-audit-dashboard-verification-wave-34.py") == "db48bbd257b34984e31c7a5bb01237bdc7d6036a474ab5e272fdddb643535d03"
+assert sha256_file("evidence/browser/current-audit-dashboard-verification-run-182-wave-34.json") == "d3dc3ef6e842f0b5df74b27948ac6ef8abfda205516f6ac9b6a5d9c9858cd81e"
+dashboard_run_182_without_seal = dict(dashboard_run_182)
+dashboard_run_182_seal = dashboard_run_182_without_seal.pop("receipt_self_seal_sha256")
+assert dashboard_run_182_seal == "25b0fe690c4dc3d3bdb480d64915be1a3ac99ea5234daaa8f499e6a04cf4533d"
+assert canonical_sha256(dashboard_run_182_without_seal) == dashboard_run_182_seal
+assert {key for key, value in dashboard_run_182["credit_boundary"].items() if value} == {
+    "exact_audit_dashboard_artifact",
+}
+assert all(value is False for value in dashboard_run_182["completion_boundary"].values())
+run_182_history = findings_register["current_audit_artifact_verification_history"]["run_182"]
+assert run_182_history["run_id"] == dashboard_run_182["run_id"]
+assert run_182_history["receipt_sha256"] == "d3dc3ef6e842f0b5df74b27948ac6ef8abfda205516f6ac9b6a5d9c9858cd81e"
+assert run_182_history["dashboard_sha256"] == "8779848cc1a95ef82f2c5eba1a542e5a4784559f75ef20e9eb06696abde56457"
+assert run_182_history["viewports"] == "4/4"
+assert run_182_history["navigation"] == "10/10"
+assert run_182_history["unique_local_resources"] == "455/455"
+assert run_182_history["visible_boundary_checks"] == "105/105"
+assert run_182_history["anchor_elements"] == "852/852"
+assert run_182_history["application_browser_credit"] is False
+assert run_182_history["publication_credit"] is False
+assert run_182_history["audit_complete"] is False
+assert run_182_history["superseded_by_run_184_reporting_sources"] is True
+assert run_182_history["run_185_dashboard_verification_required"] is True
+
+assert run_183_remediation["run_id"] == "RUN-183-FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01-REMEDIATION-WAVE-35"
+assert sha256_file("generators/materialize-run-183-fleet-trip-playback-site-privacy-remediation-wave-35.py") == "602964ec765cc9bd71d7b6fed103bdbd1b4b5543c0843f2c2dcdb2a960779f8e"
+assert sha256_file("evidence/runtime/current-run-183-fleet-trip-playback-site-privacy-remediation-wave-35.json") == "7bb1b1013cf67344c48e5a8b6e551bf3c769695e0384c2b333fb47286e53310a"
+assert run_183_remediation["pins"]["application_baseline_commit"] == "db4196ccb3a8d9f6bcb33fb40680527d09c02dac"
+assert run_183_remediation["pins"]["fix_commit"] == "93e576978efae4a0112a95ed406c312f6bcadeb5"
+assert run_183_remediation["pins"]["clean_advanced_main_commit"] == "0537f0f0eacafbeaf635ced4883a8bdf8e49d3f6"
+assert run_183_remediation["pins"]["local_main_merge_commit"] == "4038cf7fe5a789ca64e436300f2cf4b94ac16db4"
+assert run_183_remediation["pins"]["stable_patch_id"] == "12c306d28e54ff88432d18b271706473ee793871"
+assert run_183_remediation["delegated_runtime_execution"]["baseline_red"] == {
+    "tests": 5,
+    "failed": 3,
+    "passed": 2,
+    "assertions_reported": 30,
+    "duration_seconds": 160.09,
+    "exit_code": 1,
+    "credit": "REPRODUCTION_ONLY_ZERO_PASSING_DENOMINATOR_CREDIT",
+}
+assert run_183_remediation["delegated_runtime_execution"]["isolated_green_focused"]["tests"] == 11
+assert run_183_remediation["delegated_runtime_execution"]["isolated_green_focused"]["assertions"] == 167
+assert run_183_remediation["delegated_runtime_execution"]["isolated_supporting_fleet_regressions"]["tests"] == 20
+assert run_183_remediation["delegated_runtime_execution"]["isolated_supporting_fleet_regressions"]["assertions"] == 215
+assert run_183_remediation["delegated_runtime_execution"]["post_merge_green_focused"]["tests"] == 11
+assert run_183_remediation["delegated_runtime_execution"]["post_merge_green_focused"]["assertions"] == 167
+assert run_183_remediation["delegated_runtime_execution"]["unique_bounded_accounting"]["resulting"] == {
+    "tests": 99,
+    "assertions": 1931,
+}
+assert all(value is False for value in run_183_remediation["completion_boundary"].values())
+assert len(run_183_remediation["completion_gates"]) == 26
+assert not any(run_183_remediation["completion_gates"].values())
+run_183_without_seal = dict(run_183_remediation)
+run_183_seal = run_183_without_seal.pop("receipt_self_seal_sha256")
+assert run_183_seal == "839e8d47700afedd2ec277695bbe492bd13433492ce0ff724c753988b5ce039a"
+assert canonical_sha256(run_183_without_seal) == run_183_seal
+
+assert run_183r_review["run_id"] == "RUN-183R-INDEPENDENT-FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01-REMEDIATION-REVIEW-WAVE-35"
+assert sha256_file("generators/materialize-independent-run-183-fleet-trip-playback-site-privacy-remediation-review-wave-35.py") == "171836a13c108c3176e8ddc1fa62dbc86503d6e459e43bce3eb9a1d369ece61a"
+assert sha256_file("evidence/runtime/current-run-183r-independent-fleet-trip-playback-site-privacy-remediation-review-wave-35.json") == "170245898590f6429a171bbd8a41455f096b5b43340b840294735fdbc5522640"
+assert run_183r_review["decision"]["verdict"] == "GO"
+assert run_183r_review["decision"]["blocking_discrepancies"] == 0
+assert run_183r_review["decision"]["new_historical_remediated_record_reporting_authorized"] is True
+assert run_183r_review["decision"]["authorized_live_reporting_run"] == "RUN-184"
+assert run_183r_review["decision"]["authorized_resulting_lineage"] == {
+    "retained_claim_records": 14,
+    "current_provisional_source_claims": 8,
+    "historical_already_fixed_records": 2,
+    "historical_remediated_records": 4,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_183r_review["decision"]["static_ownership_remains_pending"]["next_zero_based_index"] == 85
+assert all(value is False for value in run_183r_review["completion_boundary"].values())
+assert len(run_183r_review["completion_gates"]) == 26
+assert not any(run_183r_review["completion_gates"].values())
+run_183r_without_seal = dict(run_183r_review)
+run_183r_seal = run_183r_without_seal.pop("receipt_self_seal_sha256")
+assert run_183r_seal == "a639be1048e97e5907509b571ed92dd4a2513a22dab5b16c188b3c5e82a1b68c"
+assert canonical_sha256(run_183r_without_seal) == run_183r_seal
+
+assert run_184_reporting["run_id"] == "RUN-184-FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01-REMEDIATION-REPORTING-WAVE-35"
+assert sha256_file("generators/materialize-run-184-fleet-trip-playback-site-privacy-remediation-reporting-wave-35.py") == run_184_reporting["pins"]["reporting_materializer"]["sha256"]
+assert sha256_file("generators/build-current-audit-dashboard.py") == run_184_reporting["pins"]["dashboard_builder"]["sha256"]
+assert run_184_reporting["reporting_transition"]["finding_id"] == "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"
+assert run_184_reporting["reporting_transition"]["counts_after"] == {
+    "retained_claim_records": 14,
+    "provisional_source_claims": 8,
+    "historical_already_fixed": 2,
+    "historical_remediated": 4,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_184_reporting["bounded_execution_accounting"]["unique_total"] == {
+    "tests": 99,
+    "assertions": 1931,
+}
+assert run_184_reporting["preservation_boundary"]["dashboard_sha256"] == "8779848cc1a95ef82f2c5eba1a542e5a4784559f75ef20e9eb06696abde56457"
+assert run_184_reporting["preservation_boundary"]["static_ownership"] == {
+    "owners": 666,
+    "routes": 309,
+    "pages": 357,
+    "controller_action_bridges": 97,
+    "ownership_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+}
+assert run_184_reporting["preservation_boundary"]["queue"] == {
+    "next_zero_based_index": 85,
+    "next_queue_id": "RUN090-ROUTE-0086",
+    "next_route_record_id": "RUN077-ROUTE-0694",
+    "reviewed": 120,
+    "pending": 387,
+    "owned": 98,
+    "without_ownership": 409,
+    "advanced_by_run_184": False,
+}
+assert run_184_reporting["preservation_boundary"]["benchmark"] == {
+    "mapped": 2,
+    "total": 340,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338,
+}
+assert {key for key, value in run_184_reporting["credit_boundary"].items() if value} == {
+    "live_findings_register_and_reporting_status",
+}
+assert all(value is False for value in run_184_reporting["completion_boundary"].values())
+assert len(run_184_reporting["completion_gates"]) == 26
+assert not any(run_184_reporting["completion_gates"].values())
+run_184_without_seal = dict(run_184_reporting)
+run_184_seal = run_184_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_184_without_seal) == run_184_seal
+
 reviewed_fleet_daily_check_overlay = reviewed_fleet_trip_index_overlay
 
 required_artifacts = [
@@ -4137,11 +4331,18 @@ safe_row_status = (
 )
 fleet_row_status = (
     "historical issue · remediated on local main · not published to origin/main · "
-    "candidate feature association only · route ownership PENDING_FRESH_SEMANTIC_REVIEW · "
+    "candidate feature association only · index 84 static route owner and action bridge integrated "
+    "separately by RUN-180/R–181 · zero remediation or correctness inheritance · "
     "not a final finding"
+)
+fleet_playback_row_status = (
+    "historical issue · remediated on local main · not published to origin/main · "
+    "page/data Site privacy only · candidate feature association and index 85 ownership "
+    "PENDING_FRESH_SEMANTIC_REVIEW · not a final finding"
 )
 finding_claim_labels = dict(historical_discovery_claims)
 finding_claim_labels["FLEET-TRIP-INDEX-SITE-PRIVACY-01"] = fleet_finding["impact"]
+finding_claim_labels["FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"] = fleet_playback_finding["impact"]
 assert set(finding_claim_labels) == {row["id"] for row in live_findings}
 finding_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td class=\"partial\">{}</td></tr>".format(
@@ -4157,12 +4358,16 @@ finding_rows = "".join(
                     fleet_row_status
                     if row["id"] == "FLEET-TRIP-INDEX-SITE-PRIVACY-01"
                     else (
-                        "historical issue · already fixed on current main · not a final finding"
-                        if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                        fleet_playback_row_status
+                        if row["id"] == "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"
                         else (
-                            "historical issue · remediated on current main · not a final finding"
-                            if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
-                            else "current provisional P1 · independent review pending"
+                            "historical issue · already fixed on current main · not a final finding"
+                            if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                            else (
+                                "historical issue · remediated on current main · not a final finding"
+                                if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                else "current provisional P1 · independent review pending"
+                            )
                         )
                     )
                 )
@@ -5010,6 +5215,75 @@ run_181_template_rewrites = [
 for old, new in run_181_template_rewrites:
     assert current_template_text.count(old) == 1, f"Expected one RUN-181 template rewrite target: {old}"
     current_template_text = current_template_text.replace(old, new)
+
+run_184_template_rewrites = [
+    ('<a href="#checkpoint">RUN-181</a>', '<a href="#checkpoint">RUN-184</a>'),
+    ("RUN-001 through RUN-181 are represented by audit artifacts.", "RUN-001 through RUN-184 are represented by audit artifacts."),
+    (
+        "<li>RUN-181: live static ledger reported as $static_owner_records owners / $static_owner_routes routes / $static_owner_pages pages / $static_action_bridges bridges · $queue_reviewed reviewed / $queue_pending pending / $queue_without_owner without ownership · dashboard HTML frozen pending RUN-182</li>",
+        "<li>RUN-181: live static ledger reported as $static_owner_records owners / $static_owner_routes routes / $static_owner_pages pages / $static_action_bridges bridges · $queue_reviewed reviewed / $queue_pending pending / $queue_without_owner without ownership</li><li>RUN-182: exact RUN-181 dashboard verified at 4/4 viewports · 105/105 visible checks · 10/10 navigation · 455/455 unique local resources · 852 anchors · zero application credit</li><li>RUN-183: Fleet trip-playback page/data Site-privacy defect reproduced and remediated in exactly two transferred paths · post-merge $fleet_playback_tests/$fleet_playback_assertions uniquely counted · local main only · not published</li><li>RUN-183R: exact remediation artifacts independently reviewed GO · one new historical-remediated record authorized</li><li>RUN-184: Fleet trip-playback historical-remediated record added · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-185</li>",
+    ),
+    ("RUN-178–181 Fleet trip-index route/action ownership checkpoint", "RUN-182–184 Fleet trip playback Site privacy remediation checkpoint"),
+    (
+        "<tr><td>RUN-181 live reporting</td><td><strong>$static_owner_records owners / $static_owner_routes routes / $static_owner_pages pages / $static_action_bridges bridges · $queue_reviewed reviewed / $queue_pending pending / $queue_without_owner without ownership</strong></td><td class=\"partial\">index 84 integrated · next index 85 RUN090-ROUTE-0086 / RUN077-ROUTE-0694 · dashboard HTML unchanged · fresh RUN-182 required</td></tr>",
+        "<tr><td>RUN-181 live reporting</td><td><strong>$static_owner_records owners / $static_owner_routes routes / $static_owner_pages pages / $static_action_bridges bridges · $queue_reviewed reviewed / $queue_pending pending / $queue_without_owner without ownership</strong></td><td class=\"partial\">index 84 integrated · exact dashboard later verified by RUN-182</td></tr><tr><td>RUN-182 exact dashboard verification</td><td><strong>4/4 viewports · 105/105 visible checks · 10/10 navigation · 455/455 unique local resources · 852 anchors</strong></td><td class=\"partial\">exact superseded RUN-181 audit artifact only · zero application credit</td></tr><tr><td>RUN-183/R Fleet playback remediation and review</td><td><strong>baseline $fleet_playback_red_failed failed + $fleet_playback_red_passed passed / $fleet_playback_red_assertions assertions · post-merge $fleet_playback_tests passed / $fleet_playback_assertions assertions · supporting $fleet_playback_supporting_tests/$fleet_playback_supporting_assertions separate · baseline $fleet_playback_baseline_short · fix $fleet_playback_fix_short · exact two-path merge $fleet_playback_merge_short</strong></td><td class=\"partial\">page/data Site privacy only · independent GO · local main not published · index 85 ownership pending</td></tr><tr><td>RUN-184 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · $unique_bounded_tests tests / $unique_bounded_assertions assertions</strong></td><td class=\"partial\">one new Fleet playback historical-remediated record · zero final finding · dashboard HTML unchanged · fresh RUN-185 required</td></tr>",
+    ),
+    ("Fresh RUN-182 audit-dashboard verification required", "Fresh RUN-185 audit-dashboard verification required"),
+    (
+        "The exact RUN-181 reporting dashboard must be generated and checked in RUN-182 at 1440×900, 1280×800, 1024×768, and 390×844.",
+        "The exact RUN-184 reporting dashboard must be generated and checked in RUN-185 at 1440×900, 1280×800, 1024×768, and 390×844.",
+    ),
+    (
+        "RUN-178 verifies only the superseded RUN-177 HTML; RUN-179/R establish one Fleet trip-index route/action decision while preserving dissent and excluding the older bundle, RUN-180 integrates one owner/bridge, RUN-180R's complete synthesis authorizes reporting only, and RUN-181 alone changes live ownership/queue reporting while preserving the verified RUN-178 HTML byte-for-byte. None supplies audit-dashboard verification for the new RUN-182 HTML.",
+        "RUN-182 verifies only the superseded RUN-181 HTML; RUN-183 establishes the bounded Fleet playback page/data remediation and local integration, RUN-183R independently authorizes one new historical-remediated record, and RUN-184 alone changes the live register and reporting sources while preserving the verified RUN-182 HTML byte-for-byte. None supplies audit-dashboard verification for the new RUN-185 HTML.",
+    ),
+    ("The linked RUN-182 receipt must record", "The linked RUN-185 receipt must record"),
+    ("It verifies the RUN-181 audit artifact only", "It verifies the RUN-184 audit artifact only"),
+    (
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-182-wave-34.json">RUN-182 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json">RUN-185 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+    ),
+    ("RUN-071–181 evidence lineage", "RUN-071–184 evidence lineage"),
+    (
+        "Every current raw, generated, reviewed, and integrated RUN-077–180R source/reporting/runtime/benchmark/remediation/ownership artifact is linked with its exact SHA-256; RUN-181 is the current reporting generator execution and RUN-182 remains the fresh exact-dashboard gate.",
+        "Every current raw, generated, reviewed, and integrated RUN-077–183R source/reporting/runtime/benchmark/remediation/ownership artifact is linked with its exact SHA-256; RUN-184 is the current reporting generator execution and RUN-185 remains the fresh exact-dashboard gate.",
+    ),
+    (
+        "The current RUN-177 register retains 13 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; FLEET-TRIP-INDEX-SITE-PRIVACY-01 is a new historical-remediated record with candidate-only feature association and zero static-ownership credit.",
+        "The current RUN-184 register retains 14 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01 is the new historical-remediated record with candidate-only feature association and zero static-ownership credit.",
+    ),
+    (
+        "<div class=\"card\"><strong class=\"partial\">$finding_count</strong><span>current provisional P1 claims</span><small>$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 13 retained · none final</small></div><div class=\"card\"><strong>$unique_bounded_tests / $unique_bounded_assertions</strong><span>unique bounded disposition evidence</span><small>$med_rbac_tests/$med_rbac_assertions MED-RBAC + $med_cd_tests/$med_cd_assertions MED-CD-SCOPE + $safe_tests/$safe_assertions SAFE + $fleet_tests/$fleet_assertions Fleet; atomicity and support remain separate</small></div>",
+        "<div class=\"card\"><strong class=\"partial\">$finding_count</strong><span>current provisional P1 claims</span><small>$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 14 retained · none final</small></div><div class=\"card\"><strong>$unique_bounded_tests / $unique_bounded_assertions</strong><span>unique bounded disposition evidence</span><small>$med_rbac_tests/$med_rbac_assertions MED-RBAC + $med_cd_tests/$med_cd_assertions MED-CD-SCOPE + $safe_tests/$safe_assertions SAFE + $fleet_tests/$fleet_assertions Fleet index + $fleet_playback_tests/$fleet_playback_assertions Fleet playback; atomicity and support remain separate</small></div>",
+    ),
+    (
+        "The register retains 13 historical claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. SAFE-ALERT-DEDUP-IDENTITY-01 and FLEET-TRIP-INDEX-SITE-PRIVACY-01 are remediated on local main only and are not published to origin/main; the Fleet CAP association remains candidate-only and route ownership is PENDING_FRESH_SEMANTIC_REVIEW. None is a final finding or closed completion gate.",
+        "The register retains 14 historical claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, and FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01 are remediated on local main only and are not published to origin/main; the playback CAP association remains candidate-only and index 85 ownership is PENDING_FRESH_SEMANTIC_REVIEW. None is a final finding or closed completion gate.",
+    ),
+    (
+        "RUN-159 establishes bounded MED-RBAC execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution; RUN-173 adds one post-merge $safe_tests/$safe_assertions SAFE focused execution and RUN-176 adds one post-merge $fleet_tests/$fleet_assertions Fleet focused execution to the unique bounded total. Replays, supporting suites, adjacent filters, red failures, terminal-fixture failures, and atomicity remain separate or excluded, and none establishes full-suite, coverage, application-browser, ease, release, Pass, publication, or completion credit.",
+        "RUN-159 establishes bounded MED-RBAC execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution; RUN-173 adds one post-merge $safe_tests/$safe_assertions SAFE focused execution, RUN-176 adds one post-merge $fleet_tests/$fleet_assertions Fleet index execution, and RUN-183 adds one post-merge $fleet_playback_tests/$fleet_playback_assertions Fleet playback execution to the unique bounded total. Replays, supporting suites, adjacent filters, red failures, terminal-fixture failures, and atomicity remain separate or excluded, and none establishes full-suite, coverage, application-browser, ease, release, Pass, publication, or completion credit.",
+    ),
+    (
+        "</tr><tr><td>RUN-176 Fleet trip-index Site-privacy execution</td><td>$fleet_tests post-merge focused tests / $fleet_assertions assertions; supporting $fleet_supporting_tests/$fleet_supporting_assertions VehicleController regressions reported separately; root and expanded red executions and isolated green replay excluded</td><td class=\"partial\">selected GET/CSV rows, filters, aggregates, provenance, archived Sites, and nested identity only · static ownership PENDING_FRESH_SEMANTIC_REVIEW · full-suite green unproved</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+        "</tr><tr><td>RUN-176 Fleet trip-index Site-privacy execution</td><td>$fleet_tests post-merge focused tests / $fleet_assertions assertions; supporting $fleet_supporting_tests/$fleet_supporting_assertions VehicleController regressions reported separately; root and expanded red executions and isolated green replay excluded</td><td class=\"partial\">selected GET/CSV rows, filters, aggregates, provenance, archived Sites, and nested identity only · static ownership separate</td></tr><tr><td>RUN-183 Fleet trip-playback Site-privacy execution</td><td>$fleet_playback_tests post-merge focused tests / $fleet_playback_assertions assertions; baseline $fleet_playback_red_failed failed + $fleet_playback_red_passed passed / $fleet_playback_red_assertions assertions, isolated replay, and supporting $fleet_playback_supporting_tests/$fleet_playback_supporting_assertions regressions reported separately</td><td class=\"partial\">page/data approved-Site, provenance, concealment, driver privacy, and telemetry filtering only · index 85 ownership PENDING_FRESH_SEMANTIC_REVIEW · full-suite green unproved</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+    ),
+    ("RUN-155–177 bounded disposition provenance, remediation, and reporting", "RUN-155–184 bounded disposition provenance, remediation, and reporting"),
+    ("current RUN-177 split of 13 retained claim identities", "current RUN-184 split of 14 retained claim identities"),
+    (
+        "13 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
+        "14 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
+    ),
+]
+run_184_rewrite_expected_counts = {
+    "current RUN-177 split of 13 retained claim identities": 2,
+}
+for old, new in run_184_template_rewrites:
+    expected_count = run_184_rewrite_expected_counts.get(old, 1)
+    assert current_template_text.count(old) == expected_count, (
+        f"Expected {expected_count} RUN-184 template rewrite target(s): {old}"
+    )
+    current_template_text = current_template_text.replace(old, new)
 TEMPLATE = Template(current_template_text)
 
 
@@ -5239,6 +5513,16 @@ dashboard = TEMPLATE.substitute(
     fleet_fix_short=run_176_remediation["pins"]["fix_commit"][:12],
     fleet_merge_short=run_176_remediation["pins"]["local_main_merge_commit"][:12],
     fleet_origin_short=run_176_remediation["pins"]["origin_main_observed"][:12],
+    fleet_playback_red_failed=run_183_remediation["delegated_runtime_execution"]["baseline_red"]["failed"],
+    fleet_playback_red_passed=run_183_remediation["delegated_runtime_execution"]["baseline_red"]["passed"],
+    fleet_playback_red_assertions=run_183_remediation["delegated_runtime_execution"]["baseline_red"]["assertions_reported"],
+    fleet_playback_tests=run_183_remediation["delegated_runtime_execution"]["post_merge_green_focused"]["tests"],
+    fleet_playback_assertions=run_183_remediation["delegated_runtime_execution"]["post_merge_green_focused"]["assertions"],
+    fleet_playback_supporting_tests=run_183_remediation["delegated_runtime_execution"]["isolated_supporting_fleet_regressions"]["tests"],
+    fleet_playback_supporting_assertions=run_183_remediation["delegated_runtime_execution"]["isolated_supporting_fleet_regressions"]["assertions"],
+    fleet_playback_baseline_short=run_183_remediation["pins"]["application_baseline_commit"][:12],
+    fleet_playback_fix_short=run_183_remediation["pins"]["fix_commit"][:12],
+    fleet_playback_merge_short=run_183_remediation["pins"]["local_main_merge_commit"][:12],
     module_count=len(module_labels),
     module_rows=module_rows,
     finding_rows=finding_rows,
@@ -5335,14 +5619,14 @@ dashboard = TEMPLATE.substitute(
 )
 
 current_visible_boundaries = [
-    '<a href="#checkpoint">RUN-181</a>',
+    '<a href="#checkpoint">RUN-184</a>',
     '<a href="#findings">Finding status</a>',
     "666 owners · 309 routes + 357 pages · 97 bridges",
     "120 reviewed / 387 pending",
     "98 owned / 409 without ownership",
     "16.950878%",
     "3,263 records remain",
-    "RUN-178–181 Fleet trip-index route/action ownership checkpoint",
+    "RUN-182–184 Fleet trip playback Site privacy remediation checkpoint",
     "fleet-assets.vehicles.alerts-config",
     "RUN090-ROUTE-0084 / RUN077-ROUTE-0692",
     "VehicleController::alertsConfig",
@@ -5372,13 +5656,19 @@ current_visible_boundaries = [
     "RUN-180R: three sealed GO lanes",
     "complete synthesis authorizes reporting only",
     "RUN-181: live static ledger reported",
+    "RUN-182: exact RUN-181 dashboard verified at 4/4 viewports · 105/105 visible checks · 10/10 navigation · 455/455 unique local resources · 852 anchors",
+    "RUN-183: Fleet trip-playback page/data Site-privacy defect reproduced and remediated in exactly two transferred paths",
+    "RUN-183R: exact remediation artifacts independently reviewed GO",
+    "RUN-184: Fleet trip-playback historical-remediated record added",
     "9 current provisional P1 + 2 historical already-fixed + 1 historical remediated",
     "8 current provisional P1 + 2 historical already-fixed + 2 historical remediated",
-    "13 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 3 historical remediated",
+    "14 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 4 historical remediated",
     "RUN-176's post-merge Fleet 5/175 counted once into 88/1,764",
     "88 / 1,764",
     "83/1,589 unique bounded total",
     "88/1,764 unique bounded disposition total",
+    "99 / 1,931",
+    "99/1,931 unique bounded disposition total",
     "SAFE-ALERT-DEDUP-IDENTITY-01",
     "post-merge SAFE alert-dedup tests / 60 assertions",
     "4 failed + 1 warning-pass / 10 assertions",
@@ -5395,18 +5685,24 @@ current_visible_boundaries = [
     "not published to origin/main",
     "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
     "candidate feature association only",
-    "route ownership PENDING_FRESH_SEMANTIC_REVIEW",
+    "index 84 static route owner and action bridge integrated separately by RUN-180/R–181",
+    "index 85 ownership PENDING_FRESH_SEMANTIC_REVIEW",
     "root red 2 failed / 19 assertions",
     "expanded red 5 failed / 55 assertions",
     "post-merge Fleet trip-index tests / 175 assertions",
     "supporting 4/35 VehicleController regressions reported separately",
-    "13 retained",
-    "13 historical claim identities",
+    "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
+    "page/data Site privacy only",
+    "baseline 3 failed + 2 passed / 30 assertions",
+    "post-merge Fleet playback execution",
+    "supporting 20/215",
+    "14 retained",
+    "14 historical claim identities",
     "13a7f37da9c9",
     "790bc11e3fb2",
     "c643c9e5eecf",
     "3 claim-specific test functions / 146 assertions / 3 synchronized two-process races",
-    "reported separately from the historical 78/1,529 and current 88/1,764",
+    "reported separately from the historical 78/1,529 and current 99/1,931",
     "supporting 43/716 overlaps",
     "73 bounded tests / 1,481 assertions",
     "5 focused tests / 48 assertions",
@@ -5421,7 +5717,7 @@ current_visible_boundaries = [
     "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated",
     "two broader INR failures reproduce at base",
     "full-suite green false",
-    "Fresh RUN-182 audit-dashboard verification required",
+    "Fresh RUN-185 audit-dashboard verification required",
     "cf0090ec9724",
     "0b1920dade92",
     "7b2b5688c90e",
@@ -5437,8 +5733,8 @@ current_visible_boundaries = [
     "RUN-090 frozen denominator / RUN-180R current accounting",
     "index 83 is not recredited, index 84 fleet-assets.trips.index is integrated, and index 85 fleet-assets.trips.playback is next",
     "RUN-168 verifies that exact dashboard",
-    "RUN-178 verifies only the superseded RUN-177 HTML",
-    "dashboard HTML unchanged · fresh RUN-182 required",
+    "RUN-182 verifies only the superseded RUN-181 HTML",
+    "dashboard HTML unchanged · fresh RUN-185 required",
     "visible 666/309/357 ownership, 97 bridges, 120/387 queue accounting, 98 owned/409 without ownership",
 ]
 assert all(boundary in dashboard for boundary in current_visible_boundaries)
@@ -5458,6 +5754,7 @@ assert '<a href="#checkpoint">RUN-167</a>' not in dashboard
 assert '<a href="#checkpoint">RUN-171</a>' not in dashboard
 assert '<a href="#checkpoint">RUN-174</a>' not in dashboard
 assert '<a href="#checkpoint">RUN-177</a>' not in dashboard
+assert '<a href="#checkpoint">RUN-181</a>' not in dashboard
 assert "RUN-071–171 current reporting checkpoint" not in dashboard
 assert "RUN-071–174 current reporting checkpoint" not in dashboard
 assert "RUN-158–160 current adjudication checkpoint" not in dashboard
@@ -5478,6 +5775,7 @@ assert "and fresh RUN-168 audit-dashboard verification required." not in dashboa
 assert "and fresh RUN-172 dashboard verification required." not in dashboard
 assert "Fresh RUN-175 audit-dashboard verification required" not in dashboard
 assert "Fresh RUN-178 audit-dashboard verification required" not in dashboard
+assert "Fresh RUN-182 audit-dashboard verification required" not in dashboard
 assert "visible 664/307/357 ownership, 95 bridges, 118/389 queue accounting" not in dashboard
 for stale_attribution in (
     "RUN-159/R retire only historical MED-RBAC",
@@ -5501,9 +5799,9 @@ output_path = AUDIT_DIR / "audit-dashboard.html"
 output_bytes = (dashboard.rstrip() + "\n").encode("utf-8")
 existing_output_bytes = output_path.read_bytes()
 assert (
-    existing_output_bytes in (run_178_dashboard_payload, output_bytes)
+    existing_output_bytes in (run_182_dashboard_payload, output_bytes)
 )
-temporary_path = output_path.with_name(f".{output_path.name}.tmp-run182-dashboard")
+temporary_path = output_path.with_name(f".{output_path.name}.tmp-run185-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"
 try:
     with temporary_path.open("xb") as handle:
