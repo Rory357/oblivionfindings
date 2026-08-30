@@ -24,6 +24,11 @@ CURRENT_RUN_145_RECEIPT_SHA256 = "8306a8aefe0a490ebf206d0c4716d92930326988f19e0e
 CURRENT_RUN_156R_COMMIT = "81abe37faa126f98ce47c7ca90cf569fe9c43c0d"
 RUN_167_REPORTING_COMMIT = "66fa21bfa3a59205fec9a8a756dc211a8510e419"
 RUN_168_VERIFIED_DASHBOARD_COMMIT = "e488bd3edcda0f154f87e8bbed972f14db409b82"
+RUN_184_REPORTING_COMMIT = "15b2c988f4bb7f737727cc777ab32ad771c4be06"
+SUPERSEDED_PRE_REVIEW_RUN_185_DASHBOARD_SHA256 = {
+    "07168e6b686eb0c976b18391e53979db2c605c7f9901bfdb73f4bf792c3b791c",
+    "b1c93c817244512e21e6e322cbec6617b87aed08fe52c268c292ef0bc53a812b",
+}
 CURRENT_RUN_146_MUTATED_PATHS = {
     "00-executive-summary.md",
     "03-feature-to-benchmark-matrix.csv",
@@ -4206,7 +4211,8 @@ assert run_183_remediation["delegated_runtime_execution"]["unique_bounded_accoun
 }
 assert all(value is False for value in run_183_remediation["completion_boundary"].values())
 assert len(run_183_remediation["completion_gates"]) == 26
-assert not any(run_183_remediation["completion_gates"].values())
+assert [gate["gate"] for gate in run_183_remediation["completion_gates"]] == list(range(1, 27))
+assert not any(gate["complete"] for gate in run_183_remediation["completion_gates"])
 run_183_without_seal = dict(run_183_remediation)
 run_183_seal = run_183_without_seal.pop("receipt_self_seal_sha256")
 assert run_183_seal == "839e8d47700afedd2ec277695bbe492bd13433492ce0ff724c753988b5ce039a"
@@ -4230,7 +4236,8 @@ assert run_183r_review["decision"]["authorized_resulting_lineage"] == {
 assert run_183r_review["decision"]["static_ownership_remains_pending"]["next_zero_based_index"] == 85
 assert all(value is False for value in run_183r_review["completion_boundary"].values())
 assert len(run_183r_review["completion_gates"]) == 26
-assert not any(run_183r_review["completion_gates"].values())
+assert [gate["gate"] for gate in run_183r_review["completion_gates"]] == list(range(1, 27))
+assert not any(gate["complete"] for gate in run_183r_review["completion_gates"])
 run_183r_without_seal = dict(run_183r_review)
 run_183r_seal = run_183r_without_seal.pop("receipt_self_seal_sha256")
 assert run_183r_seal == "a639be1048e97e5907509b571ed92dd4a2513a22dab5b16c188b3c5e82a1b68c"
@@ -4238,7 +4245,11 @@ assert canonical_sha256(run_183r_without_seal) == run_183r_seal
 
 assert run_184_reporting["run_id"] == "RUN-184-FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01-REMEDIATION-REPORTING-WAVE-35"
 assert sha256_file("generators/materialize-run-184-fleet-trip-playback-site-privacy-remediation-reporting-wave-35.py") == run_184_reporting["pins"]["reporting_materializer"]["sha256"]
-assert sha256_file("generators/build-current-audit-dashboard.py") == run_184_reporting["pins"]["dashboard_builder"]["sha256"]
+run_184_builder_payload = git_file_at_commit(
+    RUN_184_REPORTING_COMMIT,
+    "generators/build-current-audit-dashboard.py",
+)
+assert hashlib.sha256(run_184_builder_payload).hexdigest() == run_184_reporting["pins"]["dashboard_builder"]["sha256"]
 assert run_184_reporting["reporting_transition"]["finding_id"] == "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"
 assert run_184_reporting["reporting_transition"]["counts_after"] == {
     "retained_claim_records": 14,
@@ -4896,7 +4907,7 @@ run_171_template_rewrites = [
     ),
     (
         "Both reviewers completed independent evidence traces and neither is represented as blinded. Reviewer A had prior team-status visibility; reviewer B had prior self-assessment visibility; neither consulted the other. The six observations below authorize no correctness or final-finding credit and remain separate from the 12 retained claim identities ($finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated).",
-        "The initial exact-artifact review withheld integration for one out-of-range architecture locus; the corrected 1–21 locus received GO. RUN-170R then records three sealed post-commit GO reviews with zero discrepancies. The three observations below authorize no correctness or final-finding credit and remain separate from the 12 retained claim identities ($finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated).",
+        "The initial exact-artifact review withheld integration for one out-of-range architecture locus; the corrected 1–21 locus received GO. RUN-170R then records three sealed post-commit GO reviews with zero discrepancies. The three observations below authorize no correctness or final-finding credit and remain separate from the historical RUN-171 checkpoint of 12 retained claim identities (9 current provisional + 2 historical already-fixed + 1 historical remediated).",
     ),
     ("Fresh RUN-168 audit-dashboard verification required", "Fresh RUN-172 audit-dashboard verification required"),
     (
@@ -5219,6 +5230,56 @@ for old, new in run_181_template_rewrites:
 run_184_template_rewrites = [
     ('<a href="#checkpoint">RUN-181</a>', '<a href="#checkpoint">RUN-184</a>'),
     ("RUN-001 through RUN-181 are represented by audit artifacts.", "RUN-001 through RUN-184 are represented by audit artifacts."),
+    ("RUN-071–177 current reporting checkpoint:", "RUN-071–184 current reporting checkpoint:"),
+    ("RUN-071–177 completion-gate checkpoint", "RUN-071–184 completion-gate checkpoint"),
+    (
+        "RUN-174 alone changes the live register to $finding_count provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated",
+        "RUN-174 alone changed the live register to its historical 8 provisional + 2 historical already-fixed + 2 historical remediated",
+    ),
+    (
+        "RUN-174 changes the current finding split to $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated.",
+        "RUN-174 changed its historical finding split to 8 provisional + 2 already-fixed + 2 remediated.",
+    ),
+    (
+        "RUN-174 alone reconciles the live register to $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated and $unique_bounded_tests/$unique_bounded_assertions uniquely counted tests/assertions",
+        "RUN-174 alone reconciled its historical live register to 8 provisional + 2 already-fixed + 2 remediated and 83/1,589 uniquely counted tests/assertions",
+    ),
+    (
+        "RUN-174 records the current $finding_count + $historical_fixed_count + $historical_remediated_count split and $unique_bounded_tests/$unique_bounded_assertions unique bounded total.",
+        "RUN-174 recorded its historical 8 + 2 + 2 split and 83/1,589 unique bounded total.",
+    ),
+    (
+        "Fleet alerts-config wave 31 reviewed = 1 owner · 1 route row + 1 bridge · 0 page rows · consumer, caller, service, model, page-owner, neighbor, correctness, and downstream context not inherited · index 83 integrated · index 84 fleet-assets.trips.index unresolved",
+        "Fleet trip-index wave 34 integrated = 1 owner · 1 route row + 1 bridge · 0 page rows · historical index 83 alerts-config owner not recredited · page, sibling, caller, neighbor, correctness, and downstream context not inherited · index 84 integrated · index 85 fleet-assets.trips.playback pending with RUN090-ROUTE-0086 / RUN077-ROUTE-0694 · RUN-179/R dissent and invalidated preliminary judgments preserved · RUN-180R three sealed GO lanes with zero discrepancies",
+    ),
+    (
+        "RUN-169/R–170/R establish the current $static_owner_records bounded source-owner records and $static_action_bridges action bridges while adding one fleet-assets.vehicles.alerts-config owner and one bridge",
+        "RUN-169/R–170/R historically add one fleet-assets.vehicles.alerts-config owner and bridge, and RUN-179/R–181 later add one fleet-assets.trips.index owner and bridge to the current $static_owner_records bounded source-owner records and $static_action_bridges action bridges",
+    ),
+    (
+        "integrating index 83 and leaving index 84 fleet-assets.trips.index unresolved",
+        "integrating indexes 83 and 84 while leaving index 85 fleet-assets.trips.playback pending with RUN090-ROUTE-0086 / RUN077-ROUTE-0694",
+    ),
+    (
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from separately bounded RUN-159 MED-RBAC, RUN-162 MED-CD-SCOPE, RUN-166 manual-entry MED-CD-ATOMICITY, RUN-173 post-merge SAFE, and RUN-176 post-merge Fleet focused executions, no represented wave grants broader or full-suite application runtime or coverage; only MED-RBAC, MED-CD-SCOPE, post-merge SAFE, and post-merge Fleet contribute once to the current $unique_bounded_tests/$unique_bounded_assertions total.",
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from separately bounded RUN-159 MED-RBAC, RUN-162 MED-CD-SCOPE, RUN-166 manual-entry MED-CD-ATOMICITY, RUN-173 post-merge SAFE, RUN-176 post-merge Fleet trip-index, and RUN-183 post-merge Fleet playback focused executions, no represented wave grants broader or full-suite application runtime or coverage; only MED-RBAC, MED-CD-SCOPE, post-merge SAFE, post-merge Fleet trip-index, and post-merge Fleet playback contribute once to the current $unique_bounded_tests/$unique_bounded_assertions total.",
+    ),
+    (
+        "candidate-only CAP-FLEET-VEHICLE-REGISTER association, route ownership PENDING_FRESH_SEMANTIC_REVIEW, and explicit noninheritance for broader Fleet correctness",
+        "candidate-only CAP-FLEET-VEHICLE-REGISTER association, index 84 route owner and action bridge integrated separately by RUN-180/R–181 with zero correctness inheritance, and explicit noninheritance for broader Fleet correctness",
+    ),
+    (
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, and bounded Fleet evidence through RUN-180R, reported in RUN-181, with fresh RUN-182 dashboard verification required. Exactly two matrix rows have static benchmark-mapping credit. RUN-159, RUN-162, RUN-166, RUN-173, and RUN-176 retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, and post-merge Fleet $fleet_tests/$fleet_assertions contribute once to the unchanged $unique_bounded_tests/$unique_bounded_assertions unique bounded total. RUN-179/R–181 add only one Fleet trip-index static route owner and bridge while preserving dissent, excluding the older bundle, and adding zero finding or correctness credit. SAFE and Fleet remediation remain local-main-only and unpublished. No lane grants inherited playback, broader Fleet or safeguarding correctness, page, consumer, caller, service, model, adjacent-route execution, runtime, browser, benchmark-final, final-finding, Pass, release, publication, feature-completion, Gate 4, or audit-completion credit.",
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, and bounded Fleet evidence through RUN-183R, reported in RUN-184, with fresh RUN-185 dashboard verification required. Exactly two matrix rows have static benchmark-mapping credit. RUN-159, RUN-162, RUN-166, RUN-173, RUN-176, and RUN-183 retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, post-merge Fleet trip-index $fleet_tests/$fleet_assertions, and post-merge Fleet playback $fleet_playback_tests/$fleet_playback_assertions contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. RUN-179/R–181 add only one Fleet trip-index static route owner and bridge while preserving dissent, excluding the older bundle, and adding zero finding or correctness credit; RUN-183/R add page/data Site-privacy remediation evidence only and no static ownership credit. SAFE and both Fleet remediations remain local-main-only and unpublished. No lane grants inherited broader Fleet or safeguarding correctness, page, consumer, caller, service, model, adjacent-route execution, runtime, signed-in application-browser, benchmark-final, final-finding, Pass, release, publication, feature-completion, Gate 4, or audit-completion credit.",
+    ),
+    (
+        "RUN-177: Fleet trip privacy historical-remediated record added · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total",
+        "RUN-177: Fleet trip privacy historical-remediated record added · historical 8 provisional + 2 already-fixed + 3 remediated · RUN-176's post-merge Fleet 5/175 counted once into 88/1,764 · 88/1,764 unique bounded disposition total",
+    ),
+    (
+        "<tr><td>RUN-177 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · $unique_bounded_tests tests / $unique_bounded_assertions assertions</strong>",
+        "<tr><td>RUN-177 live reporting</td><td><strong>historical 8 current provisional P1 + 2 historical already-fixed + 3 historical remediated · historical total 88 / 1,764</strong>",
+    ),
     (
         "<li>RUN-181: live static ledger reported as $static_owner_records owners / $static_owner_routes routes / $static_owner_pages pages / $static_action_bridges bridges · $queue_reviewed reviewed / $queue_pending pending / $queue_without_owner without ownership · dashboard HTML frozen pending RUN-182</li>",
         "<li>RUN-181: live static ledger reported as $static_owner_records owners / $static_owner_routes routes / $static_owner_pages pages / $static_action_bridges bridges · $queue_reviewed reviewed / $queue_pending pending / $queue_without_owner without ownership</li><li>RUN-182: exact RUN-181 dashboard verified at 4/4 viewports · 105/105 visible checks · 10/10 navigation · 455/455 unique local resources · 852 anchors · zero application credit</li><li>RUN-183: Fleet trip-playback page/data Site-privacy defect reproduced and remediated in exactly two transferred paths · post-merge $fleet_playback_tests/$fleet_playback_assertions uniquely counted · local main only · not published</li><li>RUN-183R: exact remediation artifacts independently reviewed GO · one new historical-remediated record authorized</li><li>RUN-184: Fleet trip-playback historical-remediated record added · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-185</li>",
@@ -5226,7 +5287,7 @@ run_184_template_rewrites = [
     ("RUN-178–181 Fleet trip-index route/action ownership checkpoint", "RUN-182–184 Fleet trip playback Site privacy remediation checkpoint"),
     (
         "<tr><td>RUN-181 live reporting</td><td><strong>$static_owner_records owners / $static_owner_routes routes / $static_owner_pages pages / $static_action_bridges bridges · $queue_reviewed reviewed / $queue_pending pending / $queue_without_owner without ownership</strong></td><td class=\"partial\">index 84 integrated · next index 85 RUN090-ROUTE-0086 / RUN077-ROUTE-0694 · dashboard HTML unchanged · fresh RUN-182 required</td></tr>",
-        "<tr><td>RUN-181 live reporting</td><td><strong>$static_owner_records owners / $static_owner_routes routes / $static_owner_pages pages / $static_action_bridges bridges · $queue_reviewed reviewed / $queue_pending pending / $queue_without_owner without ownership</strong></td><td class=\"partial\">index 84 integrated · exact dashboard later verified by RUN-182</td></tr><tr><td>RUN-182 exact dashboard verification</td><td><strong>4/4 viewports · 105/105 visible checks · 10/10 navigation · 455/455 unique local resources · 852 anchors</strong></td><td class=\"partial\">exact superseded RUN-181 audit artifact only · zero application credit</td></tr><tr><td>RUN-183/R Fleet playback remediation and review</td><td><strong>baseline $fleet_playback_red_failed failed + $fleet_playback_red_passed passed / $fleet_playback_red_assertions assertions · post-merge $fleet_playback_tests passed / $fleet_playback_assertions assertions · supporting $fleet_playback_supporting_tests/$fleet_playback_supporting_assertions separate · baseline $fleet_playback_baseline_short · fix $fleet_playback_fix_short · exact two-path merge $fleet_playback_merge_short</strong></td><td class=\"partial\">page/data Site privacy only · independent GO · local main not published · index 85 ownership pending</td></tr><tr><td>RUN-184 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · $unique_bounded_tests tests / $unique_bounded_assertions assertions</strong></td><td class=\"partial\">one new Fleet playback historical-remediated record · zero final finding · dashboard HTML unchanged · fresh RUN-185 required</td></tr>",
+        "<tr><td>RUN-181 live reporting</td><td><strong>$static_owner_records owners / $static_owner_routes routes / $static_owner_pages pages / $static_action_bridges bridges · $queue_reviewed reviewed / $queue_pending pending / $queue_without_owner without ownership</strong></td><td class=\"partial\">index 84 integrated · next index 85 RUN090-ROUTE-0086 / RUN077-ROUTE-0694 · exact dashboard later verified by RUN-182</td></tr><tr><td>RUN-182 exact dashboard verification</td><td><strong>4/4 viewports · 105/105 visible checks · 10/10 navigation · 455/455 unique local resources · 852 anchors</strong></td><td class=\"partial\">exact superseded RUN-181 audit artifact only · zero application credit</td></tr><tr><td>RUN-183/R Fleet playback remediation and review</td><td><strong>baseline $fleet_playback_red_failed failed + $fleet_playback_red_passed passed / $fleet_playback_red_assertions assertions · post-merge $fleet_playback_tests passed / $fleet_playback_assertions assertions · supporting $fleet_playback_supporting_tests/$fleet_playback_supporting_assertions separate · baseline $fleet_playback_baseline_short · fix $fleet_playback_fix_short · exact two-path merge $fleet_playback_merge_short</strong></td><td class=\"partial\">page/data Site privacy only · independent GO · local main not published · index 85 ownership pending</td></tr><tr><td>RUN-184 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · $unique_bounded_tests tests / $unique_bounded_assertions assertions</strong></td><td class=\"partial\">one new Fleet playback historical-remediated record · zero final finding · dashboard HTML unchanged · fresh RUN-185 required</td></tr>",
     ),
     ("Fresh RUN-182 audit-dashboard verification required", "Fresh RUN-185 audit-dashboard verification required"),
     (
@@ -5694,7 +5755,7 @@ current_visible_boundaries = [
     "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
     "page/data Site privacy only",
     "baseline 3 failed + 2 passed / 30 assertions",
-    "post-merge Fleet playback execution",
+    "RUN-183 adds one post-merge 11/167 Fleet playback execution",
     "supporting 20/215",
     "14 retained",
     "14 historical claim identities",
@@ -5776,6 +5837,10 @@ assert "and fresh RUN-172 dashboard verification required." not in dashboard
 assert "Fresh RUN-175 audit-dashboard verification required" not in dashboard
 assert "Fresh RUN-178 audit-dashboard verification required" not in dashboard
 assert "Fresh RUN-182 audit-dashboard verification required" not in dashboard
+assert (
+    "12 retained claim identities (8 current provisional + 2 historical already-fixed + 4 historical remediated)"
+    not in dashboard
+)
 assert "visible 664/307/357 ownership, 95 bridges, 118/389 queue accounting" not in dashboard
 for stale_attribution in (
     "RUN-159/R retire only historical MED-RBAC",
@@ -5800,6 +5865,8 @@ output_bytes = (dashboard.rstrip() + "\n").encode("utf-8")
 existing_output_bytes = output_path.read_bytes()
 assert (
     existing_output_bytes in (run_182_dashboard_payload, output_bytes)
+    or hashlib.sha256(existing_output_bytes).hexdigest()
+    in SUPERSEDED_PRE_REVIEW_RUN_185_DASHBOARD_SHA256
 )
 temporary_path = output_path.with_name(f".{output_path.name}.tmp-run185-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"

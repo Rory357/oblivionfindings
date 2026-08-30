@@ -1,0 +1,941 @@
+{
+  "schema_version": "run-185-audit-dashboard-verification-wave-35-v1",
+  "run_id": "RUN-185-AUDIT-DASHBOARD-VERIFICATION-WAVE-35",
+  "generated_on": "2026-08-30",
+  "status": "AUDIT_DASHBOARD_RUN184_EXACT_ARTIFACT_RESPONSIVE_NAVIGATION_RESOURCE_VERIFICATION_GO_LOCAL_ONLY_SERVER_CLEANUP_COMPLETE_ZERO_APPLICATION_PUBLICATION_FINAL_FINDING_GATE4_OR_AUDIT_COMPLETION_CREDIT",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false,
+    "authorization_boundary": "Site access, exact roles and permissions, canonical ownership, privacy, and direct-object denial"
+  },
+  "scope": "Exact RUN184 reporting dashboard and bounded audit-artifact verification only",
+  "pins": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "continuation_request_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "continuation_request_is_not_governing_prompt": true,
+    "run_184_checkpoint_commit": "15b2c988f4bb7f737727cc777ab32ad771c4be06",
+    "run_184_checkpoint_tree": "b71caa8f2a0b616db92fd3058c8f8cbc014e0459",
+    "run_184_checkpoint_parent": "a900f078c9c05f587f6f7884f5fe715076891416",
+    "origin_main_before_run_185_commit": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead": 31,
+    "local_main_behind": 0,
+    "run_184_materializer": {
+      "path": "generators/materialize-run-184-fleet-trip-playback-site-privacy-remediation-reporting-wave-35.py",
+      "sha256": "a68c61a72b7a6d956c776bbe5aca3e3ed421a4602328364c96e3ea9557258156",
+      "git_blob_id": "0355a8d8abcf2cbe0af2b1a8f9d0c76837650df8",
+      "bytes": 31599,
+      "lines": 595
+    },
+    "run_184_receipt": {
+      "path": "evidence/source/current-run-184-fleet-trip-playback-site-privacy-remediation-reporting-wave-35.json",
+      "sha256": "c01d56df5512183ac8363c58ea73af4abf504ef3bc956967b43b15929d5e84e0",
+      "git_blob_id": "1a07f1e3e20c8adfbd2dee893553ed9bcc0e5c92",
+      "bytes": 17255,
+      "lines": 396,
+      "receipt_self_seal_sha256": "d798f2ee3bae70539ad764dcc0204f32146012c0c0d82424651419908f0b6aac"
+    },
+    "run_184_findings": {
+      "path": "findings.json",
+      "sha256": "28622b14799477cfa37069bffd16f500f429ff5013ac418ed75394486cb24bc3",
+      "git_blob_id": "00fc8cc934bae3cc1b7d830f4dbc5bf74b679e0b",
+      "bytes": 610120,
+      "lines": 10824
+    },
+    "run_184_committed_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "9d4b3b1a197bd231da931781190b8ddde26367f7f7013ae17573ad5d12723975",
+      "git_blob_id": "4bab68986c1928ea8c468ad5f724ad62d0f0cc0e",
+      "bytes": 667421,
+      "lines": 5816
+    },
+    "run_185_final_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "c050ce639b0523e1864ddd861f88fdac6af6545666798605362f81e6b2763fe2",
+      "git_blob_id": "7b8b48550fe06d4d5f886ce032e9dfd8cefb8531",
+      "bytes": 676644,
+      "lines": 5883
+    },
+    "run_185_builder_diff": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "binary_diff_sha256": "2652dbd904aa3dc7b5f5bb9b891d6573d81ff230329ec50ea0708d5090089c73",
+      "numstat": {
+        "added": 73,
+        "deleted": 6
+      }
+    },
+    "run_182_committed_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "8779848cc1a95ef82f2c5eba1a542e5a4784559f75ef20e9eb06696abde56457",
+      "git_blob_id": "eba39723cdd892249714dc32d9589b718593b24f",
+      "bytes": 296602,
+      "lines": 78
+    },
+    "run_185_final_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7",
+      "git_blob_id": "35e98d2f17e081eb01ec51de1429e9eab1208697",
+      "bytes": 304332,
+      "lines": 78
+    },
+    "run_185_dashboard_diff": {
+      "path": "audit-dashboard.html",
+      "binary_diff_sha256": "dd09a57930c0bc6cd80a316a1d09e4dcf8494c80a6efd25bdac5c0ff2616c128",
+      "numstat": {
+        "added": 18,
+        "deleted": 18
+      }
+    },
+    "run_185_receipt_materializer": {
+      "path": "generators/materialize-run-185-audit-dashboard-verification-wave-35.py",
+      "sha256": "d974f3329db546b5b7a3f1e2325ecb9f9eba6db6fee3e695aca7a7ff668ab18f",
+      "git_blob_id": "a76deb8cc9888f95b49ae9e618ef5decfa1e8e51",
+      "bytes": 52892,
+      "lines": 1363
+    },
+    "supplied_stale_builder_candidate_sha256": "6691fe0fa68051817d565cfddf5cf0b3fab05ddd4d415172235f8aaad827c2d2",
+    "supplied_stale_builder_candidate_matches_final": false
+  },
+  "lineage": {
+    "run_183_and_run_183r": "bounded Fleet playback remediation and exact review only",
+    "run_184": "adds one historical-remediated record and reports 14=8+2+4 with unique bounded execution 99/1931",
+    "run_185": "generates from exact committed RUN184 sources and verifies only the resulting audit artifact",
+    "candidate_feature_association": "CAP-FLEET-VEHICLE-REGISTER",
+    "candidate_feature_identity_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "index_84_static_owner_recredited": false,
+    "index_85_static_ownership_adjudicated": false
+  },
+  "dashboard_generation": {
+    "committed_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "9d4b3b1a197bd231da931781190b8ddde26367f7f7013ae17573ad5d12723975",
+      "git_blob_id": "4bab68986c1928ea8c468ad5f724ad62d0f0cc0e",
+      "bytes": 667421,
+      "lines": 5816
+    },
+    "final_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "c050ce639b0523e1864ddd861f88fdac6af6545666798605362f81e6b2763fe2",
+      "git_blob_id": "7b8b48550fe06d4d5f886ce032e9dfd8cefb8531",
+      "bytes": 676644,
+      "lines": 5883
+    },
+    "builder_changed_by_run_185_sequence": true,
+    "builder_change": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "binary_diff_sha256": "2652dbd904aa3dc7b5f5bb9b891d6573d81ff230329ec50ea0708d5090089c73",
+      "numstat": {
+        "added": 73,
+        "deleted": 6
+      }
+    },
+    "builder_execution_guard_corrections": [
+      {
+        "name": "run183-and-run183r-list-shaped-completion-gates",
+        "effect": "validate IDs 1 through 26 and each explicit complete=false",
+        "credit": false
+      },
+      {
+        "name": "committed-run184-builder-byte-pin",
+        "effect": "read RUN184 builder bytes at exact commit 15b2c988",
+        "credit": false
+      },
+      {
+        "name": "frozen-run177-88-1764-history",
+        "effect": "prevent current 99/1931 values from leaking into RUN177",
+        "credit": false
+      },
+      {
+        "name": "run181-next-index-identities",
+        "effect": "retain index 85 RUN090-ROUTE-0086 and RUN077-ROUTE-0694",
+        "credit": false
+      },
+      {
+        "name": "run183-playback-boundary-wording",
+        "effect": "identify the one post-merge 11/167 Fleet playback increment",
+        "credit": false
+      },
+      {
+        "name": "qualified-index84-index85-ownership-history",
+        "effect": "separate index 84 owner credit from pending index 85 correctness",
+        "credit": false
+      },
+      {
+        "name": "current-contributor-and-footer-lineage",
+        "effect": "report through RUN184 without stale RUN174 or RUN171 current tense",
+        "credit": false
+      },
+      {
+        "name": "two-hash-superseded-output-guard",
+        "effect": "permit only the two explicitly rejected RUN185 HTML inputs",
+        "credit": false
+      }
+    ],
+    "guard_failure_credit": false,
+    "final_builder_runs_observed": 2,
+    "final_builder_runs_byte_identical": true,
+    "independent_final_source_and_html_review": {
+      "result": "GO",
+      "findings": [],
+      "dashboard_sha256": "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7",
+      "builder_sha256": "c050ce639b0523e1864ddd861f88fdac6af6545666798605362f81e6b2763fe2",
+      "credit": "EXACT_AUDIT_DASHBOARD_ARTIFACT_ONLY"
+    },
+    "committed_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "8779848cc1a95ef82f2c5eba1a542e5a4784559f75ef20e9eb06696abde56457",
+      "git_blob_id": "eba39723cdd892249714dc32d9589b718593b24f",
+      "bytes": 296602,
+      "lines": 78
+    },
+    "final_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7",
+      "git_blob_id": "35e98d2f17e081eb01ec51de1429e9eab1208697",
+      "bytes": 304332,
+      "lines": 78
+    },
+    "dashboard_change": {
+      "path": "audit-dashboard.html",
+      "binary_diff_sha256": "dd09a57930c0bc6cd80a316a1d09e4dcf8494c80a6efd25bdac5c0ff2616c128",
+      "numstat": {
+        "added": 18,
+        "deleted": 18
+      }
+    },
+    "superseded_validation_history": [
+      {
+        "sha256": "07168e6b686eb0c976b18391e53979db2c605c7f9901bfdb73f4bf792c3b791c",
+        "result": "NO_GO",
+        "credit": false,
+        "reason": "independent review found RUN174 current-tense lineage and stale ownership or contributor-footer contradictions"
+      },
+      {
+        "sha256": "b1c93c817244512e21e6e322cbec6617b87aed08fe52c268c292ef0bc53a812b",
+        "result": "NO_GO",
+        "credit": false,
+        "reason": "follow-up review found the historical RUN171 12-record clause leaking the current 8+2+4 split"
+      }
+    ],
+    "final_validation": {
+      "sha256": "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7",
+      "result": "GO",
+      "findings": []
+    },
+    "forward_generator_is_intentionally_unhashed": true,
+    "forward_receipt_is_intentionally_unhashed": true,
+    "hash_cycle_present": false,
+    "application_source_or_product_test_change": false,
+    "credit_effect": "exact audit-dashboard artifact verification only"
+  },
+  "verification_method": {
+    "browser": "Codex in-app browser",
+    "served_from": "temporary loopback-only HTTP server on 127.0.0.1:43185",
+    "server_executable": "C:\\Users\\steph\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+    "server_command_line_suffix": "-B -m http.server 43185 --bind 127.0.0.1",
+    "target_url": "http://127.0.0.1:43185/audit-dashboard.html?run=185&sha=3c339da7",
+    "target_document_loaded": true,
+    "document_title": "Oblivion Findings current-source audit",
+    "loopback_get_status": 200,
+    "loopback_content_type": "text/html",
+    "loopback_response_bytes": 304332,
+    "loopback_response_sha256": "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7",
+    "page_sandbox_fetch_status": "UNAVAILABLE_IN_READ_ONLY_PAGE_SANDBOX_NOT_A_PAGE_FAILURE",
+    "external_testing": false,
+    "desktop_and_mobile_visual_inspection": "GO"
+  },
+  "verification": {
+    "dashboard_builder_final_byte_identical_runs_observed": 2,
+    "dashboard_builder_final_runs_byte_identical": true,
+    "receipt_materializer_final_byte_identical_runs_required": 2,
+    "viewports_required": 4,
+    "viewports_verified": 4,
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual_browser_viewport": "1440x900",
+        "visible_boundaries_required": 117,
+        "visible_boundaries_passed": 117,
+        "anchor_elements": 868,
+        "fragment_anchors": 10,
+        "browser_dom_ids": 11,
+        "semantic_navigation_sections": 10,
+        "table_wrappers": 10,
+        "unique_local_relative_resources": 463,
+        "navigation_links_visible": 10,
+        "page_overflow": false,
+        "duplicate_ids": false,
+        "missing_fragment_targets": false,
+        "table_containment_failure": false,
+        "visual_inspection": "GO_NO_CLIPPING_OVERLAP_OR_ILLEGIBILITY",
+        "mobile_navigation_horizontally_scrollable": null
+      },
+      {
+        "requested": "1280x800",
+        "actual_browser_viewport": "1280x800",
+        "visible_boundaries_required": 117,
+        "visible_boundaries_passed": 117,
+        "anchor_elements": 868,
+        "fragment_anchors": 10,
+        "browser_dom_ids": 11,
+        "semantic_navigation_sections": 10,
+        "table_wrappers": 10,
+        "unique_local_relative_resources": 463,
+        "navigation_links_visible": 10,
+        "page_overflow": false,
+        "duplicate_ids": false,
+        "missing_fragment_targets": false,
+        "table_containment_failure": false,
+        "visual_inspection": "STRUCTURAL_CHECKS_GO_VISUAL_EXTREMES_REVIEWED",
+        "mobile_navigation_horizontally_scrollable": null
+      },
+      {
+        "requested": "1024x768",
+        "actual_browser_viewport": "1024x768",
+        "visible_boundaries_required": 117,
+        "visible_boundaries_passed": 117,
+        "anchor_elements": 868,
+        "fragment_anchors": 10,
+        "browser_dom_ids": 11,
+        "semantic_navigation_sections": 10,
+        "table_wrappers": 10,
+        "unique_local_relative_resources": 463,
+        "navigation_links_visible": 10,
+        "page_overflow": false,
+        "duplicate_ids": false,
+        "missing_fragment_targets": false,
+        "table_containment_failure": false,
+        "visual_inspection": "STRUCTURAL_CHECKS_GO_VISUAL_EXTREMES_REVIEWED",
+        "mobile_navigation_horizontally_scrollable": null
+      },
+      {
+        "requested": "390x844",
+        "actual_browser_viewport": "390x844",
+        "visible_boundaries_required": 117,
+        "visible_boundaries_passed": 117,
+        "anchor_elements": 868,
+        "fragment_anchors": 10,
+        "browser_dom_ids": 11,
+        "semantic_navigation_sections": 10,
+        "table_wrappers": 10,
+        "unique_local_relative_resources": 463,
+        "navigation_links_visible": 10,
+        "page_overflow": false,
+        "duplicate_ids": false,
+        "missing_fragment_targets": false,
+        "table_containment_failure": false,
+        "visual_inspection": "GO_NO_CLIPPING_OVERLAP_OR_ILLEGIBILITY",
+        "mobile_navigation_horizontally_scrollable": true
+      }
+    ],
+    "exact_utf8_visible_boundary_manifest_required": 117,
+    "exact_utf8_visible_boundary_manifest_passed": 117,
+    "screens_visually_go": true,
+    "navigation_clicks_required": 10,
+    "navigation_clicks_passed": 10,
+    "navigation_results": [
+      {
+        "label": "Progress",
+        "href": "#progress",
+        "browser_click_performed": true,
+        "resulting_hash": "#progress",
+        "target_exists": true,
+        "target_visible": true,
+        "pass": true
+      },
+      {
+        "label": "RUN-184",
+        "href": "#checkpoint",
+        "browser_click_performed": true,
+        "resulting_hash": "#checkpoint",
+        "target_exists": true,
+        "target_visible": true,
+        "pass": true
+      },
+      {
+        "label": "Pages",
+        "href": "#pages",
+        "browser_click_performed": true,
+        "resulting_hash": "#pages",
+        "target_exists": true,
+        "target_visible": true,
+        "pass": true
+      },
+      {
+        "label": "Static census",
+        "href": "#static-census",
+        "browser_click_performed": true,
+        "resulting_hash": "#static-census",
+        "target_exists": true,
+        "target_visible": true,
+        "pass": true
+      },
+      {
+        "label": "Runtime gates",
+        "href": "#runtime",
+        "browser_click_performed": true,
+        "resulting_hash": "#runtime",
+        "target_exists": true,
+        "target_visible": true,
+        "pass": true
+      },
+      {
+        "label": "Benchmarks",
+        "href": "#benchmarks",
+        "browser_click_performed": true,
+        "resulting_hash": "#benchmarks",
+        "target_exists": true,
+        "target_visible": true,
+        "pass": true
+      },
+      {
+        "label": "Modules",
+        "href": "#modules",
+        "browser_click_performed": true,
+        "resulting_hash": "#modules",
+        "target_exists": true,
+        "target_visible": true,
+        "pass": true
+      },
+      {
+        "label": "Finding status",
+        "href": "#findings",
+        "browser_click_performed": true,
+        "resulting_hash": "#findings",
+        "target_exists": true,
+        "target_visible": true,
+        "pass": true
+      },
+      {
+        "label": "Architecture",
+        "href": "#architecture",
+        "browser_click_performed": true,
+        "resulting_hash": "#architecture",
+        "target_exists": true,
+        "target_visible": true,
+        "pass": true
+      },
+      {
+        "label": "Gaps",
+        "href": "#gaps",
+        "browser_click_performed": true,
+        "resulting_hash": "#gaps",
+        "target_exists": true,
+        "target_visible": true,
+        "pass": true
+      }
+    ],
+    "console_warning_entries": 0,
+    "console_error_entries": 0,
+    "uncaught_page_error_entries": null,
+    "browser_dev_log_entries": null,
+    "unreported_dev_log_fields_fabricated": false,
+    "authored_ids": 10,
+    "browser_dom_ids": 11,
+    "browser_only_injected_id_count": 1,
+    "duplicate_authored_ids": [],
+    "heading_elements": 26,
+    "section_elements": 26,
+    "semantic_navigation_sections": 10,
+    "table_elements": 10,
+    "table_wrappers": 10,
+    "anchor_elements": 868,
+    "anchor_elements_rendered_in_browser": 868,
+    "hash_anchor_occurrences": 10,
+    "unique_hash_anchors": 10,
+    "missing_hash_targets": [],
+    "local_resource_link_occurrences": 858,
+    "unique_local_resources": 463,
+    "pre_materialization_resource_diagnostic": {
+      "filesystem_and_http_head_200": "461/463",
+      "expected_missing_future_paths": [
+        "evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json",
+        "generators/materialize-run-185-audit-dashboard-verification-wave-35.py"
+      ],
+      "credit": false
+    },
+    "post_materialization_filesystem_resources": "463/463",
+    "post_materialization_filesystem_failures": [],
+    "post_materialization_http_head_resources": "463/463",
+    "post_materialization_http_head_failures": [],
+    "post_materialization_http_head_finalized": true,
+    "hash_bearing_file_occurrences_verified": 747,
+    "unique_hash_bearing_file_paths_verified": 389,
+    "historical_directory_bundle_digest_occurrences": 2,
+    "historical_directory_bundle_digest_paths": [
+      "task-scripts/"
+    ],
+    "hash_bearing_link_failures": [],
+    "run_185_generator_link_occurrences": 2,
+    "run_185_generator_link_adjacent_hash_occurrences": 0,
+    "run_185_forward_receipt_link_occurrences": 3,
+    "run_185_forward_receipt_link_adjacent_hash_occurrences": 0,
+    "visible_static_checks_required": 117,
+    "visible_static_checks_passed": 117,
+    "visible_static_checks": {
+      "<a href=\"#checkpoint\">RUN-184</a>": true,
+      "<a href=\"#findings\">Finding status</a>": true,
+      "666 owners · 309 routes + 357 pages · 97 bridges": true,
+      "120 reviewed / 387 pending": true,
+      "98 owned / 409 without ownership": true,
+      "16.950878%": true,
+      "3,263 records remain": true,
+      "RUN-182–184 Fleet trip playback Site privacy remediation checkpoint": true,
+      "fleet-assets.vehicles.alerts-config": true,
+      "RUN090-ROUTE-0084 / RUN077-ROUTE-0692": true,
+      "VehicleController::alertsConfig": true,
+      "CAP-FLEET-VEHICLE-REGISTER": true,
+      "index 83 is not recredited": true,
+      "index 84 fleet-assets.trips.index is integrated": true,
+      "next index 85 RUN090-ROUTE-0086 / RUN077-ROUTE-0694": true,
+      "fleet-assets.trips.index": true,
+      "fleet-assets.trips.playback": true,
+      "three provisional-not-final observations": true,
+      "RUN-168: exact RUN-167 dashboard verified at 4/4 viewports": true,
+      "RUN-169/R: queue index 83 Fleet alerts-config candidate independently reviewed OWNER": true,
+      "RUN-170: exactly one route owner and one action bridge integrated": true,
+      "RUN-170R: three sealed post-commit GO reviews": true,
+      "RUN-171: live static ledger reported": true,
+      "RUN-172: exact RUN-171 dashboard verified at 4/4 viewports": true,
+      "RUN-173: SAFE concern-identity defect reproduced and remediated in exactly two transferred paths": true,
+      "RUN-173R: exact remediation artifacts independently reviewed GO": true,
+      "RUN-174: SAFE record reclassified in place": true,
+      "RUN-175: exact RUN-174 dashboard verified at 4/4 viewports": true,
+      "RUN-176: Fleet trip-index Site-privacy defect reproduced and remediated in exactly two transferred paths": true,
+      "RUN-176R: exact remediation artifacts independently reviewed GO": true,
+      "RUN-177: Fleet trip privacy historical-remediated record added": true,
+      "RUN-178: exact RUN-177 dashboard verified at 4/4 viewports": true,
+      "RUN-179/R: index 84 Fleet trip-index review preserves two invalidated older-bundle SHARED judgments": true,
+      "RUN-180: exactly one fleet-assets.trips.index route owner and VehicleController::trips bridge integrated": true,
+      "RUN-180R: three sealed GO lanes": true,
+      "complete synthesis authorizes reporting only": true,
+      "RUN-181: live static ledger reported": true,
+      "RUN-182: exact RUN-181 dashboard verified at 4/4 viewports · 105/105 visible checks · 10/10 navigation · 455/455 unique local resources · 852 anchors": true,
+      "RUN-183: Fleet trip-playback page/data Site-privacy defect reproduced and remediated in exactly two transferred paths": true,
+      "RUN-183R: exact remediation artifacts independently reviewed GO": true,
+      "RUN-184: Fleet trip-playback historical-remediated record added": true,
+      "9 current provisional P1 + 2 historical already-fixed + 1 historical remediated": true,
+      "8 current provisional P1 + 2 historical already-fixed + 2 historical remediated": true,
+      "14 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 4 historical remediated": true,
+      "RUN-176's post-merge Fleet 5/175 counted once into 88/1,764": true,
+      "88 / 1,764": true,
+      "83/1,589 unique bounded total": true,
+      "88/1,764 unique bounded disposition total": true,
+      "99 / 1,931": true,
+      "99/1,931 unique bounded disposition total": true,
+      "SAFE-ALERT-DEDUP-IDENTITY-01": true,
+      "post-merge SAFE alert-dedup tests / 60 assertions": true,
+      "4 failed + 1 warning-pass / 10 assertions": true,
+      "supporting 28/73 bridge and 3/5 HsEvent evidence reported separately": true,
+      "6 terminal-fixture failures occurred before bridge/dedup execution": true,
+      "30-minute dedup window": true,
+      "+5 minutes stays idempotent": true,
+      "+31-minute lifecycle remains unchanged": true,
+      "e488bd3edcda": true,
+      "dc04067e304a": true,
+      "705db2dc3ba0": true,
+      "c39b07654705": true,
+      "a8d813f1878c6a720f5308f28e5a591f90097961444876f93fcfe5a9262e909a": true,
+      "not published to origin/main": true,
+      "FLEET-TRIP-INDEX-SITE-PRIVACY-01": true,
+      "candidate feature association only": true,
+      "index 84 static route owner and action bridge integrated separately by RUN-180/R–181": true,
+      "index 85 ownership PENDING_FRESH_SEMANTIC_REVIEW": true,
+      "root red 2 failed / 19 assertions": true,
+      "expanded red 5 failed / 55 assertions": true,
+      "post-merge Fleet trip-index tests / 175 assertions": true,
+      "supporting 4/35 VehicleController regressions reported separately": true,
+      "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01": true,
+      "page/data Site privacy only": true,
+      "baseline 3 failed + 2 passed / 30 assertions": true,
+      "RUN-183 adds one post-merge 11/167 Fleet playback execution": true,
+      "supporting 20/215": true,
+      "14 retained": true,
+      "14 historical claim identities": true,
+      "13a7f37da9c9": true,
+      "790bc11e3fb2": true,
+      "c643c9e5eecf": true,
+      "3 claim-specific test functions / 146 assertions / 3 synchronized two-process races": true,
+      "reported separately from the historical 78/1,529 and current 99/1,931": true,
+      "supporting 43/716 overlaps": true,
+      "73 bounded tests / 1,481 assertions": true,
+      "5 focused tests / 48 assertions": true,
+      "3 independent current-source ALREADY_FIXED reviews": true,
+      "historical issue · already fixed on current main · not a final finding": true,
+      "historical issue · already fixed on current main only for the bounded manual-entry register/stock clause · residual compound scope unadjudicated · not a final finding": true,
+      "historical issue · remediated on current main · not a final finding": true,
+      "historical issue · remediated on local main · not published to origin/main · 30-minute dedup contract and +31-minute lifecycle preserved · not a final finding": true,
+      "MED-CD-SCOPE-01": true,
+      "MED-CD-ATOMICITY-01": true,
+      "RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution without application or product-test change": true,
+      "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated": true,
+      "two broader INR failures reproduce at base": true,
+      "full-suite green false": true,
+      "Fresh RUN-185 audit-dashboard verification required": true,
+      "cf0090ec9724": true,
+      "0b1920dade92": true,
+      "7b2b5688c90e": true,
+      "2/340 mappings": true,
+      "0/340 final no-match/NCM": true,
+      "338 unresolved targets": true,
+      "one operating organisation across multiple Sites": true,
+      "Gate 4 and audit completion false": true,
+      "RUN-153/R establish the historical 664 bounded source-owner records (307 routes + 357 pages)": true,
+      "at that historical checkpoint 116 queue rows were reviewed, 391 remained pending, and 413 remained without ownership": true,
+      "662 historical cumulative owner records": true,
+      "RUN-180/R current Fleet trip-index route/action ownership": true,
+      "RUN-090 frozen denominator / RUN-180R current accounting": true,
+      "index 83 is not recredited, index 84 fleet-assets.trips.index is integrated, and index 85 fleet-assets.trips.playback is next": true,
+      "RUN-168 verifies that exact dashboard": true,
+      "RUN-182 verifies only the superseded RUN-181 HTML": true,
+      "dashboard HTML unchanged · fresh RUN-185 required": true,
+      "visible 666/309/357 ownership, 97 bridges, 120/387 queue accounting, 98 owned/409 without ownership": true
+    },
+    "required_live_checks": {
+      "<a href=\"#checkpoint\">RUN-184</a>": true,
+      "14 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 4 historical remediated": true,
+      "99 / 1,931": true,
+      "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01": true,
+      "RUN-183 adds one post-merge 11/167 Fleet playback execution": true,
+      "supporting 20/215": true,
+      "CAP-FLEET-VEHICLE-REGISTER": true,
+      "index 84 integrated · next index 85 RUN090-ROUTE-0086 / RUN077-ROUTE-0694": true,
+      "2/340 mappings": true,
+      "0/340 final no-match/NCM": true,
+      "338 unresolved targets": true,
+      "one operating organisation across multiple Sites": true,
+      "Gate 4 and audit completion false": true,
+      "Fresh RUN-185 audit-dashboard verification required": true
+    },
+    "prohibited_visible_phrase_hits": {},
+    "single_organisation_multi_site_wording_present": true,
+    "tenant_word_present": false
+  },
+  "reported_finding_boundary": {
+    "retained_claim_records": 14,
+    "current_provisional_source_claims": 8,
+    "historical_already_fixed_records": 2,
+    "historical_remediated_records": 4,
+    "final_P0": 0,
+    "final_P1": 0,
+    "changed_by_run_185": false
+  },
+  "bounded_execution_accounting": {
+    "unique_tests": 99,
+    "unique_assertions": 1931,
+    "changed_by_run_185": false,
+    "executed_by_run_185": false,
+    "red_replay_isolated_supporting_or_other_fix_recredit": false
+  },
+  "static_ownership_boundary": {
+    "owner_records": 666,
+    "route_owners": 309,
+    "page_owners": 357,
+    "action_bridges": 97,
+    "source_denominator": 3929,
+    "source_ownership_percent": "16.950878",
+    "source_residual_records": 3263,
+    "queue_total": 507,
+    "queue_reviewed": 120,
+    "queue_pending": 387,
+    "queue_owned": 98,
+    "queue_without_ownership": 409,
+    "next_zero_based_index": 85,
+    "next_queue_id": "RUN090-ROUTE-0086",
+    "next_route_record_id": "RUN077-ROUTE-0694",
+    "next_route": "fleet-assets.trips.playback",
+    "next_action": "FleetTripController::show",
+    "next_ownership_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "changed_by_run_185": false,
+    "correctness_credit": false
+  },
+  "benchmark_boundary": {
+    "mapped": 2,
+    "total": 340,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338,
+    "changed_by_run_185": false
+  },
+  "noninheritance_boundary": {
+    "builder_guard_correction_credit": false,
+    "superseded_html_validation_credit": false,
+    "run_184_reporting_recredited": false,
+    "run_183_application_remediation_recredited": false,
+    "static_route_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "application_source_or_product_test": false,
+    "application_runtime_reexecution": false,
+    "application_browser": false,
+    "executed_product_tests": false,
+    "queue_advance": false,
+    "playback_or_adjacent_route_outcome": false,
+    "broader_fleet_correctness": false,
+    "benchmark_mapping_or_final_no_match_NCM": false,
+    "ease": false,
+    "final_finding": false,
+    "feature_module_or_pass_completion": false,
+    "release_publication_gate4_or_audit_completion": false
+  },
+  "root_browser_resource_cleanup": {
+    "browser_viewport_override_reset": true,
+    "agent_created_tab_closed": true,
+    "remaining_controlled_tabs": 0,
+    "temporary_loopback_port": 43185,
+    "temporary_server_pid": 3004,
+    "temporary_server_executable": "C:\\Users\\steph\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+    "listeners_after_cleanup": 0,
+    "exact_pid_present_after_cleanup": false,
+    "matching_loopback_server_processes_after_cleanup": 0,
+    "cleanup_finalized": true,
+    "pending_fields_if_not_finalized": []
+  },
+  "worktree_boundary": {
+    "expected_final_status_count": 4,
+    "expected_final_porcelain_statuses": [
+      " M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+      " M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py",
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json",
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-185-audit-dashboard-verification-wave-35.py"
+    ],
+    "no_staged_paths": true,
+    "git_diff_check_clean": true,
+    "exact_match_required": true
+  },
+  "mutation_attestation": {
+    "sequence_paths": [
+      "generators/build-current-audit-dashboard.py",
+      "audit-dashboard.html",
+      "generators/materialize-run-185-audit-dashboard-verification-wave-35.py",
+      "evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json"
+    ],
+    "receipt_materializer_persistent_write_scope": [
+      "evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json"
+    ],
+    "builder_changed_before_run_185_materializer": true,
+    "audit_dashboard_html_changed_before_run_185_materializer": true,
+    "application_paths_changed": [],
+    "product_test_paths_changed": [],
+    "findings_register_changed_by_run_185": false,
+    "run_184_reporting_surfaces_changed_by_run_185": false,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "database_changed": false,
+    "application_tests_or_build_run_by_materializer": false
+  },
+  "remote_state_boundary": {
+    "origin_main_before_run_185_commit": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead_before_run_185_commit": 31,
+    "local_main_behind_before_run_185_commit": 0,
+    "application_merges_remain_local_only": true,
+    "push_or_publication_performed_by_materializer": false,
+    "publication_claim": false
+  },
+  "credit_boundary": {
+    "exact_audit_dashboard_artifact": true,
+    "static_route_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "static_page_or_frontend_ownership": false,
+    "correctness": false,
+    "site_privacy_or_direct_object": false,
+    "application_source_or_product_tests": false,
+    "application_runtime": false,
+    "application_browser": false,
+    "executed_product_tests": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "final_finding": false,
+    "release": false,
+    "publication": false,
+    "feature_or_module_completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "completion_gates": [
+    {
+      "gate": 1,
+      "name": "routes_classified",
+      "complete": false
+    },
+    {
+      "gate": 2,
+      "name": "inertia_pages_classified",
+      "complete": false
+    },
+    {
+      "gate": 3,
+      "name": "features_in_canonical_register",
+      "complete": false
+    },
+    {
+      "gate": 4,
+      "name": "routes_and_pages_mapped_to_feature_id",
+      "complete": false
+    },
+    {
+      "gate": 5,
+      "name": "features_with_verified_benchmark_or_final_ncm",
+      "complete": false
+    },
+    {
+      "gate": 6,
+      "name": "human_features_with_task_script_and_ten_scores",
+      "complete": false
+    },
+    {
+      "gate": 7,
+      "name": "common_and_safety_journeys_cross_reviewed",
+      "complete": false
+    },
+    {
+      "gate": 8,
+      "name": "hero_banner_instances_classified",
+      "complete": false
+    },
+    {
+      "gate": 9,
+      "name": "overlay_implementations_and_triggers_classified",
+      "complete": false
+    },
+    {
+      "gate": 10,
+      "name": "safe_routes_observed_at_desktop",
+      "complete": false
+    },
+    {
+      "gate": 11,
+      "name": "selected_families_and_journeys_all_viewports",
+      "complete": false
+    },
+    {
+      "gate": 12,
+      "name": "required_visual_states_classified",
+      "complete": false
+    },
+    {
+      "gate": 13,
+      "name": "material_visual_finding_families_resampled",
+      "complete": false
+    },
+    {
+      "gate": 14,
+      "name": "models_classified",
+      "complete": false
+    },
+    {
+      "gate": 15,
+      "name": "policies_classified",
+      "complete": false
+    },
+    {
+      "gate": 16,
+      "name": "service_domain_entries_classified",
+      "complete": false
+    },
+    {
+      "gate": 17,
+      "name": "critical_async_owners_classified",
+      "complete": false
+    },
+    {
+      "gate": 18,
+      "name": "modules_with_all_eight_passes",
+      "complete": false
+    },
+    {
+      "gate": 19,
+      "name": "prompt_benchmark_projects_formally_triaged",
+      "complete": false
+    },
+    {
+      "gate": 20,
+      "name": "p0_p1_complete_finding_fields",
+      "complete": false
+    },
+    {
+      "gate": 21,
+      "name": "redesigns_neutral_native_no_copy",
+      "complete": false
+    },
+    {
+      "gate": 22,
+      "name": "ease_4_5_claims_independently_reviewed",
+      "complete": false
+    },
+    {
+      "gate": 23,
+      "name": "browser_claims_labeled",
+      "complete": false
+    },
+    {
+      "gate": 24,
+      "name": "visual_inconsistencies_complete_context",
+      "complete": false
+    },
+    {
+      "gate": 25,
+      "name": "official_source_inference_specialist_split",
+      "complete": false
+    },
+    {
+      "gate": 26,
+      "name": "all_agents_returned_reconciled_represented_none_live",
+      "complete": false
+    }
+  ],
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "artifact_completion_scope": [
+    "generators/build-current-audit-dashboard.py",
+    "audit-dashboard.html",
+    "generators/materialize-run-185-audit-dashboard-verification-wave-35.py",
+    "evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json"
+  ],
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "run_185_sequence_written_paths": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-185-audit-dashboard-verification-wave-35.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json"
+  ],
+  "root_finalization_required": {
+    "post_materialization_http_head": false,
+    "server_cleanup": false,
+    "receipt_materializer_arguments": {
+      "final_http_head_verified_count": 463,
+      "final_http_head_failure_count": 0,
+      "listeners_after_cleanup": 0,
+      "exact_server_pid_present_after_cleanup": false,
+      "matching_loopback_processes_after_cleanup": 0
+    }
+  },
+  "receipt_self_seal_sha256": "d49f27d1ed2f7f4f53c366d711653bbbb0fc541ba2d7c08f2780d4319193e776"
+}
