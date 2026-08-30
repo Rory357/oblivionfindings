@@ -3,6 +3,42 @@
 use App\Services\Queclink\CommandBuilder;
 use App\Services\Queclink\SerialNumberAllocator;
 
+test('serial allocation skips reserved values and wraps the sixteen-bit ring', function () {
+    $serials = new class extends SerialNumberAllocator
+    {
+        protected function startingValue(): int
+        {
+            return 0xFFFE;
+        }
+    };
+
+    expect($serials->nextExcluding([' fffe ', 'FFFF', 'not-a-serial']))->toBe('0000')
+        ->and($serials->next())->toBe('FFFE');
+});
+
+test('malformed reservations do not falsely exhaust the serial space', function () {
+    $available = 'BEEF';
+    $reserved = ['not-a-serial'];
+    for ($value = 0; $value <= 0xFFFF; $value++) {
+        $serial = strtoupper(str_pad(dechex($value), 4, '0', STR_PAD_LEFT));
+        if ($serial !== $available) {
+            $reserved[] = $serial;
+        }
+    }
+
+    expect((new SerialNumberAllocator)->nextExcluding($reserved))->toBe($available);
+});
+
+test('serial allocation fails closed when every protocol slot is reserved', function () {
+    $reserved = [];
+    for ($value = 0; $value <= 0xFFFF; $value++) {
+        $reserved[] = strtoupper(str_pad(dechex($value), 4, '0', STR_PAD_LEFT));
+    }
+
+    expect(fn () => (new SerialNumberAllocator)->nextExcluding($reserved))
+        ->toThrow(RuntimeException::class, 'No Queclink command serial number is currently available.');
+});
+
 test('gl30m family commands use the GL30MEU factory password', function () {
     $serials = new class extends SerialNumberAllocator
     {
