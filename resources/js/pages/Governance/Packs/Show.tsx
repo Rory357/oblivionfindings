@@ -45,6 +45,7 @@ interface Props extends PageProps {
         };
     };
     is_distributed: boolean;
+    can_mark_read: boolean;
     manifestSections: Array<{
         id: string;
         title: string;
@@ -72,6 +73,7 @@ export default function PackShow({
     auth,
     pack,
     is_distributed,
+    can_mark_read,
     manifestSections,
     contentSections,
     distributionStats,
@@ -81,12 +83,12 @@ export default function PackShow({
     const canManagePack = !!auth.can?.governance?.packs?.manage;
 
     useEffect(() => {
-        if (is_distributed) {
+        if (can_mark_read) {
             void axios
                 .post(`/governance/packs/${pack.id}/read`)
                 .catch(() => undefined);
         }
-    }, [is_distributed, pack.id]);
+    }, [can_mark_read, pack.id]);
 
     const distributePack = () => {
         setDistributing(true);

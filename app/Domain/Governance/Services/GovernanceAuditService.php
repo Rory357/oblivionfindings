@@ -3,6 +3,7 @@
 namespace App\Domain\Governance\Services;
 
 use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -59,10 +60,13 @@ class GovernanceAuditService
      * Read both tables as a unified stream of audit entries (newest first).
      *
      * @param  array{user_id?: int, entity_type?: string, entity_id?: int, action?: string, change_type?: string, from?: string, to?: string}  $filters
-     * @return \Illuminate\Pagination\LengthAwarePaginator
+     * @param  array<int, string>  $excludedEntityTypes
      */
-    public static function paginate(array $filters = [], int $perPage = 50): \Illuminate\Pagination\LengthAwarePaginator
-    {
+    public static function paginate(
+        array $filters = [],
+        int $perPage = 50,
+        array $excludedEntityTypes = [],
+    ): LengthAwarePaginator {
         $actions = DB::table('governance_audit_log')->select([
             DB::raw("'action' as kind"),
             'id',
@@ -92,6 +96,11 @@ class GovernanceAuditService
             'ip_address',
             'created_at',
         ]);
+
+        if ($excludedEntityTypes !== []) {
+            $actions->whereNotIn('resource_type', $excludedEntityTypes);
+            $changes->whereNotIn('entity_type', $excludedEntityTypes);
+        }
 
         if (! empty($filters['user_id'])) {
             $actions->where('user_id', $filters['user_id']);

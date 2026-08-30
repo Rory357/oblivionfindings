@@ -17,10 +17,12 @@ use Illuminate\Support\Str;
 
 class GovernanceWorkflowService
 {
+    public function __construct(protected BoardPackAccessService $boardPackAccess) {}
+
     public function dashboardWorkflow(?User $user = null, int $limit = 15): array
     {
         $actions = collect()
-            ->merge($this->meetingActions())
+            ->merge($this->meetingActions($user))
             ->merge($this->resolutionActions())
             ->merge($this->riskActions())
             ->merge($this->complianceActions())
@@ -56,7 +58,11 @@ class GovernanceWorkflowService
         $agendaCount = $meeting->agendaItems->count();
         $attendanceCount = $meeting->attendances->count();
         $quorum = $meeting->calculateQuorum();
-        $pack = $meeting->boardPack;
+        $pack = $user
+            ? $this->boardPackAccess->visiblePack($user, $meeting->boardPack)
+            : null;
+        $includePackItems = $user !== null
+            && ($this->boardPackAccess->canManage($user) || $pack !== null);
         $ceoReport = $meeting->ceoReport;
         $minutes = $meeting->minutes;
         $resolutions = $meeting->resolutions->whereIn('status', ['draft', 'open'])->count();
@@ -99,7 +105,7 @@ class GovernanceWorkflowService
                 'detail' => $ceoSubmitted
                     ? 'CEO report has been submitted for board pre-read.'
                     : ($meeting->ceo_report_deadline
-                        ? 'CEO report is still pending. Due ' . $meeting->ceo_report_deadline->format('j M Y g:i A') . '.'
+                        ? 'CEO report is still pending. Due '.$meeting->ceo_report_deadline->format('j M Y g:i A').'.'
                         : 'CEO report is still pending for this meeting.'),
                 'action_label' => 'Open CEO Report',
                 'action_url' => $ceoReport ? "/governance/ceo-reports/{$ceoReport->id}" : '/governance/ceo-reports',
@@ -186,6 +192,12 @@ class GovernanceWorkflowService
             ],
         ]);
 
+        if (! $includePackItems) {
+            $items = $items->reject(
+                fn (array $item) => in_array($item['key'], ['pack_generated', 'pack_distributed'], true),
+            );
+        }
+
         $nextStep = $items->first(fn (array $item) => ! in_array($item['status'], ['done', 'blocked'], true))
             ?? $items->first(fn (array $item) => $item['status'] === 'blocked');
 
@@ -233,7 +245,7 @@ class GovernanceWorkflowService
             ->get();
     }
 
-    protected function meetingActions(): Collection
+    protected function meetingActions(?User $user): Collection
     {
         if (! Schema::hasTable('governance_meetings')) {
             return collect();
@@ -248,6 +260,7 @@ class GovernanceWorkflowService
             ->get();
 
         $actions = collect();
+        $canManagePacks = $user !== null && $this->boardPackAccess->canManage($user);
 
         foreach ($meetings as $meeting) {
             $daysToMeeting = (int) now()->startOfDay()->diffInDays($meeting->scheduled_at?->startOfDay(), false);
@@ -270,7 +283,7 @@ class GovernanceWorkflowService
                 ));
             }
 
-            if ($meeting->agenda_items_count > 0 && $meeting->boardPack === null && $daysToMeeting <= 14) {
+            if ($canManagePacks && $meeting->agenda_items_count > 0 && $meeting->boardPack === null && $daysToMeeting <= 14) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:pack-generate",
                     'Meetings',
@@ -285,7 +298,7 @@ class GovernanceWorkflowService
                 ));
             }
 
-            if ($meeting->boardPack !== null && $meeting->boardPack->distributed_at === null && $isSoon) {
+            if ($canManagePacks && $meeting->boardPack !== null && $meeting->boardPack->distributed_at === null && $isSoon) {
                 $actions->push($this->makeAction(
                     "meeting:{$meeting->id}:pack-distribute",
                     'Meetings',

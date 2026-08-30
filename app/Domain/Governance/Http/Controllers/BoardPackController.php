@@ -2,15 +2,19 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
+use App\Domain\Governance\Jobs\GenerateBoardPack;
 use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\Governance\Services\BoardPackBuilderService;
+use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Domain\Governance\Support\BoardPackPresenter;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class BoardPackController extends Controller
@@ -18,11 +22,16 @@ class BoardPackController extends Controller
     public function __construct(
         protected BoardPackBuilderService $packService,
         protected BoardPackPresenter $presenter,
+        protected BoardPackAccessService $access,
     ) {}
 
     public function index(Request $request)
     {
-        $query = BoardPack::query()
+        $viewer = $request->user();
+        $canManage = $this->access->canManage($viewer);
+        $visibleQuery = $this->access->visibleQuery($viewer);
+
+        $query = (clone $visibleQuery)
             ->with(['meeting:id,title,scheduled_at,meeting_type', 'generatedBy:id,name'])
             ->latest('id');
 
@@ -36,26 +45,31 @@ class BoardPackController extends Controller
 
         $packs = $query->paginate(25)->withQueryString();
 
-        // Meetings that don't yet have a board pack — the dialog uses these.
-        $meetingsWithoutPack = GovernanceMeeting::query()
-            ->whereDoesntHave('boardPack')
-            ->whereNotIn('status', ['cancelled', 'archived'])
-            ->orderBy('scheduled_at')
-            ->withCount('agendaItems')
-            ->get(['id', 'title', 'scheduled_at', 'status'])
-            ->map(fn (GovernanceMeeting $meeting) => [
-                'id' => $meeting->id,
-                'title' => $meeting->title,
-                'scheduled_at' => $meeting->scheduled_at?->toIso8601String(),
-                'status' => $meeting->status,
-                'agenda_items_count' => (int) ($meeting->agenda_items_count ?? 0),
-            ])
-            ->values()
-            ->all();
+        $meetingsWithoutPack = [];
+        if ($canManage) {
+            // Only pack managers use the generation dialog or need draft meeting metadata.
+            $meetingsWithoutPack = GovernanceMeeting::query()
+                ->whereDoesntHave('boardPack')
+                ->whereNotIn('status', ['cancelled', 'archived'])
+                ->orderBy('scheduled_at')
+                ->withCount('agendaItems')
+                ->get(['id', 'title', 'scheduled_at', 'status'])
+                ->map(fn (GovernanceMeeting $meeting) => [
+                    'id' => $meeting->id,
+                    'title' => $meeting->title,
+                    'scheduled_at' => $meeting->scheduled_at?->toIso8601String(),
+                    'status' => $meeting->status,
+                    'agenda_items_count' => (int) ($meeting->agenda_items_count ?? 0),
+                ])
+                ->values()
+                ->all();
+        }
 
         return Inertia::render('Governance/Packs/Index', [
             'packs' => [
-                'data' => $packs->items(),
+                'data' => collect($packs->items())
+                    ->map(fn (BoardPack $pack) => $this->presentIndexPack($pack))
+                    ->all(),
                 'links' => $packs->linkCollection()->toArray(),
                 'current_page' => $packs->currentPage(),
                 'last_page' => $packs->lastPage(),
@@ -65,22 +79,24 @@ class BoardPackController extends Controller
                 'status' => $request->string('status')->toString() ?: null,
             ],
             'summary' => [
-                'total' => BoardPack::count(),
-                'distributed' => BoardPack::whereNotNull('distributed_at')->count(),
-                'draft' => BoardPack::whereNull('distributed_at')->count(),
+                'total' => (clone $visibleQuery)->count(),
+                'distributed' => (clone $visibleQuery)->whereNotNull('distributed_at')->count(),
+                'draft' => (clone $visibleQuery)->whereNull('distributed_at')->count(),
             ],
             'meetings_without_pack' => $meetingsWithoutPack,
         ]);
     }
 
-    public function show(BoardPack $pack)
+    public function show(Request $request, BoardPack $pack)
     {
+        $this->access->concealUnlessVisible($request->user(), $pack);
         $pack->load(['meeting', 'snapshot', 'generatedBy']);
         $presented = $this->presenter->present($pack);
 
         return Inertia::render('Governance/Packs/Show', [
-            'pack' => $pack,
+            'pack' => $this->presentShowPack($pack),
             'is_distributed' => $pack->isDistributed(),
+            'can_mark_read' => $this->access->recipientBoardMemberId($request->user(), $pack) !== null,
             'read_count' => $pack->readCount(),
             'download_count' => $pack->downloadCount(),
             'manifestSections' => $presented['manifestSections'],
@@ -119,7 +135,7 @@ class BoardPackController extends Controller
             }
 
             // Dispatch async job for generation
-            \App\Domain\Governance\Jobs\GenerateBoardPack::dispatch($meeting->id);
+            GenerateBoardPack::dispatch($meeting->id);
 
             if ($request->expectsJson()) {
                 return response()->json(['status' => 'queued']);
@@ -137,11 +153,11 @@ class BoardPackController extends Controller
             if ($request->expectsJson()) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Board pack generation failed: ' . $e->getMessage(),
+                    'message' => 'Board pack generation failed: '.$e->getMessage(),
                 ], 500);
             }
 
-            return redirect()->back()->with('error', 'Board pack generation failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Board pack generation failed: '.$e->getMessage());
         }
     }
 
@@ -168,11 +184,11 @@ class BoardPackController extends Controller
             if ($request->expectsJson()) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Board pack regeneration failed: ' . $e->getMessage(),
+                    'message' => 'Board pack regeneration failed: '.$e->getMessage(),
                 ], 500);
             }
 
-            return redirect()->back()->with('error', 'Board pack regeneration failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Board pack regeneration failed: '.$e->getMessage());
         }
     }
 
@@ -180,7 +196,17 @@ class BoardPackController extends Controller
     {
         $validated = $request->validate([
             'board_member_ids' => 'nullable|array',
-            'board_member_ids.*' => 'exists:board_members,id',
+            'board_member_ids.*' => [
+                'integer',
+                Rule::exists('board_members', 'id')->where(fn ($query) => $query
+                    ->where('is_active', true)
+                    ->whereNull('deleted_at')
+                    ->whereDate('term_start', '<=', today())
+                    ->where(function ($term) {
+                        $term->whereNull('term_end')
+                            ->orWhereDate('term_end', '>=', today());
+                    })),
+            ],
         ]);
 
         $this->packService->distribute(
@@ -191,36 +217,32 @@ class BoardPackController extends Controller
         return redirect()->back()->with('success', 'Board pack distributed to members.');
     }
 
-    public function download(BoardPack $pack)
+    public function download(Request $request, BoardPack $pack)
     {
-        $boardMember = auth()->user()->boardMember;
+        $viewer = $request->user();
+        $this->access->concealUnlessVisible($viewer, $pack);
 
-        if (!$boardMember) {
-            abort(403, 'Board access required.');
+        // Never create a tracking event for a file that cannot be delivered.
+        if (! $pack->file_path || ! Storage::exists($pack->file_path)) {
+            abort(404, 'Pack file not found.');
         }
 
-        if (!$pack->isDistributed()) {
-            abort(403, 'Pack not yet distributed.');
-        }
+        $recipientBoardMemberId = $this->access->recipientBoardMemberId($viewer, $pack);
 
-        $distributedTo = $pack->distributed_to ?? [];
-        if (!in_array($boardMember->id, $distributedTo)) {
-            abort(403, 'You are not authorized to access this pack.');
+        if ($recipientBoardMemberId !== null) {
+            $pack->recordDownload($recipientBoardMemberId);
         }
-
-        // Record download (audit-tracked board pack viewing).
-        $pack->recordDownload($boardMember->id);
-        \App\Domain\Governance\Services\GovernanceAuditService::log(
+        GovernanceAuditService::log(
             'board_pack.downloaded',
             'BoardPack',
             $pack->id,
-            ['board_member_id' => $boardMember->id, 'meeting_id' => $pack->meeting_id]
+            [
+                'board_member_id' => $recipientBoardMemberId,
+                'user_id' => $viewer->id,
+                'meeting_id' => $pack->governance_meeting_id,
+                'managed_access' => $this->access->canManage($viewer),
+            ]
         );
-
-        // Return file
-        if (!Storage::exists($pack->file_path)) {
-            abort(404, 'Pack file not found.');
-        }
 
         return Storage::download($pack->file_path, basename($pack->file_path));
     }
@@ -234,15 +256,13 @@ class BoardPackController extends Controller
         return response()->json($preview);
     }
 
-    public function markAsRead(BoardPack $pack)
+    public function markAsRead(Request $request, BoardPack $pack)
     {
-        $boardMember = auth()->user()->boardMember;
+        $this->access->concealUnlessVisible($request->user(), $pack);
+        $boardMemberId = $this->access->recipientBoardMemberId($request->user(), $pack);
+        abort_unless($boardMemberId !== null, 404);
 
-        if (!$boardMember) {
-            abort(403);
-        }
-
-        $pack->recordRead($boardMember->id);
+        $pack->recordRead($boardMemberId);
 
         return response()->json(['success' => true]);
     }
@@ -281,7 +301,7 @@ class BoardPackController extends Controller
         foreach ($request->file('files') as $file) {
             $directory = "governance/board-packs/{$pack->id}/supplementary";
             $extension = $file->getClientOriginalExtension() ?: $file->extension();
-            $storedName = Str::uuid()->toString() . ($extension ? ".{$extension}" : '');
+            $storedName = Str::uuid()->toString().($extension ? ".{$extension}" : '');
             $path = $file->storeAs($directory, $storedName, 'local');
 
             $existing[] = [
@@ -298,7 +318,7 @@ class BoardPackController extends Controller
 
         $pack->update(['supplementary_attachments' => $existing]);
 
-        \App\Domain\Governance\Services\GovernanceAuditService::log(
+        GovernanceAuditService::log(
             'board_pack.attachment_added',
             'BoardPack',
             $pack->id,
@@ -334,7 +354,7 @@ class BoardPackController extends Controller
 
         $pack->update(['supplementary_attachments' => $remaining]);
 
-        \App\Domain\Governance\Services\GovernanceAuditService::log(
+        GovernanceAuditService::log(
             'board_pack.attachment_removed',
             'BoardPack',
             $pack->id,
@@ -349,16 +369,10 @@ class BoardPackController extends Controller
     /**
      * Stream a supplementary attachment back to the user.
      */
-    public function downloadAttachment(BoardPack $pack, string $attachment)
+    public function downloadAttachment(Request $request, BoardPack $pack, string $attachment)
     {
-        // Manage permission means a secretary/chair downloading their own pack;
-        // otherwise the user must be a distributed-to board member.
-        $boardMember = auth()->user()?->boardMember ?? null;
-        $canManage = auth()->user()?->canDo('governance.packs.manage') ?? false;
-
-        if (! $canManage && (! $boardMember || ! $pack->isDistributed() || ! in_array($boardMember->id, $pack->distributed_to ?? []))) {
-            abort(403, 'Not authorised to access this attachment.');
-        }
+        $viewer = $request->user();
+        $this->access->concealUnlessVisible($viewer, $pack);
 
         $existing = is_array($pack->supplementary_attachments) ? $pack->supplementary_attachments : [];
         $target = collect($existing)->firstWhere('id', $attachment);
@@ -367,12 +381,13 @@ class BoardPackController extends Controller
             abort(404, 'Attachment not found.');
         }
 
-        if ($boardMember && ! $canManage) {
-            \App\Domain\Governance\Services\GovernanceAuditService::log(
+        $recipientBoardMemberId = $this->access->recipientBoardMemberId($viewer, $pack);
+        if ($recipientBoardMemberId !== null) {
+            GovernanceAuditService::log(
                 'board_pack.attachment_downloaded',
                 'BoardPack',
                 $pack->id,
-                ['attachment_id' => $attachment, 'board_member_id' => $boardMember->id],
+                ['attachment_id' => $attachment, 'board_member_id' => $recipientBoardMemberId],
             );
         }
 
@@ -381,6 +396,48 @@ class BoardPackController extends Controller
             $target['original_name'] ?? 'attachment',
             ['Content-Type' => $target['mime_type'] ?? 'application/octet-stream'],
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentIndexPack(BoardPack $pack): array
+    {
+        return [
+            'id' => (int) $pack->id,
+            'meeting_id' => (int) $pack->governance_meeting_id,
+            'meeting' => $pack->meeting ? [
+                'id' => (int) $pack->meeting->id,
+                'title' => $pack->meeting->title,
+                'scheduled_at' => $pack->meeting->scheduled_at?->toIso8601String(),
+                'meeting_type' => $pack->meeting->meeting_type,
+            ] : null,
+            'generatedBy' => $pack->generatedBy ? [
+                'id' => (int) $pack->generatedBy->id,
+                'name' => $pack->generatedBy->name,
+            ] : null,
+            'distributed_at' => $pack->distributed_at?->toIso8601String(),
+            'created_at' => $pack->created_at?->toIso8601String(),
+            'updated_at' => $pack->updated_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentShowPack(BoardPack $pack): array
+    {
+        return [
+            'id' => (int) $pack->id,
+            'generated_at' => $pack->generated_at?->toIso8601String(),
+            'distributed_at' => $pack->distributed_at?->toIso8601String(),
+            'file_size' => $pack->file_size,
+            'watermark_text' => $pack->watermark_text,
+            'meeting' => [
+                'title' => $pack->meeting->title,
+                'scheduled_at' => $pack->meeting->scheduled_at?->toIso8601String(),
+            ],
+        ];
     }
 
     /**

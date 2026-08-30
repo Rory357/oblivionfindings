@@ -2,15 +2,21 @@
 
 namespace App\Domain\Governance\Services;
 
+use App\Domain\Governance\Jobs\SendBoardPackNotification;
 use App\Domain\Governance\Models\BoardCommittee;
+use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\BoardPack;
-use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Models\DashboardSnapshot;
 use App\Domain\Governance\Models\GovernanceDocument;
+use App\Domain\Governance\Models\GovernanceMeeting;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class BoardPackBuilderService
 {
     protected DashboardAggregatorService $dashboardService;
+
     protected RiskScoringService $riskService;
 
     public function __construct(
@@ -24,7 +30,7 @@ class BoardPackBuilderService
     /**
      * Build a complete board pack
      */
-    public function build(GovernanceMeeting $meeting, ?\App\Domain\Governance\Models\DashboardSnapshot $snapshot = null): BoardPack
+    public function build(GovernanceMeeting $meeting, ?DashboardSnapshot $snapshot = null): BoardPack
     {
         $snapshot = $snapshot ?? $this->dashboardService->captureSnapshot('month');
         $content = $this->buildPackContent($meeting, $snapshot);
@@ -80,7 +86,7 @@ class BoardPackBuilderService
                 'date' => $meeting->scheduled_at->format('l, j F Y'),
                 'type' => $this->getMeetingTypeLabel($meeting->meeting_type),
             ],
-            'agenda' => $meeting->agendaItems->map(fn($item) => [
+            'agenda' => $meeting->agendaItems->map(fn ($item) => [
                 'order' => $item->order,
                 'title' => $item->title,
                 'presenter' => $item->presenter?->name,
@@ -139,7 +145,7 @@ class BoardPackBuilderService
     protected function generateFile(GovernanceMeeting $meeting, array $content): array
     {
         // Try PDF generation if dompdf is available
-        if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+        if (class_exists(Pdf::class)) {
             return $this->generatePdf($meeting, $content);
         }
 
@@ -155,10 +161,10 @@ class BoardPackBuilderService
         $filename = sprintf(
             'board-pack-%s-%s.json',
             $meeting->scheduled_at->format('Y-m-d'),
-            \Illuminate\Support\Str::slug($meeting->title)
+            Str::slug($meeting->title)
         );
 
-        $path = 'board-packs/' . $filename;
+        $path = 'board-packs/'.$filename;
         $jsonContent = json_encode($content, JSON_PRETTY_PRINT);
 
         Storage::put($path, $jsonContent);
@@ -178,12 +184,12 @@ class BoardPackBuilderService
         $filename = sprintf(
             'board-pack-%s-%s.pdf',
             $meeting->scheduled_at->format('Y-m-d'),
-            \Illuminate\Support\Str::slug($meeting->title)
+            Str::slug($meeting->title)
         );
 
-        $path = 'board-packs/' . $filename;
+        $path = 'board-packs/'.$filename;
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('governance.board-pack.pdf', [
+        $pdf = Pdf::loadView('governance.board-pack.pdf', [
             'meeting' => $meeting,
             'content' => $content,
             'generated_at' => now(),
@@ -213,7 +219,7 @@ class BoardPackBuilderService
      */
     protected function getMeetingTypeLabel(string $type): string
     {
-        return match($type) {
+        return match ($type) {
             'full_board' => 'Full Board Meeting',
             'audit_risk' => 'Audit & Risk Committee',
             'people' => 'People Committee',
@@ -231,18 +237,21 @@ class BoardPackBuilderService
     {
         $meeting = $pack->meeting;
 
-        // Get all board members or specified ones
-        $recipients = $boardMemberIds
-            ? \App\Domain\Governance\Models\BoardMember::whereIn('id', $boardMemberIds)->get()
-            : \App\Domain\Governance\Models\BoardMember::active()->get();
+        // Explicit and default recipient lists use the same canonical active-term boundary.
+        $recipientQuery = BoardMember::query()->active();
+        if (! empty($boardMemberIds)) {
+            $recipientQuery->whereIn('id', array_unique(array_map('intval', $boardMemberIds)));
+        }
+
+        $recipients = $recipientQuery->get();
 
         $ids = $recipients->pluck('id')->toArray();
         $pack->markAsDistributed($ids);
 
         // Send notifications
         foreach ($recipients as $member) {
-            if (class_exists(\App\Domain\Governance\Jobs\SendBoardPackNotification::class)) {
-                \App\Domain\Governance\Jobs\SendBoardPackNotification::dispatch($pack, $member);
+            if (class_exists(SendBoardPackNotification::class)) {
+                SendBoardPackNotification::dispatch($pack, $member);
             }
         }
 
@@ -288,23 +297,6 @@ class BoardPackBuilderService
     }
 
     /**
-     * Get pack download URL
-     */
-    public function getDownloadUrl(BoardPack $pack, \App\Domain\Governance\Models\BoardMember $boardMember): ?string
-    {
-        // Verify board member is authorized
-        if (!in_array($boardMember->id, $pack->distributed_to ?? [])) {
-            return null;
-        }
-
-        // Record download
-        $pack->recordDownload($boardMember->id);
-
-        // Generate temporary URL
-        return Storage::temporaryUrl($pack->file_path, now()->addHour());
-    }
-
-    /**
      * Preview pack (without saving)
      */
     public function preview(GovernanceMeeting $meeting): array
@@ -336,7 +328,7 @@ class BoardPackBuilderService
         $pages = 2; // Cover + agenda
 
         foreach ($manifest as $item) {
-            $pages += match($item['id']) {
+            $pages += match ($item['id']) {
                 'dashboard' => 3,
                 'risk_report' => 4,
                 'ceo_report' => 3,
@@ -359,8 +351,8 @@ class BoardPackBuilderService
 
         return [
             'fiscal_year' => $financial['fiscal_year'] ?? null,
-            'utilization' => isset($financial['budget_utilization']) ? round((float) $financial['budget_utilization'], 1) . '%' : 'Unavailable',
-            'variance' => isset($financial['variance']) ? round((float) $financial['variance'], 1) . '%' : 'Unavailable',
+            'utilization' => isset($financial['budget_utilization']) ? round((float) $financial['budget_utilization'], 1).'%' : 'Unavailable',
+            'variance' => isset($financial['variance']) ? round((float) $financial['variance'], 1).'%' : 'Unavailable',
             'budget_total' => $financial['budget_total'] ?? null,
             'actual_total' => $financial['actual_total'] ?? null,
             'roadmap_forecast_total' => $financial['roadmap_forecast_total'] ?? null,

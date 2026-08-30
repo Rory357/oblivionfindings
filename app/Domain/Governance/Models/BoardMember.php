@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BoardMember extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'user_id',
@@ -76,9 +76,10 @@ class BoardMember extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true)
+            ->whereDate('term_start', '<=', today())
             ->where(function ($q) {
                 $q->whereNull('term_end')
-                    ->orWhere('term_end', '>=', now());
+                    ->orWhereDate('term_end', '>=', today());
             });
     }
 

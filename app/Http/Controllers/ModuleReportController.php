@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Governance\Models\BoardPack;
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Models\AuditLog;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedicationAdministration;
@@ -18,6 +20,7 @@ class ModuleReportController extends Controller
 {
     public function __construct(
         private readonly MedicationGovernanceScopeService $medicationScope,
+        private readonly BoardPackAccessService $boardPackAccess,
     ) {}
 
     public function show(Request $request, string $module)
@@ -258,6 +261,7 @@ class ModuleReportController extends Controller
         $governance = $this->medicationGovernance($definition);
         if ($governance === 'general_audit') {
             $this->excludeMedicationAuditFamilies($query);
+            $this->excludeBoardPackAuditUnlessManager($query, $user);
 
             return;
         }
@@ -312,6 +316,24 @@ class ModuleReportController extends Controller
                         ->where('action', 'not like', 'controlled_drug%')
                         ->where('action', 'not like', 'cd.%')
                         ->where('action', 'not like', 'cd\_%');
+                });
+        });
+    }
+
+    private function excludeBoardPackAuditUnlessManager(Builder $query, User $user): void
+    {
+        if ($this->boardPackAccess->canManage($user)) {
+            return;
+        }
+
+        $query->where(function (Builder $nonPack): void {
+            $nonPack->whereNull('auditable_type')
+                ->orWhereNotIn('auditable_type', [BoardPack::class, 'BoardPack']);
+        })->where(function (Builder $nonPackAction): void {
+            $nonPackAction->whereNull('action')
+                ->orWhere(function (Builder $action): void {
+                    $action->where('action', 'not like', 'boardpack.%')
+                        ->where('action', 'not like', 'board_pack.%');
                 });
         });
     }

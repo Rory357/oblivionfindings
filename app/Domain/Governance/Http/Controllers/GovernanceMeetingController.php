@@ -11,6 +11,7 @@ use App\Domain\Governance\Models\MeetingAgendaItem;
 use App\Domain\Governance\Models\MeetingAttendance;
 use App\Domain\Governance\Models\MeetingMinute;
 use App\Domain\Governance\Models\MeetingRsvp;
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\Governance\Services\GovernanceNestedMutationService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Domain\Governance\Support\GovernancePresenter;
@@ -25,6 +26,7 @@ class GovernanceMeetingController extends Controller
         protected GovernanceWorkflowService $workflowService,
         protected GovernancePresenter $presenter,
         protected GovernanceNestedMutationService $nestedMutations,
+        protected BoardPackAccessService $boardPackAccess,
     ) {}
 
     public function create()
@@ -123,7 +125,7 @@ class GovernanceMeetingController extends Controller
         ]);
     }
 
-    public function show(GovernanceMeeting $meeting)
+    public function show(Request $request, GovernanceMeeting $meeting)
     {
         $meeting->load([
             'chair.user',
@@ -136,19 +138,27 @@ class GovernanceMeetingController extends Controller
             'resolutions',
         ]);
 
+        $viewer = $request->user();
+        $visiblePack = $this->boardPackAccess->visiblePack($viewer, $meeting->boardPack);
+        $meeting->setRelation('boardPack', $visiblePack);
+
         $quorum = $meeting->calculateQuorum();
         $boardMembers = BoardMember::with('user')->active()->get();
-        $workflowChecklist = $this->workflowService->meetingChecklist($meeting, auth()->user());
+        $workflowChecklist = $this->workflowService->meetingChecklist($meeting, $viewer);
+        $meetingCockpit = $this->presenter->meetingCockpit($meeting, $quorum, $workflowChecklist, $viewer);
+
+        // The meeting payload needs only a linkable pack summary, never the raw model fields.
+        $visiblePack?->setVisible(['id', 'distributed_at']);
 
         return Inertia::render('Governance/Meetings/Show', [
             'meeting' => $meeting,
             'quorum' => $quorum,
             'boardMembers' => $boardMembers,
-            'canEdit' => $meeting->isEditable() && auth()->user()->can('update', $meeting),
-            'canManageMinutes' => auth()->user()->can('manageMinutes', $meeting),
-            'canApproveMinutes' => auth()->user()->can('approveMinutes', $meeting),
+            'canEdit' => $meeting->isEditable() && $viewer->can('update', $meeting),
+            'canManageMinutes' => $viewer->can('manageMinutes', $meeting),
+            'canApproveMinutes' => $viewer->can('approveMinutes', $meeting),
             'workflowChecklist' => $workflowChecklist,
-            'meetingCockpit' => $this->presenter->meetingCockpit($meeting, $quorum, $workflowChecklist),
+            'meetingCockpit' => $meetingCockpit,
         ]);
     }
 

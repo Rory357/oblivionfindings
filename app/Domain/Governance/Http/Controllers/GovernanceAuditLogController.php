@@ -2,6 +2,8 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
+use App\Domain\Governance\Models\BoardPack;
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -18,10 +20,17 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class GovernanceAuditLogController extends Controller
 {
+    public function __construct(protected BoardPackAccessService $boardPackAccess) {}
+
     public function index(Request $request): Response
     {
         $filters = $this->resolveFilters($request);
-        $entries = GovernanceAuditService::paginate($filters, perPage: 50);
+        $excludedEntityTypes = $this->excludedEntityTypes($request);
+        $entries = GovernanceAuditService::paginate(
+            $filters,
+            perPage: 50,
+            excludedEntityTypes: $excludedEntityTypes,
+        );
 
         // Hydrate user names for the visible page only.
         $userIds = collect($entries->items())->pluck('user_id')->filter()->unique()->values();
@@ -61,22 +70,27 @@ class GovernanceAuditLogController extends Controller
                 'from' => $filters['from'] ?? null,
                 'to' => $filters['to'] ?? null,
             ],
-            'entityTypes' => $this->entityTypes(),
-            'actionTypes' => $this->actionTypes(),
-            'changeTypes' => $this->changeTypes(),
+            'entityTypes' => $this->entityTypes($excludedEntityTypes),
+            'actionTypes' => $this->actionTypes($excludedEntityTypes),
+            'changeTypes' => $this->changeTypes($excludedEntityTypes),
         ]);
     }
 
     public function export(Request $request): StreamedResponse
     {
         $filters = $this->resolveFilters($request);
+        $excludedEntityTypes = $this->excludedEntityTypes($request);
 
-        $callback = function () use ($filters) {
+        $callback = function () use ($filters, $excludedEntityTypes) {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, ['Kind', 'Type', 'EntityType', 'EntityId', 'UserId', 'IP', 'Description', 'CreatedAt']);
 
             // Stream a generous slice (up to 10k rows) — far cheaper than paging.
-            $entries = GovernanceAuditService::paginate($filters, perPage: 10000);
+            $entries = GovernanceAuditService::paginate(
+                $filters,
+                perPage: 10000,
+                excludedEntityTypes: $excludedEntityTypes,
+            );
             foreach ($entries->items() as $row) {
                 $row = (array) $row;
                 fputcsv($handle, [
@@ -93,7 +107,7 @@ class GovernanceAuditLogController extends Controller
             fclose($handle);
         };
 
-        return response()->streamDownload($callback, 'governance-audit-log-' . now()->format('Y-m-d-Hi') . '.csv', [
+        return response()->streamDownload($callback, 'governance-audit-log-'.now()->format('Y-m-d-Hi').'.csv', [
             'Content-Type' => 'text/csv',
         ]);
     }
@@ -112,21 +126,54 @@ class GovernanceAuditLogController extends Controller
     }
 
     /** Distinct entity types in the unified audit stream. */
-    private function entityTypes(): array
+    /** @param array<int, string> $excludedEntityTypes */
+    private function entityTypes(array $excludedEntityTypes): array
     {
-        $a = DB::table('governance_audit_log')->distinct()->pluck('resource_type')->toArray();
-        $b = DB::table('governance_change_log')->distinct()->pluck('entity_type')->toArray();
+        $a = DB::table('governance_audit_log')
+            ->whereNotIn('resource_type', $excludedEntityTypes)
+            ->distinct()
+            ->pluck('resource_type')
+            ->toArray();
+        $b = DB::table('governance_change_log')
+            ->whereNotIn('entity_type', $excludedEntityTypes)
+            ->distinct()
+            ->pluck('entity_type')
+            ->toArray();
 
         return collect(array_merge($a, $b))->filter()->unique()->sort()->values()->toArray();
     }
 
-    private function actionTypes(): array
+    /** @param array<int, string> $excludedEntityTypes */
+    private function actionTypes(array $excludedEntityTypes): array
     {
-        return DB::table('governance_audit_log')->distinct()->pluck('action')->filter()->sort()->values()->toArray();
+        return DB::table('governance_audit_log')
+            ->whereNotIn('resource_type', $excludedEntityTypes)
+            ->distinct()
+            ->pluck('action')
+            ->filter()
+            ->sort()
+            ->values()
+            ->toArray();
     }
 
-    private function changeTypes(): array
+    /** @param array<int, string> $excludedEntityTypes */
+    private function changeTypes(array $excludedEntityTypes): array
     {
-        return DB::table('governance_change_log')->distinct()->pluck('change_type')->filter()->sort()->values()->toArray();
+        return DB::table('governance_change_log')
+            ->whereNotIn('entity_type', $excludedEntityTypes)
+            ->distinct()
+            ->pluck('change_type')
+            ->filter()
+            ->sort()
+            ->values()
+            ->toArray();
+    }
+
+    /** @return array<int, string> */
+    private function excludedEntityTypes(Request $request): array
+    {
+        return $this->boardPackAccess->canManage($request->user())
+            ? []
+            : ['BoardPack', BoardPack::class];
     }
 }

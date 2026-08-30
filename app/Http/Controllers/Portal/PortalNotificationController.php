@@ -2,11 +2,16 @@
 
 namespace App\Http\Controllers\Portal;
 
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
 class PortalNotificationController extends Controller
 {
+    public function __construct(
+        private readonly BoardPackAccessService $boardPackAccess,
+    ) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -14,10 +19,10 @@ class PortalNotificationController extends Controller
 
         $filter = $request->input('filter', 'all');
 
-        $query = $user->notifications();
+        $query = $this->boardPackAccess->visibleNotificationQuery($user);
 
         if ($filter === 'unread') {
-            $query = $user->unreadNotifications();
+            $query = $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true);
         }
 
         $notifications = $query->orderByDesc('created_at')
@@ -33,7 +38,7 @@ class PortalNotificationController extends Controller
         return inertia('portal/notifications', [
             'notifications' => $notifications,
             'filter' => $filter,
-            'unreadCount' => $user->unreadNotifications()->count(),
+            'unreadCount' => $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true)->count(),
         ]);
     }
 
@@ -42,7 +47,10 @@ class PortalNotificationController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
-        $notification = $user->notifications()->where('id', $notificationId)->firstOrFail();
+        $notification = $this->boardPackAccess
+            ->visibleNotificationQuery($user)
+            ->where('id', $notificationId)
+            ->firstOrFail();
         $notification->update(['read_at' => now()]);
 
         return redirect()->back();
@@ -53,7 +61,9 @@ class PortalNotificationController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
-        $user->unreadNotifications()->update(['read_at' => now()]);
+        $this->boardPackAccess
+            ->visibleNotificationQuery($user, unreadOnly: true)
+            ->update(['read_at' => now()]);
 
         return redirect()->back();
     }

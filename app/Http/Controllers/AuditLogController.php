@@ -34,7 +34,7 @@ class AuditLogController extends Controller
             'date_to' => $filters['date_to'] ?? null,
         ];
 
-        $logs = $this->auditLogs->query($queryFilters)
+        $logs = $this->auditLogs->query($queryFilters, $user)
             ->paginate(50)
             ->withQueryString()
             ->through(fn ($log): array => $this->auditLogs->present($log));
@@ -42,7 +42,7 @@ class AuditLogController extends Controller
         return inertia('audit/index', [
             'logs' => $logs,
             'filters' => $filters,
-            'filter_options' => $this->auditLogs->filterOptions(),
+            'filter_options' => $this->auditLogs->filterOptions($user),
         ]);
     }
 

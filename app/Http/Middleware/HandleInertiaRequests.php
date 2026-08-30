@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Domain\Finance\Services\FinanceHubCountsService;
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\It\ItModuleNavigation;
 use App\Models\Announcement;
 use App\Models\AppSetting;
@@ -29,6 +30,10 @@ use Inertia\Middleware;
 class HandleInertiaRequests extends Middleware
 {
     protected $rootView = 'app';
+
+    public function __construct(
+        private readonly BoardPackAccessService $boardPackAccess,
+    ) {}
 
     public function version(Request $request): ?string
     {
@@ -309,9 +314,11 @@ class HandleInertiaRequests extends Middleware
             // fetches them in a follow-up request after mount.
             'inbox' => Inertia::defer(fn () => $user ? [
                 'notifications' => [
-                    'unread_count' => $hasNotificationsTable ? $user->unreadNotifications()->count() : 0,
+                    'unread_count' => $hasNotificationsTable
+                        ? $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true)->count()
+                        : 0,
                     'items' => $hasNotificationsTable
-                        ? $user->notifications()
+                        ? $this->boardPackAccess->visibleNotificationQuery($user)
                             ->latest()
                             ->limit(8)
                             ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])

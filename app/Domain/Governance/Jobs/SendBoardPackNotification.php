@@ -5,6 +5,7 @@ namespace App\Domain\Governance\Jobs;
 use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Governance\Notifications\BoardPackPublishedNotification;
+use App\Domain\Governance\Services\BoardPackAccessService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -20,8 +21,20 @@ class SendBoardPackNotification implements ShouldQueue
         public BoardMember $boardMember
     ) {}
 
-    public function handle(): void
+    public function handle(BoardPackAccessService $boardPackAccess): void
     {
-        $this->boardMember->user->notify(new BoardPackPublishedNotification($this->pack));
+        $pack = $this->pack->fresh(['meeting']);
+        $boardMember = $this->boardMember->fresh(['user']);
+        $user = $boardMember?->user;
+
+        if (! $pack
+            || ! $boardMember
+            || ! $user
+            || ! $boardPackAccess->canView($user, $pack)
+            || $boardPackAccess->recipientBoardMemberId($user, $pack) !== (int) $boardMember->id) {
+            return;
+        }
+
+        $user->notify(new BoardPackPublishedNotification($pack));
     }
 }

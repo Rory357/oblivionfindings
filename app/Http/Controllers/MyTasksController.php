@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Http\Resources\MyShiftResource;
@@ -54,6 +55,7 @@ class MyTasksController extends Controller
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
+        private readonly BoardPackAccessService $boardPackAccess,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -125,7 +127,9 @@ class MyTasksController extends Controller
             'timesheets_pending' => collect($timesheets)->count(),
             'incidents_open' => count($incidents),
             'cr_alerts' => collect($tasks)->where('type', 'alert')->count(),
-            'notifications_unread' => $user->unreadNotifications()->count(),
+            'notifications_unread' => $this->boardPackAccess
+                ->visibleNotificationQuery($user, unreadOnly: true)
+                ->count(),
         ];
 
         // 11. Frontline clock state (PR 4)
@@ -1590,7 +1594,8 @@ class MyTasksController extends Controller
         try {
             $workerNow = Carbon::now($this->workerTimezone());
 
-            return $user->unreadNotifications()
+            return $this->boardPackAccess
+                ->visibleNotificationQuery($user, unreadOnly: true)
                 ->latest()
                 ->limit(5)
                 ->get(['id', 'type', 'data', 'created_at'])

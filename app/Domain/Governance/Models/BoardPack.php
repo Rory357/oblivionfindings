@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BoardPack extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'governance_meeting_id',
@@ -40,6 +40,16 @@ class BoardPack extends Model
         'supplementary_attachments' => 'array',
     ];
 
+    protected array $auditExcludedAttributes = [
+        'document_manifest',
+        'file_path',
+        'checksum',
+        'distributed_to',
+        'download_tracking',
+        'read_tracking',
+        'supplementary_attachments',
+    ];
+
     public function meeting(): BelongsTo
     {
         return $this->belongsTo(GovernanceMeeting::class, 'governance_meeting_id');
@@ -57,7 +67,7 @@ class BoardPack extends Model
 
     public function isDistributed(): bool
     {
-        return !is_null($this->distributed_at);
+        return ! is_null($this->distributed_at);
     }
 
     public function markAsDistributed(array $boardMemberIds): void
@@ -82,7 +92,7 @@ class BoardPack extends Model
     public function recordRead(int $boardMemberId): void
     {
         $tracking = $this->read_tracking ?? [];
-        if (!in_array($boardMemberId, array_column($tracking, 'board_member_id'))) {
+        if (! in_array($boardMemberId, array_column($tracking, 'board_member_id'))) {
             $tracking[] = [
                 'board_member_id' => $boardMemberId,
                 'read_at' => now()->toIso8601String(),
@@ -103,10 +113,11 @@ class BoardPack extends Model
 
     public function verifyIntegrity(): bool
     {
-        if (!$this->file_path || !file_exists(storage_path('app/' . $this->file_path))) {
+        if (! $this->file_path || ! file_exists(storage_path('app/'.$this->file_path))) {
             return false;
         }
-        $currentChecksum = hash_file('sha256', storage_path('app/' . $this->file_path));
+        $currentChecksum = hash_file('sha256', storage_path('app/'.$this->file_path));
+
         return hash_equals($this->checksum, $currentChecksum);
     }
 }
