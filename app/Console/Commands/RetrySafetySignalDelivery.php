@@ -9,7 +9,7 @@ use Throwable;
 class RetrySafetySignalDelivery extends Command
 {
     protected $signature = 'safety-signals:retry
-        {source : fleet, shift, device, or incident}
+        {source : fleet, shift, device, incident, or facility}
         {outbox : Outbox row id}';
 
     protected $description = 'Safely replay one failed safety-signal delivery without duplicating its final alert';

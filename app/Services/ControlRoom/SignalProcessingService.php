@@ -3,6 +3,7 @@
 namespace App\Services\ControlRoom;
 
 use App\Enums\AlertSeverity;
+use App\Exceptions\SafetySignalUnroutable;
 use App\Jobs\Notifications\DeliverControlRoomAlertNotificationJob;
 use App\Models\Asset;
 use App\Models\Client;
@@ -22,6 +23,7 @@ use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
+use App\Models\FacilitySignal;
 use App\Models\FleetOuting;
 use App\Models\FleetResidentTransport;
 use App\Models\FleetSignal;
@@ -42,6 +44,10 @@ use Throwable;
 
 class SignalProcessingService
 {
+    public const FACILITY_PROJECTION_CONFLICT = 'Facility safety signal idempotency identity conflicts with existing Control Room provenance.';
+
+    public const FACILITY_QUARANTINE_PREFIX = 'Quarantined by Facility delivery validation: ';
+
     private const TRANSACTION_ATTEMPTS = 3;
 
     private const INCIDENT_CORRELATION_CAPABILITY = 'incident_correlation';
@@ -145,6 +151,7 @@ class SignalProcessingService
     {
         return DB::transaction(function () use ($signal) {
             $signal = Signal::query()->whereKey($signal->id)->lockForUpdate()->firstOrFail();
+            $this->assertFacilityProjectionBeforeProcessing($signal);
 
             // Typed alert provenance is the durable recovery point. It wins
             // over a stale in-memory lifecycle state left by historical or
@@ -1260,6 +1267,180 @@ class SignalProcessingService
         ]);
 
         $alert->update(['playbook_run_id' => $run->id]);
+    }
+
+    /**
+     * Ingest a durable Facility source intent into the Control Room pipeline.
+     */
+    public function ingestFromFacilitySignal(FacilitySignal $facilitySignal): Signal
+    {
+        if (! $facilitySignal->site_id) {
+            throw new SafetySignalUnroutable(
+                'Facility safety signal has no canonical Site.',
+            );
+        }
+
+        $source = SignalSource::query()->firstOrCreate(
+            ['slug' => 'facility'],
+            [
+                'name' => 'Facility / Site Operations',
+                'vendor' => 'internal',
+                'status' => 'active',
+                'config' => [],
+                'capabilities' => ['scheduled_checks', 'event_driven'],
+            ],
+        );
+        if ($source->status !== 'active') {
+            throw new SafetySignalUnroutable(
+                'Facility safety signal has no active signal source.',
+            );
+        }
+
+        $idempotencyKey = hash(
+            'sha256',
+            'safety-signal|facility|'.$facilitySignal->idempotency_key,
+        );
+        $projection = $this->facilityProjection($facilitySignal, $source);
+        $signal = Signal::query()
+            ->where('idempotency_key', $idempotencyKey)
+            ->lockForUpdate()
+            ->first();
+        $signal ??= $this->ingest($projection);
+        $signal = Signal::query()
+            ->whereKey($signal->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        if (! $this->facilityProjectionMatches($signal, $facilitySignal, $source, $projection)) {
+            throw new SafetySignalUnroutable(
+                self::FACILITY_PROJECTION_CONFLICT,
+            );
+        }
+
+        if ($signal->status === 'failed'
+            && str_starts_with((string) $signal->processing_notes, self::FACILITY_QUARANTINE_PREFIX)
+            && $signal->alert_id === null
+            && $signal->correlated_alert_id === null
+            && ! $signal->originAlert()->exists()
+        ) {
+            $signal->forceFill([
+                'status' => 'pending',
+                'processed_at' => null,
+                'processing_notes' => null,
+            ])->save();
+        }
+
+        return $signal;
+    }
+
+    /** @return array<string, mixed> */
+    private function facilityProjection(
+        FacilitySignal $facilitySignal,
+        SignalSource $source,
+    ): array {
+        return [
+            'signal_source_id' => $source->id,
+            'signal_type_code' => $facilitySignal->signal_type,
+            'idempotency_key' => hash(
+                'sha256',
+                'safety-signal|facility|'.$facilitySignal->idempotency_key,
+            ),
+            'site_id' => $facilitySignal->site_id,
+            'external_ref' => 'facility_signal_'.$facilitySignal->id,
+            'severity_hint' => $facilitySignal->severity_hint,
+            'occurred_at' => $facilitySignal->occurred_at,
+            'payload' => [],
+            'normalized_data' => array_merge(
+                $facilitySignal->payload ?? [],
+                [
+                    'facility_signal_id' => $facilitySignal->id,
+                    'inspection_schedule_id' => $facilitySignal->inspection_schedule_id,
+                    'inspection_record_id' => $facilitySignal->inspection_record_id,
+                    'site_id' => $facilitySignal->site_id,
+                ],
+            ),
+        ];
+    }
+
+    /** @param array<string, mixed> $projection */
+    private function facilityProjectionMatches(
+        Signal $signal,
+        FacilitySignal $facilitySignal,
+        SignalSource $source,
+        array $projection,
+    ): bool {
+        return (int) $signal->signal_source_id === (int) $source->id
+            && $signal->signalSource?->slug === 'facility'
+            && (int) $signal->site_id === (int) $facilitySignal->site_id
+            && $signal->signal_type_code === $facilitySignal->signal_type
+            && $signal->idempotency_key === $projection['idempotency_key']
+            && $signal->external_ref === $projection['external_ref']
+            && (int) data_get($signal->normalized_data, 'facility_signal_id') === (int) $facilitySignal->id
+            && (int) data_get($signal->normalized_data, 'inspection_schedule_id') === (int) $facilitySignal->inspection_schedule_id
+            && (int) data_get($signal->normalized_data, 'inspection_record_id') === (int) $facilitySignal->inspection_record_id
+            && (int) data_get($signal->normalized_data, 'site_id') === (int) $facilitySignal->site_id
+            && $signal->severity_hint === AlertSeverity::normalise($facilitySignal->severity_hint)
+            && $signal->occurred_at !== null
+            && $signal->occurred_at->equalTo($facilitySignal->occurred_at)
+            && $signal->payload === []
+            && $this->canonicalProjectionValue($signal->normalized_data)
+                === $this->canonicalProjectionValue($projection['normalized_data']);
+    }
+
+    private function assertFacilityProjectionBeforeProcessing(Signal $signal): void
+    {
+        $facilitySignalId = (int) data_get($signal->normalized_data, 'facility_signal_id');
+        $claimsFacility = $facilitySignalId > 0
+            || preg_match('/\Afacility_signal_[1-9][0-9]*\z/D', (string) $signal->external_ref) === 1;
+        if (! $claimsFacility) {
+            return;
+        }
+
+        $facilitySignal = $facilitySignalId > 0
+            ? FacilitySignal::query()->whereKey($facilitySignalId)->first()
+            : null;
+        $source = SignalSource::query()
+            ->where('slug', 'facility')
+            ->lockForUpdate()
+            ->first();
+        if ($facilitySignal === null || ! $facilitySignal->site_id || $source === null) {
+            throw new SafetySignalUnroutable(
+                self::FACILITY_QUARANTINE_PREFIX.'Facility signal provenance is incomplete.',
+            );
+        }
+        if ($source->status !== 'active') {
+            throw new SafetySignalUnroutable(
+                self::FACILITY_QUARANTINE_PREFIX.'Facility safety signal has no active signal source.',
+            );
+        }
+
+        $projection = $this->facilityProjection($facilitySignal, $source);
+        if (! $this->facilityProjectionMatches($signal, $facilitySignal, $source, $projection)) {
+            throw new SafetySignalUnroutable(
+                self::FACILITY_QUARANTINE_PREFIX.self::FACILITY_PROJECTION_CONFLICT,
+            );
+        }
+    }
+
+    private function canonicalProjectionValue(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (array_is_list($value)) {
+            return array_map(
+                fn (mixed $item): mixed => $this->canonicalProjectionValue($item),
+                $value,
+            );
+        }
+
+        ksort($value);
+
+        return array_map(
+            fn (mixed $item): mixed => $this->canonicalProjectionValue($item),
+            $value,
+        );
     }
 
     /**

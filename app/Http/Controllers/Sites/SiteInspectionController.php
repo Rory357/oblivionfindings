@@ -10,7 +10,9 @@ use App\Models\SiteInspectionRecord;
 use App\Models\SiteInspectionSchedule;
 use App\Services\Facility\FacilitySignalService;
 use App\Services\UserSiteAccessService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class SiteInspectionController extends Controller
@@ -77,8 +79,8 @@ class SiteInspectionController extends Controller
                 'event_type' => 'inspection',
                 'title' => $validated['title'],
                 'description' => $validated['description'] ?? 'Scheduled inspection',
-                'start_at' => $validated['first_due_date'] . ' 09:00:00',
-                'end_at' => $validated['first_due_date'] . ' 10:00:00',
+                'start_at' => $validated['first_due_date'].' 09:00:00',
+                'end_at' => $validated['first_due_date'].' 10:00:00',
                 'recurrence_rule' => $this->frequencyToRrule($validated['frequency'], $validated['custom_rrule'] ?? null),
                 'created_by_user_id' => $request->user()->id,
                 'owner_user_id' => $validated['assigned_to_user_id'] ?? null,
@@ -110,28 +112,37 @@ class SiteInspectionController extends Controller
             ],
         ]);
 
-        $record = SiteInspectionRecord::create([
-            'schedule_id' => $schedule->id,
-            'site_id' => $site->id,
-            'due_date' => $schedule->next_due_date,
-            'completed_at' => now(),
-            'completed_by_user_id' => $request->user()->id,
-            'result' => $validated['result'],
-            'findings' => $validated['findings'] ?? null,
-            'corrective_actions' => $validated['corrective_actions'] ?? null,
-            'linked_hazard_id' => $validated['linked_hazard_id'] ?? null,
-            'evidence_photos' => $validated['evidence_photos'] ?? null,
-        ]);
+        DB::transaction(function () use ($request, $site, $schedule, $validated): void {
+            $lockedSchedule = SiteInspectionSchedule::query()
+                ->whereKey($schedule->id)
+                ->where('site_id', $site->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        // Emit canonical signal for failed inspections → Control Room
-        if ($record->result === 'fail') {
-            app(FacilitySignalService::class)->emitInspectionFailed($schedule, $record);
-        }
+            $record = SiteInspectionRecord::create([
+                'schedule_id' => $lockedSchedule->id,
+                'site_id' => $site->id,
+                'due_date' => $lockedSchedule->next_due_date,
+                'completed_at' => now(),
+                'completed_by_user_id' => $request->user()->id,
+                'result' => $validated['result'],
+                'findings' => $validated['findings'] ?? null,
+                'corrective_actions' => $validated['corrective_actions'] ?? null,
+                'linked_hazard_id' => $validated['linked_hazard_id'] ?? null,
+                'evidence_photos' => $validated['evidence_photos'] ?? null,
+            ]);
 
-        // Update next due date
-        $schedule->update([
-            'next_due_date' => $this->calculateNextDueDate($schedule),
-        ]);
+            // A failed inspection and its durable Control Room delivery intent
+            // are one acceptance boundary. Any persistence failure rolls back
+            // the record and schedule advance together.
+            if ($record->result === 'fail') {
+                app(FacilitySignalService::class)->emitInspectionFailed($lockedSchedule, $record);
+            }
+
+            $lockedSchedule->update([
+                'next_due_date' => $this->calculateNextDueDate($lockedSchedule),
+            ]);
+        }, 3);
 
         return redirect()
             ->route('sites.inspections.index', $site)
@@ -266,7 +277,7 @@ class SiteInspectionController extends Controller
 
     private function calculateNextDueDate(SiteInspectionSchedule $schedule): string
     {
-        $current = \Carbon\Carbon::parse($schedule->next_due_date);
+        $current = Carbon::parse($schedule->next_due_date);
 
         return match ($schedule->frequency) {
             'weekly' => $current->addWeek()->toDateString(),
@@ -277,5 +288,4 @@ class SiteInspectionController extends Controller
             default => $current->addMonth()->toDateString(),
         };
     }
-
 }
