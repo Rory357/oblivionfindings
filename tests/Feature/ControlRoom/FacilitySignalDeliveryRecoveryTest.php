@@ -195,7 +195,7 @@ class FacilitySignalDeliveryRecoveryTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_same_day_failed_record_collision_rolls_back_the_second_acceptance(): void
+    public function test_failed_records_have_stable_record_identity_across_same_day_acceptance_and_later_replay(): void
     {
         $schedule = $this->schedule();
         $request = [
@@ -207,30 +207,60 @@ class FacilitySignalDeliveryRecoveryTest extends TestCase
         $this->actingAs($this->user)
             ->post(route('sites.inspections.complete', [$this->site, $schedule]), $request)
             ->assertRedirect(route('sites.inspections.index', $this->site));
+        $this->actingAs($this->user)
+            ->post(route('sites.inspections.complete', [$this->site, $schedule]), $request)
+            ->assertRedirect(route('sites.inspections.index', $this->site));
 
-        $firstRecord = SiteInspectionRecord::query()->sole();
-        $signal = FacilitySignal::query()->sole();
-        $acceptedNextDueDate = $schedule->fresh()->next_due_date->toDateString();
+        $records = SiteInspectionRecord::query()->orderBy('id')->get();
+        $signals = FacilitySignal::query()->orderBy('id')->get();
+        $outboxes = FacilitySignalOutbox::query()->orderBy('id')->get();
 
-        $this->withoutExceptionHandling();
+        $this->assertCount(2, $records);
+        $this->assertCount(2, $signals);
+        $this->assertCount(2, $outboxes);
+        $this->assertSame('2026-10-15', $schedule->fresh()->next_due_date->toDateString());
+        $this->assertSame(
+            $records->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+            $signals->pluck('inspection_record_id')->map(fn ($id): int => (int) $id)->all(),
+        );
+        $this->assertSame(
+            $records->map(fn (SiteInspectionRecord $record): string => hash('sha256', implode('|', [
+                'facility',
+                FacilitySignalService::TYPE_INSPECTION_FAILED,
+                $record->id,
+            ])))->all(),
+            $signals->pluck('idempotency_key')->all(),
+        );
+        $this->assertSame(
+            $signals->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+            $outboxes->pluck('facility_signal_id')->map(fn ($id): int => (int) $id)->all(),
+        );
+        $this->assertSame(
+            $outboxes->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+            Queue::pushed(DispatchFacilitySignalOutbox::class)
+                ->map(fn (DispatchFacilitySignalOutbox $job): int => $job->outboxId)
+                ->all(),
+        );
 
-        try {
-            $this->actingAs($this->user)
-                ->post(route('sites.inspections.complete', [$this->site, $schedule]), $request);
-            $this->fail('A different failed record must not reuse the first record\'s durable Facility intent.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertStringContainsString(
-                'exact immutable signal type, Site, schedule, and record provenance',
-                $exception->getMessage(),
-            );
-        }
+        $recordIds = $records->pluck('id')->all();
+        $signalIds = $signals->pluck('id')->all();
+        $outboxIds = $outboxes->pluck('id')->all();
+        Carbon::setTestNow('2026-09-01 10:00:00');
 
-        $this->assertDatabaseCount('site_inspection_records', 1);
-        $this->assertDatabaseCount('facility_signals', 1);
-        $this->assertDatabaseCount('facility_signal_outbox', 1);
-        $this->assertSame($firstRecord->id, $signal->inspection_record_id);
-        $this->assertSame($acceptedNextDueDate, $schedule->fresh()->next_due_date->toDateString());
-        Queue::assertPushed(DispatchFacilitySignalOutbox::class, 1);
+        app(FacilitySignalService::class)->emitInspectionFailed(
+            $schedule->fresh(),
+            $records->first()->fresh(),
+        );
+
+        $this->assertSame($recordIds, SiteInspectionRecord::query()->orderBy('id')->pluck('id')->all());
+        $this->assertSame($signalIds, FacilitySignal::query()->orderBy('id')->pluck('id')->all());
+        $this->assertSame($outboxIds, FacilitySignalOutbox::query()->orderBy('id')->pluck('id')->all());
+        $this->assertSame(
+            [$outboxIds[0], $outboxIds[1], $outboxIds[0]],
+            Queue::pushed(DispatchFacilitySignalOutbox::class)
+                ->map(fn (DispatchFacilitySignalOutbox $job): int => $job->outboxId)
+                ->all(),
+        );
     }
 
     public function test_post_commit_dispatch_failure_preserves_the_accepted_pending_intent(): void
@@ -765,6 +795,59 @@ class FacilitySignalDeliveryRecoveryTest extends TestCase
 
         $this->assertSame('processed', $legacyProcessed->fresh()->status);
         $this->assertSame('processed', $legacyPending->fresh()->status);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+    }
+
+    public function test_pre_record_identity_durable_failed_signal_remains_replay_compatible(): void
+    {
+        $schedule = $this->schedule();
+        $record = $this->failedRecord($schedule);
+        $legacyKey = hash('sha256', implode('|', [
+            'facility',
+            FacilitySignalService::TYPE_INSPECTION_FAILED,
+            $schedule->id,
+            '2026-08-31',
+        ]));
+        $facilitySignal = FacilitySignal::query()->create([
+            'site_id' => $this->site->id,
+            'inspection_schedule_id' => $schedule->id,
+            'inspection_record_id' => $record->id,
+            'signal_type' => FacilitySignalService::TYPE_INSPECTION_FAILED,
+            'severity_hint' => 'high',
+            'occurred_at' => now(),
+            'idempotency_key' => $legacyKey,
+            'payload' => [
+                'title' => 'Inspection FAILED: Emergency lighting inspection',
+                'description' => 'Inspection FAILED: Emergency lighting inspection',
+                'source_module' => 'facility',
+                'signal_type' => FacilitySignalService::TYPE_INSPECTION_FAILED,
+                'inspection_schedule_id' => $schedule->id,
+                'inspection_record_id' => $record->id,
+                'site_id' => $this->site->id,
+                'result' => 'fail',
+            ],
+        ]);
+        $outbox = FacilitySignalOutbox::query()->create([
+            'facility_signal_id' => $facilitySignal->id,
+            'status' => 'pending',
+        ]);
+        $job = new DispatchFacilitySignalOutbox($outbox->id);
+
+        $job->handle(app(SignalProcessingService::class));
+        $job->handle(app(SignalProcessingService::class));
+
+        $controlSignal = Signal::query()->sole();
+        $this->assertSame($legacyKey, $facilitySignal->fresh()->idempotency_key);
+        $this->assertSame('sent', $outbox->fresh()->status);
+        $this->assertSame(1, $outbox->fresh()->attempts);
+        $this->assertSame($this->site->id, $controlSignal->site_id);
+        $this->assertSame($schedule->id, $controlSignal->normalized_data['inspection_schedule_id']);
+        $this->assertSame($record->id, $controlSignal->normalized_data['inspection_record_id']);
+        $this->assertSame(
+            hash('sha256', 'safety-signal|facility|'.$legacyKey),
+            $controlSignal->idempotency_key,
+        );
+        $this->assertDatabaseCount('control_room_signals', 1);
         $this->assertDatabaseCount('control_room_alerts', 1);
     }
 
