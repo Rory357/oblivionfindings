@@ -1,0 +1,396 @@
+{
+  "schema_version": "run-169-outcome-neutral-fleet-vehicle-alerts-config-route-action-cohort-wave-31-v1",
+  "run_id": "RUN-169-OUTCOME-NEUTRAL-FLEET-VEHICLE-ALERTS-CONFIG-ROUTE-ACTION-COHORT-WAVE-31",
+  "status": "OUTCOME_NEUTRAL_CURRENT_PIN_SOURCE_PACKET_READY_INDEPENDENT_REVIEW_REQUIRED_ZERO_OWNERSHIP_OR_CORRECTNESS_CREDIT",
+  "generated_on": "2026-08-30",
+  "architecture_rule": "One operating organisation across multiple Sites. Exact permissions, approved Sites, canonical ownership, direct-object concealment and privacy are the boundaries; no tenant design or tenant-isolation credit.",
+  "pins": {
+    "checkpoint_commit": "e488bd3edcda0f154f87e8bbed972f14db409b82",
+    "checkpoint_tree": "9e93b8aea4f4b907cde3dc59dd0520fba5bd7080",
+    "application_commit": "e488bd3edcda0f154f87e8bbed972f14db409b82",
+    "application_tree": "9e93b8aea4f4b907cde3dc59dd0520fba5bd7080",
+    "app_tree": "b9a9a672bea01473d8be96a0afb548e6291aee9c",
+    "routes_tree": "9392e22e4c472610da98977bec4e112092d223b9",
+    "resources_js_tree": "776359c5b8b06a55fcf5fe4464bc3e00d01248e5",
+    "resources_js_pages_tree": "077d40c746018b655c9b9f8c1ee3f87c2d792a8c",
+    "tests_tree": "90886d938c57ab7b45c9301514077d16e4c6b470",
+    "prompt_path": "C:\\Users\\steph\\.codex\\attachments\\8b35b9fe-b295-4a84-bdf9-a8afb05b2daa\\pasted-text-1.txt",
+    "prompt_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "generator": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-outcome-neutral-fleet-vehicle-alerts-config-route-action-cohort-wave-31.py",
+    "generator_sha256": "ffb1dba865a50f3cdcbf4e3ce285482e062bb023145089353a68f705d0646c7e",
+    "generator_blob_id": "0199cbc6044817f4484fa7ce4824d0dcff1bd9cf",
+    "inputs": {
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
+      "03-feature-to-benchmark-matrix.csv": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+      "task-scripts/cap-fleet-vehicle-register.md": "9dd6e901b7d4ef3f688a246f069c621180b8ebdf72a1ddd6ee30e6dd9f6742bd",
+      "generators/integrate-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.py": "b5c7f04cd44ecd73dda9c7fe4a9e2e8616c68674cdc52d393ec696b06ad2327e",
+      "generators/integrate-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.py": "00b90c5932614eaf67cbca29c860924fad67190605bbf476fdc285174831ea83",
+      "evidence/source/current-run-153-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.json": "9b7e382f83787d807de8d752ecb3e6524280c707899aba78d47082765272e815",
+      "evidence/source/current-run-153r-independent-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-review-wave-26.json": "7f1da8394a8054f01f34fb943a3fba6601bf70ea06d69cf97033f2208edf4461",
+      "evidence/source/current-run-154-reviewed-fleet-vehicle-register-index-route-action-reporting-wave-26.json": "c5e782984c743186305b70fc2430d7dc56aede62621066ca159c96c3484f9ef8",
+      "evidence/browser/current-audit-dashboard-verification-run-168-wave-30.json": "95f5eff21563ff010cd49f2ff6cf958825f1d1f7717066ed571e9e078dea4998",
+      "audit-dashboard.html": "80360ae152642e4f7c0c90b18c42e76fb156bf8cd34eb9df17b358170cc71b89"
+    }
+  },
+  "selection_contract": {
+    "source": "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json",
+    "selected_queue_indices_zero_based": [
+      83
+    ],
+    "selected_queue_ids": [
+      "RUN090-ROUTE-0084"
+    ],
+    "selected_route_record_ids": [
+      "RUN077-ROUTE-0692"
+    ],
+    "selected_feature_ids": [
+      "CAP-FLEET-VEHICLE-REGISTER"
+    ],
+    "selection_outcome_neutral": true,
+    "ownership_decisions_authored": 0,
+    "page_candidates_selected": 0
+  },
+  "identity": {
+    "route_method": "get",
+    "literal_uri": "/vehicles/{asset}/alerts-config",
+    "literal_route_name": "fleet-assets.vehicles.alerts-config",
+    "action_expression": "[VehicleController::class, 'alertsConfig']",
+    "resolved_controller": "App\\Http\\Controllers\\FleetAssets\\VehicleController",
+    "controller_method": "alertsConfig",
+    "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1061",
+    "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "candidate_relation": "BOTH_LANES_IDENTICAL_PENDING_REVIEW"
+  },
+  "records": [
+    {
+      "queue_id": "RUN090-ROUTE-0084",
+      "canonical_key": "route|RUN077-ROUTE-0692",
+      "review_partition": "A",
+      "surface": "ROUTE_SOURCE_RECORD",
+      "source_record_id": "RUN077-ROUTE-0692",
+      "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "direct_identity": {
+        "lane": "EXACT_LITERAL_ROUTE_NAME",
+        "source_field": "literal_route_name",
+        "source_value": "fleet-assets.vehicles.alerts-config",
+        "matrix_field": "route_names",
+        "matrix_token": "fleet-assets.vehicles.alerts-config",
+        "case_sensitive_exact_equality": true,
+        "candidate_cardinality": 1
+      },
+      "source": {
+        "route_file": "routes/fleet-assets.php",
+        "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_key": "routes/fleet-assets.php:53:9:get:9",
+        "source_anchor": "routes/fleet-assets.php:53",
+        "source_locator": "routes/fleet-assets.php:53:9:get",
+        "route_method": "get",
+        "literal_uri": "/vehicles/{asset}/alerts-config",
+        "literal_route_name": "fleet-assets.vehicles.alerts-config",
+        "action_expression": "[VehicleController::class, 'alertsConfig']",
+        "statement_excerpt": "Route::get('/vehicles/{asset}/alerts-config', [VehicleController::class, 'alertsConfig'])->whereNumber('asset')->name('fleet-assets.vehicles.alerts-config');",
+        "statement_sha256": "ca8700b0ad42f46141b6acefd691bf135687daad904621ab1cf0a52fb8d310d1"
+      },
+      "secondary_lane": {
+        "relation_comparison": "NAME_ONLY",
+        "backend_method_relation": {
+          "relation_class": "STATIC_CANDIDATE_RELATION",
+          "rule": "Import-aware exact [Controller::class, 'method'] resolution, exactly one uncommented method definition, and exact controller-file plus definition-line containment within an explicit matrix backend_anchors line or line range; whole-file anchors are excluded from this exact-line lane.",
+          "resolution": {
+            "status": "EXACT_CLASS_METHOD_ARRAY_RESOLVED_UNIQUE_DEFINITION",
+            "action_expression": "[VehicleController::class, 'alertsConfig']",
+            "class_token": "VehicleController",
+            "resolved_fqcn": "App\\Http\\Controllers\\FleetAssets\\VehicleController",
+            "resolution_basis": "EXACT_ROUTE_FILE_USE_IMPORT",
+            "controller_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+            "controller_file_sha256": "478a1a0a33868536fc3b2baf5db2d06732ddb5fa16094997a5128dc2267b5239",
+            "method": "alertsConfig",
+            "definition_line": 1061,
+            "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1061"
+          },
+          "candidate_count": 0,
+          "candidate_feature_ids": [],
+          "matching_matrix_anchors": [],
+          "credit_awarded": false
+        },
+        "contradictory_candidate_present": false
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+        "feature_class": "H",
+        "module": "Fleet & Assets",
+        "user_job": "Maintain vehicles and vehicle-specific state",
+        "route_names": "fleet-assets.fuel.index; fleet-assets.fuel.store; fleet-assets.trips.index; fleet-assets.trips.playback; fleet-assets.trips.playback.data; fleet-assets.trips.toggle-personal; fleet-assets.vehicles.alerts-config; fleet-assets.vehicles.alerts-config.save; fleet-assets.vehicles.bulk-action; fleet-assets.vehicles.index; fleet-assets.vehicles.show; fleet-assets.vehicles.update",
+        "route_paths": "routes/fleet-assets.php:51-66",
+        "page_files": "resources/js/pages/fleet-assets/vehicles/index.tsx",
+        "backend_anchors": "app/Http/Controllers/FleetAssets/VehicleController.php:31-194; app/Http/Controllers/FleetAssets/VehicleController.php:247-340; app/Http/Controllers/FleetAssets/VehicleController.php:475-550",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "run_082_candidate_record_sha256": "9c5eac5baaa152e31be22e480a23e2361d9f2f29eb5b181e43ff18e8cf4596b3",
+        "run_077_manifest_record_sha256": "583b85dc698e0e6f52de8facc0d73c586f99566b035bec00c45da6a610bebb38",
+        "feature_identity_projection_sha256": "bfa6379bc2d8918237480060414b89dd2e61ffa2d907d639a62ec1fd9892f164",
+        "joined_candidate_evidence_sha256": "1b537d412ad459c52dc62e1555e5d9f48b9fadf3c7230ca4bf7d747372c9dc0b"
+      },
+      "review_state": {
+        "status": "PENDING_FRESH_SEMANTIC_REVIEW",
+        "allowed_outcomes": [
+          "OWNER",
+          "SHARED_RELATION",
+          "EVIDENCE_GAP"
+        ],
+        "ownership_credit": false
+      },
+      "queue_record_sha256": "d29353be38d964311d6586311d654c13dc2a39da9b7bcdb8a6a75d69fa511731"
+    }
+  ],
+  "queue_boundary": {
+    "reviewed_key_count": 118,
+    "reviewed_key_list_sha256": "e598ea44dc0abf67f5dae3374f2d5608d10e5a2edae475ed18a8f0ecaf227e40",
+    "selected_index_83_member": false,
+    "preceding_index_81_member": true,
+    "preceding_index_82_member": true,
+    "current_next_unresolved_index": 83,
+    "current_next_unresolved_queue_id": "RUN090-ROUTE-0084",
+    "post_selection_next_index_if_owner": 84,
+    "post_selection_next_queue_id_if_owner": "RUN090-ROUTE-0085",
+    "immutable_run090_pending_label_does_not_override_later_review": true
+  },
+  "source_review_packet": {
+    "required_source_files": [
+      {
+        "path": "routes/fleet-assets.php",
+        "sha256": "4be79ba4a0957f81f3e99de8eea7f29a398f8a115957bd44af06dbbf78fe2c4c",
+        "blob_id": "f0b2b8c199ada1d8ef8bdb41c99bfc2ac02f93d2",
+        "bytes": 28332,
+        "lines": 351,
+        "loci": [
+          "49-58"
+        ],
+        "purpose": "permission group and exact selected GET route"
+      },
+      {
+        "path": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "sha256": "478a1a0a33868536fc3b2baf5db2d06732ddb5fa16094997a5128dc2267b5239",
+        "blob_id": "49897a4f91a2484c0633c6a575f554ed725acb1f",
+        "bytes": 49203,
+        "lines": 1138,
+        "loci": [
+          "55-57",
+          "1061-1088"
+        ],
+        "purpose": "schema guard, authorized vehicle resolution, alert config/geofences projection and render"
+      },
+      {
+        "path": "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php",
+        "sha256": "c6ad39b72e659086e62a63e7510b8e8cb14e2a80192841cdddb5dc71436f9534",
+        "blob_id": "3737bf5327cd86e9b551ce86296005b1813c9616",
+        "bytes": 58370,
+        "lines": 1357,
+        "loci": [
+          "278-290"
+        ],
+        "purpose": "canonical authorized vehicle resolver used by the action"
+      },
+      {
+        "path": "app/Models/Asset.php",
+        "sha256": "ba455db793fd59faff49f3092695227f7fe5b1db17d9ada3610ce62835d28012",
+        "blob_id": "e644731fbcf65f91ae06cb6b240b346e492a306b",
+        "bytes": 9053,
+        "lines": 336,
+        "loci": [
+          "58-86"
+        ],
+        "purpose": "canonical vehicle alert_config field and array cast"
+      },
+      {
+        "path": "resources/js/pages/fleet-assets/vehicles/alerts-config.tsx",
+        "sha256": "492f1cab43c4c2390a08d75f3b458740f93755789f6a6b2e1e2663a94c329d9d",
+        "blob_id": "d5c9255f7a1bb3cedcc282f348f9a117d0d8ca30",
+        "bytes": 27433,
+        "lines": 542,
+        "loci": [
+          "31-59",
+          "167-236",
+          "520-538"
+        ],
+        "purpose": "dedicated vehicle alert configuration consumer; context only"
+      },
+      {
+        "path": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+        "sha256": "72cb083e156d44279682ade62db2cb5a47d066e49f3a0c4054a067853bfe604a",
+        "blob_id": "f9313885f30c22af5295048b12ec38e336a35fc2",
+        "bytes": 97420,
+        "lines": 1716,
+        "loci": [
+          "346-353"
+        ],
+        "purpose": "direct Configure Alerts caller; context only"
+      },
+      {
+        "path": "tests/Feature/FleetAssets/AssetMutationBoundaryTest.php",
+        "sha256": "c7a7d7ad1d1372218eb071d917df832ffc9c49991fd58b8254efaeb363e03f7a",
+        "blob_id": "54a9540cf2011a8e15bf9788ea96fa885b5afcaf",
+        "bytes": 35254,
+        "lines": 857,
+        "loci": [
+          "299-340"
+        ],
+        "purpose": "sibling POST denial only; no selected GET coverage"
+      },
+      {
+        "path": "docs/architecture/single-tenant-application.md",
+        "sha256": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c",
+        "blob_id": "d204082ce6b328ceb8518edcaebf77d2868d689b",
+        "bytes": 1936,
+        "lines": 21,
+        "loci": [
+          "1-21"
+        ],
+        "purpose": "one-organisation multi-Site boundary"
+      }
+    ],
+    "required_source_file_count": 8,
+    "exact_selected_loci": {
+      "route": {
+        "source_anchor": "routes/fleet-assets.php:53",
+        "source_line": "Route::get('/vehicles/{asset}/alerts-config', [VehicleController::class, 'alertsConfig'])->whereNumber('asset')->name('fleet-assets.vehicles.alerts-config');",
+        "source_line_sha256": "aa8bc12e7aa019402cab86d586388a6f08caf5f12e790b94455fa1c1fc88a695"
+      },
+      "permission": {
+        "source_anchor": "routes/fleet-assets.php:50",
+        "source_line": "Route::middleware('permission:fleet.viewAny')->group(function () {",
+        "source_line_sha256": "3712215f669220d4ced949e1f01b93f27b6efa070134ae2bbfb7bb44e75b0168"
+      },
+      "controller": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1061",
+        "source_line": "public function alertsConfig(Request $request, Asset $asset)",
+        "source_line_sha256": "9bff88acb91e07b99a90357444e402eca23258ba63273910f9e7deb89267ba51"
+      },
+      "authorized_vehicle": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1064",
+        "source_line": "$asset = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey()) ?? abort(404);",
+        "source_line_sha256": "cec781767c1f258e1a98751d276665acf4b0003a519371e891f02a49047836eb"
+      },
+      "render": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1076",
+        "source_line": "return Inertia::render('fleet-assets/vehicles/alerts-config', [",
+        "source_line_sha256": "12ddaa0bb21a670af25d3ff8a14da573ae58e6cd702b1aec95cc2d18ea36d9f6"
+      },
+      "consumer": {
+        "source_anchor": "resources/js/pages/fleet-assets/vehicles/alerts-config.tsx:167",
+        "source_line": "export default function VehicleAlertsConfig({",
+        "source_line_sha256": "1aa71ada56daf1ca1e3776ea0e931fc90c1a00a270677411792c7c8970274af0"
+      },
+      "caller": {
+        "source_anchor": "resources/js/pages/fleet-assets/vehicles/show.tsx:349",
+        "source_line": "href={`/fleet-assets/vehicles/${vehicle.id}/alerts-config`}",
+        "source_line_sha256": "914142eb90577f6540f0d2b66d1766d0b26aa52b048b32b298ea172eb946857a"
+      }
+    },
+    "selected_controller_method_slice": {
+      "source_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+      "method": "alertsConfig",
+      "start_line": 1061,
+      "end_line": 1088,
+      "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1061",
+      "text": "    public function alertsConfig(Request $request, Asset $asset)\n    {\n        $user = $request->user() ?? abort(403);\n        $asset = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey()) ?? abort(404);\n        $config = [];\n        if ($this->hasVehicleAlertConfigField() && $asset->alert_config) {\n            $config = is_string($asset->alert_config) ? json_decode($asset->alert_config, true) : (array) $asset->alert_config;\n        }\n\n        $geofences = $asset->geofences()->get(['id', 'name', 'is_active'])->map(fn ($g) => [\n            'id' => $g->id,\n            'name' => $g->name,\n            'is_active' => $g->is_active,\n        ]);\n\n        return Inertia::render('fleet-assets/vehicles/alerts-config', [\n            'asset' => [\n                'id' => $asset->id,\n                'name' => $asset->name,\n                'asset_tag' => $asset->asset_tag,\n            ],\n            'config' => $config,\n            'geofences' => $geofences,\n            'can' => [\n                'manage' => (bool) $request->user()?->canDo('fleet.manage'),\n            ],\n        ]);\n    }\n",
+      "text_sha256": "b9940e2dda6fede48c52b4630cd976e2401b5926fa82e125c15faa31a1b73fe7",
+      "source_file_sha256": "478a1a0a33868536fc3b2baf5db2d06732ddb5fa16094997a5128dc2267b5239",
+      "source_file_blob_id": "49897a4f91a2484c0633c6a575f554ed725acb1f",
+      "brace_balanced": true
+    },
+    "consumer_and_caller_context_only": {
+      "page_file": "resources/js/pages/fleet-assets/vehicles/alerts-config.tsx",
+      "caller_file": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+      "selected": false,
+      "ownership_recredited": false,
+      "context_only": true
+    },
+    "packet_sha256": "89d8ea3b1818eb9005cf344414dca1f659eb79263e5cc93aee1873cafcebce76"
+  },
+  "historical_pin_reconciliation": {
+    "task_script_historical_application_pin": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "current_review_pin": "e488bd3edcda0f154f87e8bbed972f14db409b82",
+    "route_file_drifted": true,
+    "queue_statement_sha256_still_exact": true,
+    "historical_review_or_ownership_inherited": false
+  },
+  "provisional_assurance_questions": [
+    "Does the selected GET retain exact approved-Site and direct-object concealment for every fleet.viewAny actor?",
+    "Why is there no focused test for the selected GET action/component while the sibling POST denial is tested?",
+    "Do the page and caller express only consumption/navigation rather than co-ownership of the exact GET user job?"
+  ],
+  "fresh_review_contract": {
+    "status": "PENDING",
+    "required_independent_reviews": 1,
+    "allowed_outcomes": [
+      "OWNER",
+      "SHARED_RELATION",
+      "EVIDENCE_GAP"
+    ],
+    "ownership_integration_authorized": false
+  },
+  "stop_rules": [
+    "No route/name/backend containment candidate is an ownership decision.",
+    "No page, caller, model, service, sibling POST or adjacent queue row identity is inherited.",
+    "Correctness and test-coverage questions remain separate even if ownership is accepted.",
+    "No runtime, browser, test, benchmark, finding, completion or Gate 4 credit."
+  ],
+  "counts": {
+    "selected_queue_rows": 1,
+    "selected_route_rows": 1,
+    "selected_page_rows": 0,
+    "ownership_decisions": 0,
+    "ownership_material_source_files": 8,
+    "provisional_assurance_questions": 3
+  },
+  "credit_boundary": {
+    "static_source_feature_ownership": false,
+    "static_route_feature_ownership": false,
+    "static_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "canonical_object_ownership_correctness": false,
+    "approved_site_scope_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_concealment_correctness": false,
+    "query_projection_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "final_no_match_or_NCM": false,
+    "final_finding": false,
+    "feature_completion": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": false,
+  "source_review_complete": false,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-outcome-neutral-fleet-vehicle-alerts-config-route-action-cohort-wave-31.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/root-run-169-outcome-neutral-fleet-vehicle-alerts-config-route-action-cohort-wave-31.json"
+  ],
+  "self_seal": {
+    "algorithm": "sha256-canonical-json-with-self-seal-omitted",
+    "sha256": "f36a58efc9e6e6c129d795c645bdc6ebb294a63ccbfcdc69ab832a9e5709b6aa"
+  }
+}
