@@ -3,6 +3,7 @@
 namespace App\Services\Compliance;
 
 use App\Domain\Governance\Models\ComplianceObligation;
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
@@ -41,6 +42,7 @@ class ComplianceMetricsService
         private readonly UserSiteAccessService $siteAccess,
         private readonly MedicationGovernanceScopeService $medicationScope,
         private readonly ControlRoomAlertAccessService $alertAccess,
+        private readonly BoardPackAccessService $boardPackAccess,
     ) {}
 
     public function normalisePeriod(?string $period): string
@@ -405,6 +407,7 @@ class ComplianceMetricsService
     private function visibleAuditActivity(User $viewer): Builder
     {
         $audit = AuditLog::query();
+        $this->boardPackAccess->scopeAuditVisibility($audit, $viewer);
         $visibleAlertIds = ControlRoomAlert::query()->select('control_room_alerts.id');
         $this->siteAccess->applyAlertScope(
             $visibleAlertIds,

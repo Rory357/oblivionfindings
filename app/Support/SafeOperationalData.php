@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -206,7 +207,8 @@ final class SafeOperationalData
 
         $class = $model::class;
 
-        return $model instanceof Device
+        return $model instanceof BoardPack
+            || $model instanceof Device
             || str_starts_with($class, 'App\\Models\\Integration\\')
             || str_starts_with($class, 'App\\Domain\\SecurityDevices\\Models\\');
     }

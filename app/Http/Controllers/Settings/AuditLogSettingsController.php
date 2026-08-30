@@ -14,28 +14,30 @@ class AuditLogSettingsController extends Controller
     public function index(Request $request)
     {
         $this->authorizeAuditAccess($request);
+        $viewer = $request->user();
 
         $filters = $this->normalizeFilters($request);
-        $events = $this->auditLogs->query($filters)
+        $events = $this->auditLogs->query($filters, $viewer)
             ->paginate(50)
             ->withQueryString()
             ->through(fn ($log): array => $this->auditLogs->present($log));
-        $options = $this->auditLogs->filterOptions();
+        $options = $this->auditLogs->filterOptions($viewer);
 
         return inertia('settings/audit-logs', [
             'events' => $events,
             'users' => $options['users'],
             'filters' => $this->responseFilters($filters),
-            'stats' => $this->auditLogs->stats($filters),
+            'stats' => $this->auditLogs->stats($filters, $viewer),
         ]);
     }
 
     public function export(Request $request): StreamedResponse
     {
         $this->authorizeAuditAccess($request);
+        $viewer = $request->user();
 
         $filters = $this->normalizeFilters($request);
-        $logs = $this->auditLogs->query($filters)->limit(5000)->get();
+        $logs = $this->auditLogs->query($filters, $viewer)->limit(5000)->get();
 
         return response()->streamDownload(function () use ($logs): void {
             $handle = fopen('php://output', 'wb');

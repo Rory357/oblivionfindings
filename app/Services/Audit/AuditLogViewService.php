@@ -2,6 +2,7 @@
 
 namespace App\Services\Audit;
 
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\User;
@@ -12,6 +13,8 @@ use Illuminate\Support\Str;
 
 final class AuditLogViewService
 {
+    public function __construct(private readonly BoardPackAccessService $boardPackAccess) {}
+
     /** @var array<string, array{actions: array<int, string>, subjects: array<int, string>}> */
     private const MODULES = [
         'it' => [
@@ -76,7 +79,7 @@ final class AuditLogViewService
      *     date_to?:?string
      * }  $filters
      */
-    public function query(array $filters = []): Builder
+    public function query(array $filters = [], ?User $viewer = null): Builder
     {
         $query = AuditLog::query()
             ->with([
@@ -85,6 +88,8 @@ final class AuditLogViewService
             ])
             ->orderByDesc('created_at')
             ->orderByDesc('id');
+
+        $this->boardPackAccess->scopeAuditVisibility($query, $viewer);
 
         if ($filters['search'] ?? null) {
             $needle = $filters['search'];
@@ -164,10 +169,11 @@ final class AuditLogViewService
     }
 
     /** @return array{users: array<int, array{id:int,name:string}>, clients: array<int, array{id:int,name:string}>} */
-    public function filterOptions(): array
+    public function filterOptions(?User $viewer = null): array
     {
+        $visibleAudit = $this->query([], $viewer)->reorder();
         $users = User::query()
-            ->whereIn('id', AuditLog::query()->select('user_id')->whereNotNull('user_id'))
+            ->whereIn('id', (clone $visibleAudit)->select('user_id')->whereNotNull('user_id'))
             ->orderBy('name')
             ->limit(250)
             ->get(['id', 'name'])
@@ -175,7 +181,7 @@ final class AuditLogViewService
             ->all();
 
         $clients = Client::query()
-            ->whereIn('id', AuditLog::query()->select('client_id')->whereNotNull('client_id'))
+            ->whereIn('id', (clone $visibleAudit)->select('client_id')->whereNotNull('client_id'))
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->limit(250)
@@ -193,9 +199,9 @@ final class AuditLogViewService
      * @param  array<string, mixed>  $filters
      * @return array{today:int,this_week:int,this_month:int}
      */
-    public function stats(array $filters): array
+    public function stats(array $filters, ?User $viewer = null): array
     {
-        $base = $this->query($filters)->reorder();
+        $base = $this->query($filters, $viewer)->reorder();
 
         return [
             'today' => (clone $base)->whereDate('created_at', today())->count(),

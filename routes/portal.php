@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Http\Controllers\AnnouncementInboxController;
 use App\Http\Controllers\Auth\PortalOAuthController;
 use App\Http\Controllers\ClientCalendarController;
@@ -192,9 +193,9 @@ Route::middleware(['auth'])->group(function () {
         ->name('inbox.announcements.readAll');
 
     // Notification Centre (full page)
-    Route::get('/notifications', function (Request $request) {
+    Route::get('/notifications', function (Request $request, BoardPackAccessService $boardPackAccess) {
         $user = $request->user();
-        $query = $user->notifications();
+        $query = $boardPackAccess->visibleNotificationQuery($user);
 
         $filter = $request->query('filter', 'all');
         if ($filter === 'unread') {
@@ -218,7 +219,7 @@ Route::middleware(['auth'])->group(function () {
                 'acknowledged_at' => $n->acknowledged_at,
                 'created_at' => $n->created_at,
             ]),
-            'unread_count' => $user->unreadNotifications()->count(),
+            'unread_count' => $boardPackAccess->visibleNotificationQuery($user, unreadOnly: true)->count(),
             'filters' => ['filter' => $filter, 'type' => $type],
             'announcements' => Announcement::query()
                 ->where('is_active', true)

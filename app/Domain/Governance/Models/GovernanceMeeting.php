@@ -61,6 +61,10 @@ class GovernanceMeeting extends Model
         'ceo_report_deadline' => 'datetime',
     ];
 
+    protected $hidden = [
+        'pack_distributed_at',
+    ];
+
     public function committee(): BelongsTo
     {
         return $this->belongsTo(BoardCommittee::class, 'board_committee_id');

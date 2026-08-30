@@ -41,7 +41,7 @@ class BoardPackPublishedNotification extends Notification
         return [
             'type' => 'board_pack_published',
             'pack_id' => $this->pack->id,
-            'meeting_id' => $this->pack->meeting_id,
+            'meeting_id' => $this->pack->governance_meeting_id,
         ];
     }
 }

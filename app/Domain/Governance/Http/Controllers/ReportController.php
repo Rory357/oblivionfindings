@@ -48,7 +48,7 @@ class ReportController extends Controller
         $workflow = $this->workflowService->dashboardWorkflow($request->user());
 
         return Inertia::render('Governance/Reports/BoardMonthly', [
-            'report' => $this->presenter->boardMonthly($widgets, [], $workflow),
+            'report' => $this->presenter->boardMonthly($widgets, [], $workflow, $request->user()),
             'generatedAt' => now()->toIso8601String(),
         ]);
     }

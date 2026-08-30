@@ -84,7 +84,6 @@ interface Meeting {
     status: string;
     quorum_met: boolean;
     quorum_required: number;
-    pack_distributed_at: string | null;
     chair: { user: { name: string }; id: number } | null;
     secretary: { user: { name: string }; id: number } | null;
     agenda_items: Array<{
@@ -112,7 +111,6 @@ interface Meeting {
     } | null;
     board_pack: {
         id: number;
-        generated_at: string;
         distributed_at: string | null;
     } | null;
     resolutions: Array<{

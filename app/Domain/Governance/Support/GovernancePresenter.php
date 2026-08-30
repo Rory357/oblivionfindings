@@ -10,6 +10,7 @@ use App\Domain\Governance\Models\GovernancePolicy;
 use App\Domain\Governance\Models\MeetingMinute;
 use App\Domain\Governance\Models\RiskRegisterEntry;
 use App\Domain\Governance\Models\SpendApproval;
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Domain\Governance\Services\SpendApprovalCommandService;
@@ -21,12 +22,15 @@ use Illuminate\Support\Facades\Schema;
 
 class GovernancePresenter
 {
-    public function __construct(protected SpendApprovalCommandService $spendApprovalReader) {}
+    public function __construct(
+        protected SpendApprovalCommandService $spendApprovalReader,
+        protected BoardPackAccessService $boardPackAccess,
+    ) {}
 
     public function dashboard(array $widgets, array $period, array $freshness, array $workflow, ?User $user = null): array
     {
         $cards = collect([
-            $this->meetingReadinessCard(),
+            $this->meetingReadinessCard($user),
             $this->followThroughCard(),
             $this->widgetCard('decisions_required', $widgets['decisions_required'] ?? null, $freshness),
             $this->widgetCard('roadmap', $widgets['roadmap'] ?? null, $freshness),
@@ -100,7 +104,7 @@ class GovernancePresenter
             'role_actions' => $this->roleActions($user),
             'kpi_band' => $this->buildKpiBand($widgets, $workflow),
             'next_meeting' => $this->buildNextMeeting($user),
-            'board_pack' => $this->buildBoardPack(),
+            'board_pack' => $this->buildBoardPack($user),
             'calendar_events' => $this->buildCalendarEvents(),
             'timeline' => $this->buildTimeline($user),
             'recently_completed' => $this->buildRecentlyCompleted($user),
@@ -249,9 +253,11 @@ class GovernancePresenter
     /**
      * Board pack readiness for the next upcoming meeting.
      */
-    protected function buildBoardPack(): ?array
+    protected function buildBoardPack(?User $user): ?array
     {
-        if (! Schema::hasTable('governance_meetings')) {
+        if (! $user
+            || ! $this->boardPackAccess->canViewPacks($user)
+            || ! Schema::hasTable('governance_meetings')) {
             return null;
         }
 
@@ -266,7 +272,11 @@ class GovernancePresenter
             return null;
         }
 
-        $pack = $meeting->boardPack;
+        $pack = $this->boardPackAccess->visiblePack($user, $meeting->boardPack);
+        if (! $pack && ! $this->boardPackAccess->canManage($user)) {
+            return null;
+        }
+
         $distributed = $pack ? count(array_unique($pack->distributed_to ?? [])) : 0;
         $readCount = $pack?->readCount() ?? 0;
 
@@ -385,9 +395,38 @@ class GovernancePresenter
             }
         }
 
+        $boardPackEventIds = collect($events)
+            ->filter(fn (array $row) => class_basename($row['entity_type'] ?? '') === 'BoardPack')
+            ->pluck('entity_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $readableBoardPackIds = collect();
+        if ($user
+            && $this->boardPackAccess->canManage($user)
+            && $boardPackEventIds->isNotEmpty()) {
+            $readableBoardPackIds = $this->boardPackAccess
+                ->visibleQuery($user)
+                ->whereKey($boardPackEventIds->all())
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id);
+        }
+
         $formatted = collect($events)
-            ->filter(fn (array $row) => class_basename($row['entity_type'] ?? '') !== 'SpendApproval'
-                || $readableSpendIds->contains((int) ($row['entity_id'] ?? 0)))
+            ->filter(function (array $row) use ($readableSpendIds, $readableBoardPackIds) {
+                $entityType = class_basename($row['entity_type'] ?? '');
+
+                if ($entityType === 'SpendApproval') {
+                    return $readableSpendIds->contains((int) ($row['entity_id'] ?? 0));
+                }
+
+                if ($entityType === 'BoardPack') {
+                    return $readableBoardPackIds->contains((int) ($row['entity_id'] ?? 0));
+                }
+
+                return true;
+            })
             ->map(function (array $row) {
                 $createdAt = isset($row['created_at']) ? Carbon::parse($row['created_at']) : null;
 
@@ -566,9 +605,9 @@ class GovernancePresenter
         };
     }
 
-    public function boardMonthly(array $widgets, array $freshness, array $workflow): array
+    public function boardMonthly(array $widgets, array $freshness, array $workflow, ?User $user = null): array
     {
-        $dashboard = $this->dashboard($widgets, ['type' => 'month'], $freshness, $workflow);
+        $dashboard = $this->dashboard($widgets, ['type' => 'month'], $freshness, $workflow, $user);
         $cards = collect($dashboard['cards_by_key']);
 
         return [
@@ -651,11 +690,19 @@ class GovernancePresenter
         ];
     }
 
-    public function meetingCockpit(GovernanceMeeting $meeting, array $quorum, array $workflowChecklist): array
-    {
+    public function meetingCockpit(
+        GovernanceMeeting $meeting,
+        array $quorum,
+        array $workflowChecklist,
+        ?User $user = null,
+    ): array {
         $ceoStatus = $meeting->ceoReport?->status;
         $ceoSubmitted = in_array($ceoStatus, ['submitted', 'included_in_pack'], true);
-        $pack = $meeting->boardPack;
+        $pack = $user
+            ? $this->boardPackAccess->visiblePack($user, $meeting->boardPack)
+            : null;
+        $includePackCard = $user !== null
+            && ($this->boardPackAccess->canManage($user) || $pack !== null);
 
         $previousOpenItems = $this->openFollowThroughForMeeting($this->previousMeeting($meeting));
         $pendingResolutions = $meeting->resolutions->whereIn('status', ['draft', 'open'])->count();
@@ -663,65 +710,71 @@ class GovernancePresenter
         $distributedCount = count(array_unique($pack?->distributed_to ?? []));
         $minutesStatus = $meeting->minutes?->status;
 
-        return [
-            'cards' => [
-                [
-                    'key' => 'ceo_report',
-                    'title' => 'CEO Report',
-                    'status' => $ceoSubmitted ? 'done' : ($meeting->ceo_report_deadline && $meeting->ceo_report_deadline->isPast() ? 'warning' : 'todo'),
-                    'value' => $ceoSubmitted ? 'Submitted' : 'Pending',
-                    'detail' => $meeting->ceo_report_deadline
-                        ? 'Due '.$meeting->ceo_report_deadline->timezone('Pacific/Auckland')->format('j M Y g:i A')
-                        : 'No deadline set',
-                    'href' => $meeting->ceoReport ? "/governance/ceo-reports/{$meeting->ceoReport->id}" : '/governance/ceo-reports',
-                ],
-                [
-                    'key' => 'pack_readiness',
-                    'title' => 'Board Pack',
-                    'status' => $pack?->distributed_at ? 'done' : ($pack ? 'in_progress' : 'todo'),
-                    'value' => $pack?->distributed_at ? 'Distributed' : ($pack ? 'Generated' : 'Not started'),
-                    'detail' => $pack?->distributed_at
-                        ? "{$readCount} read / {$distributedCount} distributed"
-                        : ($pack ? 'Ready to distribute to the board' : 'Generate once agenda and papers are ready'),
-                    'href' => $pack ? "/governance/packs/{$pack->id}" : "/governance/meetings/{$meeting->id}",
-                ],
-                [
-                    'key' => 'quorum',
-                    'title' => 'Quorum',
-                    'status' => $quorum['met'] ? 'done' : ($quorum['present'] > 0 ? 'in_progress' : 'todo'),
-                    'value' => "{$quorum['present']} / {$quorum['required']}",
-                    'detail' => $quorum['met'] ? 'Quorum confirmed for decision-making.' : 'Attendance still needs to be confirmed.',
-                    'href' => "/governance/meetings/{$meeting->id}?tab=attendance",
-                ],
-                [
-                    'key' => 'resolutions',
-                    'title' => 'Pending Resolutions',
-                    'status' => $pendingResolutions > 0 ? 'in_progress' : 'done',
-                    'value' => $pendingResolutions,
-                    'detail' => $pendingResolutions > 0 ? 'Decision papers still open for this meeting.' : 'Decision papers are prepared or complete.',
-                    'href' => "/governance/meetings/{$meeting->id}?tab=resolutions",
-                ],
-                [
-                    'key' => 'minutes',
-                    'title' => 'Minutes',
-                    'status' => in_array($minutesStatus, ['signed', 'archived'], true) ? 'done' : ($meeting->minutes ? 'in_progress' : 'todo'),
-                    'value' => $meeting->minutes ? $this->titleize($meeting->minutes->status) : 'Not drafted',
-                    'detail' => $meeting->minutes
-                        ? 'Version '.$meeting->minutes->version_number.' is currently '.$this->titleize($meeting->minutes->status).'.'
-                        : 'Minutes will be drafted after the meeting.',
-                    'href' => "/governance/meetings/{$meeting->id}?tab=minutes",
-                ],
-                [
-                    'key' => 'follow_through',
-                    'title' => 'Previous Follow-through',
-                    'status' => $previousOpenItems->isEmpty() ? 'done' : 'warning',
-                    'value' => $previousOpenItems->count(),
-                    'detail' => $previousOpenItems->isEmpty()
-                        ? 'No open follow-through from the previous governance cycle.'
-                        : 'Open action items remain from the last meeting cycle.',
-                    'href' => '/governance/actions',
-                ],
+        $cards = collect([
+            [
+                'key' => 'ceo_report',
+                'title' => 'CEO Report',
+                'status' => $ceoSubmitted ? 'done' : ($meeting->ceo_report_deadline && $meeting->ceo_report_deadline->isPast() ? 'warning' : 'todo'),
+                'value' => $ceoSubmitted ? 'Submitted' : 'Pending',
+                'detail' => $meeting->ceo_report_deadline
+                    ? 'Due '.$meeting->ceo_report_deadline->timezone('Pacific/Auckland')->format('j M Y g:i A')
+                    : 'No deadline set',
+                'href' => $meeting->ceoReport ? "/governance/ceo-reports/{$meeting->ceoReport->id}" : '/governance/ceo-reports',
             ],
+            [
+                'key' => 'pack_readiness',
+                'title' => 'Board Pack',
+                'status' => $pack?->distributed_at ? 'done' : ($pack ? 'in_progress' : 'todo'),
+                'value' => $pack?->distributed_at ? 'Distributed' : ($pack ? 'Generated' : 'Not started'),
+                'detail' => $pack?->distributed_at
+                    ? "{$readCount} read / {$distributedCount} distributed"
+                    : ($pack ? 'Ready to distribute to the board' : 'Generate once agenda and papers are ready'),
+                'href' => $pack ? "/governance/packs/{$pack->id}" : "/governance/meetings/{$meeting->id}",
+            ],
+            [
+                'key' => 'quorum',
+                'title' => 'Quorum',
+                'status' => $quorum['met'] ? 'done' : ($quorum['present'] > 0 ? 'in_progress' : 'todo'),
+                'value' => "{$quorum['present']} / {$quorum['required']}",
+                'detail' => $quorum['met'] ? 'Quorum confirmed for decision-making.' : 'Attendance still needs to be confirmed.',
+                'href' => "/governance/meetings/{$meeting->id}?tab=attendance",
+            ],
+            [
+                'key' => 'resolutions',
+                'title' => 'Pending Resolutions',
+                'status' => $pendingResolutions > 0 ? 'in_progress' : 'done',
+                'value' => $pendingResolutions,
+                'detail' => $pendingResolutions > 0 ? 'Decision papers still open for this meeting.' : 'Decision papers are prepared or complete.',
+                'href' => "/governance/meetings/{$meeting->id}?tab=resolutions",
+            ],
+            [
+                'key' => 'minutes',
+                'title' => 'Minutes',
+                'status' => in_array($minutesStatus, ['signed', 'archived'], true) ? 'done' : ($meeting->minutes ? 'in_progress' : 'todo'),
+                'value' => $meeting->minutes ? $this->titleize($meeting->minutes->status) : 'Not drafted',
+                'detail' => $meeting->minutes
+                    ? 'Version '.$meeting->minutes->version_number.' is currently '.$this->titleize($meeting->minutes->status).'.'
+                    : 'Minutes will be drafted after the meeting.',
+                'href' => "/governance/meetings/{$meeting->id}?tab=minutes",
+            ],
+            [
+                'key' => 'follow_through',
+                'title' => 'Previous Follow-through',
+                'status' => $previousOpenItems->isEmpty() ? 'done' : 'warning',
+                'value' => $previousOpenItems->count(),
+                'detail' => $previousOpenItems->isEmpty()
+                    ? 'No open follow-through from the previous governance cycle.'
+                    : 'Open action items remain from the last meeting cycle.',
+                'href' => '/governance/actions',
+            ],
+        ]);
+
+        if (! $includePackCard) {
+            $cards = $cards->reject(fn (array $card) => $card['key'] === 'pack_readiness');
+        }
+
+        return [
+            'cards' => $cards->values()->all(),
             'next_step' => $workflowChecklist['next_step'] ?? null,
         ];
     }
@@ -754,7 +807,7 @@ class GovernancePresenter
         };
     }
 
-    protected function meetingReadinessCard(): array
+    protected function meetingReadinessCard(?User $user): array
     {
         $meeting = GovernanceMeeting::query()
             ->with(['agendaItems', 'boardPack', 'ceoReport', 'resolutions', 'attendances'])
@@ -780,15 +833,21 @@ class GovernancePresenter
         $daysUntilMeeting = now()->startOfDay()->diffInDays($meeting->scheduled_at?->copy()->startOfDay(), false);
         $quorum = $meeting->calculateQuorum();
         $agendaCount = $meeting->agendaItems->count();
-        $packDistributed = (bool) $meeting->boardPack?->distributed_at;
+        $pack = $user
+            ? $this->boardPackAccess->visiblePack($user, $meeting->boardPack)
+            : null;
+        $canManagePacks = $user !== null && $this->boardPackAccess->canManage($user);
+        $includePackMetric = $canManagePacks || $pack !== null;
+        $packDistributed = (bool) $pack?->distributed_at;
         $ceoSubmitted = in_array($meeting->ceoReport?->status, ['submitted', 'included_in_pack'], true);
         $pendingResolutions = $meeting->resolutions->whereIn('status', ['draft', 'open'])->count();
 
         $status = 'good';
-        if ($daysUntilMeeting <= 7 && (! $packDistributed || ! $ceoSubmitted || ! $quorum['met'])) {
+        $packNeedsAttention = $canManagePacks && ! $packDistributed;
+        if ($daysUntilMeeting <= 7 && ($packNeedsAttention || ! $ceoSubmitted || ! $quorum['met'])) {
             $status = 'warning';
         }
-        if ($daysUntilMeeting <= 3 && ($agendaCount === 0 || ! $packDistributed)) {
+        if ($daysUntilMeeting <= 3 && ($agendaCount === 0 || $packNeedsAttention)) {
             $status = 'critical';
         }
 
@@ -799,13 +858,15 @@ class GovernancePresenter
             $status,
             'Governance meetings, board packs, CEO reports',
             $this->derivedFreshness(),
-            [
+            array_values(array_filter([
                 $this->metric('Next meeting', $meeting->scheduled_at?->timezone('Pacific/Auckland')->format('j M g:i A') ?? 'TBC'),
                 $this->metric('Agenda items', $agendaCount, $agendaCount === 0 ? 'warning' : 'default'),
-                $this->metric('Pack', $packDistributed ? 'Distributed' : ($meeting->boardPack ? 'Generated' : 'Not started'), $packDistributed ? 'default' : 'warning'),
+                $includePackMetric
+                    ? $this->metric('Pack', $packDistributed ? 'Distributed' : ($pack ? 'Generated' : 'Not started'), $packDistributed ? 'default' : 'warning')
+                    : null,
                 $this->metric('CEO report', $ceoSubmitted ? 'Submitted' : 'Pending', $ceoSubmitted ? 'default' : 'warning'),
                 $this->metric('Pending resolutions', $pendingResolutions, $pendingResolutions > 0 ? 'warning' : 'default'),
-            ],
+            ])),
             array_values(array_filter([
                 $meeting->title,
                 $meeting->location ? "Location: {$meeting->location}" : null,

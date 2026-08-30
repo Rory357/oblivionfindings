@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Models\Asset;
 use App\Models\AuditLog;
 use App\Models\ClientControlledDrugDiscrepancy;
@@ -20,6 +21,7 @@ class ReportsController extends Controller
 {
     public function __construct(
         private readonly MedicationGovernanceScopeService $medicationScope,
+        private readonly BoardPackAccessService $boardPackAccess,
     ) {}
 
     public function index(Request $request)
@@ -37,7 +39,7 @@ class ReportsController extends Controller
             $user,
             $medicationSiteIds,
         );
-        $generalAuditActivity = $this->generalAuditActivityQuery();
+        $generalAuditActivity = $this->generalAuditActivityQuery($user);
 
         $kpis = [
             'openIncidents' => ClientIncident::query()
@@ -187,10 +189,11 @@ class ReportsController extends Controller
         return $query;
     }
 
-    private function generalAuditActivityQuery(): Builder
+    private function generalAuditActivityQuery(User $user): Builder
     {
         $query = AuditLog::query();
         $this->excludeMedicationAuditFamilies($query);
+        $this->boardPackAccess->scopeAuditVisibility($query, $user);
 
         return $query;
     }
@@ -225,7 +228,7 @@ class ReportsController extends Controller
     private function moduleSummaryQuery(array $module, User $user, array $siteIds): Builder
     {
         return match ($this->moduleMedicationGovernance($module)) {
-            'general_audit' => $this->generalAuditActivityQuery(),
+            'general_audit' => $this->generalAuditActivityQuery($user),
             'administration' => $this->medicationAdministrationQuery($user, $siteIds),
             'controlled' => $this->controlledDiscrepancyQuery($user, $siteIds),
             default => $module['model']::query(),

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Governance\Models\BoardPack;
+use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Models\Asset;
 use App\Models\AuditLog;
 use App\Models\ClientBreakGlassAccess;
@@ -22,6 +24,7 @@ class CombinedReportController extends Controller
 {
     public function __construct(
         private readonly MedicationGovernanceScopeService $medicationScope,
+        private readonly BoardPackAccessService $boardPackAccess,
     ) {}
 
     public function show(Request $request, string $report)
@@ -301,7 +304,7 @@ class CombinedReportController extends Controller
                 ],
             ];
         } else {
-            $generalAuditActivity = $this->generalAuditActivityQuery();
+            $generalAuditActivity = $this->generalAuditActivityQuery($user);
             $metrics = [
                 ['label' => 'Audit events (7d)', 'value' => (clone $generalAuditActivity)->where('created_at', '>=', $from7)->count()],
                 ['label' => 'Overdue asset inspections', 'value' => Asset::query()->where('requires_inspection', true)->whereNotNull('inspection_due_at')->where('inspection_due_at', '<', $now->toDateString())->count()],
@@ -437,10 +440,11 @@ class CombinedReportController extends Controller
         return $query;
     }
 
-    private function generalAuditActivityQuery(): Builder
+    private function generalAuditActivityQuery(User $user): Builder
     {
         $query = AuditLog::query();
         $this->excludeMedicationAuditFamilies($query);
+        $this->excludeBoardPackAuditUnlessManager($query, $user);
 
         return $query;
     }
@@ -464,6 +468,24 @@ class CombinedReportController extends Controller
                         ->where('action', 'not like', 'controlled_drug%')
                         ->where('action', 'not like', 'cd.%')
                         ->where('action', 'not like', 'cd\_%');
+                });
+        });
+    }
+
+    private function excludeBoardPackAuditUnlessManager(Builder $query, User $user): void
+    {
+        if ($this->boardPackAccess->canManage($user)) {
+            return;
+        }
+
+        $query->where(function (Builder $nonPack): void {
+            $nonPack->whereNull('auditable_type')
+                ->orWhereNotIn('auditable_type', [BoardPack::class, 'BoardPack']);
+        })->where(function (Builder $nonPackAction): void {
+            $nonPackAction->whereNull('action')
+                ->orWhere(function (Builder $action): void {
+                    $action->where('action', 'not like', 'boardpack.%')
+                        ->where('action', 'not like', 'board_pack.%');
                 });
         });
     }

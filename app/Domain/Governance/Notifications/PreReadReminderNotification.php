@@ -4,11 +4,10 @@ namespace App\Domain\Governance\Notifications;
 
 use App\Domain\Governance\Models\GovernanceMeeting;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class PreReadReminderNotification extends Notification implements ShouldQueue
+class PreReadReminderNotification extends Notification
 {
     use Queueable;
 
