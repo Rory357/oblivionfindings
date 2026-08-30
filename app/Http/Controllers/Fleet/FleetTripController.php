@@ -2,29 +2,44 @@
 
 namespace App\Http\Controllers\Fleet;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Controller;
+use App\Models\Asset;
+use App\Models\FleetDriverSession;
 use App\Models\FleetTelemetryEvent;
 use App\Models\FleetTrip;
-use App\Models\FleetDriverSession;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class FleetTripController extends Controller
 {
-    public function show(Request $request, FleetTrip $trip)
+    /** @var list<string> */
+    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
+
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
+    public function show(Request $request, int $trip)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('fleet.viewAny'), 403);
 
-        $trip->load(['asset:id,name,asset_tag', 'driverSession.user:id,name']);
+        $visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
+        $trip = $this->visibleTripsQuery($visibleSiteIds)->findOrFail($trip);
+        $trip->load('asset:id,name,asset_tag');
+
+        $visibleDriverSessions = $this->visibleDriverSessionsQuery($trip, $visibleSiteIds);
+        $currentDriverSession = $trip->driver_session_id
+            ? (clone $visibleDriverSessions)->with('user:id,name')->find($trip->driver_session_id)
+            : null;
 
         AuditLogger::log('fleet.trip.view', $trip, [
             'trip_id' => $trip->id,
         ]);
 
-        $drivers = FleetDriverSession::query()
-            ->where('asset_id', $trip->asset_id)
+        $drivers = (clone $visibleDriverSessions)
             ->with('user:id,name')
             ->orderByDesc('started_at')
             ->limit(10)
@@ -39,10 +54,10 @@ class FleetTripController extends Controller
                     'name' => $trip->asset->name,
                     'asset_tag' => $trip->asset->asset_tag,
                 ] : null,
-                'driver_session_id' => $trip->driver_session_id,
-                'driver' => $trip->driverSession?->user ? [
-                    'id' => $trip->driverSession->user->id,
-                    'name' => $trip->driverSession->user->name,
+                'driver_session_id' => $currentDriverSession?->id,
+                'driver' => $currentDriverSession?->user ? [
+                    'id' => $currentDriverSession->user->id,
+                    'name' => $currentDriverSession->user->name,
                 ] : null,
                 'started_at' => optional($trip->started_at)->toISOString(),
                 'ended_at' => optional($trip->ended_at)->toISOString(),
@@ -55,7 +70,7 @@ class FleetTripController extends Controller
                 'status' => $trip->status,
                 'consent_blocked' => $trip->consent_blocked,
             ],
-            'driver_sessions' => $drivers->map(fn($d) => [
+            'driver_sessions' => $drivers->map(fn ($d) => [
                 'id' => $d->id,
                 'user' => $d->user ? [
                     'id' => $d->user->id,
@@ -70,10 +85,13 @@ class FleetTripController extends Controller
         ]);
     }
 
-    public function playback(Request $request, FleetTrip $trip)
+    public function playback(Request $request, int $trip)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('fleet.viewAny'), 403);
+
+        $visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
+        $trip = $this->visibleTripsQuery($visibleSiteIds)->findOrFail($trip);
 
         $query = FleetTelemetryEvent::query()
             ->where('asset_id', $trip->asset_id)
@@ -91,7 +109,7 @@ class FleetTripController extends Controller
 
         return response()->json([
             'trip_id' => $trip->id,
-            'points' => $points->map(fn($p) => [
+            'points' => $points->map(fn ($p) => [
                 'occurred_at' => optional($p->occurred_at)->toISOString(),
                 'lat' => $p->latitude,
                 'lng' => $p->longitude,
@@ -155,5 +173,109 @@ class FleetTripController extends Controller
         $trip->delete();
 
         return redirect()->route('fleet-assets.trips.index')->with('success', 'Trip deleted.');
+    }
+
+    /** @param list<int> $siteIds */
+    private function visibleTripsQuery(array $siteIds): Builder
+    {
+        return FleetTrip::query()->whereIn(
+            'asset_id',
+            $this->applyTripAssetSiteScope(Asset::query()->vehicles(), $siteIds)->select('assets.id'),
+        );
+    }
+
+    /** @param list<int> $siteIds */
+    private function applyTripAssetSiteScope(Builder $query, array $siteIds): Builder
+    {
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $siteColumn = $query->qualifyColumn('site_id');
+        $homeSiteColumn = $query->qualifyColumn('home_site_id');
+        $clientColumn = $query->qualifyColumn('client_id');
+
+        return $query->where(function (Builder $provenance) use (
+            $siteIds,
+            $siteColumn,
+            $homeSiteColumn,
+            $clientColumn,
+        ): void {
+            $provenance->where(function (Builder $directSite) use ($siteIds, $siteColumn, $clientColumn): void {
+                $directSite->whereIn($siteColumn, $siteIds)
+                    ->whereHas('site', fn (Builder $site) => $this->applyOperationalSiteScope($site))
+                    ->where(function (Builder $clientAgreement) use ($siteColumn, $clientColumn): void {
+                        $clientAgreement->whereNull($clientColumn)
+                            ->orWhereHas('client', fn (Builder $client) => $client
+                                ->whereColumn($client->qualifyColumn('site_id'), $siteColumn)
+                                ->whereHas('site', fn (Builder $site) => $this->applyOperationalSiteScope($site)));
+                    });
+            })->orWhere(function (Builder $homeSite) use (
+                $siteIds,
+                $siteColumn,
+                $homeSiteColumn,
+                $clientColumn,
+            ): void {
+                $homeSite->whereNull($siteColumn)
+                    ->whereIn($homeSiteColumn, $siteIds)
+                    ->whereHas('homeSite', fn (Builder $site) => $this->applyOperationalSiteScope($site))
+                    ->where(function (Builder $clientAgreement) use ($homeSiteColumn, $clientColumn): void {
+                        $clientAgreement->whereNull($clientColumn)
+                            ->orWhereHas('client', fn (Builder $client) => $client
+                                ->whereColumn($client->qualifyColumn('site_id'), $homeSiteColumn)
+                                ->whereHas('site', fn (Builder $site) => $this->applyOperationalSiteScope($site)));
+                    });
+            })->orWhere(function (Builder $clientSite) use (
+                $siteIds,
+                $siteColumn,
+                $homeSiteColumn,
+                $clientColumn,
+            ): void {
+                $clientSite->whereNull($siteColumn)
+                    ->whereNull($homeSiteColumn)
+                    ->whereNotNull($clientColumn)
+                    ->whereHas('client', fn (Builder $client) => $client
+                        ->whereIn($client->qualifyColumn('site_id'), $siteIds)
+                        ->whereHas('site', fn (Builder $site) => $this->applyOperationalSiteScope($site)));
+            });
+        });
+    }
+
+    private function applyOperationalSiteScope(Builder $query): Builder
+    {
+        return $query
+            ->where($query->qualifyColumn('is_active'), true)
+            ->where($query->qualifyColumn('archived'), false)
+            ->whereNull($query->qualifyColumn('archived_at'));
+    }
+
+    /** @param list<int> $siteIds */
+    private function visibleDriverSessionsQuery(FleetTrip $trip, array $siteIds): Builder
+    {
+        return FleetDriverSession::query()
+            ->where('asset_id', $trip->asset_id)
+            ->whereHas('user', function (Builder $userQuery) use ($siteIds): void {
+                $this->applyHistoricalTripDriverSiteScope($userQuery, $siteIds);
+            });
+    }
+
+    /** @param list<int> $siteIds */
+    private function applyHistoricalTripDriverSiteScope(Builder $query, array $siteIds): Builder
+    {
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $profiles = HrEmployeeProfile::withTrashed()
+            ->select('user_id')
+            ->where(function (Builder $siteQuery) use ($siteIds): void {
+                $siteQuery->whereIn('primary_site_id', $siteIds);
+
+                foreach ($siteIds as $siteId) {
+                    $siteQuery->orWhereJsonContains('secondary_site_ids', $siteId);
+                }
+            });
+
+        return $query->whereIn($query->qualifyColumn('id'), $profiles);
     }
 }
