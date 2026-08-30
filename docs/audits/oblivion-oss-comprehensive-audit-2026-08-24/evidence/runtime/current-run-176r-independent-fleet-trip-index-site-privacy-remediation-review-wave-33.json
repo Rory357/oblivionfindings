@@ -1,0 +1,176 @@
+{
+  "schema_version": "run-176r-independent-fleet-trip-index-site-privacy-remediation-review-wave-33-v1",
+  "run_id": "RUN-176R-INDEPENDENT-FLEET-TRIP-INDEX-SITE-PRIVACY-01-REMEDIATION-REVIEW-WAVE-33",
+  "status": "GO_EXACT_RUN176_ARTIFACT_REVIEW_NEW_HISTORICAL_REMEDIATED_REPORTING_AUTHORIZED_ZERO_STATIC_OWNERSHIP_PUBLICATION_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "materialized_on": "2026-08-30",
+  "architecture_boundary": "One operating organisation across multiple Sites; approved Site access, exact roles and permissions, canonical Asset provenance, direct-object denial, and privacy are the boundaries. Site is provenance, not a tenant boundary.",
+  "pins": {
+    "application_baseline_commit": "13a7f37da9c966fa531f20e82b1bb9eac814e041",
+    "application_baseline_tree": "e952efb7d0b1446d2c6b67bbd28339bd906d1b38",
+    "fix_commit": "790bc11e3fb2b17a0eb8ba96e2cdea87ba8175b5",
+    "fix_tree": "657abb07867068865f935008c2c43dea38c867c8",
+    "clean_audit_release_commit": "13a7f37da9c966fa531f20e82b1bb9eac814e041",
+    "clean_audit_release_tree": "e952efb7d0b1446d2c6b67bbd28339bd906d1b38",
+    "local_main_merge_commit": "c643c9e5eecf3b4272f55ec6d5aab4b99c3e300d",
+    "local_main_tree": "657abb07867068865f935008c2c43dea38c867c8",
+    "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "stable_patch_id": "a602e6dfa300cad25462998039558b03536e6c0c",
+    "application_published": false,
+    "producer_generator": {
+      "path": "generators/materialize-run-176-fleet-trip-index-site-privacy-remediation-wave-33.py",
+      "sha256": "26386c9394da1ce73274e8d9a4c19e45fd5bad7409d37770401eb0b491a6f9ba",
+      "git_blob_id": "ccecc5b7fab536143bc94a8698fba23e9c60678e",
+      "bytes": 33454,
+      "lines": 814
+    },
+    "producer_receipt": {
+      "path": "evidence/runtime/current-run-176-fleet-trip-index-site-privacy-remediation-wave-33.json",
+      "sha256": "6e9fa6d855e6ec168d4c651921702dab8872810ddd89f6ba3cd353bf49e0c87c",
+      "git_blob_id": "f1f96f69ea70d9962342cd1f64ea532f81a00eab",
+      "bytes": 17327,
+      "lines": 414,
+      "receipt_self_seal_sha256": "541e2cc0c0a167b48cfac6e96ab2286d9898cb737dec2eb115b41d56e74b9617"
+    },
+    "review_materializer": {
+      "path": "generators/materialize-independent-run-176-fleet-trip-index-site-privacy-remediation-review-wave-33.py",
+      "sha256": "15ecb5bb1982c8647f30da697da35593deef6575b3c19806920b7596be2834c3",
+      "git_blob_id": "d9113acd0d38c142021c30f08f9e5a7a0309af36",
+      "bytes": 34245,
+      "lines": 856
+    },
+    "current_findings_before_run_177": {
+      "path": "findings.json",
+      "sha256": "32675839fb79d66d49d93a97be66f2805d854231c6ca8c513d336941c6291b0e",
+      "git_blob_id": "ee6d5ac14e7b492b612ef5a84d7c6e199760507d",
+      "bytes": 561735,
+      "lines": 10073
+    },
+    "dirty_allowlist": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-176-fleet-trip-index-site-privacy-remediation-wave-33.json",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-176r-independent-fleet-trip-index-site-privacy-remediation-review-wave-33.json",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-run-176-fleet-trip-index-site-privacy-remediation-review-wave-33.py",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-176-fleet-trip-index-site-privacy-remediation-wave-33.py"
+    ]
+  },
+  "review": {
+    "reviewer_lane": "/root/run176_producer_review",
+    "independent_pre_execution_review_wrote_files": false,
+    "review_materializer_implemented_after_go": true,
+    "review_materialized_by_root": true,
+    "reviewer_executed_php_tests_browser_or_database": false,
+    "reviewer_wrote_application_or_live_reporting_files": false,
+    "checks": {
+      "strict_json_zero_duplicate_keys": true,
+      "lf_no_bom_no_trailing_whitespace": true,
+      "pretty_json_round_trip": true,
+      "canonical_self_seal": true,
+      "commit_tree_parent_subject_patch_id": true,
+      "two_path_order_status_numstat_blob_sha_bytes_lines": true,
+      "zero_path_audit_advance_and_transferred_byte_equality": true,
+      "origin_tracking_tip_local_divergence_and_nonpublication": true,
+      "root_and_delegated_red_execution_distinguished": true,
+      "runtime_arithmetic_replay_and_supporting_exclusions": true,
+      "current_register_12_records_and_fleet_record_absent": true,
+      "cleanup_and_unrelated_process_boundary": true,
+      "static_ownership_index_84_and_candidate_boundary": true,
+      "credit_noninheritance_and_completion_boundaries": true,
+      "four_path_dirty_allowlist": true
+    },
+    "discrepancies": []
+  },
+  "decision": {
+    "verdict": "GO",
+    "blocking_discrepancies": 0,
+    "new_historical_remediated_record_reporting_authorized": true,
+    "authorized_live_reporting_run": "RUN-177",
+    "authorized_finding_id": "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
+    "authorized_candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "authorized_reporting_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "authorized_live_count_delta": {
+      "retained_claim_records": 1,
+      "current_provisional_source_claims": 0,
+      "historical_already_fixed_records": 0,
+      "historical_remediated_records": 1,
+      "final_P0": 0,
+      "final_P1": 0,
+      "benchmark_mapped": 0,
+      "final_no_match_or_NCM": 0,
+      "benchmark_unresolved": 0,
+      "static_owner_records": 0,
+      "static_route_owners": 0,
+      "static_page_owners": 0,
+      "static_controller_action_bridges": 0,
+      "direct_exact_queue_reviewed": 0
+    },
+    "authorized_resulting_lineage": {
+      "retained_claim_records": 13,
+      "current_provisional_source_claims": 8,
+      "historical_already_fixed_records": 2,
+      "historical_remediated_records": 3,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "authorized_unique_bounded_disposition_increment": {
+      "prior_tests": 83,
+      "prior_assertions": 1589,
+      "tests": 5,
+      "assertions": 175,
+      "resulting_tests": 88,
+      "resulting_assertions": 1764,
+      "post_merge_focused_counted_once": true,
+      "root_or_delegated_red_counted": false,
+      "isolated_replay_counted_again": false,
+      "supporting_runs_counted": false
+    },
+    "static_ownership_remains_pending": {
+      "ownership_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+      "next_zero_based_index": 84,
+      "next_queue_id": "RUN090-ROUTE-0085",
+      "next_route_record_id": "RUN077-ROUTE-0693",
+      "route_owner_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "queue_advance_authorized": false
+    },
+    "live_reporting_changed_by_run_176r": false,
+    "run_177_required": true,
+    "run_178_fresh_dashboard_verification_required": true
+  },
+  "credit_boundary": {
+    "independent_exact_artifact_review_for_new_historical_remediated_reporting": true,
+    "application_remediation_reexecution": false,
+    "runtime_reexecution": false,
+    "application_publication": false,
+    "live_reporting": false,
+    "static_route_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_advance": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "final_finding": false,
+    "pass": false,
+    "release": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-run-176-fleet-trip-index-site-privacy-remediation-review-wave-33.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-176r-independent-fleet-trip-index-site-privacy-remediation-review-wave-33.json"
+  ],
+  "receipt_self_seal_sha256": "a596b81ded6db13d312bdcbf52deb7a3e088f8404d81c774b3f5910c86140f49"
+}
