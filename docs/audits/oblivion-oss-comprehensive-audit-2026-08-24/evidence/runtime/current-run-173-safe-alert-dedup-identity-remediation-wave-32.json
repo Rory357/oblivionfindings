@@ -1,0 +1,279 @@
+{
+  "schema_version": "run-173-safe-alert-dedup-identity-remediation-wave-32-v1",
+  "run_id": "RUN-173-SAFE-ALERT-DEDUP-IDENTITY-01-REMEDIATION-WAVE-32",
+  "status": "CURRENT_SAFE_ALERT_DEDUP_IDENTITY_DEFECT_REPRODUCED_REMEDIATED_LOCALLY_INTEGRATED_BOUNDED_VERIFIED_NOT_PUBLISHED_REPORTING_NOT_YET_AUTHORIZED_ZERO_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "materialized_on": "2026-08-30",
+  "architecture_boundary": "One operating organisation across multiple Sites; Site access, exact roles and permissions, canonical ownership, direct-object denial, privacy, consent, and concern identity are the boundaries. Site and client are provenance, not tenant or concern identity.",
+  "pins": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "continuation_prompt_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "application_baseline_commit": "e488bd3edcda0f154f87e8bbed972f14db409b82",
+    "application_baseline_tree": "9e93b8aea4f4b907cde3dc59dd0520fba5bd7080",
+    "fix_commit": "dc04067e304adebb47335d4f65e8c61061ec6e29",
+    "fix_tree": "15a2e4b47788e9f2779030ec6d4d9ca7c1022727",
+    "fix_parent": "e488bd3edcda0f154f87e8bbed972f14db409b82",
+    "fix_commit_subject": "Fix safeguarding alert dedup identity",
+    "stable_patch_id": "af3daf2bf52f9f8865a139df36375819416ce370",
+    "clean_audit_release_commit": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "clean_audit_release_tree": "9ba0e09593c890908bdd8a9f3f1cc1f7b9fddeda",
+    "local_main_merge_commit": "705db2dc3ba05a8fdf647cd28bdc9c226a694068",
+    "local_main_tree": "59b4fc58567f64bc80ff3d2e47b52860ce44cb02",
+    "merge_parents": [
+      "c39b076547056b1e158c604957a04bd8b75b0f29",
+      "dc04067e304adebb47335d4f65e8c61061ec6e29"
+    ],
+    "merge_subject": "Merge SAFE-ALERT-DEDUP-IDENTITY-01",
+    "audit_advance_from_baseline": {
+      "path_count": 18,
+      "audit_root_only": true,
+      "transferred_paths_unchanged": true
+    },
+    "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead": 2,
+    "local_main_behind": 0,
+    "application_remote_publication_observed": false,
+    "publication_authorized": false,
+    "materializer": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-173-safe-alert-dedup-identity-remediation-wave-32.py",
+      "sha256": "132cb9ad5be6ca420070d67014ab3f8b625c0924022976ab3d2f0262c1ae55ae",
+      "git_blob_id": "087f12a17ffec68c8f99f993935a79ab79f731ce",
+      "bytes": 19802,
+      "lines": 471
+    },
+    "baseline_service": {
+      "path": "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php",
+      "sha256": "b965cb3ad99d38e241db211cac80a4e872fa01ac1465b63c11fdbe21f84a8fb3",
+      "git_blob_id": "77283467065e32c6d295a54161609fd094093fcf",
+      "bytes": 15317,
+      "lines": 391
+    },
+    "fix_source_and_regression_test": [
+      {
+        "path": "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php",
+        "sha256": "f9ab84ec5db2594eec393d39ba93dd4554c7d77193f2a286c2965cdde6a74898",
+        "git_blob_id": "947d0a75c98a5151e920b541d56493fb39b540fd",
+        "bytes": 15643,
+        "lines": 395,
+        "insertions": 4,
+        "deletions": 0
+      },
+      {
+        "path": "tests/Feature/ControlRoom/SafeguardingAlertDedupIdentityReproductionTest.php",
+        "sha256": "a8d813f1878c6a720f5308f28e5a591f90097961444876f93fcfe5a9262e909a",
+        "git_blob_id": "32ee456e6b1d1328fccb42c0c532a368ba1e1720",
+        "bytes": 11985,
+        "lines": 277,
+        "insertions": 277,
+        "deletions": 0
+      }
+    ],
+    "merged_source_and_regression_test": [
+      {
+        "path": "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php",
+        "sha256": "f9ab84ec5db2594eec393d39ba93dd4554c7d77193f2a286c2965cdde6a74898",
+        "git_blob_id": "947d0a75c98a5151e920b541d56493fb39b540fd",
+        "bytes": 15643,
+        "lines": 395,
+        "insertions": 4,
+        "deletions": 0
+      },
+      {
+        "path": "tests/Feature/ControlRoom/SafeguardingAlertDedupIdentityReproductionTest.php",
+        "sha256": "a8d813f1878c6a720f5308f28e5a591f90097961444876f93fcfe5a9262e909a",
+        "git_blob_id": "32ee456e6b1d1328fccb42c0c532a368ba1e1720",
+        "bytes": 11985,
+        "lines": 277,
+        "insertions": 277,
+        "deletions": 0
+      }
+    ]
+  },
+  "issue_first_disposition": {
+    "finding_id": "SAFE-ALERT-DEDUP-IDENTITY-01",
+    "feature_id": "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
+    "related_feature_ids": [
+      "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+      "CAP-SAFE-TERMINAL-PROJECTION"
+    ],
+    "verdict": "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED",
+    "new_discovery_stopped_after_confirmation": true,
+    "exclusive_remediation_paths": [
+      "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php",
+      "tests/Feature/ControlRoom/SafeguardingAlertDedupIdentityReproductionTest.php"
+    ],
+    "red_baseline": {
+      "commit": "e488bd3edcda0f154f87e8bbed972f14db409b82",
+      "focused_cases": 5,
+      "failed": 4,
+      "warning_pass": 1,
+      "assertions_reported": 10,
+      "passing_denominator_credit": 0,
+      "observations": [
+        "distinct same-client safeguarding concern suppressed",
+        "distinct same-Site personless safeguarding concern suppressed",
+        "distinct cross-Site personless safeguarding concern suppressed",
+        "observer custody could not retain two concern-owned alert chains"
+      ],
+      "already_preserved_contract": "The same-concern retry case was the warning-pass; it did not prove the four missing distinct-concern boundaries."
+    }
+  },
+  "remediation": {
+    "summary": "Within the existing 30-minute source/type dedup window, safeguard alerts key to context.concern_id before client, asset, or null-entity fallback.",
+    "production_files": 1,
+    "regression_test_files": 1,
+    "changed_paths": 2,
+    "insertions": 281,
+    "deletions": 0,
+    "same_concern_within_30_minutes_idempotent": true,
+    "distinct_concern_ids_separate_regardless_of_client_site_or_personless_state": true,
+    "site_and_client_preserved_as_provenance": true,
+    "existing_global_30_minute_window_preserved": true,
+    "existing_31_minute_critical_escalation_lifecycle_preserved": true,
+    "timeless_identity_introduced": false,
+    "routes_pages_components_copy_or_layout_changed": false,
+    "third_party_source_assets_wording_or_layout_copied": false,
+    "single_tenant_multi_site_boundary_preserved": true
+  },
+  "delegated_runtime_execution": {
+    "execution_owner": "separate Continue OSS audit fixes task",
+    "root_reran_tests_for_run_173": false,
+    "isolated_red_execution": {
+      "failed": 4,
+      "warning_pass": 1,
+      "assertions_reported": 10,
+      "credit": "REPRODUCTION_ONLY_ZERO_PASSING_DENOMINATOR_CREDIT"
+    },
+    "isolated_green_focused": {
+      "tests": 5,
+      "assertions": 60,
+      "duration_seconds": 168.87
+    },
+    "post_merge_green_focused": {
+      "tests": 5,
+      "assertions": 60,
+      "duration_seconds": 154.93,
+      "unique_bounded_disposition_denominator_credit": true
+    },
+    "focused_cases": [
+      "distinct same-client concerns each create their own alert",
+      "distinct same-Site personless concerns each create their own alert",
+      "retrying the same concern after five minutes remains idempotent",
+      "distinct personless concerns do not collapse across Sites",
+      "observer links each concern HsEvent only to its own alert and custody remains unchanged on retry"
+    ],
+    "focused_replay_aggregated_more_than_once": false,
+    "supporting_control_room_bridge_suite": {
+      "tests": 28,
+      "assertions": 73,
+      "duration_seconds": 148.09,
+      "reported_separately": true,
+      "added_to_bounded_disposition_denominator": false
+    },
+    "adjacent_hs_event_safeguarding_filter": {
+      "tests_passed": 3,
+      "assertions": 5,
+      "reported_separately": true,
+      "added_to_bounded_disposition_denominator": false
+    },
+    "terminal_transition_fixture_debt": {
+      "failures": 6,
+      "classification": "PRE_EXISTING_TEST_FIXTURE_DEBT_BEFORE_BRIDGE_OR_DEDUP_EXECUTION",
+      "missing_fixture_fields": [
+        "worksafe_decision_tree_version",
+        "worksafe_source_effective_date"
+      ],
+      "safe_remediation_credit": false,
+      "full_suite_green": false
+    },
+    "syntax": {
+      "files_passed": 2,
+      "result": "PASS"
+    },
+    "pint": {
+      "result": "PASS"
+    },
+    "full_suite_or_coverage_credit": false
+  },
+  "independent_static_review": {
+    "lane": "/root/safe_merge_review",
+    "verdict": "GO",
+    "findings": 0,
+    "executed_tests": false,
+    "wrote_files": false,
+    "exact_merge_commit_tree_parents_and_two_path_delta_verified": true,
+    "baseline_defect_and_30_minute_contract_verified": true,
+    "observer_custody_and_31_minute_lifecycle_verified": true,
+    "exact_run_173_receipt_review_completed": false,
+    "retirement_reporting_authorized": false
+  },
+  "cleanup_evidence": {
+    "isolated_worktree": "C:/w/safe-alert",
+    "isolated_worktree_removed": true,
+    "isolated_branch": "codex/safe-alert-dedup-identity-01",
+    "isolated_branch_deleted": true,
+    "numeric_pid_test_schema_count": 0,
+    "php_or_php_cgi_process_count": 0,
+    "main_clean_before_audit_writes": true
+  },
+  "noninheritance_boundary": {
+    "terminal_transition_fixture_debt_recredited": false,
+    "timeless_retry_credit": false,
+    "within_window_escalation_semantics_credit": false,
+    "unused_escalation_parameter_credit": false,
+    "broader_safeguarding_correctness_credit": false,
+    "application_browser_or_ease_credit": false,
+    "benchmark_mapping_or_NCM_changed": false,
+    "ownership_inventory_queue_or_matrix_changed": false,
+    "full_feature_module_pass_release_or_completion_credit": false
+  },
+  "reporting_boundary": {
+    "current_retained_identity_count": 12,
+    "current_split": "9 provisional + 2 historical already-fixed + 1 historical remediated",
+    "authorized_after_independent_exact_artifact_review": "8 provisional + 2 historical already-fixed + 2 historical remediated",
+    "run_173_changes_live_reporting": false,
+    "run_174_required": true,
+    "run_175_fresh_dashboard_verification_required_after_reporting": true
+  },
+  "credit_boundary": {
+    "historical_condition_confirmed": true,
+    "current_defect_reproduced": true,
+    "application_remediation": true,
+    "bounded_runtime": true,
+    "application_commit_integrated_local_main": true,
+    "application_commit_published": false,
+    "finding_retirement_reporting": false,
+    "terminal_fixture_debt": false,
+    "timeless_retry": false,
+    "within_window_escalation": false,
+    "unused_escalation_parameter": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "full_feature_or_module": false,
+    "release": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-173-safe-alert-dedup-identity-remediation-wave-32.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-173-safe-alert-dedup-identity-remediation-wave-32.json"
+  ],
+  "receipt_self_seal_sha256": "76e16c3a5ae8fe397eb980b648ebe072d280ec36b626eca6c3fb5123c9b47a7a"
+}
