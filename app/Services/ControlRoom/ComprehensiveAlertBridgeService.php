@@ -272,6 +272,10 @@ class ComprehensiveAlertBridgeService
             $dedupQuery
                 ->where('context->workplace_injury_id', (int) $context['workplace_injury_id'])
                 ->actionable();
+        } elseif ($source === 'safeguarding' && ! empty($context['concern_id'])) {
+            // A safeguarding alert belongs to its concern record. Client and
+            // Site identify provenance, but neither is the concern's identity.
+            $dedupQuery->where('context->concern_id', (int) $context['concern_id']);
         } elseif ($clientId) {
             $dedupQuery->where('client_id', $clientId);
         } elseif ($assetId) {
