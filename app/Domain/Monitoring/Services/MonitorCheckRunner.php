@@ -71,13 +71,12 @@ final class MonitorCheckRunner
             ->where('source_key', $sourceKey)
             ->first();
         if ($existing !== null) {
-            return new ObservationResult(
-                observation: $existing,
-                duplicate: true,
-                stateChanged: false,
-                from: $monitor->current_state,
-                to: $monitor->current_state,
-                deviceEvent: null,
+            return $this->ingestor->ingest(
+                monitor: $monitor,
+                input: ObservationInput::fromObservation($existing),
+                siteId: $siteId,
+                deviceId: (int) $monitor->device_id,
+                collectorReference: null,
             );
         }
 

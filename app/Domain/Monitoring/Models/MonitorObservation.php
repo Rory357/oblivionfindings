@@ -21,10 +21,26 @@ class MonitorObservation extends Model
     use HasFactory, WritesLegacyStorageContext;
 
     public const array IMMUTABLE_PROVENANCE_ATTRIBUTES = [
+        'id',
         'monitor_id',
         'device_id',
         'site_id',
         'collector_id',
+    ];
+
+    private const array IMMUTABLE_EVIDENCE_ATTRIBUTES = [
+        ...self::IMMUTABLE_PROVENANCE_ATTRIBUTES,
+        'source_key',
+        'state',
+        'value',
+        'unit',
+        'latency_ms',
+        'message',
+        'metrics',
+        'metric_data_class',
+        'metric_privacy_class',
+        'observed_at',
+        'ingested_at',
     ];
 
     private static bool $provenanceColumnsAvailable = false;
@@ -43,8 +59,11 @@ class MonitorObservation extends Model
         'latency_ms',
         'message',
         'metrics',
+        'metric_data_class',
+        'metric_privacy_class',
         'observed_at',
         'ingested_at',
+        'metrics_projected_at',
     ];
 
     protected $casts = [
@@ -54,6 +73,7 @@ class MonitorObservation extends Model
         'metrics' => 'array',
         'observed_at' => 'datetime',
         'ingested_at' => 'datetime',
+        'metrics_projected_at' => 'immutable_datetime',
     ];
 
     public function monitor(): BelongsTo
@@ -78,8 +98,13 @@ class MonitorObservation extends Model
 
     public function fill(array $attributes)
     {
-        if ($this->exists && array_intersect(array_keys($attributes), self::IMMUTABLE_PROVENANCE_ATTRIBUTES) !== []) {
-            throw new \LogicException('Monitoring observation provenance is immutable.');
+        if ($this->exists
+            && array_intersect(array_keys($attributes), self::IMMUTABLE_EVIDENCE_ATTRIBUTES) !== []) {
+            throw new \LogicException('Monitoring observation evidence is immutable.');
+        }
+
+        if ($this->exists && array_key_exists('metrics_projected_at', $attributes)) {
+            $this->assertValidProjectionSealTransition($attributes['metrics_projected_at']);
         }
 
         return parent::fill($attributes);
@@ -105,6 +130,10 @@ class MonitorObservation extends Model
 
     protected function performInsert(Builder $query)
     {
+        if ($this->getAttribute('metrics_projected_at') !== null) {
+            throw new \LogicException('Monitoring metric projection seal must begin pending.');
+        }
+
         if (self::supportsProvenanceColumns()) {
             $monitor = Monitor::query()
                 ->with('collector')
@@ -124,10 +153,21 @@ class MonitorObservation extends Model
 
     protected function performUpdate(Builder $query)
     {
-        if ($this->isDirty(self::IMMUTABLE_PROVENANCE_ATTRIBUTES)) {
-            throw new \LogicException('Monitoring observation provenance is immutable.');
+        if ($this->isDirty(self::IMMUTABLE_EVIDENCE_ATTRIBUTES)) {
+            throw new \LogicException('Monitoring observation evidence is immutable.');
+        }
+
+        if ($this->isDirty('metrics_projected_at')) {
+            $this->assertValidProjectionSealTransition($this->getAttribute('metrics_projected_at'));
         }
 
         return parent::performUpdate($query);
+    }
+
+    private function assertValidProjectionSealTransition(mixed $value): void
+    {
+        if ($this->getRawOriginal('metrics_projected_at') !== null || $value === null) {
+            throw new \LogicException('Monitoring metric projection seal is monotonic.');
+        }
     }
 }
