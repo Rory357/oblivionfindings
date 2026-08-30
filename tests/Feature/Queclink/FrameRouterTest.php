@@ -14,6 +14,7 @@ use App\Services\Queclink\ConfigurationSnapshotService;
 use App\Services\Queclink\Exceptions\IntakeRejected;
 use App\Services\Queclink\Listener\ConnectionState;
 use App\Services\Queclink\Listener\FrameRouter;
+use App\Services\Queclink\SerialNumberAllocator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -22,6 +23,18 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->router = app(FrameRouter::class);
     $this->state = new ConnectionState('192.0.2.10:54321');
+    $this->pendingCommandSnapshot = static fn (int $id): ?object => DB::table('queclink_pending_commands')
+        ->where('id', $id)
+        ->first([
+            'raw_command',
+            'raw_command_encrypted',
+            'serial_number',
+            'status',
+            'sent_at',
+            'sent_session_id',
+            'acked_at',
+            'ack_response',
+        ]);
 });
 
 it('makes the first connection identity immutable', function () {
@@ -377,6 +390,484 @@ it('dispatches queued commands when a paired device sends a frame', function () 
 
     expect(QueclinkPendingCommand::first()->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
         ->and(QueclinkPendingCommand::first()->sent_at)->not->toBeNull();
+
+    $repeatResponses = $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    expect($repeatResponses)->toBe(['+SACK:GTHBD,8020090100,09CF$']);
+});
+
+it('reserializes same-device queued collisions before dispatch', function () {
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $commands = collect([1, 2])->map(fn (int $sequence) => QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => "AT+GTRTO=gv500cg,{$sequence},,,,,0042$",
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+    ]));
+
+    $responses = $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    $commands = $commands->map->fresh();
+    expect($responses)->toBe([
+        '+SACK:GTHBD,8020090100,09CF$',
+        $commands[0]->raw_command,
+        $commands[1]->raw_command,
+    ])
+        ->and($commands->pluck('status')->unique()->all())->toBe([QueclinkPendingCommand::STATUS_SENT])
+        ->and($commands->pluck('serial_number')->unique()->count())->toBe(2);
+
+    $commands->each(function (QueclinkPendingCommand $command): void {
+        expect($command->raw_command)->toEndWith(','.$command->serial_number.'$')
+            ->and(DB::table('queclink_pending_commands')->where('id', $command->id)->value('raw_command'))
+            ->toBe('[encrypted command payload]')
+            ->and(DB::table('queclink_pending_commands')->where('id', $command->id)->value('raw_command_encrypted'))
+            ->not->toBeNull();
+    });
+});
+
+it('reserializes a queued collision with a current transmitted command', function () {
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $current = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_SENT,
+        'sent_at' => now(),
+        'expires_at' => now()->addHour(),
+    ]);
+    $queued = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,2,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+    ]);
+    $responses = $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    $queued->refresh();
+    expect($current->fresh()->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($queued->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($queued->serial_number)->not->toBe('0042')
+        ->and($queued->raw_command)->toEndWith(','.$queued->serial_number.'$')
+        ->and($responses)->toBe(['+SACK:GTHBD,8020090100,09CF$', $queued->raw_command]);
+});
+
+it('never reuses a serial retained by any transmission provenance', function (
+    string $previousStatus,
+    bool $hasSentAt,
+    bool $hasSentSession,
+    bool $hasAckedAt,
+    bool $hasAckResponse,
+    ?int $expiryMinutes,
+) {
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $previous = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => $previousStatus,
+        'sent_at' => $hasSentAt ? now()->subDays(30)->subMinute() : null,
+        'sent_session_id' => $hasSentSession ? $this->state->sessionId : null,
+        'acked_at' => $hasAckedAt ? now()->subDays(30) : null,
+        'ack_response' => $hasAckResponse ? '+ACK:GTRTO,legacy$' : null,
+        'expires_at' => $expiryMinutes === null ? null : now()->addMinutes($expiryMinutes),
+    ]);
+    expect($previous->sent_at !== null)->toBe($hasSentAt)
+        ->and($previous->sent_session_id !== null)->toBe($hasSentSession)
+        ->and($previous->acked_at !== null)->toBe($hasAckedAt)
+        ->and($previous->ack_response !== null)->toBe($hasAckResponse);
+    $queued = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,2,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+    ]);
+
+    $responses = $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    $queued->refresh();
+    expect($queued->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($queued->serial_number)->not->toBe('0042')
+        ->and($queued->raw_command)->toEndWith(','.$queued->serial_number.'$')
+        ->and($responses)->toContain($queued->raw_command);
+})->with([
+    'old acknowledgement with future expiry' => [QueclinkPendingCommand::STATUS_ACKED, true, false, true, true, 60],
+    'old acknowledgement with legacy null expiry' => [QueclinkPendingCommand::STATUS_ACKED, true, false, true, true, null],
+    'expired row with sent timestamp only' => [QueclinkPendingCommand::STATUS_EXPIRED, true, false, false, false, -1],
+    'expired row with sent session only' => [QueclinkPendingCommand::STATUS_EXPIRED, false, true, false, false, null],
+    'expired row with old ack timestamp only' => [QueclinkPendingCommand::STATUS_EXPIRED, false, false, true, false, 60],
+    'expired row with ack response only' => [QueclinkPendingCommand::STATUS_EXPIRED, false, false, false, true, -1],
+    'legacy acknowledged status only' => [QueclinkPendingCommand::STATUS_ACKED, false, false, false, false, null],
+    'legacy sent status only' => [QueclinkPendingCommand::STATUS_SENT, false, false, false, false, 60],
+]);
+
+it('does not reuse a serial while an expired sent row can still correlate', function () {
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_SENT,
+        'sent_at' => now()->subHour(),
+        'expires_at' => now()->subMinute(),
+    ]);
+    $queued = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,2,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+    ]);
+
+    $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    $queued->refresh();
+    expect($queued->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($queued->serial_number)->not->toBe('0042')
+        ->and($queued->raw_command)->toEndWith(','.$queued->serial_number.'$');
+});
+
+it('never reuses a timed-out transmitted serial for a delayed acknowledgement', function () {
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $timedOut = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_EXPIRED,
+        'sent_at' => now()->subHours(2),
+        'expires_at' => now()->subHour(),
+    ]);
+    $queued = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,2,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+    ]);
+
+    $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    $queued->refresh();
+    expect($queued->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($queued->serial_number)->not->toBe('0042');
+
+    $this->router->handleInbound(
+        '+ACK:GTRTO,8020090100,864696060004173,GV500CG,GPS,0042,20230811125618,0A6B$',
+        $this->state,
+    );
+
+    expect($timedOut->fresh()->status)->toBe(QueclinkPendingCommand::STATUS_EXPIRED)
+        ->and($timedOut->fresh()->acked_at)->toBeNull()
+        ->and($queued->fresh()->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($queued->fresh()->acked_at)->toBeNull();
+});
+
+it('keeps an expired command serial reserved after same-turn acknowledgement', function () {
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $previous = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_SENT,
+        'sent_at' => now()->subHour(),
+        'expires_at' => now()->subMinute(),
+    ]);
+    $queued = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,2,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+    ]);
+
+    $responses = $this->router->handleInbound(
+        '+ACK:GTRTO,8020090100,864696060004173,GV500CG,GPS,0042,20230811125617,0A6A$',
+        $this->state,
+    );
+
+    $previous->refresh();
+    $queued->refresh();
+    expect($previous->status)->toBe(QueclinkPendingCommand::STATUS_ACKED)
+        ->and($previous->acked_at)->not->toBeNull()
+        ->and($queued->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($queued->serial_number)->not->toBe('0042')
+        ->and($responses)->toContain($queued->raw_command);
+
+    $originalAckedAt = $previous->acked_at->copy();
+    $originalAckResponse = $previous->ack_response;
+    $this->travel(2)->seconds();
+
+    $this->router->handleInbound(
+        '+ACK:GTRTO,8020090100,864696060004173,GV500CG,GPS,0042,20230811125618,0A6B$',
+        $this->state,
+    );
+
+    expect($previous->fresh()->acked_at)->toEqual($originalAckedAt)
+        ->and($previous->fresh()->ack_response)->toBe($originalAckResponse)
+        ->and($queued->fresh()->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($queued->fresh()->acked_at)->toBeNull();
+});
+
+it('keeps serial reuse scoped to the current device', function () {
+    $other = QueclinkDevice::create([
+        'imei' => '867963069916998',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    QueclinkPendingCommand::create([
+        'queclink_device_id' => $other->id,
+        'imei' => $other->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_SENT,
+        'sent_at' => now(),
+    ]);
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $queued = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,2,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+    ]);
+
+    $responses = $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    $queued->refresh();
+    expect($queued->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($queued->serial_number)->toBe('0042')
+        ->and($responses)->toContain($queued->raw_command);
+});
+
+it('never retransmits a requeued command that retains transmission provenance', function (string $provenanceColumn) {
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $provenance = match ($provenanceColumn) {
+        'sent_at' => now()->subMinute(),
+        'sent_session_id' => $this->state->sessionId,
+        'acked_at' => now()->subSeconds(30),
+        'ack_response' => '+ACK:GTRTO,legacy$',
+    };
+    $queued = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,2,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+        $provenanceColumn => $provenance,
+    ]);
+    $before = ($this->pendingCommandSnapshot)($queued->id);
+
+    $responses = $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    $after = ($this->pendingCommandSnapshot)($queued->id);
+    expect($responses)->toBe(['+SACK:GTHBD,8020090100,09CF$'])
+        ->and($after)->toEqual($before)
+        ->and($queued->fresh()->raw_command)->toBe('AT+GTRTO=gv500cg,2,,,,,0042$');
+})->with([
+    'sent timestamp' => 'sent_at',
+    'sent session' => 'sent_session_id',
+    'ack timestamp' => 'acked_at',
+    'ack response' => 'ack_response',
+]);
+
+it('leaves an invalid serial binding queued without emitting command bytes', function (string $rawCommand, string $storedSerial) {
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $queued = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => $rawCommand,
+        'serial_number' => $storedSerial,
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+    ]);
+    $before = ($this->pendingCommandSnapshot)($queued->id);
+
+    $responses = $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    $after = ($this->pendingCommandSnapshot)($queued->id);
+    $queued->refresh();
+    expect($responses)->toBe(['+SACK:GTHBD,8020090100,09CF$'])
+        ->and($after)->toEqual($before)
+        ->and($queued->raw_command)->toBe($rawCommand)
+        ->and($queued->sent_at)->toBeNull();
+})->with([
+    'mismatched valid suffix' => ['AT+GTRTO=gv500cg,1,,,,,0043$', '0042'],
+    'missing suffix' => ['AT+GTRTO=gv500cg,1$', '0042'],
+    'malformed suffix' => ['AT+GTRTO=gv500cg,1,,,,,ZZZZ$', '0042'],
+    'lowercase persisted serial' => ['AT+GTRTO=gv500cg,1,,,,,00AF$', '00af'],
+    'malformed persisted serial' => ['AT+GTRTO=gv500cg,1,,,,,0042$', 'ZZZZ'],
+]);
+
+it('rejects unsafe allocator output without changing the queued command', function (string $allocatorOutput) {
+    app()->instance(SerialNumberAllocator::class, new class($allocatorOutput) extends SerialNumberAllocator
+    {
+        public function __construct(private readonly string $output) {}
+
+        public function nextExcluding(iterable $reserved): string
+        {
+            return $this->output;
+        }
+    });
+    $this->router = app(FrameRouter::class);
+
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_SENT,
+        'sent_at' => now(),
+    ]);
+    $queued = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,2,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+    ]);
+    $before = ($this->pendingCommandSnapshot)($queued->id);
+
+    $responses = $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    $after = ($this->pendingCommandSnapshot)($queued->id);
+    $queued->refresh();
+    expect($responses)->toBe(['+SACK:GTHBD,8020090100,09CF$'])
+        ->and($after)->toEqual($before)
+        ->and($queued->raw_command)->toBe('AT+GTRTO=gv500cg,2,,,,,0042$')
+        ->and($queued->sent_at)->toBeNull();
+})->with([
+    'malformed serial' => 'ZZZZ',
+    'still-reserved serial' => '0042',
+    'padded otherwise valid serial' => ' 0043 ',
+]);
+
+it('leaves a colliding command queued when no serial can be allocated', function () {
+    app()->instance(SerialNumberAllocator::class, new class extends SerialNumberAllocator
+    {
+        public function nextExcluding(iterable $reserved): string
+        {
+            throw new RuntimeException('No Queclink command serial number is currently available.');
+        }
+    });
+    $this->router = app(FrameRouter::class);
+
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_SENT,
+        'sent_at' => now(),
+    ]);
+    $queued = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,2,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_QUEUED,
+    ]);
+    $before = ($this->pendingCommandSnapshot)($queued->id);
+
+    $responses = $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    $after = ($this->pendingCommandSnapshot)($queued->id);
+    $queued->refresh();
+    expect($responses)->toBe(['+SACK:GTHBD,8020090100,09CF$'])
+        ->and($after)->toEqual($before)
+        ->and($queued->raw_command)->toBe('AT+GTRTO=gv500cg,2,,,,,0042$')
+        ->and($queued->sent_at)->toBeNull();
 });
 
 it('correlates an inbound +ACK with the matching pending command by serial number', function () {
@@ -394,12 +885,124 @@ it('correlates an inbound +ACK with the matching pending command by serial numbe
         'sent_at' => now()->subSeconds(2),
     ]);
 
+    $ackFrame = '+ACK:GTRTO,8020090100,864696060004173,GV500CG,GPS,0042,20230811125617,0A6A$';
     $this->router->handleInbound(
-        '+ACK:GTRTO,8020090100,864696060004173,GV500CG,GPS,0042,20230811125617,0A6A$',
+        $ackFrame,
         $this->state,
     );
 
     $cmd->refresh();
     expect($cmd->status)->toBe(QueclinkPendingCommand::STATUS_ACKED)
-        ->and($cmd->acked_at)->not->toBeNull();
+        ->and($cmd->acked_at)->not->toBeNull()
+        ->and($cmd->ack_response)->toBe($ackFrame);
+});
+
+it('keeps acknowledgement correlation scoped to one device', function () {
+    $firstDevice = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $secondDevice = QueclinkDevice::create([
+        'imei' => '867963069916998',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $firstCommand = QueclinkPendingCommand::create([
+        'queclink_device_id' => $firstDevice->id,
+        'imei' => $firstDevice->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_SENT,
+        'sent_at' => now(),
+    ]);
+    $secondCommand = QueclinkPendingCommand::create([
+        'queclink_device_id' => $secondDevice->id,
+        'imei' => $secondDevice->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_SENT,
+        'sent_at' => now(),
+    ]);
+
+    $this->router->handleInbound(
+        '+ACK:GTRTO,8020090100,864696060004173,GV500CG,GPS,0042,20230811125617,0A6A$',
+        $this->state,
+    );
+
+    expect($firstCommand->fresh()->status)->toBe(QueclinkPendingCommand::STATUS_ACKED)
+        ->and($firstCommand->fresh()->acked_at)->not->toBeNull()
+        ->and($secondCommand->fresh()->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($secondCommand->fresh()->acked_at)->toBeNull()
+        ->and($secondCommand->fresh()->ack_response)->toBeNull();
+});
+
+it('rejects an ambiguous acknowledgement without changing either command', function () {
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $commands = collect([1, 2])->map(fn (int $sequence) => QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => "AT+GTRTO=gv500cg,{$sequence},,,,,0042$",
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_SENT,
+        'sent_at' => now()->subSeconds($sequence),
+    ]));
+
+    $this->router->handleInbound(
+        '+ACK:GTRTO,8020090100,864696060004173,GV500CG,GPS,0042,20230811125617,0A6A$',
+        $this->state,
+    );
+
+    $commands->each(function (QueclinkPendingCommand $command): void {
+        $command->refresh();
+        expect($command->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+            ->and($command->acked_at)->toBeNull()
+            ->and($command->ack_response)->toBeNull();
+    });
+});
+
+it('does not let a delayed acknowledgement cross an acknowledged serial boundary', function () {
+    $device = QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+    ]);
+    $sent = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,2,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_SENT,
+        'sent_at' => now(),
+        'expires_at' => now()->addHour(),
+    ]);
+    $acked = QueclinkPendingCommand::create([
+        'queclink_device_id' => $device->id,
+        'imei' => $device->imei,
+        'command_word' => 'GTRTO',
+        'raw_command' => 'AT+GTRTO=gv500cg,1,,,,,0042$',
+        'serial_number' => '0042',
+        'status' => QueclinkPendingCommand::STATUS_ACKED,
+        'sent_at' => now()->subMinute(),
+        'acked_at' => now()->subSeconds(30),
+        'ack_response' => 'original-ack',
+        'expires_at' => now()->addHour(),
+    ]);
+    $originalAckedAt = $acked->acked_at->copy();
+    $originalAckResponse = $acked->ack_response;
+
+    $this->router->handleInbound(
+        '+ACK:GTRTO,8020090100,864696060004173,GV500CG,GPS,0042,20230811125617,0A6A$',
+        $this->state,
+    );
+
+    expect($sent->fresh()->status)->toBe(QueclinkPendingCommand::STATUS_SENT)
+        ->and($sent->fresh()->acked_at)->toBeNull()
+        ->and($acked->fresh()->status)->toBe(QueclinkPendingCommand::STATUS_ACKED)
+        ->and($acked->fresh()->acked_at)->toEqual($originalAckedAt)
+        ->and($acked->fresh()->ack_response)->toBe($originalAckResponse);
 });

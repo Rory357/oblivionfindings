@@ -12,11 +12,15 @@ use App\Services\Queclink\AtTrackFrame;
 use App\Services\Queclink\AtTrackProtocolParser;
 use App\Services\Queclink\Exceptions\IntakeRejected;
 use App\Services\Queclink\GovernedCommandLifecycleService;
+use App\Services\Queclink\SerialNumberAllocator;
 use App\Support\SafeOperationalData;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * Routes a single parsed inbound frame:
@@ -35,6 +39,7 @@ class FrameRouter
         protected AckBuilder $acks,
         protected FleetTelemetryIngestService $ingest,
         protected GovernedCommandLifecycleService $governedCommands,
+        protected SerialNumberAllocator $serials,
         protected ListenerLimits $limits,
     ) {}
 
@@ -189,7 +194,14 @@ class FrameRouter
         // 4. Dispatch any queued commands for paired devices (capped per frame).
         if ($queclinkDevice && $queclinkDevice->isPaired()) {
             foreach ($this->popQueuedCommands($queclinkDevice) as $command) {
-                $sent = $this->governedCommands->markSent($command, $state->sessionId);
+                $sent = $this->claimQueuedCommand(
+                    (int) $command->id,
+                    $queclinkDevice,
+                    $state->sessionId,
+                );
+                if ($sent === null) {
+                    continue;
+                }
                 $outbound[] = $sent->raw_command;
                 $this->logRawOutbound(
                     $sent->raw_command,
@@ -410,16 +422,153 @@ class FrameRouter
         if ($frame->serialNumber === null) {
             return;
         }
-        QueclinkPendingCommand::query()
-            ->forDevice($device->id)
-            ->where('serial_number', $frame->serialNumber)
-            ->where('status', QueclinkPendingCommand::STATUS_SENT)
-            ->orderBy('id')
-            ->get()
-            ->each(fn (QueclinkPendingCommand $command) => $this->governedCommands->markAcknowledged(
-                $command,
-                $frame->rawFrame,
-            ));
+        DB::transaction(function () use ($frame, $device): void {
+            QueclinkDevice::query()->whereKey($device->id)->lockForUpdate()->firstOrFail();
+
+            $matches = QueclinkPendingCommand::query()
+                ->forDevice($device->id)
+                ->where('serial_number', $frame->serialNumber)
+                ->where(function (Builder $query): void {
+                    $this->constrainTransmittedSerial($query);
+                })
+                ->orderBy('id')
+                ->limit(2)
+                ->lockForUpdate()
+                ->get();
+
+            $match = $matches->count() === 1 ? $matches->first() : null;
+            if (! $match || $match->status !== QueclinkPendingCommand::STATUS_SENT) {
+                if ($matches->count() > 1) {
+                    Log::warning('Ambiguous Queclink command acknowledgement rejected.', SafeOperationalData::logContext([
+                        'provider' => 'queclink',
+                        'device_id' => $device->device_id,
+                        'items_errored' => $matches->count(),
+                    ]));
+                }
+
+                return;
+            }
+
+            $this->governedCommands->markAcknowledged($match, $frame->rawFrame);
+        }, 3);
+    }
+
+    private function claimQueuedCommand(
+        int $commandId,
+        QueclinkDevice $device,
+        ?string $sessionId,
+    ): ?QueclinkPendingCommand {
+        return DB::transaction(function () use ($commandId, $device, $sessionId): ?QueclinkPendingCommand {
+            QueclinkDevice::query()->whereKey($device->id)->lockForUpdate()->firstOrFail();
+
+            $pending = QueclinkPendingCommand::query()->lockForUpdate()->find($commandId);
+            if (! $pending
+                || (int) $pending->queclink_device_id !== (int) $device->id
+                || $pending->status !== QueclinkPendingCommand::STATUS_QUEUED
+                || $pending->isExpired()) {
+                return null;
+            }
+
+            // A row can be requeued by legacy repair or corrupted state while
+            // still carrying proof that its bytes reached a device. Never
+            // retransmit that row or let its own id evade the tombstone query.
+            if ($pending->sent_at !== null
+                || $pending->sent_session_id !== null
+                || $pending->acked_at !== null
+                || $pending->ack_response !== null) {
+                Log::warning('Queclink requeued command with transmission provenance rejected.', SafeOperationalData::logContext([
+                    'provider' => 'queclink',
+                    'device_id' => $device->device_id,
+                    'items_errored' => 1,
+                ]));
+
+                return null;
+            }
+
+            $rawCommand = $pending->raw_command;
+            $storedSerial = (string) $pending->serial_number;
+            if (! is_string($rawCommand)
+                || preg_match('/^[0-9A-F]{4}$/', $storedSerial) !== 1
+                || preg_match('/,([0-9A-F]{4})\$$/i', $rawCommand, $rawMatch) !== 1
+                || strtoupper($rawMatch[1]) !== $storedSerial) {
+                Log::warning('Queclink queued command serial binding rejected.', SafeOperationalData::logContext([
+                    'provider' => 'queclink',
+                    'device_id' => $device->device_id,
+                    'items_errored' => 1,
+                ]));
+
+                return null;
+            }
+
+            $now = now();
+            $reserved = QueclinkPendingCommand::query()
+                ->forDevice($device->id)
+                ->where('id', '<>', $pending->id)
+                ->where(function (Builder $query) use ($now): void {
+                    $query->where(function (Builder $queued) use ($now): void {
+                        $queued->where('status', QueclinkPendingCommand::STATUS_QUEUED)
+                            ->where(function (Builder $lifetime) use ($now): void {
+                                $lifetime->whereNull('expires_at')->orWhere('expires_at', '>', $now);
+                            });
+                    })->orWhere(function (Builder $transmitted): void {
+                        $this->constrainTransmittedSerial($transmitted);
+                    });
+                })
+                ->lockForUpdate()
+                ->pluck('serial_number')
+                ->map(fn (mixed $serial): string => strtoupper(trim((string) $serial)))
+                ->filter(fn (string $serial): bool => preg_match('/^[0-9A-F]{4}$/', $serial) === 1)
+                ->unique()
+                ->values()
+                ->all();
+
+            if (in_array($storedSerial, $reserved, true)) {
+                try {
+                    $newSerial = $this->serials->nextExcluding($reserved);
+                } catch (RuntimeException) {
+                    return null;
+                }
+                if (preg_match('/^[0-9A-F]{4}$/', $newSerial) !== 1
+                    || in_array($newSerial, $reserved, true)) {
+                    return null;
+                }
+
+                $rewritten = preg_replace(
+                    '/,[0-9A-F]{4}\$$/i',
+                    ','.$newSerial.'$',
+                    $rawCommand,
+                    1,
+                    $replacementCount,
+                );
+                if (! is_string($rewritten) || $replacementCount !== 1) {
+                    return null;
+                }
+
+                $pending->forceFill([
+                    'serial_number' => $newSerial,
+                    'raw_command' => $rewritten,
+                ])->save();
+            }
+
+            return $this->governedCommands->markSent($pending, $sessionId);
+        }, 3);
+    }
+
+    private function constrainTransmittedSerial(Builder $query): void
+    {
+        // Queclink's 16-bit serial has no repository-proven maximum ACK delay.
+        // Once command bytes have been exposed to a device, retain that serial
+        // as a permanent per-device tombstone and fail closed on exhaustion.
+        $query->where(function (Builder $transmitted): void {
+            $transmitted->whereNotNull('sent_at')
+                ->orWhereNotNull('sent_session_id')
+                ->orWhereNotNull('acked_at')
+                ->orWhereNotNull('ack_response')
+                ->orWhereIn('status', [
+                    QueclinkPendingCommand::STATUS_SENT,
+                    QueclinkPendingCommand::STATUS_ACKED,
+                ]);
+        });
     }
 
     /** @return iterable<QueclinkPendingCommand> */
@@ -432,6 +581,7 @@ class FrameRouter
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })
             ->orderBy('created_at')
+            ->orderBy('id')
             ->limit(self::MAX_COMMANDS_PER_FRAME * 5)
             ->get()
             ->filter(function (QueclinkPendingCommand $command): bool {
