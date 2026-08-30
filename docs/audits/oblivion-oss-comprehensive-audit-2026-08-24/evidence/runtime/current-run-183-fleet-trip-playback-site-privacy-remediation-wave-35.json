@@ -1,0 +1,634 @@
+{
+  "schema_version": "run-183-fleet-trip-playback-site-privacy-remediation-wave-35-v1",
+  "run_id": "RUN-183-FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01-REMEDIATION-WAVE-35",
+  "status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING_BOUNDED_VERIFIED_NOT_PUBLISHED_LIVE_REPORTING_NOT_YET_AUTHORIZED_ZERO_STATIC_OWNERSHIP_OR_COMPLETION_CREDIT",
+  "materialized_on": "2026-08-30",
+  "architecture_boundary": "One operating organisation across multiple Sites; approved Site access, exact roles and permissions, canonical Asset provenance, direct-object denial, and privacy are the boundaries. Site is provenance, not a tenant.",
+  "pins": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "continuation_prompt_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "application_baseline_commit": "db4196ccb3a8d9f6bcb33fb40680527d09c02dac",
+    "application_baseline_tree": "68052b68b070dff799d5be1d5515ec0b8472207f",
+    "fix_commit": "93e576978efae4a0112a95ed406c312f6bcadeb5",
+    "fix_tree": "f265c8476773aaceecbfe90680e59b5f4c74b205",
+    "fix_parent": "db4196ccb3a8d9f6bcb33fb40680527d09c02dac",
+    "fix_commit_subject": "fix(fleet): scope trip playback to visible sites",
+    "stable_patch_id": "12c306d28e54ff88432d18b271706473ee793871",
+    "clean_advanced_main_commit": "0537f0f0eacafbeaf635ced4883a8bdf8e49d3f6",
+    "clean_advanced_main_tree": "5eb8c401847f2da101922aef6c100b8e03d30b9d",
+    "advanced_main_path_count": 8,
+    "advanced_main_disjoint_paths": [
+      {
+        "path": "app/Http/Controllers/Settings/ApiSettingsController.php",
+        "sha256": "c5d6ba1e5272b80e378e0b124fac1cffd2d9db45372d8663a4c54f0420a9a979",
+        "git_blob_id": "81643844551bcaafe91c15db6207f690081db57d",
+        "bytes": 13891,
+        "lines": 425
+      },
+      {
+        "path": "app/Services/Integration/GovernedWebhookProbeService.php",
+        "sha256": "2af8e642a39bd7a6b04a715eba1570a040e996797131178303489aca64171d19",
+        "git_blob_id": "def98bb44e8636c96f4a6a3528efc69701560ec4",
+        "bytes": 4082,
+        "lines": 131
+      },
+      {
+        "path": "app/Services/Queclink/Listener/ConnectionState.php",
+        "sha256": "c564accb56a55ab5aed125cf7807cd0fe59ced0c688b94fd556fc3ccef3135c4",
+        "git_blob_id": "c823d26a0e949df6c75506feb2a88cf9f886a8df",
+        "bytes": 1964,
+        "lines": 74
+      },
+      {
+        "path": "app/Services/Queclink/Listener/FrameRouter.php",
+        "sha256": "c2956e5a5303bf04b45fbc23ab5f4a53408107903c3cb3b8022e9fcbd7f49142",
+        "git_blob_id": "27589b1db7ba8121e1ba3b75e92defd1a605388e",
+        "bytes": 24393,
+        "lines": 601
+      },
+      {
+        "path": "app/Services/Queclink/SerialNumberAllocator.php",
+        "sha256": "9e8c34f5342e31eadc4d15077a26d6c4676c06891514492a0e421e6e42617e1d",
+        "git_blob_id": "b9fdd61d6aa7ce7c80a951d173364331873c7e51",
+        "bytes": 1863,
+        "lines": 63
+      },
+      {
+        "path": "tests/Feature/Queclink/FrameRouterTest.php",
+        "sha256": "30b8ab02488fb9b39896ff12e1586f4ee90f0215a67034edd7cddd45478e16e2",
+        "git_blob_id": "d5106b77909498cd9273110830adebf292e06673",
+        "bytes": 41468,
+        "lines": 1008
+      },
+      {
+        "path": "tests/Feature/Settings/ApiSettingsWebhookDestinationTest.php",
+        "sha256": "bfdb3163e358615be76835b1ad9135db12e2021763362c7a02be5dceb5ab894e",
+        "git_blob_id": "adabf280aae316159c6d6947fb846180a9ed6042",
+        "bytes": 7040,
+        "lines": 207
+      },
+      {
+        "path": "tests/Unit/Services/Queclink/CommandBuilderTest.php",
+        "sha256": "3069901ece2afde4b8a664cefc00e1f6996bcd4f0ef494c8386c10856046105d",
+        "git_blob_id": "eac4a10b4b7549052fe10b3eaa06868c369e3659",
+        "bytes": 9569,
+        "lines": 266
+      }
+    ],
+    "transferred_paths_unchanged_base_to_advanced_main": true,
+    "local_main_merge_commit": "4038cf7fe5a789ca64e436300f2cf4b94ac16db4",
+    "local_main_tree": "b9757ccb9010564b8512c0ed47abfc553f38b697",
+    "merge_parents": [
+      "0537f0f0eacafbeaf635ced4883a8bdf8e49d3f6",
+      "93e576978efae4a0112a95ed406c312f6bcadeb5"
+    ],
+    "merge_subject": "merge: scope fleet trip playback to visible sites",
+    "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead": 27,
+    "local_main_behind": 0,
+    "application_remote_publication_observed": false,
+    "publication_authorized": false,
+    "materializer": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-183-fleet-trip-playback-site-privacy-remediation-wave-35.py",
+      "sha256": "602964ec765cc9bd71d7b6fed103bdbd1b4b5543c0843f2c2dcdb2a960779f8e",
+      "git_blob_id": "25fd246840a9ad80158790d5585169d23c278fa2",
+      "bytes": 43544,
+      "lines": 1035
+    },
+    "baseline_controller": {
+      "path": "app/Http/Controllers/Fleet/FleetTripController.php",
+      "sha256": "c99a056b200bf53dafaaf92ea6349e91bd4dd16646eca83a48c49810763c1112",
+      "git_blob_id": "e3c5a70f694ec1c0ca9a2634466c59a443762139",
+      "bytes": 5449,
+      "lines": 159
+    },
+    "temporary_transferred_reproduction_harness": {
+      "path": "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php",
+      "sha256": "98da796613e5bd18752ddf64c1357e6a0f0ae392ab550b8e2039c8c64c489353",
+      "lines": 301,
+      "git_blob_id": null,
+      "status": "TEMPORARY_UNTRACKED_MESSAGE_ONLY_HANDOFF_NOT_CURRENT_TEST_BLOB"
+    },
+    "fix_source_and_permanent_regression_test": [
+      {
+        "path": "app/Http/Controllers/Fleet/FleetTripController.php",
+        "sha256": "4a5f448e230c79e4effcad358ef65a5ba9fa6b9774c43d2df87e3485b9b5ad63",
+        "git_blob_id": "2373c95b30958399c8ed648915991c01a0fbc84c",
+        "bytes": 10934,
+        "lines": 281,
+        "insertions": 134,
+        "deletions": 12
+      },
+      {
+        "path": "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php",
+        "sha256": "071675ba9aec303176aa00758371cbedd966e944c172e75146743d3111f1031b",
+        "git_blob_id": "68eaf494014abf68924ab47eadd4cb2e8ef12e8d",
+        "bytes": 24787,
+        "lines": 670,
+        "insertions": 670,
+        "deletions": 0
+      }
+    ],
+    "merged_source_and_permanent_regression_test": [
+      {
+        "path": "app/Http/Controllers/Fleet/FleetTripController.php",
+        "sha256": "4a5f448e230c79e4effcad358ef65a5ba9fa6b9774c43d2df87e3485b9b5ad63",
+        "git_blob_id": "2373c95b30958399c8ed648915991c01a0fbc84c",
+        "bytes": 10934,
+        "lines": 281,
+        "insertions": 134,
+        "deletions": 12
+      },
+      {
+        "path": "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php",
+        "sha256": "071675ba9aec303176aa00758371cbedd966e944c172e75146743d3111f1031b",
+        "git_blob_id": "68eaf494014abf68924ab47eadd4cb2e8ef12e8d",
+        "bytes": 24787,
+        "lines": 670,
+        "insertions": 670,
+        "deletions": 0
+      }
+    ],
+    "current_route_source": {
+      "path": "routes/fleet-assets.php",
+      "sha256": "4be79ba4a0957f81f3e99de8eea7f29a398f8a115957bd44af06dbbf78fe2c4c",
+      "git_blob_id": "f0b2b8c199ada1d8ef8bdb41c99bfc2ac02f93d2",
+      "bytes": 28332,
+      "lines": 351
+    },
+    "current_findings_before_run_183": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/findings.json",
+      "sha256": "55337abfc8f2fe9fde863715e3d77649ec6dd195008281944881b02e00bb54e1",
+      "git_blob_id": "bd0a13dc86ebdc88073ee3ac999b3514ac0a0490",
+      "bytes": 590974,
+      "lines": 10553
+    }
+  },
+  "issue_first_disposition": {
+    "finding_id": "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
+    "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "feature_identity_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "selected_route": {
+      "zero_based_index": 85,
+      "queue_id": "RUN090-ROUTE-0086",
+      "route_record_id": "RUN077-ROUTE-0694",
+      "route_name": "fleet-assets.trips.playback",
+      "controller_action": "FleetTripController::show",
+      "supporting_data_route": "fleet-assets.trips.playback.data",
+      "supporting_data_action": "FleetTripController::playback",
+      "supporting_data_route_static_ownership_adjudicated": false
+    },
+    "verdict": "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED",
+    "new_discovery_stopped_after_confirmation": true,
+    "exclusive_remediation_paths": [
+      "app/Http/Controllers/Fleet/FleetTripController.php",
+      "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php"
+    ],
+    "red_baseline": {
+      "commit": "db4196ccb3a8d9f6bcb33fb40680527d09c02dac",
+      "tests": 5,
+      "failed": 3,
+      "passed": 2,
+      "assertions_reported": 30,
+      "duration_seconds": 160.09,
+      "exit_code": 1,
+      "passing_denominator_credit": 0,
+      "observations": [
+        "foreign-Site page returned 200 instead of concealed 404",
+        "foreign-Site playback data returned 200 instead of concealed 404",
+        "visible page exposed hidden-Site driver-session identity",
+        "same-Site consent filtering remained compatible",
+        "fleet.manage operational-Site bypass remained compatible"
+      ]
+    }
+  },
+  "remediation": {
+    "summary": "Playback page and JSON now resolve trips only through the actor's visible operational Asset Site provenance before loading, auditing, or projecting data; driver identity is restricted to the same Asset and approved historical Site scope.",
+    "production_files": 1,
+    "regression_test_files": 1,
+    "changed_paths": 2,
+    "insertions": 804,
+    "deletions": 12,
+    "page_and_json_get_routes_only": true,
+    "ordinary_viewer_approved_site_scope": true,
+    "fleet_manage_operational_site_bypass_preserved": true,
+    "foreign_missing_archived_inactive_unattributed_or_conflicted_concealment_404": true,
+    "denied_page_does_not_emit_view_audit": true,
+    "nested_driver_identity_redaction": true,
+    "canonical_direct_home_and_client_site_provenance": true,
+    "same_asset_time_window_consent_and_two_thousand_point_cap_preserved": true,
+    "route_declarations_changed": false,
+    "pages_components_copy_or_layout_changed": false,
+    "models_migrations_services_or_write_paths_changed": false,
+    "third_party_source_assets_wording_or_layout_copied": false,
+    "single_tenant_multi_site_boundary_preserved": true
+  },
+  "delegated_runtime_execution": {
+    "execution_owners": {
+      "baseline_red": "root audit lane",
+      "isolated_green_regressions_and_post_merge": "separate Continue OSS audit fixes task"
+    },
+    "run_183_producer_executed_tests": false,
+    "root_post_merge_reran_tests_for_run_183": false,
+    "baseline_red": {
+      "tests": 5,
+      "failed": 3,
+      "passed": 2,
+      "assertions_reported": 30,
+      "duration_seconds": 160.09,
+      "exit_code": 1,
+      "credit": "REPRODUCTION_ONLY_ZERO_PASSING_DENOMINATOR_CREDIT"
+    },
+    "isolated_green_focused": {
+      "tests": 11,
+      "assertions": 167,
+      "duration_seconds": 154.22,
+      "added_to_bounded_disposition_denominator": false
+    },
+    "isolated_supporting_fleet_regressions": {
+      "tests": 20,
+      "assertions": 215,
+      "duration_seconds": 176.99,
+      "scope": "FleetManagementTest plus FleetTripIndexSitePrivacyTest",
+      "reported_separately": true,
+      "added_to_bounded_disposition_denominator": false
+    },
+    "post_merge_green_focused": {
+      "tests": 11,
+      "assertions": 167,
+      "duration_seconds": 174.89,
+      "unique_bounded_disposition_denominator_credit": true
+    },
+    "focused_cases": [
+      "Site-limited viewer cannot open a foreign-Site trip page",
+      "Site-limited viewer cannot fetch foreign-Site trip telemetry",
+      "visible page suppresses driver identities outside approved historical Sites",
+      "same-Site JSON keeps eligible telemetry and filters consent-blocked points",
+      "fleet.manage can open another operational Site while archived Sites stay concealed",
+      "missing trip IDs are concealed like foreign trip IDs",
+      "authentication and fleet.viewAny permission contract remains intact",
+      "secondary-Site assignment grants the same playback access as primary Site",
+      "direct, home, and client Site provenance is canonical and conflicts fail closed",
+      "current trip driver requires matching asset and approved historical Site identity",
+      "JSON returns at most 2,000 chronological eligible points"
+    ],
+    "focused_replay_aggregated_more_than_once": false,
+    "unique_bounded_accounting": {
+      "prior": {
+        "tests": 88,
+        "assertions": 1764
+      },
+      "increment": {
+        "tests": 11,
+        "assertions": 167
+      },
+      "resulting": {
+        "tests": 99,
+        "assertions": 1931
+      }
+    },
+    "syntax": {
+      "isolated_files_passed": 2,
+      "post_merge_files_passed": 2,
+      "result": "PASS"
+    },
+    "pint": {
+      "isolated": "PASS",
+      "post_merge": "PASS"
+    },
+    "git_diff_and_check": "PASS",
+    "full_suite_or_coverage_credit": false
+  },
+  "independent_static_review": {
+    "root_pre_handoff_route_source_review": "CREDIBLE_CURRENT_DEFECT_CANDIDATE",
+    "root_pre_handoff_controller_source_review": "SOURCE_PREDICTS_PAGE_AND_DATA_DISCLOSURE",
+    "audit_reproduction_harness_review": "GO_ZERO_FINDINGS",
+    "reported_isolated_controller_and_test_reviews": 2,
+    "isolated_review_verdict": "GO",
+    "isolated_review_findings": 0,
+    "reviewers_executed_tests": false,
+    "reviewers_wrote_application_files": false,
+    "exact_merge_commit_tree_parents_and_two_path_delta_verified": true,
+    "bounded_site_privacy_contract_verified": true,
+    "exact_run_183_receipt_review_completed": false,
+    "new_record_reporting_authorized": false,
+    "run_183r_still_required": true
+  },
+  "cleanup_evidence": {
+    "isolated_worktree": "C:/w/fleet-trip-playback-privacy-01",
+    "isolated_worktree_removed": true,
+    "isolated_branch": "codex/fleet-trip-playback-site-privacy-01-20260830",
+    "isolated_branch_retained_at_fix_commit": true,
+    "post_merge_owned_pids": [
+      25180,
+      42264
+    ],
+    "post_merge_owned_pids_exited": true,
+    "post_merge_global_php_or_pest_process_count": 0,
+    "numeric_pid_test_schema_count": 0,
+    "pre_existing_non_pid_schema_untouched": "oblivion_findings_codex_test_4_test_4",
+    "primary_main_clean_before_audit_writes": true,
+    "exclusive_two_path_ownership_released": true
+  },
+  "static_ownership_boundary": {
+    "owner_records": 666,
+    "route_owners": 309,
+    "page_owners": 357,
+    "action_bridges": 97,
+    "queue_total": 507,
+    "queue_reviewed": 120,
+    "queue_pending": 387,
+    "queue_owned": 98,
+    "queue_without_ownership": 409,
+    "next_zero_based_index": 85,
+    "next_queue_id": "RUN090-ROUTE-0086",
+    "next_route_record_id": "RUN077-ROUTE-0694",
+    "next_route_name": "fleet-assets.trips.playback",
+    "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "ownership_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "correctness_does_not_adjudicate_static_ownership": true,
+    "route_owner_authorized": false,
+    "controller_action_bridge_authorized": false,
+    "supporting_data_route_owner_authorized": false,
+    "queue_advance_authorized": false,
+    "fresh_outcome_neutral_ownership_review_required_later": true
+  },
+  "benchmark_boundary": {
+    "mapped": 2,
+    "total": 340,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338,
+    "changed_by_run_183": false
+  },
+  "advanced_main_noninheritance": {
+    "path_count": 8,
+    "paths": [
+      "app/Http/Controllers/Settings/ApiSettingsController.php",
+      "app/Services/Integration/GovernedWebhookProbeService.php",
+      "app/Services/Queclink/Listener/ConnectionState.php",
+      "app/Services/Queclink/Listener/FrameRouter.php",
+      "app/Services/Queclink/SerialNumberAllocator.php",
+      "tests/Feature/Queclink/FrameRouterTest.php",
+      "tests/Feature/Settings/ApiSettingsWebhookDestinationTest.php",
+      "tests/Unit/Services/Queclink/CommandBuilderTest.php"
+    ],
+    "settings_webhook_finding_credit": false,
+    "queclink_session_finding_credit": false,
+    "queclink_serial_collision_finding_credit": false,
+    "settings_or_queclink_runtime_credit": false,
+    "transferred_fleet_paths_unchanged_on_advanced_main": true
+  },
+  "noninheritance_boundary": {
+    "settings_or_queclink_application_remediation": false,
+    "settings_or_queclink_test_execution": false,
+    "settings_and_frame_router_57_tests_318_assertions": false,
+    "isolated_fleet_green_replay_recredited": false,
+    "fleet_supporting_regressions_recredited": false,
+    "baseline_red_passes_failures_or_assertions_recredited": false,
+    "static_route_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "static_playback_data_route_ownership": false,
+    "static_page_or_frontend_ownership": false,
+    "queue_matrix_or_feature_union_change": false,
+    "write_route_or_telemetry_lifecycle_correctness": false,
+    "vehicle_controller_or_trip_index_correctness": false,
+    "security_devices_or_user_site_access_service_correctness": false,
+    "application_browser_or_ease": false,
+    "benchmark_mapping_or_final_no_match_NCM": false,
+    "full_suite_coverage_feature_module_pass_or_release": false,
+    "publication_final_finding_completion_or_audit_completion": false
+  },
+  "reporting_boundary": {
+    "current_findings_snapshot": {
+      "retained_record_count": 13,
+      "current_provisional_count": 8,
+      "historical_already_fixed_count": 2,
+      "historical_remediated_count": 3,
+      "fleet_trip_playback_site_privacy_record_present": false,
+      "bounded_disposition_tests_passed": 88,
+      "bounded_disposition_assertions": 1764
+    },
+    "current_retained_identity_count": 13,
+    "current_split": "8 provisional + 2 historical already-fixed + 3 historical remediated",
+    "pending_new_record_id": "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
+    "pending_record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "pending_candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "pending_candidate_association_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "pending_reporting_delta": {
+      "retained_claim_records": 1,
+      "current_provisional_source_claims": 0,
+      "historical_already_fixed_records": 0,
+      "historical_remediated_records": 1,
+      "bounded_disposition_tests_passed": 11,
+      "bounded_disposition_assertions": 167,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "proposed_after_independent_exact_artifact_review": {
+      "retained_claim_records": 14,
+      "current_provisional_source_claims": 8,
+      "historical_already_fixed_records": 2,
+      "historical_remediated_records": 4,
+      "bounded_disposition_tests_passed": 99,
+      "bounded_disposition_assertions": 1931,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "independent_review_authorized": false,
+    "run_183_changes_live_reporting": false,
+    "run_183r_required": true,
+    "run_184_reporting_required_after_go": true,
+    "run_185_fresh_dashboard_verification_required_after_reporting": true
+  },
+  "credit_boundary": {
+    "historical_condition_confirmed": true,
+    "current_defect_reproduced": true,
+    "application_remediation": true,
+    "bounded_runtime": true,
+    "bounded_selected_page_and_json_execution": true,
+    "bounded_site_privacy_correctness": true,
+    "application_commit_integrated_local_main": true,
+    "application_commit_published": false,
+    "new_historical_remediated_record_reporting": false,
+    "static_route_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "framework_route_reachability_complete": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "full_feature_or_module": false,
+    "release": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_gates": [
+    {
+      "gate": 1,
+      "name": "routes_classified",
+      "complete": false
+    },
+    {
+      "gate": 2,
+      "name": "inertia_pages_classified",
+      "complete": false
+    },
+    {
+      "gate": 3,
+      "name": "features_in_canonical_register",
+      "complete": false
+    },
+    {
+      "gate": 4,
+      "name": "routes_and_pages_mapped_to_feature_id",
+      "complete": false
+    },
+    {
+      "gate": 5,
+      "name": "features_with_verified_benchmark_or_final_ncm",
+      "complete": false
+    },
+    {
+      "gate": 6,
+      "name": "human_features_with_task_script_and_ten_scores",
+      "complete": false
+    },
+    {
+      "gate": 7,
+      "name": "common_and_safety_journeys_cross_reviewed",
+      "complete": false
+    },
+    {
+      "gate": 8,
+      "name": "hero_banner_instances_classified",
+      "complete": false
+    },
+    {
+      "gate": 9,
+      "name": "overlay_implementations_and_triggers_classified",
+      "complete": false
+    },
+    {
+      "gate": 10,
+      "name": "safe_routes_observed_at_desktop",
+      "complete": false
+    },
+    {
+      "gate": 11,
+      "name": "selected_families_and_journeys_all_viewports",
+      "complete": false
+    },
+    {
+      "gate": 12,
+      "name": "required_visual_states_classified",
+      "complete": false
+    },
+    {
+      "gate": 13,
+      "name": "material_visual_finding_families_resampled",
+      "complete": false
+    },
+    {
+      "gate": 14,
+      "name": "models_classified",
+      "complete": false
+    },
+    {
+      "gate": 15,
+      "name": "policies_classified",
+      "complete": false
+    },
+    {
+      "gate": 16,
+      "name": "service_domain_entries_classified",
+      "complete": false
+    },
+    {
+      "gate": 17,
+      "name": "critical_async_owners_classified",
+      "complete": false
+    },
+    {
+      "gate": 18,
+      "name": "modules_with_all_eight_passes",
+      "complete": false
+    },
+    {
+      "gate": 19,
+      "name": "prompt_benchmark_projects_formally_triaged",
+      "complete": false
+    },
+    {
+      "gate": 20,
+      "name": "p0_p1_complete_finding_fields",
+      "complete": false
+    },
+    {
+      "gate": 21,
+      "name": "redesigns_neutral_native_no_copy",
+      "complete": false
+    },
+    {
+      "gate": 22,
+      "name": "ease_4_5_claims_independently_reviewed",
+      "complete": false
+    },
+    {
+      "gate": 23,
+      "name": "browser_claims_labeled",
+      "complete": false
+    },
+    {
+      "gate": 24,
+      "name": "visual_inconsistencies_complete_context",
+      "complete": false
+    },
+    {
+      "gate": 25,
+      "name": "official_source_inference_specialist_split",
+      "complete": false
+    },
+    {
+      "gate": 26,
+      "name": "all_agents_returned_reconciled_represented_none_live",
+      "complete": false
+    }
+  ],
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-183-fleet-trip-playback-site-privacy-remediation-wave-35.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-183-fleet-trip-playback-site-privacy-remediation-wave-35.json"
+  ],
+  "receipt_self_seal_sha256": "839e8d47700afedd2ec277695bbe492bd13433492ce0ff724c753988b5ce039a"
+}
