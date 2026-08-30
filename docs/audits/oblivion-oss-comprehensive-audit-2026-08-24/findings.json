@@ -1,6 +1,6 @@
 {
   "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
-  "audit_status": "NINE_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_ONE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
+  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_TWO_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
   "generated_on": "2026-08-30",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
@@ -21,6 +21,15 @@
     "run_166_med_cd_atomicity_adjudication_sha256": "c334495fa7cf7303ae70dccff475b7a9583b927bf06ee822f1a13bd347a84a46",
     "run_166r_independent_artifact_review_sha256": "fa899d56b13b584ccd103996c6a46407b105f968b0d769eae5be69a5f47b7d21",
     "run_166_atomicity_harness_snapshot_sha256": "49bbc43ca9caa470e10992751f3e2b7080cde6cf6ff554994ce85e0956b5d807",
+    "safe_alert_dedup_baseline_application_commit": "e488bd3edcda0f154f87e8bbed972f14db409b82",
+    "safe_alert_dedup_baseline_application_tree": "9e93b8aea4f4b907cde3dc59dd0520fba5bd7080",
+    "safe_alert_dedup_fix_commit": "dc04067e304adebb47335d4f65e8c61061ec6e29",
+    "safe_alert_dedup_fix_tree": "15a2e4b47788e9f2779030ec6d4d9ca7c1022727",
+    "safe_alert_dedup_local_main_merge_commit": "705db2dc3ba05a8fdf647cd28bdc9c226a694068",
+    "safe_alert_dedup_local_main_tree": "59b4fc58567f64bc80ff3d2e47b52860ce44cb02",
+    "safe_alert_dedup_origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "run_173_safe_alert_dedup_remediation_sha256": "49a4fa5ad4fefa1c72e449b69150fe05de06e8f9d0055b47e93a0a3061b66e45",
+    "run_173r_independent_artifact_review_sha256": "9a19e5ccb15d955db8bf1bcd80b40a6f89306bc9945625d275f3d6f4c543e652",
     "audit_checkpoint_parent": "35a5228b26c54684718495c33281b24c0992de02",
     "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
     "base_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
@@ -211,19 +220,19 @@
     "system_data_features": 40,
     "canonical_submodules": null,
     "historical_discovery_claim_records": 12,
-    "current_provisional_source_claims": 9,
+    "current_provisional_source_claims": 8,
     "historical_already_fixed_records": 2,
-    "historical_remediated_records": 1
+    "historical_remediated_records": 2
   },
   "counts": {
     "retained_claim_records": 12,
-    "provisional_source_claims": 9,
-    "provisional_P1": 9,
+    "provisional_source_claims": 8,
+    "provisional_P1": 8,
     "historical_already_fixed": 2,
-    "historical_remediated": 1,
-    "bounded_disposition_tests_passed": 78,
-    "bounded_disposition_assertions": 1529,
-    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE only; excludes RUN-166 MED-CD-ATOMICITY commands and every overlapping supporting execution",
+    "historical_remediated": 2,
+    "bounded_disposition_tests_passed": 83,
+    "bounded_disposition_assertions": 1589,
+    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY only; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, and every overlapping supporting execution",
     "med_rbac_bounded_tests": 73,
     "med_rbac_bounded_test_assertions": 1481,
     "med_cd_scope_focused_tests": 5,
@@ -233,7 +242,14 @@
     "med_cd_atomicity_race_subscenarios": 3,
     "med_cd_atomicity_supporting_tests": 43,
     "med_cd_atomicity_supporting_assertions": 716,
-    "med_cd_atomicity_aggregation_basis": "reported separately from 78/1529 because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
+    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167 and remains excluded from the current 83/1589 because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
+    "safe_alert_dedup_focused_tests": 5,
+    "safe_alert_dedup_focused_assertions": 60,
+    "safe_alert_dedup_supporting_control_room_bridge_tests": 28,
+    "safe_alert_dedup_supporting_control_room_bridge_assertions": 73,
+    "safe_alert_dedup_supporting_hs_event_tests": 3,
+    "safe_alert_dedup_supporting_hs_event_assertions": 5,
+    "safe_alert_dedup_terminal_fixture_failures": 6,
     "final_P0": 0,
     "final_P1": 0,
     "complete_prompt_finding_schema": 0,
@@ -330,17 +346,17 @@
       "audit_completion": 0
     }
   },
-  "credit_boundary": "Nine current provisional records, two retained historical already-fixed records, and one retained historical remediated record remain reviewable. RUN-159/R and RUN-160 establish and report the MED-RBAC-01 ALREADY_FIXED disposition. RUN-162/R and RUN-163 establish and report the MED-CD-SCOPE-01 reproduced-and-remediated disposition. RUN-165, RUN-166, and RUN-166R establish and independently authorize the MED-CD-ATOMICITY-01 ALREADY_FIXED disposition only for manual POST /emar/controlled/entries register/stock atomicity; RUN-167 alone reconciles that live record. The separately reported 3 test functions / 146 assertions / 3 synchronized races do not enlarge the existing 78/1529 bounded-disposition denominator. RUN-169/R establish one reviewed Fleet alerts-config route/action owner candidate, RUN-170 integrates only one static route owner and bridge, RUN-170R authorizes reporting only, and RUN-171 alone reports the live 665-owner ledger; the three source observations remain provisional-not-final. No correctness, selected-GET execution, final finding, benchmark, application-browser, ease, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
+  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and two retained historical remediated records remain reviewable. RUN-159/R and RUN-160 establish and report the MED-RBAC-01 ALREADY_FIXED disposition. RUN-162/R and RUN-163 establish and report the MED-CD-SCOPE-01 reproduced-and-remediated disposition. RUN-165, RUN-166, and RUN-166R establish and independently authorize the MED-CD-ATOMICITY-01 ALREADY_FIXED disposition only for manual POST /emar/controlled/entries register/stock atomicity; RUN-167 alone reconciles that live record. The separately reported 3 test functions / 146 assertions / 3 synchronized races are not added to the bounded-disposition denominator. RUN-169/R establish one reviewed Fleet alerts-config route/action owner candidate, RUN-170 integrates only one static route owner and bridge, RUN-170R authorizes reporting only, and RUN-171 alone reports the live 665-owner ledger; the three source observations remain provisional-not-final. RUN-173 establishes the SAFE-ALERT-DEDUP-IDENTITY-01 reproduced-and-remediated disposition on local main only; RUN-173R independently authorizes bounded retirement reporting, and RUN-174 alone reconciles the live record. Its unique post-merge focused 5/60 execution enlarges the bounded-disposition denominator to 83/1589. The red 4-failed plus 1-warning-pass/10-assertion run, isolated-green 5/60 replay, supporting 28/73 bridge suite, adjacent 3/5 HsEvent filter, and six pre-bridge terminal-fixture failures remain separately reported and uncredited. Local main contains merge 705db2dc3ba05a8fdf647cd28bdc9c226a694068 while origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; publication and release remain false. No broader correctness, selected-GET execution, final finding, benchmark, application-browser, ease, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
   "reconciliation": {
     "retained_record_ids_unique": true,
     "current_provisional_ids_unique": true,
     "retained_record_count": 12,
-    "current_provisional_count": 9,
+    "current_provisional_count": 8,
     "historical_already_fixed_count": 2,
-    "historical_remediated_count": 1,
+    "historical_remediated_count": 2,
     "every_primary_feature_id_in_canonical_matrix": true,
     "final_ids_cross_file_reconciled": false,
-    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01 is retained as historical remediated on current main; the other 9 records remain provisional. The atomicity record preserves explicit unadjudicated balance-check, destruction, sibling-writer, forced-deadlock-retry, and stress scope. None satisfies the cross-file final-finding gate."
+    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01 and SAFE-ALERT-DEDUP-IDENTITY-01 are retained as historical remediated on current local main, with the SAFE application merge not published to origin/main; the other 8 records remain provisional. SAFE retirement is limited to concern-owned Control Room alert identity within the existing 30-minute dedup window and bounded observer custody. Timeless retry, terminal-transition fixture debt, unused escalation semantics, broader safeguarding correctness, browser, benchmark, release, and completion credit are not inherited. None satisfies the cross-file final-finding gate."
   },
   "records": [
     {
@@ -2125,12 +2141,44 @@
     },
     {
       "id": "SAFE-ALERT-DEDUP-IDENTITY-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
       "related_feature_ids": [
         "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
         "CAP-SAFE-TERMINAL-PROJECTION"
       ],
+      "historical_provenance": {
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "canonical_pre_adjudication_record_sha256": "360386fe1222c75437c2f6140f0860679f67c63f4fe1e95fe5e8bdcc985030a8",
+        "classification": "REAL_HISTORICAL_SAFEGUARDING_CONCERN_ALERT_DEDUP_IDENTITY_CONDITION",
+        "historical_risk": "Distinct safeguarding concerns could collapse into one Control Room alert, delaying response or obscuring concern-owned custody.",
+        "preserved_identity_only": true
+      },
+      "current_adjudication": {
+        "application_baseline_commit": "e488bd3edcda0f154f87e8bbed972f14db409b82",
+        "application_baseline_tree": "9e93b8aea4f4b907cde3dc59dd0520fba5bd7080",
+        "fix_commit": "dc04067e304adebb47335d4f65e8c61061ec6e29",
+        "fix_tree": "15a2e4b47788e9f2779030ec6d4d9ca7c1022727",
+        "application_commit": "705db2dc3ba05a8fdf647cd28bdc9c226a694068",
+        "repository_tree": "59b4fc58567f64bc80ff3d2e47b52860ce44cb02",
+        "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+        "verdict": "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED",
+        "scope": "Safeguarding concern-owned Control Room alert identity within the existing 30-minute source/type dedup window and bounded observer custody only",
+        "run_173_receipt": "evidence/runtime/current-run-173-safe-alert-dedup-identity-remediation-wave-32.json",
+        "run_173_receipt_sha256": "49a4fa5ad4fefa1c72e449b69150fe05de06e8f9d0055b47e93a0a3061b66e45",
+        "run_173r_review": "evidence/runtime/current-run-173r-independent-safe-alert-dedup-identity-remediation-review-wave-32.json",
+        "run_173r_review_sha256": "9a19e5ccb15d955db8bf1bcd80b40a6f89306bc9945625d275f3d6f4c543e652",
+        "application_remediation_required": true,
+        "application_source_changed": true,
+        "integrated_to_main": true,
+        "published_to_origin_main": false,
+        "publication_authorized": false,
+        "safe_intake_canonical_scope_inherited": false,
+        "safe_projection_durability_inherited": false,
+        "timeless_retry_inherited": false,
+        "terminal_transition_fixture_debt_inherited": false,
+        "broader_safeguarding_correctness_inherited": false
+      },
       "passes": [
         "P2",
         "P5",
@@ -2143,16 +2191,16 @@
         "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
       },
       "actor_and_job": {
-        "actor": "ControlRoomAlertAccessService and lifecycle service",
-        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "actor": "Safeguarding concern observer and ComprehensiveAlertBridgeService",
+        "secondary_actors": "Same-client, same-Site personless, cross-Site personless, and same-concern retry actors in bounded tests",
         "job": "Inspect, acknowledge, triage, resolve, close, or reopen alerts",
-        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+        "status": "BOUNDED_TEST_ACTORS_VALIDATED_NOT_REPRESENTATIVE_SIGNED_IN_BROWSER"
       },
       "route_url": {
         "route_names": "control-room.alerts.index; control-room.alerts.show; control-room.alerts.acknowledge; control-room.alerts.confirm; control-room.alerts.dismiss; control-room.alerts.triage; control-room.alerts.create-incident; control-room.alerts.resolve; control-room.alerts.close; control-room.alerts.reopen-for-incident; control-room.alerts.note; control-room.alerts.meta; control-room.alerts.snooze; control-room.alerts.unsnooze; control-room.alerts.assign; control-room.alerts.unassign; control-room.alerts.escalate; control-room.alerts.store",
         "route_paths": "routes/control-room.php:49-60; routes/control-room.php:91-140; routes/control-room.php:167-187",
         "raw_route_path_field": "routes/control-room.php:49-60; routes/control-room.php:91-140; routes/control-room.php:167-187",
-        "status": "SOURCE_LOCATOR_ONLY"
+        "status": "BOUNDED_CURRENT_SOURCE_AND_RUNTIME_SCOPE_ONLY"
       },
       "frontend_anchor": {
         "page_files": "resources/js/pages/control-room/alerts/index.tsx:203-230; resources/js/pages/control-room/show.tsx:17-64",
@@ -2174,25 +2222,28 @@
         "shared_component_or_variant": null,
         "overlay_trigger": null,
         "internal_baseline": null,
-        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+        "status": "NOT_ADJUDICATED_FOR_THIS_RETAINED_HISTORICAL_RECORD"
       },
       "backend_anchor": {
         "matrix_anchors": "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php:45-777",
         "claim_anchors": [
           "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:116-136",
-          "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:249-301"
+          "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:263-301",
+          "tests/Feature/ControlRoom/SafeguardingAlertDedupIdentityReproductionTest.php:24-230",
+          "tests/Feature/HealthSafety/ControlRoomBridgeWiringTest.php:243-255"
         ],
-        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
-        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+        "controller_request_service_model_policy_job_event_migration": "BOUNDED_SERVICE_OBSERVER_CUSTODY_AND_REGRESSION_REVIEW",
+        "application_commit": "705db2dc3ba05a8fdf647cd28bdc9c226a694068"
       },
       "current_behaviour": {
-        "classification": "SOURCE_INFERRED_PROVISIONAL",
-        "summary": "Control Room alert deduplication appears able to collapse distinct safeguarding concerns because concern identity is not part of the generic deduplication key.",
-        "runtime_observed": false
+        "classification": "REMEDIATED_LOCAL_MAIN_BOUNDED_VERIFIED_NOT_PUBLISHED",
+        "summary": "Safeguarding deduplication now keys to context.concern_id before the client, asset, or null-entity fallback inside the unchanged 30-minute source/type window. Distinct same-client, same-Site personless, and cross-Site personless concerns retain separate alerts and concern-owned H&S event custody; a five-minute retry of the same concern remains idempotent, and the accepted 31-minute lifecycle remains unchanged.",
+        "runtime_observed": true,
+        "runtime_scope": "One unique post-merge focused execution passed 5 tests / 60 assertions. The isolated 5/60 replay is not double counted; 28/73 bridge and 3/5 HsEvent runs are supporting only. Six terminal-transition fixture failures occur before bridge/dedup execution and receive zero SAFE or full-suite credit."
       },
       "current_workflow": {
-        "matrix_summary": "Static canonical identity only: Inspect, acknowledge, triage, resolve, close, or reopen alerts. Representative-role completion was not executed.",
-        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+        "matrix_summary": "Bounded service-level remediation preserves one concern-owned Control Room alert and H&S event custody chain per distinct concern within the existing 30-minute window; representative signed-in workflow was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "BOUNDED_DISTINCT_CONCERN_AND_SAME_CONCERN_RETRY_PATHS_EXECUTED; REPRESENTATIVE_BROWSER_EASE_AND_BROADER_SAFEGUARDING_WORKFLOW_NOT_EXECUTED"
       },
       "ease_evidence": {
         "status": "NOT_MEASURED",
@@ -2207,16 +2258,26 @@
       },
       "evidence": {
         "source_claim_record": "evidence/source/current-feature-discovery-wave-02.json",
+        "current_remediation_receipt": "evidence/runtime/current-run-173-safe-alert-dedup-identity-remediation-wave-32.json",
+        "independent_artifact_review": "evidence/runtime/current-run-173r-independent-safe-alert-dedup-identity-remediation-review-wave-32.json",
         "claim_anchors": [
           "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:116-136",
-          "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:249-301"
+          "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:263-301",
+          "tests/Feature/ControlRoom/SafeguardingAlertDedupIdentityReproductionTest.php:24; 61; 97; 125; 160",
+          "tests/Feature/HealthSafety/ControlRoomBridgeWiringTest.php:243-255"
         ],
-        "tests_executed": 0,
+        "test_commands_executed": 1,
+        "tests_executed": 5,
+        "assertions": 60,
+        "supporting_tests": 31,
+        "supporting_assertions": 78,
+        "excluded_terminal_fixture_failures": 6,
         "browser_cells": 0,
-        "database_checks": 0
+        "database_checks": 1,
+        "database_cleanup": "numeric PID test schemas absent after execution; zero PHP/php-cgi processes; isolated worktree and branch removed"
       },
-      "problem_root_cause": "The provisional source slice did not establish concern identity as part of the generic deduplication identity.",
-      "impact": "Possible collapse of distinct safeguarding concerns into one Control Room alert, delaying response or obscuring custody.",
+      "problem_root_cause": "The generic 30-minute deduplication query fell back to client identity or the global null client/asset bucket for safeguarding alerts instead of the canonical concern ID already present in alert context.",
+      "impact": "Before remediation, distinct same-client or personless safeguarding concerns could collapse into one Control Room alert, delaying response or obscuring concern-owned alert and H&S event custody.",
       "benchmark": {
         "official_repository": null,
         "inspected_ref": null,
@@ -2231,8 +2292,8 @@
         "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
       ],
       "better_oblivion_design": {
-        "proposal": null,
-        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+        "proposal": "Use the native safeguarding concern ID as the dedup entity key within the existing source/type/time window while retaining Site and client as provenance.",
+        "status": "IMPLEMENTED_NATIVELY_WITHOUT_BENCHMARK_OR_DESIGN_CREDIT"
       },
       "target_ease": {
         "scores": null,
@@ -2245,56 +2306,51 @@
       ],
       "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
       "priority": "P1",
-      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "priority_status": "HISTORICAL_REMEDIATED_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT",
       "effort": {
         "size": null,
         "assumptions": null,
         "status": "NOT_ESTIMATED"
       },
       "dependencies_sequence": [
-        "Independent source review at the audited application pin",
-        "Create distinct same-client and personless concerns within the window and prove distinct concern-owned alerts and custody chains.",
-        "Only then decide whether a native remediation contract is warranted"
+        "Completed: four distinct-concern failures reproduced at the e488 baseline; the same-concern retry remained a warning-pass contract",
+        "Completed: narrow concern-ID dedup remediation integrated to local main at 705db2dc3ba05a8fdf647cd28bdc9c226a694068 without publication",
+        "Completed: unique post-merge 5 tests / 60 assertions plus supporting 28/73 and adjacent 3/5 executions and exact-artifact GO",
+        "Retained non-inherited gaps: timeless retry, unused escalation semantics, terminal fixture debt, broader safeguarding, browser, benchmark, release, and completion"
       ],
       "confidence": {
-        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
-        "evidence_gap": "Create distinct same-client and personless concerns within the window and prove distinct concern-owned alerts and custody chains."
+        "level": "HIGH_FOR_BOUNDED_SAFE_ALERT_DEDUP_IDENTITY_REMEDIATION_DISPOSITION",
+        "evidence_gap": "Representative signed-in application browser, full-suite/coverage, ease, target-specific benchmark, timeless retry, unused escalation semantics, and broader safeguarding correctness remain unexecuted or unadjudicated."
       },
       "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
       "interim_safeguard": "When reconciling alerts, verify source concern identity rather than relying on generic client/time similarity alone.",
       "acceptance_criteria": {
-        "given_when_then": null,
-        "status": "NOT_FINAL; REQUIRED GATE: Create distinct same-client and personless concerns within the window and prove distinct concern-owned alerts and custody chains."
+        "given_when_then": "Given distinct same-client, same-Site personless, and cross-Site personless safeguarding concerns plus a same-concern retry within five minutes, when the safeguarding bridge and observer execute, then each distinct concern retains its own alert and H&S event custody, the retry creates no duplicate, Site and client remain provenance, and the unchanged 30-minute boundary still permits the accepted 31-minute lifecycle.",
+        "status": "BOUNDED_MET_FOR_HISTORICAL_CLAIM_REMEDIATION_NOT_FINAL_FINDING_OR_FEATURE_COMPLETION"
       },
       "validation_plan": {
-        "required": "Create distinct same-client and personless concerns within the window and prove distinct concern-owned alerts and custody chains.",
-        "unit": "NOT_PLANNED_TO_EXACT_CASES",
-        "feature": "NOT_EXECUTED",
-        "architecture": "NOT_EXECUTED",
+        "required": "Retain focused distinct-concern, same-concern retry, cross-Site personless, observer-custody, and 31-minute lifecycle regression coverage; keep terminal fixture debt and broader safeguarding scope separate.",
+        "unit": "NOT_SEPARATELY_REQUIRED_FOR_THIS_REMEDIATION",
+        "feature": "EXECUTED_5_TESTS_60_ASSERTIONS_ON_LOCAL_MAIN",
+        "architecture": "STATIC_MERGE_GO_PLUS_EXACT_ARTIFACT_GO",
         "e2e": "BLOCKED",
         "visual_accessibility": "BLOCKED",
-        "performance_concurrency": "NOT_EXECUTED",
+        "performance_concurrency": "NOT_EXECUTED_OR_CREDITED",
         "representative_user": "NOT_EXECUTED"
       },
-      "finalization_blockers": [
-        "Independent current-source review",
-        "Exact final feature/finding ownership confirmation",
-        "Safe attributable runtime and/or browser validation where applicable",
-        "Target-specific benchmark or exhaustive final no-match adjudication",
-        "Complete observable acceptance criteria and validation plan"
-      ],
+      "finalization_blockers": [],
       "independent_review": {
-        "status": "NOT_COMPLETED",
-        "reviewer": null,
-        "disagreements": null,
-        "reconciliation": null
+        "status": "COMPLETED_STATIC_GO_PLUS_EXACT_ARTIFACT_GO",
+        "reviewer": "/root/safe_merge_review; /root/run173_artifact_review",
+        "disagreements": "None. Both reviews preserved the 30-minute window, 31-minute lifecycle, nonpublication, supporting-test separation, and noninheritance boundaries.",
+        "reconciliation": "RUN-173 establishes reproduction, remediation, bounded delegated runtime, local integration, and nonpublication. RUN-173R alone authorizes retirement reporting; RUN-174 alone changes the live register."
       },
       "unresolved_fields": [
-        "final exact route/page/action ownership where a sentinel remains",
         "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
         "observed workflow and ten-dimension current/target ease measures",
         "target-specific benchmark or exhaustive final no-match",
-        "native design, effort, final acceptance criteria and executable validation cases"
+        "full-suite coverage and representative signed-in application browser",
+        "timeless retry, unused escalation semantics, terminal-transition fixture debt, and broader safeguarding correctness"
       ],
       "completion_credit": false,
       "credit": {

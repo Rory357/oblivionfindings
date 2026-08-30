@@ -1,8 +1,8 @@
 # 07 — Module and feature findings
 
-> Status: in progress. This file materializes all 340 frozen canonical static feature identities and 12 retained historical claim records: **9 current provisional P1 claims + 2 historical already-fixed records + 1 historical remediated record + 0 final P0/P1 findings**. RUN-159 supplies 73 bounded tests / 1,481 assertions for `MED-RBAC-01`; RUN-162 separately supplies 5 focused tests / 48 assertions for `MED-CD-SCOPE-01`; RUN-166 separately supplies 3 claim-specific test functions / 146 assertions / 3 synchronized race subscenarios for the bounded manual-entry clause of `MED-CD-ATOMICITY-01`. The atomicity denominator is not added to the existing 78/1,529 sum. Exactly **2 target-specific static benchmark-mapping credits** remain; no application-browser, ease, final-no-match/NCM, Pass, feature-completion, or audit-completion credit follows.
+> Status: in progress. This file materializes all 340 frozen canonical static feature identities and 12 retained historical claim records: **8 current provisional P1 claims + 2 historical already-fixed records + 2 historical remediated records + 0 final P0/P1 findings**. RUN-159 supplies 73 bounded tests / 1,481 assertions for `MED-RBAC-01`; RUN-162 separately supplies 5 focused tests / 48 assertions for `MED-CD-SCOPE-01`; RUN-173 contributes one unique post-merge focused execution of 5 tests / 60 assertions for `SAFE-ALERT-DEDUP-IDENTITY-01`, producing the current non-overlapping **83 / 1,589** bounded-disposition total. RUN-166 separately supplies 3 claim-specific test functions / 146 assertions / 3 synchronized race subscenarios for the bounded manual-entry clause of `MED-CD-ATOMICITY-01`; it remains outside both the historical 78/1,529 and current 83/1,589 totals. Exactly **2 target-specific static benchmark-mapping credits** remain; no application-browser, ease, final-no-match/NCM, Pass, feature-completion, or audit-completion credit follows.
 
-Historical frozen discovery pin: `a0493442b9e392d324055c35bf25b69421dc2d35` (tree `f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1`). MED-RBAC adjudication pin: `4f57ad4202df90ded375961437879822a908627b` (tree `ee79b8d2733d09da2fd97992ac2a04e862159505`). MED-CD-SCOPE remediation pin: `0b1920dade9251d617f3cb0b69da5c0202b5a6bf` (full repository tree `7b2b5688c90e4da28725e70e38e50fd445f1b4c4`). MED-CD-ATOMICITY reviewed source pin: `cf0090ec97242776eea30a2875756446f42862f9` (tree `b1c932d1c5c19e9e2ea655da5964dd1c5e9c41f3`).
+Historical frozen discovery pin: `a0493442b9e392d324055c35bf25b69421dc2d35` (tree `f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1`). MED-RBAC adjudication pin: `4f57ad4202df90ded375961437879822a908627b` (tree `ee79b8d2733d09da2fd97992ac2a04e862159505`). MED-CD-SCOPE remediation pin: `0b1920dade9251d617f3cb0b69da5c0202b5a6bf` (full repository tree `7b2b5688c90e4da28725e70e38e50fd445f1b4c4`). MED-CD-ATOMICITY reviewed source pin: `cf0090ec97242776eea30a2875756446f42862f9` (tree `b1c932d1c5c19e9e2ea655da5964dd1c5e9c41f3`). SAFE baseline: `e488bd3edcda0f154f87e8bbed972f14db409b82`; fix: `dc04067e304adebb47335d4f65e8c61061ec6e29`; local merge: `705db2dc3ba05a8fdf647cd28bdc9c226a694068` (tree `59b4fc58567f64bc80ff3d2e47b52860ce44cb02`), explicitly not published to `origin/main`.
 Governing prompt SHA-256: `4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f`.
 
 Architecture rule: One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.
@@ -61,7 +61,7 @@ RUN-082 establishes reproducible static candidate relations and route-file regis
 |---|---:|---:|
 | Frozen canonical feature identities | 340 / 340 (300 H, 40 D) | static identity only |
 | Feature rows represented below | 340 / 340 | reporting presence only |
-| Claim records | 12 retained identities = 9 current provisional P1 + 2 historical already-fixed + 1 historical remediated | 0 final P0/P1 |
+| Claim records | 12 retained identities = 8 current provisional P1 + 2 historical already-fixed + 2 historical remediated | 0 final P0/P1 |
 | Verified target-specific benchmark mappings / final no-matches or NCMs | 2 / 340 mappings · 0 / 340 final no-matches/NCMs · 338 unresolved | 2 mapping-only; 0 other credit |
 | Validated H task/ease rows | 0 / 300 | 0 |
 | Modules with all P1–P8 complete | 0 / 29 frozen feature modules | 0 |
@@ -76,7 +76,7 @@ File presence is not audit completion. A feature row with no linked claim record
 | Catering | 6 | 0 | 6 | none materialized | 0 |
 | Clients | 9 | 0 | 9 | none materialized | 0 |
 | Compliance | 1 | 0 | 1 | none materialized | 0 |
-| Control Room | 14 | 1 | 15 | SAFE-ALERT-DEDUP-IDENTITY-01; SAFE-PROJECTION-DURABILITY-01 (related) | 0 |
+| Control Room | 14 | 1 | 15 | SAFE-ALERT-DEDUP-IDENTITY-01 (historical remediated); SAFE-PROJECTION-DURABILITY-01 (related) | 0 |
 | Finance | 34 | 8 | 42 | none materialized | 0 |
 | Fleet & Assets | 16 | 1 | 17 | none materialized | 0 |
 | Frontline Workspaces | 6 | 1 | 7 | none materialized | 0 |
@@ -96,13 +96,13 @@ File presence is not audit completion. A feature row with no linked claim record
 | Reporting | 1 | 1 | 2 | none materialized | 0 |
 | Respite | 12 | 2 | 14 | none materialized | 0 |
 | Roadmap | 4 | 0 | 4 | none materialized | 0 |
-| Safeguarding | 8 | 2 | 10 | SAFE-ALERT-DEDUP-IDENTITY-01 (related); SAFE-INTAKE-CANONICAL-SCOPE-01; SAFE-INTAKE-CANONICAL-SCOPE-01 (related); SAFE-PROJECTION-DURABILITY-01 | 0 |
+| Safeguarding | 8 | 2 | 10 | SAFE-ALERT-DEDUP-IDENTITY-01 (historical related); SAFE-INTAKE-CANONICAL-SCOPE-01; SAFE-INTAKE-CANONICAL-SCOPE-01 (related); SAFE-PROJECTION-DURABILITY-01 | 0 |
 | Security Devices | 11 | 1 | 12 | none materialized | 0 |
 | Sites & Locations | 15 | 1 | 16 | none materialized | 0 |
 | Workforce | 13 | 0 | 13 | none materialized | 0 |
 | eMAR | 16 | 1 | 17 | MED-CD-ATOMICITY-01 (historical already fixed); MED-CD-ATOMICITY-01 (historical related); MED-CD-SCOPE-01 (historical remediated); MED-CD-SCOPE-01 (historical related); MED-RBAC-01 (historical already fixed); MED-RBAC-01 (historical related) | 0 |
 
-## Claim records — 9 current provisional + 2 historical already fixed + 1 historical remediated
+## Claim records — 8 current provisional + 2 historical already fixed + 2 historical remediated
 
 ### MED-RBAC-01 — CAP-MED-CD-REGISTER-BALANCE — historical already fixed
 
@@ -146,7 +146,7 @@ File presence is not audit completion. A feature row with no linked claim record
 - Current pin and route: reviewed source `cf0090ec97242776eea30a2875756446f42862f9` / tree `b1c932d1c5c19e9e2ea655da5964dd1c5e9c41f3`; `POST /emar/controlled/entries`, route name `emar.controlled.entries.store`, `routes/emar.php:248`, `EmarController::storeCDEntry`.
 - Current backend boundary: one three-attempt `MedicationGovernanceScopeService::forMedication` transaction locks the canonical Client before the medication and stock; stale before-balances are rejected; register entry, stock update, strict audit, and durable fingerprinted replay remain inside the same transaction.
 - Runtime evidence: three separately reported claim-specific commands pass 3 test functions / 146 assertions. The exact race harness contributes one test / 119 assertions containing three synchronized two-process MySQL subscenarios: same UUID/same payload yields processed + duplicate with one effect; same UUID/different payload yields processed + 409 fingerprint conflict with one winner effect; different UUIDs/stale shared before-balance yields processed + 409 stale-stock conflict with no loser replay.
-- Denominator boundary: the 3/146/3 atomicity lane is not added to the existing 78/1,529 MED-RBAC plus MED-CD-SCOPE sum. The 43-test / 716-assertion supporting governance command overlaps prior denominators; the mixed rollback test includes an uncredited balance-check half. Invalid/misinstrumented attempts receive zero credit.
+- Denominator boundary: at RUN-167 the 3/146/3 atomicity lane was not added to the then-existing 78/1,529 MED-RBAC plus MED-CD-SCOPE sum, and it remains excluded from the current 83/1,589 total after SAFE adds one unique 5/60 execution. The 43-test / 716-assertion supporting governance command overlaps prior denominators; the mixed rollback test includes an uncredited balance-check half. Invalid/misinstrumented attempts receive zero credit.
 - Cleanup: information_schema returns zero `oa165_atomicity%` or `oa166_atomicity%` schemas; the configured `oa166_atomicity` base returns SQLSTATE 1049 confirming absence; zero owned PHP processes, listeners, or barrier files remain.
 - Independent review and application boundary: three RUN-165 source lanes and two RUN-166 runtime/artifact critics return bounded GO; RUN-166R independently validates exact producer, receipt, self-seal, reviewer-seal, and harness bytes and authorizes retirement reporting only. No application source or product test changed and no remediation was required.
 - Residual scope: `storeBalanceCheck`, destruction relationship checks, delivery/adjustment/loss and other sibling writers, forced transient-deadlock retry, and stress/repeated schedules remain unadjudicated and receive no inherited credit.
@@ -255,22 +255,19 @@ File presence is not audit completion. A feature row with no linked claim record
 - Browser/visual/ease: blocked or not measured; no screenshot, task, 4/5 score or finding credit.
 - Benchmark/no-copy: no target-specific mapping or final no-match; any eventual proposal must be an original native Oblivion design.
 
-### SAFE-ALERT-DEDUP-IDENTITY-01 — CAP-CR-ALERT-WORKLIST-LIFECYCLE
+### SAFE-ALERT-DEDUP-IDENTITY-01 — CAP-CR-ALERT-WORKLIST-LIFECYCLE — historical remediated
 
-- Status: `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`; priority label `P1` is provisional.
-- Pass lenses: P2, P5, P6, P7; none is complete from this claim.
+- Status: `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`; the retained `P1` label describes historical risk and is excluded from current provisional and final priority counts.
+- Pass lenses: P2, P5, P6, P7; the bounded remediation disposition does not complete any full feature Pass.
 - Module/submodule: Control Room / CANONICAL_STATIC_IDENTITY_DENOMINATOR.
-- Actor/job: ControlRoomAlertAccessService and lifecycle service — Inspect, acknowledge, triage, resolve, close, or reopen alerts.
-- Route loci: routes/control-room.php:49-60; routes/control-room.php:91-140; routes/control-room.php:167-187.
-- Frontend loci: resources/js/pages/control-room/alerts/index.tsx:203-230; resources/js/pages/control-room/show.tsx:17-64.
-- Backend claim anchors: app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:116-136; app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:249-301.
-- Source-inferred current behaviour: Control Room alert deduplication appears able to collapse distinct safeguarding concerns because concern identity is not part of the generic deduplication key.
-- Root-cause hypothesis: The provisional source slice did not establish concern identity as part of the generic deduplication identity.
-- Potential impact: Possible collapse of distinct safeguarding concerns into one Control Room alert, delaying response or obscuring custody.
-- Interim evidence safeguard: When reconciling alerts, verify source concern identity rather than relying on generic client/time similarity alone.
-- Required finalization gate: Create distinct same-client and personless concerns within the window and prove distinct concern-owned alerts and custody chains.
-- Browser/visual/ease: blocked or not measured; no screenshot, task, 4/5 score or finding credit.
-- Benchmark/no-copy: no target-specific mapping or final no-match; any eventual proposal must be an original native Oblivion design.
+- Historical provenance and impact: at the e488 baseline, the generic 30-minute safeguarding dedup query fell back to client identity or the global null client/asset bucket, so distinct same-client or personless concerns could collapse into one alert and obscure concern-owned custody.
+- Application boundary: fix `dc04067e304adebb47335d4f65e8c61061ec6e29` changes four lines in `app/Services/ControlRoom/ComprehensiveAlertBridgeService.php` and adds the 277-line `tests/Feature/ControlRoom/SafeguardingAlertDedupIdentityReproductionTest.php` at SHA-256 `a8d813f1878c6a720f5308f28e5a591f90097961444876f93fcfe5a9262e909a`. Local merge `705db2dc3ba05a8fdf647cd28bdc9c226a694068` integrates exactly those two paths; `origin/main` remains `c39b076547056b1e158c604957a04bd8b75b0f29`, so publication and release remain false.
+- Remediated behavior: `context.concern_id` now precedes client, asset, or null fallback inside the unchanged 30-minute source/type window. Distinct same-client, same-Site personless, and cross-Site personless concerns retain separate alerts; a five-minute same-concern retry remains idempotent; observer-produced H&S events retain concern-owned alert custody; and the accepted 31-minute lifecycle remains unchanged.
+- Reproduction and focused runtime: baseline execution reports 4 failures + 1 warning-pass / 10 assertions and receives reproduction-only credit. The unique post-merge local-main run passes 5 tests / 60 assertions and is counted once in the 83/1,589 bounded-disposition total; the isolated 5/60 replay is not counted again.
+- Supporting/excluded execution: the 28-test / 73-assertion Control Room bridge suite and 3-test / 5-assertion H&S event safeguarding filter remain separate supporting evidence. Six `SafeguardingTerminalTransitionTest` failures omit required WorkSafe decision-version/effective-date fixture fields and fail before bridge/dedup execution; they grant no SAFE or full-suite credit.
+- Independent review: the merge/code review and RUN-173 exact-artifact review return GO with zero discrepancies. RUN-173R authorizes only the historical-remediated reporting transition; RUN-174 alone changes the live record.
+- Noninheritance: timeless retry, within-window escalation semantics, the unused escalation parameter, terminal-transition fixture debt, intake canonical scope, projection durability, broader safeguarding correctness, browser, ease, benchmark, module, Pass, final finding, release, feature-completion, Gate 4, and audit completion receive no credit.
+- Evidence: `evidence/runtime/current-run-173-safe-alert-dedup-identity-remediation-wave-32.json`; independent exact-artifact review `evidence/runtime/current-run-173r-independent-safe-alert-dedup-identity-remediation-review-wave-32.json`.
 
 ### SAFE-PROJECTION-DURABILITY-01 — CAP-SAFE-TERMINAL-PROJECTION
 
