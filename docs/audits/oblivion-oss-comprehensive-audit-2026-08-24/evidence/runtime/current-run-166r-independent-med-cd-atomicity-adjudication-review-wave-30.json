@@ -1,0 +1,195 @@
+{
+  "schema_version": "run-166r-independent-med-cd-atomicity-adjudication-review-wave-30-v1",
+  "run_id": "RUN-166R-INDEPENDENT-MED-CD-ATOMICITY-01-ADJUDICATION-REVIEW-WAVE-30",
+  "status": "GO_EXACT_RUN166_ARTIFACT_REVIEW_RETIREMENT_REPORTING_AUTHORIZED_ZERO_DOWNSTREAM_CREDIT",
+  "generated_at": "2026-08-30T06:25:00+12:00",
+  "architecture_boundary": {
+    "operating_organisations": 1,
+    "multiple_Sites": true,
+    "tenant_authorization": false,
+    "authorization_boundary": "approved Site access, exact roles and permissions, canonical ownership, direct-object denial, witness qualification, and privacy"
+  },
+  "pins": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "repository_commit": "bbd9b05b03da6d98deed033471412a05cc31d6d7",
+    "repository_tree": "f5e2f69d3ab02c42583daef8eb62f8732a12a584",
+    "main_commit": "bbd9b05b03da6d98deed033471412a05cc31d6d7",
+    "origin_main_commit": "bbd9b05b03da6d98deed033471412a05cc31d6d7",
+    "historical_med_cd_atomicity_record_canonical_sha256": "9ba4f430ee59efea414b42a8633c1c969a2fd4428fbf3fef173fb5548cc8e7f1",
+    "review_materializer": {
+      "path": "generators/materialize-independent-run-166-med-cd-atomicity-adjudication-review-wave-30.py",
+      "sha256": "c68a95e98c277eaab39c046aa0972c905e22ad4809108112194fdc84202989b1",
+      "blob_id": "11c0becd82ef53e2819bdf60085c3e8eecb90829",
+      "bytes": 19652,
+      "lines": 381
+    },
+    "producer_artifacts": {
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-165-med-cd-atomicity-current-source-review-wave-30.py": {
+        "sha256": "ccc8d49b793ca1980272f93ca77c870e29de72256100d4a5595cc114a4d010ea",
+        "blob_id": "a8fec73f84b8e6c1208647839bdc47904db6758a",
+        "bytes": 22581,
+        "lines": 419
+      },
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-165-med-cd-atomicity-current-source-review-wave-30.json": {
+        "sha256": "83257b5689f69885be2ed53bee8c0250b62d0e159f5b71dc0382282bb12a81c0",
+        "blob_id": "07c446cbf89cf5fdcc435e2fa814e48a69a2e925",
+        "bytes": 13240,
+        "lines": 288
+      },
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.py": {
+        "sha256": "662a8629a6ffda759e1d471b56230d1944ab2663f6f292cdf74604c22342a845",
+        "blob_id": "34963e6c93d1fd3a975432c84bd8975a187efc19",
+        "bytes": 30738,
+        "lines": 579
+      },
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-166-med-cd-atomicity-already-fixed-adjudication-wave-30.json": {
+        "sha256": "c334495fa7cf7303ae70dccff475b7a9583b927bf06ee822f1a13bd347a84a46",
+        "blob_id": "bed3743d2191c86d4526236b78bea896a0b60574",
+        "bytes": 21939,
+        "lines": 485
+      },
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/harnesses/run-166-controlled-drug-atomicity-concurrency-test.php.txt": {
+        "sha256": "49bbc43ca9caa470e10992751f3e2b7080cde6cf6ff554994ce85e0956b5d807",
+        "blob_id": "f87f011bd6441f3cafcfc1528378e21f180d6570",
+        "bytes": 31845,
+        "lines": 715
+      }
+    },
+    "run165_self_seal_sha256": "8de90b3d923add5d4e1601561c9abb2b19e39b68aff79d74072b1edac1031212",
+    "run166_self_seal_sha256": "11f66f0c27fe4143a94451f140a8ae3a293617a6d1357f9180540a0641e05fea"
+  },
+  "review_process": {
+    "reviewers": [
+      {
+        "reviewer_lane": "/root/run163_artifact_review",
+        "role": "post-commit strict artifact, seal, arithmetic, cleanup, credit, and reporting-delta reviewer",
+        "verdict": "GO_RETIREMENT_REPORTING_ONLY",
+        "reviewed_commit": "bbd9b05b03da6d98deed033471412a05cc31d6d7",
+        "read_only": true,
+        "tests_database_browser_reexecuted": false,
+        "writes": false,
+        "checks": [
+          "all five producer artifact hashes/blobs/bytes/lines",
+          "strict JSON and all receipt/review/command/outcome seals",
+          "3 tests and 146 assertions with invalid/supporting exclusions",
+          "zero schema/process/listener/barrier cleanup",
+          "exact four positive RUN166 credits",
+          "10 to 9 provisional and 1 to 2 historical already-fixed delta"
+        ],
+        "limitations": [
+          "manual controlled-entry clause only",
+          "all other live denominators unchanged",
+          "no runtime reexecution or downstream credit"
+        ],
+        "root_materialized_record_sha256": "35faed8d7232c0b2edc013cb726ce77017f4495d9a57376ecc632a4f5dcd0c6c"
+      },
+      {
+        "reviewer_lane": "/root/run165_race_harness_critic",
+        "role": "post-commit runtime attribution, harness, concurrency, rollback, fractional, and residual-scope reviewer",
+        "verdict": "GO_RETIREMENT_REPORTING_ONLY",
+        "reviewed_commit": "bbd9b05b03da6d98deed033471412a05cc31d6d7",
+        "read_only": true,
+        "tests_database_browser_reexecuted": false,
+        "writes": false,
+        "checks": [
+          "committed harness equals executed bytes",
+          "rollback 1/10",
+          "fractional failure/resubmission/replay 1/17",
+          "three synchronized races 1/119",
+          "invalid and supporting commands excluded",
+          "cleanup complete"
+        ],
+        "limitations": [
+          "deadlock retry not forced",
+          "no stress schedule",
+          "balance, destruction, delivery, adjustment, loss, and sibling writers unadjudicated"
+        ],
+        "root_materialized_record_sha256": "fec0799f1338d3d155d77a269099f2af3256190c5925f058f5eb1aa91a39e97a"
+      }
+    ],
+    "reviewer_lanes": 2,
+    "coordinated_not_blind": true,
+    "root_materialized_returned_reviews": true,
+    "root_was_sole_writer_and_integrator": true,
+    "tests_database_browser_reexecuted": false,
+    "review_set_sha256": "9d3c0a0a777bafe9ab5c5edc3b2df079bb7bde12424dcf4434831a6c71071b33"
+  },
+  "decision": {
+    "verdict": "GO",
+    "blocking_discrepancies": 0,
+    "retirement_reporting_authorized": true,
+    "finding_id": "MED-CD-ATOMICITY-01",
+    "authorized_reporting_status": "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "authorized_scope": "manual POST /emar/controlled/entries register and stock atomicity only",
+    "authorized_live_count_delta": {
+      "retained_claim_records": 0,
+      "provisional_source_claims": -1,
+      "provisional_P1": -1,
+      "historical_already_fixed": 1,
+      "historical_remediated": 0,
+      "final_P0": 0,
+      "final_P1": 0,
+      "benchmark_mapped": 0,
+      "final_no_match_or_NCM": 0,
+      "benchmark_unresolved": 0
+    },
+    "required_post_reporting_counts": {
+      "retained_claim_records": 12,
+      "provisional_source_claims": 9,
+      "provisional_P1": 9,
+      "historical_already_fixed": 2,
+      "historical_remediated": 1,
+      "final_P0": 0,
+      "final_P1": 0,
+      "benchmark_mapped": 2,
+      "final_no_match": 0,
+      "benchmark_unresolved": 338
+    }
+  },
+  "residual_scope_boundary": {
+    "store_balance_check": "UNADJUDICATED_NO_TRANSFER",
+    "destruction_relationship_checks": "UNADJUDICATED_NO_TRANSFER",
+    "sibling_controlled_drug_writers": "UNADJUDICATED_NO_TRANSFER",
+    "transient_mysql_deadlock_retry": "NOT_FORCED_NO_TRANSFER",
+    "repeated_schedule_or_stress": "NOT_EXECUTED_NO_TRANSFER",
+    "supporting_command_overlap": "NO_ADDITIONAL_DENOMINATOR_CREDIT",
+    "rollback_test_balance_check_half": "NO_BALANCE_CHECK_CREDIT"
+  },
+  "write_boundary": {
+    "observed_changed_paths": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-166r-independent-med-cd-atomicity-adjudication-review-wave-30.json",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-run-166-med-cd-atomicity-adjudication-review-wave-30.py",
+      "tests/Feature/Emar/ControlledDrugAtomicityConcurrencyTest.php"
+    ],
+    "wrote_files": [
+      "evidence/runtime/current-run-166r-independent-med-cd-atomicity-adjudication-review-wave-30.json"
+    ],
+    "materializer_runtime_writes_only_review_receipt": true,
+    "application_files_written": []
+  },
+  "credit_boundary": {
+    "independent_exact_artifact_review_for_retirement_reporting": true,
+    "application_remediation_reexecution": false,
+    "runtime_reexecution": false,
+    "application_source_or_test_change": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "final_finding": false,
+    "pass": false,
+    "release": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "all_340_benchmark_targets_resolved": false,
+    "all_required_browser_cells_observed": false,
+    "all_task_scripts_executed": false,
+    "all_eight_passes_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "receipt_self_seal_sha256": "4f4b301aaec50ad2c716cafd1c5c6516aab5a63561bb00746f91af6bd555ab67"
+}
