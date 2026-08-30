@@ -1,0 +1,688 @@
+{
+  "schema_version": "run-179-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34-v1",
+  "run_id": "RUN-179-OUTCOME-NEUTRAL-FLEET-TRIP-INDEX-ROUTE-ACTION-COHORT-WAVE-34",
+  "status": "OUTCOME_NEUTRAL_CURRENT_MAIN_SOURCE_PACKET_READY_TWO_INDEPENDENT_REVIEWS_REQUIRED_ZERO_OWNERSHIP_CORRECTNESS_REMEDIATION_OR_COMPLETION_CREDIT",
+  "generated_on": "2026-08-30",
+  "architecture_rule": "One operating organisation across multiple Sites. Exact permissions, approved Sites, canonical record ownership, direct-object concealment and privacy are the boundaries; no tenant design or tenant-isolation credit.",
+  "pins": {
+    "checkpoint_commit": "f40e3d63ea99d774265ff9f2eefef8176ab0cbc7",
+    "checkpoint_tree": "880721d56b7d379abf9628abb22a5a9b9445194b",
+    "checkpoint_parent": "519e00a9789343720f4e85e18908908ce278d65c",
+    "application_commit": "f40e3d63ea99d774265ff9f2eefef8176ab0cbc7",
+    "application_tree": "880721d56b7d379abf9628abb22a5a9b9445194b",
+    "subtrees": {
+      "app": "3a83cf8acdd88071870634501ab7eacf2d76e62a",
+      "routes": "b62a85f59ba5f45a54fd666b3199a65453034272",
+      "resources/js": "8a851516cdb76ded362fb5912e3e930e45c8df86",
+      "resources/js/pages": "8ad1ecc5817310f2f45c64733ca72d771c798a2f",
+      "tests": "332a54fe95c85c1c1ea9477a1ea115bce9f7b4ac",
+      "database": "341446159b5d8f6e303db9e9cddabfd446b0e034",
+      "bootstrap": "df6189abe5ab5343d88674c199c4ce46e6152a57",
+      "docs/architecture": "3444047114f5f446954b032dedc4e0c7892180bd",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24": "55c64d6d46404160a1729d463c266ce12cb9b6bf"
+    },
+    "governing_prompt": {
+      "path": "C:\\Users\\steph\\Downloads\\oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+      "sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+      "role": "GOVERNING_AUDIT_PROMPT"
+    },
+    "continuation_request": {
+      "path": "C:\\Users\\steph\\.codex\\attachments\\8b35b9fe-b295-4a84-bdf9-a8afb05b2daa\\pasted-text-1.txt",
+      "sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+      "role": "CONTINUATION_REQUEST_ONLY",
+      "is_governing_prompt": false
+    },
+    "generator": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.py",
+    "generator_sha256": "61c895a305f743f102765c9f86d38843c3ce61bcc1a8684a672aa2d7cd6ee157",
+    "generator_blob_id": "506a7007c8d7b8e719b1bfa904a880a2885fe8c1",
+    "inputs": {
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
+      "03-feature-to-benchmark-matrix.csv": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+      "task-scripts/cap-fleet-vehicle-register.md": "9dd6e901b7d4ef3f688a246f069c621180b8ebdf72a1ddd6ee30e6dd9f6742bd",
+      "evidence/source/current-run-170-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.json": "c739a36e1975b60d42988be3de36b9fe1ea88cf942752c90112f40ebaa04cd8d",
+      "evidence/source/current-run-170r-independent-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-review-wave-31.json": "62474100b0c2f027fa0c15f2bb841f08ad3de058da67725a931fcafec17dd139",
+      "evidence/source/current-run-171-reviewed-fleet-vehicle-alerts-config-route-action-reporting-wave-31.json": "9ddc5386a57f782a50564d54d33a14826a84b1c91a6bb276dcd50a15e152a8ba",
+      "evidence/browser/current-audit-dashboard-verification-run-172-wave-31.json": "a18f2c03d6cb7273c36a296c8bb4f9db2e80a440bc62157c6600dff9d9aec657",
+      "evidence/runtime/current-run-176-fleet-trip-index-site-privacy-remediation-wave-33.json": "6e9fa6d855e6ec168d4c651921702dab8872810ddd89f6ba3cd353bf49e0c87c",
+      "evidence/runtime/current-run-176r-independent-fleet-trip-index-site-privacy-remediation-review-wave-33.json": "f1f7369306235ad7d5f318b512dca94e853d96e182ff5c63ddc509534fa545c1",
+      "evidence/source/current-run-177-fleet-trip-index-site-privacy-remediation-reporting-wave-33.json": "1b4cd64704c3137cfc98d0068900fe9068619dae700e519080b1d183639b5c2f",
+      "evidence/browser/current-audit-dashboard-verification-run-178-wave-33.json": "9a41983d86fa3fbe054d1ddb848a2ab4027284aa78210b78937d9728f7fbdaf2"
+    },
+    "run_178_receipt": {
+      "path": "evidence/browser/current-audit-dashboard-verification-run-178-wave-33.json",
+      "sha256": "9a41983d86fa3fbe054d1ddb848a2ab4027284aa78210b78937d9728f7fbdaf2",
+      "git_blob_id": "cf9e07288abd4db365706feda4754b6a07d491a2",
+      "receipt_self_seal_sha256": "1a8cc7a24d2fd7d1df8e63dfae87f475e1013275e77bd5e94a1ab8389502b7a8"
+    }
+  },
+  "selection_contract": {
+    "source": "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json",
+    "selected_queue_indices_zero_based": [
+      84
+    ],
+    "selected_queue_ids": [
+      "RUN090-ROUTE-0085"
+    ],
+    "selected_route_record_ids": [
+      "RUN077-ROUTE-0693"
+    ],
+    "selected_feature_ids": [
+      "CAP-FLEET-VEHICLE-REGISTER"
+    ],
+    "selected_route_names": [
+      "fleet-assets.trips.index"
+    ],
+    "selected_actions": [
+      "App\\Http\\Controllers\\FleetAssets\\VehicleController::trips"
+    ],
+    "selection_outcome_neutral": true,
+    "ownership_decisions_authored": 0,
+    "correctness_decisions_authored": 0,
+    "page_candidates_selected": 0
+  },
+  "records": [
+    {
+      "queue_id": "RUN090-ROUTE-0085",
+      "canonical_key": "route|RUN077-ROUTE-0693",
+      "review_partition": "A",
+      "surface": "ROUTE_SOURCE_RECORD",
+      "source_record_id": "RUN077-ROUTE-0693",
+      "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "direct_identity": {
+        "lane": "EXACT_LITERAL_ROUTE_NAME",
+        "source_field": "literal_route_name",
+        "source_value": "fleet-assets.trips.index",
+        "matrix_field": "route_names",
+        "matrix_token": "fleet-assets.trips.index",
+        "case_sensitive_exact_equality": true,
+        "candidate_cardinality": 1
+      },
+      "source": {
+        "route_file": "routes/fleet-assets.php",
+        "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_key": "routes/fleet-assets.php:54:9:get:10",
+        "source_anchor": "routes/fleet-assets.php:54",
+        "source_locator": "routes/fleet-assets.php:54:9:get",
+        "route_method": "get",
+        "literal_uri": "/trips",
+        "literal_route_name": "fleet-assets.trips.index",
+        "action_expression": "[VehicleController::class, 'trips']",
+        "statement_excerpt": "Route::get('/trips', [VehicleController::class, 'trips'])->name('fleet-assets.trips.index');",
+        "statement_sha256": "215529de9bef35463b260cb426036bdfa28646405de99c02518acce18ff053ce"
+      },
+      "secondary_lane": {
+        "relation_comparison": "NAME_ONLY",
+        "backend_method_relation": {
+          "relation_class": "STATIC_CANDIDATE_RELATION",
+          "rule": "Import-aware exact [Controller::class, 'method'] resolution, exactly one uncommented method definition, and exact controller-file plus definition-line containment within an explicit matrix backend_anchors line or line range; whole-file anchors are excluded from this exact-line lane.",
+          "resolution": {
+            "status": "EXACT_CLASS_METHOD_ARRAY_RESOLVED_UNIQUE_DEFINITION",
+            "action_expression": "[VehicleController::class, 'trips']",
+            "class_token": "VehicleController",
+            "resolved_fqcn": "App\\Http\\Controllers\\FleetAssets\\VehicleController",
+            "resolution_basis": "EXACT_ROUTE_FILE_USE_IMPORT",
+            "controller_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+            "controller_file_sha256": "478a1a0a33868536fc3b2baf5db2d06732ddb5fa16094997a5128dc2267b5239",
+            "method": "trips",
+            "definition_line": 562,
+            "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:562"
+          },
+          "candidate_count": 0,
+          "candidate_feature_ids": [],
+          "matching_matrix_anchors": [],
+          "credit_awarded": false
+        },
+        "contradictory_candidate_present": false
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+        "feature_class": "H",
+        "module": "Fleet & Assets",
+        "user_job": "Maintain vehicles and vehicle-specific state",
+        "route_names": "fleet-assets.fuel.index; fleet-assets.fuel.store; fleet-assets.trips.index; fleet-assets.trips.playback; fleet-assets.trips.playback.data; fleet-assets.trips.toggle-personal; fleet-assets.vehicles.alerts-config; fleet-assets.vehicles.alerts-config.save; fleet-assets.vehicles.bulk-action; fleet-assets.vehicles.index; fleet-assets.vehicles.show; fleet-assets.vehicles.update",
+        "route_paths": "routes/fleet-assets.php:51-66",
+        "page_files": "resources/js/pages/fleet-assets/vehicles/index.tsx",
+        "backend_anchors": "app/Http/Controllers/FleetAssets/VehicleController.php:31-194; app/Http/Controllers/FleetAssets/VehicleController.php:247-340; app/Http/Controllers/FleetAssets/VehicleController.php:475-550",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "run_082_candidate_record_sha256": "3ac8f41bfd105ffdcceee8c13cd1dded5bab7265baa9bf4b4e05b51e583b5bd3",
+        "run_077_manifest_record_sha256": "781ecc7374b530d969678c6f8731c5657e74171d3cb558da156470c7f92920c3",
+        "feature_identity_projection_sha256": "bfa6379bc2d8918237480060414b89dd2e61ffa2d907d639a62ec1fd9892f164",
+        "joined_candidate_evidence_sha256": "aa05de56364e0dfcab8233ae697a6f174bb3c0a7f595a5b3fc7f9e149465d000"
+      },
+      "review_state": {
+        "status": "PENDING_FRESH_SEMANTIC_REVIEW",
+        "allowed_outcomes": [
+          "OWNER",
+          "SHARED_RELATION",
+          "EVIDENCE_GAP"
+        ],
+        "ownership_credit": false
+      },
+      "queue_record_sha256": "928eeec741742f8329dd7e191a71f2d5249775b6de64e6a698a72836345ca011"
+    }
+  ],
+  "current_source_reconciliation": {
+    "immutable_run090_route_source": {
+      "source_anchor": "routes/fleet-assets.php:54",
+      "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+      "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+      "statement_sha256": "215529de9bef35463b260cb426036bdfa28646405de99c02518acce18ff053ce",
+      "statement_excerpt": "Route::get('/trips', [VehicleController::class, 'trips'])->name('fleet-assets.trips.index');"
+    },
+    "immutable_run090_controller_resolution": {
+      "controller_file_sha256": "478a1a0a33868536fc3b2baf5db2d06732ddb5fa16094997a5128dc2267b5239",
+      "definition_line": 562,
+      "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:562"
+    },
+    "current_main_route_source": {
+      "source_anchor": "routes/fleet-assets.php:54",
+      "route_file_sha256": "4be79ba4a0957f81f3e99de8eea7f29a398f8a115957bd44af06dbbf78fe2c4c",
+      "route_file_blob_id": "f0b2b8c199ada1d8ef8bdb41c99bfc2ac02f93d2",
+      "source_line_sha256": "c199bc67a11819a3ba41063d319fe40d359c90e047577a21b9a50a4df633c846",
+      "statement_excerpt": "Route::get('/trips', [VehicleController::class, 'trips'])->name('fleet-assets.trips.index');"
+    },
+    "current_main_controller_resolution": {
+      "controller_file_sha256": "ba1ecc7e876c352a78122a3b292648d834ed40c8e09ab8893b9d9150e5614c49",
+      "controller_file_blob_id": "c6b75b8f33bb7774f74d27a4bc01bf07766c3212",
+      "definition_line": 566,
+      "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:566",
+      "method_slice_sha256": "8a6e9d9c6fa42bc03a226c9a856efde55f6924778d7eefbd16ea7ff926af2d1c"
+    },
+    "route_file_drifted_since_run090": true,
+    "controller_file_drifted_since_run090": true,
+    "controller_definition_line_drifted_from_562_to_566": true,
+    "exact_route_statement_text_preserved": true,
+    "exact_action_expression_preserved": true,
+    "historical_hashes_presented_as_current": false,
+    "historical_correctness_or_ownership_inherited": false
+  },
+  "queue_boundary": {
+    "reviewed_queue_surface_rows_before_run179": 119,
+    "pending_queue_surface_rows_before_run179": 388,
+    "current_next_unresolved_index": 84,
+    "current_next_unresolved_queue_id": "RUN090-ROUTE-0085",
+    "preceding_index_83_selected_or_recredited": false,
+    "post_selection_next_index_if_owner": 85,
+    "post_selection_next_queue_id_if_owner": "RUN090-ROUTE-0086",
+    "post_selection_next_route_record_id_if_owner": "RUN077-ROUTE-0694",
+    "queue_advance_authorized": false
+  },
+  "source_review_packet": {
+    "required_source_files": [
+      {
+        "path": "routes/fleet-assets.php",
+        "sha256": "4be79ba4a0957f81f3e99de8eea7f29a398f8a115957bd44af06dbbf78fe2c4c",
+        "blob_id": "f0b2b8c199ada1d8ef8bdb41c99bfc2ac02f93d2",
+        "bytes": 28332,
+        "lines": 351,
+        "review_loci_validated": true,
+        "review_loci": [
+          "49-58"
+        ],
+        "role": "selected_route_source",
+        "purpose": "permission group, exact selected GET route, and adjacent route context",
+        "context_only": false
+      },
+      {
+        "path": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "sha256": "ba1ecc7e876c352a78122a3b292648d834ed40c8e09ab8893b9d9150e5614c49",
+        "blob_id": "c6b75b8f33bb7774f74d27a4bc01bf07766c3212",
+        "bytes": 54669,
+        "lines": 1263,
+        "review_loci_validated": true,
+        "review_loci": [
+          "35-42",
+          "566-822",
+          "1132-1238"
+        ],
+        "role": "selected_controller_action_and_helpers",
+        "purpose": "current trips action and all controller-local trip visibility/projection helpers",
+        "context_only": false
+      },
+      {
+        "path": "app/Services/Fleet/FleetTripService.php",
+        "sha256": "efaa796d73d55e4888aed8a45e6590be151bfa9b76b7910f8eaa25c5c04c5b80",
+        "blob_id": "5f1315483cfd755a1d8307f1588372d1a40cb8fd",
+        "bytes": 8476,
+        "lines": 246,
+        "review_loci_validated": true,
+        "review_loci": [
+          "12-105"
+        ],
+        "role": "canonical_trip_producer",
+        "purpose": "telemetry-driven FleetTrip creation and lifecycle producer relevant to ownership review",
+        "context_only": false
+      },
+      {
+        "path": "resources/js/pages/fleet-assets/trips/index.tsx",
+        "sha256": "49bf092590254c9b3c4dbec54c0d6870769c844757162f6846270a7631e5c91b",
+        "blob_id": "836e26a6d7c328f247d85b65948e459f1daac7dd",
+        "bytes": 37803,
+        "lines": 888,
+        "review_loci_validated": true,
+        "review_loci": [
+          "94-132",
+          "151-633",
+          "635-745"
+        ],
+        "role": "current_trip_page_consumer",
+        "purpose": "current trip-index page contract and selected GET/filter consumption",
+        "context_only": true
+      },
+      {
+        "path": "resources/js/components/app-sidebar.tsx",
+        "sha256": "46126aec43566878124c894d4a490a21d0aab11c8e3183941008422483e7d11e",
+        "blob_id": "79c64b900daa7f812d168445a267ccfaf338e424",
+        "bytes": 124500,
+        "lines": 3381,
+        "review_loci_validated": true,
+        "review_loci": [
+          "1399-1408"
+        ],
+        "role": "navigation_caller_context",
+        "purpose": "direct Fleet Trips navigation caller only",
+        "context_only": true
+      },
+      {
+        "path": "resources/js/pages/fleet-assets/dashboard.tsx",
+        "sha256": "d5f356e970a843ae727d54c5f4afe26a13712c9c93e239a45bf9eabf66ba060d",
+        "blob_id": "c4eba904c609b976d788114e5c83d1b7c520d753",
+        "bytes": 76836,
+        "lines": 1543,
+        "review_loci_validated": true,
+        "review_loci": [
+          "699-707"
+        ],
+        "role": "dashboard_caller_context",
+        "purpose": "direct Trips dashboard caller only",
+        "context_only": true
+      },
+      {
+        "path": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+        "sha256": "72cb083e156d44279682ade62db2cb5a47d066e49f3a0c4054a067853bfe604a",
+        "blob_id": "f9313885f30c22af5295048b12ec38e336a35fc2",
+        "bytes": 97420,
+        "lines": 1716,
+        "review_loci_validated": true,
+        "review_loci": [
+          "548-556"
+        ],
+        "role": "vehicle_detail_caller_context",
+        "purpose": "direct vehicle-detail Trips caller only",
+        "context_only": true
+      },
+      {
+        "path": "tests/Feature/FleetAssets/FleetTripIndexSitePrivacyTest.php",
+        "sha256": "932a35eaca38ec714874f05aa875388b67ccad3105b39b83c5df85510c27b9ce",
+        "blob_id": "d58b141ac5e7c837a3bf27d5fa4494716849f60b",
+        "bytes": 22167,
+        "lines": 521,
+        "review_loci_validated": true,
+        "review_loci": [
+          "148-459"
+        ],
+        "role": "current_test_source_context",
+        "purpose": "current focused GET/CSV Site-privacy source context; no execution credit",
+        "context_only": true
+      },
+      {
+        "path": "docs/architecture/single-tenant-application.md",
+        "sha256": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c",
+        "blob_id": "d204082ce6b328ceb8518edcaebf77d2868d689b",
+        "bytes": 1936,
+        "lines": 21,
+        "review_loci_validated": true,
+        "review_loci": [
+          "1-21"
+        ],
+        "role": "architecture_boundary",
+        "purpose": "one-organisation multi-Site authorization boundary",
+        "context_only": false
+      }
+    ],
+    "required_source_file_count": 9,
+    "exact_current_loci": {
+      "permission_group": {
+        "source_anchor": "routes/fleet-assets.php:50",
+        "source_line": "Route::middleware('permission:fleet.viewAny')->group(function () {",
+        "source_line_sha256": "3712215f669220d4ced949e1f01b93f27b6efa070134ae2bbfb7bb44e75b0168"
+      },
+      "selected_route": {
+        "source_anchor": "routes/fleet-assets.php:54",
+        "source_line": "Route::get('/trips', [VehicleController::class, 'trips'])->name('fleet-assets.trips.index');",
+        "source_line_sha256": "c199bc67a11819a3ba41063d319fe40d359c90e047577a21b9a50a4df633c846"
+      },
+      "controller_action": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:566",
+        "source_line": "public function trips(Request $request)",
+        "source_line_sha256": "692645da4e826a37e2ccbffaccd69052bb6a6de099c1353e6b787eef3ae7c5dd"
+      },
+      "visible_sites": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:569",
+        "source_line": "$visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);",
+        "source_line_sha256": "76edd2ec215e597d8d6f3de9358f4726b2f03e5433200dd28c247281b00d40ea"
+      },
+      "visible_vehicles": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:570",
+        "source_line": "$visibleVehicles = $this->visibleTripVehiclesQuery($visibleSiteIds);",
+        "source_line_sha256": "0e8126d162ff6238d042a4cc4b03c7c2877ac1feb82d6af94a3bfa4975855753"
+      },
+      "selected_filter_concealment": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:587",
+        "source_line": "$selectedVehicleId > 0 && (clone $visibleVehicles)->whereKey($selectedVehicleId)->exists(),",
+        "source_line_sha256": "ecb0eadd57bf4818d725e7b8c9a19569faa4f8596b7bc45e3a2929c91f1f3a06"
+      },
+      "csv_projection": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:616",
+        "source_line": "$exportQuery = $this->withTripIndexRelations(clone $filteredTrips, $visibleSiteIds)",
+        "source_line_sha256": "53280c3aa538a387e7cd5a04bfce7713e66aee0ceb4d10b493773b0653523fed"
+      },
+      "pagination_projection": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:758",
+        "source_line": "$trips = $query->paginate(25)->withQueryString();",
+        "source_line_sha256": "ddbef3b5f83d99326263e619df9f3ad794844f4c78692f33605ec26cbac5b290"
+      },
+      "render": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:764",
+        "source_line": "return Inertia::render('fleet-assets/trips/index', [",
+        "source_line_sha256": "16090f26dd94f5ad9b71f9937bcc4ce735f03a3f9217c7a7f715de008140f919"
+      },
+      "visible_vehicle_helper": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1133",
+        "source_line": "private function visibleTripVehiclesQuery(array $siteIds): Builder",
+        "source_line_sha256": "045dc9360e7caebcc10606bf8e966b5775da3824bac24a709a9f33f29e33e00e"
+      },
+      "asset_site_helper": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1139",
+        "source_line": "private function applyTripAssetSiteScope(Builder $query, array $siteIds): Builder",
+        "source_line_sha256": "de44f2cb757b99ceadab77a87f22c0676fa31198198f635d3792d32d4f5784db"
+      },
+      "relation_helper": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1197",
+        "source_line": "private function withTripIndexRelations(Builder $query, array $visibleSiteIds): Builder",
+        "source_line_sha256": "a4697331f3287d17de4b5faaf0cb8090e1b2807647976e9a2738a0119b118a19"
+      },
+      "driver_site_helper": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1210",
+        "source_line": "private function applyHistoricalTripDriverSiteScope(Builder $query, array $siteIds): Builder",
+        "source_line_sha256": "81a82e9fb0fca279b29ec8c90b7036d1a67cd571060574c4c9ec907287d414ef"
+      },
+      "driver_projection_helper": {
+        "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1229",
+        "source_line": "private function visibleTripDriver(FleetTrip $trip): ?User",
+        "source_line_sha256": "dd6c34b9fcee2526e9cdf3fc3e49883f8d735e07af3113b9137c8e80d3f62290"
+      },
+      "canonical_trip_producer": {
+        "source_anchor": "app/Services/Fleet/FleetTripService.php:18",
+        "source_line": "public function handleTelemetry(",
+        "source_line_sha256": "ac482fc21732bb766885732976e604aafba26c9793a31df5d975bd8e8801d509"
+      },
+      "canonical_trip_creation": {
+        "source_anchor": "app/Services/Fleet/FleetTripService.php:44",
+        "source_line": "$openTrip = FleetTrip::create([",
+        "source_line_sha256": "87f00f152a597216f3881a782742e153c919e2f58bf9fda1bda37126e2193bbf"
+      },
+      "current_page": {
+        "source_anchor": "resources/js/pages/fleet-assets/trips/index.tsx:151",
+        "source_line": "export default function TripsIndex({",
+        "source_line_sha256": "03e078eb92f8fd3d8fb2f4cbc21222c1456e18b58c9331773b405ae300e713da"
+      },
+      "current_page_request": {
+        "source_anchor": "resources/js/pages/fleet-assets/trips/index.tsx:241",
+        "source_line": "'/fleet-assets/trips',",
+        "source_line_sha256": "b074d389f96283917813ad368a2dcef74d79eb396d59d90353f0e375ddbcc760"
+      },
+      "sidebar_caller": {
+        "source_anchor": "resources/js/components/app-sidebar.tsx:1405",
+        "source_line": "href: '/fleet-assets/trips',",
+        "source_line_sha256": "04f2c567d5773b93fc92dfc55e687764c6df73852681a7b4166059b99a814dae"
+      },
+      "dashboard_caller": {
+        "source_anchor": "resources/js/pages/fleet-assets/dashboard.tsx:703",
+        "source_line": "href=\"/fleet-assets/trips\"",
+        "source_line_sha256": "9d3abf80de7787013b172c361da5c47bf9b31e3e6a071dd7ad6ab33595de25bc"
+      },
+      "vehicle_detail_caller": {
+        "source_anchor": "resources/js/pages/fleet-assets/vehicles/show.tsx:552",
+        "source_line": "<Link href={`/fleet-assets/trips`}>",
+        "source_line_sha256": "8bef3662f30b1b5b781bbbbd836eaf878eb8f157912c3ccd9380d7dcf90eca46"
+      },
+      "focused_test": {
+        "source_anchor": "tests/Feature/FleetAssets/FleetTripIndexSitePrivacyTest.php:148",
+        "source_line": "public function test_trip_index_scopes_rows_nested_identity_filters_and_every_aggregate_to_approved_sites(): void",
+        "source_line_sha256": "e9f08bf277ffa2e6cf56971a894eabbb0e7819cf2bfda22853bbb1ac2526e64b"
+      },
+      "architecture": {
+        "source_anchor": "docs/architecture/single-tenant-application.md:3",
+        "source_line": "Oblivion Findings is a single-tenant application for one operating organisation across all of its sites. It is not a multi-tenant SaaS product.",
+        "source_line_sha256": "96f2979e665f9b3b297588fb7fbbd9a4ea1dd3c3f9161b216439adad3cad544a"
+      }
+    },
+    "selected_controller_action_and_helper_slices": {
+      "trips": {
+        "source_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "source_file_sha256": "ba1ecc7e876c352a78122a3b292648d834ed40c8e09ab8893b9d9150e5614c49",
+        "source_file_blob_id": "c6b75b8f33bb7774f74d27a4bc01bf07766c3212",
+        "method": "trips",
+        "start_line": 566,
+        "end_line": 822,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:566",
+        "text": "    public function trips(Request $request)\n    {\n        $user = $request->user() ?? abort(403);\n        $visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);\n        $visibleVehicles = $this->visibleTripVehiclesQuery($visibleSiteIds);\n        $visibleTrips = FleetTrip::query()->whereIn(\n            'fleet_trips.asset_id',\n            (clone $visibleVehicles)->select('assets.id'),\n        );\n        $filteredTrips = clone $visibleTrips;\n\n        $selectedVehicleId = null;\n        if ($request->filled('vehicle_id')) {\n            $selectedVehicleId = $request->integer('vehicle_id');\n        } elseif ($request->filled('asset_id')) {\n            // Legacy support\n            $selectedVehicleId = $request->integer('asset_id');\n        }\n\n        if ($selectedVehicleId !== null) {\n            abort_unless(\n                $selectedVehicleId > 0 && (clone $visibleVehicles)->whereKey($selectedVehicleId)->exists(),\n                404,\n            );\n            $filteredTrips->where('fleet_trips.asset_id', $selectedVehicleId);\n        }\n\n        if ($request->filled('status')) {\n            $filteredTrips->where('fleet_trips.status', $request->input('status'));\n        }\n\n        if ($request->filled('date_from')) {\n            $filteredTrips->whereDate('fleet_trips.started_at', '>=', $request->input('date_from'));\n        }\n\n        if ($request->filled('date_to')) {\n            $filteredTrips->whereDate('fleet_trips.started_at', '<=', $request->input('date_to'));\n        }\n\n        if ($request->filled('search')) {\n            $search = $request->input('search');\n            $filteredTrips->where(function (Builder $query) use ($search): void {\n                $query->where('fleet_trips.start_address', 'like', \"%{$search}%\")\n                    ->orWhere('fleet_trips.end_address', 'like', \"%{$search}%\")\n                    ->orWhereHas('asset', fn ($sub) => $sub->where('name', 'like', \"%{$search}%\"));\n            });\n        }\n\n        // CSV export\n        if ($request->input('export') === 'csv') {\n            $exportQuery = $this->withTripIndexRelations(clone $filteredTrips, $visibleSiteIds)\n                ->latest('fleet_trips.started_at');\n\n            return response()->streamDownload(function () use ($exportQuery) {\n                $handle = fopen('php://output', 'w');\n                $this->putCsv($handle, ['Vehicle', 'Driver', 'Start Time', 'End Time', 'Distance (km)', 'Duration (min)', 'Max Speed (km/h)', 'Start Address', 'End Address', 'Status']);\n                foreach ($exportQuery->lazy(200) as $trip) {\n                    $driver = $this->visibleTripDriver($trip);\n                    $this->putCsv($handle, [\n                        $trip->asset?->name ?? '',\n                        $driver?->name ?? '',\n                        optional($trip->started_at)->format('Y-m-d H:i:s'),\n                        optional($trip->ended_at)->format('Y-m-d H:i:s'),\n                        $trip->distance_km ?? 0,\n                        round(($trip->duration_s ?? 0) / 60),\n                        $trip->max_speed_kph ?? '',\n                        $trip->start_address ?? '',\n                        $trip->end_address ?? '',\n                        $trip->status ?? '',\n                    ]);\n                }\n                fclose($handle);\n            }, 'trips-export.csv');\n        }\n\n        // Summary stats (from the same filtered query, without pagination)\n        $totalTrips = (clone $filteredTrips)->count();\n        $totalDistanceKm = round((float) (clone $filteredTrips)->sum('distance_km'), 1);\n        $totalDurationS = (int) (clone $filteredTrips)->sum('duration_s');\n        $avgDistanceKm = round((float) (clone $filteredTrips)->avg('distance_km'), 1);\n\n        // Average max speed (if column exists)\n        $avgSpeedKph = 0;\n        try {\n            if (Schema::hasColumn('fleet_trips', 'max_speed_kph')) {\n                $avgSpeedKph = round((float) (clone $filteredTrips)->avg('max_speed_kph'), 1);\n            }\n        } catch (\\Throwable $e) {\n            $avgSpeedKph = 0;\n        }\n\n        // Active trips count\n        $activeTrips = 0;\n        try {\n            $activeTrips = (clone $filteredTrips)->whereIn('fleet_trips.status', ['open', 'in_progress'])->count();\n        } catch (\\Throwable $e) {\n            $activeTrips = 0;\n        }\n\n        $summary = [\n            'total_trips' => $totalTrips,\n            'total_distance_km' => $totalDistanceKm,\n            'total_duration_s' => $totalDurationS,\n            'avg_speed_kph' => $avgSpeedKph,\n            'avg_distance_km' => $avgDistanceKm,\n            'active_trips' => $activeTrips,\n        ];\n\n        // Trips by day of week (MiniBarChart data)\n        $tripsByDay = [];\n        try {\n            $dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];\n            $dayCounts = (clone $filteredTrips)\n                ->selectRaw('DAYOFWEEK(started_at) as dow, COUNT(*) as cnt')\n                ->groupByRaw('DAYOFWEEK(started_at)')\n                ->pluck('cnt', 'dow')\n                ->toArray();\n\n            // MySQL DAYOFWEEK: 1=Sun, 2=Mon, ... 7=Sat → remap to Mon-Sun\n            $dowMap = [2 => 0, 3 => 1, 4 => 2, 5 => 3, 6 => 4, 7 => 5, 1 => 6];\n            foreach ($dayLabels as $i => $label) {\n                $mysqlDow = array_search($i, $dowMap);\n                $tripsByDay[] = [\n                    'label' => $label,\n                    'value' => (int) ($dayCounts[$mysqlDow] ?? 0),\n                ];\n            }\n        } catch (\\Throwable $e) {\n            $tripsByDay = array_map(fn ($l) => ['label' => $l, 'value' => 0], ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);\n        }\n\n        // Top 5 vehicles by distance (HorizontalBarChart data)\n        $topVehicles = [];\n        try {\n            $topVehicles = (clone $visibleTrips)\n                ->selectRaw('asset_id, SUM(distance_km) as total_km')\n                ->with('asset:id,name')\n                ->groupBy('asset_id')\n                ->orderByDesc('total_km')\n                ->limit(5)\n                ->get()\n                ->map(fn ($row) => [\n                    'label' => $row->asset?->name ?? 'Unknown',\n                    'value' => round((float) $row->total_km, 1),\n                ])\n                ->values()\n                ->toArray();\n        } catch (\\Throwable $e) {\n            $topVehicles = [];\n        }\n\n        // Distance trend (last 7 trips sparkline)\n        $distanceTrend = [];\n        try {\n            $distanceTrend = (clone $visibleTrips)\n                ->latest('started_at')\n                ->limit(7)\n                ->pluck('distance_km')\n                ->reverse()\n                ->values()\n                ->map(fn ($v) => round((float) $v, 1))\n                ->toArray();\n        } catch (\\Throwable $e) {\n            $distanceTrend = [];\n        }\n\n        // Hero stats — whole-fleet counts (independent of filters/pagination),\n        // matching the vehicles-index hero convention. After-hours mirrors the\n        // dashboard definition (before 8am / after 6pm, last 7 days).\n        $todayStart = now()->startOfDay();\n        $hero = [\n            'trips_today' => (clone $visibleTrips)->where('started_at', '>=', $todayStart)->count(),\n            'distance_today_km' => round((float) (clone $visibleTrips)->where('started_at', '>=', $todayStart)->sum('distance_km'), 1),\n            'active_now' => (clone $visibleTrips)->whereIn('status', ['open', 'in_progress'])->count(),\n            'after_hours_7d' => (clone $visibleTrips)->where('started_at', '>=', now()->subDays(7))\n                ->afterHours()\n                ->count(),\n        ];\n\n        // Sorting\n        $allowedSorts = ['started_at', 'distance_km', 'duration_s', 'status'];\n        $sort = $request->input('sort', 'started_at');\n        $direction = $request->input('direction', 'desc');\n        if (! in_array($sort, $allowedSorts)) {\n            $sort = 'started_at';\n        }\n        if (! in_array($direction, ['asc', 'desc'])) {\n            $direction = 'desc';\n        }\n        $query = $this->withTripIndexRelations(clone $filteredTrips, $visibleSiteIds)\n            ->orderBy($sort, $direction);\n\n        $trips = $query->paginate(25)->withQueryString();\n\n        // Get vehicles list for filter dropdown\n        $vehicles = (clone $visibleVehicles)->orderBy('name')->get(['id', 'name'])\n            ->map(fn ($v) => ['id' => $v->id, 'name' => $v->name])->values();\n\n        return Inertia::render('fleet-assets/trips/index', [\n            'trips' => [\n                'data' => $trips->getCollection()->map(function (FleetTrip $trip): array {\n                    $driver = $this->visibleTripDriver($trip);\n\n                    return [\n                        'id' => $trip->id,\n                        'asset' => $trip->asset ? [\n                            'id' => $trip->asset->id,\n                            'name' => $trip->asset->name,\n                            'asset_tag' => $trip->asset->asset_tag,\n                        ] : null,\n                        'driver' => $driver ? [\n                            'id' => $driver->id,\n                            'name' => $driver->name,\n                        ] : null,\n                        'started_at' => optional($trip->started_at)->toISOString(),\n                        'ended_at' => optional($trip->ended_at)->toISOString(),\n                        'distance_km' => $trip->distance_km,\n                        'duration_s' => $trip->duration_s,\n                        'max_speed_kph' => $trip->max_speed_kph ?? null,\n                        'status' => $trip->status,\n                        'is_personal' => (bool) $trip->is_personal,\n                        'start_address' => $trip->start_address,\n                        'end_address' => $trip->end_address,\n                        'start_latitude' => $trip->start_latitude,\n                        'start_longitude' => $trip->start_longitude,\n                        'end_latitude' => $trip->end_latitude,\n                        'end_longitude' => $trip->end_longitude,\n                        'segments' => $trip->segments->map(fn ($seg) => [\n                            'id' => $seg->id,\n                            'seq' => $seg->seq,\n                            'started_at' => optional($seg->started_at)->toISOString(),\n                            'ended_at' => optional($seg->ended_at)->toISOString(),\n                            'distance_km' => $seg->distance_km,\n                            'duration_s' => $seg->duration_s,\n                            'polyline' => $seg->polyline ? json_decode($seg->polyline, true) : null,\n                        ])->values(),\n                    ];\n                })->values(),\n                'links' => $trips->linkCollection()->toArray(),\n                'meta' => [\n                    'current_page' => $trips->currentPage(),\n                    'last_page' => $trips->lastPage(),\n                    'total' => $trips->total(),\n                ],\n            ],\n            'vehicles' => $vehicles,\n            'filters' => $request->only(['date_from', 'date_to', 'vehicle_id', 'status', 'search']),\n            'hero' => $hero,\n            'summary' => $summary,\n            'trips_by_day' => $tripsByDay,\n            'top_vehicles' => $topVehicles,\n            'distance_trend' => $distanceTrend,\n            'can' => [\n                'manage' => $this->canManageFleet($user),\n            ],\n        ]);\n    }\n",
+        "text_sha256": "8a6e9d9c6fa42bc03a226c9a856efde55f6924778d7eefbd16ea7ff926af2d1c"
+      },
+      "visibleTripVehiclesQuery": {
+        "source_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "source_file_sha256": "ba1ecc7e876c352a78122a3b292648d834ed40c8e09ab8893b9d9150e5614c49",
+        "source_file_blob_id": "c6b75b8f33bb7774f74d27a4bc01bf07766c3212",
+        "method": "visibleTripVehiclesQuery",
+        "start_line": 1133,
+        "end_line": 1136,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1133",
+        "text": "    private function visibleTripVehiclesQuery(array $siteIds): Builder\n    {\n        return $this->applyTripAssetSiteScope(Asset::query()->vehicles(), $siteIds);\n    }\n",
+        "text_sha256": "c745961e08b775f5edd47fed7af49a51b3d559d3e01714cf597ad50c7bda457e"
+      },
+      "applyTripAssetSiteScope": {
+        "source_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "source_file_sha256": "ba1ecc7e876c352a78122a3b292648d834ed40c8e09ab8893b9d9150e5614c49",
+        "source_file_blob_id": "c6b75b8f33bb7774f74d27a4bc01bf07766c3212",
+        "method": "applyTripAssetSiteScope",
+        "start_line": 1139,
+        "end_line": 1194,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1139",
+        "text": "    private function applyTripAssetSiteScope(Builder $query, array $siteIds): Builder\n    {\n        if ($siteIds === []) {\n            return $query->whereRaw('1 = 0');\n        }\n\n        $siteColumn = $query->qualifyColumn('site_id');\n        $homeSiteColumn = $query->qualifyColumn('home_site_id');\n        $clientColumn = $query->qualifyColumn('client_id');\n\n        return $query->where(function (Builder $provenance) use (\n            $siteIds,\n            $siteColumn,\n            $homeSiteColumn,\n            $clientColumn,\n        ): void {\n            $provenance->where(function (Builder $directSite) use ($siteIds, $siteColumn, $clientColumn): void {\n                $directSite->whereIn($siteColumn, $siteIds)\n                    ->where(function (Builder $clientAgreement) use ($siteColumn, $clientColumn): void {\n                        $clientAgreement->whereNull($clientColumn)\n                            ->orWhereHas('client', fn (Builder $client) => $client->whereColumn(\n                                $client->qualifyColumn('site_id'),\n                                $siteColumn,\n                            ));\n                    });\n            })->orWhere(function (Builder $homeSite) use (\n                $siteIds,\n                $siteColumn,\n                $homeSiteColumn,\n                $clientColumn,\n            ): void {\n                $homeSite->whereNull($siteColumn)\n                    ->whereIn($homeSiteColumn, $siteIds)\n                    ->where(function (Builder $clientAgreement) use ($homeSiteColumn, $clientColumn): void {\n                        $clientAgreement->whereNull($clientColumn)\n                            ->orWhereHas('client', fn (Builder $client) => $client->whereColumn(\n                                $client->qualifyColumn('site_id'),\n                                $homeSiteColumn,\n                            ));\n                    });\n            })->orWhere(function (Builder $clientSite) use (\n                $siteIds,\n                $siteColumn,\n                $homeSiteColumn,\n                $clientColumn,\n            ): void {\n                $clientSite->whereNull($siteColumn)\n                    ->whereNull($homeSiteColumn)\n                    ->whereNotNull($clientColumn)\n                    ->whereHas('client', fn (Builder $client) => $client->whereIn(\n                        $client->qualifyColumn('site_id'),\n                        $siteIds,\n                    ));\n            });\n        });\n    }\n",
+        "text_sha256": "29ee73e51d58ffcf915daaef79be381324585d9135adbe695b50b8f26b7a5691"
+      },
+      "withTripIndexRelations": {
+        "source_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "source_file_sha256": "ba1ecc7e876c352a78122a3b292648d834ed40c8e09ab8893b9d9150e5614c49",
+        "source_file_blob_id": "c6b75b8f33bb7774f74d27a4bc01bf07766c3212",
+        "method": "withTripIndexRelations",
+        "start_line": 1197,
+        "end_line": 1207,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1197",
+        "text": "    private function withTripIndexRelations(Builder $query, array $visibleSiteIds): Builder\n    {\n        return $query->with([\n            'asset:id,name,asset_tag',\n            'driverSession.user' => function ($relation) use ($visibleSiteIds): void {\n                $this->applyHistoricalTripDriverSiteScope($relation->getQuery(), $visibleSiteIds);\n                $relation->select(['id', 'name']);\n            },\n            'segments' => fn ($segments) => $segments->orderBy('seq'),\n        ]);\n    }\n",
+        "text_sha256": "c12f28466d7d565574b10ec1903a0f4d177eeec1cc10a5085a5cdbcba058e4fb"
+      },
+      "applyHistoricalTripDriverSiteScope": {
+        "source_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "source_file_sha256": "ba1ecc7e876c352a78122a3b292648d834ed40c8e09ab8893b9d9150e5614c49",
+        "source_file_blob_id": "c6b75b8f33bb7774f74d27a4bc01bf07766c3212",
+        "method": "applyHistoricalTripDriverSiteScope",
+        "start_line": 1210,
+        "end_line": 1227,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1210",
+        "text": "    private function applyHistoricalTripDriverSiteScope(Builder $query, array $siteIds): Builder\n    {\n        if ($siteIds === []) {\n            return $query->whereRaw('1 = 0');\n        }\n\n        $profiles = HrEmployeeProfile::withTrashed()\n            ->select('user_id')\n            ->where(function (Builder $siteQuery) use ($siteIds): void {\n                $siteQuery->whereIn('primary_site_id', $siteIds);\n\n                foreach ($siteIds as $siteId) {\n                    $siteQuery->orWhereJsonContains('secondary_site_ids', $siteId);\n                }\n            });\n\n        return $query->whereIn($query->qualifyColumn('id'), $profiles);\n    }\n",
+        "text_sha256": "bff9b99583085cb709dbf3fc09668f3ae929a2abd454726264f62b39509f37a5"
+      },
+      "visibleTripDriver": {
+        "source_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "source_file_sha256": "ba1ecc7e876c352a78122a3b292648d834ed40c8e09ab8893b9d9150e5614c49",
+        "source_file_blob_id": "c6b75b8f33bb7774f74d27a4bc01bf07766c3212",
+        "method": "visibleTripDriver",
+        "start_line": 1229,
+        "end_line": 1238,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:1229",
+        "text": "    private function visibleTripDriver(FleetTrip $trip): ?User\n    {\n        $session = $trip->driverSession;\n\n        if (! $session || (int) $session->asset_id !== (int) $trip->asset_id) {\n            return null;\n        }\n\n        return $session->user;\n    }\n",
+        "text_sha256": "d696751fdc96f97175d80686577484e159252062c3736adacb0a7f1801ea4319"
+      }
+    },
+    "canonical_trip_producer_slice": {
+      "source_file": "app/Services/Fleet/FleetTripService.php",
+      "source_file_sha256": "efaa796d73d55e4888aed8a45e6590be151bfa9b76b7910f8eaa25c5c04c5b80",
+      "source_file_blob_id": "5f1315483cfd755a1d8307f1588372d1a40cb8fd",
+      "method": "handleTelemetry",
+      "start_line": 18,
+      "end_line": 105,
+      "definition_anchor": "app/Services/Fleet/FleetTripService.php:18",
+      "text": "    public function handleTelemetry(\n        FleetTelemetryEvent $event,\n        FleetVehicleStateSnapshot $state,\n        ?FleetTelemetryEvent $previousEvent = null\n    ): void\n    {\n        $startSpeed = (float) config('fleet.trip.start_speed_kph', 5);\n        $stopSpeed = (float) config('fleet.trip.stop_speed_kph', 2);\n        $stopAfterMinutes = (int) config('fleet.trip.stop_after_minutes', 5);\n        $idleAfterMinutes = (int) config('fleet.behaviour.idle_after_minutes', 2);\n\n        $speed = $event->speed_kph ?? 0;\n        $moving = $speed >= $startSpeed;\n        $stopped = $speed <= $stopSpeed;\n\n        if ($moving) {\n            $state->last_moving_at = $event->occurred_at;\n        }\n\n        $openTrip = FleetTrip::query()\n            ->where('asset_id', $event->asset_id)\n            ->where('status', 'open')\n            ->latest('started_at')\n            ->first();\n\n        if ($moving && !$openTrip) {\n            $openTrip = FleetTrip::create([\n                'asset_id' => $event->asset_id,\n                'driver_session_id' => null,\n                'started_at' => $event->occurred_at ?? now(),\n                'start_latitude' => $event->latitude,\n                'start_longitude' => $event->longitude,\n                'status' => 'open',\n                'consent_blocked' => $event->consent_blocked,\n            ]);\n\n            $this->startSegment($openTrip, $event);\n        }\n\n        if ($openTrip) {\n            $distanceKm = $this->distance->kmBetween(\n                $state->latitude,\n                $state->longitude,\n                $event->latitude,\n                $event->longitude\n            );\n\n            if ($distanceKm > 0) {\n                $openTrip->distance_km += $distanceKm;\n            }\n\n            if ($event->occurred_at && $openTrip->started_at) {\n                // Pass `true` so Carbon 3 returns absolute seconds; the column\n                // is unsigned and would overflow on a negative diff.\n                $openTrip->duration_s = (int) $openTrip->started_at->diffInSeconds(\n                    $event->occurred_at,\n                    true,\n                );\n            }\n\n            if ($stopped && $state->last_moving_at instanceof Carbon) {\n                $idleMinutes = (int) $state->last_moving_at->diffInMinutes(\n                    $event->occurred_at,\n                    true,\n                );\n                if ($idleMinutes >= $stopAfterMinutes) {\n                    $openTrip->update([\n                        'ended_at' => $event->occurred_at,\n                        'end_latitude' => $event->latitude,\n                        'end_longitude' => $event->longitude,\n                        'status' => 'closed',\n                    ]);\n                    $state->last_trip_id = $openTrip->id;\n                    $this->endOpenSegment($openTrip, $event);\n                    if (config('fleet.maps.reverse_geocode_enabled')) {\n                        ReverseGeocodeFleetTrip::dispatch($openTrip->id);\n                    }\n                    $openTrip = null;\n                }\n            }\n\n            if ($openTrip) {\n                $this->updateSegments($openTrip, $event, $previousEvent, $moving, $stopped, $idleAfterMinutes);\n                $openTrip->save();\n                $state->last_trip_id = $openTrip->id;\n            }\n        }\n    }\n",
+      "text_sha256": "0bc04775e2664b777fb3c7b0a27e7a767cedaf39a85cada867e7a1cafdbc4439"
+    },
+    "current_trip_page_is_context_only": true,
+    "caller_files_are_context_only": true,
+    "focused_test_file_is_source_context_only": true,
+    "test_execution_inherited": false,
+    "page_or_caller_ownership_inherited": false,
+    "source_review_complete": false,
+    "source_packet_completeness_claimed": false,
+    "packet_sha256": "7709e6aa7dd434d6be780f17f943ffbeb453486bd3e3865a664875e083fbc77d"
+  },
+  "remediation_and_history_noninheritance": {
+    "finding_id": "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
+    "current_reporting_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "run_176_sha256": "6e9fa6d855e6ec168d4c651921702dab8872810ddd89f6ba3cd353bf49e0c87c",
+    "run_176r_sha256": "f1f7369306235ad7d5f318b512dca94e853d96e182ff5c63ddc509534fa545c1",
+    "run_177_sha256": "1b4cd64704c3137cfc98d0068900fe9068619dae700e519080b1d183639b5c2f",
+    "run_178_sha256": "9a41983d86fa3fbe054d1ddb848a2ab4027284aa78210b78937d9728f7fbdaf2",
+    "remediation_files_or_runtime_recredited": false,
+    "red_reproduction_recredited": false,
+    "isolated_or_post_merge_green_recredited": false,
+    "supporting_regressions_recredited": false,
+    "historical_remediated_reporting_recredited": false,
+    "static_route_ownership_inherited_from_remediation": false,
+    "controller_action_bridge_inherited_from_remediation": false,
+    "correctness_inherited_from_static_identity": false,
+    "final_finding_inherited": false
+  },
+  "provisional_review_questions": [
+    {
+      "question_id": "RUN179-Q-OWNERSHIP-IDENTITY",
+      "question": "Does the exact GET action directly implement the vehicle-specific state user job, or is SHARED_RELATION or EVIDENCE_GAP required?",
+      "resolved": false,
+      "finding": false
+    },
+    {
+      "question_id": "RUN179-Q-PRODUCER-RELATION",
+      "question": "Is the canonical FleetTripService producer ownership-material to this read action, and does its relation alter direct versus shared ownership?",
+      "resolved": false,
+      "finding": false
+    },
+    {
+      "question_id": "RUN179-Q-PAGE-CALLER-RELATION",
+      "question": "Do the current page and callers remain consumption/navigation context rather than co-owners of the exact route action?",
+      "resolved": false,
+      "finding": false
+    },
+    {
+      "question_id": "RUN179-Q-HISTORY-SEPARATION",
+      "question": "Can reviewers preserve the already-remediated Site-privacy history without importing its tests, correctness, or reporting disposition into static ownership?",
+      "resolved": false,
+      "finding": false
+    }
+  ],
+  "fresh_review_contract": {
+    "status": "PENDING",
+    "required_independent_reviews": 2,
+    "required_reviewers": [
+      "fresh semantic source reviewer independent of this producer",
+      "different independent exact-hash reviewer before any integration"
+    ],
+    "allowed_outcomes": [
+      "OWNER",
+      "SHARED_RELATION",
+      "EVIDENCE_GAP"
+    ],
+    "ownership_integration_authorized": false,
+    "reviewers_must_separate_ownership_from_correctness": true,
+    "reviewers_must_not_treat_questions_as_findings": true,
+    "reviewers_must_reconcile_current_lines_and_hashes": true,
+    "reviewers_must_preserve_remediation_noninheritance": true
+  },
+  "stop_rules": [
+    "Stop on any branch, commit, tree, prompt-role, input, source blob, line, queue identity, or dirty-set mismatch.",
+    "No route/name/controller/page/caller/test/service containment candidate is an ownership decision.",
+    "No prior queue outcome, remediation result, test execution, correctness result, reporting state, page, caller, service, model, or adjacent route identity is inherited.",
+    "No correctness observation becomes a finding in this outcome-neutral packet.",
+    "No runtime, database, browser, build, benchmark, NCM, publication, completion, Gate 4, or audit credit."
+  ],
+  "counts": {
+    "selected_queue_rows": 1,
+    "selected_route_rows": 1,
+    "selected_page_rows": 0,
+    "ownership_decisions": 0,
+    "correctness_decisions": 0,
+    "required_source_files": 9,
+    "controller_action_slices": 1,
+    "controller_helper_slices": 5,
+    "canonical_producer_slices": 1,
+    "provisional_review_questions": 4,
+    "required_independent_reviews": 2
+  },
+  "credit_boundary": {
+    "outcome_neutral_source_packet": true,
+    "static_source_feature_ownership": false,
+    "static_route_feature_ownership": false,
+    "static_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "frontend_caller_ownership": false,
+    "canonical_trip_producer_ownership": false,
+    "canonical_object_ownership_correctness": false,
+    "approved_site_scope_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_concealment_correctness": false,
+    "query_projection_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "executed_tests": false,
+    "remediation": false,
+    "benchmark": false,
+    "final_no_match_or_NCM": false,
+    "final_finding": false,
+    "feature_completion": false,
+    "pass": false,
+    "release": false,
+    "publication": false,
+    "completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": false,
+  "source_review_complete": false,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/root-run-179-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.json"
+  ],
+  "self_seal": {
+    "algorithm": "sha256-canonical-json-with-self-seal-omitted",
+    "sha256": "2fb26afd47c818fe5654fdc685af9a87e40624ad44e205914cca85298593bfc2"
+  }
+}
