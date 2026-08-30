@@ -202,6 +202,7 @@ it('recovers only the matching Control Room alert and IT incident when one of tw
         ->and(ControlRoomAlert::query()->where('device_id', $projection->id)->count())->toBe(2)
         ->and(ItTicket::query()->count())->toBe(2);
 
+    CarbonImmutable::setTestNow('2026-07-23T13:00:01Z');
     app(MonitoringObservationIngestor::class)->ingest(
         $first->fresh('profile'),
         dependencyObservation('first-recovered', MonitorState::Healthy),

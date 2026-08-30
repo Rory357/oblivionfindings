@@ -13,12 +13,15 @@ use App\Models\Site;
 use App\Models\SiteRoom;
 use Carbon\CarbonImmutable;
 
-function monitoringObservation(string $sourceKey, MonitorState $state): ObservationInput
-{
+function monitoringObservation(
+    string $sourceKey,
+    MonitorState $state,
+    ?CarbonImmutable $observedAt = null,
+): ObservationInput {
     return new ObservationInput(
         sourceKey: $sourceKey,
         state: $state,
-        observedAt: CarbonImmutable::parse('2026-07-18 04:00:00')->addSeconds(
+        observedAt: $observedAt ?? CarbonImmutable::parse('2026-07-18 04:00:00')->addSeconds(
             abs(crc32($sourceKey)) % 300,
         ),
         latencyMs: $state === MonitorState::Healthy ? 8 : null,
@@ -47,18 +50,19 @@ it('waits for the configured failure confirmation count before transitioning', f
     ]);
     $monitor->profile->update(['failure_confirmations' => 3]);
     $site = assignMonitoringSite($monitor);
+    $observedAt = CarbonImmutable::parse('2026-07-18 04:00:00');
 
     $ingestor = app(MonitoringObservationIngestor::class);
     $first = $ingestor->ingest(
         $monitor,
-        monitoringObservation('fail-1', MonitorState::Failed),
+        monitoringObservation('fail-1', MonitorState::Failed, $observedAt),
         $site->id,
         $monitor->device_id,
         null,
     );
     $second = $ingestor->ingest(
         $monitor->fresh(),
-        monitoringObservation('fail-2', MonitorState::Failed),
+        monitoringObservation('fail-2', MonitorState::Failed, $observedAt->addSecond()),
         $site->id,
         $monitor->device_id,
         null,
@@ -73,7 +77,7 @@ it('waits for the configured failure confirmation count before transitioning', f
 
     $result = $ingestor->ingest(
         $monitor->fresh(),
-        monitoringObservation('fail-3', MonitorState::Failed),
+        monitoringObservation('fail-3', MonitorState::Failed, $observedAt->addSeconds(2)),
         $site->id,
         $monitor->device_id,
         null,
@@ -102,6 +106,146 @@ it('deduplicates a runtime observation without incrementing confirmation', funct
         ->and($second->observation->is($first->observation))->toBeTrue()
         ->and($monitor->observations()->count())->toBe(1)
         ->and($monitor->fresh()->pending_count)->toBe(1);
+});
+
+it('persists a late observation without regressing current state or emitting a historical event', function () {
+    $monitor = Monitor::factory()->create([
+        'current_state' => MonitorState::Healthy,
+        'effective_state' => MonitorState::Healthy,
+        'affects_availability' => true,
+    ]);
+    $monitor->profile->update([
+        'failure_confirmations' => 1,
+        'recovery_confirmations' => 1,
+    ]);
+    $site = assignMonitoringSite($monitor);
+    $ingestor = app(MonitoringObservationIngestor::class);
+    $newerAt = CarbonImmutable::parse('2026-07-18 04:02:00');
+
+    $newer = $ingestor->ingest(
+        $monitor,
+        monitoringObservation('newer-failure', MonitorState::Failed, $newerAt),
+        $site->id,
+        $monitor->device_id,
+        null,
+    );
+    $before = $monitor->fresh();
+
+    $late = $ingestor->ingest(
+        $before,
+        monitoringObservation('late-recovery', MonitorState::Healthy, $newerAt->subMinute()),
+        $site->id,
+        $monitor->device_id,
+        null,
+    );
+    $after = $monitor->fresh();
+
+    expect($newer->stateChanged)->toBeTrue()
+        ->and($newer->deviceEvent?->event_type)->toBe('offline')
+        ->and($late->duplicate)->toBeFalse()
+        ->and($late->stateChanged)->toBeFalse()
+        ->and($late->from)->toBe(MonitorState::Failed)
+        ->and($late->to)->toBe(MonitorState::Failed)
+        ->and($late->deviceEvent)->toBeNull()
+        ->and($monitor->observations()->count())->toBe(2)
+        ->and($late->observation->observed_at->equalTo($newerAt->subMinute()))->toBeTrue()
+        ->and($after->current_state)->toBe(MonitorState::Failed)
+        ->and($after->effective_state)->toBe(MonitorState::Failed)
+        ->and($after->last_observation_at->equalTo($before->last_observation_at))->toBeTrue()
+        ->and($after->last_state_changed_at->equalTo($before->last_state_changed_at))->toBeTrue()
+        ->and(DeviceEvent::query()->where('device_id', $monitor->device_id)->count())->toBe(1)
+        ->and(DeviceEvent::query()->where('device_id', $monitor->device_id)->where('event_type', 'online')->count())->toBe(0);
+});
+
+it('keeps an equal-time conflicting observation out of the pending state projection', function () {
+    $monitor = Monitor::factory()->create([
+        'current_state' => MonitorState::Healthy,
+        'effective_state' => MonitorState::Healthy,
+        'affects_availability' => true,
+    ]);
+    $monitor->profile->update(['failure_confirmations' => 3]);
+    $site = assignMonitoringSite($monitor);
+    $ingestor = app(MonitoringObservationIngestor::class);
+    $observedAt = CarbonImmutable::parse('2026-07-18 04:03:00');
+
+    $pending = $ingestor->ingest(
+        $monitor,
+        monitoringObservation('equal-time-failure', MonitorState::Failed, $observedAt),
+        $site->id,
+        $monitor->device_id,
+        null,
+    );
+    $before = $monitor->fresh();
+
+    $conflict = $ingestor->ingest(
+        $before,
+        monitoringObservation('equal-time-healthy', MonitorState::Healthy, $observedAt->addMilliseconds(500)),
+        $site->id,
+        $monitor->device_id,
+        null,
+    );
+    $after = $monitor->fresh();
+
+    expect($pending->stateChanged)->toBeFalse()
+        ->and($before->pending_state)->toBe(MonitorState::Failed)
+        ->and($before->pending_count)->toBe(1)
+        ->and($conflict->duplicate)->toBeFalse()
+        ->and($conflict->stateChanged)->toBeFalse()
+        ->and($conflict->from)->toBe(MonitorState::Healthy)
+        ->and($conflict->to)->toBe(MonitorState::Healthy)
+        ->and($conflict->deviceEvent)->toBeNull()
+        ->and($monitor->observations()->count())->toBe(2)
+        ->and($conflict->observation->observed_at->equalTo($observedAt))->toBeTrue()
+        ->and($after->pending_state)->toBe($before->pending_state)
+        ->and($after->pending_count)->toBe($before->pending_count)
+        ->and($after->pending_since_at->equalTo($before->pending_since_at))->toBeTrue()
+        ->and($after->last_observation_at->equalTo($before->last_observation_at))->toBeTrue()
+        ->and(DeviceEvent::query()->where('device_id', $monitor->device_id)->count())->toBe(0);
+});
+
+it('preserves suppression and root cause projection for a late observation', function () {
+    $rootCause = Monitor::factory()->create([
+        'current_state' => MonitorState::Failed,
+        'effective_state' => MonitorState::Failed,
+    ]);
+    $lastObservationAt = CarbonImmutable::parse('2026-07-18 04:04:00');
+    $lastStateChangedAt = $lastObservationAt->subMinute();
+    $suppressedAt = $lastObservationAt->subSeconds(30);
+    $monitor = Monitor::factory()->create([
+        'current_state' => MonitorState::Failed,
+        'effective_state' => MonitorState::Suppressed,
+        'root_cause_monitor_id' => $rootCause->id,
+        'suppression_reason' => 'dependency',
+        'suppressed_at' => $suppressedAt,
+        'last_observation_at' => $lastObservationAt,
+        'last_state_changed_at' => $lastStateChangedAt,
+    ]);
+    $monitor->profile->update(['recovery_confirmations' => 1]);
+    $site = assignMonitoringSite($monitor);
+
+    $late = app(MonitoringObservationIngestor::class)->ingest(
+        $monitor,
+        monitoringObservation('late-suppressed-recovery', MonitorState::Healthy, $lastObservationAt->subMinutes(2)),
+        $site->id,
+        $monitor->device_id,
+        null,
+    );
+    $after = $monitor->fresh();
+
+    expect($late->duplicate)->toBeFalse()
+        ->and($late->stateChanged)->toBeFalse()
+        ->and($late->from)->toBe(MonitorState::Suppressed)
+        ->and($late->to)->toBe(MonitorState::Suppressed)
+        ->and($late->deviceEvent)->toBeNull()
+        ->and($monitor->observations()->count())->toBe(1)
+        ->and($after->current_state)->toBe(MonitorState::Failed)
+        ->and($after->effective_state)->toBe(MonitorState::Suppressed)
+        ->and($after->root_cause_monitor_id)->toBe($rootCause->id)
+        ->and($after->suppression_reason)->toBe('dependency')
+        ->and($after->suppressed_at->equalTo($suppressedAt))->toBeTrue()
+        ->and($after->last_observation_at->equalTo($lastObservationAt))->toBeTrue()
+        ->and($after->last_state_changed_at->equalTo($lastStateChangedAt))->toBeTrue()
+        ->and(DeviceEvent::query()->where('device_id', $monitor->device_id)->count())->toBe(0);
 });
 
 it('keeps a confirmed failure when a later observation is unknown', function () {
@@ -135,10 +279,11 @@ it('emits one online event only after confirmed availability recovery', function
     $monitor->profile->update(['recovery_confirmations' => 2]);
     $site = assignMonitoringSite($monitor);
     $ingestor = app(MonitoringObservationIngestor::class);
+    $observedAt = CarbonImmutable::parse('2026-07-18 04:05:00');
 
     $first = $ingestor->ingest(
         $monitor,
-        monitoringObservation('up-1', MonitorState::Healthy),
+        monitoringObservation('up-1', MonitorState::Healthy, $observedAt),
         $site->id,
         $monitor->device_id,
         null,
@@ -150,7 +295,7 @@ it('emits one online event only after confirmed availability recovery', function
 
     $result = $ingestor->ingest(
         $monitor->fresh(),
-        monitoringObservation('up-2', MonitorState::Healthy),
+        monitoringObservation('up-2', MonitorState::Healthy, $observedAt->addSecond()),
         $site->id,
         $monitor->device_id,
         null,

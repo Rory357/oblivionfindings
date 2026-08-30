@@ -75,6 +75,18 @@ final class MonitoringObservationIngestor
             ]);
 
             $effectiveFrom = $locked->effective_state ?? $locked->current_state;
+            if ($locked->last_observation_at !== null
+                && $input->observedAt->getTimestamp() <= $locked->last_observation_at->getTimestamp()) {
+                return new ObservationResult(
+                    observation: $observation,
+                    duplicate: false,
+                    stateChanged: false,
+                    from: $effectiveFrom,
+                    to: $effectiveFrom,
+                    deviceEvent: null,
+                );
+            }
+
             $transition = $this->stateMachine->decide($locked, $input);
             $locked->last_observation_at = $input->observedAt;
             $locked->pending_state = $transition->pendingState;
