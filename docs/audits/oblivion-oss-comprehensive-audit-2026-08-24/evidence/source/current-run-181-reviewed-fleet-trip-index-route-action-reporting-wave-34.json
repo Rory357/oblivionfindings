@@ -1,0 +1,379 @@
+{
+  "schema_version": "run-181-reviewed-fleet-trip-index-route-action-reporting-wave-34-v1",
+  "run_id": "RUN-181-REVIEWED-FLEET-TRIP-INDEX-ROUTE-ACTION-REPORTING-WAVE-34",
+  "status": "FLEET_TRIP_INDEX_REVIEWED_OWNERSHIP_REPORTING_MATERIALIZED_DASHBOARD_RUN182_REQUIRED_ZERO_CORRECTNESS_FINDING_PUBLICATION_OR_COMPLETION_CREDIT",
+  "materialized_on": "2026-08-30",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false,
+    "authorization_boundary": "Site access, exact action permissions, canonical ownership, privacy, and direct-object denial"
+  },
+  "pins": {
+    "reporting_input_commit": "673d2aadd477e6fa265e62aacad19273cb21122a",
+    "reporting_input_tree": "54e63a9339746e399b4ab57958c3650b08cb66e3",
+    "reporting_input_parent": "e6dd903e2374ebccbd34adf1c2c483905643ae36",
+    "application_commit": "f40e3d63ea99d774265ff9f2eefef8176ab0cbc7",
+    "application_tree": "880721d56b7d379abf9628abb22a5a9b9445194b",
+    "origin_main_observed_without_refetch": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "continuation_request_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "continuation_request_is_not_governing_prompt": true,
+    "run_178_materializer_sha256": "ffedf87ea3cae8b74cd280f676f3fb671e9a2885dad0a3ef8564d0ed21f8d53d",
+    "run_178_receipt_sha256": "9a41983d86fa3fbe054d1ddb848a2ab4027284aa78210b78937d9728f7fbdaf2",
+    "run_179_generator_sha256": "61c895a305f743f102765c9f86d38843c3ce61bcc1a8684a672aa2d7cd6ee157",
+    "run_179_receipt_sha256": "5505cf17bb68d3e534116ea9d33e501e0222714b6e3779d0ec6b70f819cc3b0a",
+    "run_179r_materializer_sha256": "80cf0e6febabee80b1fa99f3f296cabade8959bd5a4fcd72983af19d335332cd",
+    "run_179r_receipt_sha256": "67c5b09cbb26c95042bd7ba487c2a2c92a75d14363952ca35e9b72ee55e36d62",
+    "run_180_generator_sha256": "cdbeeae65d0d5d928d6356de7c2433d437b6f2bae9fd80bb7a942b97d41f6594",
+    "run_180_receipt_sha256": "49b0bd12abbd4dd2b9ce0dbe9b6fd60ab79eea92861f6339407fbd05f0b7c925",
+    "run_180r_materializer_sha256": "854a673d362f3c3cf70f53e1083ae9daf6d977f0411aa1444a6d8309e1a086bb",
+    "run_180r_receipt_sha256": "c6038caa557277124cb58056a2882ce41d1f2ee402f91effb0e6bfab6fe95d96",
+    "reporting_materializer": {
+      "path": "generators/materialize-run-181-reviewed-fleet-trip-index-route-action-reporting-wave-34.py",
+      "sha256": "31d674365e17035b9013864f061760f7034367b6b54551124bf4ec482df642ea",
+      "git_blob_id": "444320a449e684029082472c07e16de0d8d7489f",
+      "bytes": 37396,
+      "lines": 760
+    },
+    "baseline_findings_sha256": "43f583acac13c4e60fdd942e0f5ab0ee188dd9a5905371fedc18f6fddee833a0",
+    "current_findings": {
+      "path": "findings.json",
+      "sha256": "55337abfc8f2fe9fde863715e3d77649ec6dd195008281944881b02e00bb54e1",
+      "git_blob_id": "bd0a13dc86ebdc88073ee3ac999b3514ac0a0490",
+      "bytes": 590974,
+      "lines": 10553
+    },
+    "dashboard_generator": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "d4e8efd2aa9e80ad26389bdb0e6f21faefb02c53face26d9fb9a6119e673dc26",
+      "git_blob_id": "7343321d4f3b1e51b77d94c94258a3466430a88f",
+      "bytes": 635636,
+      "lines": 5515
+    },
+    "unchanged_run_178_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "70472c39504600f8c0b26b9ce05eb0f3e5903f1c6e9445163dba0581a2382600",
+      "git_blob_id": "54d72ff77c370c09c0b06ba35c6afbedca3d738c",
+      "bytes": 288289,
+      "lines": 78
+    }
+  },
+  "lineage_roles": {
+    "run_178": "verifies only the exact now-superseded RUN-177 audit dashboard",
+    "run_179": "selects one outcome-neutral current-source queue row and authors no ownership decision",
+    "run_179r": "preserves contaminated-preliminary exclusion and strict-current dissent, then accepts two fresh OWNER tiebreaks for later integration",
+    "run_180": "integrates exactly one route owner and one controller-action bridge while preserving dissent",
+    "run_180r": "records three sealed GO lanes; each lane withholds reporting permission and only the complete synthesis authorizes reporting",
+    "run_181": "alone changes live ownership and queue reporting surfaces",
+    "run_182": "required fresh dashboard rebuild and four-viewport exact-artifact verification"
+  },
+  "reporting_snapshot": {
+    "combined_counts": {
+      "source_owner_records": 666,
+      "route_owner_records": 309,
+      "page_owner_records": 357,
+      "distinct_feature_ids": 256,
+      "distinct_H_feature_ids": 234,
+      "distinct_D_feature_ids": 22,
+      "route_distinct_feature_ids": 64,
+      "page_distinct_feature_ids": 242,
+      "route_page_feature_overlap": 50,
+      "static_controller_action_bridges": 97,
+      "bounded_static_source_denominator": 3929,
+      "bounded_static_source_ownership_percent": "16.950878",
+      "bounded_static_source_residual_records": 3263,
+      "residual_explicit_unmapped_routes": 2892
+    },
+    "queue_accounting": {
+      "direct_exact_queue_records": 507,
+      "reviewed_queue_surface_rows": 120,
+      "owner_queue_surface_rows": 98,
+      "shared_queue_surface_rows": 10,
+      "alias_queue_surface_rows": 5,
+      "dead_queue_surface_rows": 0,
+      "evidence_gap_queue_surface_rows": 7,
+      "pending_unreviewed_queue_surface_rows": 387,
+      "queue_surfaces_without_ownership": 409
+    }
+  },
+  "queue_boundary": {
+    "preceding_index_83_not_recredited": true,
+    "selected_index_84_integrated": true,
+    "next_unresolved_index": 85,
+    "next_unresolved_queue_id": "RUN090-ROUTE-0086",
+    "next_unresolved_route_record_id": "RUN077-ROUTE-0694",
+    "next_unresolved_route_name": "fleet-assets.trips.playback",
+    "next_unresolved_action_expression": "[FleetTripController::class, 'show']",
+    "next_unresolved_queue_record_sha256": "f9df043e4557240020de213961c847fb56b8cd0e2d9b9144ec0b7a877ff84943",
+    "reviewed_key_count": 120,
+    "reviewed_key_list_sha256": "5dbcecd3986300fe255fdb75efe6013c07f3adc4071745ebebf0c4a525ee99c9",
+    "reviewed_key_list_canonical_json_sha256": "738c7836dd770e12d67de62d4f28441825814d619bb641e070e25468786fb75e"
+  },
+  "review_chronology_boundary": {
+    "preliminary_shared_judgments_invalidated": 2,
+    "excluded_material": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12",
+    "excluded_material_identity_mapping_or_credit_imported": false,
+    "strict_current_split": [
+      "OWNER_ROUTE_ACTION",
+      "EVIDENCE_GAP"
+    ],
+    "integration_stopped_before_bounded_expansion": true,
+    "fresh_tiebreak_outcomes": [
+      "OWNER_ROUTE_ACTION",
+      "OWNER_ROUTE_ACTION"
+    ],
+    "original_dissent_preserved": true
+  },
+  "provisional_source_observations": {
+    "count": 3,
+    "observation_ids": [
+      "RUN169R-ASSURANCE-SELECTED-GET-NEGATIVE-EXECUTION",
+      "RUN169R-ASSURANCE-SITE-PERMISSION-CORRECTNESS",
+      "RUN169R-ASSURANCE-CONSUMER-CALLER-NONOWNERSHIP"
+    ],
+    "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+    "correctness_credit_authorized": false,
+    "final_finding_credit_authorized": false,
+    "preserved_byte_for_parsed_value_from_reporting_input": true
+  },
+  "findings_boundary": {
+    "retained_claim_records": 13,
+    "current_provisional": 8,
+    "historical_already_fixed": 2,
+    "historical_remediated": 3,
+    "final_P0": 0,
+    "final_P1": 0
+  },
+  "bounded_execution_boundary": {
+    "unique_tests": 88,
+    "unique_assertions": 1764,
+    "changed_by_run_181": false
+  },
+  "benchmark_boundary": {
+    "mapped": 2,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338
+  },
+  "reporting_manifest": [
+    {
+      "path": "00-executive-summary.md",
+      "sha256": "919afc23d9675a0201016a294a7c4c144fa23a7821d1941e39ca9b287685680d",
+      "git_blob_id": "1d10ad848d484cabf228ffa337ff4ee231932408",
+      "bytes": 141666,
+      "lines": 571
+    },
+    {
+      "path": "01-repository-module-map.md",
+      "sha256": "0362a4715ca2f63ab2d57ea238a921f87d39a052e34c12d102accced91625883",
+      "git_blob_id": "471e6eeeaf2118b3ad38043b1f448e379843f0b3",
+      "bytes": 45350,
+      "lines": 248
+    },
+    {
+      "path": "13-unresolved-questions-and-evidence-gaps.md",
+      "sha256": "bf542800f5a706846a402754ea2a3a899d8a957b28973543c449903d0f0991ac",
+      "git_blob_id": "a6e3837334d855a8a5691bf3562e8f32d516b9b1",
+      "bytes": 40096,
+      "lines": 99
+    },
+    {
+      "path": "findings.json",
+      "sha256": "55337abfc8f2fe9fde863715e3d77649ec6dd195008281944881b02e00bb54e1",
+      "git_blob_id": "bd0a13dc86ebdc88073ee3ac999b3514ac0a0490",
+      "bytes": 590974,
+      "lines": 10553
+    },
+    {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "d4e8efd2aa9e80ad26389bdb0e6f21faefb02c53face26d9fb9a6119e673dc26",
+      "git_blob_id": "7343321d4f3b1e51b77d94c94258a3466430a88f",
+      "bytes": 635636,
+      "lines": 5515
+    }
+  ],
+  "preservation_boundary": {
+    "paths": [
+      {
+        "path": "02-eight-pass-coverage-ledger.csv",
+        "sha256": "ee4dc3126113884b4b8661dc3a3d13ac6a61b9661b2cace58fe82dcbe1d2a4a6",
+        "git_blob_id": "15fa304f839cacd35005848f3841dd740d2cf4cc",
+        "bytes": 29396,
+        "lines": 39
+      },
+      {
+        "path": "03-feature-to-benchmark-matrix.csv",
+        "sha256": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+        "git_blob_id": "1f5fdab3ae80ae4ec1b9bc4ee47eef695bdd5416",
+        "bytes": 557989,
+        "lines": 341
+      },
+      {
+        "path": "04-workflow-usability-scorecard.csv",
+        "sha256": "ea6879340229541c198b5ac654bde6d26d38eaefdd29ff66e1026263f9546faa",
+        "git_blob_id": "b3afe88d2e9e62bbc2dcd3f1a5bf4af2fb82c4fa",
+        "bytes": 855259,
+        "lines": 301
+      },
+      {
+        "path": "05-browser-visual-coverage-matrix.csv",
+        "sha256": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84",
+        "git_blob_id": "0bafaae0142327cfa6a6cdeda90b9163562fc654",
+        "bytes": 8973775,
+        "lines": 2813
+      },
+      {
+        "path": "06-open-source-benchmark-register.csv",
+        "sha256": "5a3898855f1ffffb1a493496a57f6532bdc464552e4577c9e7c97f83c9793884",
+        "git_blob_id": "f96ef7ac1f6e19f614bdce8d663cfd08ec795995",
+        "bytes": 350420,
+        "lines": 99
+      },
+      {
+        "path": "07-module-findings.md",
+        "sha256": "8124928344593b932e77cd1d2e1f0515e5f9e036ed097c6ecc1838d656c98114",
+        "git_blob_id": "6cae1d5225b63f77ae314e8b11e59e8c0de18d1e",
+        "bytes": 355679,
+        "lines": 812
+      },
+      {
+        "path": "08-cross-module-journeys.md",
+        "sha256": "ef4471ba75ac9080e4565989e4b038bf7d0ad306cad1984019882457517c853c",
+        "git_blob_id": "d48c9022d124186fe301a757e3ec8f9d86371031",
+        "bytes": 53981,
+        "lines": 309
+      },
+      {
+        "path": "09-ui-ux-accessibility-visual-consistency.md",
+        "sha256": "27fa04e15cbd0eedb92514835884d0344db09f279a2295cea94ae0d1071a6e7c",
+        "git_blob_id": "b919b27b7c64abd6faf9bdaa97783f6e64ac107d",
+        "bytes": 9449,
+        "lines": 123
+      },
+      {
+        "path": "10-architecture-data-integration-security.md",
+        "sha256": "ca5667b1c042024f32f320254baf063dd4bcd2c4b12972cf2aac29c02d782b22",
+        "git_blob_id": "8e78b5d3cb2467db37a8186ff07ab2c1608ee05d",
+        "bytes": 18532,
+        "lines": 191
+      },
+      {
+        "path": "11-prioritised-roadmap.md",
+        "sha256": "dfc1f7839232e997a5603af9c8728036cfd11244ec6cdba8966529f5e3d0f34a",
+        "git_blob_id": "92f3721c6ebd24b3e7edee6179de661a4ed976f0",
+        "bytes": 13702,
+        "lines": 66
+      },
+      {
+        "path": "12-native-build-and-do-not-copy-register.md",
+        "sha256": "ade5b1747ae5e9d8d7ff6ecd1c5bb99d7d656f98e741d400923cbdd5659c35c4",
+        "git_blob_id": "d2e394d0e4231a88c4378d5403b2e0ffa39ef043",
+        "bytes": 116212,
+        "lines": 500
+      },
+      {
+        "path": "audit-dashboard.html",
+        "sha256": "70472c39504600f8c0b26b9ce05eb0f3e5903f1c6e9445163dba0581a2382600",
+        "git_blob_id": "54d72ff77c370c09c0b06ba35c6afbedca3d738c",
+        "bytes": 288289,
+        "lines": 78
+      },
+      {
+        "path": "inventory.json",
+        "sha256": "46cd688dd9543b186a608e950754abe9e30389a792156719f8a999130dfca5fa",
+        "git_blob_id": "4f7cca5ec277edeac52c553818e35545219711c5",
+        "bytes": 2580297,
+        "lines": 96004
+      }
+    ],
+    "all_preserved_byte_identical_to_reporting_input_commit": true,
+    "dashboard_sha256_unchanged": "70472c39504600f8c0b26b9ce05eb0f3e5903f1c6e9445163dba0581a2382600",
+    "findings_records_unchanged": true,
+    "findings_records_canonical_sha256": "26676e9acf7966ffc4e25d33aaa2b2fc3112dfbc8eb5e32d83922f59dea39505",
+    "run_169_provisional_observations_unchanged": true,
+    "historical_run_170_ownership_and_review_archived_without_value_change": true,
+    "application_routes_resources_tests_database_unchanged": true,
+    "seven_path_scope": [
+      "00-executive-summary.md",
+      "01-repository-module-map.md",
+      "13-unresolved-questions-and-evidence-gaps.md",
+      "findings.json",
+      "generators/build-current-audit-dashboard.py",
+      "generators/materialize-run-181-reviewed-fleet-trip-index-route-action-reporting-wave-34.py",
+      "evidence/source/current-run-181-reviewed-fleet-trip-index-route-action-reporting-wave-34.json"
+    ]
+  },
+  "dashboard_forward_gate": {
+    "required_run": "RUN-182",
+    "dashboard_html_changed_by_run_181": false,
+    "unchanged_dashboard_sha256": "70472c39504600f8c0b26b9ce05eb0f3e5903f1c6e9445163dba0581a2382600",
+    "fresh_four_viewport_verification_required": true,
+    "required_viewports": [
+      "1440x900",
+      "1280x800",
+      "1024x768",
+      "390x844"
+    ],
+    "future_receipt_link_is_unhashed_to_avoid_cycle": true
+  },
+  "publication_boundary": {
+    "baseline_released_clean_before_reporting_writes": true,
+    "origin_main_observation_refetched_for_run_181": false,
+    "run_181_commit_or_push_performed_by_materializer": false,
+    "application_fix_merged_or_pushed": false,
+    "release_authorized": false,
+    "publication_authorized_or_performed": false
+  },
+  "noninheritance_boundary": {
+    "page_or_new_feature_ownership": false,
+    "adjacent_playback_route_ownership": false,
+    "consumer_caller_service_model_helper_or_test_ownership": false,
+    "framework_route_reachability_or_selected_get_execution": false,
+    "approved_site_permission_privacy_or_direct_object_correctness": false,
+    "application_source_tests_runtime_or_browser": false,
+    "benchmark_or_final_no_match_NCM": false,
+    "final_finding": false,
+    "pass_feature_gate_4_or_audit_completion": false
+  },
+  "credit_boundary": {
+    "live_static_ownership_and_queue_reporting": true,
+    "new_static_ownership": false,
+    "correctness": false,
+    "site_privacy_or_direct_object": false,
+    "application_source_or_tests": false,
+    "runtime": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "final_finding": false,
+    "release": false,
+    "publication": false,
+    "feature_completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "underlying_run_180_credit_boundary": {
+    "STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_1_RECORD": true,
+    "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_1_ACTION": true,
+    "all_other_credit": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "evidence/source/current-run-181-reviewed-fleet-trip-index-route-action-reporting-wave-34.json"
+  ],
+  "receipt_self_seal_sha256": "862854486a06bca5d4c05917cef2e9b45885d1e85a0f1d9130205a800e9ae70c"
+}
