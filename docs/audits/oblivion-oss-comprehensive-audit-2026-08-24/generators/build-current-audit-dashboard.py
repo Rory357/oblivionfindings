@@ -4159,6 +4159,52 @@ run_171_template_rewrites = [
 for old, new in run_171_template_rewrites:
     assert current_template_text.count(old) == 1, f"Expected one RUN-171 template rewrite target: {old}"
     current_template_text = current_template_text.replace(old, new)
+
+run_172_semantic_attribution_rewrites = [
+    (
+        "RUN-141/R review finance.api.sites.overview as one explicit JSON route/action owner; RUN-153/R establish $static_owner_records bounded source-owner records ($static_owner_routes routes + $static_owner_pages pages) across $static_owner_features FEATURE-IDs plus $static_action_bridges action bridges. Exactly one fleet-assets.vehicles.index route owner and one bridge are added; existing page-owner and sentinel context are not inherited or recredited, index 82 is context only, and index 83 remains unresolved. Route/page/overlap sets are $route_feature_ids/$page_feature_ids/$route_page_overlap; six provisional source observations remain separate from the 12 retained claim records ($finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated) and retain zero correctness or final-finding credit. $static_residual records remain and Gate 4 is open.",
+        "RUN-141/R review finance.api.sites.overview as one explicit JSON route/action owner; RUN-153/R establish the historical 664 bounded source-owner records (307 routes + 357 pages) across 256 FEATURE-IDs plus 95 action bridges. Exactly one fleet-assets.vehicles.index route owner and one bridge were added; existing page-owner and sentinel context were not inherited or recredited, index 82 was context only, and index 83 remained unresolved. Six RUN-152R observations remained separate from the 12 then-provisional claim identities and retained zero correctness or final-finding credit. RUN-170/R later establish the current $static_owner_records bounded source-owner records ($static_owner_routes routes + $static_owner_pages pages) across $static_owner_features FEATURE-IDs plus $static_action_bridges action bridges through exactly one fleet-assets.vehicles.alerts-config route owner and one bridge; index 83 is integrated and index 84 fleet-assets.trips.index is next. Three RUN-169R observations remain provisional-not-final and separate from the 12 retained claim records, which now split $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated. Current route/page/overlap sets are $route_feature_ids/$page_feature_ids/$route_page_overlap; $static_residual records remain and Gate 4 is open.",
+    ),
+    (
+        "RUN-141/R–142/R add one finance.api.sites.overview JSON route owner and one bridge, inherit or recredit no page, sibling, caller, reviewed-neighbor, or next-row ownership, and add zero union or matrix credit; $queue_reviewed queue rows are reviewed, $queue_pending remain pending, and $queue_without_owner remain without ownership.",
+        "RUN-141/R–142/R add one finance.api.sites.overview JSON route owner and one bridge, inherit or recredit no page, sibling, caller, reviewed-neighbor, or next-row ownership, and add zero union or matrix credit; at that historical checkpoint 116 queue rows were reviewed, 391 remained pending, and 413 remained without ownership. RUN-170/R current queue accounting is $queue_reviewed reviewed, $queue_pending pending, and $queue_without_owner without ownership.",
+    ),
+    (
+        "RUN-153/R add one route owner and one bridge, preserve six provisional-not-final observations separately from 12 retained claim identities ($finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated), preserve page/sentinel/neighbor noninheritance, and keep every correctness boundary and Gate 4 false. RUN-154 refreshes the Fleet reporting;",
+        "RUN-153/R add one route owner and one bridge, preserve six provisional-not-final observations separately from the 12 then-provisional claim identities, preserve page/sentinel/neighbor noninheritance, and keep every correctness boundary and Gate 4 false. Those 12 identities now split $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated after RUN-167. RUN-154 refreshes the Fleet reporting;",
+    ),
+    (
+        "RUN-152/R–153/R add one independently reviewed fleet-assets.vehicles.index route owner and one bridge, preserve six provisional-not-final observations separately from 12 retained claim identities ($finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated), preserve page/sentinel/neighbor noninheritance, and keep all correctness boundaries and Gate 4 false;",
+        "RUN-152/R–153/R add one independently reviewed fleet-assets.vehicles.index route owner and one bridge, preserve six provisional-not-final observations separately from the 12 then-provisional claim identities, preserve page/sentinel/neighbor noninheritance, and keep all correctness boundaries and Gate 4 false; those identities now split $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated after RUN-167;",
+    ),
+    ("RUN-153/R current Fleet vehicle-register overlay", "RUN-153/R historical Fleet vehicle-register overlay"),
+    ("RUN-157 current reporting refresh", "RUN-157 historical reporting refresh"),
+    ("fresh RUN-158 dashboard verification required", "subsequently verified by RUN-158"),
+    ("<tr><td>RUN-090 direct-exact queue</td>", "<tr><td>RUN-090 frozen denominator / RUN-170R current accounting</td>"),
+    (
+        "<li>RUN-142/R: one route row and one bridge integrated and independently verified · zero page/sibling/caller/neighbor/next-row inheritance · $static_owner_records cumulative owner records</li>",
+        "<li>RUN-142/R: one route row and one bridge integrated and independently verified · zero page/sibling/caller/neighbor/next-row inheritance · 662 historical cumulative owner records</li>",
+    ),
+    (
+        "<tr><td>RUN-153/R current Fleet vehicle-register index route/action ownership</td><td>$static_owner_records = $static_owner_routes route + $static_owner_pages page · $static_owner_features FEATURE-IDs = $static_owner_h_features H + $static_owner_d_features D · $static_action_bridges action bridges</td><td class=\"partial\">$ownership_percent% of bounded 3,929 · $static_residual residual · features $route_feature_ids route / $page_feature_ids page / $route_page_overlap overlap · routes 3,218 = $static_owner_routes owner + $route_shared_current shared + $route_alias_current alias + $route_residual residual with $finance_site_route_gap tagged gaps · pages 711 = $static_owner_pages owner + $page_shared shared + $page_residual residual with $page_gap tagged gap · Fleet vehicle-register wave 1 reviewed = 1 owner · 1 route row + 1 bridge · 0 page rows · page owner and historical sentinel not recredited · index 82 context only · index 83 unresolved · 6 provisional source observations separate from 12 retained claim identities ($finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated) · both reviewers non-blinded with disclosed prior visibility · neither consulted the other · zero correctness and final-finding credit · Gate 4 incomplete · ownership/linkage fields unchanged by RUN-145 benchmark-only mapping</td></tr>",
+        "<tr><td>RUN-170/R current Fleet alerts-config route/action ownership</td><td>$static_owner_records = $static_owner_routes route + $static_owner_pages page · $static_owner_features FEATURE-IDs = $static_owner_h_features H + $static_owner_d_features D · $static_action_bridges action bridges</td><td class=\"partial\">$ownership_percent% of bounded 3,929 · $static_residual residual · features $route_feature_ids route / $page_feature_ids page / $route_page_overlap overlap · routes 3,218 = $static_owner_routes owner + $route_shared_current shared + $route_alias_current alias + $route_residual residual with $finance_site_route_gap tagged gaps · pages 711 = $static_owner_pages owner + $page_shared shared + $page_residual residual with $page_gap tagged gap · Fleet alerts-config wave 31 reviewed = 1 owner · 1 route row + 1 bridge · 0 page rows · consumer, caller, service, model, page-owner, neighbor, correctness, and downstream context not inherited · index 83 integrated · index 84 fleet-assets.trips.index unresolved · 3 provisional source observations separate from 12 retained claim identities ($finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated) · corrected 1–21 architecture locus independently reviewed · three sealed post-commit GO reviews · zero correctness and final-finding credit · Gate 4 incomplete · ownership/linkage fields unchanged by RUN-145 benchmark-only mapping</td></tr>",
+    ),
+    (
+        "<li>RUN-153/R establish $static_owner_records bounded source-owner records and $static_action_bridges action bridges while adding one fleet-assets.vehicles.index owner and one bridge, preserving six provisional-not-final observations separately from the 12 retained claim identities ($finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated), inheriting or recrediting no page-owner, historical-sentinel, neighbor, or index-82 context and leaving index 83 unresolved, and adding zero feature-union, matrix, correctness, or final-finding credit; complete the framework-expanded canonical route/page denominator, $static_residual non-owner records including $route_shared_current shared routes, $route_alias_current alias routes, and $route_residual residual routes plus $page_shared shared pages and $page_gap tagged gap within $page_residual residual pages, the full crosswalk, and route reachability before Gate 4 can close</li>",
+        "<li>RUN-169/R–170/R establish the current $static_owner_records bounded source-owner records and $static_action_bridges action bridges while adding one fleet-assets.vehicles.alerts-config owner and one bridge, preserving three provisional-not-final observations separately from the 12 retained claim identities ($finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated), inheriting or recrediting no consumer, caller, service, model, page-owner, neighbor, correctness, or downstream context, integrating index 83 and leaving index 84 fleet-assets.trips.index unresolved, and adding zero feature-union, matrix, correctness, or final-finding credit; complete the framework-expanded canonical route/page denominator, $static_residual non-owner records including $route_shared_current shared routes, $route_alias_current alias routes, and $route_residual residual routes plus $page_shared shared pages and $page_gap tagged gap within $page_residual residual pages, the full crosswalk, and route reachability before Gate 4 can close</li>",
+    ),
+    (
+        "RUN-167 reports 12 retained identities = $finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated, with separate $atomicity_tests/$atomicity_assertions/$atomicity_races atomicity evidence, $benchmark_mapped/340 mappings, $final_no_matches/340 final no-match/NCM, $benchmark_unresolved unresolved targets, Gate 4 false, and fresh RUN-168 audit-dashboard verification required.",
+        "RUN-167 reports 12 retained identities = $finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated, with separate $atomicity_tests/$atomicity_assertions/$atomicity_races atomicity evidence, $benchmark_mapped/340 mappings, $final_no_matches/340 final no-match/NCM, $benchmark_unresolved unresolved targets, Gate 4 false, and RUN-168 subsequently verified the exact RUN-167 dashboard.",
+    ),
+    (
+        "visible 664/307/357 ownership, 95 bridges, 118/389 queue accounting",
+        "visible 665/308/357 ownership, 96 bridges, 119/388 queue accounting, 97 owned/410 without ownership",
+    ),
+]
+for old, new in run_172_semantic_attribution_rewrites:
+    assert current_template_text.count(old) == 1, f"Expected one RUN-172 semantic attribution target: {old}"
+    current_template_text = current_template_text.replace(old, new)
 TEMPLATE = Template(current_template_text)
 
 
@@ -4504,6 +4550,14 @@ current_visible_boundaries = [
     "338 unresolved targets",
     "one operating organisation across multiple Sites",
     "Gate 4 and audit completion false",
+    "RUN-153/R establish the historical 664 bounded source-owner records (307 routes + 357 pages)",
+    "at that historical checkpoint 116 queue rows were reviewed, 391 remained pending, and 413 remained without ownership",
+    "662 historical cumulative owner records",
+    "RUN-170/R current Fleet alerts-config route/action ownership",
+    "RUN-090 frozen denominator / RUN-170R current accounting",
+    "index 83 is integrated and index 84 fleet-assets.trips.index is next",
+    "RUN-168 subsequently verified the exact RUN-167 dashboard",
+    "visible 665/308/357 ownership, 96 bridges, 119/388 queue accounting, 97 owned/410 without ownership",
 ]
 assert all(boundary in dashboard for boundary in current_visible_boundaries)
 assert "0 current application tests" not in dashboard
@@ -4525,6 +4579,15 @@ assert "MED-CD-ATOMICITY-01</span> remains current provisional" not in dashboard
 assert "RUN-160 reports 12 retained identities" not in dashboard
 assert "10 current provisional P1 and 1 historical already-fixed, RUN-159" not in dashboard
 assert "latest bounded MED-RBAC adjudication" not in dashboard
+assert "RUN-153/R establish 665 bounded source-owner records" not in dashboard
+assert "RUN-153/R current Fleet vehicle-register" not in dashboard
+assert "RUN-157 current reporting refresh" not in dashboard
+assert "<tr><td>RUN-090 direct-exact queue</td>" not in dashboard
+assert "fresh RUN-158 dashboard verification required" not in dashboard
+assert "RUN-142/R: one route row and one bridge integrated and independently verified · zero page/sibling/caller/neighbor/next-row inheritance · 665 cumulative owner records" not in dashboard
+assert "RUN-153/R establish 665 bounded source-owner records and 96 action bridges" not in dashboard
+assert "and fresh RUN-168 audit-dashboard verification required." not in dashboard
+assert "visible 664/307/357 ownership, 95 bridges, 118/389 queue accounting" not in dashboard
 for stale_attribution in (
     "RUN-159/R retire only historical MED-RBAC",
     "historical MED-RBAC identity retired from current provisional queue",
@@ -4545,8 +4608,17 @@ for stale_attribution in (
 
 output_path = AUDIT_DIR / "audit-dashboard.html"
 output_bytes = (dashboard.rstrip() + "\n").encode("utf-8")
-assert output_path.read_bytes() in (run_168_dashboard_payload, output_bytes)
-temporary_path = output_path.with_name(f".{output_path.name}.tmp-run171-dashboard")
+existing_output_bytes = output_path.read_bytes()
+assert (
+    existing_output_bytes in (run_168_dashboard_payload, output_bytes)
+    or hashlib.sha256(existing_output_bytes).hexdigest()
+    in {
+        "94b56628243821d33fefec9b96841597cc599a65018aba15008a249deafef799",
+        "d1d392fe4467a39a8ab0390dda92f3f2f29fef64adb113439f102ecb4ea3b070",
+        "37e318135d31a588caf32db25de58f338c878b3a0f71ae68d0ce1cede3826ac4",
+    }
+)
+temporary_path = output_path.with_name(f".{output_path.name}.tmp-run172-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"
 try:
     with temporary_path.open("xb") as handle:

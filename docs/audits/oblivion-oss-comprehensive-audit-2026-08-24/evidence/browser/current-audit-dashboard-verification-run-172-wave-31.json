@@ -1,0 +1,524 @@
+{
+  "schema_version": "run-172-audit-dashboard-verification-wave-31-v1",
+  "run_id": "RUN-172-AUDIT-DASHBOARD-VERIFICATION-WAVE-31",
+  "generated_on": "2026-08-30",
+  "status": "AUDIT_DASHBOARD_RUN171_EXACT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_SEMANTIC_ATTRIBUTION_CORRECTED_ZERO_APPLICATION_OR_COMPLETION_CREDIT",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false,
+    "authorization_boundary": "Site access, exact roles/permissions, canonical ownership, privacy, and direct-object denial"
+  },
+  "scope": "Exact corrected RUN-171 reporting dashboard and narrow audit-generator semantic-attribution correction only",
+  "pins": {
+    "governing_prompt_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "run_171_checkpoint_commit": "f6589d61f249de853431266d5214b6255167594b",
+    "run_171_checkpoint_tree": "6e21d06b088c28af3700709ce5f5da6fa35c3ef6",
+    "run_171_checkpoint_parent": "ca1c53bc3062a6fe81f2855716de13636d59ac0c",
+    "origin_main_before_run_172_commit": "f6589d61f249de853431266d5214b6255167594b",
+    "application_commit": "e488bd3edcda0f154f87e8bbed972f14db409b82",
+    "application_tree": "9e93b8aea4f4b907cde3dc59dd0520fba5bd7080",
+    "run_171_materializer": {
+      "path": "generators/materialize-run-171-reviewed-fleet-vehicle-alerts-config-route-action-reporting-wave-31.py",
+      "sha256": "a48edf215eed8b0dcf95bff5e0592cab94d6946391b048317f0a21547fb3d68b",
+      "git_blob_id": "49d5ce5ba18f86969d24f1da8e4e88d1b572e50d",
+      "bytes": 33329,
+      "lines": 671
+    },
+    "run_171_receipt": {
+      "path": "evidence/source/current-run-171-reviewed-fleet-vehicle-alerts-config-route-action-reporting-wave-31.json",
+      "sha256": "9ddc5386a57f782a50564d54d33a14826a84b1c91a6bb276dcd50a15e152a8ba",
+      "git_blob_id": "619ce9f9ad40d1c3cfd65e4ceae0d3a5f4e717f4",
+      "bytes": 14266,
+      "lines": 338
+    },
+    "run_171_receipt_self_seal_sha256": "90698c71cc932d9a2d2d6d3bc030c99465f8b471be035bf85eae841e245548db",
+    "run_171_committed_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "f171941c116af15547aecb678e6ebd442d1681c91662645ed1cf7cc2d7f8bbfc",
+      "git_blob_id": "f3864ab7cfe48e32b7e018d8e08895abfeadfe84",
+      "bytes": 515678,
+      "lines": 4561
+    },
+    "run_168_frozen_dashboard_at_run_171_checkpoint": {
+      "path": "audit-dashboard.html",
+      "sha256": "80360ae152642e4f7c0c90b18c42e76fb156bf8cd34eb9df17b358170cc71b89",
+      "git_blob_id": "312b22a5575de1e77c23e6d48403341031542e10",
+      "bytes": 262452,
+      "lines": 78
+    },
+    "run_172_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "7043c30868ba11ecb82c8492d5721bd08fc0834d0f5e028457e25a85d48ee5cf",
+      "git_blob_id": "63421b213b30924b309535dea4635f18b9816934",
+      "bytes": 529981,
+      "lines": 4633
+    },
+    "run_172_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "79bb5c671606ca6f596bba6d9a0649ceed9acc549ec57174c6a1102ea22d3f47",
+      "git_blob_id": "a4daa6ea9d1ba91caf77aa875e4c7bc752dabbac",
+      "bytes": 270828,
+      "lines": 78
+    },
+    "run_172_receipt_materializer": {
+      "path": "generators/materialize-run-172-audit-dashboard-verification-wave-31.py",
+      "sha256": "d62629ff364e84eda040776431202c505100b6dc486a3324ef550259eb56abf3",
+      "git_blob_id": "a8f6079ca1209ac97256e5ffc08d11e170489ac5",
+      "bytes": 34869,
+      "lines": 630
+    }
+  },
+  "lineage": {
+    "run_168": "verifies only the exact superseded RUN-167 dashboard",
+    "run_169_and_run_169r": "establish one Fleet alerts-config OWNER candidate and three provisional-not-final observations",
+    "run_170_and_run_170r": "integrate and independently verify exactly one route owner and one action bridge",
+    "run_171": "alone reports the current 665/308/357/96 and 119/388/97/410 static ledgers",
+    "run_172": "corrects historical/current audit prose and verifies only the exact resulting audit artifact"
+  },
+  "dashboard_semantic_attribution_correction": {
+    "initial_rebuilt_dashboard_sha256": "94b56628243821d33fefec9b96841597cc599a65018aba15008a249deafef799",
+    "first_corrected_intermediate_sha256": "d1d392fe4467a39a8ab0390dda92f3f2f29fef64adb113439f102ecb4ea3b070",
+    "second_corrected_intermediate_sha256": "37e318135d31a588caf32db25de58f338c878b3a0f71ae68d0ce1cede3826ac4",
+    "final_dashboard_sha256": "79bb5c671606ca6f596bba6d9a0649ceed9acc549ec57174c6a1102ea22d3f47",
+    "original_browser_semantic_review": "NO-GO with nine historical/current attribution categories",
+    "embedded_item_6_temporal_clause_corrected": true,
+    "independent_final_label_residue": "RUN-090 frozen denominator now explicitly separated from RUN-170R current accounting",
+    "final_independent_semantic_review": "GO with zero discrepancies",
+    "independent_reviewer_file_changes": [],
+    "builder_change": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "binary_diff_sha256": "8ed1ab1ff38f9eb374a43c5306ad482e74cda992634a7d880a78dbd878758f99",
+      "numstat": {
+        "added": 74,
+        "deleted": 2
+      }
+    },
+    "dashboard_change": {
+      "path": "audit-dashboard.html",
+      "binary_diff_sha256": "6affba4f8431849116b71ca0a785ece5141c3d386599fff45f4f080000fc6ea6",
+      "numstat": {
+        "added": 17,
+        "deleted": 17
+      }
+    },
+    "final_builder_runs_observed": 2,
+    "final_builder_runs_byte_identical": true,
+    "application_source_or_product_test_change": false,
+    "credit_effect": "audit-dashboard attribution correctness and exact-artifact verification only"
+  },
+  "verification_method": {
+    "browser": "Codex in-app browser",
+    "served_from": "temporary loopback-only PHP static server on 127.0.0.1:43172",
+    "target_url": "http://127.0.0.1:43172/audit-dashboard.html?v=main-f6589d61-79bb5c67#progress",
+    "cachebuster": "main-f6589d61-79bb5c67",
+    "response_status": 200,
+    "response_content_type": "text/html; charset=UTF-8",
+    "response_bytes": 270828,
+    "response_sha256": "79bb5c671606ca6f596bba6d9a0649ceed9acc549ec57174c6a1102ea22d3f47",
+    "external_testing": false,
+    "desktop_and_mobile_visual_inspection": "GO on final SHA; transient screenshots not retained",
+    "viewport_override_reset_after_test": true,
+    "browser_tab_closed_after_test": true
+  },
+  "verification": {
+    "dashboard_builder_final_byte_identical_runs_observed": 2,
+    "dashboard_builder_final_runs_byte_identical": true,
+    "receipt_materializer_final_byte_identical_runs_required": 2,
+    "noncreditable_attempts": [
+      {
+        "attempt": "initial browser load of rebuilt SHA 94b56628",
+        "result": "nine historical/current attribution categories exposed; no browser or exact-artifact credit retained",
+        "counted_as_exact_artifact_evidence": false
+      },
+      {
+        "attempt": "intermediate SHA d1d392fe static review",
+        "result": "embedded RUN152/153 temporal leakage remained; superseded before final browser verification",
+        "counted_as_exact_artifact_evidence": false
+      },
+      {
+        "attempt": "intermediate SHA 37e31813 independent review",
+        "result": "RUN090 frozen denominator/current-accounting row label remained ambiguous; no final credit retained",
+        "counted_as_exact_artifact_evidence": false
+      },
+      {
+        "attempt": "first ten-link batch on a superseded SHA",
+        "result": "browser action window timed out and reset; only the later final-SHA bounded batches are credited",
+        "counted_as_navigation_evidence": false
+      }
+    ],
+    "viewports_required": 4,
+    "viewports_verified": 4,
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual_browser_viewport": "1440x900",
+        "root_client_width": 1425,
+        "root_scroll_width": 1425,
+        "body_scroll_width": 1425,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1425,
+        "navigation_scroll_width": 1425,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 0,
+        "table_wrappers": 10
+      },
+      {
+        "requested": "1280x800",
+        "actual_browser_viewport": "1280x800",
+        "root_client_width": 1265,
+        "root_scroll_width": 1265,
+        "body_scroll_width": 1265,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1265,
+        "navigation_scroll_width": 1265,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 0,
+        "table_wrappers": 10
+      },
+      {
+        "requested": "1024x768",
+        "actual_browser_viewport": "1024x768",
+        "root_client_width": 1009,
+        "root_scroll_width": 1009,
+        "body_scroll_width": 1009,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1009,
+        "navigation_scroll_width": 1009,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 1,
+        "table_wrappers": 10
+      },
+      {
+        "requested": "390x844",
+        "actual_browser_viewport": "390x844",
+        "root_client_width": 375,
+        "root_scroll_width": 375,
+        "body_scroll_width": 375,
+        "page_overflow_px": 0,
+        "navigation_client_width": 375,
+        "navigation_scroll_width": 922,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 10,
+        "table_wrappers": 10
+      }
+    ],
+    "font_loaded_at_all_viewports": true,
+    "main_visible_at_all_viewports": true,
+    "navigation_bounded_at_all_viewports": true,
+    "navigation_scroll_contained_at_mobile": true,
+    "tables_bounded_at_all_viewports": true,
+    "table_wrappers_overflow_auto_at_all_viewports": true,
+    "page_overflow_zero_at_all_final_viewports": true,
+    "navigation_clicks_required": 10,
+    "navigation_clicks_passed": 10,
+    "navigation_results": [
+      {
+        "label": "Progress",
+        "href": "#progress",
+        "browser_click_performed": true,
+        "resulting_hash": "#progress",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "RUN-171",
+        "href": "#checkpoint",
+        "browser_click_performed": true,
+        "resulting_hash": "#checkpoint",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Pages",
+        "href": "#pages",
+        "browser_click_performed": true,
+        "resulting_hash": "#pages",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Static census",
+        "href": "#static-census",
+        "browser_click_performed": true,
+        "resulting_hash": "#static-census",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Runtime gates",
+        "href": "#runtime",
+        "browser_click_performed": true,
+        "resulting_hash": "#runtime",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Benchmarks",
+        "href": "#benchmarks",
+        "browser_click_performed": true,
+        "resulting_hash": "#benchmarks",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Modules",
+        "href": "#modules",
+        "browser_click_performed": true,
+        "resulting_hash": "#modules",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Finding status",
+        "href": "#findings",
+        "browser_click_performed": true,
+        "resulting_hash": "#findings",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Architecture",
+        "href": "#architecture",
+        "browser_click_performed": true,
+        "resulting_hash": "#architecture",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      },
+      {
+        "label": "Gaps",
+        "href": "#gaps",
+        "browser_click_performed": true,
+        "resulting_hash": "#gaps",
+        "target_exists": true,
+        "target_top_px": 0,
+        "pass": true
+      }
+    ],
+    "console_warning_entries": 0,
+    "console_error_entries": 0,
+    "uncaught_page_error_entries": 0,
+    "browser_dev_log_entries": 0,
+    "authored_ids": 10,
+    "browser_dom_ids": 11,
+    "browser_injected_ids": [
+      "codex-browser-sidebar-comments-root"
+    ],
+    "duplicate_authored_ids": [],
+    "heading_elements": 26,
+    "table_elements": 10,
+    "table_wrappers": 10,
+    "anchor_elements": 791,
+    "anchor_elements_rendered_in_browser": 791,
+    "hash_anchor_occurrences": 10,
+    "unique_hash_anchors": 10,
+    "missing_hash_targets": [],
+    "local_resource_link_occurrences": 781,
+    "unique_local_resources": 426,
+    "prewrite_non_forward_local_resources": "425/425",
+    "prewrite_forward_receipt_is_intentional_unhashed_self_link": true,
+    "post_materialization_local_resources": "426/426",
+    "post_materialization_local_resource_failures": [],
+    "adjacent_hash_pair_occurrences": 677,
+    "unique_adjacent_hash_path_hash_pairs": 354,
+    "unique_adjacent_hash_paths": 354,
+    "hash_bearing_file_occurrences_verified": 675,
+    "unique_hash_bearing_file_paths_verified": 353,
+    "historical_directory_bundle_digest_paths": [
+      "task-scripts/"
+    ],
+    "hash_bearing_link_failures": [],
+    "run_172_forward_receipt_link_occurrences": 1,
+    "run_172_forward_receipt_link_adjacent_hash_occurrences": 0,
+    "visible_static_checks_required": 55,
+    "visible_static_checks_passed": 55,
+    "visible_static_checks": {
+      "run_171_navigation": true,
+      "current_checkpoint": true,
+      "ownership": true,
+      "queue_reviewed_pending": true,
+      "queue_owned_without": true,
+      "ownership_percent": true,
+      "residual": true,
+      "route_name": true,
+      "route_ids": true,
+      "controller_action": true,
+      "feature_id": true,
+      "cursor_integrated": true,
+      "next_cursor": true,
+      "next_route": true,
+      "observations": true,
+      "run_168": true,
+      "run_169": true,
+      "run_170": true,
+      "run_170r": true,
+      "run_171": true,
+      "finding_split": true,
+      "retained_identities": true,
+      "atomicity_runtime": true,
+      "atomicity_nonaggregate": true,
+      "supporting_overlap": true,
+      "med_rbac_runtime": true,
+      "med_scope_runtime": true,
+      "source_reviews": true,
+      "historical_fixed": true,
+      "atomicity_bounded": true,
+      "historical_remediated": true,
+      "med_scope_id": true,
+      "med_atomicity_id": true,
+      "run_166_boundary": true,
+      "residual_scope": true,
+      "base_failures": true,
+      "full_suite": true,
+      "fresh_run_172": true,
+      "source_pin": true,
+      "application_pin": true,
+      "tree_pin": true,
+      "benchmark_mapping": true,
+      "benchmark_ncm": true,
+      "benchmark_unresolved": true,
+      "architecture": true,
+      "completion_false": true,
+      "historical_664": true,
+      "historical_queue": true,
+      "historical_662": true,
+      "current_row": true,
+      "current_queue_label": true,
+      "current_cursor_sentence": true,
+      "run_168_temporal": true,
+      "run_172_contract": true,
+      "in_progress": true
+    },
+    "prohibited_visible_phrase_hits": {},
+    "single_organisation_multi_site_wording_present": true,
+    "tenant_word_present": false
+  },
+  "reported_finding_boundary": {
+    "retained_claim_records": 12,
+    "current_provisional_source_claims": 9,
+    "historical_already_fixed_records": 2,
+    "historical_remediated_records": 1,
+    "final_P0": 0,
+    "final_P1": 0,
+    "atomicity_claim_specific_denominator": "3 test functions / 146 assertions / 3 synchronized race subscenarios",
+    "atomicity_supporting_overlap": "43 tests / 716 assertions not aggregated",
+    "existing_bounded_disposition_denominator": "78 tests / 1,529 assertions",
+    "residual_atomicity_compound_scope_inherited": false
+  },
+  "static_ownership_boundary": {
+    "owner_records": 665,
+    "route_owners": 308,
+    "page_owners": 357,
+    "action_bridges": 96,
+    "queue_total": 507,
+    "queue_reviewed": 119,
+    "queue_pending": 388,
+    "queue_owned": 97,
+    "queue_without_ownership": 410,
+    "next_zero_based_index": 84,
+    "next_route": "fleet-assets.trips.index",
+    "correctness_credit": false
+  },
+  "noninheritance_boundary": {
+    "application_source_or_product_test": false,
+    "application_runtime_reexecution": false,
+    "application_browser": false,
+    "consumer_caller_service_model_page_or_neighbor": false,
+    "balance_check_destruction_sibling_writer_deadlock_retry_or_stress": false,
+    "benchmark_mapping_or_final_no_match_NCM": false,
+    "ease": false,
+    "final_finding": false,
+    "feature_module_or_pass_completion": false,
+    "release_or_audit_completion": false
+  },
+  "root_browser_resource_cleanup": {
+    "temporary_loopback_port": 43172,
+    "temporary_server_pid": 28520,
+    "listeners_after_cleanup": 0,
+    "exact_pid_present_after_cleanup": false,
+    "matching_php_processes_after_cleanup": 0,
+    "browser_viewport_override_reset": true,
+    "browser_tab_closed": true
+  },
+  "worktree_boundary": {
+    "expected_final_status_count": 4,
+    "expected_final_porcelain_statuses": [
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-172-wave-31.json",
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-172-audit-dashboard-verification-wave-31.py",
+      "M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+      "M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py"
+    ],
+    "exact_match_required": true
+  },
+  "mutation_attestation": {
+    "sequence_paths": [
+      "audit-dashboard.html",
+      "generators/build-current-audit-dashboard.py",
+      "generators/materialize-run-172-audit-dashboard-verification-wave-31.py",
+      "evidence/browser/current-audit-dashboard-verification-run-172-wave-31.json"
+    ],
+    "receipt_materializer_persistent_write_scope": [
+      "evidence/browser/current-audit-dashboard-verification-run-172-wave-31.json"
+    ],
+    "application_paths_changed": [],
+    "product_test_paths_changed": [],
+    "findings_register_changed": false,
+    "human_readable_reporting_surfaces_changed": false,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "database_changed": false,
+    "application_tests_or_build_run": false
+  },
+  "remote_state_boundary": {
+    "origin_main_before_run_172_commit": "f6589d61f249de853431266d5214b6255167594b",
+    "push_or_publication_performed_by_materializer": false,
+    "publication_claim": false
+  },
+  "credit_boundary": {
+    "audit_dashboard_run_172_semantic_attribution_corrections": true,
+    "exact_audit_dashboard_artifact": true,
+    "application_source_or_tests": false,
+    "application_runtime": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "pass": false,
+    "release": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-172-audit-dashboard-verification-wave-31.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-172-wave-31.json"
+  ],
+  "receipt_self_seal_sha256": "f2a1ca968c06bcd33cf67e243cd43b4dcdfd02655fbb7d25f57a5a8feb42f055"
+}
