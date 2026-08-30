@@ -1,0 +1,883 @@
+{
+  "schema_version": "run-180-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-wave-34-v1",
+  "run_id": "RUN-180-REVIEWED-OUTCOME-NEUTRAL-FLEET-TRIP-INDEX-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-34",
+  "status": "ONE_REVIEWED_FLEET_TRIP_INDEX_ROUTE_ACTION_OWNER_AND_BRIDGE_INTEGRATED_STATIC_ONLY_DISSENT_PRESERVED",
+  "generated_on": "2026-08-30",
+  "pins": {
+    "checkpoint_commit": "db4aa8c943c63f43892cfd2dd9d7495be60796b4",
+    "checkpoint_tree": "d38e62180949fa5a1a6c09d906821d69ede5f95d",
+    "checkpoint_parent": "b263db6e2c883cae8370cc3529eac490d121f2db",
+    "application_commit": "f40e3d63ea99d774265ff9f2eefef8176ab0cbc7",
+    "application_tree": "880721d56b7d379abf9628abb22a5a9b9445194b",
+    "application_subtrees": {
+      "app": "3a83cf8acdd88071870634501ab7eacf2d76e62a",
+      "routes": "b62a85f59ba5f45a54fd666b3199a65453034272",
+      "resources/js": "8a851516cdb76ded362fb5912e3e930e45c8df86",
+      "resources/js/pages": "8ad1ecc5817310f2f45c64733ca72d771c798a2f",
+      "tests": "332a54fe95c85c1c1ea9477a1ea115bce9f7b4ac",
+      "database": "341446159b5d8f6e303db9e9cddabfd446b0e034",
+      "bootstrap": "df6189abe5ab5343d88674c199c4ce46e6152a57",
+      "docs/architecture": "3444047114f5f446954b032dedc4e0c7892180bd"
+    },
+    "governing_prompt": {
+      "path": "C:\\Users\\steph\\Downloads\\oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+      "sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+      "role": "GOVERNING_AUDIT_PROMPT"
+    },
+    "continuation_request": {
+      "path": "C:\\Users\\steph\\.codex\\attachments\\8b35b9fe-b295-4a84-bdf9-a8afb05b2daa\\pasted-text-1.txt",
+      "sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+      "role": "CONTINUATION_REQUEST_ONLY",
+      "is_governing_prompt": false
+    },
+    "generator": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-wave-34.py",
+      "sha256": "cdbeeae65d0d5d928d6356de7c2433d437b6f2bae9fd80bb7a942b97d41f6594",
+      "blob_id": "f3bd1cae87ff0b9f74bd1be8d5e963db91cd0813",
+      "bytes": 36675,
+      "lines": 650
+    },
+    "inputs": {
+      "generators/integrate-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.py": "b5c7f04cd44ecd73dda9c7fe4a9e2e8616c68674cdc52d393ec696b06ad2327e",
+      "evidence/source/current-run-149-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.json": "12a52c434ecd18a5c6a644378070aa5ab046f5e7080726b983ded8d9c7377a55",
+      "evidence/source/current-run-153-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.json": "9b7e382f83787d807de8d752ecb3e6524280c707899aba78d47082765272e815",
+      "evidence/source/current-run-153r-independent-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-review-wave-26.json": "7f1da8394a8054f01f34fb943a3fba6601bf70ea06d69cf97033f2208edf4461",
+      "generators/integrate-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.py": "c732926f3112c987fbaaf3f398bc18b3d25027c7f1495c38016237a5cb6f28a3",
+      "evidence/source/current-run-170-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.json": "c739a36e1975b60d42988be3de36b9fe1ea88cf942752c90112f40ebaa04cd8d",
+      "evidence/source/current-run-170r-independent-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-review-wave-31.json": "62474100b0c2f027fa0c15f2bb841f08ad3de058da67725a931fcafec17dd139",
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
+      "03-feature-to-benchmark-matrix.csv": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+      "generators/build-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.py": "61c895a305f743f102765c9f86d38843c3ce61bcc1a8684a672aa2d7cd6ee157",
+      "evidence/source/root-run-179-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.json": "5505cf17bb68d3e534116ea9d33e501e0222714b6e3779d0ec6b70f819cc3b0a",
+      "generators/materialize-independent-outcome-neutral-fleet-trip-index-route-action-review-wave-34.py": "80cf0e6febabee80b1fa99f3f296cabade8959bd5a4fcd72983af19d335332cd",
+      "evidence/source/raw-run-179r-independent-outcome-neutral-fleet-trip-index-route-action-review-wave-34.json": "67c5b09cbb26c95042bd7ba487c2a2c92a75d14363952ca35e9b72ee55e36d62"
+    },
+    "input_blobs": {
+      "generators/integrate-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.py": "e8d9d1c9889be589a22db6dfea53d3122adce247",
+      "evidence/source/current-run-149-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.json": "c5f0a3bda99167f66650d63bfdb35e18d8ed93b5",
+      "evidence/source/current-run-153-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.json": "818b891cff9965193c60d83d0580c21a48d1a682",
+      "evidence/source/current-run-153r-independent-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-review-wave-26.json": "20bb3580ba2cb60205694d52aa72e16cd2f2a423",
+      "generators/integrate-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.py": "2603b130a0a674e6803413583c95b51bc3f83545",
+      "evidence/source/current-run-170-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.json": "8cff90e1e86e5752cbfc3e59d03ccc5423e23ed6",
+      "evidence/source/current-run-170r-independent-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-review-wave-31.json": "fbcccd7e19ea57db52a1d6ca462aa107107159d1",
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "66809274d25916f4e0d2426419bfde6e371ba1f1",
+      "03-feature-to-benchmark-matrix.csv": "1f5fdab3ae80ae4ec1b9bc4ee47eef695bdd5416",
+      "generators/build-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.py": "506a7007c8d7b8e719b1bfa904a880a2885fe8c1",
+      "evidence/source/root-run-179-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.json": "ea3a958c125038a95c8d98370328a263d2a2c151",
+      "generators/materialize-independent-outcome-neutral-fleet-trip-index-route-action-review-wave-34.py": "3004a455a14736f2641e7f71c506181a0b02d967",
+      "evidence/source/raw-run-179r-independent-outcome-neutral-fleet-trip-index-route-action-review-wave-34.json": "7a1d16ff8ee0f0fe78aeac742322bee0c8c6e8ec"
+    },
+    "input_map_sha256": "006289f2ca75c99676443f24f5aff1450a03f2f71c5d16798466fb133c8c09fd",
+    "cohort_self_seal_sha256": "2fb26afd47c818fe5654fdc685af9a87e40624ad44e205914cca85298593bfc2",
+    "review_self_seal_sha256": "75589c560904f51656af7038037e988ae169b181ddc480b95d5fca35cdbec14b",
+    "synthesis_record_sha256": "2142515ab596130890f398a3cb06f7818c1c98264b48598e7ccc991ea6d1df2d",
+    "decision_record_sha256": "e3530def5fb093b5b2169659d32b3251a6726d493257602c8138d3a38bc050d3"
+  },
+  "architecture_rule": "One operating organisation across multiple Sites. Exact permissions, approved Sites, canonical record ownership, direct-object concealment and privacy are the boundaries; no tenant design or tenant-isolation credit.",
+  "baseline": {
+    "source_owner_records": 665,
+    "route_owner_records": 308,
+    "page_owner_records": 357,
+    "static_controller_action_bridges": 96,
+    "reviewed_queue_surface_rows": 119,
+    "pending_unreviewed_queue_surface_rows": 388,
+    "latest_integrated_overlay": {
+      "run_id": "RUN-170-REVIEWED-OUTCOME-NEUTRAL-FLEET-VEHICLE-ALERTS-CONFIG-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-31",
+      "status": "ONE_REVIEWED_FLEET_VEHICLE_ALERTS_CONFIG_ROUTE_ACTION_OWNER_AND_BRIDGE_INTEGRATED_STATIC_ONLY"
+    },
+    "latest_independent_overlay_review": {
+      "run_id": "RUN-170R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-VEHICLE-ALERTS-CONFIG-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-31",
+      "status": "GO_THREE_PART_POST_COMMIT_REVIEW_COMPLETE_REPORTING_ONLY_ZERO_NEW_OR_DOWNSTREAM_CREDIT",
+      "reporting_only_credit": true,
+      "new_or_current_or_downstream_credit": false
+    }
+  },
+  "reviewed_overlay": {
+    "producer_run_id": "RUN-179-OUTCOME-NEUTRAL-FLEET-TRIP-INDEX-ROUTE-ACTION-COHORT-WAVE-34",
+    "review_run_id": "RUN-179R-INDEPENDENT-OUTCOME-NEUTRAL-FLEET-TRIP-INDEX-ROUTE-ACTION-REVIEW-WAVE-34",
+    "reviewed_route_actions": 1,
+    "owner_route_actions": 1,
+    "accepted_source_owner_records": 1,
+    "accepted_route_owner_records": 1,
+    "accepted_page_owner_records": 0,
+    "accepted_controller_action_bridges": 1,
+    "accepted_adjacent_route_owners": 0,
+    "accepted_model_service_helper_caller_or_test_owners": 0,
+    "new_distinct_feature_ids": 0,
+    "current_static_overlay_credit_applied": true,
+    "correctness_or_downstream_credit_authorized": false,
+    "final_finding_credit_authorized": false
+  },
+  "reviewer_lineage_and_dissent_preservation": {
+    "review_chronology": [
+      {
+        "sequence": 1,
+        "reviewer_task_path": "/root/run179_candidate_a",
+        "stage": "PRELIMINARY",
+        "reported_outcome": "UNRESOLVED_EVIDENCE_GAP_LIKE_CONSERVATISM",
+        "accepted_for_final_synthesis": false,
+        "reason_not_accepted": "Preliminary discovery input only; it did not resolve the frozen current capability identity.",
+        "chronology_record_sha256": "1e69b6b63da74f897fe3b94f646177449a6796edaaa0f30ab3011cf29e234e21"
+      },
+      {
+        "sequence": 2,
+        "reviewer_task_path": "/root/run179_candidate_b",
+        "stage": "PRELIMINARY",
+        "reported_outcome": "SHARED_RELATION",
+        "accepted_for_final_synthesis": false,
+        "reason_not_accepted": "The reasoning relied on excluded non-governing 2026-08-12 audit material; it was invalidated and rerun current-only.",
+        "excluded_material": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12",
+        "chronology_record_sha256": "10f6e36a498da5afe376b6427208b70baab7f1c9acf2f0c4965d7dec04892fe7"
+      },
+      {
+        "sequence": 3,
+        "reviewer_task_path": "/root/run179_feature_judge",
+        "stage": "PRELIMINARY",
+        "reported_outcome": "SHARED_RELATION",
+        "accepted_for_final_synthesis": false,
+        "reason_not_accepted": "The reasoning relied on excluded non-governing 2026-08-12 audit material; it was invalidated and rerun current-only.",
+        "excluded_material": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12",
+        "chronology_record_sha256": "c91b8f6574d449cb71ed87071c850c5496e2f3f03f9c3abacc2dd3758710d0bb"
+      },
+      {
+        "sequence": 4,
+        "reviewer_task_path": "/root/run179_candidate_b",
+        "stage": "STRICT_CURRENT_RERUN",
+        "reported_outcome": "OWNER_ROUTE_ACTION",
+        "accepted_for_final_synthesis": false,
+        "reason_not_accepted": "It conflicted with the separate strict-current EVIDENCE_GAP result, so integration stopped under the conflict rule pending bounded expansion and fresh tiebreaks.",
+        "older_bundle_used": false,
+        "chronology_record_sha256": "8d4c5cee2e9c6f03f3a03ea64d49bdad324ddbb129e58145685c9125fcc47dea"
+      },
+      {
+        "sequence": 5,
+        "reviewer_task_path": "/root/run179_feature_judge",
+        "stage": "STRICT_CURRENT_RERUN",
+        "reported_outcome": "EVIDENCE_GAP",
+        "accepted_for_final_synthesis": false,
+        "reason_not_accepted": "It conflicted with the separate strict-current OWNER_ROUTE_ACTION result, so integration stopped under the conflict rule pending bounded expansion and fresh tiebreaks.",
+        "older_bundle_used": false,
+        "chronology_record_sha256": "4ec43eb0fd3add6c126f56a90aa0638da62dfa266877099bd23bdbba9ebcd15a"
+      }
+    ],
+    "bounded_expansion": {
+      "trigger": "ONE_OWNER_ROUTE_ACTION_VERSUS_ONE_EVIDENCE_GAP_STRICT_CURRENT_SPLIT",
+      "integration_stopped_before_expansion": true,
+      "examined_only": [
+        "current 2026-08-24 denominator row 108",
+        "RUN179 current source packet",
+        "RUN170 current-bundle accepted precedent"
+      ],
+      "examined_older_2026_08_12_bundle": false,
+      "rewrote_or_split_frozen_denominator": false,
+      "inherited_or_recredited_neighbor_outcomes": false
+    },
+    "accepted_independent_semantic_tiebreak_reviews": [
+      {
+        "review_id": "RUN179R-STRICT-CURRENT-TIEBREAK-A",
+        "reviewer_role": "fresh independent strict-current semantic tiebreak reviewer",
+        "reviewer_task_path": "/root/run179_tiebreak_a",
+        "independent_from_neutral_packet_producer": true,
+        "independent_from_other_tiebreak_reviewer": true,
+        "other_tiebreak_reviewer_consulted": false,
+        "performed_after_strict_current_split_stop": true,
+        "review_method": "CURRENT_2026_08_24_DENOMINATOR_AND_PINNED_SOURCE_ONLY_NO_EXECUTION",
+        "raw_payload": {
+          "text": "OWNER_ROUTE_ACTION\n\nDecisive current-only anchors:\n- Matrix row 108 explicitly freezes `fleet-assets.trips.index` under `CAP-FLEET-VEHICLE-REGISTER` and “Maintain vehicles and vehicle-specific state.”\n- RUN090 index 84 has exact, unique literal-route identity. `NAME_ONLY` results from the frozen backend range ending at line 550, not contradictory ownership evidence.\n- Current route `routes/fleet-assets.php:54` uniquely invokes `VehicleController::trips`.\n- Current action `app/Http/Controllers/FleetAssets/VehicleController.php:566` queries Site-visible vehicles and their trips, filters vehicle/status/date/search, exports CSV, computes vehicle-trip summaries, and renders the dedicated trip-history page.\n- The page `resources/js/pages/fleet-assets/trips/index.tsx:308` expressly supports viewing and analysing fleet vehicle trips.\n- RUN170’s accepted precedent classified an analogous out-of-range `VehicleController` action with a dedicated non-matrix page as `OWNER_ROUTE_ACTION`.\nTreat the frozen coarse user job as the canonical denominator grouping: this action owns a material route/action slice; it need not perform the entire broad job. Do not split, rewrite, inherit, or recredit the denominator. `FleetTrip`, helpers, and the page are dependencies/consumer context, not co-owners.\nNo page, correctness, Site/privacy, runtime, browser, test, benchmark, finding, completion, or downstream integration credit is granted. No tests or edits were performed.",
+          "sha256": "b8d724483fcc8f519fa99d749fc4336e2ec575e8c8b945794fe6182bc63e3c50",
+          "bytes": 1474,
+          "lines": 11,
+          "verbatim_payload_retained": true
+        },
+        "outcome": "OWNER_ROUTE_ACTION",
+        "confidence": "HIGH_STATIC_IDENTITY_ONLY",
+        "decisive_current_loci": [
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/03-feature-to-benchmark-matrix.csv:108",
+          "routes/fleet-assets.php:54",
+          "app/Http/Controllers/FleetAssets/VehicleController.php:566-822",
+          "resources/js/pages/fleet-assets/trips/index.tsx:308",
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-170-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.json:1"
+        ],
+        "decisive_current_loci_validated": true,
+        "older_2026_08_12_bundle_consulted": false,
+        "older_bundle_feature_identity_or_credit_imported": false,
+        "current_run170_precedent_consulted": true,
+        "route_ownership_authorized_for_later_overlay": true,
+        "controller_action_bridge_authorized_for_later_overlay": true,
+        "page_ownership_authorized": false,
+        "adjacent_route_ownership_authorized": false,
+        "correctness_or_downstream_credit_authorized": false,
+        "reviewer_wrote_files": false,
+        "reviewer_executed_application_or_tests": false,
+        "review_record_sha256": "46a76d37dd4aa2932b239aa97856e6e038d5cf55b4d63cc31ff2657c5f0653ac"
+      },
+      {
+        "review_id": "RUN179R-STRICT-CURRENT-TIEBREAK-B",
+        "reviewer_role": "fresh independent strict-current semantic tiebreak reviewer",
+        "reviewer_task_path": "/root/run179_tiebreak_b",
+        "independent_from_neutral_packet_producer": true,
+        "independent_from_other_tiebreak_reviewer": true,
+        "other_tiebreak_reviewer_consulted": false,
+        "performed_after_strict_current_split_stop": true,
+        "review_method": "CURRENT_2026_08_24_DENOMINATOR_AND_PINNED_SOURCE_ONLY_NO_EXECUTION",
+        "raw_payload": {
+          "text": "OWNER_ROUTE_ACTION\n\nExact canonical inclusion is unique: matrix row 108 names `fleet-assets.trips.index`, `VehicleController` is the source owner, and no other current capability claims trips. Current source routes that GET uniquely to `VehicleController::trips`, which queries vehicle-bound `FleetTrip` state, filters/aggregates/exports it, and renders `fleet-assets/trips/index`. Current-bundle `NAME_ONLY` precedent makes missing backend/page containment non-automatic; the substantive action trace closes narrow static ownership.\nLimit: route owner plus controller-action bridge only. No page ownership, adjacent trip-route inheritance, correctness, Site/privacy/direct-object, runtime, browser, test, benchmark, finding, or completion credit.",
+          "sha256": "34e87e280cc8d6f18445061a62fb132238ee7c20fdb7f6c41941dec19706c826",
+          "bytes": 747,
+          "lines": 4,
+          "verbatim_payload_retained": true
+        },
+        "outcome": "OWNER_ROUTE_ACTION",
+        "confidence": "HIGH_STATIC_IDENTITY_ONLY",
+        "decisive_current_loci": [
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/03-feature-to-benchmark-matrix.csv:108",
+          "routes/fleet-assets.php:54",
+          "app/Http/Controllers/FleetAssets/VehicleController.php:566-822",
+          "resources/js/pages/fleet-assets/trips/index.tsx:151-745",
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-170-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.json:1"
+        ],
+        "decisive_current_loci_validated": true,
+        "older_2026_08_12_bundle_consulted": false,
+        "older_bundle_feature_identity_or_credit_imported": false,
+        "current_run170_precedent_consulted": true,
+        "route_ownership_authorized_for_later_overlay": true,
+        "controller_action_bridge_authorized_for_later_overlay": true,
+        "page_ownership_authorized": false,
+        "adjacent_route_ownership_authorized": false,
+        "correctness_or_downstream_credit_authorized": false,
+        "reviewer_wrote_files": false,
+        "reviewer_executed_application_or_tests": false,
+        "review_record_sha256": "bc8728424c8ade4f8614e7ab0c896695308d51cf8e64228d5ed8d79285d78589"
+      }
+    ],
+    "synthesis_review": {
+      "synthesis_id": "RUN179R-INDEPENDENT-REVIEW-SYNTHESIS",
+      "verdict": "GO_ACCEPT_1_OWNER_ROUTE_ACTION_FOR_BOUNDED_LATER_INTEGRATION",
+      "accepted_independent_semantic_review_ids": [
+        "RUN179R-STRICT-CURRENT-TIEBREAK-A",
+        "RUN179R-STRICT-CURRENT-TIEBREAK-B"
+      ],
+      "accepted_independent_semantic_review_record_sha256s": [
+        "46a76d37dd4aa2932b239aa97856e6e038d5cf55b4d63cc31ff2657c5f0653ac",
+        "bc8728424c8ade4f8614e7ab0c896695308d51cf8e64228d5ed8d79285d78589"
+      ],
+      "accepted_artifact_review_ids": [
+        "RUN179R-NEUTRAL-ARTIFACT-GO-A",
+        "RUN179R-NEUTRAL-ARTIFACT-GO-B"
+      ],
+      "accepted_artifact_review_record_sha256s": [
+        "2eba8723504fc5ea5d8f8d36d42c6a1df06e2329e7121fbbe36517a0f831de2b",
+        "85ce2f4a2f5084abccd1b54edb74c06bebc731ea9e35f27c7394f78d1fb9821e"
+      ],
+      "semantic_and_artifact_roles_distinct": true,
+      "chronology_record_sha256s": [
+        "1e69b6b63da74f897fe3b94f646177449a6796edaaa0f30ab3011cf29e234e21",
+        "10f6e36a498da5afe376b6427208b70baab7f1c9acf2f0c4965d7dec04892fe7",
+        "c91b8f6574d449cb71ed87071c850c5496e2f3f03f9c3abacc2dd3758710d0bb",
+        "8d4c5cee2e9c6f03f3a03ea64d49bdad324ddbb129e58145685c9125fcc47dea",
+        "4ec43eb0fd3add6c126f56a90aa0638da62dfa266877099bd23bdbba9ebcd15a"
+      ],
+      "preliminary_old_bundle_contaminated_shared_judgments_invalidated": 2,
+      "strict_current_conflict_stop_observed": true,
+      "strict_current_split": {
+        "OWNER_ROUTE_ACTION": 1,
+        "EVIDENCE_GAP": 1
+      },
+      "original_strict_current_dissent_preserved": true,
+      "dissenting_strict_current_outcome": "EVIDENCE_GAP",
+      "bounded_expansion_sources": [
+        "current 2026-08-24 340-capability denominator",
+        "RUN179 pinned current-source packet",
+        "RUN170 current-bundle route-action ownership precedent"
+      ],
+      "excluded_2026_08_12_identity_or_credit_imported": false,
+      "fresh_tiebreak_votes": {
+        "OWNER_ROUTE_ACTION": 2,
+        "SHARED_RELATION": 0,
+        "EVIDENCE_GAP": 0
+      },
+      "conflict_reconciliation": "The original EVIDENCE_GAP dissent remains recorded; two later independent current-only tiebreaks examined the named bounded evidence, did not consult one another, and both resolved the single candidate as OWNER_ROUTE_ACTION.",
+      "candidate_outcome": {
+        "OWNER_ROUTE_ACTION": 1,
+        "SHARED_RELATION": 0,
+        "EVIDENCE_GAP": 0
+      },
+      "canonical_candidate_record_sha256": "b09ac81def93dcb4800f4a1ac340c698ff73f538ae3bcca792b01a53d7c2b650",
+      "queue_record_self_seal_sha256": "928eeec741742f8329dd7e191a71f2d5249775b6de64e6a698a72836345ca011",
+      "route_ownership_authorized_for_later_overlay": true,
+      "controller_action_bridge_authorized_for_later_overlay": true,
+      "page_ownership_authorized": false,
+      "bounded_overlay_integration_authorized_later_only": true,
+      "current_overlay_credit_awarded": false,
+      "correctness_or_downstream_credit_authorized": false,
+      "conditional_projection": {
+        "status": "PROJECTED_ONLY_IF_LATER_REVIEWED_OVERLAY_INTEGRATES_THIS_DECISION",
+        "currently_applied": false,
+        "source_owners": {
+          "before": 665,
+          "delta": 1,
+          "after": 666
+        },
+        "route_owners": {
+          "before": 308,
+          "delta": 1,
+          "after": 309
+        },
+        "page_owners": {
+          "before": 357,
+          "delta": 0,
+          "after": 357
+        },
+        "controller_action_bridges": {
+          "before": 96,
+          "delta": 1,
+          "after": 97
+        },
+        "residual_source_records": {
+          "before": 3264,
+          "delta": -1,
+          "after": 3263
+        },
+        "residual_route_records": {
+          "before": 2893,
+          "delta": -1,
+          "after": 2892
+        },
+        "route_shared_relations": {
+          "before": 12,
+          "delta": 0,
+          "after": 12
+        },
+        "route_alias_relations": {
+          "before": 5,
+          "delta": 0,
+          "after": 5
+        },
+        "reviewed_queue_rows": {
+          "before": 119,
+          "delta": 1,
+          "after": 120
+        },
+        "owner_queue_rows": {
+          "before": 97,
+          "delta": 1,
+          "after": 98
+        },
+        "shared_queue_rows": {
+          "before": 10,
+          "delta": 0,
+          "after": 10
+        },
+        "alias_queue_rows": {
+          "before": 5,
+          "delta": 0,
+          "after": 5
+        },
+        "dead_queue_rows": {
+          "before": 0,
+          "delta": 0,
+          "after": 0
+        },
+        "evidence_gap_queue_rows": {
+          "before": 7,
+          "delta": 0,
+          "after": 7
+        },
+        "pending_queue_rows": {
+          "before": 388,
+          "delta": -1,
+          "after": 387
+        },
+        "queue_rows_without_ownership": {
+          "before": 410,
+          "delta": -1,
+          "after": 409
+        },
+        "next_unresolved_index": 85,
+        "next_unresolved_queue_id": "RUN090-ROUTE-0086",
+        "next_unresolved_route_record_id": "RUN077-ROUTE-0694",
+        "feature_union": {
+          "route_features": 64,
+          "page_features": 242,
+          "route_page_overlap": 50,
+          "before": 256,
+          "delta": 0,
+          "after": 256
+        },
+        "source_owner_coverage_percent_after": 16.950878,
+        "conservation_equations": {
+          "source_before": "665 + 3264 = 3929",
+          "source_after": "666 + 3263 = 3929",
+          "route_before": "308 + 12 shared + 5 alias + 2893 residual = 3218",
+          "route_after": "309 + 12 shared + 5 alias + 2892 residual = 3218",
+          "queue_before": "97 owner + 10 shared + 5 alias + 0 dead + 7 evidence-gap + 388 pending = 507",
+          "queue_after": "98 owner + 10 shared + 5 alias + 0 dead + 7 evidence-gap + 387 pending = 507",
+          "reviewed_before": "97 + 10 + 5 + 0 + 7 = 119",
+          "reviewed_after": "98 + 10 + 5 + 0 + 7 = 120",
+          "feature_union": "64 route + 242 page - 50 overlap = 256"
+        }
+      },
+      "synthesizer_wrote_files": false,
+      "synthesis_record_sha256": "2142515ab596130890f398a3cb06f7818c1c98264b48598e7ccc991ea6d1df2d"
+    },
+    "action_decision": {
+      "decision_id": "RUN179R-FLEET-TRIP-INDEX-OWNER-ROUTE-ACTION",
+      "candidate_record_sha256": "b09ac81def93dcb4800f4a1ac340c698ff73f538ae3bcca792b01a53d7c2b650",
+      "queue_record_self_seal_sha256": "928eeec741742f8329dd7e191a71f2d5249775b6de64e6a698a72836345ca011",
+      "synthesis_record_sha256": "2142515ab596130890f398a3cb06f7818c1c98264b48598e7ccc991ea6d1df2d",
+      "queue_index_zero_based": 84,
+      "queue_id": "RUN090-ROUTE-0085",
+      "route_record_id": "RUN077-ROUTE-0693",
+      "literal_route_name": "fleet-assets.trips.index",
+      "controller_fqcn": "App\\Http\\Controllers\\FleetAssets\\VehicleController",
+      "controller_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+      "controller_method": "trips",
+      "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "outcome": "OWNER_ROUTE_ACTION",
+      "confidence": "HIGH_STATIC_IDENTITY_ONLY_TWO_OF_TWO_FRESH_TIEBREAKS",
+      "owner_source_record_key": "route|RUN077-ROUTE-0693|CAP-FLEET-VEHICLE-REGISTER",
+      "bridge_key": [
+        "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "trips",
+        "CAP-FLEET-VEHICLE-REGISTER"
+      ],
+      "route_ownership_authorized_for_later_overlay": true,
+      "controller_action_bridge_authorized_for_later_overlay": true,
+      "page_ownership_authorized": false,
+      "adjacent_route_ownership_authorized": false,
+      "model_service_helper_caller_or_test_ownership_authorized": false,
+      "current_overlay_credit_awarded": false,
+      "correctness_or_downstream_credit_authorized": false,
+      "conditional_projection": {
+        "status": "PROJECTED_ONLY_IF_LATER_REVIEWED_OVERLAY_INTEGRATES_THIS_DECISION",
+        "currently_applied": false,
+        "source_owners": {
+          "before": 665,
+          "delta": 1,
+          "after": 666
+        },
+        "route_owners": {
+          "before": 308,
+          "delta": 1,
+          "after": 309
+        },
+        "page_owners": {
+          "before": 357,
+          "delta": 0,
+          "after": 357
+        },
+        "controller_action_bridges": {
+          "before": 96,
+          "delta": 1,
+          "after": 97
+        },
+        "residual_source_records": {
+          "before": 3264,
+          "delta": -1,
+          "after": 3263
+        },
+        "residual_route_records": {
+          "before": 2893,
+          "delta": -1,
+          "after": 2892
+        },
+        "route_shared_relations": {
+          "before": 12,
+          "delta": 0,
+          "after": 12
+        },
+        "route_alias_relations": {
+          "before": 5,
+          "delta": 0,
+          "after": 5
+        },
+        "reviewed_queue_rows": {
+          "before": 119,
+          "delta": 1,
+          "after": 120
+        },
+        "owner_queue_rows": {
+          "before": 97,
+          "delta": 1,
+          "after": 98
+        },
+        "shared_queue_rows": {
+          "before": 10,
+          "delta": 0,
+          "after": 10
+        },
+        "alias_queue_rows": {
+          "before": 5,
+          "delta": 0,
+          "after": 5
+        },
+        "dead_queue_rows": {
+          "before": 0,
+          "delta": 0,
+          "after": 0
+        },
+        "evidence_gap_queue_rows": {
+          "before": 7,
+          "delta": 0,
+          "after": 7
+        },
+        "pending_queue_rows": {
+          "before": 388,
+          "delta": -1,
+          "after": 387
+        },
+        "queue_rows_without_ownership": {
+          "before": 410,
+          "delta": -1,
+          "after": 409
+        },
+        "next_unresolved_index": 85,
+        "next_unresolved_queue_id": "RUN090-ROUTE-0086",
+        "next_unresolved_route_record_id": "RUN077-ROUTE-0694",
+        "feature_union": {
+          "route_features": 64,
+          "page_features": 242,
+          "route_page_overlap": 50,
+          "before": 256,
+          "delta": 0,
+          "after": 256
+        },
+        "source_owner_coverage_percent_after": 16.950878,
+        "conservation_equations": {
+          "source_before": "665 + 3264 = 3929",
+          "source_after": "666 + 3263 = 3929",
+          "route_before": "308 + 12 shared + 5 alias + 2893 residual = 3218",
+          "route_after": "309 + 12 shared + 5 alias + 2892 residual = 3218",
+          "queue_before": "97 owner + 10 shared + 5 alias + 0 dead + 7 evidence-gap + 388 pending = 507",
+          "queue_after": "98 owner + 10 shared + 5 alias + 0 dead + 7 evidence-gap + 387 pending = 507",
+          "reviewed_before": "97 + 10 + 5 + 0 + 7 = 119",
+          "reviewed_after": "98 + 10 + 5 + 0 + 7 = 120",
+          "feature_union": "64 route + 242 page - 50 overlap = 256"
+        }
+      },
+      "decision_record_sha256": "e3530def5fb093b5b2169659d32b3251a6726d493257602c8138d3a38bc050d3"
+    },
+    "original_strict_current_split_preserved": true,
+    "original_dissenting_outcome": "EVIDENCE_GAP",
+    "preliminary_shared_judgments_recredited": false,
+    "excluded_older_bundle_identity_or_credit_imported": false
+  },
+  "source_packet_boundary": {
+    "final_hardened_artifact_review_complete": true,
+    "selected_source_semantic_review_complete": true,
+    "source_packet_completeness_beyond_selected_action_claimed": false,
+    "ownership_material_expansion_required_beyond_bounded_current_inputs": false,
+    "correctness_observations_or_execution_authorize_no_credit": true
+  },
+  "remediation_and_history_noninheritance": {
+    "finding_id": "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
+    "current_reporting_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "run_176_sha256": "6e9fa6d855e6ec168d4c651921702dab8872810ddd89f6ba3cd353bf49e0c87c",
+    "run_176r_sha256": "f1f7369306235ad7d5f318b512dca94e853d96e182ff5c63ddc509534fa545c1",
+    "run_177_sha256": "1b4cd64704c3137cfc98d0068900fe9068619dae700e519080b1d183639b5c2f",
+    "run_178_sha256": "9a41983d86fa3fbe054d1ddb848a2ab4027284aa78210b78937d9728f7fbdaf2",
+    "remediation_files_or_runtime_recredited": false,
+    "red_reproduction_recredited": false,
+    "isolated_or_post_merge_green_recredited": false,
+    "supporting_regressions_recredited": false,
+    "historical_remediated_reporting_recredited": false,
+    "static_route_ownership_inherited_from_remediation": false,
+    "controller_action_bridge_inherited_from_remediation": false,
+    "correctness_inherited_from_static_identity": false,
+    "final_finding_inherited": false
+  },
+  "combined_counts": {
+    "source_owner_records": 666,
+    "route_owner_records": 309,
+    "page_owner_records": 357,
+    "distinct_feature_ids": 256,
+    "distinct_H_feature_ids": 234,
+    "distinct_D_feature_ids": 22,
+    "route_distinct_feature_ids": 64,
+    "page_distinct_feature_ids": 242,
+    "route_page_feature_overlap": 50,
+    "static_controller_action_bridges": 97,
+    "bounded_static_source_denominator": 3929,
+    "bounded_static_source_ownership_percent": "16.950878",
+    "bounded_static_source_residual_records": 3263,
+    "residual_explicit_unmapped_routes": 2892,
+    "semantic_shared_routes": 12,
+    "reviewed_alias_routes": 5,
+    "reviewed_dead_routes": 0,
+    "evidence_gap_routes_tagged_within_residual": 7,
+    "residual_unadjudicated_page_roots": 345,
+    "semantic_shared_page_roots": 9,
+    "reviewed_alias_page_roots": 0,
+    "reviewed_dead_page_roots": 0,
+    "evidence_gap_page_roots_tagged_within_residual": 1
+  },
+  "queue_accounting": {
+    "direct_exact_queue_records": 507,
+    "reviewed_queue_surface_rows": 120,
+    "owner_queue_surface_rows": 98,
+    "shared_queue_surface_rows": 10,
+    "alias_queue_surface_rows": 5,
+    "dead_queue_surface_rows": 0,
+    "evidence_gap_queue_surface_rows": 7,
+    "pending_unreviewed_queue_surface_rows": 387,
+    "queue_surfaces_without_ownership": 409,
+    "new_reviewed_route_surface_rows": 1,
+    "new_owner_route_surface_rows": 1
+  },
+  "queue_boundary": {
+    "preceding_index_83_not_recredited": true,
+    "selected_index_84_integrated": true,
+    "next_unresolved_index": 85,
+    "next_unresolved_queue_id": "RUN090-ROUTE-0086",
+    "next_unresolved_route_record_id": "RUN077-ROUTE-0694",
+    "next_unresolved_route_name": "fleet-assets.trips.playback",
+    "next_unresolved_action_expression": "[FleetTripController::class, 'show']",
+    "next_unresolved_queue_record_sha256": "f9df043e4557240020de213961c847fb56b8cd0e2d9b9144ec0b7a877ff84943",
+    "reviewed_key_count": 120,
+    "reviewed_key_list_sha256": "5dbcecd3986300fe255fdb75efe6013c07f3adc4071745ebebf0c4a525ee99c9",
+    "reviewed_key_list_canonical_json_sha256": "738c7836dd770e12d67de62d4f28441825814d619bb641e070e25468786fb75e"
+  },
+  "noninheritance_boundary": {
+    "historical_remediation": {
+      "finding_id": "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
+      "current_reporting_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+      "run_176_sha256": "6e9fa6d855e6ec168d4c651921702dab8872810ddd89f6ba3cd353bf49e0c87c",
+      "run_176r_sha256": "f1f7369306235ad7d5f318b512dca94e853d96e182ff5c63ddc509534fa545c1",
+      "run_177_sha256": "1b4cd64704c3137cfc98d0068900fe9068619dae700e519080b1d183639b5c2f",
+      "run_178_sha256": "9a41983d86fa3fbe054d1ddb848a2ab4027284aa78210b78937d9728f7fbdaf2",
+      "remediation_files_or_runtime_recredited": false,
+      "red_reproduction_recredited": false,
+      "isolated_or_post_merge_green_recredited": false,
+      "supporting_regressions_recredited": false,
+      "historical_remediated_reporting_recredited": false,
+      "static_route_ownership_inherited_from_remediation": false,
+      "controller_action_bridge_inherited_from_remediation": false,
+      "correctness_inherited_from_static_identity": false,
+      "final_finding_inherited": false
+    },
+    "historical_route_hash_not_presented_as_current": true,
+    "page_caller_service_model_helper_or_test_not_inherited_or_recredited": true,
+    "adjacent_route_identity_or_outcome_not_inherited": true,
+    "older_2026_08_12_bundle_role": "NON_GOVERNING_EXCLUDED_FROM_IDENTITY_MAPPING_BENCHMARK_AND_CREDIT",
+    "older_2026_08_12_feature_identity_imported": false,
+    "older_2026_08_12_mapping_or_benchmark_credit_imported": false
+  },
+  "overlay_source_records": [
+    {
+      "overlay_mapping_id": "RUN180-ROUTE-01",
+      "candidate_record_sha256": "b09ac81def93dcb4800f4a1ac340c698ff73f538ae3bcca792b01a53d7c2b650",
+      "queue_record_self_seal_sha256": "928eeec741742f8329dd7e191a71f2d5249775b6de64e6a698a72836345ca011",
+      "synthesis_record_sha256": "2142515ab596130890f398a3cb06f7818c1c98264b48598e7ccc991ea6d1df2d",
+      "decision_record_sha256": "e3530def5fb093b5b2169659d32b3251a6726d493257602c8138d3a38bc050d3",
+      "surface": "ROUTE_SOURCE_RECORD",
+      "source_record_id": "RUN077-ROUTE-0693",
+      "source_record_key": "route|RUN077-ROUTE-0693|CAP-FLEET-VEHICLE-REGISTER",
+      "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "feature_class": "H",
+      "module": "Fleet & Assets",
+      "user_job": "Maintain vehicles and vehicle-specific state",
+      "source": {
+        "route_file": "routes/fleet-assets.php",
+        "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_key": "routes/fleet-assets.php:54:9:get:10",
+        "source_anchor": "routes/fleet-assets.php:54",
+        "source_locator": "routes/fleet-assets.php:54:9:get",
+        "route_method": "get",
+        "literal_uri": "/trips",
+        "literal_route_name": "fleet-assets.trips.index",
+        "action_expression": "[VehicleController::class, 'trips']",
+        "statement_excerpt": "Route::get('/trips', [VehicleController::class, 'trips'])->name('fleet-assets.trips.index');",
+        "statement_sha256": "215529de9bef35463b260cb426036bdfa28646405de99c02518acce18ff053ce"
+      },
+      "source_provenance": {
+        "immutable_queue_route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "immutable_queue_route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "current_review_route_file_sha256": "4be79ba4a0957f81f3e99de8eea7f29a398f8a115957bd44af06dbbf78fe2c4c",
+        "current_review_route_file_blob_id": "f0b2b8c199ada1d8ef8bdb41c99bfc2ac02f93d2",
+        "exact_statement_preserved_across_drift": true,
+        "historical_hash_not_presented_as_current": true
+      },
+      "review_outcome": "OWNER_ROUTE_ACTION",
+      "accepted_tiebreak_review_ids": [
+        "RUN179R-STRICT-CURRENT-TIEBREAK-A",
+        "RUN179R-STRICT-CURRENT-TIEBREAK-B"
+      ],
+      "accepted_tiebreak_review_record_sha256s": [
+        "46a76d37dd4aa2932b239aa97856e6e038d5cf55b4d63cc31ff2657c5f0653ac",
+        "bc8728424c8ade4f8614e7ab0c896695308d51cf8e64228d5ed8d79285d78589"
+      ],
+      "original_strict_current_dissent_preserved": true,
+      "original_strict_current_split": {
+        "OWNER_ROUTE_ACTION": 1,
+        "EVIDENCE_GAP": 1
+      },
+      "static_source_feature_ownership_credit": true,
+      "credit_boundary": {
+        "page_ownership": false,
+        "adjacent_route_ownership": false,
+        "frontend_caller_ownership": false,
+        "service_model_helper_or_test_ownership": false,
+        "framework_route_reachability": false,
+        "canonical_object_ownership_correctness": false,
+        "approved_site_scope_correctness": false,
+        "permission_correctness": false,
+        "privacy_correctness": false,
+        "direct_object_concealment_correctness": false,
+        "query_projection_correctness": false,
+        "runtime": false,
+        "database": false,
+        "build": false,
+        "application_browser": false,
+        "executed_tests": false,
+        "benchmark": false,
+        "final_no_match_or_NCM": false,
+        "final_finding": false,
+        "completion": false,
+        "gate_4": false,
+        "publication": false,
+        "audit_complete": false
+      },
+      "overlay_row_sha256": "5e502f8732212c48edbf5e83ddb114410a06ac6d986a8a0f71f7554ad4ce2f50"
+    }
+  ],
+  "new_static_controller_action_bridges": [
+    {
+      "bridge_id": "RUN180-BRIDGE-01",
+      "candidate_record_sha256": "b09ac81def93dcb4800f4a1ac340c698ff73f538ae3bcca792b01a53d7c2b650",
+      "queue_record_self_seal_sha256": "928eeec741742f8329dd7e191a71f2d5249775b6de64e6a698a72836345ca011",
+      "synthesis_record_sha256": "2142515ab596130890f398a3cb06f7818c1c98264b48598e7ccc991ea6d1df2d",
+      "decision_record_sha256": "e3530def5fb093b5b2169659d32b3251a6726d493257602c8138d3a38bc050d3",
+      "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "route_record_id": "RUN077-ROUTE-0693",
+      "controller_fqcn": "App\\Http\\Controllers\\FleetAssets\\VehicleController",
+      "controller_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+      "controller_file_sha256": "ba1ecc7e876c352a78122a3b292648d834ed40c8e09ab8893b9d9150e5614c49",
+      "controller_file_blob_id": "c6b75b8f33bb7774f74d27a4bc01bf07766c3212",
+      "method": "trips",
+      "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:566",
+      "method_review_slice_sha256": "8a6e9d9c6fa42bc03a226c9a856efde55f6924778d7eefbd16ea7ff926af2d1c",
+      "review_outcome": "OWNER_ROUTE_ACTION",
+      "static_controller_action_bridge_credit": true,
+      "page_ownership_credit": false,
+      "adjacent_route_ownership_credit": false,
+      "service_model_helper_caller_or_test_ownership_credit": false,
+      "correctness_credit": false,
+      "site_permission_privacy_or_direct_object_credit": false,
+      "runtime_credit": false,
+      "application_browser_credit": false,
+      "executed_test_credit": false,
+      "benchmark_credit": false,
+      "final_finding_credit": false,
+      "completion_credit": false,
+      "publication_credit": false,
+      "bridge_row_sha256": "eff07ebed3567fd6e9c6aebd7980333dd8ee34a201a0ac2c4e47b93b26c2e5de"
+    }
+  ],
+  "reviewed_non_owner_outcomes": [],
+  "identity": {
+    "hash_algorithm": "sha256-of-lf-joined-sorted-unique-utf8",
+    "prior_source_record_key_list_sha256": "d691bbfc9eabfa3f34f0df294c24c6890d3082b2149ed8b553cc88747e3143e5",
+    "combined_source_record_key_list_sha256": "1648a470ca0293c4c065b30925b8eda5a9f78d35fa64935e644a3354e17cdbba",
+    "prior_bridge_key_list_sha256": "19ed2b2cabf56de20dc2ae10b70877536140dc76285c5c64462d71535b302498",
+    "combined_bridge_key_list_sha256": "6ab1b8c1045ac6c159ba4aa5856ac58e648263a530f4f7c3031e4eed5d84fa32",
+    "prior_reviewed_queue_key_list_sha256": "acfca5e54d64c54334dbd94b30104244b3d2d6722a5426439aec7a8aa62d3ab5",
+    "combined_reviewed_queue_key_list_sha256": "5dbcecd3986300fe255fdb75efe6013c07f3adc4071745ebebf0c4a525ee99c9",
+    "canonical_json_reviewed_key_hashes": {
+      "prior": "e85b37e5410c1cc861f9116061e88fb82fdb854e5dc94e56eefe1947b3a7b510",
+      "combined": "738c7836dd770e12d67de62d4f28441825814d619bb641e070e25468786fb75e"
+    },
+    "new_overlay_source_records_sha256": "7ecd0bd4b5d7ad8b1ae0d5b154254dbdc85741f5e95cb241d2d4947de58edcac",
+    "new_action_bridges_sha256": "0f48e9484084b65d1173c0925069bc400aefc266f3b52dfda64ba7b5653bf3d7",
+    "accepted_tiebreak_review_record_sha256s": [
+      "46a76d37dd4aa2932b239aa97856e6e038d5cf55b4d63cc31ff2657c5f0653ac",
+      "bc8728424c8ade4f8614e7ab0c896695308d51cf8e64228d5ed8d79285d78589"
+    ],
+    "synthesis_record_sha256": "2142515ab596130890f398a3cb06f7818c1c98264b48598e7ccc991ea6d1df2d",
+    "decision_record_sha256": "e3530def5fb093b5b2169659d32b3251a6726d493257602c8138d3a38bc050d3",
+    "original_strict_current_chronology_record_sha256s": [
+      "8d4c5cee2e9c6f03f3a03ea64d49bdad324ddbb129e58145685c9125fcc47dea",
+      "4ec43eb0fd3add6c126f56a90aa0638da62dfa266877099bd23bdbba9ebcd15a"
+    ]
+  },
+  "outcome_conservation": {
+    "reviewed_outcomes_equation": "1 = 1 owner + 0 shared + 0 evidence gap",
+    "bounded_source_equation": "3929 = 666 owner + 3263 non-owner residual",
+    "owner_surface_equation": "666 = 309 route + 357 page",
+    "feature_union_equation": "256 = 64 route + 242 page - 50 overlap",
+    "route_universe_equation": "3218 = 309 owner + 12 shared + 5 alias + 0 dead + 2892 residual",
+    "page_universe_equation": "711 = 357 owner + 9 shared + 0 alias + 0 dead + 345 residual",
+    "queue_equation": "507 = 120 reviewed + 387 pending",
+    "reviewed_queue_equation": "120 = 98 owner + 10 shared + 5 alias + 0 dead + 7 evidence gap",
+    "queue_without_ownership_equation": "409 = 387 pending + 10 shared + 5 alias + 0 dead + 7 evidence gap"
+  },
+  "credit_boundary": {
+    "STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_1_RECORD": true,
+    "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_1_ACTION": true,
+    "static_page_feature_ownership": false,
+    "adjacent_route_ownership": false,
+    "frontend_caller_ownership": false,
+    "service_model_helper_caller_or_test_ownership": false,
+    "complete_route_page_feature_crosswalk": false,
+    "framework_route_reachability": false,
+    "canonical_object_ownership_correctness": false,
+    "approved_site_scope_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_concealment_correctness": false,
+    "query_projection_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "executed_tests": false,
+    "application_source_mutation": false,
+    "matrix_mutation": false,
+    "benchmark": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "release": false,
+    "publication": false,
+    "pass": false,
+    "final_finding": false,
+    "feature_completion": false,
+    "completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "mutation_attestation": {
+    "application_source_changed": false,
+    "test_files_changed": false,
+    "matrix_changed": false,
+    "reports_changed": false,
+    "dashboard_generator_changed": false,
+    "dashboard_html_changed": false,
+    "runtime_or_external_system_changed": false,
+    "audit_artifacts_only": true,
+    "run180_producer_scope_contains_only_generator_and_receipt": true,
+    "later_owned_generator_drafts_present_outside_run180_scope": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-wave-34.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-180-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-wave-34.json"
+  ],
+  "self_seal": {
+    "algorithm": "sha256-canonical-json-with-self-seal-omitted",
+    "sha256": "181a94c9b53b7f78e3d29f5833b42bbe0e87fcfb899c2af0b465aec9a09339cf"
+  }
+}
