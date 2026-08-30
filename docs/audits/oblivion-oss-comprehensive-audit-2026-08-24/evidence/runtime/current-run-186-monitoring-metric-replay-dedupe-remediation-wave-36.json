@@ -1,0 +1,1034 @@
+{
+  "schema_version": "run-186-monitoring-metric-replay-dedupe-remediation-wave-36-v1",
+  "run_id": "RUN-186-MON-METRIC-REPLAY-DEDUPE-01-REMEDIATION-WAVE-36",
+  "status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_AFTER_CORRECTIVE_NO_GO_NOT_FINAL_FINDING_BOUNDED_VERIFIED_NOT_PUBLISHED_LIVE_REPORTING_NOT_YET_AUTHORIZED_ZERO_STATIC_OWNERSHIP_OR_COMPLETION_CREDIT",
+  "materialized_on": "2026-08-31",
+  "architecture_boundary": "One operating organisation across multiple Sites; canonical Site, Device and collector provenance, exact permissions, immutable evidence, and fail-closed privacy controls are the boundaries. Site is not a tenant.",
+  "prompt_lineage": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "continuation_attachment_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "continuation_attachment_governing": false
+  },
+  "pins": {
+    "application_baseline_commit": "a900f078c9c05f587f6f7884f5fe715076891416",
+    "application_baseline_tree": "852126934a18a1364244a35f7789263779e47485",
+    "initial_fix_commit": "f521bc0b87222e56b4822e7cb9c935486e279e76",
+    "initial_fix_tree": "7a1862f2aab2844ca568061d3f9ee78201026cbd",
+    "initial_fix_parent": "a900f078c9c05f587f6f7884f5fe715076891416",
+    "initial_fix_subject": "fix(monitoring): deduplicate metric projection replays",
+    "initial_stable_patch_id": "16e3886ad0985b4af853d34ede90e2b5e273af51",
+    "clean_advanced_audit_main_commit": "badd86d566f3354e455b92f12ab683ce6d29c965",
+    "clean_advanced_audit_main_tree": "cdeba8f19c278fcaf11c6dd0b26ff7814bc1aed9",
+    "initial_merge_commit": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
+    "initial_merge_tree": "e66c50a3b514967eec70e4774a312bff376bb66a",
+    "initial_merge_parents": [
+      "badd86d566f3354e455b92f12ab683ce6d29c965",
+      "f521bc0b87222e56b4822e7cb9c935486e279e76"
+    ],
+    "initial_merge_subject": "Merge commit 'f521bc0b87222e56b4822e7cb9c935486e279e76'",
+    "corrective_fix_commit": "c82f57779baf623c4e94ac4619b11c1b675d0230",
+    "corrective_fix_tree": "095cd7b1940988be334979af22008c635fdcaf58",
+    "corrective_fix_parent": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
+    "corrective_fix_subject": "fix(monitoring): harden metric replay cutover",
+    "corrective_stable_patch_id": "18c4df4897f2562e5c797f7de4fb075b607de24b",
+    "corrective_merge_commit": "18652d545c788f1dcdbe57662e5b1e5472d6cae7",
+    "corrective_merge_tree": "095cd7b1940988be334979af22008c635fdcaf58",
+    "corrective_merge_parents": [
+      "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
+      "c82f57779baf623c4e94ac4619b11c1b675d0230"
+    ],
+    "corrective_merge_subject": "merge: harden metric replay cutover",
+    "disjoint_dns_fix_commit": "d5efdf7782a7cd81f78bc282d684e884db001b6c",
+    "disjoint_dns_fix_tree": "15d2d624429b914047a423c36c26b5744fcd5048",
+    "disjoint_dns_fix_parent": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
+    "disjoint_dns_stable_patch_id": "c3902efb3266fa859487de20265f315c6f9401ed",
+    "current_local_main_commit": "f938c6d989f5fef052f08b9f1012116fb5cf2f69",
+    "current_local_main_tree": "70b2339300278bc0c20e32ed091f74b442bea76d",
+    "current_local_main_parents": [
+      "18652d545c788f1dcdbe57662e5b1e5472d6cae7",
+      "d5efdf7782a7cd81f78bc282d684e884db001b6c"
+    ],
+    "current_local_main_subject": "merge: bind monitoring DNS responses",
+    "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead": 38,
+    "local_main_behind": 0,
+    "application_remote_publication_observed": false,
+    "publication_authorized": false,
+    "materializer": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.py",
+      "sha256": "983b003dc149c966cdea9c59dd3cd4a766f4a5f0382e881f90b9d0cde9b86cee",
+      "git_blob_id": "b4186cd86cd9b8536dad76e0f0aca2488fe053ed",
+      "bytes": 51768,
+      "lines": 1171
+    },
+    "initial_fix_records": [
+      {
+        "path": "app/Domain/Monitoring/Data/ObservationInput.php",
+        "sha256": "84085f94d7fbf096e2217c44d9606b2ac792ca88fa7ba230dbb020e949bfe35b",
+        "git_blob_id": "33b8ee04a70f012191abf74bcf8e1630db6a4781",
+        "bytes": 1259,
+        "lines": 38
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+        "sha256": "521612d4d4477ce19e3db44aa5b116c335741d9a4516b56935b07e34cf767010",
+        "git_blob_id": "a4b9b2b647911d31c87a9b494e1a651d7b2aad67",
+        "bytes": 995,
+        "lines": 41
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MonitorObservation.php",
+        "sha256": "12604aa280d17577a39cc583718896599e7bdf2db5db6094812f82d0bf753859",
+        "git_blob_id": "cf02417e8415d868c3fbe31584866117f23053bd",
+        "bytes": 5186,
+        "lines": 173
+      },
+      {
+        "path": "app/Domain/Monitoring/Services/MetricIngestService.php",
+        "sha256": "987fd7a1838e85c0d89fe88c3e3f6406c462a27dac51be213ffd62d7f61d034b",
+        "git_blob_id": "50ce949ed97e472753c0ac443e954ca9a82bac19",
+        "bytes": 12839,
+        "lines": 353
+      },
+      {
+        "path": "app/Domain/Monitoring/Services/MonitorCheckRunner.php",
+        "sha256": "43826a3b28dd42ed1d4b9c74f6ae1bad5e16892a8edbf4d80aa5029774fe19ad",
+        "git_blob_id": "cfb9bf0b9313797b3d87f91ae57659eecd85ed04",
+        "bytes": 13753,
+        "lines": 342
+      },
+      {
+        "path": "app/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+        "sha256": "3ceb1dd9402fb647c64754339f463c5e070714800051d93aee8bf712a8b095d8",
+        "git_blob_id": "2593c2cea8248cef69534e82efc7affc2db6b99e",
+        "bytes": 16587,
+        "lines": 405
+      },
+      {
+        "path": "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+        "sha256": "3beb12083e5ee58a5905687a9cf77a1d4e1bc32f54cf449f1fb1ee377355adf0",
+        "git_blob_id": "45dbc451e2b0d48d932d8482954d211a483b62c3",
+        "bytes": 23613,
+        "lines": 493
+      },
+      {
+        "path": "tests/Feature/Monitoring/MetricRetentionTest.php",
+        "sha256": "289838fcbe10371dae92eecec0b7f70fbfc97eb763cc8b5b99808653435b5dd9",
+        "git_blob_id": "7926273c50f70bfd087d16957a1b156823482a68",
+        "bytes": 83510,
+        "lines": 2039
+      },
+      {
+        "path": "tests/Feature/Monitoring/RunMonitorCheckTest.php",
+        "sha256": "5cb7b51a03a9654c9728a79625f791e1b82cc5cc7668a85cf9de458a7c23fdc2",
+        "git_blob_id": "512b583a83e974eba701a24534cf9a1b45fe381b",
+        "bytes": 12078,
+        "lines": 299
+      }
+    ],
+    "initial_merge_records": [
+      {
+        "path": "app/Domain/Monitoring/Data/ObservationInput.php",
+        "sha256": "84085f94d7fbf096e2217c44d9606b2ac792ca88fa7ba230dbb020e949bfe35b",
+        "git_blob_id": "33b8ee04a70f012191abf74bcf8e1630db6a4781",
+        "bytes": 1259,
+        "lines": 38
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+        "sha256": "521612d4d4477ce19e3db44aa5b116c335741d9a4516b56935b07e34cf767010",
+        "git_blob_id": "a4b9b2b647911d31c87a9b494e1a651d7b2aad67",
+        "bytes": 995,
+        "lines": 41
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MonitorObservation.php",
+        "sha256": "12604aa280d17577a39cc583718896599e7bdf2db5db6094812f82d0bf753859",
+        "git_blob_id": "cf02417e8415d868c3fbe31584866117f23053bd",
+        "bytes": 5186,
+        "lines": 173
+      },
+      {
+        "path": "app/Domain/Monitoring/Services/MetricIngestService.php",
+        "sha256": "987fd7a1838e85c0d89fe88c3e3f6406c462a27dac51be213ffd62d7f61d034b",
+        "git_blob_id": "50ce949ed97e472753c0ac443e954ca9a82bac19",
+        "bytes": 12839,
+        "lines": 353
+      },
+      {
+        "path": "app/Domain/Monitoring/Services/MonitorCheckRunner.php",
+        "sha256": "43826a3b28dd42ed1d4b9c74f6ae1bad5e16892a8edbf4d80aa5029774fe19ad",
+        "git_blob_id": "cfb9bf0b9313797b3d87f91ae57659eecd85ed04",
+        "bytes": 13753,
+        "lines": 342
+      },
+      {
+        "path": "app/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+        "sha256": "3ceb1dd9402fb647c64754339f463c5e070714800051d93aee8bf712a8b095d8",
+        "git_blob_id": "2593c2cea8248cef69534e82efc7affc2db6b99e",
+        "bytes": 16587,
+        "lines": 405
+      },
+      {
+        "path": "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+        "sha256": "3beb12083e5ee58a5905687a9cf77a1d4e1bc32f54cf449f1fb1ee377355adf0",
+        "git_blob_id": "45dbc451e2b0d48d932d8482954d211a483b62c3",
+        "bytes": 23613,
+        "lines": 493
+      },
+      {
+        "path": "tests/Feature/Monitoring/MetricRetentionTest.php",
+        "sha256": "289838fcbe10371dae92eecec0b7f70fbfc97eb763cc8b5b99808653435b5dd9",
+        "git_blob_id": "7926273c50f70bfd087d16957a1b156823482a68",
+        "bytes": 83510,
+        "lines": 2039
+      },
+      {
+        "path": "tests/Feature/Monitoring/RunMonitorCheckTest.php",
+        "sha256": "5cb7b51a03a9654c9728a79625f791e1b82cc5cc7668a85cf9de458a7c23fdc2",
+        "git_blob_id": "512b583a83e974eba701a24534cf9a1b45fe381b",
+        "bytes": 12078,
+        "lines": 299
+      }
+    ],
+    "initial_name_status": [
+      "M\tapp/Domain/Monitoring/Data/ObservationInput.php",
+      "A\tapp/Domain/Monitoring/Models/MetricPointReceipt.php",
+      "M\tapp/Domain/Monitoring/Models/MonitorObservation.php",
+      "M\tapp/Domain/Monitoring/Services/MetricIngestService.php",
+      "M\tapp/Domain/Monitoring/Services/MonitorCheckRunner.php",
+      "M\tapp/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+      "A\tdatabase/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+      "M\ttests/Feature/Monitoring/MetricRetentionTest.php",
+      "M\ttests/Feature/Monitoring/RunMonitorCheckTest.php"
+    ],
+    "initial_numstat": [
+      "15\t0\tapp/Domain/Monitoring/Data/ObservationInput.php",
+      "41\t0\tapp/Domain/Monitoring/Models/MetricPointReceipt.php",
+      "44\t4\tapp/Domain/Monitoring/Models/MonitorObservation.php",
+      "109\t67\tapp/Domain/Monitoring/Services/MetricIngestService.php",
+      "6\t7\tapp/Domain/Monitoring/Services/MonitorCheckRunner.php",
+      "132\t10\tapp/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+      "493\t0\tdatabase/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+      "776\t4\ttests/Feature/Monitoring/MetricRetentionTest.php",
+      "119\t0\ttests/Feature/Monitoring/RunMonitorCheckTest.php"
+    ],
+    "corrective_fix_records": [
+      {
+        "path": "app/Domain/Monitoring/Models/MetricCurrentSummary.php",
+        "sha256": "1fbefb995a1c4d149a2216742e9d7d04023cf5fb379e44b5314da8b74f8903b9",
+        "git_blob_id": "5d27e87f4e71c7dc81b8a0b280815ce18dffe09c",
+        "bytes": 888,
+        "lines": 37
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+        "sha256": "5f66fdecf02e8505a7bc93a0bd5f88a07798a089526b6070354b4cfc6bfb9382",
+        "git_blob_id": "0fe9a95d63f7c880e7af57862115088858b9a103",
+        "bytes": 1041,
+        "lines": 43
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MetricSeries.php",
+        "sha256": "0b0aad953ff61084951d3229aa77654c99de78c9185156e87002a2b20b5d10cd",
+        "git_blob_id": "c9d6e673fd5c95cbf5914e45ef61996bbf5d94a4",
+        "bytes": 2815,
+        "lines": 100
+      },
+      {
+        "path": "app/Domain/Monitoring/Services/MetricIngestService.php",
+        "sha256": "fd6224ce5a935c19ba96424413b25a94aa1f637c892982d35289908471eb2154",
+        "git_blob_id": "4b5df48af19ca85195a5975772a3de0afefc09e6",
+        "bytes": 13947,
+        "lines": 375
+      },
+      {
+        "path": "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+        "sha256": "f15b2dbc36a155ba473d00ffaa0bdf017a9fe09e0196d1cb113b1fe9e8a756dd",
+        "git_blob_id": "18afbafa2adc46800c20860065aa2dd093071102",
+        "bytes": 31004,
+        "lines": 648
+      },
+      {
+        "path": "database/migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php",
+        "sha256": "a55abeed6875c1ceda1130ebedbc8972ea2cafa742225ff0f8a01ceb1ad75c73",
+        "git_blob_id": "868bd6135816d4249d5713c1fc5066cfd9489965",
+        "bytes": 5157,
+        "lines": 134
+      },
+      {
+        "path": "tests/Feature/Monitoring/MetricRetentionTest.php",
+        "sha256": "183a09dc2c57e61ac825a7920fc1f2b1c8a66bd8208d5568b794116d4c1fdf74",
+        "git_blob_id": "58b5483e6ebe3665cf36d70386c0b65de8bb232f",
+        "bytes": 110626,
+        "lines": 2702
+      }
+    ],
+    "corrective_merge_records": [
+      {
+        "path": "app/Domain/Monitoring/Models/MetricCurrentSummary.php",
+        "sha256": "1fbefb995a1c4d149a2216742e9d7d04023cf5fb379e44b5314da8b74f8903b9",
+        "git_blob_id": "5d27e87f4e71c7dc81b8a0b280815ce18dffe09c",
+        "bytes": 888,
+        "lines": 37
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+        "sha256": "5f66fdecf02e8505a7bc93a0bd5f88a07798a089526b6070354b4cfc6bfb9382",
+        "git_blob_id": "0fe9a95d63f7c880e7af57862115088858b9a103",
+        "bytes": 1041,
+        "lines": 43
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MetricSeries.php",
+        "sha256": "0b0aad953ff61084951d3229aa77654c99de78c9185156e87002a2b20b5d10cd",
+        "git_blob_id": "c9d6e673fd5c95cbf5914e45ef61996bbf5d94a4",
+        "bytes": 2815,
+        "lines": 100
+      },
+      {
+        "path": "app/Domain/Monitoring/Services/MetricIngestService.php",
+        "sha256": "fd6224ce5a935c19ba96424413b25a94aa1f637c892982d35289908471eb2154",
+        "git_blob_id": "4b5df48af19ca85195a5975772a3de0afefc09e6",
+        "bytes": 13947,
+        "lines": 375
+      },
+      {
+        "path": "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+        "sha256": "f15b2dbc36a155ba473d00ffaa0bdf017a9fe09e0196d1cb113b1fe9e8a756dd",
+        "git_blob_id": "18afbafa2adc46800c20860065aa2dd093071102",
+        "bytes": 31004,
+        "lines": 648
+      },
+      {
+        "path": "database/migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php",
+        "sha256": "a55abeed6875c1ceda1130ebedbc8972ea2cafa742225ff0f8a01ceb1ad75c73",
+        "git_blob_id": "868bd6135816d4249d5713c1fc5066cfd9489965",
+        "bytes": 5157,
+        "lines": 134
+      },
+      {
+        "path": "tests/Feature/Monitoring/MetricRetentionTest.php",
+        "sha256": "183a09dc2c57e61ac825a7920fc1f2b1c8a66bd8208d5568b794116d4c1fdf74",
+        "git_blob_id": "58b5483e6ebe3665cf36d70386c0b65de8bb232f",
+        "bytes": 110626,
+        "lines": 2702
+      }
+    ],
+    "corrective_name_status": [
+      "M\tapp/Domain/Monitoring/Models/MetricCurrentSummary.php",
+      "M\tapp/Domain/Monitoring/Models/MetricPointReceipt.php",
+      "M\tapp/Domain/Monitoring/Models/MetricSeries.php",
+      "M\tapp/Domain/Monitoring/Services/MetricIngestService.php",
+      "M\tdatabase/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+      "A\tdatabase/migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php",
+      "M\ttests/Feature/Monitoring/MetricRetentionTest.php"
+    ],
+    "corrective_numstat": [
+      "2\t0\tapp/Domain/Monitoring/Models/MetricCurrentSummary.php",
+      "2\t0\tapp/Domain/Monitoring/Models/MetricPointReceipt.php",
+      "2\t0\tapp/Domain/Monitoring/Models/MetricSeries.php",
+      "24\t2\tapp/Domain/Monitoring/Services/MetricIngestService.php",
+      "173\t18\tdatabase/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+      "134\t0\tdatabase/migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php",
+      "708\t45\ttests/Feature/Monitoring/MetricRetentionTest.php"
+    ],
+    "current_final_issue_records": [
+      {
+        "path": "app/Domain/Monitoring/Data/ObservationInput.php",
+        "sha256": "84085f94d7fbf096e2217c44d9606b2ac792ca88fa7ba230dbb020e949bfe35b",
+        "git_blob_id": "33b8ee04a70f012191abf74bcf8e1630db6a4781",
+        "bytes": 1259,
+        "lines": 38
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+        "sha256": "5f66fdecf02e8505a7bc93a0bd5f88a07798a089526b6070354b4cfc6bfb9382",
+        "git_blob_id": "0fe9a95d63f7c880e7af57862115088858b9a103",
+        "bytes": 1041,
+        "lines": 43
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MonitorObservation.php",
+        "sha256": "12604aa280d17577a39cc583718896599e7bdf2db5db6094812f82d0bf753859",
+        "git_blob_id": "cf02417e8415d868c3fbe31584866117f23053bd",
+        "bytes": 5186,
+        "lines": 173
+      },
+      {
+        "path": "app/Domain/Monitoring/Services/MetricIngestService.php",
+        "sha256": "fd6224ce5a935c19ba96424413b25a94aa1f637c892982d35289908471eb2154",
+        "git_blob_id": "4b5df48af19ca85195a5975772a3de0afefc09e6",
+        "bytes": 13947,
+        "lines": 375
+      },
+      {
+        "path": "app/Domain/Monitoring/Services/MonitorCheckRunner.php",
+        "sha256": "43826a3b28dd42ed1d4b9c74f6ae1bad5e16892a8edbf4d80aa5029774fe19ad",
+        "git_blob_id": "cfb9bf0b9313797b3d87f91ae57659eecd85ed04",
+        "bytes": 13753,
+        "lines": 342
+      },
+      {
+        "path": "app/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+        "sha256": "3ceb1dd9402fb647c64754339f463c5e070714800051d93aee8bf712a8b095d8",
+        "git_blob_id": "2593c2cea8248cef69534e82efc7affc2db6b99e",
+        "bytes": 16587,
+        "lines": 405
+      },
+      {
+        "path": "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+        "sha256": "f15b2dbc36a155ba473d00ffaa0bdf017a9fe09e0196d1cb113b1fe9e8a756dd",
+        "git_blob_id": "18afbafa2adc46800c20860065aa2dd093071102",
+        "bytes": 31004,
+        "lines": 648
+      },
+      {
+        "path": "tests/Feature/Monitoring/MetricRetentionTest.php",
+        "sha256": "183a09dc2c57e61ac825a7920fc1f2b1c8a66bd8208d5568b794116d4c1fdf74",
+        "git_blob_id": "58b5483e6ebe3665cf36d70386c0b65de8bb232f",
+        "bytes": 110626,
+        "lines": 2702
+      },
+      {
+        "path": "tests/Feature/Monitoring/RunMonitorCheckTest.php",
+        "sha256": "5cb7b51a03a9654c9728a79625f791e1b82cc5cc7668a85cf9de458a7c23fdc2",
+        "git_blob_id": "512b583a83e974eba701a24534cf9a1b45fe381b",
+        "bytes": 12078,
+        "lines": 299
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MetricCurrentSummary.php",
+        "sha256": "1fbefb995a1c4d149a2216742e9d7d04023cf5fb379e44b5314da8b74f8903b9",
+        "git_blob_id": "5d27e87f4e71c7dc81b8a0b280815ce18dffe09c",
+        "bytes": 888,
+        "lines": 37
+      },
+      {
+        "path": "app/Domain/Monitoring/Models/MetricSeries.php",
+        "sha256": "0b0aad953ff61084951d3229aa77654c99de78c9185156e87002a2b20b5d10cd",
+        "git_blob_id": "c9d6e673fd5c95cbf5914e45ef61996bbf5d94a4",
+        "bytes": 2815,
+        "lines": 100
+      },
+      {
+        "path": "database/migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php",
+        "sha256": "a55abeed6875c1ceda1130ebedbc8972ea2cafa742225ff0f8a01ceb1ad75c73",
+        "git_blob_id": "868bd6135816d4249d5713c1fc5066cfd9489965",
+        "bytes": 5157,
+        "lines": 134
+      }
+    ],
+    "current_disjoint_dns_records": [
+      {
+        "path": "app/Domain/Monitoring/Transports/NativeDnsTransport.php",
+        "sha256": "9cef82ac54f58c3b17c88fbaaf5ef4fbc3743b0621c42acb8152c2177217e447",
+        "git_blob_id": "02d3816a62aaadb732b8511381ed8bfa755b1235",
+        "bytes": 14307,
+        "lines": 418
+      },
+      {
+        "path": "tests/Unit/Monitoring/NativeDnsTransportTest.php",
+        "sha256": "9c4a47e2737b622307fab9e33c5955d27f5771d0048e03ebbaada60b45ec7f62",
+        "git_blob_id": "b5814bfbed123108d914f753692b455553831870",
+        "bytes": 17716,
+        "lines": 430
+      }
+    ],
+    "disjoint_dns_name_status": [
+      "M\tapp/Domain/Monitoring/Transports/NativeDnsTransport.php",
+      "A\ttests/Unit/Monitoring/NativeDnsTransportTest.php"
+    ],
+    "disjoint_dns_numstat": [
+      "278\t57\tapp/Domain/Monitoring/Transports/NativeDnsTransport.php",
+      "430\t0\ttests/Unit/Monitoring/NativeDnsTransportTest.php"
+    ],
+    "current_findings_before_run_186": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/findings.json",
+      "sha256": "28622b14799477cfa37069bffd16f500f429ff5013ac418ed75394486cb24bc3",
+      "git_blob_id": "00fc8cc934bae3cc1b7d830f4dbc5bf74b679e0b",
+      "bytes": 610120,
+      "lines": 10824
+    }
+  },
+  "issue_first_disposition": {
+    "finding_id": "MON-METRIC-REPLAY-DEDUPE-01",
+    "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "candidate_feature_id": null,
+    "feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+    "verdict": "REPRODUCED_INITIAL_FIX_POST_MERGE_NO_GO_CORRECTED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED",
+    "issue_application_baseline": "a900f078c9c05f587f6f7884f5fe715076891416",
+    "initial_exclusive_paths": [
+      "app/Domain/Monitoring/Data/ObservationInput.php",
+      "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+      "app/Domain/Monitoring/Models/MonitorObservation.php",
+      "app/Domain/Monitoring/Services/MetricIngestService.php",
+      "app/Domain/Monitoring/Services/MonitorCheckRunner.php",
+      "app/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+      "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+      "tests/Feature/Monitoring/MetricRetentionTest.php",
+      "tests/Feature/Monitoring/RunMonitorCheckTest.php"
+    ],
+    "corrective_exclusive_paths": [
+      "app/Domain/Monitoring/Models/MetricCurrentSummary.php",
+      "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+      "app/Domain/Monitoring/Models/MetricSeries.php",
+      "app/Domain/Monitoring/Services/MetricIngestService.php",
+      "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+      "database/migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php",
+      "tests/Feature/Monitoring/MetricRetentionTest.php"
+    ],
+    "final_issue_path_union": [
+      "app/Domain/Monitoring/Data/ObservationInput.php",
+      "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+      "app/Domain/Monitoring/Models/MonitorObservation.php",
+      "app/Domain/Monitoring/Services/MetricIngestService.php",
+      "app/Domain/Monitoring/Services/MonitorCheckRunner.php",
+      "app/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+      "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+      "tests/Feature/Monitoring/MetricRetentionTest.php",
+      "tests/Feature/Monitoring/RunMonitorCheckTest.php",
+      "app/Domain/Monitoring/Models/MetricCurrentSummary.php",
+      "app/Domain/Monitoring/Models/MetricSeries.php",
+      "database/migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php"
+    ],
+    "new_discovery_stopped_after_confirmation": true,
+    "source_counterexample": "A duplicate observation source key returned canonical persisted evidence, but metric projection could replay request payload, rewrite or recount history, rewind current state, and strand partial writes.",
+    "root_post_merge_red_reproduction": {
+      "commit": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
+      "temporary_change": "one existing MetricRetentionTest timestamp changed to .123456",
+      "temporary_change_reverted": true,
+      "tests": 1,
+      "failed": 1,
+      "passed": 0,
+      "assertions_reported": 0,
+      "duration_seconds": 145.27,
+      "exit_code": 1,
+      "exception": "LogicException",
+      "locus": "MetricIngestService.php:292",
+      "observed_contract_break": "receipt timestamp precision did not match the canonical point",
+      "credit": "REPRODUCTION_ONLY_ZERO_PASSING_DENOMINATOR_CREDIT"
+    }
+  },
+  "initial_remediation_and_no_go": {
+    "initial_contract": [
+      "project only canonical stored observation payload",
+      "seal an observation only after every canonical metric point succeeds",
+      "retain value-free durable per-point receipts",
+      "resume partial projection from receipts without re-probing",
+      "reject Site, Device, collector, series or observed-time mismatch",
+      "write unique late points historically without regressing current state"
+    ],
+    "initial_changed_paths": 9,
+    "initial_insertions": 1735,
+    "initial_deletions": 92,
+    "isolated_green_superseded": {
+      "tests": 49,
+      "assertions": 392,
+      "duration_seconds": 153.35,
+      "exit_code": 0,
+      "denominator_credit": false
+    },
+    "post_merge_green_superseded": {
+      "tests": 49,
+      "assertions": 392,
+      "duration_seconds": 151.11,
+      "exit_code": 0,
+      "denominator_credit": false
+    },
+    "post_merge_independent_disposition": "NO_GO",
+    "no_go_reasons": [
+      "Eloquent timestamp serialization truncated six-decimal receipt time",
+      "mixed-version old-success then newer-success then old replay could lose durable receipt evidence"
+    ],
+    "initial_green_contributes_current_reporting_denominator": false
+  },
+  "corrective_remediation": {
+    "summary": "The corrective lineage preserves six-decimal time, updates the current evidence tuple only for a current point, installs value-free receipt bridges on fresh and already-applied migration paths, and fails closed on poisoned pre-cutover subsecond evidence.",
+    "changed_paths": 7,
+    "insertions": 1045,
+    "deletions": 65,
+    "six_decimal_eloquent_models": [
+      "MetricPointReceipt",
+      "MetricCurrentSummary",
+      "MetricSeries"
+    ],
+    "current_evidence_tuple_updates_atomically_only_when_point_is_current": true,
+    "unique_late_points_do_not_regress_current_tuple_or_coverage": true,
+    "no_op_metric_series_saves_avoided": true,
+    "fresh_install_migration_amended": "2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+    "already_applied_upgrade_migration_added": "2026_08_30_000110_govern_monitoring_metric_projection_cutover.php",
+    "bridge_guards_and_triggers_installed_before_cutover": true,
+    "whole_second_old_worker_success_receipted_before_displacement": true,
+    "old_worker_failure_remains_canonically_retryable": true,
+    "partial_success_receipted_per_completed_point": true,
+    "poisoned_pre_f521_subsecond_bridge_fails_closed": true,
+    "poisoned_bridge_never_rewrites_recounts_or_silently_completes": true,
+    "observation_evidence_classification_and_provenance_immutable": true,
+    "site_device_and_collector_mismatch_fails_closed": true,
+    "direct_runner_retry_does_not_reprobe": true,
+    "receipt_retains_raw_metric_values": false,
+    "single_organisation_multi_site_boundary_preserved": true,
+    "deployment_prerequisite": [
+      "quiesce old monitoring workers",
+      "reconcile pending or incoherent rows",
+      "apply migration 000110",
+      "start new workers only after cutover reconciliation"
+    ],
+    "deployment_prerequisite_verified_in_production": false,
+    "production_migration_or_release_credit": false
+  },
+  "delegated_runtime_execution": {
+    "execution_owners": {
+      "initial_isolated_and_post_merge": "separate ten-fix remediation task",
+      "post_merge_red_reproduction": "root audit lane",
+      "corrective_isolated_and_post_merge": "separate OSS audit fixes task"
+    },
+    "run_186_producer_executed_php_or_tests": false,
+    "initial_green_runs": {
+      "isolated": "49 tests / 392 assertions / 153.35s / exit 0",
+      "post_merge": "49 tests / 392 assertions / 151.11s / exit 0",
+      "later_no_go": true,
+      "denominator_credit": false
+    },
+    "root_red_reproduction": {
+      "tests": 1,
+      "failed": 1,
+      "passed": 0,
+      "assertions": 0,
+      "duration_seconds": 145.27,
+      "exit_code": 1,
+      "denominator_credit": false
+    },
+    "initial_corrective_subsets_later_no_go": [
+      {
+        "scope": "literal .123456 receipt replay",
+        "tests": 1,
+        "assertions": 10,
+        "exit_code": 0,
+        "denominator_credit": false
+      },
+      {
+        "scope": "same-second ordering, interior point, old success, old failure, and raw bridge",
+        "tests": 5,
+        "assertions": 58,
+        "exit_code": 0,
+        "denominator_credit": false
+      },
+      {
+        "scope": "historical replay, unique late point, partial recovery, high-water compatibility, time mismatch, and series mismatch",
+        "tests": 6,
+        "assertions": 58,
+        "exit_code": 0,
+        "denominator_credit": false
+      }
+    ],
+    "first_corrective_full_green_later_no_go": {
+      "tests": 54,
+      "assertions": 455,
+      "duration_seconds": 156.72,
+      "exit_code": 0,
+      "no_go_reasons": [
+        "already-applied 000100 did not receive bridge triggers",
+        "mixed-worker subsecond recovery remained unsafe"
+      ],
+      "denominator_credit": false
+    },
+    "stopped_option_a_target": {
+      "product_cases_passed": 5,
+      "test_only_failures": 1,
+      "failure": "composite unique index assertion expected one information_schema row",
+      "correction": "require both composite index rows to be NON_UNIQUE=0",
+      "denominator_credit": false
+    },
+    "final_corrected_targeted_support": {
+      "tests": 6,
+      "assertions": 66,
+      "exit_code": 0,
+      "reported_separately": true,
+      "denominator_credit": false
+    },
+    "final_corrected_isolated_full_focused": {
+      "scope": "MetricRetentionTest plus RunMonitorCheckTest",
+      "tests": 56,
+      "assertions": 472,
+      "duration_seconds": 154.66,
+      "exit_code": 0,
+      "denominator_credit": false
+    },
+    "final_corrected_post_merge_full_focused": {
+      "scope": "MetricRetentionTest plus RunMonitorCheckTest",
+      "tests": 56,
+      "assertions": 472,
+      "duration_seconds": 162.46,
+      "exit_code": 0,
+      "unique_bounded_disposition_denominator_credit": true
+    },
+    "unique_bounded_accounting": {
+      "prior": {
+        "tests": 99,
+        "assertions": 1931
+      },
+      "increment": {
+        "tests": 56,
+        "assertions": 472
+      },
+      "proposed_after_run_186r_go": {
+        "tests": 155,
+        "assertions": 2403
+      }
+    },
+    "syntax": "PASS",
+    "scoped_pint": "PASS",
+    "git_diff_and_check": "PASS",
+    "full_suite_or_coverage_credit": false
+  },
+  "independent_review": {
+    "initial_production_schema_and_test_reviews": "GO_THEN_SUPERSEDED",
+    "post_merge_precision_and_mixed_version_review": "NO_GO",
+    "corrective_first_review": "NO_GO",
+    "corrective_first_review_blockers": [
+      "already-migrated databases required forward migration 000110",
+      "pre-f521 subsecond evidence could not be reconstructed safely"
+    ],
+    "accepted_option": "A_CANONICAL_WHOLE_SECOND_MIXED_WORKER_BRIDGE",
+    "final_corrective_reviewers": 2,
+    "final_corrective_review_verdict": "GO",
+    "final_review_boundary": "old workers quiesced, pending rows reconciled, 000110 applied, then new workers started; poisoned subsecond evidence requires operator reconciliation",
+    "reviewers_executed_tests": false,
+    "reviewers_wrote_application_files": false,
+    "exact_run_186_receipt_review_completed": false,
+    "new_record_reporting_authorized": false,
+    "run_186r_still_required": true
+  },
+  "cleanup_evidence": {
+    "initial_isolated_worktree": "C:/w/monitoring-metric-replay-01",
+    "initial_isolated_worktree_removed": true,
+    "initial_recovery_branch": "codex/monitoring-metric-replay-dedupe-01-20260830",
+    "initial_recovery_branch_retained_at_fix": true,
+    "corrective_isolated_worktree": "C:/w/monitoring-metric-replay-corrective-01",
+    "corrective_isolated_worktree_removed": true,
+    "corrective_recovery_branch": "codex/monitoring-metric-replay-corrective-01-20260830",
+    "corrective_recovery_branch_retained_at_fix": true,
+    "post_merge_global_php_or_pest_process_count": 0,
+    "numeric_pid_test_schema_count": 0,
+    "corrective_upgrade_schema_count": 0,
+    "root_red_reproduction_cleanup": {
+      "global_php_or_pest_process_count": 0,
+      "numeric_pid_test_schema_count": 0
+    },
+    "stopped_option_a_target_cleanup": {
+      "global_php_or_pest_process_count": 0,
+      "numeric_pid_test_schema_count": 0,
+      "owned_upgrade_schema_count": 0
+    },
+    "primary_main_clean_before_audit_writes": true,
+    "exclusive_corrective_path_ownership_released": true,
+    "serialized_runtime_lane_released": true
+  },
+  "static_ownership_boundary": {
+    "owner_records": 666,
+    "route_owners": 309,
+    "page_owners": 357,
+    "action_bridges": 97,
+    "queue_total": 507,
+    "queue_reviewed": 120,
+    "queue_pending": 387,
+    "queue_owned": 98,
+    "queue_without_ownership": 409,
+    "next_zero_based_index": 85,
+    "candidate_feature_id": null,
+    "feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+    "correctness_does_not_adjudicate_static_ownership": true,
+    "route_or_page_owner_authorized": false,
+    "controller_action_bridge_authorized": false,
+    "queue_advance_authorized": false,
+    "fresh_outcome_neutral_semantic_review_required_later": true
+  },
+  "benchmark_boundary": {
+    "mapped": 2,
+    "total": 340,
+    "final_no_match_or_ncm": 0,
+    "unresolved": 338,
+    "changed_by_run_186": false
+  },
+  "current_main_disjoint_dns_noninheritance": {
+    "finding_id": "MON-DNS-RESPONSE-BINDING-01",
+    "path_count": 2,
+    "paths": [
+      "app/Domain/Monitoring/Transports/NativeDnsTransport.php",
+      "tests/Unit/Monitoring/NativeDnsTransportTest.php"
+    ],
+    "merge_commit": "f938c6d989f5fef052f08b9f1012116fb5cf2f69",
+    "application_credit_in_run_186": false,
+    "runtime_credit_in_run_186": false,
+    "reporting_credit_in_run_186": false,
+    "feature_or_static_ownership_credit_in_run_186": false
+  },
+  "noninheritance_boundary": {
+    "initial_flawed_green_execution": false,
+    "initial_post_merge_green_execution": false,
+    "root_red_reproduction_passing_denominator": false,
+    "first_corrective_full_green_execution": false,
+    "stopped_option_a_target_execution": false,
+    "final_isolated_replay_duplicated_in_denominator": false,
+    "targeted_six_test_supporting_replay_duplicated_in_denominator": false,
+    "dns_application_or_runtime": false,
+    "facility_signal_application_or_runtime": false,
+    "static_route_or_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_matrix_or_feature_union_change": false,
+    "canonical_feature_identity": false,
+    "full_monitoring_suite_or_coverage": false,
+    "application_browser_or_ease": false,
+    "benchmark_mapping_or_final_no_match_ncm": false,
+    "migration_deployment_or_release": false,
+    "publication_final_finding_gate4_module_or_audit_completion": false
+  },
+  "reporting_boundary": {
+    "current_findings_snapshot": {
+      "retained_record_count": 14,
+      "current_provisional_count": 8,
+      "historical_already_fixed_count": 2,
+      "historical_remediated_count": 4,
+      "monitoring_metric_replay_dedupe_record_present": false,
+      "bounded_disposition_tests_passed": 99,
+      "bounded_disposition_assertions": 1931,
+      "static_owner_records": 666,
+      "route_owners": 309,
+      "page_owners": 357,
+      "action_bridges": 97,
+      "queue_total": 507,
+      "queue_reviewed": 120,
+      "queue_pending": 387,
+      "queue_owned": 98,
+      "queue_without_ownership": 409,
+      "benchmark_mapped": 2,
+      "benchmark_unresolved": 338,
+      "final_no_match_or_ncm": 0
+    },
+    "current_retained_identity_count": 14,
+    "current_split": "8 provisional + 2 historical already-fixed + 4 historical remediated",
+    "pending_new_record_id": "MON-METRIC-REPLAY-DEDUPE-01",
+    "pending_record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "pending_candidate_feature_id": null,
+    "pending_feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+    "pending_reporting_delta": {
+      "retained_claim_records": 1,
+      "current_provisional_source_claims": 0,
+      "historical_already_fixed_records": 0,
+      "historical_remediated_records": 1,
+      "bounded_disposition_tests_passed": 56,
+      "bounded_disposition_assertions": 472,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "proposed_after_independent_run_186r_go": {
+      "retained_claim_records": 15,
+      "current_provisional_source_claims": 8,
+      "historical_already_fixed_records": 2,
+      "historical_remediated_records": 5,
+      "bounded_disposition_tests_passed": 155,
+      "bounded_disposition_assertions": 2403,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "independent_review_authorized": false,
+    "run_186_changes_live_reporting": false,
+    "run_186r_required": true,
+    "run_187_reporting_required_after_go": true,
+    "run_188_fresh_dashboard_verification_required_after_reporting": true
+  },
+  "credit_boundary": {
+    "historical_condition_confirmed": true,
+    "current_defect_reproduced": true,
+    "application_remediation": true,
+    "corrective_application_remediation_after_no_go": true,
+    "bounded_runtime": true,
+    "bounded_metric_projection_replay_correctness": true,
+    "application_commit_integrated_local_main": true,
+    "application_commit_published": false,
+    "new_historical_remediated_record_reporting": false,
+    "static_route_or_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "canonical_feature_identity": false,
+    "framework_route_reachability_complete": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_ncm": false,
+    "ease": false,
+    "full_feature_or_module": false,
+    "migration_deployment": false,
+    "release": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_gates": [
+    {
+      "gate": 1,
+      "name": "routes_classified",
+      "complete": false
+    },
+    {
+      "gate": 2,
+      "name": "inertia_pages_classified",
+      "complete": false
+    },
+    {
+      "gate": 3,
+      "name": "features_in_canonical_register",
+      "complete": false
+    },
+    {
+      "gate": 4,
+      "name": "routes_and_pages_mapped_to_feature_id",
+      "complete": false
+    },
+    {
+      "gate": 5,
+      "name": "features_with_verified_benchmark_or_final_ncm",
+      "complete": false
+    },
+    {
+      "gate": 6,
+      "name": "human_features_with_task_script_and_ten_scores",
+      "complete": false
+    },
+    {
+      "gate": 7,
+      "name": "common_and_safety_journeys_cross_reviewed",
+      "complete": false
+    },
+    {
+      "gate": 8,
+      "name": "hero_banner_instances_classified",
+      "complete": false
+    },
+    {
+      "gate": 9,
+      "name": "overlay_implementations_and_triggers_classified",
+      "complete": false
+    },
+    {
+      "gate": 10,
+      "name": "safe_routes_observed_at_desktop",
+      "complete": false
+    },
+    {
+      "gate": 11,
+      "name": "selected_families_and_journeys_all_viewports",
+      "complete": false
+    },
+    {
+      "gate": 12,
+      "name": "required_visual_states_classified",
+      "complete": false
+    },
+    {
+      "gate": 13,
+      "name": "material_visual_finding_families_resampled",
+      "complete": false
+    },
+    {
+      "gate": 14,
+      "name": "models_classified",
+      "complete": false
+    },
+    {
+      "gate": 15,
+      "name": "policies_classified",
+      "complete": false
+    },
+    {
+      "gate": 16,
+      "name": "service_domain_entries_classified",
+      "complete": false
+    },
+    {
+      "gate": 17,
+      "name": "critical_async_owners_classified",
+      "complete": false
+    },
+    {
+      "gate": 18,
+      "name": "modules_with_all_eight_passes",
+      "complete": false
+    },
+    {
+      "gate": 19,
+      "name": "prompt_benchmark_projects_formally_triaged",
+      "complete": false
+    },
+    {
+      "gate": 20,
+      "name": "p0_p1_complete_finding_fields",
+      "complete": false
+    },
+    {
+      "gate": 21,
+      "name": "redesigns_neutral_native_no_copy",
+      "complete": false
+    },
+    {
+      "gate": 22,
+      "name": "ease_4_5_claims_independently_reviewed",
+      "complete": false
+    },
+    {
+      "gate": 23,
+      "name": "browser_claims_labeled",
+      "complete": false
+    },
+    {
+      "gate": 24,
+      "name": "visual_inconsistencies_complete_context",
+      "complete": false
+    },
+    {
+      "gate": 25,
+      "name": "official_source_inference_specialist_split",
+      "complete": false
+    },
+    {
+      "gate": 26,
+      "name": "all_agents_returned_reconciled_represented_none_live",
+      "complete": false
+    }
+  ],
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.json"
+  ],
+  "receipt_self_seal_sha256": "9d21a45a215a9d48a82d093817aba6807ef6ed73b130894ac385a41e18e527ff"
+}

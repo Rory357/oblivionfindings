@@ -1,0 +1,368 @@
+{
+  "schema_version": "run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36-v1",
+  "run_id": "RUN-186R-INDEPENDENT-MON-METRIC-REPLAY-DEDUPE-01-REMEDIATION-REVIEW-WAVE-36",
+  "status": "INDEPENDENT_EXACT_ARTIFACT_REVIEW_GO_RUN_187_BOUNDED_HISTORICAL_REMEDIATED_REPORTING_AUTHORIZED_ZERO_OTHER_CREDIT",
+  "materialized_on": "2026-08-31",
+  "architecture_boundary": "One operating organisation across multiple Sites; canonical Site, Device and collector provenance, exact permissions, immutable evidence, and fail-closed privacy controls are the boundaries. Site is not a tenant.",
+  "prompt_lineage": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "continuation_attachment_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "continuation_attachment_governing": false
+  },
+  "pins": {
+    "application_baseline_commit": "a900f078c9c05f587f6f7884f5fe715076891416",
+    "application_baseline_tree": "852126934a18a1364244a35f7789263779e47485",
+    "initial_fix_commit": "f521bc0b87222e56b4822e7cb9c935486e279e76",
+    "initial_fix_tree": "7a1862f2aab2844ca568061d3f9ee78201026cbd",
+    "initial_merge_commit": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
+    "initial_merge_tree": "e66c50a3b514967eec70e4774a312bff376bb66a",
+    "corrective_fix_commit": "c82f57779baf623c4e94ac4619b11c1b675d0230",
+    "corrective_fix_tree": "095cd7b1940988be334979af22008c635fdcaf58",
+    "corrective_merge_commit": "18652d545c788f1dcdbe57662e5b1e5472d6cae7",
+    "corrective_merge_tree": "095cd7b1940988be334979af22008c635fdcaf58",
+    "current_local_main_commit": "f938c6d989f5fef052f08b9f1012116fb5cf2f69",
+    "current_local_main_tree": "70b2339300278bc0c20e32ed091f74b442bea76d",
+    "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "initial_stable_patch_id": "16e3886ad0985b4af853d34ede90e2b5e273af51",
+    "corrective_stable_patch_id": "18c4df4897f2562e5c797f7de4fb075b607de24b",
+    "disjoint_dns_stable_patch_id": "c3902efb3266fa859487de20265f315c6f9401ed",
+    "application_published": false,
+    "producer_materializer": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.py",
+      "sha256": "983b003dc149c966cdea9c59dd3cd4a766f4a5f0382e881f90b9d0cde9b86cee",
+      "git_blob_id": "b4186cd86cd9b8536dad76e0f0aca2488fe053ed",
+      "bytes": 51768,
+      "lines": 1171
+    },
+    "producer_receipt": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.json",
+      "sha256": "bf2cd03ca2ab7aeb6a9d1093b3c08aba5a1bc29342cc4fda6fa57ef286c2f1e5",
+      "git_blob_id": "3ab0399abc912ce16df65d40e7ac91f3e1fb65d5",
+      "bytes": 42766,
+      "lines": 1034,
+      "receipt_self_seal_sha256": "9d21a45a215a9d48a82d093817aba6807ef6ed73b130894ac385a41e18e527ff"
+    },
+    "review_materializer": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-run-186-monitoring-metric-replay-dedupe-remediation-review-wave-36.py",
+      "sha256": "e081b3807c81f8f8d9c6982faddf63b548db650437cde13ff424730181361026",
+      "git_blob_id": "2e178ca16456c918f083296d81403b8d1d9062ae",
+      "bytes": 38910,
+      "lines": 854
+    },
+    "current_findings_before_run_187": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/findings.json",
+      "sha256": "28622b14799477cfa37069bffd16f500f429ff5013ac418ed75394486cb24bc3",
+      "git_blob_id": "00fc8cc934bae3cc1b7d830f4dbc5bf74b679e0b",
+      "bytes": 610120,
+      "lines": 10824
+    },
+    "dirty_allowlist": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.json",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36.json",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-run-186-monitoring-metric-replay-dedupe-remediation-review-wave-36.py",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.py"
+    ]
+  },
+  "review": {
+    "reviewer_lane": "/root/run186_metric_artifact_review",
+    "independent_from_application_remediation_and_producer_lanes": true,
+    "reviewer_executed_php_tests_database_browser_or_network": false,
+    "reviewer_wrote_application_live_reporting_or_html_files": false,
+    "checks": {
+      "strict_json_zero_duplicate_keys": true,
+      "lf_no_bom_no_trailing_whitespace": true,
+      "pretty_json_round_trip": true,
+      "canonical_self_seal": true,
+      "prompt_hash_lineage_and_single_tenant_multi_site_boundary": true,
+      "initial_base_fix_advanced_merge_metadata_and_patch_id": true,
+      "initial_nine_path_status_numstat_blob_sha_bytes_lines": true,
+      "corrective_fix_merge_metadata_patch_id_and_seven_path_delta": true,
+      "current_main_dns_only_advance_and_issue_path_blob_stability": true,
+      "root_red_reproduction_zero_passing_denominator_credit": true,
+      "initial_and_intermediate_no_go_execution_zero_credit": true,
+      "final_corrected_post_merge_56_472_counted_once": true,
+      "current_register_14_records_and_monitoring_record_absent": true,
+      "authorized_15_8_2_5_and_155_2403_arithmetic": true,
+      "null_feature_identity_and_zero_static_ownership_credit": true,
+      "option_a_writer_quiescence_and_reconciliation_boundary": true,
+      "dns_facility_deployment_publication_and_completion_noninheritance": true,
+      "cleanup_and_ownership_release_boundary": true,
+      "all_26_completion_gates_false": true,
+      "four_path_dirty_allowlist": true
+    },
+    "discrepancies": []
+  },
+  "decision": {
+    "verdict": "GO",
+    "blocking_discrepancies": 0,
+    "new_historical_remediated_record_reporting_authorized": true,
+    "authorized_live_reporting_run": "RUN-187",
+    "authorized_finding_id": "MON-METRIC-REPLAY-DEDUPE-01",
+    "authorized_feature_id": null,
+    "authorized_candidate_feature_id": null,
+    "authorized_feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+    "authorized_reporting_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "authorized_live_count_delta": {
+      "retained_claim_records": 1,
+      "current_provisional_source_claims": 0,
+      "historical_already_fixed_records": 0,
+      "historical_remediated_records": 1,
+      "bounded_disposition_tests_passed": 56,
+      "bounded_disposition_assertions": 472,
+      "final_P0": 0,
+      "final_P1": 0,
+      "benchmark_mapped": 0,
+      "final_no_match_or_ncm": 0,
+      "benchmark_unresolved": 0,
+      "static_owner_records": 0,
+      "static_route_owners": 0,
+      "static_page_owners": 0,
+      "static_controller_action_bridges": 0,
+      "direct_exact_queue_reviewed": 0
+    },
+    "authorized_resulting_lineage": {
+      "retained_claim_records": 15,
+      "current_provisional_source_claims": 8,
+      "historical_already_fixed_records": 2,
+      "historical_remediated_records": 5,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "authorized_unique_bounded_disposition_increment": {
+      "prior_tests": 99,
+      "prior_assertions": 1931,
+      "tests": 56,
+      "assertions": 472,
+      "resulting_tests": 155,
+      "resulting_assertions": 2403,
+      "final_corrected_post_merge_counted_once": true,
+      "root_red_reproduction_counted": false,
+      "initial_isolated_or_post_merge_green_counted": false,
+      "intermediate_corrective_or_stopped_runs_counted": false,
+      "final_corrected_isolated_replay_counted": false,
+      "dns_63_186_counted": false,
+      "facility_execution_counted": false
+    },
+    "static_ownership_remains_pending": {
+      "owner_records": 666,
+      "route_owners": 309,
+      "page_owners": 357,
+      "action_bridges": 97,
+      "queue_total": 507,
+      "queue_reviewed": 120,
+      "queue_pending": 387,
+      "queue_owned": 98,
+      "queue_without_ownership": 409,
+      "next_zero_based_index": 85,
+      "feature_id": null,
+      "candidate_feature_id": null,
+      "feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+      "route_or_page_owner_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "queue_advance_authorized": false
+    },
+    "option_a_deployment_boundary": {
+      "accepted_option": "A_CANONICAL_WHOLE_SECOND_MIXED_WORKER_BRIDGE",
+      "prerequisites": [
+        "quiesce old monitoring workers",
+        "reconcile pending or incoherent rows",
+        "apply migration 000110",
+        "start new workers only after cutover reconciliation"
+      ],
+      "poisoned_subsecond_evidence_requires_operator_reconciliation": true,
+      "verified_in_production": false,
+      "migration_deployment_credit": false
+    },
+    "live_reporting_changed_by_run_186r": false,
+    "run_187_required": true,
+    "run_188_fresh_dashboard_verification_required": true
+  },
+  "credit_boundary": {
+    "independent_exact_artifact_review_for_new_historical_remediated_reporting": true,
+    "application_remediation_reexecution": false,
+    "runtime_reexecution": false,
+    "application_publication": false,
+    "live_reporting": false,
+    "canonical_or_candidate_feature_identity": false,
+    "static_route_or_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_advance": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_ncm": false,
+    "migration_deployment": false,
+    "dns_or_facility_finding_reporting": false,
+    "final_finding": false,
+    "pass": false,
+    "release": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_gates": [
+    {
+      "gate": 1,
+      "name": "routes_classified",
+      "complete": false
+    },
+    {
+      "gate": 2,
+      "name": "inertia_pages_classified",
+      "complete": false
+    },
+    {
+      "gate": 3,
+      "name": "features_in_canonical_register",
+      "complete": false
+    },
+    {
+      "gate": 4,
+      "name": "routes_and_pages_mapped_to_feature_id",
+      "complete": false
+    },
+    {
+      "gate": 5,
+      "name": "features_with_verified_benchmark_or_final_ncm",
+      "complete": false
+    },
+    {
+      "gate": 6,
+      "name": "human_features_with_task_script_and_ten_scores",
+      "complete": false
+    },
+    {
+      "gate": 7,
+      "name": "common_and_safety_journeys_cross_reviewed",
+      "complete": false
+    },
+    {
+      "gate": 8,
+      "name": "hero_banner_instances_classified",
+      "complete": false
+    },
+    {
+      "gate": 9,
+      "name": "overlay_implementations_and_triggers_classified",
+      "complete": false
+    },
+    {
+      "gate": 10,
+      "name": "safe_routes_observed_at_desktop",
+      "complete": false
+    },
+    {
+      "gate": 11,
+      "name": "selected_families_and_journeys_all_viewports",
+      "complete": false
+    },
+    {
+      "gate": 12,
+      "name": "required_visual_states_classified",
+      "complete": false
+    },
+    {
+      "gate": 13,
+      "name": "material_visual_finding_families_resampled",
+      "complete": false
+    },
+    {
+      "gate": 14,
+      "name": "models_classified",
+      "complete": false
+    },
+    {
+      "gate": 15,
+      "name": "policies_classified",
+      "complete": false
+    },
+    {
+      "gate": 16,
+      "name": "service_domain_entries_classified",
+      "complete": false
+    },
+    {
+      "gate": 17,
+      "name": "critical_async_owners_classified",
+      "complete": false
+    },
+    {
+      "gate": 18,
+      "name": "modules_with_all_eight_passes",
+      "complete": false
+    },
+    {
+      "gate": 19,
+      "name": "prompt_benchmark_projects_formally_triaged",
+      "complete": false
+    },
+    {
+      "gate": 20,
+      "name": "p0_p1_complete_finding_fields",
+      "complete": false
+    },
+    {
+      "gate": 21,
+      "name": "redesigns_neutral_native_no_copy",
+      "complete": false
+    },
+    {
+      "gate": 22,
+      "name": "ease_4_5_claims_independently_reviewed",
+      "complete": false
+    },
+    {
+      "gate": 23,
+      "name": "browser_claims_labeled",
+      "complete": false
+    },
+    {
+      "gate": 24,
+      "name": "visual_inconsistencies_complete_context",
+      "complete": false
+    },
+    {
+      "gate": 25,
+      "name": "official_source_inference_specialist_split",
+      "complete": false
+    },
+    {
+      "gate": 26,
+      "name": "all_agents_returned_reconciled_represented_none_live",
+      "complete": false
+    }
+  ],
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-run-186-monitoring-metric-replay-dedupe-remediation-review-wave-36.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36.json"
+  ],
+  "receipt_self_seal_sha256": "0176cbf5e4756c4da3cfbcd91728db53756b7cd755a4db68dc8dade59daeff56"
+}
