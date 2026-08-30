@@ -1,0 +1,701 @@
+{
+  "schema_version": "run-178-audit-dashboard-verification-wave-33-v1",
+  "run_id": "RUN-178-AUDIT-DASHBOARD-VERIFICATION-WAVE-33",
+  "generated_on": "2026-08-30",
+  "status": "AUDIT_DASHBOARD_RUN177_EXACT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_LOCAL_ONLY_ZERO_APPLICATION_PUBLICATION_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false,
+    "authorization_boundary": "Site access, exact roles and permissions, canonical ownership, privacy, and direct-object denial"
+  },
+  "scope": "Exact RUN-177 reporting dashboard and bounded audit-artifact verification only",
+  "pins": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "continuation_request_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "continuation_request_is_not_governing_prompt": true,
+    "audit_run_manifest": {
+      "path": "evidence/source/audit-run-manifest.json",
+      "sha256": "f3f70f7b68b38c27e7c0c37f204515df28322c53285e5a2c8dcb463250ca735b",
+      "git_blob_id": "3b42f6c7507dfa445e6b7ccda84fb4fa2014c8fb",
+      "bytes": 2270,
+      "lines": 56
+    },
+    "run_177_checkpoint_commit": "519e00a9789343720f4e85e18908908ce278d65c",
+    "run_177_checkpoint_tree": "56b45224304ac8dd46282fa6da9088724239c2c4",
+    "run_177_checkpoint_parent": "167ae89131d9fe2aa7a2636e5d20796002ca7c03",
+    "origin_main_before_run_178_commit": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead": 11,
+    "local_main_behind": 0,
+    "run_177_materializer": {
+      "path": "generators/materialize-run-177-fleet-trip-index-site-privacy-remediation-reporting-wave-33.py",
+      "sha256": "0537b22c0c2a3707c65ab422a87689b09bcdf645b1221d5876a067e8ac94a9f5",
+      "git_blob_id": "a61bf1a198127e43e9c93c01b02a40092a8d53f9",
+      "bytes": 58278,
+      "lines": 1272
+    },
+    "run_177_receipt": {
+      "path": "evidence/source/current-run-177-fleet-trip-index-site-privacy-remediation-reporting-wave-33.json",
+      "sha256": "1b4cd64704c3137cfc98d0068900fe9068619dae700e519080b1d183639b5c2f",
+      "git_blob_id": "914e521ba2a809ce6f74b1501605182ae312c885",
+      "bytes": 15277,
+      "lines": 363,
+      "receipt_self_seal_sha256": "f0fb73ebde74dfd53890a96572e6bdae56b2d832d665506eaf95f9e44e20a059"
+    },
+    "run_177_committed_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "2e23eb4838a7ab4ddac1576c750fa56dcfd4b3828217bad003bf7aadec73dd96",
+      "git_blob_id": "3f935ff5ea7b7bff9948ea6fd108eed1633592b0",
+      "bytes": 615238,
+      "lines": 5361
+    },
+    "run_175_frozen_dashboard_at_run_177_checkpoint": {
+      "path": "audit-dashboard.html",
+      "sha256": "8586a2cb3cc6c248788ea71ecc20c2e0c4785fd5a7a5a00fa11d2ee48f48490c",
+      "git_blob_id": "1c1c521b674bcc12b5227aff1418a49ba0ace06a",
+      "bytes": 280930,
+      "lines": 78
+    },
+    "run_178_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "2e23eb4838a7ab4ddac1576c750fa56dcfd4b3828217bad003bf7aadec73dd96",
+      "git_blob_id": "3f935ff5ea7b7bff9948ea6fd108eed1633592b0",
+      "bytes": 615238,
+      "lines": 5361
+    },
+    "run_178_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "70472c39504600f8c0b26b9ce05eb0f3e5903f1c6e9445163dba0581a2382600",
+      "git_blob_id": "54d72ff77c370c09c0b06ba35c6afbedca3d738c",
+      "bytes": 288289,
+      "lines": 78
+    },
+    "run_178_receipt_materializer": {
+      "path": "generators/materialize-run-178-audit-dashboard-verification-wave-33.py",
+      "sha256": "ffedf87ea3cae8b74cd280f676f3fb671e9a2885dad0a3ef8564d0ed21f8d53d",
+      "git_blob_id": "96757955c4f5fe42dd97e8dfc568a43775b1b138",
+      "bytes": 57542,
+      "lines": 1552
+    },
+    "fleet_record_canonical_sha256": "98c82f01cf8348fc4b60a4c17feea675182dc287e4c7907174b13d44af331fab"
+  },
+  "lineage": {
+    "run_175": "verifies only the now-superseded RUN-174 dashboard",
+    "run_176": "establishes Fleet remediation, bounded runtime, local-main integration, and nonpublication",
+    "run_176r": "independently authorizes one historical-remediated record only",
+    "run_177": "adds that record and reports 8+2+3 with 88/1,764 unique bounded execution while freezing RUN-175 HTML",
+    "run_178": "generates from exact committed RUN-177 sources and verifies only the resulting audit artifact",
+    "historical_8_plus_2_plus_2_visible_only_as_superseded_lineage": true
+  },
+  "dashboard_generation": {
+    "committed_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "2e23eb4838a7ab4ddac1576c750fa56dcfd4b3828217bad003bf7aadec73dd96",
+      "git_blob_id": "3f935ff5ea7b7bff9948ea6fd108eed1633592b0",
+      "bytes": 615238,
+      "lines": 5361
+    },
+    "final_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "2e23eb4838a7ab4ddac1576c750fa56dcfd4b3828217bad003bf7aadec73dd96",
+      "git_blob_id": "3f935ff5ea7b7bff9948ea6fd108eed1633592b0",
+      "bytes": 615238,
+      "lines": 5361
+    },
+    "builder_changed_by_run_178": false,
+    "committed_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "8586a2cb3cc6c248788ea71ecc20c2e0c4785fd5a7a5a00fa11d2ee48f48490c",
+      "git_blob_id": "1c1c521b674bcc12b5227aff1418a49ba0ace06a",
+      "bytes": 280930,
+      "lines": 78
+    },
+    "final_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "70472c39504600f8c0b26b9ce05eb0f3e5903f1c6e9445163dba0581a2382600",
+      "git_blob_id": "54d72ff77c370c09c0b06ba35c6afbedca3d738c",
+      "bytes": 288289,
+      "lines": 78
+    },
+    "dashboard_change": {
+      "path": "audit-dashboard.html",
+      "binary_diff_sha256": "793b49415c1ea8bb35cb877b563abb628641caed9973fc9e7551fdafb79985d3",
+      "numstat": {
+        "added": 19,
+        "deleted": 19
+      }
+    },
+    "final_builder_runs_observed": 2,
+    "final_builder_runs_byte_identical": true,
+    "independent_source_review": {
+      "result": "GO",
+      "findings": [],
+      "dashboard_sha256": "70472c39504600f8c0b26b9ce05eb0f3e5903f1c6e9445163dba0581a2382600",
+      "builder_sha256": "2e23eb4838a7ab4ddac1576c750fa56dcfd4b3828217bad003bf7aadec73dd96",
+      "visible_static_checks": "97/97",
+      "browser_credit": false,
+      "reviewer_file_changes": []
+    },
+    "application_source_or_product_test_change": false,
+    "credit_effect": "exact audit-dashboard artifact verification only"
+  },
+  "verification_method": {
+    "browser": "Codex in-app browser",
+    "served_from": "temporary loopback-only HTTP server on 127.0.0.1:43178",
+    "server_executable": "C:\\Users\\steph\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+    "target_url": "http://127.0.0.1:43178/audit-dashboard.html?v=main-519e00a9-70472c39#progress",
+    "cachebuster": "main-519e00a9-70472c39",
+    "response_status": 200,
+    "response_content_type": "text/html",
+    "server_get_requests": 2,
+    "server_get_response_statuses": [
+      200,
+      200
+    ],
+    "response_bytes": 288289,
+    "response_sha256": "70472c39504600f8c0b26b9ce05eb0f3e5903f1c6e9445163dba0581a2382600",
+    "external_testing": false,
+    "desktop_and_mobile_visual_inspection": "GO",
+    "viewport_override_reset_after_test": true,
+    "browser_tab_closed_after_test": true,
+    "reset_browser_viewport": "1280x720",
+    "reset_document_client": "1265x720"
+  },
+  "verification": {
+    "dashboard_builder_final_byte_identical_runs_observed": 2,
+    "dashboard_builder_final_runs_byte_identical": true,
+    "receipt_materializer_final_byte_identical_runs_required": 2,
+    "noncreditable_attempts": [],
+    "viewports_required": 4,
+    "viewports_verified": 4,
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual_browser_viewport": "1440x900",
+        "root_client_width": 1425,
+        "root_scroll_width": 1425,
+        "body_scroll_width": 1425,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1425,
+        "navigation_scroll_width": 1425,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 0,
+        "table_wrappers": 10,
+        "table_wrappers_with_overflow_x_auto": 10
+      },
+      {
+        "requested": "1280x800",
+        "actual_browser_viewport": "1280x800",
+        "root_client_width": 1265,
+        "root_scroll_width": 1265,
+        "body_scroll_width": 1265,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1265,
+        "navigation_scroll_width": 1265,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 0,
+        "table_wrappers": 10,
+        "table_wrappers_with_overflow_x_auto": 10
+      },
+      {
+        "requested": "1024x768",
+        "actual_browser_viewport": "1024x768",
+        "root_client_width": 1009,
+        "root_scroll_width": 1009,
+        "body_scroll_width": 1009,
+        "page_overflow_px": 0,
+        "navigation_client_width": 1009,
+        "navigation_scroll_width": 1009,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 1,
+        "table_wrappers": 10,
+        "table_wrappers_with_overflow_x_auto": 10
+      },
+      {
+        "requested": "390x844",
+        "actual_browser_viewport": "390x844",
+        "root_client_width": 375,
+        "root_scroll_width": 375,
+        "body_scroll_width": 375,
+        "page_overflow_px": 0,
+        "navigation_client_width": 375,
+        "navigation_scroll_width": 922,
+        "navigation_overflow_x": "auto",
+        "active_table_scrollers": 10,
+        "table_wrappers": 10,
+        "table_wrappers_with_overflow_x_auto": 10
+      }
+    ],
+    "font_loaded_at_all_viewports": true,
+    "main_visible_at_all_viewports": true,
+    "navigation_bounded_at_all_viewports": true,
+    "navigation_scroll_contained_at_mobile": true,
+    "tables_bounded_at_all_viewports": true,
+    "table_wrappers_overflow_auto_at_all_viewports": true,
+    "page_overflow_zero_at_all_final_viewports": true,
+    "screens_visually_go": true,
+    "navigation_clicks_required": 10,
+    "navigation_clicks_passed": 10,
+    "navigation_credited_batch_sizes": [
+      3,
+      3,
+      4
+    ],
+    "navigation_results": [
+      {
+        "label": "Progress",
+        "href": "#progress",
+        "credited_batch": 1,
+        "browser_click_performed": true,
+        "resulting_hash": "#progress",
+        "target_exists": true,
+        "target_top_px": 0.21875,
+        "target_width_px": 1140,
+        "scroll_y": 2050,
+        "pass": true
+      },
+      {
+        "label": "RUN-177",
+        "href": "#checkpoint",
+        "credited_batch": 1,
+        "browser_click_performed": true,
+        "resulting_hash": "#checkpoint",
+        "target_exists": true,
+        "target_top_px": 0.4375,
+        "target_width_px": 1140,
+        "scroll_y": 2387,
+        "pass": true
+      },
+      {
+        "label": "Pages",
+        "href": "#pages",
+        "credited_batch": 1,
+        "browser_click_performed": true,
+        "resulting_hash": "#pages",
+        "target_exists": true,
+        "target_top_px": -0.09375,
+        "target_width_px": 1140,
+        "scroll_y": 20700,
+        "pass": true
+      },
+      {
+        "label": "Static census",
+        "href": "#static-census",
+        "credited_batch": 2,
+        "browser_click_performed": true,
+        "resulting_hash": "#static-census",
+        "target_exists": true,
+        "target_top_px": -0.015625,
+        "target_width_px": 1140,
+        "scroll_y": 26598,
+        "pass": true
+      },
+      {
+        "label": "Runtime gates",
+        "href": "#runtime",
+        "credited_batch": 2,
+        "browser_click_performed": true,
+        "resulting_hash": "#runtime",
+        "target_exists": true,
+        "target_top_px": 0.171875,
+        "target_width_px": 1140,
+        "scroll_y": 29693,
+        "pass": true
+      },
+      {
+        "label": "Benchmarks",
+        "href": "#benchmarks",
+        "credited_batch": 2,
+        "browser_click_performed": true,
+        "resulting_hash": "#benchmarks",
+        "target_exists": true,
+        "target_top_px": -0.15625,
+        "target_width_px": 1140,
+        "scroll_y": 31118,
+        "pass": true
+      },
+      {
+        "label": "Modules",
+        "href": "#modules",
+        "credited_batch": 3,
+        "browser_click_performed": true,
+        "resulting_hash": "#modules",
+        "target_exists": true,
+        "target_top_px": 0.203125,
+        "target_width_px": 1140,
+        "scroll_y": 32551,
+        "pass": true
+      },
+      {
+        "label": "Finding status",
+        "href": "#findings",
+        "credited_batch": 3,
+        "browser_click_performed": true,
+        "resulting_hash": "#findings",
+        "target_exists": true,
+        "target_top_px": -0.109375,
+        "target_width_px": 1140,
+        "scroll_y": 34050,
+        "pass": true
+      },
+      {
+        "label": "Architecture",
+        "href": "#architecture",
+        "credited_batch": 3,
+        "browser_click_performed": true,
+        "resulting_hash": "#architecture",
+        "target_exists": true,
+        "target_top_px": -0.484375,
+        "target_width_px": 1140,
+        "scroll_y": 35873,
+        "pass": true
+      },
+      {
+        "label": "Gaps",
+        "href": "#gaps",
+        "credited_batch": 3,
+        "browser_click_performed": true,
+        "resulting_hash": "#gaps",
+        "target_exists": true,
+        "target_top_px": -0.296875,
+        "target_width_px": 1140,
+        "scroll_y": 36664,
+        "pass": true
+      }
+    ],
+    "console_warning_entries": 0,
+    "console_error_entries": 0,
+    "uncaught_page_error_entries": 0,
+    "browser_dev_log_entries": 0,
+    "authored_ids": 10,
+    "browser_dom_ids": 11,
+    "browser_injected_ids": [
+      "codex-browser-sidebar-comments-root"
+    ],
+    "duplicate_authored_ids": [],
+    "heading_elements": 26,
+    "table_elements": 10,
+    "table_wrappers": 10,
+    "anchor_elements": 828,
+    "anchor_elements_rendered_in_browser": 828,
+    "hash_anchor_occurrences": 10,
+    "unique_hash_anchors": 10,
+    "missing_hash_targets": [],
+    "local_resource_link_occurrences": 818,
+    "unique_local_resources": 443,
+    "prewrite_non_forward_local_resources": "442/442",
+    "prewrite_non_forward_local_resource_failures": [],
+    "run_178_forward_receipt_is_intentional_unhashed_self_link": true,
+    "post_materialization_local_resources": "443/443",
+    "post_materialization_local_resource_failures": [],
+    "adjacent_hash_pair_occurrences": 709,
+    "unique_adjacent_hash_path_hash_pairs": 370,
+    "unique_adjacent_hash_paths": 370,
+    "hash_bearing_file_occurrences_verified": 707,
+    "unique_hash_bearing_file_paths_verified": 369,
+    "historical_directory_bundle_digest_occurrences": 2,
+    "historical_directory_bundle_digest_paths": [
+      "task-scripts/"
+    ],
+    "hash_bearing_link_failures": [],
+    "run_178_generator_link_occurrences": 2,
+    "run_178_generator_link_adjacent_hash_occurrences": 0,
+    "run_178_forward_receipt_link_occurrences": 3,
+    "run_178_forward_receipt_link_adjacent_hash_occurrences": 0,
+    "visible_static_checks_required": 97,
+    "visible_static_checks_passed": 97,
+    "visible_static_checks": {
+      "<a href=\"#checkpoint\">RUN-177</a>": true,
+      "<a href=\"#findings\">Finding status</a>": true,
+      "665 owners · 308 routes + 357 pages · 96 bridges": true,
+      "119 reviewed / 388 pending": true,
+      "97 owned / 410 without ownership": true,
+      "16.925426%": true,
+      "3,264 records remain": true,
+      "RUN-175–177 Fleet trip index Site privacy remediation checkpoint": true,
+      "fleet-assets.vehicles.alerts-config": true,
+      "RUN090-ROUTE-0084 / RUN077-ROUTE-0692": true,
+      "VehicleController::alertsConfig": true,
+      "CAP-FLEET-VEHICLE-REGISTER": true,
+      "index 83 integrated": true,
+      "next index 84 RUN090-ROUTE-0085 / RUN077-ROUTE-0693": true,
+      "fleet-assets.trips.index": true,
+      "three provisional-not-final observations": true,
+      "RUN-168: exact RUN-167 dashboard verified at 4/4 viewports": true,
+      "RUN-169/R: queue index 83 Fleet alerts-config candidate independently reviewed OWNER": true,
+      "RUN-170: exactly one route owner and one action bridge integrated": true,
+      "RUN-170R: three sealed post-commit GO reviews": true,
+      "RUN-171: live static ledger reported": true,
+      "RUN-172: exact RUN-171 dashboard verified at 4/4 viewports": true,
+      "RUN-173: SAFE concern-identity defect reproduced and remediated in exactly two transferred paths": true,
+      "RUN-173R: exact remediation artifacts independently reviewed GO": true,
+      "RUN-174: SAFE record reclassified in place": true,
+      "RUN-175: exact RUN-174 dashboard verified at 4/4 viewports": true,
+      "RUN-176: Fleet trip-index Site-privacy defect reproduced and remediated in exactly two transferred paths": true,
+      "RUN-176R: exact remediation artifacts independently reviewed GO": true,
+      "RUN-177: Fleet trip privacy historical-remediated record added": true,
+      "9 current provisional P1 + 2 historical already-fixed + 1 historical remediated": true,
+      "8 current provisional P1 + 2 historical already-fixed + 2 historical remediated": true,
+      "13 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 3 historical remediated": true,
+      "RUN-176's post-merge Fleet 5/175 counted once into 88/1,764": true,
+      "88 / 1,764": true,
+      "83/1,589 unique bounded total": true,
+      "88/1,764 unique bounded disposition total": true,
+      "SAFE-ALERT-DEDUP-IDENTITY-01": true,
+      "post-merge SAFE alert-dedup tests / 60 assertions": true,
+      "4 failed + 1 warning-pass / 10 assertions": true,
+      "supporting 28/73 bridge and 3/5 HsEvent evidence reported separately": true,
+      "6 terminal-fixture failures occurred before bridge/dedup execution": true,
+      "30-minute dedup window": true,
+      "+5 minutes stays idempotent": true,
+      "+31-minute lifecycle remains unchanged": true,
+      "e488bd3edcda": true,
+      "dc04067e304a": true,
+      "705db2dc3ba0": true,
+      "c39b07654705": true,
+      "a8d813f1878c6a720f5308f28e5a591f90097961444876f93fcfe5a9262e909a": true,
+      "not published to origin/main": true,
+      "FLEET-TRIP-INDEX-SITE-PRIVACY-01": true,
+      "candidate feature association only": true,
+      "route ownership PENDING_FRESH_SEMANTIC_REVIEW": true,
+      "root red 2 failed / 19 assertions": true,
+      "expanded red 5 failed / 55 assertions": true,
+      "post-merge Fleet trip-index tests / 175 assertions": true,
+      "supporting 4/35 VehicleController regressions reported separately": true,
+      "13 retained": true,
+      "13 historical claim identities": true,
+      "13a7f37da9c9": true,
+      "790bc11e3fb2": true,
+      "c643c9e5eecf": true,
+      "3 claim-specific test functions / 146 assertions / 3 synchronized two-process races": true,
+      "reported separately from the historical 78/1,529 and current 88/1,764": true,
+      "supporting 43/716 overlaps": true,
+      "73 bounded tests / 1,481 assertions": true,
+      "5 focused tests / 48 assertions": true,
+      "3 independent current-source ALREADY_FIXED reviews": true,
+      "historical issue · already fixed on current main · not a final finding": true,
+      "historical issue · already fixed on current main only for the bounded manual-entry register/stock clause · residual compound scope unadjudicated · not a final finding": true,
+      "historical issue · remediated on current main · not a final finding": true,
+      "historical issue · remediated on local main · not published to origin/main · 30-minute dedup contract and +31-minute lifecycle preserved · not a final finding": true,
+      "MED-CD-SCOPE-01": true,
+      "MED-CD-ATOMICITY-01": true,
+      "RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution without application or product-test change": true,
+      "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated": true,
+      "two broader INR failures reproduce at base": true,
+      "full-suite green false": true,
+      "Fresh RUN-178 audit-dashboard verification required": true,
+      "cf0090ec9724": true,
+      "0b1920dade92": true,
+      "7b2b5688c90e": true,
+      "2/340 mappings": true,
+      "0/340 final no-match/NCM": true,
+      "338 unresolved targets": true,
+      "one operating organisation across multiple Sites": true,
+      "Gate 4 and audit completion false": true,
+      "RUN-153/R establish the historical 664 bounded source-owner records (307 routes + 357 pages)": true,
+      "at that historical checkpoint 116 queue rows were reviewed, 391 remained pending, and 413 remained without ownership": true,
+      "662 historical cumulative owner records": true,
+      "RUN-170/R current Fleet alerts-config route/action ownership": true,
+      "RUN-090 frozen denominator / RUN-170R current accounting": true,
+      "index 83 is integrated and index 84 fleet-assets.trips.index is next": true,
+      "RUN-168 verifies that exact dashboard": true,
+      "RUN-175 verifies only the superseded RUN-174 HTML": true,
+      "dashboard HTML unchanged · fresh RUN-178 required": true,
+      "visible 665/308/357 ownership, 96 bridges, 119/388 queue accounting, 97 owned/410 without ownership": true
+    },
+    "prohibited_visible_phrase_hits": {},
+    "single_organisation_multi_site_wording_present": true,
+    "tenant_word_present": false
+  },
+  "reported_finding_boundary": {
+    "retained_claim_records": 13,
+    "current_provisional_source_claims": 8,
+    "historical_already_fixed_records": 2,
+    "historical_remediated_records": 3,
+    "superseded_pre_run_177_split": {
+      "current_provisional_source_claims": 8,
+      "historical_already_fixed_records": 2,
+      "historical_remediated_records": 2,
+      "current_credit": false
+    },
+    "final_P0": 0,
+    "final_P1": 0,
+    "fleet_trip_index_site_privacy_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_PUBLISHED_NOT_FINAL_FINDING",
+    "fleet_feature_identity_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "fleet_candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER"
+  },
+  "bounded_execution_accounting": {
+    "med_rbac": {
+      "tests": 73,
+      "assertions": 1481
+    },
+    "med_scope": {
+      "tests": 5,
+      "assertions": 48
+    },
+    "safe_post_merge_unique_increment": {
+      "tests": 5,
+      "assertions": 60,
+      "counted_once": true
+    },
+    "fleet_post_merge_unique_increment": {
+      "tests": 5,
+      "assertions": 175,
+      "counted_once": true
+    },
+    "unique_total": {
+      "tests": 88,
+      "assertions": 1764
+    },
+    "excluded_from_unique_total": {
+      "root_initial_red": {
+        "failed": 2,
+        "assertions_reported": 19
+      },
+      "delegated_recreated_red": {
+        "failed": 2,
+        "assertions_reported": 19
+      },
+      "delegated_expanded_red": {
+        "failed": 5,
+        "assertions_reported": 55
+      },
+      "isolated_green_replay": {
+        "tests": 5,
+        "assertions": 175
+      },
+      "supporting_vehicle_controller_regressions": {
+        "tests": 4,
+        "assertions": 35
+      }
+    },
+    "red_replay_or_supporting_recredit": false
+  },
+  "static_ownership_boundary": {
+    "owner_records": 665,
+    "route_owners": 308,
+    "page_owners": 357,
+    "action_bridges": 96,
+    "queue_total": 507,
+    "queue_reviewed": 119,
+    "queue_pending": 388,
+    "queue_owned": 97,
+    "queue_without_ownership": 410,
+    "next_zero_based_index": 84,
+    "next_queue_id": "RUN090-ROUTE-0085",
+    "next_route_record_id": "RUN077-ROUTE-0693",
+    "next_route": "fleet-assets.trips.index",
+    "ownership_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "correctness_credit": false
+  },
+  "benchmark_boundary": {
+    "mapped": 2,
+    "total": 340,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338,
+    "changed_by_run_178": false
+  },
+  "noninheritance_boundary": {
+    "application_source_or_product_test": false,
+    "application_runtime_reexecution": false,
+    "application_browser": false,
+    "static_route_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "static_page_or_frontend_ownership": false,
+    "queue_advance": false,
+    "fleet_red_isolated_green_or_supporting_runs": false,
+    "broader_fleet_permission_privacy_or_direct_object_correctness": false,
+    "benchmark_mapping_or_final_no_match_NCM": false,
+    "ease": false,
+    "final_finding": false,
+    "feature_module_or_pass_completion": false,
+    "release_publication_or_audit_completion": false
+  },
+  "root_browser_resource_cleanup": {
+    "temporary_loopback_port": 43178,
+    "temporary_server_pid": 42288,
+    "temporary_server_executable": "C:\\Users\\steph\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+    "server_get_requests": 2,
+    "listeners_after_cleanup": 0,
+    "exact_pid_present_after_cleanup": false,
+    "matching_loopback_server_processes_after_cleanup": 0,
+    "browser_viewport_override_reset": true,
+    "browser_tab_closed": true
+  },
+  "worktree_boundary": {
+    "expected_final_status_count": 3,
+    "expected_final_porcelain_statuses": [
+      " M docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-178-wave-33.json",
+      "?? docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-178-audit-dashboard-verification-wave-33.py"
+    ],
+    "no_staged_paths": true,
+    "git_diff_check_clean": true,
+    "exact_match_required": true
+  },
+  "mutation_attestation": {
+    "sequence_paths": [
+      "audit-dashboard.html",
+      "generators/materialize-run-178-audit-dashboard-verification-wave-33.py",
+      "evidence/browser/current-audit-dashboard-verification-run-178-wave-33.json"
+    ],
+    "receipt_materializer_persistent_write_scope": [
+      "evidence/browser/current-audit-dashboard-verification-run-178-wave-33.json"
+    ],
+    "builder_changed_by_run_178": false,
+    "application_paths_changed": [],
+    "product_test_paths_changed": [],
+    "findings_register_changed_by_run_178": false,
+    "run_177_human_readable_reporting_surfaces_changed_by_run_178": false,
+    "audit_dashboard_html_changed_by_run_178": true,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "database_changed": false,
+    "application_tests_or_build_run": false
+  },
+  "remote_state_boundary": {
+    "origin_main_before_run_178_commit": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead_before_run_178_commit": 11,
+    "local_main_behind_before_run_178_commit": 0,
+    "safe_fleet_and_board_application_merges_remain_local_only": true,
+    "push_or_publication_performed_by_materializer": false,
+    "publication_claim": false
+  },
+  "credit_boundary": {
+    "exact_audit_dashboard_artifact": true,
+    "application_source_or_tests": false,
+    "application_runtime": false,
+    "application_browser": false,
+    "publication": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "pass": false,
+    "release": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "coverage_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "run_178_sequence_written_paths": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-178-audit-dashboard-verification-wave-33.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-178-wave-33.json"
+  ],
+  "receipt_self_seal_sha256": "1a8cc7a24d2fd7d1df8e63dfae87f475e1013275e77bd5e94a1ab8389502b7a8"
+}
