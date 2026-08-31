@@ -499,3 +499,11 @@ Exactly 2 / 340 rows have `benchmark_mapping_credit=true`; the other 338 remain 
 - A missing or partial licence/edition record blocks formal triage credit; it does not imply that a project is unsafe or unsuitable generally.
 - Any later reuse, integration or licence decision requires a separate explicitly authorised legal and technical review.
 - This register is not legal advice, clinical certification or a security attestation.
+
+## RUN-187 native monitoring remediation boundary
+
+`MON-METRIC-REPLAY-DEDUPE-01` is a native Oblivion Findings source/remediation lineage, not an OSS comparator adoption and not a canonical feature mapping. Its `feature_id` and `candidate_feature_id` are null, feature identity remains `UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW`, and no route/page/bridge/module or benchmark ownership is granted. The benchmark register therefore remains **2/340 mapped, 0 final no-match/NCM, 338 unresolved**.
+
+RUN-186/R preserve the initial remediation and post-merge NO-GO, the corrective native implementation, and the final post-corrective-merge 56/472 execution. RUN-187 adds only that 56/472 once to the bounded aggregate, now **155/2,403**. The initial 49/392 and every replay, subset, DNS, Facility, deployment, and publication lane remain separate and uncredited.
+
+The option-A rollout order is mandatory but unverified: **quiesce old monitoring workers; reconcile pending or incoherent rows; apply migration 000110; then start new workers only after cutover reconciliation**; poisoned subsecond evidence requires operator reconciliation. Nothing in this record authorizes copying an external implementation, production migration, worker restart, or publication. The frozen RUN-185 dashboard remains unchanged until RUN-188.

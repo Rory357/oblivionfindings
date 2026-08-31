@@ -1,6 +1,6 @@
 # 07 — Module and feature findings
 
-> Status: in progress. This file materializes all 340 frozen canonical static feature identities and 14 retained claim records: **8 current provisional P1 claims + 2 historical already-fixed records + 4 historical remediated records + 0 final P0/P1 findings**. RUN-159 supplies 73 bounded tests / 1,481 assertions for `MED-RBAC-01`; RUN-162 separately supplies 5 focused tests / 48 assertions for `MED-CD-SCOPE-01`; RUN-173 contributes one unique post-merge focused execution of 5 tests / 60 assertions for `SAFE-ALERT-DEDUP-IDENTITY-01`; RUN-176 contributes one unique post-merge focused execution of 5 tests / 175 assertions for `FLEET-TRIP-INDEX-SITE-PRIVACY-01`; RUN-183 contributes one unique post-merge focused execution of 11 tests / 167 assertions for `FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01`, producing the current non-overlapping **99 / 1,931** bounded-disposition total. RUN-166 separately supplies 3 claim-specific test functions / 146 assertions / 3 synchronized race subscenarios for the bounded manual-entry clause of `MED-CD-ATOMICITY-01`; it remains outside the aggregated total. Exactly **2 target-specific static benchmark-mapping credits** remain; no application-browser, ease, final-no-match/NCM, Pass, feature-completion, or audit-completion credit follows.
+> Status: in progress. This file materializes all 340 frozen canonical static feature identities and **15 retained claim records = 8 current provisional P1 + 2 historical already fixed + 5 historical remediated + 0 final P0/P1 findings**. RUN-159 supplies 73 bounded tests / 1,481 assertions for `MED-RBAC-01`; RUN-162 supplies 5/48 for `MED-CD-SCOPE-01`; RUN-173 contributes one unique post-merge 5/60 for `SAFE-ALERT-DEDUP-IDENTITY-01`; RUN-176 contributes one unique post-merge 5/175 for `FLEET-TRIP-INDEX-SITE-PRIVACY-01`; RUN-183 contributes one unique post-merge 11/167 for `FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01`; and RUN-186 contributes only the final post-corrective-merge 56/472 for `MON-METRIC-REPLAY-DEDUPE-01`, producing the current non-overlapping **155 / 2,403** bounded-disposition total. The Monitoring record has null feature and candidate IDs, `UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW`, and zero static ownership. Its initial 49/392, red reproduction, intermediate/stopped runs, isolated replay, DNS, and Facility execution remain excluded. RUN-166's 3 claim-specific test functions / 146 assertions / 3 synchronized race subscenarios remain outside the aggregate. Exactly **2 target-specific static benchmark-mapping credits** remain; no application-browser, ease, final-no-match/NCM, deployment, Pass, feature-completion, or audit-completion credit follows.
 
 Historical frozen discovery pin: `a0493442b9e392d324055c35bf25b69421dc2d35` (tree `f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1`). MED-RBAC adjudication pin: `4f57ad4202df90ded375961437879822a908627b` (tree `ee79b8d2733d09da2fd97992ac2a04e862159505`). MED-CD-SCOPE remediation pin: `0b1920dade9251d617f3cb0b69da5c0202b5a6bf` (full repository tree `7b2b5688c90e4da28725e70e38e50fd445f1b4c4`). MED-CD-ATOMICITY reviewed source pin: `cf0090ec97242776eea30a2875756446f42862f9` (tree `b1c932d1c5c19e9e2ea655da5964dd1c5e9c41f3`). SAFE baseline: `e488bd3edcda0f154f87e8bbed972f14db409b82`; fix: `dc04067e304adebb47335d4f65e8c61061ec6e29`; local merge: `705db2dc3ba05a8fdf647cd28bdc9c226a694068` (tree `59b4fc58567f64bc80ff3d2e47b52860ce44cb02`), explicitly not published to `origin/main`.
 Governing prompt SHA-256: `4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f`.
@@ -61,7 +61,7 @@ RUN-082 establishes reproducible static candidate relations and route-file regis
 |---|---:|---:|
 | Frozen canonical feature identities | 340 / 340 (300 H, 40 D) | static identity only |
 | Feature rows represented below | 340 / 340 | reporting presence only |
-| Claim records | 14 retained identities = 8 current provisional P1 + 2 historical already-fixed + 4 historical remediated | 0 final P0/P1 |
+| Claim records | 15 retained identities = 8 current provisional P1 + 2 historical already fixed + 5 historical remediated | 0 final P0/P1; Monitoring remains feature-unassigned with zero static ownership |
 | Verified target-specific benchmark mappings / final no-matches or NCMs | 2 / 340 mappings · 0 / 340 final no-matches/NCMs · 338 unresolved | 2 mapping-only; 0 other credit |
 | Validated H task/ease rows | 0 / 300 | 0 |
 | Modules with all P1–P8 complete | 0 / 29 frozen feature modules | 0 |
@@ -102,7 +102,7 @@ File presence is not audit completion. A feature row with no linked claim record
 | Workforce | 13 | 0 | 13 | none materialized | 0 |
 | eMAR | 16 | 1 | 17 | MED-CD-ATOMICITY-01 (historical already fixed); MED-CD-ATOMICITY-01 (historical related); MED-CD-SCOPE-01 (historical remediated); MED-CD-SCOPE-01 (historical related); MED-RBAC-01 (historical already fixed); MED-RBAC-01 (historical related) | 0 |
 
-## Claim records — 8 current provisional + 2 historical already fixed + 4 historical remediated
+## Claim records — 8 current provisional + 2 historical already fixed + 5 historical remediated
 
 ### MED-RBAC-01 — CAP-MED-CD-REGISTER-BALANCE — historical already fixed
 
@@ -825,3 +825,11 @@ Each row is a frozen static identity, not a completed feature audit. Exact sourc
 ## Finalization contract
 
 A claim can become final only after independent source review, exact canonical ownership, full prompt finding fields, task/browser/runtime evidence where applicable, target-specific benchmark or exhaustive no-match adjudication, observable acceptance criteria, and an executable validation plan. Until then the final P0/P1 count remains zero.
+
+## RUN-187 retained monitoring remediation record
+
+`MON-METRIC-REPLAY-DEDUPE-01` is appended as `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`. RUN-186/R preserve the initial fix and initial post-merge **NO-GO**, the later corrective fix and merge, deterministic runtime/cleanup evidence, and two-review GO. The accepted bounded outcome covers canonical stored observation payloads, durable value-free per-point receipts, partial-failure resume without re-probe, Site/device/series/time integrity, six-decimal current-evidence ordering, and the option-A mixed-worker cutover boundary. Only the final post-corrective-merge **56 tests / 472 assertions** count once; initial 49/392 and every other replay or supporting execution have zero denominator credit.
+
+No canonical feature association was independently established. Therefore `feature_id=null`, `candidate_feature_id=null`, `related_feature_ids=[]`, `UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW`, and zero static ownership are the only honest representation. This record does not appear in the canonical 340-row feature table above and grants no route, page, controller-action bridge, module, Pass, benchmark, browser, ease, deployment, release, publication, feature-completion, final-finding, Gate 4, or audit-completion credit.
+
+Deployment prerequisite, not deployment evidence: **quiesce old monitoring workers; reconcile pending or incoherent rows; apply migration 000110; then start new workers only after cutover reconciliation**. Poisoned subsecond evidence requires operator reconciliation. The register is **15 = 8 + 2 + 5**, unique bounded execution is **155/2,403**, P0/P1 remain **0/0**, and all 26 completion gates remain false. RUN-185 dashboard verification remains historical evidence only; the frozen HTML is stale pending RUN-188.

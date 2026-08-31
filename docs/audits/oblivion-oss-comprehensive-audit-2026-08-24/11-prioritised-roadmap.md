@@ -1,6 +1,6 @@
 # 11 — Prioritised audit-completion roadmap
 
-> This is an evidence-closure roadmap. The register contains 14 retained records: 8 current provisional claims, two historical already-fixed records (`MED-RBAC-01` and the bounded manual-entry clause of `MED-CD-ATOMICITY-01`), and four historical remediated records (`MED-CD-SCOPE-01`, `SAFE-ALERT-DEDUP-IDENTITY-01`, `FLEET-TRIP-INDEX-SITE-PRIVACY-01`, and `FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01`). Priority labels on the 8 active claims remain provisional until their independent and runtime gates are satisfied.
+> This is an evidence-closure roadmap. The register contains **15 retained records = 8 current provisional + 2 historical already fixed + 5 historical remediated**: the already-fixed records are `MED-RBAC-01` and the bounded manual-entry clause of `MED-CD-ATOMICITY-01`; the remediated records are `MED-CD-SCOPE-01`, `SAFE-ALERT-DEDUP-IDENTITY-01`, `FLEET-TRIP-INDEX-SITE-PRIVACY-01`, `FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01`, and `MON-METRIC-REPLAY-DEDUPE-01`. The Monitoring record has null feature and candidate IDs, `UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW`, and zero static ownership. Priority labels on the 8 active claims remain provisional until their independent and runtime gates are satisfied.
 
 Architecture constraint: One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.
 
@@ -66,3 +66,11 @@ No application owner, delivery effort or remediation design is assigned to the 8
 - Representative role, approved-Site and synthetic/non-sensitive fixture definitions, plus explicit read-only/pre-submit boundaries and cleanup authority for any later mutation-capable lane.
 - A separately authorised runtime/test/database gate if execution becomes necessary; static source does not grant it.
 - Specialist decisions for legal, clinical and security assertions after the audit separates official source, inference and decision boundaries.
+
+## RUN-187 monitoring replay remediation reporting priority
+
+`MON-METRIC-REPLAY-DEDUPE-01` is now a historical-remediated, non-final record with no canonical or candidate feature association and zero static ownership credit. RUN-186/R preserve the initial 49/392 isolated and post-merge executions as later **NO-GO**, the complete corrective lineage, and the final post-corrective-merge 56/472 execution. RUN-187 counts only that final 56/472 once, moving the unique bounded total from 99/1,931 to **155/2,403**; no reproduction, subset, stopped run, isolated replay, DNS, or Facility execution is aggregated.
+
+Before any production rollout credit can be considered, operators must perform the exact option-A sequence: **quiesce old monitoring workers; reconcile pending or incoherent rows; apply migration 000110; then start new workers only after cutover reconciliation**. Poisoned subsecond evidence requires operator reconciliation. This is a deployment prerequisite, not verified deployment, publication, release, or completion evidence.
+
+The next reporting priority is RUN-188: generate and verify a fresh dashboard from the RUN-187 sources at the four required viewports. Until then the RUN-185 HTML SHA-256 `3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7` remains intentionally frozen and stale. Static **666/309/357/97**, queue **507/120/387/98/409** with index 85 next, benchmark **2/340**, NCM **0**, unresolved **338**, P0/P1 **0/0**, Gate 4 false, and all 26 completion gates remain unchanged.

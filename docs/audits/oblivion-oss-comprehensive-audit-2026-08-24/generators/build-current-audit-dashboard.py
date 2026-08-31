@@ -278,6 +278,10 @@ dashboard_run_182 = read_json_strict("evidence/browser/current-audit-dashboard-v
 run_183_remediation = read_json_strict("evidence/runtime/current-run-183-fleet-trip-playback-site-privacy-remediation-wave-35.json")
 run_183r_review = read_json_strict("evidence/runtime/current-run-183r-independent-fleet-trip-playback-site-privacy-remediation-review-wave-35.json")
 run_184_reporting = read_json_strict("evidence/source/current-run-184-fleet-trip-playback-site-privacy-remediation-reporting-wave-35.json")
+dashboard_run_185 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json")
+run_186_remediation = read_json_strict("evidence/runtime/current-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.json")
+run_186r_review = read_json_strict("evidence/runtime/current-run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36.json")
+run_187_reporting = read_json_strict("evidence/source/current-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.json")
 findings_register = read_json_strict("findings.json")
 assert sha256_file("evidence/source/current-canonical-feature-identity-wave-01.json") == "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
 assert sha256_file("evidence/source/current-canonical-identity-agent-register.json") == "21ebd8b004b5ade11aa01281958cda2be2ca966d1fb7c46576e039fab5f47baf"
@@ -3203,6 +3207,14 @@ for label, path in (
     ("RUN-183R independent Fleet trip-playback remediation review", "evidence/runtime/current-run-183r-independent-fleet-trip-playback-site-privacy-remediation-review-wave-35.json"),
     ("RUN-184 Fleet trip-playback Site-privacy remediation-reporting materializer", "generators/materialize-run-184-fleet-trip-playback-site-privacy-remediation-reporting-wave-35.py"),
     ("RUN-184 Fleet trip-playback Site-privacy remediation-reporting receipt", "evidence/source/current-run-184-fleet-trip-playback-site-privacy-remediation-reporting-wave-35.json"),
+    ("RUN-185 exact RUN-184 audit-dashboard verification materializer", "generators/materialize-run-185-audit-dashboard-verification-wave-35.py"),
+    ("RUN-185 exact RUN-184 audit-dashboard verification", "evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json"),
+    ("RUN-186 Monitoring metric replay remediation materializer", "generators/materialize-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.py"),
+    ("RUN-186 Monitoring metric replay remediation receipt", "evidence/runtime/current-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.json"),
+    ("RUN-186R independent Monitoring metric replay remediation-review materializer", "generators/materialize-independent-run-186-monitoring-metric-replay-dedupe-remediation-review-wave-36.py"),
+    ("RUN-186R independent Monitoring metric replay remediation review", "evidence/runtime/current-run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36.json"),
+    ("RUN-187 Monitoring metric replay remediation-reporting materializer", "generators/materialize-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.py"),
+    ("RUN-187 Monitoring metric replay remediation-reporting receipt", "evidence/source/current-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.json"),
 ):
     if path not in checkpoint_paths:
         checkpoint_evidence.append((label, path))
@@ -3215,9 +3227,9 @@ checkpoint_evidence_links = "".join(
 checkpoint_evidence_links += (
     '<li><a href="task-scripts/">RUN-072 task-script directory (300 files)</a> '
     f'<code>{html.escape(usability_materialization["outputs"]["task_scripts"]["bundle_sha256"])}</code></li>'
-    '<li><a href="generators/materialize-run-185-audit-dashboard-verification-wave-35.py">RUN-185 audit-dashboard verification materializer</a> '
+    '<li><a href="generators/materialize-run-188-audit-dashboard-verification-wave-36.py">RUN-188 audit-dashboard verification materializer</a> '
     '<span>forward generator; fresh exact-artifact verification required</span></li>'
-    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json">RUN-185 audit-dashboard verification receipt</a> '
+    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">RUN-188 audit-dashboard verification receipt</a> '
     '<span>forward receipt; intentionally unhashed to avoid an evidence cycle</span></li>'
 )
 start_ready_ids = "<br>".join(
@@ -3349,8 +3361,8 @@ historical_discovery_claims = {row["finding_id"]: row["source_claim"] for row in
 assert len(historical_discovery_claims) == 12
 
 assert findings_register["schema_version"] == "oblivion_audit_findings_v2_mixed_current_status"
-assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_FOUR_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
-assert findings_register["generated_on"] == "2026-08-30"
+assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_FIVE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
+assert findings_register["generated_on"] == "2026-08-31"
 assert findings_register["architecture_rule"] == "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries."
 findings_pins = findings_register["pins"]
 assert findings_pins["governing_prompt_sha256"] == "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
@@ -3393,11 +3405,23 @@ assert findings_pins["fleet_trip_playback_site_privacy_stable_patch_id"] == "12c
 assert findings_pins["fleet_trip_playback_site_privacy_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
 assert findings_pins["run_183_fleet_trip_playback_site_privacy_remediation_sha256"] == "7bb1b1013cf67344c48e5a8b6e551bf3c769695e0384c2b333fb47286e53310a"
 assert findings_pins["run_183r_independent_artifact_review_sha256"] == "170245898590f6429a171bbd8a41455f096b5b43340b840294735fdbc5522640"
+assert findings_pins["monitoring_metric_replay_application_baseline_commit"] == "a900f078c9c05f587f6f7884f5fe715076891416"
+assert findings_pins["monitoring_metric_replay_initial_fix_commit"] == "f521bc0b87222e56b4822e7cb9c935486e279e76"
+assert findings_pins["monitoring_metric_replay_initial_merge_commit"] == "778c00a5d09511aee1a836a689d7bb1b56ce4ff6"
+assert findings_pins["monitoring_metric_replay_corrective_fix_commit"] == "c82f57779baf623c4e94ac4619b11c1b675d0230"
+assert findings_pins["monitoring_metric_replay_corrective_merge_commit"] == "18652d545c788f1dcdbe57662e5b1e5472d6cae7"
+assert findings_pins["monitoring_metric_replay_corrective_merge_tree"] == "095cd7b1940988be334979af22008c635fdcaf58"
+assert findings_pins["monitoring_metric_replay_current_local_main_commit"] == "f938c6d989f5fef052f08b9f1012116fb5cf2f69"
+assert findings_pins["monitoring_metric_replay_current_local_main_tree"] == "70b2339300278bc0c20e32ed091f74b442bea76d"
+assert findings_pins["run_185_dashboard_verification_sha256"] == "e6965bba3f25b80e6ce70aa3656802956bed935d79aaf46576e1420f0c65e07c"
+assert findings_pins["run_186_monitoring_metric_replay_dedupe_remediation_sha256"] == "bf2cd03ca2ab7aeb6a9d1093b3c08aba5a1bc29342cc4fda6fa57ef286c2f1e5"
+assert findings_pins["run_186r_independent_artifact_review_sha256"] == "035271d7bfcd4256a59f01e9953f9cd8074466c0389f74ce82325a46ee6a6af7"
 live_findings = findings_register["records"]
-assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 14
+assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 15
 assert {row["id"] for row in live_findings} == set(historical_discovery_claims) | {
     "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
     "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
+    "MON-METRIC-REPLAY-DEDUPE-01",
 }
 provisional_findings = [
     row for row in live_findings
@@ -3413,7 +3437,7 @@ historical_remediated_findings = [
 ]
 assert len(provisional_findings) == findings_register["counts"]["provisional_source_claims"] == 8
 assert len(historical_fixed_findings) == findings_register["counts"]["historical_already_fixed"] == 2
-assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 4
+assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 5
 historical_fixed_by_id = {row["id"]: row for row in historical_fixed_findings}
 assert set(historical_fixed_by_id) == {"MED-RBAC-01", "MED-CD-ATOMICITY-01"}
 assert historical_fixed_by_id["MED-RBAC-01"]["current_adjudication"]["verdict"] == "ALREADY_FIXED"
@@ -3455,6 +3479,7 @@ assert set(historical_remediated_by_id) == {
     "SAFE-ALERT-DEDUP-IDENTITY-01",
     "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
     "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
+    "MON-METRIC-REPLAY-DEDUPE-01",
 }
 scope_finding = historical_remediated_by_id["MED-CD-SCOPE-01"]
 assert scope_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED"
@@ -3501,12 +3526,39 @@ assert fleet_playback_finding["current_adjudication"]["published_to_origin_main"
 assert fleet_playback_finding["route_url"]["ownership_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
 assert fleet_playback_finding["evidence"]["tests_executed"] == 11
 assert fleet_playback_finding["evidence"]["assertions"] == 167
+metric_finding = historical_remediated_by_id["MON-METRIC-REPLAY-DEDUPE-01"]
+assert metric_finding["feature_id"] is None
+assert metric_finding["candidate_feature_id"] is None
+assert metric_finding["related_feature_ids"] == []
+assert metric_finding["feature_identity_status"] == "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW"
+assert metric_finding["feature_id_role"] == "NO_CANONICAL_OR_CANDIDATE_FEATURE_ASSOCIATION_ZERO_STATIC_OWNERSHIP_CREDIT"
+assert metric_finding["route_url"]["ownership_status"] == "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW"
+assert metric_finding["current_adjudication"]["verdict"] == "REPRODUCED_INITIAL_FIX_POST_MERGE_NO_GO_CORRECTED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED"
+assert metric_finding["current_adjudication"]["application_commit"] == "18652d545c788f1dcdbe57662e5b1e5472d6cae7"
+assert metric_finding["current_adjudication"]["repository_tree"] == "095cd7b1940988be334979af22008c635fdcaf58"
+assert metric_finding["current_adjudication"]["current_local_main_commit"] == "f938c6d989f5fef052f08b9f1012116fb5cf2f69"
+assert metric_finding["evidence"]["tests_executed"] == 56
+assert metric_finding["evidence"]["assertions"] == 472
+assert metric_finding["evidence"]["initial_superseded_tests"] == 49
+assert metric_finding["evidence"]["initial_superseded_assertions"] == 392
+assert metric_finding["option_a_deployment_boundary"]["prerequisites_in_order"] == [
+    "quiesce old monitoring workers",
+    "reconcile pending or incoherent rows",
+    "apply migration 000110",
+    "start new workers only after cutover reconciliation",
+]
+assert metric_finding["option_a_deployment_boundary"]["poisoned_subsecond_evidence_requires_operator_reconciliation"] is True
+assert metric_finding["option_a_deployment_boundary"]["verified_in_production"] is False
+assert metric_finding["option_a_deployment_boundary"]["migration_deployment_credit"] is False
+assert metric_finding["option_a_deployment_boundary"]["release_or_publication_credit"] is False
 assert all(row["completion_credit"] is False for row in live_findings)
 assert all(all(value is False for value in row["credit"].values()) for row in live_findings)
-assert findings_register["counts"]["bounded_disposition_tests_passed"] == 99
-assert findings_register["counts"]["bounded_disposition_assertions"] == 1931
+assert findings_register["counts"]["bounded_disposition_tests_passed"] == 155
+assert findings_register["counts"]["bounded_disposition_assertions"] == 2403
 assert "5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
+assert "only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution" in findings_register["counts"]["bounded_disposition_sum_basis"]
+assert "initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert findings_register["counts"]["med_rbac_bounded_tests"] == 73
 assert findings_register["counts"]["med_rbac_bounded_test_assertions"] == 1481
 assert findings_register["counts"]["med_cd_scope_focused_tests"] == 5
@@ -3534,11 +3586,19 @@ assert findings_register["counts"]["fleet_trip_playback_site_privacy_supporting_
 assert findings_register["counts"]["fleet_trip_playback_site_privacy_baseline_failed"] == 3
 assert findings_register["counts"]["fleet_trip_playback_site_privacy_baseline_passed"] == 2
 assert findings_register["counts"]["fleet_trip_playback_site_privacy_baseline_assertions"] == 30
+assert findings_register["counts"]["monitoring_metric_replay_dedupe_focused_tests"] == 56
+assert findings_register["counts"]["monitoring_metric_replay_dedupe_focused_assertions"] == 472
+assert findings_register["counts"]["monitoring_metric_replay_initial_superseded_tests"] == 49
+assert findings_register["counts"]["monitoring_metric_replay_initial_superseded_assertions"] == 392
+assert findings_register["counts"]["monitoring_metric_replay_initial_post_merge_verdict"] == "NO_GO_ZERO_DENOMINATOR_CREDIT"
+assert findings_register["counts"]["monitoring_metric_replay_option_a_deployment_verified"] is False
 assert findings_register["counts"]["final_P0"] == findings_register["counts"]["final_P1"] == 0
-assert findings_register["reconciliation"]["retained_record_count"] == 14
+assert findings_register["reconciliation"]["retained_record_count"] == 15
 assert findings_register["reconciliation"]["current_provisional_count"] == 8
 assert findings_register["reconciliation"]["historical_already_fixed_count"] == 2
-assert findings_register["reconciliation"]["historical_remediated_count"] == 4
+assert findings_register["reconciliation"]["historical_remediated_count"] == 5
+assert findings_register["reconciliation"]["every_non_null_primary_feature_id_in_canonical_matrix"] is True
+assert findings_register["reconciliation"]["records_without_primary_or_candidate_feature_id"] == ["MON-METRIC-REPLAY-DEDUPE-01"]
 
 assert run_163_reporting["schema_version"] == "run-163-med-cd-scope-remediation-reporting-wave-29-v1"
 assert run_163_reporting["run_id"] == "RUN-163-MED-CD-SCOPE-01-REMEDIATION-REPORTING-WAVE-29"
@@ -4297,6 +4357,147 @@ run_184_without_seal = dict(run_184_reporting)
 run_184_seal = run_184_without_seal.pop("receipt_self_seal_sha256")
 assert canonical_sha256(run_184_without_seal) == run_184_seal
 
+assert sha256_file("generators/materialize-run-185-audit-dashboard-verification-wave-35.py") == "d974f3329db546b5b7a3f1e2325ecb9f9eba6db6fee3e695aca7a7ff668ab18f"
+assert sha256_file("evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json") == "e6965bba3f25b80e6ce70aa3656802956bed935d79aaf46576e1420f0c65e07c"
+assert dashboard_run_185["run_id"] == "RUN-185-AUDIT-DASHBOARD-VERIFICATION-WAVE-35"
+assert dashboard_run_185["pins"]["run_185_final_dashboard"]["sha256"] == "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7"
+assert dashboard_run_185["verification"]["viewports_verified"] == 4
+assert dashboard_run_185["verification"]["visible_static_checks_required"] == 117
+assert dashboard_run_185["verification"]["visible_static_checks_passed"] == 117
+assert dashboard_run_185["verification"]["navigation_clicks_passed"] == 10
+assert dashboard_run_185["verification"]["unique_local_resources"] == 463
+assert dashboard_run_185["verification"]["post_materialization_filesystem_resources"] == "463/463"
+assert dashboard_run_185["verification"]["post_materialization_http_head_resources"] == "463/463"
+assert dashboard_run_185["verification"]["anchor_elements"] == 868
+dashboard_run_185_without_seal = dict(dashboard_run_185)
+dashboard_run_185_seal = dashboard_run_185_without_seal.pop("receipt_self_seal_sha256")
+assert dashboard_run_185_seal == "d49f27d1ed2f7f4f53c366d711653bbbb0fc541ba2d7c08f2780d4319193e776"
+assert canonical_sha256(dashboard_run_185_without_seal) == dashboard_run_185_seal
+assert {key for key, value in dashboard_run_185["credit_boundary"].items() if value} == {"exact_audit_dashboard_artifact"}
+run_185_history = findings_register["current_audit_artifact_verification_history"]["run_185"]
+assert run_185_history["run_id"] == dashboard_run_185["run_id"]
+assert run_185_history["receipt_sha256"] == "e6965bba3f25b80e6ce70aa3656802956bed935d79aaf46576e1420f0c65e07c"
+assert run_185_history["receipt_self_seal_sha256"] == dashboard_run_185_seal
+assert run_185_history["dashboard_sha256"] == "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7"
+assert run_185_history["viewports"] == "4/4"
+assert run_185_history["visible_boundary_checks"] == "117/117"
+assert run_185_history["navigation"] == "10/10"
+assert run_185_history["unique_local_resources"] == "463/463"
+assert run_185_history["anchor_elements"] == "868/868"
+assert run_185_history["superseded_by_run_187_reporting_sources"] is True
+assert run_185_history["run_188_dashboard_verification_required"] is True
+assert run_185_history["application_browser_credit"] is False
+assert run_185_history["publication_credit"] is False
+assert run_185_history["audit_complete"] is False
+
+assert sha256_file("generators/materialize-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.py") == "983b003dc149c966cdea9c59dd3cd4a766f4a5f0382e881f90b9d0cde9b86cee"
+assert sha256_file("evidence/runtime/current-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.json") == "bf2cd03ca2ab7aeb6a9d1093b3c08aba5a1bc29342cc4fda6fa57ef286c2f1e5"
+assert run_186_remediation["run_id"] == "RUN-186-MON-METRIC-REPLAY-DEDUPE-01-REMEDIATION-WAVE-36"
+assert run_186_remediation["pins"]["application_baseline_commit"] == "a900f078c9c05f587f6f7884f5fe715076891416"
+assert run_186_remediation["pins"]["initial_fix_commit"] == "f521bc0b87222e56b4822e7cb9c935486e279e76"
+assert run_186_remediation["pins"]["initial_merge_commit"] == "778c00a5d09511aee1a836a689d7bb1b56ce4ff6"
+assert run_186_remediation["pins"]["corrective_fix_commit"] == "c82f57779baf623c4e94ac4619b11c1b675d0230"
+assert run_186_remediation["pins"]["corrective_merge_commit"] == "18652d545c788f1dcdbe57662e5b1e5472d6cae7"
+assert run_186_remediation["pins"]["corrective_merge_tree"] == "095cd7b1940988be334979af22008c635fdcaf58"
+assert run_186_remediation["pins"]["current_local_main_commit"] == "f938c6d989f5fef052f08b9f1012116fb5cf2f69"
+assert run_186_remediation["pins"]["current_local_main_tree"] == "70b2339300278bc0c20e32ed091f74b442bea76d"
+assert run_186_remediation["initial_remediation_and_no_go"]["post_merge_independent_disposition"] == "NO_GO"
+assert run_186_remediation["initial_remediation_and_no_go"]["isolated_green_superseded"]["tests"] == 49
+assert run_186_remediation["initial_remediation_and_no_go"]["isolated_green_superseded"]["assertions"] == 392
+assert run_186_remediation["initial_remediation_and_no_go"]["initial_green_contributes_current_reporting_denominator"] is False
+metric_runtime = run_186_remediation["delegated_runtime_execution"]
+assert metric_runtime["final_corrected_post_merge_full_focused"]["tests"] == 56
+assert metric_runtime["final_corrected_post_merge_full_focused"]["assertions"] == 472
+assert metric_runtime["final_corrected_post_merge_full_focused"]["unique_bounded_disposition_denominator_credit"] is True
+assert metric_runtime["final_corrected_isolated_full_focused"]["denominator_credit"] is False
+assert metric_runtime["unique_bounded_accounting"] == {
+    "prior": {"tests": 99, "assertions": 1931},
+    "increment": {"tests": 56, "assertions": 472},
+    "proposed_after_run_186r_go": {"tests": 155, "assertions": 2403},
+}
+assert run_186_remediation["corrective_remediation"]["deployment_prerequisite"] == [
+    "quiesce old monitoring workers",
+    "reconcile pending or incoherent rows",
+    "apply migration 000110",
+    "start new workers only after cutover reconciliation",
+]
+assert run_186_remediation["corrective_remediation"]["poisoned_pre_f521_subsecond_bridge_fails_closed"] is True
+assert run_186_remediation["corrective_remediation"]["deployment_prerequisite_verified_in_production"] is False
+assert len(run_186_remediation["completion_gates"]) == 26
+assert not any(gate["complete"] for gate in run_186_remediation["completion_gates"])
+run_186_without_seal = dict(run_186_remediation)
+run_186_seal = run_186_without_seal.pop("receipt_self_seal_sha256")
+assert run_186_seal == "9d21a45a215a9d48a82d093817aba6807ef6ed73b130894ac385a41e18e527ff"
+assert canonical_sha256(run_186_without_seal) == run_186_seal
+
+assert sha256_file("generators/materialize-independent-run-186-monitoring-metric-replay-dedupe-remediation-review-wave-36.py") == "e081b3807c81f8f8d9c6982faddf63b548db650437cde13ff424730181361026"
+assert sha256_file("evidence/runtime/current-run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36.json") == "035271d7bfcd4256a59f01e9953f9cd8074466c0389f74ce82325a46ee6a6af7"
+assert run_186r_review["run_id"] == "RUN-186R-INDEPENDENT-MON-METRIC-REPLAY-DEDUPE-01-REMEDIATION-REVIEW-WAVE-36"
+metric_review_decision = run_186r_review["decision"]
+assert metric_review_decision["verdict"] == "GO"
+assert metric_review_decision["blocking_discrepancies"] == 0
+assert metric_review_decision["new_historical_remediated_record_reporting_authorized"] is True
+assert metric_review_decision["authorized_live_reporting_run"] == "RUN-187"
+assert metric_review_decision["authorized_finding_id"] == "MON-METRIC-REPLAY-DEDUPE-01"
+assert metric_review_decision["authorized_feature_id"] is None
+assert metric_review_decision["authorized_candidate_feature_id"] is None
+assert metric_review_decision["authorized_feature_identity_status"] == "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW"
+assert metric_review_decision["authorized_resulting_lineage"] == {
+    "retained_claim_records": 15,
+    "current_provisional_source_claims": 8,
+    "historical_already_fixed_records": 2,
+    "historical_remediated_records": 5,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert metric_review_decision["authorized_unique_bounded_disposition_increment"]["resulting_tests"] == 155
+assert metric_review_decision["authorized_unique_bounded_disposition_increment"]["resulting_assertions"] == 2403
+assert metric_review_decision["static_ownership_remains_pending"]["owner_records"] == 666
+assert metric_review_decision["static_ownership_remains_pending"]["route_owners"] == 309
+assert metric_review_decision["static_ownership_remains_pending"]["page_owners"] == 357
+assert metric_review_decision["static_ownership_remains_pending"]["action_bridges"] == 97
+assert metric_review_decision["static_ownership_remains_pending"]["queue_reviewed"] == 120
+assert metric_review_decision["static_ownership_remains_pending"]["queue_pending"] == 387
+assert metric_review_decision["static_ownership_remains_pending"]["queue_owned"] == 98
+assert metric_review_decision["static_ownership_remains_pending"]["queue_without_ownership"] == 409
+assert metric_review_decision["static_ownership_remains_pending"]["next_zero_based_index"] == 85
+assert metric_review_decision["option_a_deployment_boundary"]["prerequisites"] == metric_finding["option_a_deployment_boundary"]["prerequisites_in_order"]
+assert metric_review_decision["option_a_deployment_boundary"]["poisoned_subsecond_evidence_requires_operator_reconciliation"] is True
+assert metric_review_decision["option_a_deployment_boundary"]["verified_in_production"] is False
+assert len(run_186r_review["completion_gates"]) == 26
+assert not any(gate["complete"] for gate in run_186r_review["completion_gates"])
+run_186r_without_seal = dict(run_186r_review)
+run_186r_seal = run_186r_without_seal.pop("receipt_self_seal_sha256")
+assert run_186r_seal == "0176cbf5e4756c4da3cfbcd91728db53756b7cd755a4db68dc8dade59daeff56"
+assert canonical_sha256(run_186r_without_seal) == run_186r_seal
+
+assert run_187_reporting["run_id"] == "RUN-187-MON-METRIC-REPLAY-DEDUPE-01-REMEDIATION-REPORTING-WAVE-36"
+assert run_187_reporting["reporting_transition"]["finding_id"] == "MON-METRIC-REPLAY-DEDUPE-01"
+assert run_187_reporting["reporting_transition"]["feature_id"] is None
+assert run_187_reporting["reporting_transition"]["candidate_feature_id"] is None
+assert run_187_reporting["reporting_transition"]["feature_identity_status"] == "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW"
+assert run_187_reporting["reporting_transition"]["counts_after"] == {
+    "retained_claim_records": 15,
+    "provisional_source_claims": 8,
+    "historical_already_fixed": 2,
+    "historical_remediated": 5,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_187_reporting["bounded_execution_accounting"]["unique_total"] == {"tests": 155, "assertions": 2403}
+assert run_187_reporting["bounded_execution_accounting"]["counted_once"] == {"tests": 56, "assertions": 472}
+assert run_187_reporting["preservation_boundary"]["dashboard_sha256"] == "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7"
+assert run_187_reporting["preservation_boundary"]["dashboard_html_changed"] is False
+assert run_187_reporting["dashboard_forward_gate"]["required_run"] == "RUN-188"
+assert run_187_reporting["option_a_deployment_boundary"]["prerequisites_in_order"] == metric_finding["option_a_deployment_boundary"]["prerequisites_in_order"]
+assert {key for key, value in run_187_reporting["credit_boundary"].items() if value} == {"live_findings_register_and_reporting_status"}
+assert len(run_187_reporting["completion_gates"]) == 26
+assert not any(run_187_reporting["completion_gates"].values())
+assert all(value is False for value in run_187_reporting["completion_boundary"].values())
+run_187_without_seal = dict(run_187_reporting)
+run_187_seal = run_187_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_187_without_seal) == run_187_seal
+
 reviewed_fleet_daily_check_overlay = reviewed_fleet_trip_index_overlay
 
 required_artifacts = [
@@ -4354,6 +4555,7 @@ fleet_playback_row_status = (
 finding_claim_labels = dict(historical_discovery_claims)
 finding_claim_labels["FLEET-TRIP-INDEX-SITE-PRIVACY-01"] = fleet_finding["impact"]
 finding_claim_labels["FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"] = fleet_playback_finding["impact"]
+finding_claim_labels["MON-METRIC-REPLAY-DEDUPE-01"] = metric_finding["impact"]
 assert set(finding_claim_labels) == {row["id"] for row in live_findings}
 finding_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td class=\"partial\">{}</td></tr>".format(
@@ -4396,6 +4598,12 @@ assert expected_atomicity_row in finding_rows
 assert finding_rows.count(atomicity_row_status) == 1
 assert finding_rows.count(safe_row_status) == 1
 assert finding_rows.count(fleet_row_status) == 1
+expected_metric_row = (
+    '<tr><td class="mono">MON-METRIC-REPLAY-DEDUPE-01</td><td>'
+    f'{html.escape(metric_finding["impact"])}</td>'
+    '<td class="partial">historical issue · remediated on current main · not a final finding</td></tr>'
+)
+assert expected_metric_row in finding_rows
 
 architecture_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td>{}</td><td class=\"partial\">source-only; promotion gate open</td></tr>".format(
@@ -5345,6 +5553,106 @@ for old, new in run_184_template_rewrites:
         f"Expected {expected_count} RUN-184 template rewrite target(s): {old}"
     )
     current_template_text = current_template_text.replace(old, new)
+
+run_187_template_rewrites = [
+    ('<a href="#checkpoint">RUN-184</a>', '<a href="#checkpoint">RUN-187</a>'),
+    ("RUN-001 through RUN-184 are represented by audit artifacts.", "RUN-001 through RUN-187 are represented by audit artifacts."),
+    ("RUN-071–184 current reporting checkpoint", "RUN-071–187 current reporting checkpoint"),
+    ("RUN-071–184 completion-gate checkpoint", "RUN-071–187 completion-gate checkpoint"),
+    (
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, and bounded Fleet evidence through RUN-183R, reported in RUN-184, with fresh RUN-185 dashboard verification required.",
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, bounded Fleet evidence, RUN-185 exact-dashboard verification, and RUN-186/R Monitoring metric-replay evidence, reported in RUN-187, with fresh RUN-188 dashboard verification required.",
+    ),
+    (
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from separately bounded RUN-159 MED-RBAC, RUN-162 MED-CD-SCOPE, RUN-166 manual-entry MED-CD-ATOMICITY, RUN-173 post-merge SAFE, RUN-176 post-merge Fleet trip-index, and RUN-183 post-merge Fleet playback focused executions, no represented wave grants broader or full-suite application runtime or coverage; only MED-RBAC, MED-CD-SCOPE, post-merge SAFE, post-merge Fleet trip-index, and post-merge Fleet playback contribute once to the current $unique_bounded_tests/$unique_bounded_assertions total.",
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from separately bounded RUN-159 MED-RBAC, RUN-162 MED-CD-SCOPE, RUN-166 manual-entry MED-CD-ATOMICITY, RUN-173 post-merge SAFE, RUN-176 post-merge Fleet trip-index, RUN-183 post-merge Fleet playback, and RUN-186 final post-corrective-merge Monitoring metric-replay focused executions, no represented wave grants broader or full-suite application runtime or coverage; only MED-RBAC, MED-CD-SCOPE, post-merge SAFE, post-merge Fleet trip-index, post-merge Fleet playback, and the final post-corrective-merge Monitoring $metric_tests/$metric_assertions contribute once to the current $unique_bounded_tests/$unique_bounded_assertions total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions and all Monitoring replays/subsets are excluded.",
+    ),
+    (
+        "Exactly two matrix rows have static benchmark-mapping credit. RUN-159, RUN-162, RUN-166, RUN-173, RUN-176, and RUN-183 retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, post-merge Fleet trip-index $fleet_tests/$fleet_assertions, and post-merge Fleet playback $fleet_playback_tests/$fleet_playback_assertions contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total.",
+        "Exactly two matrix rows have static benchmark-mapping credit. RUN-159, RUN-162, RUN-166, RUN-173, RUN-176, RUN-183, and RUN-186/R retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, post-merge Fleet trip-index $fleet_tests/$fleet_assertions, post-merge Fleet playback $fleet_playback_tests/$fleet_playback_assertions, and final post-corrective-merge Monitoring $metric_tests/$metric_assertions contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions and every Monitoring replay/subset remain excluded.",
+    ),
+    (
+        "RUN-159 establishes bounded MED-RBAC execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution; RUN-173 adds one post-merge $safe_tests/$safe_assertions SAFE focused execution, RUN-176 adds one post-merge $fleet_tests/$fleet_assertions Fleet index execution, and RUN-183 adds one post-merge $fleet_playback_tests/$fleet_playback_assertions Fleet playback execution to the unique bounded total. Replays, supporting suites, adjacent filters, red failures, terminal-fixture failures, and atomicity remain separate or excluded, and none establishes full-suite, coverage, application-browser, ease, release, Pass, publication, or completion credit.",
+        "RUN-159 establishes bounded MED-RBAC execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution; RUN-173 adds one post-merge $safe_tests/$safe_assertions SAFE focused execution, RUN-176 adds one post-merge $fleet_tests/$fleet_assertions Fleet index execution, RUN-183 adds one post-merge $fleet_playback_tests/$fleet_playback_assertions Fleet playback execution, and RUN-186 adds only the final post-corrective-merge $metric_tests/$metric_assertions Monitoring metric-replay execution to the unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, all Monitoring replays/subsets, supporting suites, adjacent filters, red failures, terminal-fixture failures, and atomicity remain separate or excluded, and none establishes full-suite, coverage, application-browser, ease, release, Pass, publication, or completion credit.",
+    ),
+    (
+        "RUN-184: Fleet trip-playback historical-remediated record added · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total",
+        "RUN-184: Fleet trip-playback historical-remediated record added · 8 provisional + 2 already-fixed + 4 remediated · 99/1,931 unique bounded disposition total",
+    ),
+    (
+        "<tr><td>RUN-184 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · $unique_bounded_tests tests / $unique_bounded_assertions assertions</strong>",
+        "<tr><td>RUN-184 live reporting</td><td><strong>8 current provisional P1 + 2 historical already-fixed + 4 historical remediated · 99 tests / 1,931 assertions</strong>",
+    ),
+    (
+        "dashboard HTML frozen pending RUN-185</li>",
+        "dashboard HTML later verified by RUN-185</li><li>RUN-185: exact RUN-184 dashboard verified at 4/4 viewports · 117/117 visible checks · 10/10 navigation · 463/463 resources · 868 anchors · 14 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 4 historical remediated · zero application credit</li><li>RUN-186: MON-METRIC-REPLAY-DEDUPE-01 initial remediation later adjudicated NO-GO and corrective remediation integrated · lineage $metric_baseline_short → $metric_initial_fix_short → $metric_initial_merge_short → $metric_corrective_fix_short → $metric_corrective_merge_short; current local main $metric_current_main_short · only final post-corrective-merge $metric_tests/$metric_assertions counted once · initial $metric_initial_tests/$metric_initial_assertions and all replays/subsets/DNS/Facility excluded</li><li>RUN-186R: exact artifacts independently reviewed GO · null feature and candidate IDs · zero static ownership · option-A prerequisite: quiesce old monitoring workers; reconcile pending or incoherent rows; apply migration 000110; start new workers only after cutover reconciliation; poisoned subsecond evidence requires operator reconciliation · RUN-187 reporting authorized</li><li>RUN-187: Monitoring metric replay historical-remediated record added · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-188</li>",
+    ),
+    (
+        "RUN-182–184 Fleet trip playback Site privacy remediation checkpoint",
+        "RUN-185–187 Monitoring metric replay remediation reporting checkpoint",
+    ),
+    (
+        "fresh RUN-185 required</td></tr>",
+        "exact dashboard later verified by RUN-185</td></tr><tr><td>RUN-185 exact dashboard verification</td><td><strong>4/4 viewports · 117/117 visible checks · 10/10 navigation · 463/463 resources · 868 anchors</strong></td><td class=\"partial\">exact superseded RUN-184 audit artifact only · zero application credit</td></tr><tr><td>RUN-186/R Monitoring metric replay remediation</td><td><strong>initial $metric_initial_tests/$metric_initial_assertions later NO-GO · final post-corrective-merge $metric_tests/$metric_assertions counted once · corrective merge $metric_corrective_merge_short</strong></td><td class=\"partial\">null feature identity · zero static ownership · option-A deployment prerequisite unverified · poisoned subsecond evidence needs operator reconciliation</td></tr><tr><td>RUN-187 live reporting</td><td><strong>$finding_count current provisional P1 + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated · $unique_bounded_tests tests / $unique_bounded_assertions assertions</strong></td><td class=\"partial\">one Monitoring historical-remediated record · zero final finding · dashboard HTML unchanged · fresh RUN-188 required</td></tr>",
+    ),
+    ("Fresh RUN-185 audit-dashboard verification required", "Fresh RUN-188 audit-dashboard verification required"),
+    (
+        "The exact RUN-184 reporting dashboard must be generated and checked in RUN-185 at 1440×900, 1280×800, 1024×768, and 390×844.",
+        "The exact RUN-187 reporting dashboard must be generated and checked in RUN-188 at 1440×900, 1280×800, 1024×768, and 390×844.",
+    ),
+    ("The linked RUN-185 receipt must record", "The linked RUN-188 receipt must record"),
+    ("It verifies the RUN-184 audit artifact only", "It verifies the RUN-187 audit artifact only"),
+    (
+        "RUN-184 is the current reporting generator execution and RUN-185 remains the fresh exact-dashboard gate.",
+        "RUN-185 verifies only the superseded RUN-184 artifact; RUN-186/R establish the bounded Monitoring remediation/review evidence; RUN-187 is the current reporting generator execution and RUN-188 remains the fresh exact-dashboard gate.",
+    ),
+    (
+        "RUN-182 verifies only the superseded RUN-181 HTML; RUN-183 establishes the bounded Fleet playback page/data remediation and local integration, RUN-183R independently authorizes one new historical-remediated record, and RUN-184 alone changes the live register and reporting sources while preserving the verified RUN-182 HTML byte-for-byte. None supplies audit-dashboard verification for the new RUN-185 HTML.",
+        "RUN-182 verifies only the superseded RUN-181 HTML; RUN-183 establishes the bounded Fleet playback page/data remediation and local integration, RUN-183R independently authorizes one new historical-remediated record, and RUN-184 changes that live register while preserving the verified RUN-182 HTML byte-for-byte. RUN-185 then verifies only the superseded RUN-184 HTML; RUN-186 establishes the bounded corrective Monitoring metric-replay remediation and RUN-186R independently authorizes one new historical-remediated record; RUN-187 alone changes the live register and reporting sources while preserving the verified RUN-185 HTML byte-for-byte. None supplies audit-dashboard verification for the new RUN-188 HTML.",
+    ),
+    (
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json">RUN-185 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json">RUN-185 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/runtime/current-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.json">RUN-186 Monitoring metric-replay remediation receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/runtime/current-run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36.json">RUN-186R independent Monitoring metric-replay review receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.json">RUN-187 Monitoring metric-replay reporting receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">RUN-188 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+    ),
+    ("RUN-071–184 evidence lineage", "RUN-071–187 evidence lineage"),
+    (
+        "Every current raw, generated, reviewed, and integrated RUN-077–183R source/reporting/runtime/benchmark/remediation/ownership artifact is linked with its exact SHA-256;",
+        "Every current raw, generated, reviewed, and integrated RUN-077–187 source/reporting/runtime/benchmark/remediation/ownership artifact is linked with its exact SHA-256;",
+    ),
+    (
+        "SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, and FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01 are remediated on local main only and are not published to origin/main; the playback CAP association remains candidate-only and index 85 ownership is PENDING_FRESH_SEMANTIC_REVIEW. None is a final finding or closed completion gate.",
+        "SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, and FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01 are remediated on local main only and are not published to origin/main; the playback CAP association remains candidate-only and index 85 ownership is PENDING_FRESH_SEMANTIC_REVIEW. MON-METRIC-REPLAY-DEDUPE-01 is also remediated on local main only and unpublished, has null feature and candidate IDs with UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW identity and zero static ownership, and retains the unverified option-A deployment prerequisite plus poisoned-subsecond operator-reconciliation boundary. None is a final finding or closed completion gate.",
+    ),
+    (
+        "</tr><tr><td>RUN-183 Fleet trip-playback Site-privacy execution</td><td>$fleet_playback_tests post-merge focused tests / $fleet_playback_assertions assertions; baseline $fleet_playback_red_failed failed + $fleet_playback_red_passed passed / $fleet_playback_red_assertions assertions, isolated replay, and supporting $fleet_playback_supporting_tests/$fleet_playback_supporting_assertions regressions reported separately</td><td class=\"partial\">page/data approved-Site, provenance, concealment, driver privacy, and telemetry filtering only · index 85 ownership PENDING_FRESH_SEMANTIC_REVIEW · full-suite green unproved</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+        "</tr><tr><td>RUN-183 Fleet trip-playback Site-privacy execution</td><td>$fleet_playback_tests post-merge focused tests / $fleet_playback_assertions assertions; baseline $fleet_playback_red_failed failed + $fleet_playback_red_passed passed / $fleet_playback_red_assertions assertions, isolated replay, and supporting $fleet_playback_supporting_tests/$fleet_playback_supporting_assertions regressions reported separately</td><td class=\"partial\">page/data approved-Site, provenance, concealment, driver privacy, and telemetry filtering only · index 85 ownership PENDING_FRESH_SEMANTIC_REVIEW · full-suite green unproved</td></tr><tr><td>RUN-186 corrected Monitoring metric-replay execution</td><td>only final post-corrective-merge $metric_tests tests / $metric_assertions assertions counted once; initial $metric_initial_tests/$metric_initial_assertions, final isolated replay, red reproduction, intermediate subsets, stopped run, DNS, Facility, and overlapping support excluded</td><td class=\"partial\">null feature and candidate IDs · zero static ownership · option-A deployment prerequisite unverified · poisoned subsecond evidence requires operator reconciliation · no deployment, publication, full-suite, or completion credit</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+    ),
+    (
+        "The current RUN-184 register retains 14 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01 is the new historical-remediated record with candidate-only feature association and zero static-ownership credit.",
+        "The current RUN-187 register retains 15 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; MON-METRIC-REPLAY-DEDUPE-01 is the new historical-remediated record with null feature and candidate IDs, UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW identity, and zero static-ownership credit.",
+    ),
+    (
+        "$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 14 retained · none final",
+        "$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 15 retained · none final",
+    ),
+    (
+        "$fleet_playback_tests/$fleet_playback_assertions Fleet playback; atomicity and support remain separate",
+        "$fleet_playback_tests/$fleet_playback_assertions Fleet playback + $metric_tests/$metric_assertions final corrected Monitoring replay; initial $metric_initial_tests/$metric_initial_assertions and all other replay/support remain separate",
+    ),
+    (
+        "The register retains 14 historical claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records.",
+        "The register retains 15 claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. MON-METRIC-REPLAY-DEDUPE-01 has null feature and candidate IDs, UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW identity, and zero static ownership.",
+    ),
+    ("RUN-155–184 bounded disposition provenance, remediation, and reporting", "RUN-155–187 bounded disposition provenance, remediation, and reporting"),
+    ("current RUN-184 split of 14 retained claim identities", "current RUN-187 split of 15 retained claim identities"),
+    (
+        "14 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
+        "15 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
+    ),
+]
+for old, new in run_187_template_rewrites:
+    assert old in current_template_text, f"Expected RUN-187 template rewrite target: {old}"
+    current_template_text = current_template_text.replace(old, new)
 TEMPLATE = Template(current_template_text)
 
 
@@ -5584,6 +5892,16 @@ dashboard = TEMPLATE.substitute(
     fleet_playback_baseline_short=run_183_remediation["pins"]["application_baseline_commit"][:12],
     fleet_playback_fix_short=run_183_remediation["pins"]["fix_commit"][:12],
     fleet_playback_merge_short=run_183_remediation["pins"]["local_main_merge_commit"][:12],
+    metric_tests=metric_finding["evidence"]["tests_executed"],
+    metric_assertions=metric_finding["evidence"]["assertions"],
+    metric_initial_tests=metric_finding["evidence"]["initial_superseded_tests"],
+    metric_initial_assertions=metric_finding["evidence"]["initial_superseded_assertions"],
+    metric_baseline_short=metric_finding["current_adjudication"]["application_baseline_commit"][:12],
+    metric_initial_fix_short=metric_finding["current_adjudication"]["initial_fix_commit"][:12],
+    metric_initial_merge_short=metric_finding["current_adjudication"]["initial_merge_commit"][:12],
+    metric_corrective_fix_short=metric_finding["current_adjudication"]["corrective_fix_commit"][:12],
+    metric_corrective_merge_short=metric_finding["current_adjudication"]["application_commit"][:12],
+    metric_current_main_short=metric_finding["current_adjudication"]["current_local_main_commit"][:12],
     module_count=len(module_labels),
     module_rows=module_rows,
     finding_rows=finding_rows,
@@ -5680,14 +5998,14 @@ dashboard = TEMPLATE.substitute(
 )
 
 current_visible_boundaries = [
-    '<a href="#checkpoint">RUN-184</a>',
+    '<a href="#checkpoint">RUN-187</a>',
     '<a href="#findings">Finding status</a>',
     "666 owners · 309 routes + 357 pages · 97 bridges",
     "120 reviewed / 387 pending",
     "98 owned / 409 without ownership",
     "16.950878%",
     "3,263 records remain",
-    "RUN-182–184 Fleet trip playback Site privacy remediation checkpoint",
+    "RUN-185–187 Monitoring metric replay remediation reporting checkpoint",
     "fleet-assets.vehicles.alerts-config",
     "RUN090-ROUTE-0084 / RUN077-ROUTE-0692",
     "VehicleController::alertsConfig",
@@ -5721,6 +6039,42 @@ current_visible_boundaries = [
     "RUN-183: Fleet trip-playback page/data Site-privacy defect reproduced and remediated in exactly two transferred paths",
     "RUN-183R: exact remediation artifacts independently reviewed GO",
     "RUN-184: Fleet trip-playback historical-remediated record added",
+    "RUN-185: exact RUN-184 dashboard verified at 4/4 viewports",
+    "117/117 visible checks",
+    "463/463 resources",
+    "868 anchors",
+    "RUN-186: MON-METRIC-REPLAY-DEDUPE-01 initial remediation later adjudicated NO-GO and corrective remediation integrated",
+    "only final post-corrective-merge 56/472 counted once",
+    "initial 49/392 and all replays/subsets/DNS/Facility excluded",
+    "RUN-186R: exact artifacts independently reviewed GO",
+    "null feature and candidate IDs",
+    "zero static ownership",
+    "RUN-187: Monitoring metric replay historical-remediated record added",
+    "15 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 5 historical remediated",
+    "155 / 2,403",
+    "155/2,403 unique bounded disposition total",
+    "RUN-071–187 current reporting checkpoint",
+    "RUN-071–187 completion-gate checkpoint",
+    "RUN-071–187 evidence lineage",
+    "Every current raw, generated, reviewed, and integrated RUN-077–187",
+    "RUN-186 corrected Monitoring metric-replay execution",
+    "final post-corrective-merge Monitoring 56/472",
+    "initial Monitoring 49/392",
+    "RUN-188 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)",
+    "MON-METRIC-REPLAY-DEDUPE-01",
+    "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+    "MON-METRIC-REPLAY-DEDUPE-01 is also remediated on local main only and unpublished",
+    "quiesce old monitoring workers",
+    "reconcile pending or incoherent rows",
+    "apply migration 000110",
+    "start new workers only after cutover reconciliation",
+    "poisoned subsecond evidence requires operator reconciliation",
+    "a900f078c9c0",
+    "f521bc0b8722",
+    "778c00a5d095",
+    "c82f57779baf",
+    "18652d545c78",
+    "f938c6d989f5",
     "9 current provisional P1 + 2 historical already-fixed + 1 historical remediated",
     "8 current provisional P1 + 2 historical already-fixed + 2 historical remediated",
     "14 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 4 historical remediated",
@@ -5728,7 +6082,6 @@ current_visible_boundaries = [
     "88 / 1,764",
     "83/1,589 unique bounded total",
     "88/1,764 unique bounded disposition total",
-    "99 / 1,931",
     "99/1,931 unique bounded disposition total",
     "SAFE-ALERT-DEDUP-IDENTITY-01",
     "post-merge SAFE alert-dedup tests / 60 assertions",
@@ -5758,12 +6111,12 @@ current_visible_boundaries = [
     "RUN-183 adds one post-merge 11/167 Fleet playback execution",
     "supporting 20/215",
     "14 retained",
-    "14 historical claim identities",
+    "15 claim identities",
     "13a7f37da9c9",
     "790bc11e3fb2",
     "c643c9e5eecf",
     "3 claim-specific test functions / 146 assertions / 3 synchronized two-process races",
-    "reported separately from the historical 78/1,529 and current 99/1,931",
+    "reported separately from the historical 78/1,529 and current 155/2,403",
     "supporting 43/716 overlaps",
     "73 bounded tests / 1,481 assertions",
     "5 focused tests / 48 assertions",
@@ -5778,7 +6131,7 @@ current_visible_boundaries = [
     "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated",
     "two broader INR failures reproduce at base",
     "full-suite green false",
-    "Fresh RUN-185 audit-dashboard verification required",
+    "Fresh RUN-188 audit-dashboard verification required",
     "cf0090ec9724",
     "0b1920dade92",
     "7b2b5688c90e",
@@ -5795,7 +6148,7 @@ current_visible_boundaries = [
     "index 83 is not recredited, index 84 fleet-assets.trips.index is integrated, and index 85 fleet-assets.trips.playback is next",
     "RUN-168 verifies that exact dashboard",
     "RUN-182 verifies only the superseded RUN-181 HTML",
-    "dashboard HTML unchanged · fresh RUN-185 required",
+    "exact dashboard later verified by RUN-185",
     "visible 666/309/357 ownership, 97 bridges, 120/387 queue accounting, 98 owned/409 without ownership",
 ]
 assert all(boundary in dashboard for boundary in current_visible_boundaries)
@@ -5837,6 +6190,15 @@ assert "and fresh RUN-172 dashboard verification required." not in dashboard
 assert "Fresh RUN-175 audit-dashboard verification required" not in dashboard
 assert "Fresh RUN-178 audit-dashboard verification required" not in dashboard
 assert "Fresh RUN-182 audit-dashboard verification required" not in dashboard
+assert "RUN-071–184 current reporting checkpoint" not in dashboard
+assert "RUN-071–184 completion-gate checkpoint" not in dashboard
+assert "RUN-071–184 evidence lineage" not in dashboard
+assert "None supplies audit-dashboard verification for the new RUN-185 HTML." not in dashboard
+assert (
+    "RUN-185 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)"
+    not in dashboard
+)
+assert "Every current raw, generated, reviewed, and integrated RUN-077–183R" not in dashboard
 assert (
     "12 retained claim identities (8 current provisional + 2 historical already-fixed + 4 historical remediated)"
     not in dashboard

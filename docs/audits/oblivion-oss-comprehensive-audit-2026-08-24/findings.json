@@ -1,7 +1,7 @@
 {
   "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
-  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_FOUR_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
-  "generated_on": "2026-08-30",
+  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_FIVE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
+  "generated_on": "2026-08-31",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
@@ -51,6 +51,17 @@
     "fleet_trip_playback_site_privacy_origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
     "run_183_fleet_trip_playback_site_privacy_remediation_sha256": "7bb1b1013cf67344c48e5a8b6e551bf3c769695e0384c2b333fb47286e53310a",
     "run_183r_independent_artifact_review_sha256": "170245898590f6429a171bbd8a41455f096b5b43340b840294735fdbc5522640",
+    "monitoring_metric_replay_application_baseline_commit": "a900f078c9c05f587f6f7884f5fe715076891416",
+    "monitoring_metric_replay_initial_fix_commit": "f521bc0b87222e56b4822e7cb9c935486e279e76",
+    "monitoring_metric_replay_initial_merge_commit": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
+    "monitoring_metric_replay_corrective_fix_commit": "c82f57779baf623c4e94ac4619b11c1b675d0230",
+    "monitoring_metric_replay_corrective_merge_commit": "18652d545c788f1dcdbe57662e5b1e5472d6cae7",
+    "monitoring_metric_replay_corrective_merge_tree": "095cd7b1940988be334979af22008c635fdcaf58",
+    "monitoring_metric_replay_current_local_main_commit": "f938c6d989f5fef052f08b9f1012116fb5cf2f69",
+    "monitoring_metric_replay_current_local_main_tree": "70b2339300278bc0c20e32ed091f74b442bea76d",
+    "run_185_dashboard_verification_sha256": "e6965bba3f25b80e6ce70aa3656802956bed935d79aaf46576e1420f0c65e07c",
+    "run_186_monitoring_metric_replay_dedupe_remediation_sha256": "bf2cd03ca2ab7aeb6a9d1093b3c08aba5a1bc29342cc4fda6fa57ef286c2f1e5",
+    "run_186r_independent_artifact_review_sha256": "035271d7bfcd4256a59f01e9953f9cd8074466c0389f74ce82325a46ee6a6af7",
     "audit_checkpoint_parent": "35a5228b26c54684718495c33281b24c0992de02",
     "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
     "base_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
@@ -252,20 +263,20 @@
     "system_data_features": 40,
     "canonical_submodules": null,
     "historical_discovery_claim_records": 12,
-    "current_retained_claim_records": 14,
+    "current_retained_claim_records": 15,
     "current_provisional_source_claims": 8,
     "historical_already_fixed_records": 2,
-    "historical_remediated_records": 4
+    "historical_remediated_records": 5
   },
   "counts": {
-    "retained_claim_records": 14,
+    "retained_claim_records": 15,
     "provisional_source_claims": 8,
     "provisional_P1": 8,
     "historical_already_fixed": 2,
-    "historical_remediated": 4,
-    "bounded_disposition_tests_passed": 99,
-    "bounded_disposition_assertions": 1931,
-    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY only; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, and every overlapping supporting execution",
+    "historical_remediated": 5,
+    "bounded_disposition_tests_passed": 155,
+    "bounded_disposition_assertions": 2403,
+    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY plus only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, the initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO, the root 1-test red reproduction, every intermediate corrective subset or stopped run, the final isolated corrective 56/472 replay, DNS 63/186, Facility execution, and every overlapping supporting execution",
     "med_rbac_bounded_tests": 73,
     "med_rbac_bounded_test_assertions": 1481,
     "med_cd_scope_focused_tests": 5,
@@ -275,7 +286,7 @@
     "med_cd_atomicity_race_subscenarios": 3,
     "med_cd_atomicity_supporting_tests": 43,
     "med_cd_atomicity_supporting_assertions": 716,
-    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764 total, and remains excluded from the current RUN-184 99/1931 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
+    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764 and RUN-184 99/1931 totals, and remains excluded from the current RUN-187 155/2403 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
     "safe_alert_dedup_focused_tests": 5,
     "safe_alert_dedup_focused_assertions": 60,
     "safe_alert_dedup_supporting_control_room_bridge_tests": 28,
@@ -294,6 +305,12 @@
     "fleet_trip_playback_site_privacy_baseline_failed": 3,
     "fleet_trip_playback_site_privacy_baseline_passed": 2,
     "fleet_trip_playback_site_privacy_baseline_assertions": 30,
+    "monitoring_metric_replay_dedupe_focused_tests": 56,
+    "monitoring_metric_replay_dedupe_focused_assertions": 472,
+    "monitoring_metric_replay_initial_superseded_tests": 49,
+    "monitoring_metric_replay_initial_superseded_assertions": 392,
+    "monitoring_metric_replay_initial_post_merge_verdict": "NO_GO_ZERO_DENOMINATOR_CREDIT",
+    "monitoring_metric_replay_option_a_deployment_verified": false,
     "final_P0": 0,
     "final_P1": 0,
     "complete_prompt_finding_schema": 0,
@@ -390,17 +407,20 @@
       "audit_completion": 0
     }
   },
-  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and four retained historical remediated records remain reviewable. RUN-183 establishes the FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01 reproduced-and-remediated page/data disposition on local main only; RUN-183R independently authorizes one new historical-remediated identity, and RUN-184 alone adds the live record. Only the unique post-merge playback 11/167 execution extends the prior 88/1764 bounded-disposition denominator to 99/1931. Its baseline 3-failed/2-passed/30-assertion reproduction, isolated 11/167 replay, and supporting 20/215 regressions remain separately reported and uncredited. CAP-FLEET-VEHICLE-REGISTER is a candidate reporting association only; queue index 85 remains PENDING_FRESH_SEMANTIC_REVIEW, and no owner, bridge, page, queue, matrix, or feature-union credit follows. The exact playback page/data Site, provenance, direct-object, driver-identity, consent/time/asset telemetry contract is bounded; route/frontend/write/telemetry-lifecycle/adjacent ownership and broader Fleet correctness are not inherited. Local main contains Fleet merge 4038cf7fe5a789ca64e436300f2cf4b94ac16db4 while origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; publication and release remain false. Reporting input a900f078c9c05f587f6f7884f5fe715076891416 includes the disjoint Monitoring fix in exactly three paths with zero inherited reporting, execution, finding, or completion credit. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
+  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and five retained historical remediated records remain reviewable. RUN-186/R establish and independently authorize only the MON-METRIC-REPLAY-DEDUPE-01 historical-remediated record. The initial 49/392 isolated and post-merge runs were later adjudicated NO-GO and receive no denominator credit; only the final post-corrective-merge 56/472 execution extends 99/1931 to 155/2403. The final corrected isolated replay, red reproduction, intermediate subsets, stopped run, DNS, Facility, and overlapping support remain separate and uncredited. Monitoring has no canonical or candidate feature association: feature_id and candidate_feature_id are null with UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW, and no static owner, bridge, page, queue, matrix, feature-union, DNS, or Facility credit follows. Option A is a deployment prerequisite only: quiesce old monitoring workers; reconcile pending or incoherent rows; apply migration 000110; then start new workers after cutover reconciliation; poisoned subsecond evidence requires operator reconciliation. This prerequisite has no production migration, deployment, publication, or release credit. Origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; both Monitoring integrations in this remediation lineage remain local-only and unpublished. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
   "reconciliation": {
     "retained_record_ids_unique": true,
     "current_provisional_ids_unique": true,
-    "retained_record_count": 14,
+    "retained_record_count": 15,
     "current_provisional_count": 8,
     "historical_already_fixed_count": 2,
-    "historical_remediated_count": 4,
-    "every_primary_feature_id_in_canonical_matrix": true,
+    "historical_remediated_count": 5,
+    "every_non_null_primary_feature_id_in_canonical_matrix": true,
+    "records_without_primary_or_candidate_feature_id": [
+      "MON-METRIC-REPLAY-DEDUPE-01"
+    ],
     "final_ids_cross_file_reconciled": false,
-    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, and FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01 are retained as historical remediated; the other 8 records remain provisional. Playback remediation is limited to its page/data approved-Site, canonical provenance, concealment, driver privacy, and telemetry filtering contract and is not published to origin/main. CAP-FLEET-VEHICLE-REGISTER remains a candidate reporting association with PENDING_FRESH_SEMANTIC_REVIEW status; queue index 85 and all ownership, bridge, page, queue, matrix, and feature-union accounting remain unchanged. Route/frontend/write/telemetry-lifecycle/adjacent ownership, broader Fleet correctness, browser, benchmark, release, full-suite coverage, and completion credit are not inherited. None satisfies the cross-file final-finding gate."
+    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01, and MON-METRIC-REPLAY-DEDUPE-01 are retained as historical remediated; the other 8 records remain provisional. Monitoring remediation is limited to canonical metric replay, durable value-free receipts, partial recovery, current-evidence tuple ordering, and the explicit option-A cutover boundary. It has null feature_id and candidate_feature_id, UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW status, and zero static ownership. Queue index 85 and all ownership, bridge, page, queue, matrix, feature-union, DNS, and Facility accounting remain unchanged. Browser, benchmark, deployment, publication, release, full-suite coverage, and completion credit are not inherited. None satisfies the cross-file final-finding gate."
   },
   "records": [
     {
@@ -3242,6 +3262,260 @@
         "pass": false,
         "completion": false
       }
+    },
+    {
+      "id": "MON-METRIC-REPLAY-DEDUPE-01",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+      "feature_id": null,
+      "candidate_feature_id": null,
+      "feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+      "feature_id_role": "NO_CANONICAL_OR_CANDIDATE_FEATURE_ASSOCIATION_ZERO_STATIC_OWNERSHIP_CREDIT",
+      "related_feature_ids": [],
+      "historical_provenance": {
+        "application_commit": "a900f078c9c05f587f6f7884f5fe715076891416",
+        "application_tree": "852126934a18a1364244a35f7789263779e47485",
+        "classification": "REAL_HISTORICAL_MONITORING_METRIC_REPLAY_DEDUPE_AND_CUTOVER_CONDITION",
+        "historical_risk": "A duplicate or partial observation replay could project request-time metric data instead of canonical stored evidence, rewrite or recount history, rewind current state, lose durable receipt evidence across mixed-worker cutover, or strand a recoverable partial write.",
+        "preserved_identity_only": true,
+        "new_record_authorized_by_run_186r": true,
+        "record_present_before_run_187": false,
+        "pre_run_187_register_sha256": "28622b14799477cfa37069bffd16f500f429ff5013ac418ed75394486cb24bc3"
+      },
+      "current_adjudication": {
+        "application_baseline_commit": "a900f078c9c05f587f6f7884f5fe715076891416",
+        "application_baseline_tree": "852126934a18a1364244a35f7789263779e47485",
+        "initial_fix_commit": "f521bc0b87222e56b4822e7cb9c935486e279e76",
+        "initial_fix_tree": "7a1862f2aab2844ca568061d3f9ee78201026cbd",
+        "initial_merge_commit": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
+        "initial_merge_tree": "e66c50a3b514967eec70e4774a312bff376bb66a",
+        "initial_post_merge_verdict": "NO_GO_ZERO_DENOMINATOR_CREDIT",
+        "corrective_fix_commit": "c82f57779baf623c4e94ac4619b11c1b675d0230",
+        "corrective_fix_tree": "095cd7b1940988be334979af22008c635fdcaf58",
+        "application_commit": "18652d545c788f1dcdbe57662e5b1e5472d6cae7",
+        "repository_tree": "095cd7b1940988be334979af22008c635fdcaf58",
+        "current_local_main_commit": "f938c6d989f5fef052f08b9f1012116fb5cf2f69",
+        "current_local_main_tree": "70b2339300278bc0c20e32ed091f74b442bea76d",
+        "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+        "verdict": "REPRODUCED_INITIAL_FIX_POST_MERGE_NO_GO_CORRECTED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED",
+        "scope": "Canonical stored monitoring-observation metric projection; value-free durable per-point receipts; partial-failure resume without re-probe; Site, Device, collector, series and observed-time integrity; six-decimal current-evidence ordering; and option-A mixed-worker cutover only.",
+        "run_186_receipt": "evidence/runtime/current-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.json",
+        "run_186_receipt_sha256": "bf2cd03ca2ab7aeb6a9d1093b3c08aba5a1bc29342cc4fda6fa57ef286c2f1e5",
+        "run_186r_review": "evidence/runtime/current-run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36.json",
+        "run_186r_review_sha256": "035271d7bfcd4256a59f01e9953f9cd8074466c0389f74ce82325a46ee6a6af7",
+        "application_remediation_required": true,
+        "corrective_application_remediation_required_after_no_go": true,
+        "application_source_changed": true,
+        "integrated_to_main": true,
+        "published_to_origin_main": false,
+        "publication_authorized": false,
+        "feature_identity_assigned": false,
+        "static_route_or_page_feature_ownership_inherited": false,
+        "static_controller_action_bridge_inherited": false,
+        "queue_advance_inherited": false,
+        "dns_response_binding_inherited": false,
+        "facility_signal_delivery_inherited": false,
+        "broader_monitoring_correctness_inherited": false
+      },
+      "option_a_deployment_boundary": {
+        "accepted_option": "A_CANONICAL_WHOLE_SECOND_MIXED_WORKER_BRIDGE",
+        "prerequisites_in_order": [
+          "quiesce old monitoring workers",
+          "reconcile pending or incoherent rows",
+          "apply migration 000110",
+          "start new workers only after cutover reconciliation"
+        ],
+        "poisoned_subsecond_evidence_requires_operator_reconciliation": true,
+        "verified_in_production": false,
+        "migration_deployment_credit": false,
+        "release_or_publication_credit": false
+      },
+      "passes": [
+        "P2",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Monitoring",
+        "submodule": "CANONICAL_METRIC_PROJECTION_REPLAY_AND_CUTOVER_BOUNDARY",
+        "submodule_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW_ZERO_STATIC_OWNERSHIP_CREDIT"
+      },
+      "actor_and_job": {
+        "actor": "Monitoring observation ingestor and retry worker",
+        "secondary_actors": "Direct runner retries, mixed-version workers, late unique observations, partial multi-point failures, and operator cutover reconciliation in bounded tests and source review",
+        "job": "Persist canonical observations and project each metric point exactly once without rewriting history or regressing current evidence",
+        "status": "BOUNDED_TEST_ACTORS_VALIDATED_NOT_REPRESENTATIVE_SIGNED_IN_BROWSER"
+      },
+      "route_url": {
+        "route_names": null,
+        "route_paths": null,
+        "raw_route_path_field": null,
+        "ownership_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+        "status": "NO_ROUTE_OR_PAGE_FEATURE_ASSOCIATION_ESTABLISHED"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": null,
+        "application_commit": "18652d545c788f1dcdbe57662e5b1e5472d6cae7",
+        "status": "NO_FRONTEND_ASSOCIATION_OR_CREDIT"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_RETAINED_HISTORICAL_RECORD"
+      },
+      "backend_anchor": {
+        "matrix_anchors": null,
+        "claim_anchors": [
+          "app/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+          "app/Domain/Monitoring/Services/MetricIngestService.php",
+          "app/Domain/Monitoring/Services/MonitorCheckRunner.php",
+          "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+          "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+          "database/migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php",
+          "tests/Feature/Monitoring/MetricRetentionTest.php",
+          "tests/Feature/Monitoring/RunMonitorCheckTest.php"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "BOUNDED_SERVICE_MODEL_MIGRATION_AND_REGRESSION_REVIEW",
+        "application_commit": "18652d545c788f1dcdbe57662e5b1e5472d6cae7"
+      },
+      "current_behaviour": {
+        "classification": "REMEDIATED_LOCAL_MAIN_BOUNDED_VERIFIED_NOT_PUBLISHED_DEPLOYMENT_PREREQUISITE_OPEN",
+        "summary": "Fresh observations and direct retries project canonical stored metric payload. Durable value-free receipts make exact and historical replay idempotent, partial projection resumes without re-probing, unique late points cannot regress the current evidence tuple, provenance mismatch fails closed, and fresh/already-applied migration paths install guarded cutover bridges. Poisoned pre-cutover subsecond evidence remains fail-closed for operator reconciliation.",
+        "runtime_observed": true,
+        "runtime_scope": "Only the final post-corrective-merge MetricRetentionTest plus RunMonitorCheckTest execution contributes 56 tests / 472 assertions once. The initial isolated and post-merge 49/392 runs later received NO-GO; the root red, intermediate subsets, stopped run, final isolated 56/472 replay, DNS 63/186, and Facility execution receive zero denominator credit."
+      },
+      "current_workflow": {
+        "matrix_summary": "Bounded service-level persistence and recovery contract only; no canonical feature, route, page, representative browser, deployment, or module completion is established.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "BOUNDED_CANONICAL_REPLAY_PARTIAL_RECOVERY_ORDERING_PROVENANCE_AND_CUTOVER_PATHS_EXECUTED; PRODUCTION_CUTOVER_BROWSER_EASE_AND_BROADER_MONITORING_NOT_EXECUTED"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": null
+      },
+      "evidence": {
+        "current_remediation_receipt": "evidence/runtime/current-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.json",
+        "independent_artifact_review": "evidence/runtime/current-run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36.json",
+        "claim_anchors": [
+          "app/Domain/Monitoring/Services/MetricIngestService.php",
+          "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+          "database/migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php",
+          "tests/Feature/Monitoring/MetricRetentionTest.php",
+          "tests/Feature/Monitoring/RunMonitorCheckTest.php"
+        ],
+        "test_commands_executed": 1,
+        "tests_executed": 56,
+        "assertions": 472,
+        "initial_superseded_tests": 49,
+        "initial_superseded_assertions": 392,
+        "browser_cells": 0,
+        "database_checks": 1,
+        "database_cleanup": "global PHP/Pest zero; exact numeric PID-suffixed schemas zero; corrective upgrade schemas zero; isolated corrective worktree removed cleanly"
+      },
+      "problem_root_cause": "Duplicate source-key observations returned canonical database evidence but metric projection could consume replay request payload; durable completion and per-point evidence were insufficient across partial external writes, historical replay, timestamp precision, and mixed-worker migration cutover.",
+      "impact": "Before final correction, a tampered, late, partial, or mixed-version replay could overwrite or recount metric history, rewind current summaries, invalidate coverage, strand canonical recovery, or suppress a distinct same-second point.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Project only immutable canonical stored observation payload and seal completion only after all points succeed.",
+        "Persist value-free per-point receipt evidence so exact, historical, partial, and direct-runner retries converge without recounting, rewinding, or re-probing.",
+        "Fail closed on provenance, series, timestamp, poisoned cutover, or privacy-classification mismatch while preserving one operating organisation across multiple Sites."
+      ],
+      "better_oblivion_design": {
+        "proposal": "Keep canonical observation evidence immutable, bind every projected point to a durable value-free receipt, update current evidence atomically only for a current point, and make mixed-worker cutover explicit and fail-closed.",
+        "status": "IMPLEMENTED_NATIVELY_WITHOUT_BENCHMARK_DESIGN_DEPLOYMENT_OR_RELEASE_CREDIT"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [],
+      "rbac_privacy": "One operating organisation across multiple Sites; canonical Site, Device, collector, stored observation provenance, and privacy classification are the boundaries, not tenant isolation.",
+      "priority": "P1",
+      "priority_status": "HISTORICAL_REMEDIATED_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Completed: canonical replay defect reproduced and initial nine-path remediation integrated at 778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
+        "NO-GO retained: initial 49/392 isolated and post-merge results did not close fractional-time or mixed-worker cutover correctness",
+        "Completed: corrective seven-path remediation integrated at 18652d545c788f1dcdbe57662e5b1e5472d6cae7 and final post-merge 56/472 passed",
+        "Deployment prerequisite open: quiesce old workers; reconcile pending or incoherent rows; apply 000110; then start new workers; operator-reconcile poisoned subsecond evidence"
+      ],
+      "confidence": {
+        "level": "HIGH_FOR_BOUNDED_MONITORING_METRIC_REPLAY_REMEDIATION_DISPOSITION",
+        "evidence_gap": "Production cutover, representative browser, full-suite/coverage, canonical feature identity, static ownership, ease, target-specific benchmark, DNS, Facility, and broader Monitoring correctness remain unexecuted or unadjudicated."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording, or distinctive layout may be copied.",
+      "interim_safeguard": "Before deployment, quiesce old monitoring workers, reconcile pending and incoherent observations and poisoned subsecond evidence, apply migration 000110, and only then start new workers.",
+      "acceptance_criteria": {
+        "given_when_then": "Given fresh, duplicate, tampered, historical, unique-late, partial multi-point, direct-runner, precision-conflicting, provenance-mismatched, old-worker and already-applied-000100 cases, when canonical projection or recovery runs, then each completed canonical point has one value-free receipt, replay cannot rewrite or recount, the current tuple advances only for current evidence, failures remain retryable or fail closed visibly, and cutover follows the option-A prerequisite without granting deployment credit.",
+        "status": "BOUNDED_MET_FOR_HISTORICAL_CLAIM_REMEDIATION_NOT_FINAL_FINDING_FEATURE_DEPLOYMENT_OR_COMPLETION"
+      },
+      "validation_plan": {
+        "required": "Retain focused canonical payload, exact/historical replay, partial recovery, direct no-reprobe, six-decimal ordering, receipt mismatch/privacy, legacy bridge, poisoned subsecond, and already-applied-000100 upgrade coverage; separately execute and evidence production cutover.",
+        "unit": "NOT_SEPARATELY_REQUIRED_FOR_THIS_REMEDIATION",
+        "feature": "EXECUTED_56_TESTS_472_ASSERTIONS_ON_FINAL_CORRECTIVE_LOCAL_MAIN",
+        "architecture": "TWO_FINAL_STATIC_GO_REVIEWS_PLUS_RUN186R_EXACT_ARTIFACT_GO",
+        "e2e": "NOT_EXECUTED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED_OR_CREDITED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "canonical or candidate feature identity remains unassigned",
+        "option-A production cutover and poisoned-subsecond operator reconciliation remain unverified"
+      ],
+      "independent_review": {
+        "status": "COMPLETED_FINAL_PRODUCTION_SCHEMA_TEST_GO_PLUS_RUN186R_EXACT_ARTIFACT_GO",
+        "reviewer": "independent production/schema/test reviewers and RUN-186R exact-artifact reviewer",
+        "disagreements": "Initial remediation was reopened after a post-merge NO-GO for fractional timestamp precision and mixed-worker receipt loss. Final GO is bounded to option A and preserves the production deployment prerequisite.",
+        "reconciliation": "RUN-186 preserves the complete initial, NO-GO, corrective, runtime, cleanup, and local integration lineage. RUN-186R alone authorizes one unassigned-feature historical-remediated record; RUN-187 alone changes the live register."
+      },
+      "unresolved_fields": [
+        "canonical or candidate FEATURE-ID and static source ownership",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline, and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "production option-A cutover, poisoned-subsecond reconciliation, full-suite coverage, representative browser, DNS, Facility, and broader Monitoring correctness"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
     }
   ],
   "current_static_linkage": {
@@ -3602,6 +3876,23 @@
       "audit_complete": false,
       "superseded_by_run_184_reporting_sources": true,
       "run_185_dashboard_verification_required": true
+    },
+    "run_185": {
+      "run_id": "RUN-185-AUDIT-DASHBOARD-VERIFICATION-WAVE-35",
+      "receipt_sha256": "e6965bba3f25b80e6ce70aa3656802956bed935d79aaf46576e1420f0c65e07c",
+      "receipt_self_seal_sha256": "d49f27d1ed2f7f4f53c366d711653bbbb0fc541ba2d7c08f2780d4319193e776",
+      "dashboard_sha256": "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7",
+      "status": "AUDIT_DASHBOARD_RUN184_EXACT_ARTIFACT_RESPONSIVE_NAVIGATION_RESOURCE_VERIFICATION_GO_LOCAL_ONLY_SERVER_CLEANUP_COMPLETE_ZERO_APPLICATION_PUBLICATION_FINAL_FINDING_GATE4_OR_AUDIT_COMPLETION_CREDIT",
+      "viewports": "4/4",
+      "visible_boundary_checks": "117/117",
+      "navigation": "10/10",
+      "unique_local_resources": "463/463",
+      "anchor_elements": "868/868",
+      "application_browser_credit": false,
+      "publication_credit": false,
+      "audit_complete": false,
+      "superseded_by_run_187_reporting_sources": true,
+      "run_188_dashboard_verification_required": true
     }
   },
   "current_designated_application_access_preflight": {

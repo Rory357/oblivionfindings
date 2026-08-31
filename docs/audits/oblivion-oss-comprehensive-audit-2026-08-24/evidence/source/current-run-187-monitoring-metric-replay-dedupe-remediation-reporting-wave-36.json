@@ -1,0 +1,412 @@
+{
+  "schema_version": "run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36-v1",
+  "run_id": "RUN-187-MON-METRIC-REPLAY-DEDUPE-01-REMEDIATION-REPORTING-WAVE-36",
+  "status": "MONITORING_METRIC_REPLAY_DEDUPE_HISTORICAL_REMEDIATION_REPORTING_MATERIALIZED_DASHBOARD_RUN188_REQUIRED_ZERO_STATIC_DEPLOYMENT_PUBLICATION_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "materialized_on": "2026-08-31",
+  "architecture_boundary": "Single operating organisation across multiple Sites; Site access, canonical ownership, exact permissions, consent and privacy remain the boundaries.",
+  "pins": {
+    "reporting_input_commit": "50878f2d3008e17979e049d08d66d4b2254499fa",
+    "reporting_input_tree": "9a9e45ea62624bdeca3a6f1d3683dd23735764de",
+    "reporting_input_parent": "f938c6d989f5fef052f08b9f1012116fb5cf2f69",
+    "reporting_input_subject": "audit: seal RUN186 metric replay remediation",
+    "reporting_materializer": {
+      "path": "generators/materialize-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.py",
+      "sha256": "342e5cddf6e8e4150a20e43e7efbfa56abc8754af97055e1a66eb59582dcde65",
+      "git_blob_id": "f2c8b4d70c178aab69d615665ef699ad0252a52d",
+      "bytes": 32816,
+      "lines": 608
+    },
+    "dashboard_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "91d6fc4d29fad8f584a8dbc5248d07254c736d605932babd119158754168ba25",
+      "git_blob_id": "90b7377f34b8da4a0c5a3920c4bda0fac3705c6b",
+      "bytes": 717425,
+      "lines": 6245
+    },
+    "baseline_findings": {
+      "path": "findings.json",
+      "sha256": "28622b14799477cfa37069bffd16f500f429ff5013ac418ed75394486cb24bc3",
+      "ordered_record_list_sha256": "15b85c4ddd6ab297aa74ec8042e0606ccf593dff53b0bbc672a38e9b0990e19e",
+      "records": 14
+    },
+    "updated_findings": {
+      "path": "findings.json",
+      "sha256": "9c4aae028a358f0d1cb005fa31650ab7c696fb71731fb6961ccc4962f2cac5c9",
+      "git_blob_id": "22c2766988b684c8a3c3f6cd8b817ce37741f4b2",
+      "bytes": 630225,
+      "lines": 11115
+    },
+    "frozen_run_185_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7",
+      "git_blob_id": "35e98d2f17e081eb01ec51de1429e9eab1208697",
+      "bytes": 304332,
+      "lines": 78
+    },
+    "run_185_receipt": {
+      "path": "evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json",
+      "sha256": "e6965bba3f25b80e6ce70aa3656802956bed935d79aaf46576e1420f0c65e07c",
+      "git_blob_id": "9ce011eed77c68d14584d10e62094861dff4eba2",
+      "bytes": 38174,
+      "lines": 941
+    },
+    "run_186_generator": {
+      "path": "generators/materialize-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.py",
+      "sha256": "983b003dc149c966cdea9c59dd3cd4a766f4a5f0382e881f90b9d0cde9b86cee",
+      "git_blob_id": "b4186cd86cd9b8536dad76e0f0aca2488fe053ed",
+      "bytes": 51768,
+      "lines": 1171
+    },
+    "run_186_receipt": {
+      "path": "evidence/runtime/current-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.json",
+      "sha256": "bf2cd03ca2ab7aeb6a9d1093b3c08aba5a1bc29342cc4fda6fa57ef286c2f1e5",
+      "git_blob_id": "3ab0399abc912ce16df65d40e7ac91f3e1fb65d5",
+      "bytes": 42766,
+      "lines": 1034
+    },
+    "run_186r_generator": {
+      "path": "generators/materialize-independent-run-186-monitoring-metric-replay-dedupe-remediation-review-wave-36.py",
+      "sha256": "e081b3807c81f8f8d9c6982faddf63b548db650437cde13ff424730181361026",
+      "git_blob_id": "2e178ca16456c918f083296d81403b8d1d9062ae",
+      "bytes": 38910,
+      "lines": 854
+    },
+    "run_186r_receipt": {
+      "path": "evidence/runtime/current-run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36.json",
+      "sha256": "035271d7bfcd4256a59f01e9953f9cd8074466c0389f74ce82325a46ee6a6af7",
+      "git_blob_id": "86a08a68944710e6e5ae4e16e90f495dd7584db0",
+      "bytes": 14630,
+      "lines": 368
+    },
+    "application_lineage": {
+      "baseline_commit": "a900f078c9c05f587f6f7884f5fe715076891416",
+      "baseline_tree": "852126934a18a1364244a35f7789263779e47485",
+      "initial_fix_commit": "f521bc0b87222e56b4822e7cb9c935486e279e76",
+      "initial_fix_tree": "7a1862f2aab2844ca568061d3f9ee78201026cbd",
+      "initial_merge_commit": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
+      "initial_merge_tree": "e66c50a3b514967eec70e4774a312bff376bb66a",
+      "corrective_fix_commit": "c82f57779baf623c4e94ac4619b11c1b675d0230",
+      "corrective_fix_tree": "095cd7b1940988be334979af22008c635fdcaf58",
+      "corrective_merge_commit": "18652d545c788f1dcdbe57662e5b1e5472d6cae7",
+      "corrective_merge_tree": "095cd7b1940988be334979af22008c635fdcaf58",
+      "current_local_main_commit": "f938c6d989f5fef052f08b9f1012116fb5cf2f69",
+      "current_local_main_tree": "70b2339300278bc0c20e32ed091f74b442bea76d",
+      "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+      "published": false
+    },
+    "initial_paths": [
+      "app/Domain/Monitoring/Data/ObservationInput.php",
+      "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+      "app/Domain/Monitoring/Models/MonitorObservation.php",
+      "app/Domain/Monitoring/Services/MetricIngestService.php",
+      "app/Domain/Monitoring/Services/MonitorCheckRunner.php",
+      "app/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+      "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+      "tests/Feature/Monitoring/MetricRetentionTest.php",
+      "tests/Feature/Monitoring/RunMonitorCheckTest.php"
+    ],
+    "corrective_paths": [
+      "app/Domain/Monitoring/Models/MetricCurrentSummary.php",
+      "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+      "app/Domain/Monitoring/Models/MetricSeries.php",
+      "app/Domain/Monitoring/Services/MetricIngestService.php",
+      "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+      "database/migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php",
+      "tests/Feature/Monitoring/MetricRetentionTest.php"
+    ],
+    "current_issue_union_paths": [
+      "app/Domain/Monitoring/Data/ObservationInput.php",
+      "app/Domain/Monitoring/Models/MetricCurrentSummary.php",
+      "app/Domain/Monitoring/Models/MetricPointReceipt.php",
+      "app/Domain/Monitoring/Models/MetricSeries.php",
+      "app/Domain/Monitoring/Models/MonitorObservation.php",
+      "app/Domain/Monitoring/Services/MetricIngestService.php",
+      "app/Domain/Monitoring/Services/MonitorCheckRunner.php",
+      "app/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+      "database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php",
+      "database/migrations/2026_08_30_000110_govern_monitoring_metric_projection_cutover.php",
+      "tests/Feature/Monitoring/MetricRetentionTest.php",
+      "tests/Feature/Monitoring/RunMonitorCheckTest.php"
+    ],
+    "reporting_records": [
+      {
+        "path": "00-executive-summary.md",
+        "sha256": "e01925e0739d94dd8c276160b1f9587a8790b551d056372371e000e93788bf22",
+        "git_blob_id": "07600c307272e0d745b20a1c47de59ddb594bcbc",
+        "bytes": 150668,
+        "lines": 598
+      },
+      {
+        "path": "01-repository-module-map.md",
+        "sha256": "aade98ec13ff442f188d1121c7d58d1928424961e26ceadae50d003adc11d53f",
+        "git_blob_id": "0bf84f2ca66333a9cb5c128b4bfa310a5f452b38",
+        "bytes": 48814,
+        "lines": 262
+      },
+      {
+        "path": "07-module-findings.md",
+        "sha256": "2faa57cc3223844f81adfee9bc6eb6f1fefa550a1c5d95138f9839f5672cb77c",
+        "git_blob_id": "73648afa9bad514958a8da5cf28497e3c49bf66b",
+        "bytes": 362136,
+        "lines": 835
+      },
+      {
+        "path": "11-prioritised-roadmap.md",
+        "sha256": "623e2fd37ebc521abb66f62e01549130b87b5fc3a2002a59355967cf8b20542f",
+        "git_blob_id": "1314db6588564da31f3ba7667f75aec75ca44d7a",
+        "bytes": 17304,
+        "lines": 76
+      },
+      {
+        "path": "12-native-build-and-do-not-copy-register.md",
+        "sha256": "24bb7a08bb6e87aaf015018b601f4699784745bbab32138e7e56fcdda074132b",
+        "git_blob_id": "0f6eb9cbedd6cb0c406ce782e3960907494c3abf",
+        "bytes": 118616,
+        "lines": 509
+      },
+      {
+        "path": "13-unresolved-questions-and-evidence-gaps.md",
+        "sha256": "125182436c75293abc67e4ca59f94bcb4b78961fd87d0496da518000691cfe2d",
+        "git_blob_id": "ee1df149c2b8da55f4357920afae0fed31e553f7",
+        "bytes": 42765,
+        "lines": 111
+      },
+      {
+        "path": "findings.json",
+        "sha256": "9c4aae028a358f0d1cb005fa31650ab7c696fb71731fb6961ccc4962f2cac5c9",
+        "git_blob_id": "22c2766988b684c8a3c3f6cd8b817ce37741f4b2",
+        "bytes": 630225,
+        "lines": 11115
+      },
+      {
+        "path": "generators/build-current-audit-dashboard.py",
+        "sha256": "91d6fc4d29fad8f584a8dbc5248d07254c736d605932babd119158754168ba25",
+        "git_blob_id": "90b7377f34b8da4a0c5a3920c4bda0fac3705c6b",
+        "bytes": 717425,
+        "lines": 6245
+      }
+    ]
+  },
+  "reporting_transition": {
+    "finding_id": "MON-METRIC-REPLAY-DEDUPE-01",
+    "authorized_by_run_186r": true,
+    "status_after": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "feature_id": null,
+    "candidate_feature_id": null,
+    "related_feature_ids": [],
+    "feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+    "static_ownership_credit": false,
+    "counts_before": {
+      "retained_claim_records": 14,
+      "provisional_source_claims": 8,
+      "historical_already_fixed": 2,
+      "historical_remediated": 4,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "counts_after": {
+      "retained_claim_records": 15,
+      "provisional_source_claims": 8,
+      "historical_already_fixed": 2,
+      "historical_remediated": 5,
+      "final_P0": 0,
+      "final_P1": 0
+    }
+  },
+  "bounded_execution_accounting": {
+    "prior": {
+      "tests": 99,
+      "assertions": 1931
+    },
+    "counted_once": {
+      "tests": 56,
+      "assertions": 472
+    },
+    "unique_total": {
+      "tests": 155,
+      "assertions": 2403
+    },
+    "initial_49_392_denominator_credit": false,
+    "root_red_reproduction_denominator_credit": false,
+    "intermediate_or_stopped_runs_denominator_credit": false,
+    "final_isolated_replay_denominator_credit": false,
+    "dns_63_186_denominator_credit": false,
+    "facility_execution_denominator_credit": false
+  },
+  "option_a_deployment_boundary": {
+    "accepted_option": "A_CANONICAL_WHOLE_SECOND_MIXED_WORKER_BRIDGE",
+    "prerequisites_in_order": [
+      "quiesce old monitoring workers",
+      "reconcile pending or incoherent rows",
+      "apply migration 000110",
+      "start new workers only after cutover reconciliation"
+    ],
+    "poisoned_subsecond_evidence_requires_operator_reconciliation": true,
+    "verified_in_production": false,
+    "migration_deployment_credit": false,
+    "publication_credit": false,
+    "final_finding_or_completion_credit": false
+  },
+  "preservation_boundary": {
+    "dashboard_sha256": "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7",
+    "dashboard_html_changed": false,
+    "static_ownership": {
+      "owners": 666,
+      "routes": 309,
+      "pages": 357,
+      "controller_action_bridges": 97
+    },
+    "queue": {
+      "total": 507,
+      "reviewed": 120,
+      "pending": 387,
+      "owned": 98,
+      "without_ownership": 409,
+      "next_zero_based_index": 85,
+      "advanced": false
+    },
+    "benchmark": {
+      "mapped": 2,
+      "total": 340,
+      "final_no_match_or_NCM": 0,
+      "unresolved": 338
+    },
+    "source_denominator": {
+      "total": 3929,
+      "owned": 666,
+      "residual": 3263,
+      "percent": "16.950878"
+    },
+    "P0": 0,
+    "P1": 0
+  },
+  "run_185_history": {
+    "viewports": "4/4",
+    "visible_checks": "117/117",
+    "navigation": "10/10",
+    "resources": "463/463",
+    "anchors": 868,
+    "credit": "EXACT_SUPERSEDED_RUN184_DASHBOARD_ONLY"
+  },
+  "dashboard_forward_gate": {
+    "required_run": "RUN-188",
+    "generator": "generators/materialize-run-188-audit-dashboard-verification-wave-36.py",
+    "receipt": "evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json",
+    "dashboard_html_changed_by_run_187": false,
+    "fresh_four_viewport_verification_required": true,
+    "forward_paths_intentionally_unhashed": true
+  },
+  "reporting_transaction": {
+    "exact_ten_path_allowlist": [
+      "00-executive-summary.md",
+      "01-repository-module-map.md",
+      "07-module-findings.md",
+      "11-prioritised-roadmap.md",
+      "12-native-build-and-do-not-copy-register.md",
+      "13-unresolved-questions-and-evidence-gaps.md",
+      "evidence/source/current-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.json",
+      "findings.json",
+      "generators/build-current-audit-dashboard.py",
+      "generators/materialize-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.py"
+    ],
+    "reporting_surfaces": [
+      "00-executive-summary.md",
+      "01-repository-module-map.md",
+      "07-module-findings.md",
+      "11-prioritised-roadmap.md",
+      "12-native-build-and-do-not-copy-register.md",
+      "13-unresolved-questions-and-evidence-gaps.md",
+      "findings.json",
+      "generators/build-current-audit-dashboard.py"
+    ],
+    "new_generator": "generators/materialize-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.py",
+    "new_receipt": "evidence/source/current-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.json",
+    "materializer_wrote_only": [
+      "evidence/source/current-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.json"
+    ],
+    "strict_utf8_lf_text_validated": true,
+    "strict_duplicate_key_json_validated": true,
+    "dashboard_preserved_byte_for_byte": true
+  },
+  "credit_boundary": {
+    "live_findings_register_and_reporting_status": true,
+    "canonical_or_candidate_feature_identity": false,
+    "static_route_or_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_advance": false,
+    "application_runtime_reexecution": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "migration_deployment": false,
+    "release": false,
+    "publication": false,
+    "final_finding": false,
+    "pass": false,
+    "feature_or_module_completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "completion_gates": {
+    "1": false,
+    "2": false,
+    "3": false,
+    "4": false,
+    "5": false,
+    "6": false,
+    "7": false,
+    "8": false,
+    "9": false,
+    "10": false,
+    "11": false,
+    "12": false,
+    "13": false,
+    "14": false,
+    "15": false,
+    "16": false,
+    "17": false,
+    "18": false,
+    "19": false,
+    "20": false,
+    "21": false,
+    "22": false,
+    "23": false,
+    "24": false,
+    "25": false,
+    "26": false
+  },
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "evidence/source/current-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.json"
+  ],
+  "receipt_self_seal_sha256": "ed9fe03582bc147a5524bb2810051e0721cfaa65257893d3f18066b7afa39c97"
+}
