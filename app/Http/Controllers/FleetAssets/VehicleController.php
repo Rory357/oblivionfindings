@@ -567,7 +567,7 @@ class VehicleController extends Controller
     {
         $user = $request->user() ?? abort(403);
         $visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
-        $visibleVehicles = $this->visibleTripVehiclesQuery($visibleSiteIds);
+        $visibleVehicles = $this->visibleVehiclesQuery($visibleSiteIds);
         $visibleTrips = FleetTrip::query()->whereIn(
             'fleet_trips.asset_id',
             (clone $visibleVehicles)->select('assets.id'),
@@ -823,13 +823,24 @@ class VehicleController extends Controller
 
     public function fuel(Request $request)
     {
-        $user = $request->user();
+        $user = $request->user() ?? abort(403);
+        $visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
+        $visibleVehicles = $this->visibleVehiclesQuery($visibleSiteIds);
+        $visibleVehicleIds = fn (): Builder => (clone $visibleVehicles)
+            ->select($visibleVehicles->getModel()->qualifyColumn('id'));
+
         $query = FleetFuelLog::query()
+            ->whereIn('asset_id', $visibleVehicleIds())
             ->with(['asset:id,name,asset_tag', 'user:id,name'])
             ->latest('logged_at');
 
         if ($request->filled('asset_id')) {
-            $query->where('asset_id', (int) $request->input('asset_id'));
+            $assetId = (int) $request->input('asset_id');
+            abort_unless(
+                $assetId > 0 && (clone $visibleVehicles)->whereKey($assetId)->exists(),
+                404,
+            );
+            $query->where('asset_id', $assetId);
         }
 
         if ($request->filled('date_from')) {
@@ -867,6 +878,7 @@ class VehicleController extends Controller
 
         // Summary stats (MTD)
         $mtdQuery = FleetFuelLog::query()
+            ->whereIn('asset_id', $visibleVehicleIds())
             ->whereMonth('logged_at', now()->month)
             ->whereYear('logged_at', now()->year);
 
@@ -876,10 +888,14 @@ class VehicleController extends Controller
         $avgCostPerLitre = $totalLitres > 0 ? round($totalCost / $totalLitres, 3) : 0;
 
         // Hero — whole-fleet, independent of filters (MTD spend/litres + 30-day entry count).
-        $entries30d = FleetFuelLog::where('logged_at', '>=', now()->subDays(30))->count();
+        $entries30d = FleetFuelLog::query()
+            ->whereIn('asset_id', $visibleVehicleIds())
+            ->where('logged_at', '>=', now()->subDays(30))
+            ->count();
 
         // Per-vehicle efficiency (batch-query trip distances to avoid N+1)
         $fuelByAsset = FleetFuelLog::query()
+            ->whereIn('asset_id', $visibleVehicleIds())
             ->selectRaw('asset_id, SUM(quantity_litres) as total_litres')
             ->with('asset:id,name')
             ->groupBy('asset_id')
@@ -887,6 +903,7 @@ class VehicleController extends Controller
             ->get();
 
         $distanceByAsset = FleetTrip::query()
+            ->whereIn('asset_id', $visibleVehicleIds())
             ->whereIn('asset_id', $fuelByAsset->pluck('asset_id'))
             ->where('status', 'completed')
             ->selectRaw('asset_id, SUM(distance_km) as total_distance')
@@ -927,7 +944,7 @@ class VehicleController extends Controller
         $fuelLogs = $query->paginate(25)->withQueryString();
 
         // Get vehicles list for filter dropdown
-        $vehicles = Asset::vehicles()->orderBy('name')->get(['id', 'name'])
+        $vehicles = (clone $visibleVehicles)->orderBy('name')->get(['id', 'name'])
             ->map(fn ($v) => ['id' => $v->id, 'name' => $v->name])->values();
 
         return Inertia::render('fleet-assets/fuel/index', [
@@ -1130,13 +1147,13 @@ class VehicleController extends Controller
     }
 
     /** @param list<int> $siteIds */
-    private function visibleTripVehiclesQuery(array $siteIds): Builder
+    private function visibleVehiclesQuery(array $siteIds): Builder
     {
-        return $this->applyTripAssetSiteScope(Asset::query()->vehicles(), $siteIds);
+        return $this->applyAssetSiteScope(Asset::query()->vehicles(), $siteIds);
     }
 
     /** @param list<int> $siteIds */
-    private function applyTripAssetSiteScope(Builder $query, array $siteIds): Builder
+    private function applyAssetSiteScope(Builder $query, array $siteIds): Builder
     {
         if ($siteIds === []) {
             return $query->whereRaw('1 = 0');
