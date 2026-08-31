@@ -3,14 +3,20 @@
 namespace App\Services\Facility;
 
 use App\Enums\AlertSeverity;
-use App\Models\ControlRoom\SignalSource;
+use App\Jobs\DispatchFacilitySignalOutbox;
 use App\Models\ControlRoomAlert;
+use App\Models\FacilitySignal;
+use App\Models\FacilitySignalOutbox;
 use App\Models\ShiftTask;
 use App\Models\SiteInspectionRecord;
 use App\Models\SiteInspectionSchedule;
 use App\Models\User;
-use App\Services\ControlRoom\SignalProcessingService;
+use Carbon\CarbonInterface;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
+use Throwable;
 
 /**
  * Canonical facility signal emission service.
@@ -18,7 +24,7 @@ use Illuminate\Support\Facades\Log;
  * Covers site/facility operational alerts:
  * - Inspection overdue / failed
  *
- * Flow: facility event → FacilitySignalService → SignalProcessingService → ControlRoomAlert
+ * Flow: facility event → durable source/outbox → Control Room
  */
 class FacilitySignalService
 {
@@ -28,17 +34,12 @@ class FacilitySignalService
 
     public const TYPE_SHIFT_TASK_DUE = 'shift_task_due';
 
-    protected ?SignalSource $signalSource = null;
-
-    public function __construct(
-        protected SignalProcessingService $signalProcessor,
-    ) {}
-
     /**
      * Emit an inspection overdue signal.
      */
     public function emitInspectionOverdue(SiteInspectionSchedule $schedule, int $daysOverdue): void
     {
+        $this->assertCanonicalSchedule($schedule);
         $schedule->loadMissing(['site:id,name', 'assignedTo:id,name']);
 
         // Only safety-critical overdue inspections (>7 days) go to CR as high.
@@ -72,6 +73,18 @@ class FacilitySignalService
         SiteInspectionSchedule $schedule,
         SiteInspectionRecord $record,
     ): void {
+        $this->assertCanonicalSchedule($schedule);
+        if (! $record->exists
+            || $record->getKey() === null
+            || $record->result !== 'fail'
+            || (int) $record->schedule_id !== (int) $schedule->getKey()
+            || (int) $record->site_id !== (int) $schedule->site_id
+        ) {
+            throw new InvalidArgumentException(
+                'A failed Facility signal requires the exact persisted failed inspection record, schedule, and Site.',
+            );
+        }
+
         $schedule->loadMissing(['site:id,name', 'assignedTo:id,name']);
 
         $this->emit(
@@ -161,57 +174,144 @@ class FacilitySignalService
         array $context,
         ?int $siteId = null,
     ): void {
-        $source = $this->getSignalSource();
+        $occurredAt = now();
+        $idempotencyKey = $this->buildIdempotencyKey($signalType, $context, $occurredAt);
+        $normalizedData = array_merge([
+            'title' => $message,
+            'description' => $message,
+            'source_module' => 'facility',
+            'signal_type' => $signalType,
+        ], $context);
 
-        $idempotencyKey = $this->buildIdempotencyKey($signalType, $context);
+        [$signal, $outboxId] = DB::transaction(function () use (
+            $signalType,
+            $severity,
+            $context,
+            $siteId,
+            $idempotencyKey,
+            $occurredAt,
+            $normalizedData,
+        ): array {
+            try {
+                $signal = FacilitySignal::query()->firstOrCreate(
+                    ['idempotency_key' => $idempotencyKey],
+                    [
+                        'site_id' => $siteId,
+                        'inspection_schedule_id' => $context['inspection_schedule_id'] ?? null,
+                        'inspection_record_id' => $context['inspection_record_id'] ?? null,
+                        'signal_type' => $signalType,
+                        'severity_hint' => $severity,
+                        'occurred_at' => $occurredAt,
+                        'payload' => $normalizedData,
+                    ],
+                );
+            } catch (UniqueConstraintViolationException $exception) {
+                // A locking read escapes MySQL's repeatable-read snapshot and
+                // observes the winner of a concurrent first-write race.
+                $signal = FacilitySignal::query()
+                    ->where('idempotency_key', $idempotencyKey)
+                    ->lockForUpdate()
+                    ->first();
+                if ($signal === null) {
+                    throw $exception;
+                }
+            }
 
-        $signalData = [
-            'signal_source_id' => $source?->id,
-            'signal_type_code' => $signalType,
-            'idempotency_key' => $idempotencyKey,
-            'site_id' => $siteId,
-            'client_id' => $context['client_id'] ?? null,
-            'severity_hint' => $severity,
-            'occurred_at' => now(),
-            'payload' => [],
-            'normalized_data' => array_merge([
-                'title' => $message,
-                'description' => $message,
-                'source_module' => 'facility',
-                'signal_type' => $signalType,
-            ], $context),
-        ];
+            $signal = FacilitySignal::query()
+                ->whereKey($signal->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->assertImmutableSignalProvenance(
+                $signal,
+                $signalType,
+                $severity,
+                $context,
+                $siteId,
+            );
+            try {
+                $outbox = FacilitySignalOutbox::query()->firstOrCreate(
+                    ['facility_signal_id' => $signal->id],
+                    ['status' => 'pending'],
+                );
+            } catch (UniqueConstraintViolationException $exception) {
+                $outbox = FacilitySignalOutbox::query()
+                    ->where('facility_signal_id', $signal->id)
+                    ->lockForUpdate()
+                    ->first();
+                if ($outbox === null) {
+                    throw $exception;
+                }
+            }
 
-        try {
-            $signal = $this->signalProcessor->ingest($signalData);
-            $alert = $this->signalProcessor->process($signal);
+            return [$signal, (int) $outbox->id];
+        }, 3);
 
-            if ($alert) {
-                Log::info('FacilitySignalService: alert created', [
-                    'signal_type' => $signalType,
-                    'alert_id' => $alert->id,
-                    'severity' => $severity,
-                    'site_id' => $siteId,
+        $facilitySignalId = (int) $signal->id;
+        $dispatch = function () use ($facilitySignalId, $outboxId): void {
+            try {
+                DispatchFacilitySignalOutbox::dispatch($outboxId);
+            } catch (Throwable $exception) {
+                // The source and outbox are already durable. The scheduled
+                // recovery sweep will dispatch the pending intent.
+                Log::error('Facility safety signal queue dispatch failed', [
+                    'facility_signal_id' => $facilitySignalId,
+                    'outbox_id' => $outboxId,
+                    'error' => $exception->getMessage(),
                 ]);
             }
-        } catch (\Throwable $e) {
-            Log::error('FacilitySignalService: signal emission failed', [
-                'signal_type' => $signalType,
-                'severity' => $severity,
-                'error' => $e->getMessage(),
-            ]);
+        };
+
+        DB::afterCommit($dispatch);
+    }
+
+    /** @param array<string, mixed> $context */
+    private function assertImmutableSignalProvenance(
+        FacilitySignal $signal,
+        string $signalType,
+        string $severity,
+        array $context,
+        ?int $siteId,
+    ): void {
+        $scheduleId = isset($context['inspection_schedule_id'])
+            ? (int) $context['inspection_schedule_id']
+            : null;
+        $recordId = isset($context['inspection_record_id'])
+            ? (int) $context['inspection_record_id']
+            : null;
+
+        if ($signal->signal_type !== $signalType
+            || $signal->severity_hint !== AlertSeverity::normalise($severity)
+            || ! $this->nullableIdsMatch($signal->site_id, $siteId)
+            || ! $this->nullableIdsMatch($signal->inspection_schedule_id, $scheduleId)
+            || ! $this->nullableIdsMatch($signal->inspection_record_id, $recordId)
+        ) {
+            throw new InvalidArgumentException(
+                'A Facility signal idempotency key may only reuse the exact immutable signal type, Site, schedule, and record provenance.',
+            );
         }
+    }
+
+    private function nullableIdsMatch(mixed $actual, ?int $expected): bool
+    {
+        if ($actual === null || $expected === null) {
+            return $actual === null && $expected === null;
+        }
+
+        return (int) $actual === $expected;
     }
 
     /**
      * Build idempotency key with appropriate dedup windows.
      */
-    protected function buildIdempotencyKey(string $signalType, array $context): string
-    {
+    protected function buildIdempotencyKey(
+        string $signalType,
+        array $context,
+        CarbonInterface $occurredAt,
+    ): string {
         // Inspections dedup daily (only need one alert per day per schedule)
         $windowMinutes = str_starts_with($signalType, 'inspection') ? 1440 : 30;
-        $window = now()->format('Y-m-d').($windowMinutes < 1440
-            ? '_'.(intdiv((int) now()->format('G'), 1).':'.(intdiv((int) now()->format('i'), $windowMinutes) * $windowMinutes))
+        $window = $occurredAt->format('Y-m-d').($windowMinutes < 1440
+            ? '_'.(intdiv((int) $occurredAt->format('G'), 1).':'.(intdiv((int) $occurredAt->format('i'), $windowMinutes) * $windowMinutes))
             : '');
 
         $entityKey = match ($signalType) {
@@ -228,29 +328,16 @@ class FacilitySignalService
         ]));
     }
 
-    protected function getSignalSource(): ?SignalSource
+    private function assertCanonicalSchedule(SiteInspectionSchedule $schedule): void
     {
-        if ($this->signalSource) {
-            return $this->signalSource;
-        }
-
-        try {
-            $this->signalSource = SignalSource::firstOrCreate(
-                ['slug' => 'facility'],
-                [
-                    'name' => 'Facility / Site Operations',
-                    'vendor' => 'internal',
-                    'status' => 'active',
-                    'config' => [],
-                    'capabilities' => ['scheduled_checks', 'event_driven'],
-                ]
+        if (! $schedule->exists
+            || $schedule->getKey() === null
+            || $schedule->site_id === null
+            || (int) $schedule->site_id <= 0
+        ) {
+            throw new InvalidArgumentException(
+                'A Facility inspection signal requires an exact persisted schedule and Site.',
             );
-        } catch (\Throwable $e) {
-            Log::error('FacilitySignalService: failed to resolve signal source', [
-                'error' => $e->getMessage(),
-            ]);
         }
-
-        return $this->signalSource;
     }
 }

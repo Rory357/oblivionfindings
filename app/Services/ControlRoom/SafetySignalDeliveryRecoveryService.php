@@ -5,10 +5,13 @@ namespace App\Services\ControlRoom;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceEventSignalOutbox;
 use App\Jobs\DispatchDeviceEventSignalOutbox;
+use App\Jobs\DispatchFacilitySignalOutbox;
 use App\Jobs\DispatchFleetSignalOutbox;
 use App\Jobs\DispatchIncidentLifecycleSignalOutbox;
 use App\Jobs\DispatchShiftSignalOutbox;
 use App\Models\ClientIncident;
+use App\Models\FacilitySignal;
+use App\Models\FacilitySignalOutbox;
 use App\Models\FleetSignal;
 use App\Models\FleetSignalOutbox;
 use App\Models\IncidentLifecycleSignal;
@@ -31,27 +34,29 @@ class SafetySignalDeliveryRecoveryService
 
     /**
      * @return array{
-     *   reconciled: array{fleet: int, shift: int, device: int, incident: int},
-     *   queued: array{fleet: int, shift: int, device: int, incident: int},
-     *   failures: array{fleet: int, shift: int, device: int, incident: int},
+     *   reconciled: array{fleet: int, shift: int, device: int, incident: int, facility: int},
+     *   queued: array{fleet: int, shift: int, device: int, incident: int, facility: int},
+     *   failures: array{fleet: int, shift: int, device: int, incident: int, facility: int},
      *   failure_rows: list<array{source: string, id: int, status: string, attempts: int, last_attempt_at: ?string, last_error: ?string}>
      * }
      */
     public function recover(int $limit = 100, bool $reportOnly = false): array
     {
         $limit = max(1, min($limit, 1000));
-        $reconciled = ['fleet' => 0, 'shift' => 0, 'device' => 0, 'incident' => 0];
-        $queued = ['fleet' => 0, 'shift' => 0, 'device' => 0, 'incident' => 0];
+        $reconciled = ['fleet' => 0, 'shift' => 0, 'device' => 0, 'incident' => 0, 'facility' => 0];
+        $queued = ['fleet' => 0, 'shift' => 0, 'device' => 0, 'incident' => 0, 'facility' => 0];
 
         if (! $reportOnly) {
             $this->terminalizeExhausted(FleetSignalOutbox::class);
             $this->terminalizeExhausted(ShiftSignalOutbox::class);
             $this->terminalizeExhausted(DeviceEventSignalOutbox::class);
             $this->terminalizeExhausted(IncidentLifecycleSignalOutbox::class);
+            $this->terminalizeExhausted(FacilitySignalOutbox::class);
             $reconciled['fleet'] = $this->reconcileFleet($limit);
             $reconciled['shift'] = $this->reconcileShift($limit);
             $reconciled['device'] = $this->reconcileDevice($limit);
             $reconciled['incident'] = $this->reconcileIncident($limit);
+            $reconciled['facility'] = $this->reconcileFacility($limit);
             $queued['fleet'] = $this->dispatchEligible(
                 FleetSignalOutbox::class,
                 fn (int $id) => DispatchFleetSignalOutbox::dispatch($id),
@@ -72,6 +77,11 @@ class SafetySignalDeliveryRecoveryService
                 fn (int $id) => DispatchIncidentLifecycleSignalOutbox::dispatch($id),
                 $limit,
             );
+            $queued['facility'] = $this->dispatchEligible(
+                FacilitySignalOutbox::class,
+                fn (int $id) => DispatchFacilitySignalOutbox::dispatch($id),
+                $limit,
+            );
         }
 
         return [
@@ -82,6 +92,7 @@ class SafetySignalDeliveryRecoveryService
                 'shift' => $this->failureCount(ShiftSignalOutbox::class),
                 'device' => $this->failureCount(DeviceEventSignalOutbox::class),
                 'incident' => $this->failureCount(IncidentLifecycleSignalOutbox::class),
+                'facility' => $this->failureCount(FacilitySignalOutbox::class),
             ],
             'failure_rows' => $this->failureRows($limit),
         ];
@@ -94,7 +105,8 @@ class SafetySignalDeliveryRecoveryService
             'shift' => [ShiftSignalOutbox::class, fn (int $id) => DispatchShiftSignalOutbox::dispatch($id)],
             'device' => [DeviceEventSignalOutbox::class, fn (int $id) => DispatchDeviceEventSignalOutbox::dispatch($id)],
             'incident' => [IncidentLifecycleSignalOutbox::class, fn (int $id) => DispatchIncidentLifecycleSignalOutbox::dispatch($id)],
-            default => throw new InvalidArgumentException('Source must be fleet, shift, device, or incident.'),
+            'facility' => [FacilitySignalOutbox::class, fn (int $id) => DispatchFacilitySignalOutbox::dispatch($id)],
+            default => throw new InvalidArgumentException('Source must be fleet, shift, device, incident, or facility.'),
         };
 
         DB::transaction(function () use ($modelClass, $outboxId): void {
@@ -262,6 +274,26 @@ class SafetySignalDeliveryRecoveryService
         return $count;
     }
 
+    private function reconcileFacility(int $limit): int
+    {
+        $count = 0;
+
+        FacilitySignal::query()
+            ->whereDoesntHave('outbox')
+            ->orderBy('id')
+            ->limit($limit)
+            ->get(['id'])
+            ->each(function (FacilitySignal $signal) use (&$count): void {
+                $outbox = FacilitySignalOutbox::query()->firstOrCreate(
+                    ['facility_signal_id' => $signal->id],
+                    ['status' => 'pending'],
+                );
+                $count += $outbox->wasRecentlyCreated ? 1 : 0;
+            });
+
+        return $count;
+    }
+
     /** @param class-string<Model> $modelClass */
     private function dispatchEligible(string $modelClass, callable $dispatch, int $limit): int
     {
@@ -328,6 +360,7 @@ class SafetySignalDeliveryRecoveryService
             'shift' => ShiftSignalOutbox::class,
             'device' => DeviceEventSignalOutbox::class,
             'incident' => IncidentLifecycleSignalOutbox::class,
+            'facility' => FacilitySignalOutbox::class,
         ])->flatMap(fn (string $modelClass, string $source) => $modelClass::query()
             ->whereIn('status', ['failed', 'dead_letter', 'unroutable'])
             ->latest('last_attempt_at')
