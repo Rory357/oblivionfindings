@@ -1,0 +1,412 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-196R-INDEPENDENT-SUMMARY-TIMELINE-SITE-PRIVACY-01-REMEDIATION-REVIEW-WAVE-39",
+  "status": "GO_EXACT_RUN196_ARTIFACT_REVIEW_NEW_HISTORICAL_REMEDIATED_REPORTING_AUTHORIZED_ZERO_STATIC_OWNERSHIP_PUBLICATION_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "evidence_date": "2026-09-01",
+  "scope": {
+    "finding_id": "SUMMARY-TIMELINE-SITE-PRIVACY-01",
+    "type": "independent_exact_artifact_review",
+    "architecture": "single operating organisation across multiple Sites",
+    "tenant_design_introduced": false,
+    "application_or_test_source_mutated": false,
+    "runtime_database_browser_or_build_executed": false,
+    "live_reporting_mutated": false
+  },
+  "pins": {
+    "baseline": {
+      "commit": "39a5d97d7d0ff9ea03070e90193581479f423022",
+      "tree": "90b9adba1261fb1ec30d9fe4b13daaf5149fc1dc",
+      "parents": [
+        "04c32c36fdda6ce60ce281c06ad68aaa78527422"
+      ],
+      "subject": "audit: record RUN193 Fleet fuel privacy remediation"
+    },
+    "audit_release": {
+      "commit": "4c47d2eeed0b1006c11166da8ab8b0747d7554b7",
+      "tree": "67d02dab74cdb608a019432bcb032520cd02db3e",
+      "parents": [
+        "47a6d231c52a78c9f0f606e41d4492d754771027"
+      ],
+      "subject": "audit: verify RUN195 current dashboard"
+    },
+    "sealed_fix": {
+      "commit": "31a9edfbab32a19062ccf15e123cd0b0923b7dc3",
+      "tree": "5e8e8f5e560b5ff2d157902808e2c0b5e17952f5",
+      "parents": [
+        "39a5d97d7d0ff9ea03070e90193581479f423022"
+      ],
+      "subject": "fix(security): scope summaries and timelines to Sites"
+    },
+    "effective_merge": {
+      "commit": "5c8a1357f830d0b8a8c14924016d89df52ab9e86",
+      "tree": "974af4e10eea90e9e9254d509443b49cf0052931",
+      "parents": [
+        "4c47d2eeed0b1006c11166da8ab8b0747d7554b7",
+        "31a9edfbab32a19062ccf15e123cd0b0923b7dc3"
+      ],
+      "subject": "merge: scope summaries and timelines to Sites"
+    },
+    "current_main": {
+      "commit": "44ab5e270aecd961e2e75abcdbe4d2cb1effa3df",
+      "tree": "cae56eafa2c63af68e099995b08b3c926575373b",
+      "parents": [
+        "5c8a1357f830d0b8a8c14924016d89df52ab9e86",
+        "caec88e054e1dbd546b0b18a1a0df19618f8311d"
+      ],
+      "subject": "merge: scope My Day alerts to Sites"
+    },
+    "origin_main": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "origin_main_behind": 0,
+    "origin_main_ahead": 83,
+    "application_published": false,
+    "advanced_my_day_paths": [
+      "app/Http/Controllers/MyDayActionsController.php",
+      "app/Http/Controllers/MyTasksController.php",
+      "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+      "tests/Feature/MyDayControlRoomSlaTest.php"
+    ],
+    "advanced_my_day_credit_inherited": false,
+    "run195": {
+      "path": "evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json",
+      "sha256": "455ee26c87ec6f07eca687eb1e40d2049c01513002732d08f74696b3dd617456",
+      "receipt_self_seal_sha256": "a3dc0871156ba4c6376a92a4cacab8b8697fa0efcd49dea42d212533aff6b284"
+    },
+    "owned_worktree_boundary": [
+      {
+        "state": "??",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-196-summary-timeline-site-privacy-remediation-wave-39.json"
+      },
+      {
+        "state": "??",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-196r-independent-summary-timeline-site-privacy-remediation-review-wave-39.json"
+      },
+      {
+        "state": "??",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-run-196-summary-timeline-site-privacy-remediation-review-wave-39.py"
+      },
+      {
+        "state": "??",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-196-summary-timeline-site-privacy-remediation-wave-39.py"
+      }
+    ],
+    "producer_generator": {
+      "path": "generators/materialize-run-196-summary-timeline-site-privacy-remediation-wave-39.py",
+      "sha256": "e8c45110a983d2d210501024d89d6f9b968103141b86feb174c5641757dd5555",
+      "git_blob_id": "e20e14e236c6bab19c4ceeaedace7f64e5d6e03e",
+      "bytes": 25092,
+      "lines": 659
+    },
+    "producer_receipt": {
+      "path": "evidence/runtime/current-run-196-summary-timeline-site-privacy-remediation-wave-39.json",
+      "sha256": "96c275826a695a4b41b98891bd6560e6592be415c43fa360f1730c0c7fe9013a",
+      "git_blob_id": "27a3b7967621c3238379ad1a0784cfd63161d84b",
+      "bytes": 20902,
+      "lines": 543,
+      "receipt_self_seal_sha256": "325269d2a0721c620c9a588da65c016b2355f8c5fb51e6ec112156888483609c"
+    },
+    "review_materializer": {
+      "path": "generators/materialize-independent-run-196-summary-timeline-site-privacy-remediation-review-wave-39.py",
+      "sha256": "0c4fb643e608fa73fdc6118a7b83d1024123cd7857b84c36a136b51b3244edc8",
+      "git_blob_id": "1389f0a50cccf21fe313b34da3cfb8b3c6f92af9",
+      "bytes": 37653,
+      "lines": 961
+    },
+    "current_findings_before_run197": {
+      "path": "findings.json",
+      "sha256": "268b63e20dcc40ecc0ba772e8431a9d8a35c9df9bfa98197abdfc273e972e525",
+      "git_blob_id": "6735e906278726d34dcbd6aba30e5feb5f60b27f",
+      "bytes": 664123,
+      "lines": 11633
+    }
+  },
+  "review": {
+    "reviewer_lanes": [
+      "/root/run196_credit_review",
+      "/root/run196_git_review",
+      "/root/run196_receipt_review"
+    ],
+    "independent_reviewers": 3,
+    "all_final_reviewers_read_only": true,
+    "resolved_no_go_findings": [
+      {
+        "finding": "receipt embedded the live first-run dirty list and changed bytes when the output appeared",
+        "resolution": "validate live status but record one static deterministic four-file owned boundary"
+      },
+      {
+        "finding": "assert-only validation could be compiled away by optimized Python",
+        "resolution": "raise RuntimeError when __debug__ is false before validation, receipt construction, or writing"
+      }
+    ],
+    "final_exact_snapshot": {
+      "producer_sha256": "e8c45110a983d2d210501024d89d6f9b968103141b86feb174c5641757dd5555",
+      "receipt_sha256": "96c275826a695a4b41b98891bd6560e6592be415c43fa360f1730c0c7fe9013a",
+      "receipt_self_seal_sha256": "325269d2a0721c620c9a588da65c016b2355f8c5fb51e6ec112156888483609c",
+      "two_ordinary_runs_byte_identical": true,
+      "optimized_python_failed_before_write": true,
+      "optimized_python_preserved_output_hash": true
+    },
+    "final_reviewer_dispositions": [
+      {
+        "lane": "/root/run196_credit_review",
+        "verdict": "GO",
+        "focus": "bounded credit and completion boundaries"
+      },
+      {
+        "lane": "/root/run196_git_review",
+        "verdict": "GO",
+        "focus": "Git lineage, blobs, status, and nonpublication"
+      },
+      {
+        "lane": "/root/run196_receipt_review",
+        "verdict": "GO",
+        "focus": "receipt integrity, determinism, and fail-closed writing"
+      }
+    ],
+    "checks": {
+      "strict_json_duplicate_free_finite_and_pretty": true,
+      "lf_no_bom_no_trailing_whitespace": true,
+      "canonical_producer_self_seal": true,
+      "producer_and_receipt_exact_hash_blob_bytes_lines": true,
+      "commit_tree_parent_subject_and_four_path_lineage": true,
+      "merge_and_current_blobs_equal_sealed_fix": true,
+      "advanced_my_day_noninheritance": true,
+      "run195_receipt_link_and_self_seal": true,
+      "red_and_zero_credit_run_boundaries": true,
+      "focused_15_of_32_only_aggregate_eligible": true,
+      "emar_2_of_238_support_only": true,
+      "shared_40_of_438_not_split_or_recredited": true,
+      "canonical_unit_test_path_adjudicated": true,
+      "pre_run197_register_16_and_161_of_2609": true,
+      "null_feature_identity_and_zero_static_ownership": true,
+      "all_26_completion_gates_false": true,
+      "static_four_file_owned_boundary": true
+    },
+    "discrepancies": []
+  },
+  "decision": {
+    "verdict": "GO",
+    "blocking_discrepancies": 0,
+    "new_historical_remediated_record_reporting_authorized": true,
+    "authorized_live_reporting_run": "RUN-197",
+    "authorized_finding_id": "SUMMARY-TIMELINE-SITE-PRIVACY-01",
+    "authorized_feature_id": null,
+    "authorized_candidate_feature_id": null,
+    "authorized_reporting_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "authorized_live_count_delta": {
+      "retained_claim_records": 1,
+      "current_provisional_source_claims": 0,
+      "historical_already_fixed_records": 0,
+      "historical_remediated_records": 1,
+      "bounded_disposition_tests_passed": 15,
+      "bounded_disposition_assertions": 32,
+      "final_P0": 0,
+      "final_P1": 0,
+      "benchmark_mapped": 0,
+      "final_no_match_or_NCM": 0,
+      "benchmark_unresolved": 0,
+      "static_owner_records": 0,
+      "static_route_owners": 0,
+      "static_page_owners": 0,
+      "static_controller_action_bridges": 0,
+      "direct_exact_queue_reviewed": 0
+    },
+    "authorized_resulting_lineage": {
+      "retained_claim_records": 17,
+      "current_provisional_source_claims": 8,
+      "historical_already_fixed_records": 2,
+      "historical_remediated_records": 7,
+      "bounded_disposition_tests_passed": 176,
+      "bounded_disposition_assertions": 2641,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "authorized_unique_bounded_disposition_increment": {
+      "prior_tests": 161,
+      "prior_assertions": 2609,
+      "tests": 15,
+      "assertions": 32,
+      "resulting_tests": 176,
+      "resulting_assertions": 2641,
+      "focused_execution_counted_once": true,
+      "red_failures_or_assertions_counted": false,
+      "isolated_supporting_compatibility_counted": false,
+      "shared_post_merge_execution_counted": false
+    },
+    "static_ownership_remains_unassigned": {
+      "feature_id": null,
+      "candidate_feature_id": null,
+      "status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+      "route_owner_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "page_owner_authorized": false,
+      "queue_advance_authorized": false
+    },
+    "live_reporting_changed_by_run196r": false,
+    "run197_required": true,
+    "run198_fresh_dashboard_verification_required": true
+  },
+  "credit_boundary": {
+    "independent_exact_artifact_review_for_reporting_authorization": true,
+    "application_remediation_reexecution": false,
+    "runtime_reexecution": false,
+    "application_browser": false,
+    "representative_user": false,
+    "live_reporting": false,
+    "application_publication": false,
+    "static_route_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "static_page_or_frontend_ownership": false,
+    "queue_advance": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "my_day_remediation_or_runtime": false,
+    "adjacent_surface": false,
+    "final_finding": false,
+    "pass": false,
+    "release": false,
+    "gate_4": false,
+    "feature_or_module_completion": false,
+    "audit_complete": false
+  },
+  "completion_gates": [
+    {
+      "name": "routes_classified",
+      "complete": false
+    },
+    {
+      "name": "inertia_pages_classified",
+      "complete": false
+    },
+    {
+      "name": "features_in_canonical_register",
+      "complete": false
+    },
+    {
+      "name": "routes_and_pages_mapped_to_feature_id",
+      "complete": false
+    },
+    {
+      "name": "features_with_verified_benchmark_or_final_ncm",
+      "complete": false
+    },
+    {
+      "name": "human_features_with_task_script_and_ten_scores",
+      "complete": false
+    },
+    {
+      "name": "common_and_safety_journeys_cross_reviewed",
+      "complete": false
+    },
+    {
+      "name": "hero_banner_instances_classified",
+      "complete": false
+    },
+    {
+      "name": "overlay_implementations_and_triggers_classified",
+      "complete": false
+    },
+    {
+      "name": "safe_routes_observed_at_desktop",
+      "complete": false
+    },
+    {
+      "name": "selected_families_and_journeys_all_viewports",
+      "complete": false
+    },
+    {
+      "name": "required_visual_states_classified",
+      "complete": false
+    },
+    {
+      "name": "material_visual_finding_families_resampled",
+      "complete": false
+    },
+    {
+      "name": "models_classified",
+      "complete": false
+    },
+    {
+      "name": "policies_classified",
+      "complete": false
+    },
+    {
+      "name": "service_domain_entries_classified",
+      "complete": false
+    },
+    {
+      "name": "critical_async_owners_classified",
+      "complete": false
+    },
+    {
+      "name": "modules_with_all_eight_passes",
+      "complete": false
+    },
+    {
+      "name": "prompt_benchmark_projects_formally_triaged",
+      "complete": false
+    },
+    {
+      "name": "p0_p1_complete_finding_fields",
+      "complete": false
+    },
+    {
+      "name": "redesigns_neutral_native_no_copy",
+      "complete": false
+    },
+    {
+      "name": "ease_4_5_claims_independently_reviewed",
+      "complete": false
+    },
+    {
+      "name": "browser_claims_labeled",
+      "complete": false
+    },
+    {
+      "name": "visual_inconsistencies_complete_context",
+      "complete": false
+    },
+    {
+      "name": "official_source_inference_specialist_split",
+      "complete": false
+    },
+    {
+      "name": "all_agents_returned_reconciled_represented_none_live",
+      "complete": false
+    }
+  ],
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-run-196-summary-timeline-site-privacy-remediation-review-wave-39.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-196r-independent-summary-timeline-site-privacy-remediation-review-wave-39.json"
+  ],
+  "receipt_self_seal_sha256": "9eefa1031060434a0ee027b5a22d4a3a399ef6472220b5e8628808bf2eb375da"
+}

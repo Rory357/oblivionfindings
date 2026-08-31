@@ -1,0 +1,543 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-196-SUMMARY-TIMELINE-SITE-PRIVACY-01-REMEDIATION-WAVE-39",
+  "status": "CURRENT_SUMMARY_TIMELINE_SITE_PRIVACY_DEFECT_REPRODUCED_REMEDIATED_LOCALLY_INTEGRATED_BOUNDED_VERIFIED_NOT_PUBLISHED_REPORTING_NOT_YET_AUTHORIZED_ZERO_STATIC_OWNERSHIP_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "evidence_date": "2026-09-01",
+  "scope": {
+    "finding_id": "SUMMARY-TIMELINE-SITE-PRIVACY-01",
+    "type": "bounded_remediation_execution_and_local_integration_receipt",
+    "architecture": "single operating organisation across multiple Sites",
+    "authorization_boundary": [
+      "current approved Site access",
+      "exact roles and permissions",
+      "canonical ownership",
+      "direct-object denial",
+      "privacy"
+    ],
+    "tenant_design_introduced": false,
+    "application_source_mutated_by_this_materializer": false,
+    "runtime_executed_by_this_materializer": false,
+    "browser_executed_by_this_materializer": false,
+    "reporting_not_yet_materialized": true
+  },
+  "governing_inputs": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "continuation_prompt_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "explicit_issue_first_override_applied": true
+  },
+  "lineage": {
+    "owned_worktree_boundary": [
+      {
+        "state": "??",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-196-summary-timeline-site-privacy-remediation-wave-39.json"
+      },
+      {
+        "state": "??",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-196-summary-timeline-site-privacy-remediation-wave-39.py"
+      }
+    ],
+    "baseline": {
+      "commit": "39a5d97d7d0ff9ea03070e90193581479f423022",
+      "tree": "90b9adba1261fb1ec30d9fe4b13daaf5149fc1dc",
+      "parents": [
+        "04c32c36fdda6ce60ce281c06ad68aaa78527422"
+      ],
+      "subject": "audit: record RUN193 Fleet fuel privacy remediation"
+    },
+    "audit_release": {
+      "commit": "4c47d2eeed0b1006c11166da8ab8b0747d7554b7",
+      "tree": "67d02dab74cdb608a019432bcb032520cd02db3e",
+      "parents": [
+        "47a6d231c52a78c9f0f606e41d4492d754771027"
+      ],
+      "subject": "audit: verify RUN195 current dashboard"
+    },
+    "sealed_fix": {
+      "commit": "31a9edfbab32a19062ccf15e123cd0b0923b7dc3",
+      "tree": "5e8e8f5e560b5ff2d157902808e2c0b5e17952f5",
+      "parents": [
+        "39a5d97d7d0ff9ea03070e90193581479f423022"
+      ],
+      "subject": "fix(security): scope summaries and timelines to Sites"
+    },
+    "effective_merge": {
+      "commit": "5c8a1357f830d0b8a8c14924016d89df52ab9e86",
+      "tree": "974af4e10eea90e9e9254d509443b49cf0052931",
+      "parents": [
+        "4c47d2eeed0b1006c11166da8ab8b0747d7554b7",
+        "31a9edfbab32a19062ccf15e123cd0b0923b7dc3"
+      ],
+      "subject": "merge: scope summaries and timelines to Sites"
+    },
+    "current_main": {
+      "commit": "44ab5e270aecd961e2e75abcdbe4d2cb1effa3df",
+      "tree": "cae56eafa2c63af68e099995b08b3c926575373b",
+      "parents": [
+        "5c8a1357f830d0b8a8c14924016d89df52ab9e86",
+        "caec88e054e1dbd546b0b18a1a0df19618f8311d"
+      ],
+      "subject": "merge: scope My Day alerts to Sites"
+    },
+    "advanced_unrelated_paths": [
+      "app/Http/Controllers/MyDayActionsController.php",
+      "app/Http/Controllers/MyTasksController.php",
+      "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+      "tests/Feature/MyDayControlRoomSlaTest.php"
+    ],
+    "advanced_unrelated_paths_credit_inherited": false,
+    "run195": {
+      "path": "evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json",
+      "sha256": "455ee26c87ec6f07eca687eb1e40d2049c01513002732d08f74696b3dd617456",
+      "receipt_self_seal_sha256": "a3dc0871156ba4c6376a92a4cacab8b8697fa0efcd49dea42d212533aff6b284"
+    }
+  },
+  "finding": {
+    "finding_id": "SUMMARY-TIMELINE-SITE-PRIVACY-01",
+    "feature_identity": {
+      "feature_id": null,
+      "candidate_feature_id": null,
+      "status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+      "static_ownership_credit": false
+    },
+    "capability_boundary": "staff summary/timeline reads and queued generation Site authorization",
+    "current_defect": "Action permission without current approved shared-Site access allowed another staff member's summary/timeline reads, while generation used legacy organization comparison and queued work did not revalidate the requester before protected event reads or summary writes.",
+    "expected_contract": [
+      "self-read and existing action compatibility remain",
+      "other-staff access requires canonical active shared-Site scope",
+      "only hr.employees.viewAllSites bypasses staff Site scope",
+      "client Gate behavior remains unchanged",
+      "queued generation revalidates before protected reads and writes"
+    ],
+    "red_reproduction": {
+      "command": "php artisan test tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php --stop-on-failure --colors=never",
+      "exit_code": 1,
+      "failed": 1,
+      "passed": 5,
+      "assertions": 9,
+      "duration_seconds": 148.82,
+      "observed": "remote-Site staff summary returned 200 instead of 403"
+    },
+    "zero_credit_runs": [
+      {
+        "reason": "vendor junction resolved Composer application classes into primary",
+        "phase": "before Laravel bootstrap",
+        "assertions": 0
+      }
+    ],
+    "changed_paths": [
+      "app/Http/Controllers/SummaryController.php",
+      "app/Http/Controllers/TimelineController.php",
+      "app/Jobs/GenerateSummaryJob.php",
+      "tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php"
+    ],
+    "file_lineage": [
+      {
+        "path": "app/Http/Controllers/SummaryController.php",
+        "baseline": {
+          "path": "app/Http/Controllers/SummaryController.php",
+          "sha256": "e190c354738c7795d35d10a3fa060194ef1f25a4107d470796e99093dc2a97ef",
+          "bytes": 5069,
+          "lines": 153,
+          "git_blob_id": "04d878a6c5e3650468d293fc7917eea21a6b21b0"
+        },
+        "sealed_fix": {
+          "path": "app/Http/Controllers/SummaryController.php",
+          "sha256": "0ccfba4684ed2eee6d8ea6417cfff569c86c333f7f2c94d5272b43cbc4d5c826",
+          "bytes": 5395,
+          "lines": 165,
+          "git_blob_id": "017e005afcbf37b6027a87c695e0c46bc7f4fa2d"
+        },
+        "effective_merge": {
+          "path": "app/Http/Controllers/SummaryController.php",
+          "sha256": "0ccfba4684ed2eee6d8ea6417cfff569c86c333f7f2c94d5272b43cbc4d5c826",
+          "bytes": 5395,
+          "lines": 165,
+          "git_blob_id": "017e005afcbf37b6027a87c695e0c46bc7f4fa2d"
+        },
+        "current_main": {
+          "path": "app/Http/Controllers/SummaryController.php",
+          "sha256": "0ccfba4684ed2eee6d8ea6417cfff569c86c333f7f2c94d5272b43cbc4d5c826",
+          "bytes": 5395,
+          "lines": 165,
+          "git_blob_id": "017e005afcbf37b6027a87c695e0c46bc7f4fa2d"
+        },
+        "fix_diff": {
+          "path": "app/Http/Controllers/SummaryController.php",
+          "insertions": 21,
+          "deletions": 9,
+          "binary_diff_sha256": "b8708a3d99fcd74ae3a1486931cf44d2ca84455e3199ad525939508322b38154"
+        },
+        "merge_blob_identical_to_fix": true,
+        "current_blob_identical_to_fix": true
+      },
+      {
+        "path": "app/Http/Controllers/TimelineController.php",
+        "baseline": {
+          "path": "app/Http/Controllers/TimelineController.php",
+          "sha256": "d7844e978d73e227e038f7c39f67e56f8c6615016cbe5a565402a6b1487dd35d",
+          "bytes": 8045,
+          "lines": 198,
+          "git_blob_id": "2e0bc7bd80c8fe636f676ab2ba3c1f340059a5dd"
+        },
+        "sealed_fix": {
+          "path": "app/Http/Controllers/TimelineController.php",
+          "sha256": "ee96cb23f211004ef1922bab78ab668d81ee13eece7bb3687348d92709c8ed18",
+          "bytes": 8228,
+          "lines": 205,
+          "git_blob_id": "e8e8fb192f6478c10c643860bb08358749d599c6"
+        },
+        "effective_merge": {
+          "path": "app/Http/Controllers/TimelineController.php",
+          "sha256": "ee96cb23f211004ef1922bab78ab668d81ee13eece7bb3687348d92709c8ed18",
+          "bytes": 8228,
+          "lines": 205,
+          "git_blob_id": "e8e8fb192f6478c10c643860bb08358749d599c6"
+        },
+        "current_main": {
+          "path": "app/Http/Controllers/TimelineController.php",
+          "sha256": "ee96cb23f211004ef1922bab78ab668d81ee13eece7bb3687348d92709c8ed18",
+          "bytes": 8228,
+          "lines": 205,
+          "git_blob_id": "e8e8fb192f6478c10c643860bb08358749d599c6"
+        },
+        "fix_diff": {
+          "path": "app/Http/Controllers/TimelineController.php",
+          "insertions": 12,
+          "deletions": 5,
+          "binary_diff_sha256": "86e954179a699a2f0798f7de1522c065385306c94b1594b90402a10fed5fe57d"
+        },
+        "merge_blob_identical_to_fix": true,
+        "current_blob_identical_to_fix": true
+      },
+      {
+        "path": "app/Jobs/GenerateSummaryJob.php",
+        "baseline": {
+          "path": "app/Jobs/GenerateSummaryJob.php",
+          "sha256": "03871b724c4d0873555e86431720e3493cdf86a15de1cf619d6e31dd10a17c63",
+          "bytes": 5246,
+          "lines": 150,
+          "git_blob_id": "fad87fc942341f2023fc4e37a0ce30ef251aee25"
+        },
+        "sealed_fix": {
+          "path": "app/Jobs/GenerateSummaryJob.php",
+          "sha256": "89c085667be31b45f260d2e57e9a3a2cb1736f81aca7f0781bcce032cde8b3a2",
+          "bytes": 5522,
+          "lines": 163,
+          "git_blob_id": "6bc48f49ce46329fdab0c1cf634c2393cc0f4d80"
+        },
+        "effective_merge": {
+          "path": "app/Jobs/GenerateSummaryJob.php",
+          "sha256": "89c085667be31b45f260d2e57e9a3a2cb1736f81aca7f0781bcce032cde8b3a2",
+          "bytes": 5522,
+          "lines": 163,
+          "git_blob_id": "6bc48f49ce46329fdab0c1cf634c2393cc0f4d80"
+        },
+        "current_main": {
+          "path": "app/Jobs/GenerateSummaryJob.php",
+          "sha256": "89c085667be31b45f260d2e57e9a3a2cb1736f81aca7f0781bcce032cde8b3a2",
+          "bytes": 5522,
+          "lines": 163,
+          "git_blob_id": "6bc48f49ce46329fdab0c1cf634c2393cc0f4d80"
+        },
+        "fix_diff": {
+          "path": "app/Jobs/GenerateSummaryJob.php",
+          "insertions": 21,
+          "deletions": 8,
+          "binary_diff_sha256": "258c0cd4c8a524bf81d9b0ff9aa607f210d6e667629e891ccbbd634702445018"
+        },
+        "merge_blob_identical_to_fix": true,
+        "current_blob_identical_to_fix": true
+      },
+      {
+        "path": "tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php",
+        "baseline": {
+          "path": "tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php",
+          "sha256": "a5384bc1eebb2eb15c38993fad75c1704296418d63e67e29f4c58ff39fc76613",
+          "bytes": 8700,
+          "lines": 266,
+          "git_blob_id": "55a7f5235dde8cf9d0a7d38444905be231dbcd90"
+        },
+        "sealed_fix": {
+          "path": "tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php",
+          "sha256": "713f3e92006ddd9983a07312f3c02d0142e1fd2776ab15000ad18cbb658c70d3",
+          "bytes": 13491,
+          "lines": 394,
+          "git_blob_id": "8466ad33dffd2b3aac1c8dd365dfe036dcf03786"
+        },
+        "effective_merge": {
+          "path": "tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php",
+          "sha256": "713f3e92006ddd9983a07312f3c02d0142e1fd2776ab15000ad18cbb658c70d3",
+          "bytes": 13491,
+          "lines": 394,
+          "git_blob_id": "8466ad33dffd2b3aac1c8dd365dfe036dcf03786"
+        },
+        "current_main": {
+          "path": "tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php",
+          "sha256": "713f3e92006ddd9983a07312f3c02d0142e1fd2776ab15000ad18cbb658c70d3",
+          "bytes": 13491,
+          "lines": 394,
+          "git_blob_id": "8466ad33dffd2b3aac1c8dd365dfe036dcf03786"
+        },
+        "fix_diff": {
+          "path": "tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php",
+          "insertions": 136,
+          "deletions": 8,
+          "binary_diff_sha256": "966eb0fa7f169d676adf2ffc621ace265dd6ce5a8a7c874cc3276d0eceab9eb1"
+        },
+        "merge_blob_identical_to_fix": true,
+        "current_blob_identical_to_fix": true
+      }
+    ],
+    "isolated_focused_verification": {
+      "command": "php artisan test tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php --colors=never",
+      "exit_code": 0,
+      "passed": 15,
+      "assertions": 32,
+      "duration_seconds": 147.9,
+      "eligible_for_bounded_aggregate": true
+    },
+    "isolated_supporting_compatibility": {
+      "command": "php artisan test tests/Feature/Emar/MedicationTimelineProjectionVisibilityTest.php --colors=never",
+      "exit_code": 0,
+      "passed": 2,
+      "assertions": 238,
+      "duration_seconds": 149.2,
+      "eligible_for_bounded_aggregate": false,
+      "reason": "supporting compatibility execution is separately reported and not recredited"
+    },
+    "independent_source_and_test_review": {
+      "disposition": "GO",
+      "reviewed_boundaries": [
+        "self-read and action compatibility",
+        "other-staff canonical active Site scope",
+        "global-permission exception",
+        "unchanged client Gate",
+        "queue authorization before read/write",
+        "unique staff-profile relationship"
+      ]
+    }
+  },
+  "post_merge_shared_support": {
+    "command": "php artisan test tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php tests/Feature/Emar/MedicationTimelineProjectionVisibilityTest.php tests/Feature/MyDayControlRoomSlaTest.php tests/Unit/ControlRoom/ControlRoomAlertLifecycleServiceTest.php --colors=never",
+    "tests": [
+      "tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php",
+      "tests/Feature/Emar/MedicationTimelineProjectionVisibilityTest.php",
+      "tests/Feature/MyDayControlRoomSlaTest.php",
+      "tests/Unit/ControlRoom/ControlRoomAlertLifecycleServiceTest.php"
+    ],
+    "exit_code": 0,
+    "passed": 40,
+    "assertions": 438,
+    "duration_seconds": 193.7,
+    "eligible_for_bounded_aggregate": false,
+    "shared_denominator_not_split_or_recredited": true,
+    "checks": {
+      "php_syntax_paths_passed": 8,
+      "php_syntax_paths_total": 8,
+      "scoped_pint_passed": true,
+      "git_diff_check_passed": true,
+      "first_parent_delta_exact": true,
+      "merge_blobs_identical_to_sealed_fix": true
+    },
+    "zero_credit_runs": [
+      {
+        "reason": "wrong Medication test directory",
+        "phase": "before test execution",
+        "tests_executed": 0
+      }
+    ]
+  },
+  "handoff_path_adjudication": {
+    "stale_message_path": "tests/Feature/ControlRoom/ControlRoomAlertLifecycleServiceTest.php",
+    "stale_path_exists": false,
+    "canonical_repository_path": "tests/Unit/ControlRoom/ControlRoomAlertLifecycleServiceTest.php",
+    "canonical_path_exists": true,
+    "credit_uses_canonical_path_only": true
+  },
+  "cleanup_and_release": {
+    "at_fix_lane_release": {
+      "global_php_pest_process_count": 0,
+      "numeric_pid_suffixed_schema_count": 0,
+      "primary_status_empty": true,
+      "origin_main_behind": 0,
+      "origin_main_ahead": 83,
+      "push_performed": false
+    },
+    "removed_clean_worktree": "C:/w/summary-timeline-site-privacy-01",
+    "retained_recovery_branch": "codex/summary-timeline-site-privacy-01",
+    "all_four_paths_released": true,
+    "serialized_runtime_lane_released": true
+  },
+  "credit_boundary": {
+    "exact_remediation_source_credit": true,
+    "exact_focused_test_execution_credit": true,
+    "local_merge_credit": true,
+    "cleanup_credit": true,
+    "application_browser_credit": false,
+    "representative_user_credit": false,
+    "benchmark_or_comparator_credit": false,
+    "final_ncm_credit": false,
+    "static_route_action_ownership_credit": false,
+    "static_page_or_frontend_ownership_credit": false,
+    "queue_advance_credit": false,
+    "adjacent_surface_credit": false,
+    "feature_or_module_completion_credit": false,
+    "release_or_deployment_credit": false,
+    "publication_credit": false,
+    "final_finding_reporting_credit": false,
+    "gate_4_credit": false,
+    "audit_completion_credit": false,
+    "my_day_fix_or_runtime_credit": false,
+    "excluded_surfaces": [
+      "other timeline-event correctness or event-level Site filtering",
+      "client policy correctness beyond preservation",
+      "routes, frontend, models, schema, access service, and provider behavior",
+      "other summary or timeline surfaces",
+      "My Day and Control Room remediation",
+      "tenant or organization design"
+    ]
+  },
+  "materializer": {
+    "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-196-summary-timeline-site-privacy-remediation-wave-39.py",
+    "sha256": "e8c45110a983d2d210501024d89d6f9b968103141b86feb174c5641757dd5555",
+    "bytes": 25092,
+    "lines": 659
+  },
+  "completion_gates": [
+    {
+      "name": "routes_classified",
+      "complete": false
+    },
+    {
+      "name": "inertia_pages_classified",
+      "complete": false
+    },
+    {
+      "name": "features_in_canonical_register",
+      "complete": false
+    },
+    {
+      "name": "routes_and_pages_mapped_to_feature_id",
+      "complete": false
+    },
+    {
+      "name": "features_with_verified_benchmark_or_final_ncm",
+      "complete": false
+    },
+    {
+      "name": "human_features_with_task_script_and_ten_scores",
+      "complete": false
+    },
+    {
+      "name": "common_and_safety_journeys_cross_reviewed",
+      "complete": false
+    },
+    {
+      "name": "hero_banner_instances_classified",
+      "complete": false
+    },
+    {
+      "name": "overlay_implementations_and_triggers_classified",
+      "complete": false
+    },
+    {
+      "name": "safe_routes_observed_at_desktop",
+      "complete": false
+    },
+    {
+      "name": "selected_families_and_journeys_all_viewports",
+      "complete": false
+    },
+    {
+      "name": "required_visual_states_classified",
+      "complete": false
+    },
+    {
+      "name": "material_visual_finding_families_resampled",
+      "complete": false
+    },
+    {
+      "name": "models_classified",
+      "complete": false
+    },
+    {
+      "name": "policies_classified",
+      "complete": false
+    },
+    {
+      "name": "service_domain_entries_classified",
+      "complete": false
+    },
+    {
+      "name": "critical_async_owners_classified",
+      "complete": false
+    },
+    {
+      "name": "modules_with_all_eight_passes",
+      "complete": false
+    },
+    {
+      "name": "prompt_benchmark_projects_formally_triaged",
+      "complete": false
+    },
+    {
+      "name": "p0_p1_complete_finding_fields",
+      "complete": false
+    },
+    {
+      "name": "redesigns_neutral_native_no_copy",
+      "complete": false
+    },
+    {
+      "name": "ease_4_5_claims_independently_reviewed",
+      "complete": false
+    },
+    {
+      "name": "browser_claims_labeled",
+      "complete": false
+    },
+    {
+      "name": "visual_inconsistencies_complete_context",
+      "complete": false
+    },
+    {
+      "name": "official_source_inference_specialist_split",
+      "complete": false
+    },
+    {
+      "name": "all_agents_returned_reconciled_represented_none_live",
+      "complete": false
+    }
+  ],
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "receipt_self_seal_sha256": "325269d2a0721c620c9a588da65c016b2355f8c5fb51e6ec112156888483609c"
+}
