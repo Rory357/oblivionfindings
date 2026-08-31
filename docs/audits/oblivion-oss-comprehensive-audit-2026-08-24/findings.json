@@ -1,6 +1,6 @@
 {
   "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
-  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_SIX_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
+  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_SEVEN_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
   "generated_on": "2026-09-01",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
@@ -65,6 +65,21 @@
     "run_193_fleet_fuel_index_site_privacy_remediation_sha256": "1396205a5f63d4571b0e5b738f00f3a7cadc8ab93499a012e0e0f827b70b495f",
     "run_193r_independent_artifact_review_materializer_sha256": "953d8d68aa2a869fe5c82f495de60b351c49b53f846955167f7f1434964541ac",
     "run_193r_independent_artifact_review_sha256": "87a1157f26bbfaf062ec22bceb616bf4f54c72f908cddfd68c2b59db91cbbb41",
+    "summary_timeline_site_privacy_baseline_commit": "39a5d97d7d0ff9ea03070e90193581479f423022",
+    "summary_timeline_site_privacy_baseline_tree": "90b9adba1261fb1ec30d9fe4b13daaf5149fc1dc",
+    "summary_timeline_site_privacy_audit_release_commit": "4c47d2eeed0b1006c11166da8ab8b0747d7554b7",
+    "summary_timeline_site_privacy_audit_release_tree": "67d02dab74cdb608a019432bcb032520cd02db3e",
+    "summary_timeline_site_privacy_fix_commit": "31a9edfbab32a19062ccf15e123cd0b0923b7dc3",
+    "summary_timeline_site_privacy_fix_tree": "5e8e8f5e560b5ff2d157902808e2c0b5e17952f5",
+    "summary_timeline_site_privacy_local_main_merge_commit": "5c8a1357f830d0b8a8c14924016d89df52ab9e86",
+    "summary_timeline_site_privacy_local_main_tree": "974af4e10eea90e9e9254d509443b49cf0052931",
+    "summary_timeline_site_privacy_current_main_commit": "44ab5e270aecd961e2e75abcdbe4d2cb1effa3df",
+    "summary_timeline_site_privacy_current_main_tree": "cae56eafa2c63af68e099995b08b3c926575373b",
+    "summary_timeline_site_privacy_origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "run_196_summary_timeline_site_privacy_remediation_generator_sha256": "e8c45110a983d2d210501024d89d6f9b968103141b86feb174c5641757dd5555",
+    "run_196_summary_timeline_site_privacy_remediation_sha256": "96c275826a695a4b41b98891bd6560e6592be415c43fa360f1730c0c7fe9013a",
+    "run_196r_independent_artifact_review_materializer_sha256": "0c4fb643e608fa73fdc6118a7b83d1024123cd7857b84c36a136b51b3244edc8",
+    "run_196r_independent_artifact_review_sha256": "a53d2b279cf1becff1e7b851d522a43fb2cacfc05f5099250da910c9d3fbe151",
     "monitoring_metric_replay_application_baseline_commit": "a900f078c9c05f587f6f7884f5fe715076891416",
     "monitoring_metric_replay_initial_fix_commit": "f521bc0b87222e56b4822e7cb9c935486e279e76",
     "monitoring_metric_replay_initial_merge_commit": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
@@ -289,20 +304,20 @@
     "system_data_features": 40,
     "canonical_submodules": null,
     "historical_discovery_claim_records": 12,
-    "current_retained_claim_records": 16,
+    "current_retained_claim_records": 17,
     "current_provisional_source_claims": 8,
     "historical_already_fixed_records": 2,
-    "historical_remediated_records": 6
+    "historical_remediated_records": 7
   },
   "counts": {
-    "retained_claim_records": 16,
+    "retained_claim_records": 17,
     "provisional_source_claims": 8,
     "provisional_P1": 8,
     "historical_already_fixed": 2,
-    "historical_remediated": 6,
-    "bounded_disposition_tests_passed": 161,
-    "bounded_disposition_assertions": 2609,
-    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY plus only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution plus the unique 6/206 post-merge focused component of the combined FLEET-FUEL-INDEX-SITE-PRIVACY run; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, the initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO, the root 1-test red reproduction, every intermediate corrective subset or stopped run, the final isolated corrective 56/472 replay, DNS 63/186, Facility execution, Fuel red 6-failed/65-assertion reproduction, isolated Fuel 6/206 replay, supporting Fuel 20/215 regressions, any second count from combined 26/421, and every overlapping supporting execution",
+    "historical_remediated": 7,
+    "bounded_disposition_tests_passed": 176,
+    "bounded_disposition_assertions": 2641,
+    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY plus only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution plus the unique 6/206 post-merge focused component of the combined FLEET-FUEL-INDEX-SITE-PRIVACY run plus the unique isolated focused 15/32 SUMMARY-TIMELINE-SITE-PRIVACY execution; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, the initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO, the root 1-test red reproduction, every intermediate corrective subset or stopped run, the final isolated corrective 56/472 replay, DNS 63/186, Facility execution, Fuel red 6-failed/65-assertion reproduction, isolated Fuel 6/206 replay, supporting Fuel 20/215 regressions, any second count from combined 26/421, Summary red 1-failed/5-passed/9-assertion reproduction, the zero-assertion vendor-junction run, Emar 2/238 supporting compatibility, shared post-merge 40/438, and every overlapping supporting execution",
     "med_rbac_bounded_tests": 73,
     "med_rbac_bounded_test_assertions": 1481,
     "med_cd_scope_focused_tests": 5,
@@ -312,7 +327,7 @@
     "med_cd_atomicity_race_subscenarios": 3,
     "med_cd_atomicity_supporting_tests": 43,
     "med_cd_atomicity_supporting_assertions": 716,
-    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764, RUN-184 99/1931, and RUN-187 155/2403 totals, and remains excluded from the current RUN-194 161/2609 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
+    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764, RUN-184 99/1931, RUN-187 155/2403, and RUN-194 161/2609 totals, and remains excluded from the current RUN-197 176/2641 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
     "safe_alert_dedup_focused_tests": 5,
     "safe_alert_dedup_focused_assertions": 60,
     "safe_alert_dedup_supporting_control_room_bridge_tests": 28,
@@ -338,6 +353,15 @@
     "fleet_fuel_index_site_privacy_baseline_failed": 6,
     "fleet_fuel_index_site_privacy_baseline_passed": 0,
     "fleet_fuel_index_site_privacy_baseline_assertions": 65,
+    "summary_timeline_site_privacy_focused_tests": 15,
+    "summary_timeline_site_privacy_focused_assertions": 32,
+    "summary_timeline_site_privacy_supporting_tests": 2,
+    "summary_timeline_site_privacy_supporting_assertions": 238,
+    "summary_timeline_site_privacy_baseline_failed": 1,
+    "summary_timeline_site_privacy_baseline_passed": 5,
+    "summary_timeline_site_privacy_baseline_assertions": 9,
+    "summary_timeline_site_privacy_shared_post_merge_tests": 40,
+    "summary_timeline_site_privacy_shared_post_merge_assertions": 438,
     "monitoring_metric_replay_dedupe_focused_tests": 56,
     "monitoring_metric_replay_dedupe_focused_assertions": 472,
     "monitoring_metric_replay_initial_superseded_tests": 49,
@@ -440,20 +464,21 @@
       "audit_completion": 0
     }
   },
-  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and six retained historical remediated records remain reviewable. RUN-193/R establish and independently authorize only the new FLEET-FUEL-INDEX-SITE-PRIVACY-01 historical-remediated record. Its unique post-merge focused 6/206 component extends the prior RUN-187 155/2403 denominator to 161/2609 exactly once; the red 6-failed/65-assertion reproduction, isolated 6/206 replay, supporting 20/215 regressions, and any second count from combined 26/421 remain separate and uncredited. The Fuel record is a candidate reporting association to CAP-FLEET-VEHICLE-REGISTER with zero static route owner, controller-action bridge, page, queue, matrix, feature-union, independent visible-row logger-Site redaction, write-path, adjacent-route, browser, benchmark, publication, release, or completion credit. Its logger proof is row-scoped only: foreign-row attached identity does not escape through rows or CSV, but no independent logger directory or profile authorization is established. Earlier Monitoring option-A deployment prerequisites and all prior noninheritance boundaries remain unchanged. Origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; Fleet Fuel integration remains local-only and unpublished. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
+  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and seven retained historical remediated records remain reviewable. RUN-196/R establish and independently authorize only the new SUMMARY-TIMELINE-SITE-PRIVACY-01 historical-remediated record. Its unique focused 15/32 execution extends the prior RUN-194 161/2609 denominator to 176/2641 exactly once; the red 1-failed/5-passed/9-assertion reproduction, zero-assertion vendor-junction run, Emar 2/238 supporting compatibility, and shared post-merge 40/438 remain separate and uncredited. The Summary record has null feature and candidate IDs with zero route owner, controller-action bridge, page, queue, matrix, feature-union, My Day, adjacent-surface, browser, benchmark, publication, release, or completion credit. Its queue proof is bounded to canonical active shared-Site staff access, the hr.employees.viewAllSites exception, unchanged client Gate behavior, and requester revalidation before protected reads and writes. Earlier Monitoring option-A deployment prerequisites, Fleet candidate-only associations, and all prior noninheritance boundaries remain unchanged. Origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; Summary integration and reporting remain local-only and unpublished. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
   "reconciliation": {
     "retained_record_ids_unique": true,
     "current_provisional_ids_unique": true,
-    "retained_record_count": 16,
+    "retained_record_count": 17,
     "current_provisional_count": 8,
     "historical_already_fixed_count": 2,
-    "historical_remediated_count": 6,
+    "historical_remediated_count": 7,
     "every_non_null_primary_feature_id_in_canonical_matrix": true,
     "records_without_primary_or_candidate_feature_id": [
-      "MON-METRIC-REPLAY-DEDUPE-01"
+      "MON-METRIC-REPLAY-DEDUPE-01",
+      "SUMMARY-TIMELINE-SITE-PRIVACY-01"
     ],
     "final_ids_cross_file_reconciled": false,
-    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01, MON-METRIC-REPLAY-DEDUPE-01, and FLEET-FUEL-INDEX-SITE-PRIVACY-01 are retained as historical remediated; the other 8 records remain provisional. Fuel remediation is limited to the selected GET index and CSV row universe, vehicle choices, aggregates, efficiency inputs, filter concealment, and row-attached identity. It is only a candidate reporting association to CAP-FLEET-VEHICLE-REGISTER, remains PENDING_FRESH_SEMANTIC_REVIEW, and receives zero static ownership. RUN-190 separately integrates only queue index 85 fleet-assets.trips.playback / FleetTripController::show as one static route owner and bridge; index 86 playback.data remains pending, while Fuel is candidate index 87 and receives no queue advance. No finding, page, sibling-route, remediation, correctness, runtime, browser, benchmark, feature-union, publication, release, full-suite, or completion credit is inherited. None satisfies the cross-file final-finding gate."
+    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01, MON-METRIC-REPLAY-DEDUPE-01, FLEET-FUEL-INDEX-SITE-PRIVACY-01, and SUMMARY-TIMELINE-SITE-PRIVACY-01 are retained as historical remediated; the other 8 records remain provisional. Summary remediation is limited to canonical active shared-Site staff summary/timeline access and queued requester revalidation, preserves the explicit hr.employees.viewAllSites exception and unchanged client Gate behavior, has null feature and candidate IDs, and receives zero static ownership. RUN-190 separately integrates only queue index 85 fleet-assets.trips.playback / FleetTripController::show as one static route owner and bridge; index 86 playback.data remains pending, while Fuel is candidate index 87 and receives no queue advance. My Day, adjacent surfaces, page/frontend ownership, browser, benchmark, publication, release, full-suite, feature/module, final-finding, and completion credit are not inherited. None satisfies the cross-file final-finding gate."
   },
   "records": [
     {
@@ -3772,6 +3797,242 @@
         "observed workflow and ten-dimension current/target ease measures",
         "target-specific benchmark or exhaustive final no-match",
         "full-suite coverage, representative signed-in application browser, route/frontend/write ownership, independent visible-row logger-Site semantics, adjacent Fleet routes, and broader Fleet correctness"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "SUMMARY-TIMELINE-SITE-PRIVACY-01",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+      "feature_id": null,
+      "candidate_feature_id": null,
+      "feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+      "feature_id_role": "NO_CANONICAL_OR_CANDIDATE_FEATURE_ASSOCIATION_ZERO_STATIC_OWNERSHIP_CREDIT",
+      "related_feature_ids": [],
+      "historical_provenance": {
+        "application_commit": "39a5d97d7d0ff9ea03070e90193581479f423022",
+        "application_tree": "90b9adba1261fb1ec30d9fe4b13daaf5149fc1dc",
+        "classification": "REAL_HISTORICAL_SUMMARY_TIMELINE_SITE_PRIVACY_CONDITION",
+        "historical_risk": "Action permission without current approved shared-Site access could expose another staff member's summary or timeline, while queued generation could read protected events or write summaries after requester access was revoked.",
+        "preserved_identity_only": true,
+        "new_record_authorized_by_run_196r": true,
+        "record_present_before_run_197": false,
+        "pre_run_197_register_sha256": "268b63e20dcc40ecc0ba772e8431a9d8a35c9df9bfa98197abdfc273e972e525"
+      },
+      "current_adjudication": {
+        "application_baseline_commit": "39a5d97d7d0ff9ea03070e90193581479f423022",
+        "application_baseline_tree": "90b9adba1261fb1ec30d9fe4b13daaf5149fc1dc",
+        "audit_release_commit": "4c47d2eeed0b1006c11166da8ab8b0747d7554b7",
+        "audit_release_tree": "67d02dab74cdb608a019432bcb032520cd02db3e",
+        "fix_commit": "31a9edfbab32a19062ccf15e123cd0b0923b7dc3",
+        "fix_tree": "5e8e8f5e560b5ff2d157902808e2c0b5e17952f5",
+        "application_commit": "5c8a1357f830d0b8a8c14924016d89df52ab9e86",
+        "repository_tree": "974af4e10eea90e9e9254d509443b49cf0052931",
+        "current_local_main_commit_at_run_196": "44ab5e270aecd961e2e75abcdbe4d2cb1effa3df",
+        "current_local_main_tree_at_run_196": "cae56eafa2c63af68e099995b08b3c926575373b",
+        "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+        "verdict": "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED",
+        "scope": "Staff summary and timeline reads plus queued summary generation: canonical active shared-Site access, the explicit hr.employees.viewAllSites exception, unchanged client Gate behavior, and requester revalidation before protected reads or writes.",
+        "run_196_receipt": "evidence/runtime/current-run-196-summary-timeline-site-privacy-remediation-wave-39.json",
+        "run_196_receipt_sha256": "96c275826a695a4b41b98891bd6560e6592be415c43fa360f1730c0c7fe9013a",
+        "run_196r_review": "evidence/runtime/current-run-196r-independent-summary-timeline-site-privacy-remediation-review-wave-39.json",
+        "run_196r_review_sha256": "a53d2b279cf1becff1e7b851d522a43fb2cacfc05f5099250da910c9d3fbe151",
+        "application_remediation_required": true,
+        "application_source_changed": true,
+        "integrated_to_main": true,
+        "published_to_origin_main": false,
+        "publication_authorized": false,
+        "feature_identity_assigned": false,
+        "static_route_or_page_feature_ownership_inherited": false,
+        "static_controller_action_bridge_inherited": false,
+        "queue_advance_inherited": false,
+        "my_day_remediation_or_runtime_inherited": false,
+        "adjacent_summary_timeline_surface_correctness_inherited": false,
+        "broader_staff_or_client_authorization_inherited": false
+      },
+      "passes": [
+        "P2",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Cross-module Staff Context",
+        "submodule": "SUMMARY_TIMELINE_SITE_PRIVACY_BOUNDARY",
+        "submodule_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW_ZERO_STATIC_OWNERSHIP_CREDIT"
+      },
+      "actor_and_job": {
+        "actor": "Staff summary and timeline viewer",
+        "secondary_actors": "Self-reader, same-Site and remote-Site staff, hr.employees.viewAllSites actor, client reader under the unchanged Gate, queued requester, and requester whose Site access changes before execution in bounded tests",
+        "job": "Read or generate staff summaries and timelines without receiving another staff member's protected events outside current approved Site scope",
+        "status": "BOUNDED_TEST_ACTORS_VALIDATED_NOT_REPRESENTATIVE_SIGNED_IN_BROWSER"
+      },
+      "route_url": {
+        "route_names": "portal.summaries.generate; timeline.my; timeline.staff; summaries.me; summaries.staff; summaries.generate",
+        "route_paths": "routes/portal.php:178-180; routes/portal.php:241-243; routes/portal.php:289-295",
+        "raw_route_path_field": "routes/portal.php:178-180; routes/portal.php:241-243; routes/portal.php:289-295",
+        "ownership_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+        "status": "SOURCE_LOCATORS_ONLY_ZERO_STATIC_ROUTE_OWNERSHIP_CREDIT"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": null,
+        "application_commit": "5c8a1357f830d0b8a8c14924016d89df52ab9e86",
+        "status": "NO_FRONTEND_ASSOCIATION_OR_CREDIT"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_RETAINED_HISTORICAL_RECORD"
+      },
+      "backend_anchor": {
+        "matrix_anchors": null,
+        "claim_anchors": [
+          "app/Http/Controllers/SummaryController.php",
+          "app/Http/Controllers/TimelineController.php",
+          "app/Jobs/GenerateSummaryJob.php",
+          "tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "BOUNDED_CONTROLLER_JOB_AND_REGRESSION_REVIEW",
+        "application_commit": "5c8a1357f830d0b8a8c14924016d89df52ab9e86"
+      },
+      "current_behaviour": {
+        "classification": "REMEDIATED_LOCAL_MAIN_BOUNDED_VERIFIED_NOT_PUBLISHED",
+        "summary": "Self-read and existing actions remain compatible. Other-staff summary and timeline access now requires canonical active shared-Site scope unless the actor has hr.employees.viewAllSites. Client access still uses the existing Gate. Queued generation revalidates requester authority before protected event reads and before writing the summary.",
+        "runtime_observed": true,
+        "runtime_scope": "Only the isolated focused 15 tests / 32 assertions contribute once. The 1-failed/5-passed/9-assertion red reproduction, zero-assertion vendor-junction attempt, Emar 2/238 compatibility run, and shared post-merge 40/438 execution are reported separately and not counted."
+      },
+      "current_workflow": {
+        "matrix_summary": "Bounded staff summary/timeline and queued-generation authorization contract only; no canonical feature, page, representative browser, or module completion is established.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "BOUNDED_SELF_SHARED_SITE_GLOBAL_PERMISSION_CLIENT_GATE_AND_QUEUED_REVALIDATION_PATHS_EXECUTED; REPRESENTATIVE_BROWSER_EASE_STATIC_OWNERSHIP_AND_BROADER_CONTEXT_WORKFLOW_NOT_EXECUTED"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": null
+      },
+      "evidence": {
+        "current_remediation_receipt": "evidence/runtime/current-run-196-summary-timeline-site-privacy-remediation-wave-39.json",
+        "independent_artifact_review": "evidence/runtime/current-run-196r-independent-summary-timeline-site-privacy-remediation-review-wave-39.json",
+        "claim_anchors": [
+          "app/Http/Controllers/SummaryController.php",
+          "app/Http/Controllers/TimelineController.php",
+          "app/Jobs/GenerateSummaryJob.php",
+          "tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php"
+        ],
+        "test_commands_executed": 1,
+        "tests_executed": 15,
+        "assertions": 32,
+        "supporting_tests": 2,
+        "supporting_assertions": 238,
+        "shared_post_merge_tests": 40,
+        "shared_post_merge_assertions": 438,
+        "baseline_failed_cases": 1,
+        "baseline_passed_cases": 5,
+        "baseline_assertions": 9,
+        "browser_cells": 0,
+        "database_checks": 1,
+        "database_cleanup": "global PHP/Pest zero; exact numeric PID-suffixed schemas zero; isolated worktree removed cleanly"
+      },
+      "problem_root_cause": "Staff summary and timeline reads treated action permission as sufficient without requiring current canonical shared-Site scope, while queued generation relied on legacy organization comparison and did not revalidate the requester before protected reads or writes.",
+      "impact": "Before remediation, an actor with action permission but no current shared-Site access could read another staff member's protected summary or timeline, and a queued request could continue after authorization changed.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve self-read and existing action compatibility while requiring canonical active shared-Site access for other-staff summary and timeline reads.",
+        "Preserve only the explicit hr.employees.viewAllSites exception and unchanged client Gate behavior; do not infer tenant or organization authorization.",
+        "Revalidate the queued requester before protected event reads and summary writes without copying third-party wording, assets, source, or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": "Apply one current canonical Site-scope rule to staff summary/timeline reads and repeat the same requester check inside queued generation before any protected read or write.",
+        "status": "IMPLEMENTED_NATIVELY_WITHOUT_BENCHMARK_OR_DESIGN_CREDIT"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [],
+      "rbac_privacy": "One operating organisation across multiple Sites; current approved Site access, exact action permission, canonical staff and client ownership, direct-object denial, and privacy are the boundaries, not tenant isolation.",
+      "priority": "P1",
+      "priority_status": "HISTORICAL_REMEDIATED_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Completed: focused unchanged-source reproduction observed remote-Site staff summary 200 instead of 403 at baseline 39a5d97d7d0ff9ea03070e90193581479f423022",
+        "Completed: exact four-path native remediation integrated to local main at 5c8a1357f830d0b8a8c14924016d89df52ab9e86 without publication",
+        "Completed: isolated focused 15 tests / 32 assertions plus separately reported Emar 2/238 and shared post-merge 40/438 support with three independent RUN196R GO reviews",
+        "Retained non-inherited gaps: canonical feature identity, static route/page/action ownership, adjacent summary/timeline surfaces, My Day, representative browser, benchmark, release, and completion"
+      ],
+      "confidence": {
+        "level": "HIGH_FOR_BOUNDED_SUMMARY_TIMELINE_SITE_PRIVACY_REMEDIATION_DISPOSITION",
+        "evidence_gap": "Canonical or candidate feature identity, static route/page/action ownership, representative signed-in application browser, full-suite/coverage, ease, target-specific benchmark, adjacent summary/timeline surfaces, My Day, and broader staff/client authorization remain unexecuted or unadjudicated."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording, or distinctive layout may be copied.",
+      "interim_safeguard": "Before relying on staff summary or timeline output, verify the viewer and queued requester still share an active approved Site with the target unless the exact global permission applies.",
+      "acceptance_criteria": {
+        "given_when_then": "Given self, same-Site, remote-Site, exact global-permission, client-Gate, and queued-requester authorization states, when a summary or timeline is read or generated, then self and allowed actions remain compatible; another staff member requires current canonical active shared-Site scope unless hr.employees.viewAllSites applies; client Gate behavior is unchanged; and queued generation revalidates before protected reads and writes without granting adjacent-surface, My Day, route/page, browser, benchmark, module, or completion credit.",
+        "status": "BOUNDED_MET_FOR_HISTORICAL_CLAIM_REMEDIATION_NOT_FINAL_FINDING_OR_FEATURE_COMPLETION"
+      },
+      "validation_plan": {
+        "required": "Retain focused self, same-Site, remote-Site, global-permission, client-Gate, and queued authorization-change coverage; keep other timeline-event correctness, client policy correctness, routes/frontend/models/schema/access-service/provider behavior, My Day, and broader authorization separate.",
+        "unit": "NOT_SEPARATELY_REQUIRED_FOR_THIS_REMEDIATION",
+        "feature": "EXECUTED_15_TESTS_32_ASSERTIONS_IN_ISOLATED_FOCUSED_RUN",
+        "architecture": "STATIC_SOURCE_TEST_GO_PLUS_THREE_REVIEWER_RUN196R_EXACT_ARTIFACT_GO",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED_OR_CREDITED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "canonical or candidate feature identity remains unassigned"
+      ],
+      "independent_review": {
+        "status": "COMPLETED_SOURCE_TEST_GO_PLUS_THREE_FINAL_RUN196R_EXACT_ARTIFACT_GO_REVIEWS",
+        "reviewer": "independent source/test reviewer and RUN196R credit, Git, and receipt reviewers",
+        "disagreements": "Two receipt-construction NO-GOs were corrected before RUN196R: dynamic first-run dirty-state serialization and assert-only optimized-Python validation. All three final reviewers returned GO on the exact deterministic snapshot.",
+        "reconciliation": "RUN-196 establishes reproduction, remediation, bounded runtime, local integration, cleanup, and nonpublication. RUN-196R alone authorizes one null-feature historical-remediated record; RUN-197 alone changes the live register."
+      },
+      "unresolved_fields": [
+        "canonical or candidate FEATURE-ID and static source ownership",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline, and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "full-suite coverage, representative signed-in browser, adjacent summary/timeline surfaces, My Day, and broader staff/client authorization"
       ],
       "completion_credit": false,
       "credit": {

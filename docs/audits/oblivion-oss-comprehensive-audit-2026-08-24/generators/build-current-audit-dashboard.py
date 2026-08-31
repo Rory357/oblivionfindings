@@ -286,6 +286,10 @@ dashboard_run_192 = read_json_strict("evidence/browser/current-audit-dashboard-v
 run_193_remediation = read_json_strict("evidence/runtime/current-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.json")
 run_193r_review = read_json_strict("evidence/runtime/current-run-193r-independent-fleet-fuel-index-site-privacy-remediation-review-wave-38.json")
 run_194_reporting = read_json_strict("evidence/source/current-run-194-fleet-fuel-index-site-privacy-remediation-reporting-wave-38.json")
+dashboard_run_195 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json")
+run_196_remediation = read_json_strict("evidence/runtime/current-run-196-summary-timeline-site-privacy-remediation-wave-39.json")
+run_196r_review = read_json_strict("evidence/runtime/current-run-196r-independent-summary-timeline-site-privacy-remediation-review-wave-39.json")
+run_197_reporting = read_json_strict("evidence/source/current-run-197-summary-timeline-site-privacy-remediation-reporting-wave-39.json")
 findings_register = read_json_strict("findings.json")
 assert sha256_file("evidence/source/current-canonical-feature-identity-wave-01.json") == "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
 assert sha256_file("evidence/source/current-canonical-identity-agent-register.json") == "21ebd8b004b5ade11aa01281958cda2be2ca966d1fb7c46576e039fab5f47baf"
@@ -3239,6 +3243,14 @@ for label, path in (
     ("RUN-193R independent Fleet Fuel remediation review", "evidence/runtime/current-run-193r-independent-fleet-fuel-index-site-privacy-remediation-review-wave-38.json"),
     ("RUN-194 Fleet Fuel remediation-reporting materializer", "generators/materialize-run-194-fleet-fuel-index-site-privacy-remediation-reporting-wave-38.py"),
     ("RUN-194 Fleet Fuel remediation-reporting receipt", "evidence/source/current-run-194-fleet-fuel-index-site-privacy-remediation-reporting-wave-38.json"),
+    ("RUN-195 exact RUN-194 audit-dashboard verification materializer", "generators/materialize-run-195-audit-dashboard-verification-wave-38.py"),
+    ("RUN-195 exact RUN-194 audit-dashboard verification", "evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json"),
+    ("RUN-196 Summary/timeline Site-privacy remediation materializer", "generators/materialize-run-196-summary-timeline-site-privacy-remediation-wave-39.py"),
+    ("RUN-196 Summary/timeline Site-privacy remediation receipt", "evidence/runtime/current-run-196-summary-timeline-site-privacy-remediation-wave-39.json"),
+    ("RUN-196R independent Summary/timeline remediation-review materializer", "generators/materialize-independent-run-196-summary-timeline-site-privacy-remediation-review-wave-39.py"),
+    ("RUN-196R independent Summary/timeline remediation review", "evidence/runtime/current-run-196r-independent-summary-timeline-site-privacy-remediation-review-wave-39.json"),
+    ("RUN-197 Summary/timeline remediation-reporting materializer", "generators/materialize-run-197-summary-timeline-site-privacy-remediation-reporting-wave-39.py"),
+    ("RUN-197 Summary/timeline remediation-reporting receipt", "evidence/source/current-run-197-summary-timeline-site-privacy-remediation-reporting-wave-39.json"),
 ):
     if path not in checkpoint_paths:
         checkpoint_evidence.append((label, path))
@@ -3251,9 +3263,9 @@ checkpoint_evidence_links = "".join(
 checkpoint_evidence_links += (
     '<li><a href="task-scripts/">RUN-072 task-script directory (300 files)</a> '
     f'<code>{html.escape(usability_materialization["outputs"]["task_scripts"]["bundle_sha256"])}</code></li>'
-    '<li><a href="generators/materialize-run-195-audit-dashboard-verification-wave-38.py">RUN-195 audit-dashboard verification materializer</a> '
+    '<li><a href="generators/materialize-run-198-audit-dashboard-verification-wave-39.py">RUN-198 audit-dashboard verification materializer</a> '
     '<span>forward generator; fresh exact-artifact verification required</span></li>'
-    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json">RUN-195 audit-dashboard verification receipt</a> '
+    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-198-wave-39.json">RUN-198 audit-dashboard verification receipt</a> '
     '<span>forward receipt; intentionally unhashed to avoid an evidence cycle</span></li>'
 )
 start_ready_ids = "<br>".join(
@@ -3385,7 +3397,7 @@ historical_discovery_claims = {row["finding_id"]: row["source_claim"] for row in
 assert len(historical_discovery_claims) == 12
 
 assert findings_register["schema_version"] == "oblivion_audit_findings_v2_mixed_current_status"
-assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_SIX_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
+assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_SEVEN_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
 assert findings_register["generated_on"] == "2026-09-01"
 assert findings_register["architecture_rule"] == "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries."
 findings_pins = findings_register["pins"]
@@ -3458,13 +3470,29 @@ assert findings_pins["monitoring_metric_replay_current_local_main_tree"] == "70b
 assert findings_pins["run_185_dashboard_verification_sha256"] == "e6965bba3f25b80e6ce70aa3656802956bed935d79aaf46576e1420f0c65e07c"
 assert findings_pins["run_186_monitoring_metric_replay_dedupe_remediation_sha256"] == "bf2cd03ca2ab7aeb6a9d1093b3c08aba5a1bc29342cc4fda6fa57ef286c2f1e5"
 assert findings_pins["run_186r_independent_artifact_review_sha256"] == "035271d7bfcd4256a59f01e9953f9cd8074466c0389f74ce82325a46ee6a6af7"
+assert findings_pins["summary_timeline_site_privacy_baseline_commit"] == "39a5d97d7d0ff9ea03070e90193581479f423022"
+assert findings_pins["summary_timeline_site_privacy_baseline_tree"] == "90b9adba1261fb1ec30d9fe4b13daaf5149fc1dc"
+assert findings_pins["summary_timeline_site_privacy_audit_release_commit"] == "4c47d2eeed0b1006c11166da8ab8b0747d7554b7"
+assert findings_pins["summary_timeline_site_privacy_audit_release_tree"] == "67d02dab74cdb608a019432bcb032520cd02db3e"
+assert findings_pins["summary_timeline_site_privacy_fix_commit"] == "31a9edfbab32a19062ccf15e123cd0b0923b7dc3"
+assert findings_pins["summary_timeline_site_privacy_fix_tree"] == "5e8e8f5e560b5ff2d157902808e2c0b5e17952f5"
+assert findings_pins["summary_timeline_site_privacy_local_main_merge_commit"] == "5c8a1357f830d0b8a8c14924016d89df52ab9e86"
+assert findings_pins["summary_timeline_site_privacy_local_main_tree"] == "974af4e10eea90e9e9254d509443b49cf0052931"
+assert findings_pins["summary_timeline_site_privacy_current_main_commit"] == "44ab5e270aecd961e2e75abcdbe4d2cb1effa3df"
+assert findings_pins["summary_timeline_site_privacy_current_main_tree"] == "cae56eafa2c63af68e099995b08b3c926575373b"
+assert findings_pins["summary_timeline_site_privacy_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
+assert findings_pins["run_196_summary_timeline_site_privacy_remediation_generator_sha256"] == "e8c45110a983d2d210501024d89d6f9b968103141b86feb174c5641757dd5555"
+assert findings_pins["run_196_summary_timeline_site_privacy_remediation_sha256"] == "96c275826a695a4b41b98891bd6560e6592be415c43fa360f1730c0c7fe9013a"
+assert findings_pins["run_196r_independent_artifact_review_materializer_sha256"] == "0c4fb643e608fa73fdc6118a7b83d1024123cd7857b84c36a136b51b3244edc8"
+assert findings_pins["run_196r_independent_artifact_review_sha256"] == "a53d2b279cf1becff1e7b851d522a43fb2cacfc05f5099250da910c9d3fbe151"
 live_findings = findings_register["records"]
-assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 16
+assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 17
 assert {row["id"] for row in live_findings} == set(historical_discovery_claims) | {
     "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
     "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
     "FLEET-FUEL-INDEX-SITE-PRIVACY-01",
     "MON-METRIC-REPLAY-DEDUPE-01",
+    "SUMMARY-TIMELINE-SITE-PRIVACY-01",
 }
 provisional_findings = [
     row for row in live_findings
@@ -3480,7 +3508,7 @@ historical_remediated_findings = [
 ]
 assert len(provisional_findings) == findings_register["counts"]["provisional_source_claims"] == 8
 assert len(historical_fixed_findings) == findings_register["counts"]["historical_already_fixed"] == 2
-assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 6
+assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 7
 historical_fixed_by_id = {row["id"]: row for row in historical_fixed_findings}
 assert set(historical_fixed_by_id) == {"MED-RBAC-01", "MED-CD-ATOMICITY-01"}
 assert historical_fixed_by_id["MED-RBAC-01"]["current_adjudication"]["verdict"] == "ALREADY_FIXED"
@@ -3524,6 +3552,7 @@ assert set(historical_remediated_by_id) == {
     "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
     "FLEET-FUEL-INDEX-SITE-PRIVACY-01",
     "MON-METRIC-REPLAY-DEDUPE-01",
+    "SUMMARY-TIMELINE-SITE-PRIVACY-01",
 }
 scope_finding = historical_remediated_by_id["MED-CD-SCOPE-01"]
 assert scope_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED"
@@ -3611,10 +3640,42 @@ assert metric_finding["option_a_deployment_boundary"]["poisoned_subsecond_eviden
 assert metric_finding["option_a_deployment_boundary"]["verified_in_production"] is False
 assert metric_finding["option_a_deployment_boundary"]["migration_deployment_credit"] is False
 assert metric_finding["option_a_deployment_boundary"]["release_or_publication_credit"] is False
+summary_finding = historical_remediated_by_id["SUMMARY-TIMELINE-SITE-PRIVACY-01"]
+assert summary_finding["feature_id"] is None
+assert summary_finding["candidate_feature_id"] is None
+assert summary_finding["related_feature_ids"] == []
+assert summary_finding["feature_identity_status"] == "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW"
+assert summary_finding["feature_id_role"] == "NO_CANONICAL_OR_CANDIDATE_FEATURE_ASSOCIATION_ZERO_STATIC_OWNERSHIP_CREDIT"
+assert summary_finding["route_url"]["ownership_status"] == "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW"
+assert summary_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED"
+assert summary_finding["current_adjudication"]["application_commit"] == "5c8a1357f830d0b8a8c14924016d89df52ab9e86"
+assert summary_finding["current_adjudication"]["repository_tree"] == "974af4e10eea90e9e9254d509443b49cf0052931"
+assert summary_finding["evidence"]["tests_executed"] == 15
+assert summary_finding["evidence"]["assertions"] == 32
+assert summary_finding["evidence"]["supporting_tests"] == 2
+assert summary_finding["evidence"]["supporting_assertions"] == 238
+assert summary_finding["evidence"]["shared_post_merge_tests"] == 40
+assert summary_finding["evidence"]["shared_post_merge_assertions"] == 438
+assert summary_finding["evidence"]["baseline_failed_cases"] == 1
+assert summary_finding["evidence"]["baseline_passed_cases"] == 5
+assert summary_finding["evidence"]["baseline_assertions"] == 9
+assert all(
+    summary_finding["current_adjudication"][key] is False
+    for key in (
+        "static_route_or_page_feature_ownership_inherited",
+        "static_controller_action_bridge_inherited",
+        "queue_advance_inherited",
+        "my_day_remediation_or_runtime_inherited",
+        "adjacent_summary_timeline_surface_correctness_inherited",
+        "broader_staff_or_client_authorization_inherited",
+        "published_to_origin_main",
+        "publication_authorized",
+    )
+)
 assert all(row["completion_credit"] is False for row in live_findings)
 assert all(all(value is False for value in row["credit"].values()) for row in live_findings)
-assert findings_register["counts"]["bounded_disposition_tests_passed"] == 161
-assert findings_register["counts"]["bounded_disposition_assertions"] == 2609
+assert findings_register["counts"]["bounded_disposition_tests_passed"] == 176
+assert findings_register["counts"]["bounded_disposition_assertions"] == 2641
 assert "5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution" in findings_register["counts"]["bounded_disposition_sum_basis"]
@@ -3661,13 +3722,26 @@ assert findings_register["counts"]["fleet_fuel_index_site_privacy_baseline_passe
 assert findings_register["counts"]["fleet_fuel_index_site_privacy_baseline_assertions"] == 65
 assert "unique 6/206 post-merge focused component" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "any second count from combined 26/421" in findings_register["counts"]["bounded_disposition_sum_basis"]
+assert findings_register["counts"]["summary_timeline_site_privacy_focused_tests"] == 15
+assert findings_register["counts"]["summary_timeline_site_privacy_focused_assertions"] == 32
+assert findings_register["counts"]["summary_timeline_site_privacy_supporting_tests"] == 2
+assert findings_register["counts"]["summary_timeline_site_privacy_supporting_assertions"] == 238
+assert findings_register["counts"]["summary_timeline_site_privacy_baseline_failed"] == 1
+assert findings_register["counts"]["summary_timeline_site_privacy_baseline_passed"] == 5
+assert findings_register["counts"]["summary_timeline_site_privacy_baseline_assertions"] == 9
+assert findings_register["counts"]["summary_timeline_site_privacy_shared_post_merge_tests"] == 40
+assert findings_register["counts"]["summary_timeline_site_privacy_shared_post_merge_assertions"] == 438
+assert "unique isolated focused 15/32 SUMMARY-TIMELINE-SITE-PRIVACY execution" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert findings_register["counts"]["final_P0"] == findings_register["counts"]["final_P1"] == 0
-assert findings_register["reconciliation"]["retained_record_count"] == 16
+assert findings_register["reconciliation"]["retained_record_count"] == 17
 assert findings_register["reconciliation"]["current_provisional_count"] == 8
 assert findings_register["reconciliation"]["historical_already_fixed_count"] == 2
-assert findings_register["reconciliation"]["historical_remediated_count"] == 6
+assert findings_register["reconciliation"]["historical_remediated_count"] == 7
 assert findings_register["reconciliation"]["every_non_null_primary_feature_id_in_canonical_matrix"] is True
-assert findings_register["reconciliation"]["records_without_primary_or_candidate_feature_id"] == ["MON-METRIC-REPLAY-DEDUPE-01"]
+assert findings_register["reconciliation"]["records_without_primary_or_candidate_feature_id"] == [
+    "MON-METRIC-REPLAY-DEDUPE-01",
+    "SUMMARY-TIMELINE-SITE-PRIVACY-01",
+]
 
 assert run_163_reporting["schema_version"] == "run-163-med-cd-scope-remediation-reporting-wave-29-v1"
 assert run_163_reporting["run_id"] == "RUN-163-MED-CD-SCOPE-01-REMEDIATION-REPORTING-WAVE-29"
@@ -4225,6 +4299,11 @@ run_192_dashboard_payload = git_file_at_commit(
     "audit-dashboard.html",
 )
 assert hashlib.sha256(run_192_dashboard_payload).hexdigest() == "8d19569e7bfb256edeecdc754e2bc47e2ddad3ecd8de099e3bb0dad9b50e313b"
+run_195_dashboard_payload = git_file_at_commit(
+    "4c47d2eeed0b1006c11166da8ab8b0747d7554b7",
+    "audit-dashboard.html",
+)
+assert hashlib.sha256(run_195_dashboard_payload).hexdigest() == "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9"
 
 assert sha256_file("generators/build-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.py") == "61c895a305f743f102765c9f86d38843c3ce61bcc1a8684a672aa2d7cd6ee157"
 assert sha256_file("evidence/source/root-run-179-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.json") == "5505cf17bb68d3e534116ea9d33e501e0222714b6e3779d0ec6b70f819cc3b0a"
@@ -4817,6 +4896,147 @@ run_194_without_seal = dict(run_194_reporting)
 run_194_seal = run_194_without_seal.pop("receipt_self_seal_sha256")
 assert canonical_sha256(run_194_without_seal) == run_194_seal
 
+assert sha256_file("generators/materialize-run-195-audit-dashboard-verification-wave-38.py") == "349576404fe3ff96f1ceeeb9f7fa85887150246fc73bba3d9b48549415509c8d"
+assert sha256_file("evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json") == "455ee26c87ec6f07eca687eb1e40d2049c01513002732d08f74696b3dd617456"
+assert dashboard_run_195["run_id"] == "RUN-195-AUDIT-DASHBOARD-VERIFICATION-WAVE-38"
+assert dashboard_run_195["schema_version"] == "run-195-audit-dashboard-verification-wave-38-v1"
+assert dashboard_run_195["pins"]["final_run_195_builder"]["sha256"] == "44fe804d6671672fbe0c2cc73d2f0917f4042c466901419f9b76d89ecbdfd5a4"
+assert dashboard_run_195["pins"]["final_run_195_dashboard"]["sha256"] == "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9"
+assert dashboard_run_195["reported_snapshot"]["finding_lineage"] == {
+    "records": 16,
+    "provisional": 8,
+    "historical_already_fixed": 2,
+    "historical_remediated": 6,
+    "bounded_tests": 161,
+    "bounded_assertions": 2609,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert len(dashboard_run_195["current_browser_verification"]["viewports"]) == 4
+assert all(
+    row["visible_text_passed"] == row["visible_text_total"] == 39
+    and row["page_horizontal_overflow"] is False
+    and row["table_containment_failures"] == 0
+    for row in dashboard_run_195["current_browser_verification"]["viewports"].values()
+)
+assert len(dashboard_run_195["current_browser_verification"]["navigation"]) == 10
+assert all(row["target_exists"] and row["target_visible"] for row in dashboard_run_195["current_browser_verification"]["navigation"])
+assert dashboard_run_195["html_graph"]["unique_local_resources"] == 491
+assert dashboard_run_195["html_graph"]["existing_unique_local_resources"] == 491
+assert dashboard_run_195["html_graph"]["anchor_element_count"] == 944
+assert dashboard_run_195["html_graph"]["duplicate_id_count"] == 0
+assert dashboard_run_195["html_graph"]["hash_mismatches"] == []
+assert dashboard_run_195["finalization_state"]["cleanup_complete"] is True
+assert {key for key, value in dashboard_run_195["credit_boundary"].items() if value} == {
+    "exact_run_195_dashboard_artifact_verification",
+}
+assert len(dashboard_run_195["completion_gates"]) == 26
+assert not any(row["complete"] for row in dashboard_run_195["completion_gates"])
+run_195_without_seal = dict(dashboard_run_195)
+run_195_seal = run_195_without_seal.pop("receipt_self_seal_sha256")
+assert run_195_seal == "a3dc0871156ba4c6376a92a4cacab8b8697fa0efcd49dea42d212533aff6b284"
+assert canonical_sha256(run_195_without_seal) == run_195_seal
+
+assert sha256_file("generators/materialize-run-196-summary-timeline-site-privacy-remediation-wave-39.py") == "e8c45110a983d2d210501024d89d6f9b968103141b86feb174c5641757dd5555"
+assert sha256_file("evidence/runtime/current-run-196-summary-timeline-site-privacy-remediation-wave-39.json") == "96c275826a695a4b41b98891bd6560e6592be415c43fa360f1730c0c7fe9013a"
+assert run_196_remediation["run_id"] == "RUN-196-SUMMARY-TIMELINE-SITE-PRIVACY-01-REMEDIATION-WAVE-39"
+assert run_196_remediation["status"] == "CURRENT_SUMMARY_TIMELINE_SITE_PRIVACY_DEFECT_REPRODUCED_REMEDIATED_LOCALLY_INTEGRATED_BOUNDED_VERIFIED_NOT_PUBLISHED_REPORTING_NOT_YET_AUTHORIZED_ZERO_STATIC_OWNERSHIP_FINAL_FINDING_OR_COMPLETION_CREDIT"
+assert run_196_remediation["lineage"]["baseline"]["commit"] == "39a5d97d7d0ff9ea03070e90193581479f423022"
+assert run_196_remediation["lineage"]["sealed_fix"]["commit"] == "31a9edfbab32a19062ccf15e123cd0b0923b7dc3"
+assert run_196_remediation["lineage"]["effective_merge"]["commit"] == "5c8a1357f830d0b8a8c14924016d89df52ab9e86"
+assert run_196_remediation["lineage"]["current_main"]["commit"] == "44ab5e270aecd961e2e75abcdbe4d2cb1effa3df"
+assert run_196_remediation["finding"]["feature_identity"] == {
+    "feature_id": None,
+    "candidate_feature_id": None,
+    "status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+    "static_ownership_credit": False,
+}
+assert run_196_remediation["finding"]["red_reproduction"]["failed"] == 1
+assert run_196_remediation["finding"]["red_reproduction"]["passed"] == 5
+assert run_196_remediation["finding"]["red_reproduction"]["assertions"] == 9
+assert run_196_remediation["finding"]["zero_credit_runs"][0]["assertions"] == 0
+assert run_196_remediation["finding"]["isolated_focused_verification"]["passed"] == 15
+assert run_196_remediation["finding"]["isolated_focused_verification"]["assertions"] == 32
+assert run_196_remediation["finding"]["isolated_focused_verification"]["eligible_for_bounded_aggregate"] is True
+assert run_196_remediation["finding"]["isolated_supporting_compatibility"]["passed"] == 2
+assert run_196_remediation["finding"]["isolated_supporting_compatibility"]["assertions"] == 238
+assert run_196_remediation["finding"]["isolated_supporting_compatibility"]["eligible_for_bounded_aggregate"] is False
+assert run_196_remediation["post_merge_shared_support"]["passed"] == 40
+assert run_196_remediation["post_merge_shared_support"]["assertions"] == 438
+assert run_196_remediation["post_merge_shared_support"]["shared_denominator_not_split_or_recredited"] is True
+assert {key for key, value in run_196_remediation["credit_boundary"].items() if value} == {
+    "exact_remediation_source_credit",
+    "exact_focused_test_execution_credit",
+    "local_merge_credit",
+    "cleanup_credit",
+    "excluded_surfaces",
+}
+assert len(run_196_remediation["completion_gates"]) == 26
+assert not any(row["complete"] for row in run_196_remediation["completion_gates"])
+assert {row["name"] for row in run_196_remediation["completion_gates"]} == set(run_196_remediation["completion_boundary"])
+run_196_without_seal = dict(run_196_remediation)
+run_196_seal = run_196_without_seal.pop("receipt_self_seal_sha256")
+assert run_196_seal == "325269d2a0721c620c9a588da65c016b2355f8c5fb51e6ec112156888483609c"
+assert canonical_sha256(run_196_without_seal) == run_196_seal
+
+assert sha256_file("generators/materialize-independent-run-196-summary-timeline-site-privacy-remediation-review-wave-39.py") == "0c4fb643e608fa73fdc6118a7b83d1024123cd7857b84c36a136b51b3244edc8"
+assert sha256_file("evidence/runtime/current-run-196r-independent-summary-timeline-site-privacy-remediation-review-wave-39.json") == "a53d2b279cf1becff1e7b851d522a43fb2cacfc05f5099250da910c9d3fbe151"
+assert run_196r_review["run_id"] == "RUN-196R-INDEPENDENT-SUMMARY-TIMELINE-SITE-PRIVACY-01-REMEDIATION-REVIEW-WAVE-39"
+assert run_196r_review["decision"]["verdict"] == "GO"
+assert run_196r_review["review"]["independent_reviewers"] == 3
+assert run_196r_review["review"]["all_final_reviewers_read_only"] is True
+assert len(run_196r_review["review"]["resolved_no_go_findings"]) == 2
+assert run_196r_review["review"]["discrepancies"] == []
+assert run_196r_review["decision"]["authorized_finding_id"] == "SUMMARY-TIMELINE-SITE-PRIVACY-01"
+assert run_196r_review["decision"]["authorized_feature_id"] is None
+assert run_196r_review["decision"]["authorized_candidate_feature_id"] is None
+assert run_196r_review["decision"]["authorized_resulting_lineage"] == {
+    "retained_claim_records": 17,
+    "current_provisional_source_claims": 8,
+    "historical_already_fixed_records": 2,
+    "historical_remediated_records": 7,
+    "bounded_disposition_tests_passed": 176,
+    "bounded_disposition_assertions": 2641,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_196r_review["decision"]["run197_required"] is True
+assert run_196r_review["decision"]["run198_fresh_dashboard_verification_required"] is True
+assert {key for key, value in run_196r_review["credit_boundary"].items() if value} == {
+    "independent_exact_artifact_review_for_reporting_authorization",
+}
+assert len(run_196r_review["completion_gates"]) == 26
+assert not any(row["complete"] for row in run_196r_review["completion_gates"])
+assert {row["name"] for row in run_196r_review["completion_gates"]} == set(run_196r_review["completion_boundary"])
+run_196r_without_seal = dict(run_196r_review)
+run_196r_seal = run_196r_without_seal.pop("receipt_self_seal_sha256")
+assert run_196r_seal == "9eefa1031060434a0ee027b5a22d4a3a399ef6472220b5e8628808bf2eb375da"
+assert canonical_sha256(run_196r_without_seal) == run_196r_seal
+
+assert run_197_reporting["run_id"] == "RUN-197-SUMMARY-TIMELINE-SITE-PRIVACY-01-REMEDIATION-REPORTING-WAVE-39"
+assert run_197_reporting["reporting_transition"]["finding_id"] == "SUMMARY-TIMELINE-SITE-PRIVACY-01"
+assert run_197_reporting["reporting_transition"]["counts_after"] == {
+    "retained_claim_records": 17,
+    "provisional_source_claims": 8,
+    "historical_already_fixed": 2,
+    "historical_remediated": 7,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_197_reporting["bounded_execution_accounting"]["unique_total"] == {"tests": 176, "assertions": 2641}
+assert run_197_reporting["dashboard_forward_gate"]["required_run"] == "RUN-198"
+assert run_197_reporting["dashboard_forward_gate"]["dashboard_html_changed_by_run_197"] is False
+assert run_197_reporting["dashboard_forward_gate"]["preserved_run_195_dashboard_sha256"] == "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9"
+assert {key for key, value in run_197_reporting["credit_boundary"].items() if value} == {
+    "live_findings_register_and_reporting_status",
+}
+assert len(run_197_reporting["completion_gates"]) == 26
+assert not any(row["complete"] for row in run_197_reporting["completion_gates"])
+assert {row["name"] for row in run_197_reporting["completion_gates"]} == set(run_197_reporting["completion_boundary"])
+run_197_without_seal = dict(run_197_reporting)
+run_197_seal = run_197_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_197_without_seal) == run_197_seal
+
 reviewed_fleet_daily_check_overlay = findings_register["current_static_source_feature_ownership"]
 
 required_artifacts = [
@@ -4879,11 +5099,18 @@ fleet_fuel_row_status = (
     "playback.data · zero static ownership, adjacent-route, or independent logger-Site inheritance · "
     "not a final finding"
 )
+summary_row_status = (
+    "historical issue · remediated on local main · not published to origin/main · "
+    "shared-Site staff Summary/timeline authorization and queued requester revalidation only · "
+    "feature unassigned · zero static ownership, adjacent-surface, My Day, browser, benchmark, "
+    "publication, or completion inheritance · not a final finding"
+)
 finding_claim_labels = dict(historical_discovery_claims)
 finding_claim_labels["FLEET-TRIP-INDEX-SITE-PRIVACY-01"] = fleet_finding["impact"]
 finding_claim_labels["FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"] = fleet_playback_finding["impact"]
 finding_claim_labels["FLEET-FUEL-INDEX-SITE-PRIVACY-01"] = fleet_fuel_finding["impact"]
 finding_claim_labels["MON-METRIC-REPLAY-DEDUPE-01"] = metric_finding["impact"]
+finding_claim_labels["SUMMARY-TIMELINE-SITE-PRIVACY-01"] = summary_finding["impact"]
 assert set(finding_claim_labels) == {row["id"] for row in live_findings}
 finding_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td class=\"partial\">{}</td></tr>".format(
@@ -4905,12 +5132,16 @@ finding_rows = "".join(
                             fleet_fuel_row_status
                             if row["id"] == "FLEET-FUEL-INDEX-SITE-PRIVACY-01"
                             else (
-                                "historical issue · already fixed on current main · not a final finding"
-                                if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                summary_row_status
+                                if row["id"] == "SUMMARY-TIMELINE-SITE-PRIVACY-01"
                                 else (
-                                    "historical issue · remediated on current main · not a final finding"
-                                    if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
-                                    else "current provisional P1 · independent review pending"
+                                    "historical issue · already fixed on current main · not a final finding"
+                                    if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                    else (
+                                        "historical issue · remediated on current main · not a final finding"
+                                        if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                        else "current provisional P1 · independent review pending"
+                                    )
                                 )
                             )
                         )
@@ -6201,6 +6432,122 @@ current_template_text = (
     + fresh_run_195_body
     + current_template_text[fresh_run_195_body_end:]
 )
+
+run_197_template_rewrites = [
+    ('<a href="#checkpoint">RUN-194</a>', '<a href="#checkpoint">RUN-197</a>'),
+    (
+        "RUN-192–194 Fleet Fuel index Site-privacy remediation reporting checkpoint",
+        "RUN-195–197 Summary/timeline Site-privacy remediation reporting checkpoint",
+    ),
+    (
+        "RUN-194: Fuel historical-remediated record added · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-195</li>",
+        "RUN-194: Fuel historical-remediated record added · historical 8 provisional + 2 already-fixed + 6 remediated · historical 161/2,609 unique bounded disposition total · dashboard HTML later verified by RUN-195</li><li>RUN-195: exact RUN-194 dashboard verified at 4/4 viewports · 39/39 named visible checks per viewport · 10/10 navigation · 491/491 resources · 944 anchors · zero application credit</li><li>RUN-196: Summary/timeline Site-privacy defect reproduced and remediated in exactly four transferred paths · unique focused $summary_tests/$summary_assertions counted once · local main only · not published</li><li>RUN-196R: exact remediation artifacts independently reviewed GO by three read-only reviewers · one feature-unassigned historical-remediated record authorized · zero static ownership or queue advance</li><li>RUN-197: Summary/timeline historical-remediated record added · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-198</li>",
+    ),
+    (
+        "The current RUN-194 register retains 16 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; FLEET-FUEL-INDEX-SITE-PRIVACY-01 is the new historical-remediated record with candidate-only CAP-FLEET-VEHICLE-REGISTER association, pending index-87 ownership behind index 86 playback.data, and zero static-ownership credit.",
+        "The current RUN-197 register retains 17 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; SUMMARY-TIMELINE-SITE-PRIVACY-01 is the new historical-remediated record with null feature and candidate IDs, UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW identity, and zero static-ownership credit.",
+    ),
+    (
+        "The current RUN-194 register retains $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated. FLEET-FUEL-INDEX-SITE-PRIVACY-01 adds only bounded selected Fuel GET-index/CSV Site-privacy remediation reporting; Fuel remains candidate index 87 with zero owner, bridge, page, or queue credit, while playback.data index 86 remains next.",
+        "The current RUN-197 register retains $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated. SUMMARY-TIMELINE-SITE-PRIVACY-01 adds only bounded shared-Site staff Summary/timeline authorization and queued requester-revalidation reporting; feature identity remains unassigned with zero owner, bridge, page, or queue credit, while playback.data index 86 remains next.",
+    ),
+    (
+        "$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 16 retained · none final",
+        "$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 17 retained · none final",
+    ),
+    (
+        "$fleet_playback_tests/$fleet_playback_assertions Fleet playback + $metric_tests/$metric_assertions final corrected Monitoring replay + $fleet_fuel_tests/$fleet_fuel_assertions Fleet Fuel; initial $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, and all other replay/support remain separate",
+        "$fleet_playback_tests/$fleet_playback_assertions Fleet playback + $metric_tests/$metric_assertions final corrected Monitoring replay + $fleet_fuel_tests/$fleet_fuel_assertions Fleet Fuel + $summary_tests/$summary_assertions Summary/timeline; initial $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, Summary red/zero-assertion/$summary_supporting_tests/$summary_supporting_assertions support/$summary_shared_tests/$summary_shared_assertions shared execution, and all other replay/support remain separate",
+    ),
+    (
+        "The register retains 16 claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. MON-METRIC-REPLAY-DEDUPE-01 retains null feature and candidate IDs and zero static ownership. FLEET-FUEL-INDEX-SITE-PRIVACY-01 is candidate-only for CAP-FLEET-VEHICLE-REGISTER; row-attached logger identity follows foreign-row concealment only, with no independent logger-Site authorization for an otherwise visible row.",
+        "The register retains 17 claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. MON-METRIC-REPLAY-DEDUPE-01 and SUMMARY-TIMELINE-SITE-PRIVACY-01 retain null feature and candidate IDs and zero static ownership. FLEET-FUEL-INDEX-SITE-PRIVACY-01 remains candidate-only for CAP-FLEET-VEHICLE-REGISTER; row-attached logger identity follows foreign-row concealment only, with no independent logger-Site authorization for an otherwise visible row.",
+    ),
+    (
+        "16 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
+        "17 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
+    ),
+    (
+        "RUN-155–194 bounded disposition provenance, remediation, and reporting",
+        "RUN-155–197 bounded disposition provenance, remediation, and reporting",
+    ),
+    (
+        "RUN-001 through RUN-194 are represented by audit artifacts.",
+        "RUN-001 through RUN-197 are represented by audit artifacts.",
+    ),
+    ("RUN-071–194 current reporting checkpoint", "RUN-071–197 current reporting checkpoint"),
+    ("RUN-071–194 completion-gate checkpoint", "RUN-071–197 completion-gate checkpoint"),
+    ("RUN-071–194 evidence lineage", "RUN-071–197 evidence lineage"),
+    (
+        "Every current raw, generated, reviewed, and integrated RUN-077–194",
+        "Every current raw, generated, reviewed, and integrated RUN-077–197",
+    ),
+    ("current RUN-194 split of 16 retained claim identities", "current RUN-197 split of 17 retained claim identities"),
+    ("Fresh RUN-195 audit-dashboard verification required", "Fresh RUN-198 audit-dashboard verification required"),
+    (
+        "The exact RUN-194 reporting dashboard must be generated and checked in RUN-195",
+        "The exact RUN-197 reporting dashboard must be generated and checked in RUN-198",
+    ),
+    (
+        "RUN-188 verifies only the superseded RUN-187 HTML; RUN-189/R–191 establish and report only the playback/show owner and bridge. RUN-192 verifies the exact RUN-191 HTML; RUN-193 reproduces and locally integrates the bounded Fleet Fuel index/CSV Site-privacy remediation, RUN-193R authorizes one historical-remediated record, and RUN-194 changes only live reporting while preserving the verified RUN-192 HTML byte-for-byte. None supplies audit-dashboard verification for the new RUN-195 HTML.",
+        "RUN-192 verifies only the superseded RUN-191 HTML; RUN-193/R establish the bounded Fleet Fuel remediation and RUN-194 reports it. RUN-195 verifies the exact RUN-194 HTML; RUN-196 reproduces and locally integrates the bounded Summary/timeline Site-privacy remediation, RUN-196R authorizes one feature-unassigned historical-remediated record, and RUN-197 changes only live reporting while preserving the verified RUN-195 HTML byte-for-byte. None supplies audit-dashboard verification for the new RUN-198 HTML.",
+    ),
+    (
+        "It verifies the RUN-194 audit artifact only",
+        "It verifies the RUN-197 audit artifact only",
+    ),
+    (
+        "RUN-195 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)",
+        "RUN-195 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list) · <a href=\"evidence/runtime/current-run-196-summary-timeline-site-privacy-remediation-wave-39.json\">RUN-196 Summary/timeline remediation receipt</a> (verified and hashed in the current evidence list) · <a href=\"evidence/runtime/current-run-196r-independent-summary-timeline-site-privacy-remediation-review-wave-39.json\">RUN-196R independent Summary/timeline review receipt</a> (verified and hashed in the current evidence list) · <a href=\"evidence/source/current-run-197-summary-timeline-site-privacy-remediation-reporting-wave-39.json\">RUN-197 reporting receipt</a> (verified and hashed in the current evidence list) · <a href=\"evidence/browser/current-audit-dashboard-verification-run-198-wave-39.json\">RUN-198 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)",
+    ),
+    (
+        "RUN-195 audit-dashboard verification materializer</a> (forward reference; intentionally unhashed)",
+        "RUN-195 audit-dashboard verification materializer</a> (verified and hashed in the current evidence list) · <a href=\"generators/materialize-run-196-summary-timeline-site-privacy-remediation-wave-39.py\">RUN-196 Summary/timeline remediation materializer</a> (verified and hashed in the current evidence list) · <a href=\"generators/materialize-independent-run-196-summary-timeline-site-privacy-remediation-review-wave-39.py\">RUN-196R independent Summary/timeline review materializer</a> (verified and hashed in the current evidence list) · <a href=\"generators/materialize-run-197-summary-timeline-site-privacy-remediation-reporting-wave-39.py\">RUN-197 reporting materializer</a> (verified and hashed in the current evidence list) · <a href=\"generators/materialize-run-198-audit-dashboard-verification-wave-39.py\">RUN-198 audit-dashboard verification materializer</a> (forward reference; intentionally unhashed)",
+    ),
+    (
+        '<li><a href="evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json">Superseded RUN-192 verification GO</a></li></ul>',
+        '<li><a href="evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json">Superseded RUN-192 verification GO</a></li><li><a href="evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json">Superseded RUN-195 verification GO</a></li></ul>',
+    ),
+    (
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, bounded Fleet evidence, RUN-192 exact-dashboard verification, and RUN-193/R Fleet Fuel evidence, reported in RUN-194, with fresh RUN-195 dashboard verification required.",
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, bounded Fleet evidence, RUN-195 exact-dashboard verification, and RUN-196/R Summary/timeline evidence, reported in RUN-197, with fresh RUN-198 dashboard verification required.",
+    ),
+    (
+        "RUN-159, RUN-162, RUN-166, RUN-173, RUN-176, RUN-183, RUN-186/R, and RUN-193/R retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, post-merge Fleet trip-index $fleet_tests/$fleet_assertions, post-merge Fleet playback $fleet_playback_tests/$fleet_playback_assertions, final post-corrective-merge Monitoring $metric_tests/$metric_assertions, and the unique post-merge Fuel $fleet_fuel_tests/$fleet_fuel_assertions component contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, and every other replay/subset remain excluded.",
+        "RUN-159, RUN-162, RUN-166, RUN-173, RUN-176, RUN-183, RUN-186/R, RUN-193/R, and RUN-196/R retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, post-merge Fleet trip-index $fleet_tests/$fleet_assertions, post-merge Fleet playback $fleet_playback_tests/$fleet_playback_assertions, final post-corrective-merge Monitoring $metric_tests/$metric_assertions, unique post-merge Fuel $fleet_fuel_tests/$fleet_fuel_assertions, and focused Summary/timeline $summary_tests/$summary_assertions contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, Summary red/zero-assertion/$summary_supporting_tests/$summary_supporting_assertions support/$summary_shared_tests/$summary_shared_assertions shared execution, and every other replay/subset remain excluded.",
+    ),
+    (
+        "</tr><tr><td>RUN-193 Fleet Fuel index Site-privacy execution</td><td>$fleet_fuel_tests post-merge focused tests / $fleet_fuel_assertions assertions counted once; baseline $fleet_fuel_red_failed failed + $fleet_fuel_red_passed passed / $fleet_fuel_red_assertions assertions, isolated $fleet_fuel_tests/$fleet_fuel_assertions replay, supporting $fleet_fuel_supporting_tests/$fleet_fuel_supporting_assertions regressions, and any second count from combined 26/421 excluded</td><td class=\"partial\">selected GET index/CSV rows, filters, month-to-date totals, rolling 30-day entry count, efficiency inputs, provenance, archived Sites, and row-scoped attached identity only · candidate index 87 pending behind index 86 · baseline $fleet_fuel_baseline_short · fix $fleet_fuel_fix_short · local merge $fleet_fuel_merge_short · origin/main $fleet_fuel_origin_short unchanged · full-suite green unproved</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+        "</tr><tr><td>RUN-193 Fleet Fuel index Site-privacy execution</td><td>$fleet_fuel_tests post-merge focused tests / $fleet_fuel_assertions assertions counted once; baseline $fleet_fuel_red_failed failed + $fleet_fuel_red_passed passed / $fleet_fuel_red_assertions assertions, isolated $fleet_fuel_tests/$fleet_fuel_assertions replay, supporting $fleet_fuel_supporting_tests/$fleet_fuel_supporting_assertions regressions, and any second count from combined 26/421 excluded</td><td class=\"partial\">selected GET index/CSV rows, filters, month-to-date totals, rolling 30-day entry count, efficiency inputs, provenance, archived Sites, and row-scoped attached identity only · candidate index 87 pending behind index 86 · baseline $fleet_fuel_baseline_short · fix $fleet_fuel_fix_short · local merge $fleet_fuel_merge_short · origin/main $fleet_fuel_origin_short unchanged · full-suite green unproved</td></tr><tr><td>RUN-196 Summary/timeline Site-privacy execution</td><td>$summary_tests focused tests / $summary_assertions assertions counted once; baseline $summary_red_failed failed + $summary_red_passed passed / $summary_red_assertions assertions, zero-assertion vendor-junction attempt, eMAR $summary_supporting_tests/$summary_supporting_assertions support, shared post-merge $summary_shared_tests/$summary_shared_assertions, and wrong-path pre-test invocation excluded</td><td class=\"partial\">self and existing actions preserved · other-staff reads require active shared-Site scope unless hr.employees.viewAllSites · client Gate unchanged · queued requester revalidated before protected reads/writes · feature unassigned · baseline $summary_baseline_short · fix $summary_fix_short · local merge $summary_merge_short · current main $summary_current_main_short · origin/main $summary_origin_short unchanged</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+    ),
+]
+for old, new in run_197_template_rewrites:
+    assert current_template_text.count(old) == 1, f"Expected one RUN-197 template rewrite target: {old}"
+    current_template_text = current_template_text.replace(old, new)
+
+fresh_run_198_section_start = (
+    '<section class="panel"><h2>Fresh RUN-198 audit-dashboard verification required</h2><p>'
+)
+fresh_run_198_section_end = '</p><ul class="list">'
+assert current_template_text.count(fresh_run_198_section_start) == 1
+fresh_run_198_start_index = current_template_text.index(fresh_run_198_section_start)
+fresh_run_198_body_start = fresh_run_198_start_index + len(fresh_run_198_section_start)
+fresh_run_198_body_end = current_template_text.index(
+    fresh_run_198_section_end,
+    fresh_run_198_body_start,
+)
+fresh_run_198_body = (
+    "The exact RUN-197 reporting dashboard must be generated and checked in RUN-198 at 1440×900, 1280×800, 1024×768, and 390×844. "
+    "RUN-195 verifies only the superseded RUN-194 HTML; RUN-196 reproduces and locally integrates the bounded Summary/timeline Site-privacy remediation, RUN-196R authorizes one feature-unassigned historical-remediated record, and RUN-197 changes only live reporting while preserving the verified RUN-195 HTML byte-for-byte. "
+    "None supplies audit-dashboard verification for the new RUN-198 HTML. "
+    "The linked RUN-198 receipt must record page overflow, bounded mobile table scrolling, navigation, local links, anchors, duplicate authored IDs, console output, visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership, 17 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 7 historical remediated, 176/2,641 uniquely counted bounded tests/assertions, focused Summary/timeline 15/32 counted once, all Summary red/zero-assertion/2/238 support/40/438 shared executions excluded, current 2/340 benchmark mapping, 0/340 final no-match/NCM, 338 unresolved targets, one operating organisation across multiple Sites, Gate 4 open, and every non-bounded runtime, application-browser, final-finding, release, Pass, feature-completion, and audit-complete zero-credit boundary. "
+    "It verifies the RUN-197 audit artifact only and grants no application-browser, responsive-application, visual, workflow, release, Pass, feature-completion, or audit-complete credit."
+)
+current_template_text = (
+    current_template_text[:fresh_run_198_body_start]
+    + fresh_run_198_body
+    + current_template_text[fresh_run_198_body_end:]
+)
 TEMPLATE = Template(current_template_text)
 
 
@@ -6451,6 +6798,20 @@ dashboard = TEMPLATE.substitute(
     fleet_fuel_fix_short=run_193_remediation["pins"]["fix_commit"][:12],
     fleet_fuel_merge_short=run_193_remediation["pins"]["local_main_merge_commit"][:12],
     fleet_fuel_origin_short=run_193_remediation["pins"]["origin_main_observed"][:12],
+    summary_red_failed=run_196_remediation["finding"]["red_reproduction"]["failed"],
+    summary_red_passed=run_196_remediation["finding"]["red_reproduction"]["passed"],
+    summary_red_assertions=run_196_remediation["finding"]["red_reproduction"]["assertions"],
+    summary_tests=run_196_remediation["finding"]["isolated_focused_verification"]["passed"],
+    summary_assertions=run_196_remediation["finding"]["isolated_focused_verification"]["assertions"],
+    summary_supporting_tests=run_196_remediation["finding"]["isolated_supporting_compatibility"]["passed"],
+    summary_supporting_assertions=run_196_remediation["finding"]["isolated_supporting_compatibility"]["assertions"],
+    summary_shared_tests=run_196_remediation["post_merge_shared_support"]["passed"],
+    summary_shared_assertions=run_196_remediation["post_merge_shared_support"]["assertions"],
+    summary_baseline_short=run_196_remediation["lineage"]["baseline"]["commit"][:12],
+    summary_fix_short=run_196_remediation["lineage"]["sealed_fix"]["commit"][:12],
+    summary_merge_short=run_196_remediation["lineage"]["effective_merge"]["commit"][:12],
+    summary_current_main_short=run_196_remediation["lineage"]["current_main"]["commit"][:12],
+    summary_origin_short=findings_pins["summary_timeline_site_privacy_origin_main_observed"][:12],
     metric_tests=metric_finding["evidence"]["tests_executed"],
     metric_assertions=metric_finding["evidence"]["assertions"],
     metric_initial_tests=metric_finding["evidence"]["initial_superseded_tests"],
@@ -6557,14 +6918,14 @@ dashboard = TEMPLATE.substitute(
 )
 
 current_visible_boundaries = [
-    '<a href="#checkpoint">RUN-194</a>',
+    '<a href="#checkpoint">RUN-197</a>',
     '<a href="#findings">Finding status</a>',
     "667 = 310 route + 357 page",
     "121 reviewed / 386 pending",
     "reviewed = 99 owned + 10 shared + 5 alias + 7 gap",
     "16.976330%",
     "3,262 records remain",
-    "RUN-192–194 Fleet Fuel index Site-privacy remediation reporting checkpoint",
+    "RUN-195–197 Summary/timeline Site-privacy remediation reporting checkpoint",
     "fleet-assets.vehicles.alerts-config",
     "RUN090-ROUTE-0084 / RUN077-ROUTE-0692",
     "VehicleController::alertsConfig",
@@ -6624,13 +6985,19 @@ current_visible_boundaries = [
     "RUN-193: Fleet Fuel index/CSV Site-privacy defect reproduced and remediated in exactly two transferred paths",
     "RUN-193R: exact remediation artifacts independently reviewed GO",
     "RUN-194: Fuel historical-remediated record added",
-    "16 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 6 historical remediated",
-    "161 / 2,609",
-    "161/2,609 unique bounded disposition total",
-    "RUN-071–194 current reporting checkpoint",
-    "RUN-071–194 completion-gate checkpoint",
-    "RUN-071–194 evidence lineage",
-    "Every current raw, generated, reviewed, and integrated RUN-077–194",
+    "RUN-195: exact RUN-194 dashboard verified at 4/4 viewports",
+    "39/39 named visible checks per viewport",
+    "10/10 navigation · 491/491 resources · 944 anchors",
+    "RUN-196: Summary/timeline Site-privacy defect reproduced and remediated in exactly four transferred paths",
+    "RUN-196R: exact remediation artifacts independently reviewed GO by three read-only reviewers",
+    "RUN-197: Summary/timeline historical-remediated record added",
+    "17 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 7 historical remediated",
+    "176 / 2,641",
+    "176/2,641 unique bounded disposition total",
+    "RUN-071–197 current reporting checkpoint",
+    "RUN-071–197 completion-gate checkpoint",
+    "RUN-071–197 evidence lineage",
+    "Every current raw, generated, reviewed, and integrated RUN-077–197",
     "RUN-186 corrected Monitoring metric-replay execution",
     "final post-corrective-merge Monitoring 56/472",
     "initial Monitoring 49/392",
@@ -6642,9 +7009,13 @@ current_visible_boundaries = [
     "RUN-193 Fleet Fuel remediation receipt",
     "RUN-193R independent Fuel review receipt",
     "RUN-194 reporting receipt",
-    "RUN-195 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)",
-    "RUN-195 audit-dashboard verification materializer</a> (forward reference; intentionally unhashed)",
-    "dashboard HTML frozen pending RUN-195",
+    "RUN-195 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list)",
+    "RUN-196 Summary/timeline remediation receipt",
+    "RUN-196R independent Summary/timeline review receipt",
+    "RUN-197 reporting receipt",
+    "RUN-198 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)",
+    "RUN-198 audit-dashboard verification materializer</a> (forward reference; intentionally unhashed)",
+    "dashboard HTML frozen pending RUN-198",
     "MON-METRIC-REPLAY-DEDUPE-01",
     "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
     "MON-METRIC-REPLAY-DEDUPE-01 is also remediated on local main only and unpublished",
@@ -6705,6 +7076,14 @@ current_visible_boundaries = [
     "supporting 20/215 regressions",
     "candidate index 87 pending behind index 86",
     "baseline df65322f8eb7 · fix 2ec4b70e379c · local merge 04c32c36fdda · origin/main c39b07654705 unchanged",
+    "SUMMARY-TIMELINE-SITE-PRIVACY-01",
+    "RUN-196 Summary/timeline Site-privacy execution",
+    "feature unassigned",
+    "other-staff reads require active shared-Site scope unless hr.employees.viewAllSites",
+    "baseline 39a5d97d7d0f · fix 31a9edfbab32 · local merge 5c8a1357f830 · current main 44ab5e270aec · origin/main c39b07654705 unchanged",
+    "15 focused tests / 32 assertions counted once",
+    "eMAR 2/238 support",
+    "shared post-merge 40/438",
     "14 retained",
     "13a7f37da9c9",
     "790bc11e3fb2",
@@ -6724,7 +7103,7 @@ current_visible_boundaries = [
     "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated",
     "two broader INR failures reproduce at base",
     "full-suite green false",
-    "Fresh RUN-195 audit-dashboard verification required",
+    "Fresh RUN-198 audit-dashboard verification required",
     "cf0090ec9724",
     "0b1920dade92",
     "7b2b5688c90e",
@@ -6743,13 +7122,12 @@ current_visible_boundaries = [
     "RUN-188 verifies only the superseded RUN-187 HTML",
     "exact dashboard later verified by RUN-185",
     "visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership",
-    "no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-194 reporting sources or the RUN-195 dashboard generated from them",
-    "None supplies audit-dashboard verification for the new RUN-195 HTML.",
-    "The linked RUN-195 receipt must record",
-    "It verifies the RUN-194 audit artifact only",
+    "None supplies audit-dashboard verification for the new RUN-198 HTML.",
+    "The linked RUN-198 receipt must record",
+    "It verifies the RUN-197 audit artifact only",
     "RUN-188 exact RUN-187 audit-dashboard verification materializer",
     "RUN-194 Fleet Fuel remediation-reporting receipt",
-    "RUN-195 audit-dashboard verification materializer",
+    "RUN-198 audit-dashboard verification materializer",
 ]
 missing_current_visible_boundaries = [
     boundary for boundary in current_visible_boundaries if boundary not in dashboard
@@ -6868,6 +7246,7 @@ assert (
         run_185_dashboard_payload,
         run_188_dashboard_payload,
         run_192_dashboard_payload,
+        run_195_dashboard_payload,
         output_bytes,
     )
     or hashlib.sha256(existing_output_bytes).hexdigest()
@@ -6877,7 +7256,7 @@ assert (
         "966c93ed940d2fb58e4510e65442b10faab2ea5d966e66abb4acc2695fb1a091",
     }
 )
-temporary_path = output_path.with_name(f".{output_path.name}.tmp-run195-dashboard")
+temporary_path = output_path.with_name(f".{output_path.name}.tmp-run198-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"
 try:
     with temporary_path.open("xb") as handle:
