@@ -113,7 +113,7 @@ class MyTasksController extends Controller
         $incidents = $this->getIncidents($userId, $queryNow);
 
         // 6. Tasks (CR alerts + followups + notes - existing aggregation)
-        $tasks = $this->getCrTasks($userId);
+        $tasks = $this->getCrTasks($user);
         $notifications = $this->getDigestNotifications($user);
         $pendingClaimsCount = $this->getPendingClaimsCount($user);
 
@@ -1360,10 +1360,11 @@ class MyTasksController extends Controller
         }
     }
 
-    private function getCrTasks(int $userId): array
+    private function getCrTasks(User $user): array
     {
+        $userId = (int) $user->id;
         $tasks = collect()
-            ->merge($this->getAlertTasks($userId))
+            ->merge($this->getAlertTasks($user))
             ->merge($this->getFollowupTasks($userId))
             ->merge($this->getNoteFollowupTasks($userId));
 
@@ -1430,12 +1431,19 @@ class MyTasksController extends Controller
         return null;
     }
 
-    private function getAlertTasks(int $userId): array
+    private function getAlertTasks(User $user): array
     {
         try {
             $now = now();
+            $currentUser = User::query()->find($user->id);
+            if (! $currentUser) {
+                return [];
+            }
+            $query = ControlRoomAlert::query()
+                ->where('assigned_to_user_id', $currentUser->id);
+            $this->siteAccess->applyAlertScope($query, $currentUser);
 
-            return ControlRoomAlert::where('assigned_to_user_id', $userId)
+            return $query
                 ->unresolved()
                 // PR 17 — hide snoozed alerts from /my-day until the window
                 // elapses. The alert row remains fully live on the CR side.

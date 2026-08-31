@@ -1,15 +1,91 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 
-it('residual terminal SLA is omitted from the My Day alert task', function () {
+function myDayAlertWorkerAt(Site $site): User
+{
     $worker = User::factory()->frontlineWorker()->create();
-    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now()->subDay()->toDateString(),
+        'end_date' => null,
+    ]);
+
+    return $worker;
+}
+
+it('conceals assigned alerts outside the workers current approved Sites', function () {
+    $localSite = Site::factory()->create(['is_active' => true]);
+    $remoteSite = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($localSite);
+    $localAlert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create([
+        'site_id' => $localSite->id,
+    ]);
+    $remoteAlert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create([
+        'site_id' => $remoteSite->id,
+    ]);
+
+    $response = $this->actingAs($worker)->get('/my-day')->assertOk();
+    $taskIds = collect($response->inertiaProps('tasks'))->pluck('id')->all();
+
+    expect($taskIds)
+        ->toContain('alert-'.$localAlert->id)
+        ->not->toContain('alert-'.$remoteAlert->id);
+});
+
+it('forbids an assigned worker from acknowledging or snoozing a remote Site alert', function () {
+    $localSite = Site::factory()->create(['is_active' => true]);
+    $remoteSite = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($localSite);
+    $ackAlert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create([
+        'site_id' => $remoteSite->id,
+    ]);
+    $snoozeAlert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create([
+        'site_id' => $remoteSite->id,
+        'severity' => 'medium',
+    ]);
+
+    $this->actingAs($worker)
+        ->post(route('my-day.alert.ack', $ackAlert, false))
+        ->assertForbidden();
+    $this->post(route('my-day.alert.snooze', $snoozeAlert, false), ['window' => '15m'])
+        ->assertForbidden();
+
+    expect($ackAlert->fresh()->status)->toBe(ControlRoomAlert::STATUS_OPEN)
+        ->and($ackAlert->fresh()->acknowledged_at)->toBeNull()
+        ->and($snoozeAlert->fresh()->snoozed_until)->toBeNull()
+        ->and($snoozeAlert->fresh()->snoozed_by_user_id)->toBeNull();
+});
+
+it('conceals and protects an assigned alert after the workers Site access is revoked', function () {
+    $site = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($site);
+    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create(['site_id' => $site->id]);
+    $worker->hrEmployeeProfile()->update(['is_active' => false]);
+
+    $response = $this->actingAs($worker)->get('/my-day')->assertOk();
+    expect(collect($response->inertiaProps('tasks'))->pluck('id')->all())
+        ->not->toContain('alert-'.$alert->id);
+
+    $this->post(route('my-day.alert.ack', $alert, false))->assertForbidden();
+    expect($alert->fresh()->status)->toBe(ControlRoomAlert::STATUS_OPEN)
+        ->and($alert->fresh()->acknowledged_at)->toBeNull();
+});
+
+it('residual terminal SLA is omitted from the My Day alert task', function () {
+    $site = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($site);
+    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create(['site_id' => $site->id]);
     AlertSla::query()->create([
         'alert_id' => $alert->id,
         'ended_as' => AlertSla::ENDED_RECONCILED_NO_MATCH,
@@ -27,8 +103,9 @@ it('residual terminal SLA is omitted from the My Day alert task', function () {
 });
 
 it('acknowledges an assigned alert through the canonical lifecycle', function () {
-    $worker = User::factory()->frontlineWorker()->create();
-    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create();
+    $site = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($site);
+    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create(['site_id' => $site->id]);
     $definition = SlaDefinition::query()->create([
         'name' => 'My Day acknowledgement',
         'code' => 'my-day-acknowledgement',
@@ -61,8 +138,9 @@ it('acknowledges an assigned alert through the canonical lifecycle', function ()
 });
 
 it('reports an invalid My Day acknowledgement without overwriting triage', function () {
-    $worker = User::factory()->frontlineWorker()->create();
-    $alert = ControlRoomAlert::factory()->triaging()->assignedTo($worker)->create();
+    $site = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($site);
+    $alert = ControlRoomAlert::factory()->triaging()->assignedTo($worker)->create(['site_id' => $site->id]);
     $acknowledgedAt = $alert->acknowledged_at;
     $acknowledgedBy = $alert->acknowledged_by_user_id;
 
@@ -79,11 +157,12 @@ it('reports an invalid My Day acknowledgement without overwriting triage', funct
 });
 
 it('rechecks the My Day assignee under the lifecycle lock before acknowledging', function () {
-    $worker = User::factory()->frontlineWorker()->create();
-    $replacement = User::factory()->frontlineWorker()->create();
-    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create();
+    $site = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($site);
+    $replacement = myDayAlertWorkerAt($site);
+    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create(['site_id' => $site->id]);
     $realLifecycle = app(ControlRoomAlertLifecycleService::class);
-    $proxy = \Mockery::mock(ControlRoomAlertLifecycleService::class);
+    $proxy = Mockery::mock(ControlRoomAlertLifecycleService::class);
     $proxy->shouldReceive('acknowledge')
         ->once()
         ->andReturnUsing(function (...$arguments) use ($alert, $realLifecycle, $replacement) {
@@ -105,11 +184,15 @@ it('rechecks the My Day assignee under the lifecycle lock before acknowledging',
 });
 
 it('rechecks the My Day assignee under a lock before snoozing', function () {
-    $worker = User::factory()->frontlineWorker()->create();
-    $replacement = User::factory()->frontlineWorker()->create();
-    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create(['severity' => 'medium']);
+    $site = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($site);
+    $replacement = myDayAlertWorkerAt($site);
+    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create([
+        'site_id' => $site->id,
+        'severity' => 'medium',
+    ]);
     $realLifecycle = app(ControlRoomAlertLifecycleService::class);
-    $proxy = \Mockery::mock(ControlRoomAlertLifecycleService::class);
+    $proxy = Mockery::mock(ControlRoomAlertLifecycleService::class);
     $proxy->shouldReceive('snoozeForAssignee')
         ->once()
         ->andReturnUsing(function (...$arguments) use ($alert, $realLifecycle, $replacement) {
@@ -127,5 +210,105 @@ it('rechecks the My Day assignee under a lock before snoozing', function () {
 
     expect($alert->fresh()->assigned_to_user_id)->toBe($replacement->id)
         ->and($alert->fresh()->snoozed_until)->toBeNull()
+        ->and($alert->fresh()->snoozed_by_user_id)->toBeNull();
+});
+
+it('rechecks canonical Site access under the lifecycle lock before acknowledging', function () {
+    $localSite = Site::factory()->create(['is_active' => true]);
+    $remoteSite = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($localSite);
+    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create(['site_id' => $localSite->id]);
+    $realLifecycle = app(ControlRoomAlertLifecycleService::class);
+    $proxy = Mockery::mock(ControlRoomAlertLifecycleService::class);
+    $proxy->shouldReceive('acknowledge')
+        ->once()
+        ->andReturnUsing(function (...$arguments) use ($alert, $realLifecycle, $remoteSite) {
+            $alert->forceFill(['site_id' => $remoteSite->id])->save();
+
+            return $realLifecycle->acknowledge(...$arguments);
+        });
+    $this->app->instance(ControlRoomAlertLifecycleService::class, $proxy);
+
+    $this->actingAs($worker)
+        ->post(route('my-day.alert.ack', $alert, false))
+        ->assertForbidden();
+
+    expect($alert->fresh()->status)->toBe(ControlRoomAlert::STATUS_OPEN)
+        ->and($alert->fresh()->acknowledged_at)->toBeNull();
+});
+
+it('rechecks canonical Site access under the lifecycle lock before snoozing', function () {
+    $localSite = Site::factory()->create(['is_active' => true]);
+    $remoteSite = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($localSite);
+    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create([
+        'site_id' => $localSite->id,
+        'severity' => 'medium',
+    ]);
+    $realLifecycle = app(ControlRoomAlertLifecycleService::class);
+    $proxy = Mockery::mock(ControlRoomAlertLifecycleService::class);
+    $proxy->shouldReceive('snoozeForAssignee')
+        ->once()
+        ->andReturnUsing(function (...$arguments) use ($alert, $realLifecycle, $remoteSite) {
+            $alert->forceFill(['site_id' => $remoteSite->id])->save();
+
+            return $realLifecycle->snoozeForAssignee(...$arguments);
+        });
+    $this->app->instance(ControlRoomAlertLifecycleService::class, $proxy);
+
+    $this->actingAs($worker)
+        ->post(route('my-day.alert.snooze', $alert, false), ['window' => '15m'])
+        ->assertForbidden();
+
+    expect($alert->fresh()->snoozed_until)->toBeNull()
+        ->and($alert->fresh()->snoozed_by_user_id)->toBeNull();
+});
+
+it('rechecks current worker access under the lifecycle lock before acknowledging', function () {
+    $site = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($site);
+    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create(['site_id' => $site->id]);
+    $realLifecycle = app(ControlRoomAlertLifecycleService::class);
+    $proxy = Mockery::mock(ControlRoomAlertLifecycleService::class);
+    $proxy->shouldReceive('acknowledge')
+        ->once()
+        ->andReturnUsing(function (...$arguments) use ($worker, $realLifecycle) {
+            $worker->hrEmployeeProfile()->update(['is_active' => false]);
+
+            return $realLifecycle->acknowledge(...$arguments);
+        });
+    $this->app->instance(ControlRoomAlertLifecycleService::class, $proxy);
+
+    $this->actingAs($worker)
+        ->post(route('my-day.alert.ack', $alert, false))
+        ->assertForbidden();
+
+    expect($alert->fresh()->status)->toBe(ControlRoomAlert::STATUS_OPEN)
+        ->and($alert->fresh()->acknowledged_at)->toBeNull();
+});
+
+it('rechecks current worker access under the lifecycle lock before snoozing', function () {
+    $site = Site::factory()->create(['is_active' => true]);
+    $worker = myDayAlertWorkerAt($site);
+    $alert = ControlRoomAlert::factory()->open()->assignedTo($worker)->create([
+        'site_id' => $site->id,
+        'severity' => 'medium',
+    ]);
+    $realLifecycle = app(ControlRoomAlertLifecycleService::class);
+    $proxy = Mockery::mock(ControlRoomAlertLifecycleService::class);
+    $proxy->shouldReceive('snoozeForAssignee')
+        ->once()
+        ->andReturnUsing(function (...$arguments) use ($worker, $realLifecycle) {
+            $worker->hrEmployeeProfile()->update(['is_active' => false]);
+
+            return $realLifecycle->snoozeForAssignee(...$arguments);
+        });
+    $this->app->instance(ControlRoomAlertLifecycleService::class, $proxy);
+
+    $this->actingAs($worker)
+        ->post(route('my-day.alert.snooze', $alert, false), ['window' => '15m'])
+        ->assertForbidden();
+
+    expect($alert->fresh()->snoozed_until)->toBeNull()
         ->and($alert->fresh()->snoozed_by_user_id)->toBeNull();
 });

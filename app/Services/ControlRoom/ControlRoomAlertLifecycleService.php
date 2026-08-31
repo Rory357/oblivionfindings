@@ -53,6 +53,11 @@ class ControlRoomAlertLifecycleService
         return DB::transaction(function () use ($alert, $actor, $operatorNote, $requiredAssigneeUserId): ControlRoomAlert {
             $locked = $this->lockAlert($alert);
             $this->assertRequiredAssignee($locked, $requiredAssigneeUserId);
+            if ($requiredAssigneeUserId !== null) {
+                $currentActor = User::query()->find($actor->id);
+                abort_unless($currentActor, 403, UserSiteAccessService::DEFAULT_MESSAGE);
+                $this->siteAccess->assertCanAccessAlert($currentActor, $locked);
+            }
             $this->assertStatus($locked, [ControlRoomAlert::STATUS_OPEN], 'acknowledge');
             $at = now();
             $context = $locked->context ?? [];
@@ -95,6 +100,9 @@ class ControlRoomAlertLifecycleService
         return DB::transaction(function () use ($alert, $actor, $until, $window): ControlRoomAlert {
             $locked = $this->lockAlert($alert);
             $this->assertRequiredAssignee($locked, $actor->id);
+            $currentActor = User::query()->find($actor->id);
+            abort_unless($currentActor, 403, UserSiteAccessService::DEFAULT_MESSAGE);
+            $this->siteAccess->assertCanAccessAlert($currentActor, $locked);
 
             if ($locked->isTerminal()) {
                 throw new InvalidArgumentException('Resolved, closed, or dismissed alerts can\'t be snoozed.');

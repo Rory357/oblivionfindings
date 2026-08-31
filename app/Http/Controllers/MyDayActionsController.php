@@ -2,17 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Services\AttendanceService;
+use App\Http\Controllers\ControlRoom\ControlRoomAlertController;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\Shift;
 use App\Models\ShiftTask;
 use App\Models\Timesheet;
 use App\Models\TimesheetClientAllocation;
+use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
@@ -22,7 +29,7 @@ use InvalidArgumentException;
  *
  * The old shortcut `clockIn`/`clockOut` methods were removed in PR 4.5 so
  * the frontline clock flow has a single trusted path through
- * {@see \App\Http\Controllers\AttendanceController} + {@see \App\Domain\Hr\Services\AttendanceService}.
+ * {@see AttendanceController} + {@see AttendanceService}.
  * Do not re-add quick-clock endpoints here.
  */
 class MyDayActionsController extends Controller
@@ -313,9 +320,9 @@ class MyDayActionsController extends Controller
      *   - all residents at the shift's site (residential setting)
      *   - any explicit shift_clients pivot rows (group shift schema)
      *
-     * @return \Illuminate\Support\Collection<int, int>
+     * @return Collection<int, int>
      */
-    private function allowedClientIdsForTimesheet(Timesheet $timesheet): \Illuminate\Support\Collection
+    private function allowedClientIdsForTimesheet(Timesheet $timesheet): Collection
     {
         $ids = collect();
         if ($timesheet->client_id) {
@@ -335,7 +342,7 @@ class MyDayActionsController extends Controller
             }
             // Dormant group-shift schema (kept compatible — see migration
             // 2026_03_23_006400_add_multi_client_and_tags_to_shifts.php).
-            if (\Illuminate\Support\Facades\Schema::hasTable('shift_clients')) {
+            if (Schema::hasTable('shift_clients')) {
                 $groupIds = DB::table('shift_clients')
                     ->where('shift_id', $shift->id)
                     ->pluck('client_id');
@@ -401,7 +408,7 @@ class MyDayActionsController extends Controller
      * Frontline acknowledge — lets the assigned worker mark a control-room
      * alert as seen from /my-day.
      *
-     * Distinct from {@see \App\Http\Controllers\ControlRoom\ControlRoomAlertController::acknowledge}
+     * Distinct from {@see ControlRoomAlertController::acknowledge}
      * which is gated to CR operators with `controlRoom.alerts.manage`. Here we
      * gate strictly on the alert's assignee so a frontline worker can clear
      * their own item without inheriting operator permissions. The canonical
@@ -412,10 +419,14 @@ class MyDayActionsController extends Controller
         Request $request,
         ControlRoomAlert $alert,
         ControlRoomAlertLifecycleService $lifecycle,
+        UserSiteAccessService $siteAccess,
     ) {
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($alert->assigned_to_user_id === $user->id, 403);
+        $currentUser = User::query()->find($user->id);
+        abort_unless($currentUser, 403);
+        $siteAccess->assertCanAccessAlert($currentUser, $alert);
 
         try {
             $acknowledged = $lifecycle->acknowledge($alert, $user, null, $user->id);
@@ -444,11 +455,14 @@ class MyDayActionsController extends Controller
         Request $request,
         ControlRoomAlert $alert,
         ControlRoomAlertLifecycleService $lifecycle,
-    )
-    {
+        UserSiteAccessService $siteAccess,
+    ) {
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($alert->assigned_to_user_id === $user->id, 403);
+        $currentUser = User::query()->find($user->id);
+        abort_unless($currentUser, 403);
+        $siteAccess->assertCanAccessAlert($currentUser, $alert);
 
         $window = $request->input('window', '15m');
         $until = match ($window) {
@@ -476,7 +490,7 @@ class MyDayActionsController extends Controller
     private function endOfShiftFor($user): Carbon
     {
         try {
-            $openShift = \App\Domain\Hr\Models\HrAttendanceSession::query()
+            $openShift = HrAttendanceSession::query()
                 ->where('user_id', $user->id)
                 ->open()
                 ->with('shift:id,ends_at')
