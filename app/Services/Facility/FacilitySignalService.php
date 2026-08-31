@@ -308,15 +308,25 @@ class FacilitySignalService
         array $context,
         CarbonInterface $occurredAt,
     ): string {
-        // Inspections dedup daily (only need one alert per day per schedule)
+        // A failed inspection is immutable record evidence. Its identity must
+        // survive delayed replay and must never suppress another failed record
+        // for the same schedule and calendar day.
+        if ($signalType === self::TYPE_INSPECTION_FAILED) {
+            return hash('sha256', implode('|', [
+                'facility',
+                $signalType,
+                $context['inspection_record_id'] ?? 'unknown',
+            ]));
+        }
+
+        // Overdue inspections dedup daily (one alert per schedule/day).
         $windowMinutes = str_starts_with($signalType, 'inspection') ? 1440 : 30;
         $window = $occurredAt->format('Y-m-d').($windowMinutes < 1440
             ? '_'.(intdiv((int) $occurredAt->format('G'), 1).':'.(intdiv((int) $occurredAt->format('i'), $windowMinutes) * $windowMinutes))
             : '');
 
         $entityKey = match ($signalType) {
-            self::TYPE_INSPECTION_OVERDUE,
-            self::TYPE_INSPECTION_FAILED => $context['inspection_schedule_id'] ?? 'unknown',
+            self::TYPE_INSPECTION_OVERDUE => $context['inspection_schedule_id'] ?? 'unknown',
             default => 'unknown',
         };
 
