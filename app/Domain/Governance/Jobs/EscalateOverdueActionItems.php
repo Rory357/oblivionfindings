@@ -9,6 +9,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Gate;
 
 class EscalateOverdueActionItems implements ShouldQueue
 {
@@ -18,7 +20,13 @@ class EscalateOverdueActionItems implements ShouldQueue
     {
         $overdue = ActionItem::overdue()
             ->whereNull('escalated_at')
+            ->with([
+                'assignedTo.hrEmployeeProfile' => fn ($profile) => $profile->withTrashed(),
+                'assignedTo.permissionOverrides',
+                'assignedTo.roles.permissions',
+            ])
             ->get();
+        $today = Carbon::today();
 
         foreach ($overdue as $item) {
             $item->escalate(
@@ -26,9 +34,23 @@ class EscalateOverdueActionItems implements ShouldQueue
                 'Automatically escalated due to overdue status'
             );
 
-            // Notify assignee and chair
-            $item->assignedTo->notify(new ActionItemEscalatedNotification($item));
-            
+            $recipient = $item->assignedTo;
+            $profile = $recipient?->hrEmployeeProfile;
+            $hasCurrentProfile = ! $profile || (
+                ! $profile->trashed()
+                && $profile->is_active
+                && $profile->start_date
+                && $profile->start_date->startOfDay()->lte($today)
+                && (! $profile->end_date || $profile->end_date->startOfDay()->gte($today))
+            );
+
+            if ($recipient?->approved_at
+                && $hasCurrentProfile
+                && $recipient->canDo('governance.actions.view')
+                && Gate::forUser($recipient)->allows('view', $item)) {
+                $recipient->notify(new ActionItemEscalatedNotification($item));
+            }
+
             \Log::info("Escalated action item: {$item->action_reference}");
         }
     }
