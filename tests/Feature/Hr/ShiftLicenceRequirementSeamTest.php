@@ -10,6 +10,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Eligibility\Rules\RequiredDriverLicenceRule;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
@@ -138,6 +139,109 @@ test('a licence that expires before the shift blocks eligibility', function () {
 
     expect($result['passed'])->toBeFalse()
         ->and($result['message'])->toContain('expires before this shift');
+});
+
+test('an explicitly required licence remains valid throughout duty on its worker-local expiry date', function () {
+    config(['app.worker_timezone' => 'Pacific/Auckland']);
+    $timezone = (string) config('app.worker_timezone');
+    licenceRequirementDriver(['licence_expires_at' => '2026-08-31']);
+
+    $result = app(RequiredDriverLicenceRule::class)->evaluate(
+        licenceRequirementShift([
+            'starts_at' => CarbonImmutable::parse('2026-08-31 13:00:00', $timezone)->utc(),
+            'ends_at' => CarbonImmutable::parse('2026-08-31 17:00:00', $timezone)->utc(),
+            'required_licence_class' => '2',
+        ]),
+        $this->worker,
+    );
+
+    expect($result['passed'])->toBeTrue();
+});
+
+test('an explicitly required licence blocks duty that continues beyond its worker-local expiry date', function () {
+    config(['app.worker_timezone' => 'Pacific/Auckland']);
+    $timezone = (string) config('app.worker_timezone');
+    licenceRequirementDriver(['licence_expires_at' => '2026-08-31']);
+
+    $result = app(RequiredDriverLicenceRule::class)->evaluate(
+        licenceRequirementShift([
+            'starts_at' => CarbonImmutable::parse('2026-08-31 09:00:00', $timezone)->utc(),
+            'ends_at' => CarbonImmutable::parse('2026-09-01 00:00:01', $timezone)->utc(),
+            'required_licence_class' => '2',
+        ]),
+        $this->worker,
+    );
+
+    expect($result['passed'])->toBeFalse()
+        ->and($result['severity'])->toBe('block')
+        ->and($result['overrideable'])->toBeFalse()
+        ->and($result['message'])->toContain('does not remain valid for this entire shift');
+});
+
+test('an explicitly required licence covers a half-open duty window ending exactly at local midnight', function () {
+    config(['app.worker_timezone' => 'Pacific/Auckland']);
+    $timezone = (string) config('app.worker_timezone');
+    licenceRequirementDriver(['licence_expires_at' => '2026-08-31']);
+
+    $result = app(RequiredDriverLicenceRule::class)->evaluate(
+        licenceRequirementShift([
+            'starts_at' => CarbonImmutable::parse('2026-08-31 16:00:00', $timezone)->utc(),
+            'ends_at' => CarbonImmutable::parse('2026-09-01 00:00:00', $timezone)->utc(),
+            'required_licence_class' => '2',
+        ]),
+        $this->worker,
+    );
+
+    expect($result['passed'])->toBeTrue();
+});
+
+test('an explicit licence requirement fails closed when the planned duty window is invalid', function () {
+    config(['app.worker_timezone' => 'Pacific/Auckland']);
+    $timezone = (string) config('app.worker_timezone');
+    licenceRequirementDriver(['licence_expires_at' => '2026-09-30']);
+
+    $result = app(RequiredDriverLicenceRule::class)->evaluate(
+        licenceRequirementShift([
+            'starts_at' => CarbonImmutable::parse('2026-08-31 17:00:00', $timezone)->utc(),
+            'ends_at' => CarbonImmutable::parse('2026-08-31 09:00:00', $timezone)->utc(),
+            'required_licence_class' => '2',
+        ]),
+        $this->worker,
+    );
+
+    expect($result['passed'])->toBeFalse()
+        ->and($result['severity'])->toBe('block')
+        ->and($result['message'])->toContain('planned shift duty window is invalid');
+});
+
+test('an explicit licence requirement fails closed when a planned duty endpoint is missing', function () {
+    licenceRequirementDriver(['licence_expires_at' => '2026-09-30']);
+    $shift = licenceRequirementShift(['required_licence_class' => '2']);
+    $shift->forceFill(['ends_at' => null]);
+
+    $result = app(RequiredDriverLicenceRule::class)->evaluate($shift, $this->worker);
+
+    expect($result['passed'])->toBeFalse()
+        ->and($result['severity'])->toBe('block')
+        ->and($result['overrideable'])->toBeFalse()
+        ->and($result['message'])->toContain('planned shift duty window is invalid');
+});
+
+test('a valid explicit duty window preserves the missing-expiry hard block', function () {
+    licenceRequirementDriver(['licence_expires_at' => null]);
+
+    $result = app(RequiredDriverLicenceRule::class)->evaluate(
+        licenceRequirementShift(['required_licence_class' => '2']),
+        $this->worker,
+    );
+
+    expect($result)->toMatchArray([
+        'rule' => 'required_driver_licence',
+        'passed' => false,
+        'severity' => 'block',
+        'overrideable' => false,
+        'message' => 'The driving licence expiry date is not recorded.',
+    ]);
 });
 
 test('driver data for another worker never satisfies the requirement', function () {
