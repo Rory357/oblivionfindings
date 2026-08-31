@@ -3,7 +3,9 @@
 namespace App\Jobs;
 
 use App\Models\SiteHazard;
+use App\Models\User;
 use App\Notifications\HazardOverdueNotification;
+use App\Services\UserSiteAccessService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -19,13 +21,13 @@ class HazardOverdueJob implements ShouldQueue
         $this->onQueue('notifications');
     }
 
-    public function handle(): void
+    public function handle(UserSiteAccessService $siteAccess): void
     {
         $today = now()->toDateString();
 
         // Find hazards approaching due date (2 days warning)
         $warningDate = now()->addDays(2)->toDateString();
-        
+
         $warningHazards = SiteHazard::query()
             ->whereIn('status', ['open', 'in_progress'])
             ->whereDate('due_date', '<=', $warningDate)
@@ -35,7 +37,7 @@ class HazardOverdueJob implements ShouldQueue
             ->get();
 
         foreach ($warningHazards as $hazard) {
-            if ($hazard->assignedTo) {
+            if ($this->canReceiveForSite($hazard->assignedTo, (int) $hazard->site_id, $siteAccess)) {
                 $hazard->assignedTo->notify(new HazardOverdueNotification($hazard, 'warning'));
             }
             $hazard->update(['warning_sent_at' => now()]);
@@ -49,18 +51,31 @@ class HazardOverdueJob implements ShouldQueue
             ->with(['site:id,name', 'assignedTo:id,name'])
             ->get();
 
+        $hsOfficers = $overdueHazards->isEmpty()
+            ? collect()
+            : User::query()
+                ->whereHas('roles', fn ($query) => $query->where('name', 'health_safety_officer'))
+                ->get();
+
         foreach ($overdueHazards as $hazard) {
-            if ($hazard->assignedTo) {
+            if ($this->canReceiveForSite($hazard->assignedTo, (int) $hazard->site_id, $siteAccess)) {
                 $hazard->assignedTo->notify(new HazardOverdueNotification($hazard, 'overdue'));
             }
-            
+
             // Also notify H&S officers
-            $hsOfficers = \App\Models\User::whereHas('roles', fn($q) => $q->where('name', 'health_safety_officer'))->get();
             foreach ($hsOfficers as $officer) {
-                $officer->notify(new HazardOverdueNotification($hazard, 'overdue_escalation'));
+                if ($this->canReceiveForSite($officer, (int) $hazard->site_id, $siteAccess)) {
+                    $officer->notify(new HazardOverdueNotification($hazard, 'overdue_escalation'));
+                }
             }
-            
+
             $hazard->update(['overdue_notified_at' => now()]);
         }
+    }
+
+    private function canReceiveForSite(?User $recipient, int $siteId, UserSiteAccessService $siteAccess): bool
+    {
+        return $recipient !== null
+            && in_array($siteId, $siteAccess->accessibleHealthSafetySiteIds($recipient), true);
     }
 }
