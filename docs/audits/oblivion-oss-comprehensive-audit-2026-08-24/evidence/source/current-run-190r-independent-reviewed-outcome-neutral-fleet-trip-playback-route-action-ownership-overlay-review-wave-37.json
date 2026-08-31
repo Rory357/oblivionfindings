@@ -1,0 +1,363 @@
+{
+  "schema_version": "run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37-v1",
+  "run_id": "RUN-190R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-37",
+  "status": "GO_TWO_LANE_POST_COMMIT_REVIEW_COMPLETE_REPORTING_ONLY_ZERO_NEW_OR_DOWNSTREAM_CREDIT",
+  "reviewed_on": "2026-08-31",
+  "pins": {
+    "producer_commit": "8b4e5acbbc75db6ea2b966b0cd8d82beff2b4213",
+    "producer_tree": "9f91a6044b58354340385cd2120b4bfc10fda62a",
+    "producer_parent": "e32dcf40d2c4e648464d73524704c3025ffe0651",
+    "producer_parent_tree": "d3bd0be17614790e2bf971d848ff6228b067b173",
+    "producer_subject": "audit: integrate RUN190 playback ownership",
+    "origin_main_observed_without_refetch": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "governing_prompt": {
+      "path": "C:\\Users\\steph\\Downloads\\oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+      "sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+      "role": "GOVERNING_AUDIT_PROMPT"
+    },
+    "continuation_request": {
+      "path": "C:\\Users\\steph\\.codex\\attachments\\8b35b9fe-b295-4a84-bdf9-a8afb05b2daa\\pasted-text-1.txt",
+      "sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+      "role": "CONTINUATION_REQUEST_ONLY",
+      "is_governing_prompt": false
+    },
+    "producer_generator": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.py",
+      "sha256": "0115154b4472f96977f0d82c286943af7b687240cd23f997d2d5e0a590e18599",
+      "blob_id": "2dc37fc5126f484254b1bb03b7c35be357772cdb",
+      "bytes": 41260,
+      "lines": 853
+    },
+    "producer": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json",
+      "sha256": "88494bb887c78f488df3915c86a8ad47b2176da469aedda3803151b8edd4a708",
+      "blob_id": "c4da9be0db2e179bbdaacb19a814165d4ff28f0c",
+      "bytes": 68142,
+      "lines": 985
+    },
+    "producer_self_seal_sha256": "16cbb874448ec053f976594cfe031ed1834601d66c8b1ffe7bb79a06336d4142",
+    "producer_input_map_sha256": "fc9d3dc1cb8677cd1d3b027d8342263ec06bac843d8a16b0ce90c99aa4e0864c",
+    "semantic_review_record_sha256s": [
+      "0247add20542aa4578ca20747796e01d6528b0b7b01fb93486ccba09253d728d",
+      "469fa03b2a408f95aca7636fae7a4ab0a16ff53cf38c69db7584a6e9d164cd17"
+    ],
+    "final_exact_artifact_review_record_sha256s": [
+      "d67eef3feefadecaaef269d22398879dc04cb550d275fa0a2c8d7a7b8520bf0b",
+      "2b117150aa4b3152a0f576536210e082f15f91414f1ede48dc8d5c5804167009"
+    ],
+    "semantic_consensus_record_sha256": "d9f89cb1c19d9894150d1df63fdd85482cdcf0a66fb2fe37297f2757aa810227",
+    "run190_computed_decision_sha256": "b3456ba2d566a616dbd314c50c4b9a4f8ed019193ecb60076e668cc046d27a7f",
+    "overlay_row_sha256": "31a2f128dacd47d73377db8422e2d89448909d9f4d98fe8089fa0522cb0ddfb2",
+    "bridge_row_sha256": "a8934922a42c1270c62276c2dc345066372a8ea73fa3ca0875cd3c75020fc5c9",
+    "materializer": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.py",
+      "sha256": "ec87f7eb11ab139278e7247880ae8a4adb8546cc55ce8ed76d2c2ea79603f132",
+      "blob_id": "c5b4a9ebee35f1b5f43fbc2f40b0aa8cae45ac90",
+      "bytes": 30133,
+      "lines": 571
+    }
+  },
+  "architecture_rule": "One operating organisation across multiple Sites. Exact permissions, approved Sites, canonical record ownership, direct-object concealment and privacy are the boundaries; no tenant design or tenant-isolation credit.",
+  "methods": {
+    "independent_reviews": 2,
+    "synthesizers": 1,
+    "committed_artifact_only": true,
+    "producer_generator_executed_by_reviewers": false,
+    "application_executed": false,
+    "tests_executed": false,
+    "database_used": false,
+    "build_used": false,
+    "browser_used": false,
+    "external_system_used": false
+  },
+  "producer_scope": {
+    "changed_paths": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.py",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json"
+    ],
+    "changed_path_count": 2,
+    "added_lines": 1838,
+    "deleted_lines": 0,
+    "generator_numstat": "853/0",
+    "receipt_numstat": "985/0",
+    "working_copies_match_committed_blobs": true,
+    "application_tests_routes_and_resources_unchanged_by_run190": true
+  },
+  "independent_review_records": [
+    {
+      "review_id": "RUN190R-INDEPENDENT-REVIEW-A",
+      "reviewer_role": "exact commit artifact lineage and seal integrity reviewer",
+      "reviewer_task_path": "/root/run189_semantic_a",
+      "independent_from_producer": true,
+      "independent_from_other_review_lane": true,
+      "blinded_review": false,
+      "nonblinding_reason": "The committed RUN190 producer artifact and bounded audit context were visible; no blindness is claimed.",
+      "delivery_channel": "collaboration_final_answer",
+      "raw_payload": "GO — zero discrepancies.\n\n- Commit pin: `8b4e5acbbc75db6ea2b966b0cd8d82beff2b4213`\n- Tree: `9f91a6044b58354340385cd2120b4bfc10fda62a`\n- Sole parent: `e32dcf40d2c4e648464d73524704c3025ffe0651`\n- Scope: exactly the two reviewed RUN190 files, both new additions.\n- Generator: SHA-256 `0115154b4472f96977f0d82c286943af7b687240cd23f997d2d5e0a590e18599`; blob `2dc37fc5126f484254b1bb03b7c35be357772cdb`\n- Receipt: SHA-256 `88494bb887c78f488df3915c86a8ad47b2176da469aedda3803151b8edd4a708`; blob `c4da9be0db2e179bbdaacb19a814165d4ff28f0c`\n- Receipt self-seal: `16cbb874448ec053f976594cfe031ed1834601d66c8b1ffe7bb79a06336d4142`\n- Row seal: `31a2f128dacd47d73377db8422e2d89448909d9f4d98fe8089fa0522cb0ddfb2`\n- Bridge seal: `a8934922a42c1270c62276c2dc345066372a8ea73fa3ca0875cd3c75020fc5c9`\n- Final-review seals: `d67eef3feefadecaaef269d22398879dc04cb550d275fa0a2c8d7a7b8520bf0b`, `2b117150aa4b3152a0f576536210e082f15f91414f1ede48dc8d5c5804167009`\n\nAll 18 input hashes/blobs, lineage self-seals, semantic/consensus/decision seals, queue-row seals, and eight prior/combined identity hashes match. The worktree and index are clean.",
+      "raw_payload_sha256": "6e515d6bc36c1cf9d1ecd9e4ae528c0fa64d7bd182c61ec5952e40043ecbd1de",
+      "raw_payload_bytes": 1121,
+      "raw_payload_lines": 14,
+      "verbatim_payload_retained": true,
+      "review_method": "READ_ONLY_INDEPENDENT_COMMITTED_ARTIFACT_REVIEW_NO_APPLICATION_EXECUTION",
+      "verified_dimensions": [
+        "commit_tree_parent_subject_and_exact_two_path_scope",
+        "producer_generator_and_receipt_bytes_blobs_and_format",
+        "all_input_sha_blob_pairs_and_prompt_provenance",
+        "lineage_semantic_consensus_decision_row_and_bridge_seals",
+        "prior_and_combined_identity_seals",
+        "clean_worktree_and_execution_boundary"
+      ],
+      "verdict": "GO",
+      "discrepancies": 0,
+      "reviewer_wrote_files": false,
+      "reviewer_executed_generator_application_tests_browser_or_database": false,
+      "reporting_authorization_individually_granted": false,
+      "review_record_sha256": "fffe65c879b5e59cdc81d97c9ffd51bb967a4fa958eebbc2b71f1b10efb848c9"
+    },
+    {
+      "review_id": "RUN190R-INDEPENDENT-REVIEW-B",
+      "reviewer_role": "independent accounting cursor credit and noninheritance reviewer",
+      "reviewer_task_path": "/root/run189_semantic_b",
+      "independent_from_producer": true,
+      "independent_from_other_review_lane": true,
+      "blinded_review": false,
+      "nonblinding_reason": "The committed RUN190 producer artifact and bounded audit context were visible; no blindness is claimed.",
+      "delivery_channel": "collaboration_final_answer",
+      "raw_payload": "GO — RUN190 post-commit accounting is exact.\n\n- HEAD: `8b4e5acbbc75db6ea2b966b0cd8d82beff2b4213`\n- Tree: `9f91a6044b58354340385cd2120b4bfc10fda62a`\n- Sole parent: `e32dcf40d2c4e648464d73524704c3025ffe0651`\n- Worktree: clean.\n- Commit scope: exactly the RUN190 generator and receipt; both tracked blobs match working bytes.\n- Receipt SHA-256 remains `88494bb887c78f488df3915c86a8ad47b2176da469aedda3803151b8edd4a708`; self-seal recomputes exactly to `16cbb874448ec053f976594cfe031ed1834601d66c8b1ffe7bb79a06336d4142`.\n- All 18 sealed input hashes/blobs and the input-map hash match.\n\nIndependent ledger reconstruction:\n\n- Owners: `666 → 667`\n- Route owners: `309 → 310`\n- Page owners: unchanged at `357`\n- Controller-action bridges: `97 → 98`\n- Combined source identity: `2e5f82279c71860a6fc2576859fb4351a6e3fbd3010f7c9f2fe598b48facf5a6`\n- Combined bridge identity: `354fd9239de4233eff3e1b20b7df5c2c519e11c8a90b88490cab9513e9f1b42c`\n\nExactly two static credits were added:\n\n- Route owner: `RUN077-ROUTE-0694` → `CAP-FLEET-VEHICLE-REGISTER`\n- Action bridge: `app/Http/Controllers/Fleet/FleetTripController.php|show|CAP-FLEET-VEHICLE-REGISTER`\n\nBoth identities were absent from the prior ledger; no page, sibling route or non-owner row was added.\n\nQueue reconstruction:\n\n- Reviewed: `120 → 121`\n- Pending: `387 → 386`\n- Reviewed-key identity: `2329f613c5310950191a5206fd764a78afc9e6f5bf0d502d0a65751a580f1393`\n- Next cursor: index `86`, `RUN090-ROUTE-0087`, `RUN077-ROUTE-0695`, `fleet-assets.trips.playback.data` → `FleetTripController::playback`\n\nAll accounting equations balance. Every page, sibling, caller, redirect, service/helper/test, remediation, correctness, Site/privacy, runtime, browser, benchmark, publication, finding, completion, Gate 4 and audit-completion boundary remains false or explicitly non-inherited. Only artifact-local completion is true.\n\nExact discrepancies: none. No generators, application code, tests, browser or database work was executed, and no other agents were consulted.",
+      "raw_payload_sha256": "1cbb6669888716f34e8805e4187fbaeb24e34ad2c2e5491efaa584453dd9ffa0",
+      "raw_payload_bytes": 2021,
+      "raw_payload_lines": 36,
+      "verbatim_payload_retained": true,
+      "review_method": "READ_ONLY_INDEPENDENT_COMMITTED_ARTIFACT_REVIEW_NO_APPLICATION_EXECUTION",
+      "verified_dimensions": [
+        "owner_route_page_and_bridge_accounting",
+        "source_and_bridge_identity_reconstruction",
+        "queue_accounting_and_next_cursor",
+        "selected_route_action_only_credit",
+        "sibling_page_caller_service_test_and_remediation_noninheritance",
+        "correctness_runtime_benchmark_publication_and_completion_boundaries"
+      ],
+      "verdict": "GO",
+      "discrepancies": 0,
+      "reviewer_wrote_files": false,
+      "reviewer_executed_generator_application_tests_browser_or_database": false,
+      "reporting_authorization_individually_granted": false,
+      "review_record_sha256": "2557d71096bc9737d40dda88e52e780e9671abae4342b9c96e9ac30e3f377990"
+    }
+  ],
+  "synthesis_review": {
+    "synthesis_id": "RUN190R-TWO-LANE-POST-COMMIT-SYNTHESIS",
+    "accepted_review_ids": [
+      "RUN190R-INDEPENDENT-REVIEW-A",
+      "RUN190R-INDEPENDENT-REVIEW-B"
+    ],
+    "accepted_review_record_sha256s": [
+      "fffe65c879b5e59cdc81d97c9ffd51bb967a4fa958eebbc2b71f1b10efb848c9",
+      "2557d71096bc9737d40dda88e52e780e9671abae4342b9c96e9ac30e3f377990"
+    ],
+    "independent_reviews": 2,
+    "all_exact_lane_payloads_sealed_before_synthesis": true,
+    "discrepancies": 0,
+    "artifact_lineage_and_seal_integrity_go": true,
+    "accounting_cursor_credit_and_noninheritance_go": true,
+    "producer_commit_exact_two_path_scope": true,
+    "reporting_materialization_authorized": true,
+    "new_current_or_downstream_credit_authorized": false,
+    "correctness_runtime_benchmark_finding_or_completion_credit_authorized": false,
+    "release_or_publication_authorized": false,
+    "gate_4_complete": false,
+    "audit_complete": false,
+    "synthesis_record_sha256": "f0b19d23eb3e2fc5ddc0aea6d441f558f17731e0b47b4dd0db8cf0bb047851a9"
+  },
+  "decision": {
+    "decision_id": "RUN190R-POST-COMMIT-REVIEW-DECISION",
+    "verdict": "GO_TWO_LANE_POST_COMMIT_REVIEW_COMPLETE_REPORTING_ONLY_ZERO_NEW_OR_DOWNSTREAM_CREDIT",
+    "accepted_review_record_sha256s": [
+      "fffe65c879b5e59cdc81d97c9ffd51bb967a4fa958eebbc2b71f1b10efb848c9",
+      "2557d71096bc9737d40dda88e52e780e9671abae4342b9c96e9ac30e3f377990"
+    ],
+    "synthesis_record_sha256": "f0b19d23eb3e2fc5ddc0aea6d441f558f17731e0b47b4dd0db8cf0bb047851a9",
+    "independent_reviews": 2,
+    "independently_sealed_review_records": true,
+    "discrepancies": 0,
+    "reporting_materialization_authorized": true,
+    "new_source_ownership_credit": false,
+    "new_route_ownership_credit": false,
+    "new_page_ownership_credit": false,
+    "new_controller_action_bridge_credit": false,
+    "current_overlay_ownership_credit": false,
+    "correctness_or_downstream_credit": false,
+    "release_authorized": false,
+    "publication_authorized": false,
+    "gate_4_complete": false,
+    "audit_complete": false,
+    "decision_record_sha256": "dc6490c07f8228036689d9c3210487426d7d0cd3a7e75540a6c377eace39621b"
+  },
+  "producer_snapshot": {
+    "run_id": "RUN-190-REVIEWED-OUTCOME-NEUTRAL-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-37",
+    "status": "ONE_REVIEWED_FLEET_TRIP_PLAYBACK_ROUTE_ACTION_OWNER_AND_BRIDGE_INTEGRATED_STATIC_ONLY_ZERO_SIBLING_CORRECTNESS_RUNTIME_OR_COMPLETION_CREDIT",
+    "combined_counts": {
+      "source_denominator": 3929,
+      "source_owner_records": 667,
+      "route_owner_records": 310,
+      "page_owner_records": 357,
+      "static_controller_action_bridges": 98,
+      "source_owner_percent": "16.976330",
+      "source_residual_records": 3262,
+      "route_denominator": 3218,
+      "residual_explicit_unmapped_routes": 2891,
+      "page_denominator": 711,
+      "residual_explicit_unmapped_pages": 345,
+      "distinct_feature_ids": 256,
+      "distinct_route_feature_ids": 64,
+      "distinct_page_feature_ids": 242,
+      "route_page_feature_overlap": 50
+    },
+    "queue_accounting": {
+      "queue_surface_rows": 507,
+      "reviewed_queue_surface_rows": 121,
+      "pending_unreviewed_queue_surface_rows": 386,
+      "reviewed_owner_route_rows": 99,
+      "reviewed_shared_relation_rows": 10,
+      "reviewed_alias_rows": 5,
+      "reviewed_dead_or_retired_rows": 0,
+      "reviewed_evidence_gap_rows": 7,
+      "queue_surfaces_without_ownership": 408,
+      "new_reviewed_route_surface_rows": 1,
+      "new_owner_route_surface_rows": 1
+    },
+    "queue_boundary": {
+      "preceding_index_84_not_recredited": true,
+      "selected_index_85_integrated": true,
+      "next_unresolved_index": 86,
+      "next_unresolved_queue_id": "RUN090-ROUTE-0087",
+      "next_unresolved_route_record_id": "RUN077-ROUTE-0695",
+      "next_unresolved_route_name": "fleet-assets.trips.playback.data",
+      "next_unresolved_action_expression": "[FleetTripController::class, 'playback']",
+      "next_unresolved_queue_record_sha256": "ed12617b478e0a22014fb6c81402e5cf79aa574720e8ef8e2ce93f198a099893",
+      "reviewed_key_count": 121,
+      "reviewed_key_list_sha256": "2329f613c5310950191a5206fd764a78afc9e6f5bf0d502d0a65751a580f1393",
+      "reviewed_key_list_canonical_json_sha256": "5d45c0c6b47770e42d68f6d1ee44c82774346b5d8909648c85ce74b793c02c8e"
+    },
+    "identity": {
+      "hash_algorithm": "sha256-of-lf-joined-sorted-unique-utf8",
+      "prior_source_record_key_list_sha256": "1648a470ca0293c4c065b30925b8eda5a9f78d35fa64935e644a3354e17cdbba",
+      "combined_source_record_key_list_sha256": "2e5f82279c71860a6fc2576859fb4351a6e3fbd3010f7c9f2fe598b48facf5a6",
+      "prior_bridge_key_list_sha256": "6ab1b8c1045ac6c159ba4aa5856ac58e648263a530f4f7c3031e4eed5d84fa32",
+      "combined_bridge_key_list_sha256": "354fd9239de4233eff3e1b20b7df5c2c519e11c8a90b88490cab9513e9f1b42c",
+      "prior_reviewed_queue_key_list_sha256": "5dbcecd3986300fe255fdb75efe6013c07f3adc4071745ebebf0c4a525ee99c9",
+      "combined_reviewed_queue_key_list_sha256": "2329f613c5310950191a5206fd764a78afc9e6f5bf0d502d0a65751a580f1393",
+      "canonical_json_reviewed_key_hashes": {
+        "prior": "738c7836dd770e12d67de62d4f28441825814d619bb641e070e25468786fb75e",
+        "combined": "5d45c0c6b47770e42d68f6d1ee44c82774346b5d8909648c85ce74b793c02c8e"
+      },
+      "new_overlay_source_records_sha256": "20be0f18f623a94231f2a88b2eb62d3e9f4bd785bf33d0822434267997936b38",
+      "new_action_bridges_sha256": "5608dd3ed0b33de029adcff9b7e05031b281c8afe956c94feff83d1d1726e605",
+      "accepted_semantic_review_record_sha256s": [
+        "0247add20542aa4578ca20747796e01d6528b0b7b01fb93486ccba09253d728d",
+        "469fa03b2a408f95aca7636fae7a4ab0a16ff53cf38c69db7584a6e9d164cd17"
+      ],
+      "accepted_final_exact_artifact_review_record_sha256s": [
+        "d67eef3feefadecaaef269d22398879dc04cb550d275fa0a2c8d7a7b8520bf0b",
+        "2b117150aa4b3152a0f576536210e082f15f91414f1ede48dc8d5c5804167009"
+      ],
+      "semantic_consensus_record_sha256": "d9f89cb1c19d9894150d1df63fdd85482cdcf0a66fb2fe37297f2757aa810227",
+      "run190_computed_decision_sha256": "b3456ba2d566a616dbd314c50c4b9a4f8ed019193ecb60076e668cc046d27a7f"
+    },
+    "outcome_conservation": {
+      "reviewed_outcomes_equation": "1 = 1 owner + 0 shared + 0 evidence gap",
+      "bounded_source_equation": "3929 = 667 owner + 3262 non-owner residual",
+      "owner_surface_equation": "667 = 310 route + 357 page",
+      "feature_union_equation": "256 = 64 route + 242 page - 50 overlap",
+      "route_universe_equation": "3218 = 310 owner + 12 shared + 5 alias + 0 dead + 2891 residual",
+      "page_universe_equation": "711 = 357 owner + 9 shared + 0 alias + 0 dead + 345 residual",
+      "queue_equation": "507 = 121 reviewed + 386 pending",
+      "reviewed_queue_equation": "121 = 99 owner + 10 shared + 5 alias + 0 dead + 7 evidence gap",
+      "queue_without_ownership_equation": "408 = 386 pending + 10 shared + 5 alias + 0 dead + 7 evidence gap"
+    },
+    "overlay_row_sha256": "31a2f128dacd47d73377db8422e2d89448909d9f4d98fe8089fa0522cb0ddfb2",
+    "bridge_row_sha256": "a8934922a42c1270c62276c2dc345066372a8ea73fa3ca0875cd3c75020fc5c9",
+    "sibling_playback_data_route_identity_or_outcome_inherited": false
+  },
+  "publication_boundary": {
+    "local_main_equals_producer_commit": true,
+    "origin_main_equals_producer_commit": false,
+    "origin_main_observed_without_refetch": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead_of_origin_main_by_commits": 51,
+    "local_main_behind_origin_main_by_commits": 0,
+    "remote_refetch_for_run190r_performed": false,
+    "push_performed": false,
+    "release_authorized": false,
+    "publication_authorized_or_performed": false,
+    "local_remote_tracking_alignment_claimed": false
+  },
+  "credit_boundary": {
+    "INDEPENDENT_OVERLAY_REVIEW_FOR_REPORTING": true,
+    "new_source_ownership": false,
+    "new_route_ownership": false,
+    "new_page_ownership": false,
+    "new_controller_action_bridge": false,
+    "current_overlay_ownership_credit": false,
+    "downstream_ownership_credit": false,
+    "adjacent_route_ownership": false,
+    "frontend_caller_ownership": false,
+    "service_model_helper_caller_or_test_ownership": false,
+    "complete_route_page_feature_crosswalk": false,
+    "framework_route_reachability": false,
+    "canonical_object_ownership_correctness": false,
+    "approved_site_scope_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_concealment_correctness": false,
+    "query_projection_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "pass": false,
+    "final_finding": false,
+    "feature_completion": false,
+    "completion": false,
+    "gate_4": false,
+    "release": false,
+    "publication": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "artifact_completion_scope": "THIS_EXACT_TWO_FILE_RUN190R_REVIEW_ARTIFACT_ONLY",
+  "reporting_materialization_authorized": true,
+  "audit_completion_test_met": false,
+  "mutation_attestation": {
+    "application_source_changed": false,
+    "test_files_changed": false,
+    "matrix_or_reporting_changed": false,
+    "runtime_browser_or_external_system_changed": false,
+    "audit_artifacts_only": true,
+    "run190r_scope_contains_only_materializer_and_receipt": true
+  },
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json"
+  ],
+  "self_seal": {
+    "algorithm": "sha256-canonical-json-with-self-seal-omitted",
+    "sha256": "1a9767955433c71d958c21557e3084ecb5b66a3b7e190324d4fd387f5267e503"
+  }
+}
