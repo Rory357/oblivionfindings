@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
 
 class SendRoadmapDigestJob implements ShouldQueue
 {
@@ -32,8 +33,14 @@ class SendRoadmapDigestJob implements ShouldQueue
             ->where('status', 'pending')
             ->count();
 
+        $today = Carbon::today();
         $recipients = User::query()
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['admin', 'provider_manager', 'board_chair']))
+            ->whereNotNull('approved_at')
+            ->with([
+                'hrEmployeeProfile' => fn ($profile) => $profile->withTrashed(),
+                'permissionOverrides',
+                'roles.permissions',
+            ])
             ->get();
 
         $payload = [
@@ -48,6 +55,21 @@ class SendRoadmapDigestJob implements ShouldQueue
             'url' => url('/roadmap/dashboard'),
         ];
 
-        $recipients->each(fn (User $user) => $user->notify(new AppEventNotification($payload)));
+        $recipients
+            ->filter(function (User $user) use ($today): bool {
+                $profile = $user->hrEmployeeProfile;
+                if ($profile && (
+                    $profile->trashed()
+                    || ! $profile->is_active
+                    || ! $profile->start_date
+                    || $profile->start_date->startOfDay()->gt($today)
+                    || ($profile->end_date && $profile->end_date->startOfDay()->lt($today))
+                )) {
+                    return false;
+                }
+
+                return $user->canDo('roadmap.view') || $user->canDo('governance.view');
+            })
+            ->each(fn (User $user) => $user->notify(new AppEventNotification($payload)));
     }
 }
