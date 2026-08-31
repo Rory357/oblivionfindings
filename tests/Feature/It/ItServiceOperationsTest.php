@@ -32,6 +32,7 @@ use App\Notifications\It\TicketReopenedNotification;
 use App\Notifications\It\TicketRepliedNotification;
 use App\Notifications\It\TicketResolvedNotification;
 use App\Notifications\It\TicketSlaNotification;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
@@ -401,6 +402,156 @@ test('local mail acceptance remains distinct from provider delivery and provider
         null,
     ));
     expect($delivery->fresh()->status)->toBe('bounced');
+});
+
+test('provider delivery status rejects excessive future skew without poisoning later ordering', function () {
+    Carbon::setTestNow(Carbon::parse('2026-08-31 12:00:00', 'UTC'));
+
+    try {
+        $deliveries = app(ItEmailDeliveryService::class);
+        $receipt = now()->toImmutable()->utc();
+        $boundary = ItEmailDelivery::factory()->create(['status' => 'queued']);
+        $mutableBoundary = Carbon::instance(
+            $receipt->addSeconds(300)->setTimezone('Pacific/Auckland'),
+        );
+        $mutableBoundaryBefore = [
+            $mutableBoundary->format('Y-m-d H:i:s.uP'),
+            $mutableBoundary->getTimezone()->getName(),
+        ];
+        $deliveries->recordProviderStatus(
+            $boundary->notification_uuid,
+            'delivered',
+            null,
+            'provider-boundary',
+            $mutableBoundary,
+        );
+
+        expect($boundary->fresh()->status)->toBe('delivered')
+            ->and($boundary->fresh()->provider_status_at?->equalTo($receipt->addSeconds(300)))->toBeTrue()
+            ->and([
+                $mutableBoundary->format('Y-m-d H:i:s.uP'),
+                $mutableBoundary->getTimezone()->getName(),
+            ])->toBe($mutableBoundaryBefore);
+
+        $receiptDelivery = ItEmailDelivery::factory()->create(['status' => 'queued']);
+        $deliveries->recordProviderStatus(
+            $receiptDelivery->notification_uuid,
+            'delivered',
+            null,
+            'provider-receipt',
+        );
+        expect($receiptDelivery->fresh()->provider_status_at?->equalTo($receipt))->toBeTrue()
+            ->and($receiptDelivery->fresh()->delivered_at?->equalTo($receipt))->toBeTrue();
+
+        $delivery = ItEmailDelivery::factory()->create(['status' => 'queued']);
+        $rawBeforeRejection = $delivery->fresh()->getRawOriginal();
+        expect(fn () => $deliveries->recordProviderStatus(
+            $delivery->notification_uuid,
+            'failed',
+            'Forged future failure.',
+            'provider-future',
+            $receipt->addSeconds(300)->addMicrosecond(),
+        ))->toThrow(DomainException::class, 'timestamp is too far in the future');
+
+        $delivery->refresh();
+        expect($delivery->getRawOriginal())->toBe($rawBeforeRejection);
+
+        $deliveries->recordProviderStatus(
+            $delivery->notification_uuid,
+            'delivered',
+            null,
+            'provider-current',
+            $receipt,
+        );
+
+        expect($delivery->fresh()->status)->toBe('delivered')
+            ->and($delivery->fresh()->provider_message_id)->toBe('provider-current')
+            ->and($delivery->fresh()->provider_status_at?->equalTo($receipt))->toBeTrue();
+    } finally {
+        Carbon::setTestNow();
+    }
+});
+
+test('authenticated delivery callbacks reject excessive future skew without mutating the delivery', function () {
+    Carbon::setTestNow(Carbon::parse('2026-08-31 12:00:00', 'UTC'));
+
+    try {
+        config(['it.outbound_mail.status_secret' => 'delivery-secret']);
+        $receipt = now()->toImmutable()->utc();
+        $boundary = ItEmailDelivery::factory()->create(['status' => 'queued']);
+        $this->postJson('/api/it/email/deliveries/status', [
+            'notification_id' => $boundary->notification_uuid,
+            'status' => 'delivered',
+            'provider_message_id' => 'provider-boundary',
+            'occurred_at' => $receipt->addSeconds(300)->format('Y-m-d\TH:i:s.uP'),
+        ], ['X-IT-Delivery-Secret' => 'delivery-secret'])->assertOk();
+
+        expect($boundary->fresh()->status)->toBe('delivered')
+            ->and($boundary->fresh()->provider_status_at?->equalTo($receipt->addSeconds(300)))->toBeTrue();
+
+        $offsetBoundary = ItEmailDelivery::factory()->create(['status' => 'queued']);
+        $this->postJson('/api/it/email/deliveries/status', [
+            'notification_id' => $offsetBoundary->notification_uuid,
+            'status' => 'delivered',
+            'provider_message_id' => 'provider-offset-boundary',
+            'occurred_at' => $receipt->addSeconds(300)
+                ->setTimezone('Pacific/Auckland')
+                ->format('Y-m-d\TH:i:s.uP'),
+        ], ['X-IT-Delivery-Secret' => 'delivery-secret'])->assertOk();
+
+        expect($offsetBoundary->fresh()->provider_status_at?->equalTo($receipt->addSeconds(300)))->toBeTrue();
+
+        $millisecond = ItEmailDelivery::factory()->create(['status' => 'queued']);
+        $this->postJson('/api/it/email/deliveries/status', [
+            'notification_id' => $millisecond->notification_uuid,
+            'status' => 'delivered',
+            'provider_message_id' => 'provider-millisecond',
+            'occurred_at' => '2026-08-31T12:04:59.123Z',
+        ], ['X-IT-Delivery-Secret' => 'delivery-secret'])->assertOk();
+
+        expect($millisecond->fresh()->status)->toBe('delivered')
+            ->and($millisecond->fresh()->provider_message_id)->toBe('provider-millisecond');
+
+        $delivery = ItEmailDelivery::factory()->create(['status' => 'queued']);
+        $rawBeforeRejections = $delivery->fresh()->getRawOriginal();
+
+        $this->postJson('/api/it/email/deliveries/status', [
+            'notification_id' => $delivery->notification_uuid,
+            'status' => 'failed',
+            'provider_message_id' => 'provider-future',
+            'occurred_at' => $receipt->addSeconds(300)->addMicrosecond()->format('Y-m-d\TH:i:s.uP'),
+            'error' => 'Forged future failure.',
+        ], ['X-IT-Delivery-Secret' => 'delivery-secret'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('occurred_at');
+
+        foreach (['+300 seconds', '2026-08-31T12:05:00.000000'] as $ambiguousTimestamp) {
+            $this->postJson('/api/it/email/deliveries/status', [
+                'notification_id' => $delivery->notification_uuid,
+                'status' => 'failed',
+                'provider_message_id' => 'provider-ambiguous',
+                'occurred_at' => $ambiguousTimestamp,
+                'error' => 'Ambiguous provider time.',
+            ], ['X-IT-Delivery-Secret' => 'delivery-secret'])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('occurred_at');
+        }
+
+        expect($delivery->fresh()->getRawOriginal())->toBe($rawBeforeRejections);
+
+        $this->postJson('/api/it/email/deliveries/status', [
+            'notification_id' => $delivery->notification_uuid,
+            'status' => 'delivered',
+            'provider_message_id' => 'provider-current',
+            'occurred_at' => $receipt->format('Y-m-d\TH:i:s.uP'),
+        ], ['X-IT-Delivery-Secret' => 'delivery-secret'])->assertOk();
+
+        expect($delivery->fresh()->status)->toBe('delivered')
+            ->and($delivery->fresh()->provider_message_id)->toBe('provider-current')
+            ->and($delivery->fresh()->provider_status_at?->equalTo($receipt))->toBeTrue();
+    } finally {
+        Carbon::setTestNow();
+    }
 });
 
 test('every IT mail type creates a visible delivery and can be retried safely', function () {
