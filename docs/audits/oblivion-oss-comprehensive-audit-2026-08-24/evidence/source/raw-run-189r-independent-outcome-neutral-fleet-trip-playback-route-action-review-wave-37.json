@@ -1,0 +1,259 @@
+{
+  "schema_version": "run-189r-independent-outcome-neutral-fleet-trip-playback-route-action-review-wave-37-v1",
+  "run_id": "RUN-189R-INDEPENDENT-OUTCOME-NEUTRAL-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-REVIEW-WAVE-37",
+  "status": "TWO_FRESH_INDEPENDENT_OWNER_ROUTE_ACTION_REVIEWS_RECONCILED_LATER_OVERLAY_ONLY_ZERO_CURRENT_OWNERSHIP_CORRECTNESS_RUNTIME_OR_COMPLETION_CREDIT",
+  "generated_on": "2026-08-31",
+  "architecture_rule": "One operating organisation across multiple Sites. Exact permissions, approved Sites, canonical record ownership, direct-object concealment and privacy are the boundaries; no tenant design or tenant-isolation credit.",
+  "pins": {
+    "checkpoint_commit": "d991b2898b70409ce7c019abe9ddbd8394e0b595",
+    "checkpoint_tree": "46074d7ec2b2a75b6fc4c3fa67187d5b908de79a",
+    "checkpoint_parents": [
+      "10943780e7abea7a9d3b155bcd20154daf9bcc2d",
+      "d6e2b22cf765f211763f88213b7145aa5adfde33"
+    ],
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "continuation_request_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "continuation_request_is_not_governing_prompt": true,
+    "packet_generator": {
+      "path": "generators/build-outcome-neutral-fleet-trip-playback-route-action-cohort-wave-37.py",
+      "sha256": "ccb18a24eb698084736d3851fa1d205e6061e645faabd86400f8e0da50f05774",
+      "blob_id": "01b8b63b676237c3fcba1bd44a5d8012d6edb817"
+    },
+    "packet": {
+      "path": "evidence/source/root-run-189-outcome-neutral-fleet-trip-playback-route-action-cohort-wave-37.json",
+      "sha256": "77b58c6c97153793bd1eda12107ee174d8ea926ede0de940918e42d411d51734",
+      "self_seal_sha256": "11d39b08909e6ad3ecbec73c824f26ec82f7bf226440d69df4667e84395cb13d",
+      "source_packet_sha256": "5c78cf40387a4eac26682ddf5dbde5ca5d6bdde33ab52f054702481b16128144"
+    },
+    "review_generator": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-outcome-neutral-fleet-trip-playback-route-action-review-wave-37.py",
+      "sha256": "ee22f7dbbf652f326edfa14af0ba23985295c2ac782a26b6370b3acaca5ffa84",
+      "blob_id": "77fc107b5781be19b38936f4152f2440f9116f3a"
+    }
+  },
+  "identity": {
+    "queue_id": "RUN090-ROUTE-0086",
+    "source_record_id": "RUN077-ROUTE-0694",
+    "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "route_name": "fleet-assets.trips.playback",
+    "action": "App\\Http\\Controllers\\Fleet\\FleetTripController::show"
+  },
+  "semantic_reviews": [
+    {
+      "review_id": "RUN189R-SEMANTIC-A",
+      "reviewer_task": "/root/run189_semantic_a",
+      "review_role": "FRESH_SEMANTIC_SOURCE_REVIEWER_INDEPENDENT_OF_PRODUCER_AND_REVIEW_B",
+      "reviewed_on": "2026-08-31",
+      "identity": {
+        "queue_id": "RUN090-ROUTE-0086",
+        "source_record_id": "RUN077-ROUTE-0694",
+        "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+        "route_name": "fleet-assets.trips.playback",
+        "action": "App\\Http\\Controllers\\Fleet\\FleetTripController::show"
+      },
+      "integrity": {
+        "reviewed_generator_sha256": "ccb18a24eb698084736d3851fa1d205e6061e645faabd86400f8e0da50f05774",
+        "reviewed_generator_blob_id": "01b8b63b676237c3fcba1bd44a5d8012d6edb817",
+        "reviewed_receipt_sha256": "77b58c6c97153793bd1eda12107ee174d8ea926ede0de940918e42d411d51734",
+        "reviewed_receipt_self_seal_sha256": "11d39b08909e6ad3ecbec73c824f26ec82f7bf226440d69df4667e84395cb13d",
+        "reviewed_source_packet_sha256": "5c78cf40387a4eac26682ddf5dbde5ca5d6bdde33ab52f054702481b16128144",
+        "all_pinned_inputs_match": true,
+        "all_external_prompt_pins_match": true,
+        "all_nine_source_blobs_match": true,
+        "all_twenty_two_exact_loci_match": true,
+        "all_eight_method_slices_match": true,
+        "duplicate_json_keys": 0,
+        "blocking_discrepancies": 0
+      },
+      "verdict": "GO",
+      "outcome": "OWNER_ROUTE_ACTION",
+      "ownership_credit_recommended_for_later_overlay": true,
+      "rationale": "The show action directly resolves a Site-visible vehicle-linked FleetTrip, loads asset and driver context, audits the view, and renders material vehicle-specific trip state. This is a direct slice of Maintain vehicles and vehicle-specific state rather than route-name adjacency.",
+      "candidate_anchor_reconciliation": "The frozen VehicleController and vehicle-index anchors prevent automatic containment credit, but current Asset vehicle and FleetTrip semantics resolve the direct action trace without inheritance.",
+      "historical_task_pin_note": {
+        "embedded_application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "embedded_application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+        "role": "HISTORICAL_FROZEN_TASK_PROVENANCE_NOT_RUN189_APPLICATION_PIN",
+        "coherent_pair": true,
+        "changes_outcome": false
+      },
+      "noninheritance": {
+        "correctness_adjudicated": false,
+        "sibling_data_route_ownership_inherited": false,
+        "frontend_page_or_caller_ownership_inherited": false,
+        "legacy_redirect_ownership_inherited": false,
+        "fleet_trip_service_ownership_inherited": false,
+        "test_or_runtime_credit_inherited": false,
+        "remediation_history_credit_inherited": false,
+        "older_bundle_identity_inherited": false,
+        "queue_advance_authorized": false,
+        "integration_authorized": false
+      },
+      "review_record_sha256": "0247add20542aa4578ca20747796e01d6528b0b7b01fb93486ccba09253d728d"
+    },
+    {
+      "review_id": "RUN189R-SEMANTIC-B",
+      "reviewer_task": "/root/run189_semantic_b",
+      "review_role": "FRESH_SEMANTIC_SOURCE_REVIEWER_INDEPENDENT_OF_PRODUCER_AND_REVIEW_A",
+      "reviewed_on": "2026-08-31",
+      "identity": {
+        "queue_id": "RUN090-ROUTE-0086",
+        "source_record_id": "RUN077-ROUTE-0694",
+        "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+        "route_name": "fleet-assets.trips.playback",
+        "action": "App\\Http\\Controllers\\Fleet\\FleetTripController::show"
+      },
+      "integrity": {
+        "reviewed_generator_sha256": "ccb18a24eb698084736d3851fa1d205e6061e645faabd86400f8e0da50f05774",
+        "reviewed_generator_blob_id": "01b8b63b676237c3fcba1bd44a5d8012d6edb817",
+        "reviewed_receipt_sha256": "77b58c6c97153793bd1eda12107ee174d8ea926ede0de940918e42d411d51734",
+        "reviewed_receipt_self_seal_sha256": "11d39b08909e6ad3ecbec73c824f26ec82f7bf226440d69df4667e84395cb13d",
+        "reviewed_source_packet_sha256": "5c78cf40387a4eac26682ddf5dbde5ca5d6bdde33ab52f054702481b16128144",
+        "all_pinned_inputs_match": true,
+        "all_external_prompt_pins_match": true,
+        "all_nine_source_blobs_match": true,
+        "all_twenty_two_exact_loci_match": true,
+        "all_eight_method_slices_match": true,
+        "duplicate_json_keys": 0,
+        "blocking_discrepancies": 0
+      },
+      "verdict": "GO",
+      "outcome": "OWNER_ROUTE_ACTION",
+      "ownership_credit_recommended_for_later_overlay": true,
+      "rationale": "The action directly resolves a Site-visible FleetTrip, loads vehicle and driver context, and supplies timing, location, distance, duration, status, consent and management state to the playback view. This is a substantive route-action slice of the frozen user job.",
+      "candidate_anchor_reconciliation": "The frozen VehicleController and vehicle-index anchors block automatic containment credit; current direct action semantics independently establish the route-action relation.",
+      "noninheritance": {
+        "correctness_adjudicated": false,
+        "sibling_data_route_ownership_inherited": false,
+        "frontend_page_or_caller_ownership_inherited": false,
+        "legacy_redirect_ownership_inherited": false,
+        "fleet_trip_service_ownership_inherited": false,
+        "test_or_runtime_credit_inherited": false,
+        "remediation_history_credit_inherited": false,
+        "older_bundle_identity_inherited": false,
+        "queue_advance_authorized": false,
+        "integration_authorized": false
+      },
+      "review_record_sha256": "469fa03b2a408f95aca7636fae7a4ab0a16ff53cf38c69db7584a6e9d164cd17"
+    }
+  ],
+  "semantic_review_record_count": 2,
+  "semantic_review_consensus": {
+    "synthesis_id": "RUN189R-SEMANTIC-CONSENSUS",
+    "accepted_review_record_sha256s": [
+      "0247add20542aa4578ca20747796e01d6528b0b7b01fb93486ccba09253d728d",
+      "469fa03b2a408f95aca7636fae7a4ab0a16ff53cf38c69db7584a6e9d164cd17"
+    ],
+    "fresh_independent_semantic_review_count": 2,
+    "outcomes": [
+      "OWNER_ROUTE_ACTION",
+      "OWNER_ROUTE_ACTION"
+    ],
+    "dissent_present": false,
+    "discrepancies": 0,
+    "consensus_outcome": "OWNER_ROUTE_ACTION",
+    "ownership_credit_recommended_for_later_overlay": true,
+    "ownership_credit_materialized_by_run189r": false,
+    "queue_advance_materialized_by_run189r": false,
+    "correctness_or_downstream_credit": false,
+    "synthesis_record_sha256": "d9f89cb1c19d9894150d1df63fdd85482cdcf0a66fb2fe37297f2757aa810227"
+  },
+  "decision": {
+    "verdict": "GO_OWNER_ROUTE_ACTION_FOR_LATER_BOUNDED_OVERLAY",
+    "outcome": "OWNER_ROUTE_ACTION",
+    "ownership_credit_recommended": true,
+    "ownership_credit_materialized": false,
+    "controller_action_bridge_materialized": false,
+    "queue_advance_materialized": false,
+    "overlay_materialization_authorized_after_final_exact_artifact_review": true,
+    "correctness_decision": false,
+    "finding": false
+  },
+  "later_overlay_contract": {
+    "maximum_new_route_owner_rows": 1,
+    "maximum_new_controller_action_bridges": 1,
+    "route_owner_identity": "route|RUN077-ROUTE-0694|CAP-FLEET-VEHICLE-REGISTER",
+    "action_bridge_identity": "app/Http/Controllers/Fleet/FleetTripController.php|show|CAP-FLEET-VEHICLE-REGISTER",
+    "reviewed_key_identity": "route|RUN077-ROUTE-0694",
+    "conditional_next_zero_based_index": 86,
+    "conditional_next_queue_id": "RUN090-ROUTE-0087",
+    "conditional_next_route_record_id": "RUN077-ROUTE-0695",
+    "conditional_next_route_name": "fleet-assets.trips.playback.data",
+    "page_owner_rows": 0,
+    "sibling_data_route_rows": 0,
+    "reporting_or_dashboard_changes": 0,
+    "materialized_by_run189r": false
+  },
+  "frozen_counts": {
+    "owner_records": 666,
+    "route_owners": 309,
+    "page_owners": 357,
+    "action_bridges": 97,
+    "queue_reviewed": 120,
+    "queue_pending": 387,
+    "changed_by_run189r": false
+  },
+  "final_exact_artifact_review_contract": {
+    "status": "REQUIRED_AFTER_MATERIALIZATION_BEFORE_COMMIT",
+    "required_distinct_read_only_reviewers": 2,
+    "must_verify_generator_receipt_hashes_and_self_seal": true,
+    "must_verify_semantic_review_record_hashes_and_synthesis": true,
+    "must_verify_zero_current_overlay_or_queue_advance": true,
+    "results_must_be_consumed_by_later_overlay": true
+  },
+  "noninheritance_boundary": {
+    "correctness_adjudicated": false,
+    "sibling_data_route_ownership_inherited": false,
+    "frontend_page_or_caller_ownership_inherited": false,
+    "legacy_redirect_ownership_inherited": false,
+    "fleet_trip_service_ownership_inherited": false,
+    "test_or_runtime_credit_inherited": false,
+    "remediation_history_credit_inherited": false,
+    "older_bundle_identity_inherited": false,
+    "queue_advance_authorized": false,
+    "integration_authorized": false,
+    "dedicated_page_ownership_materialized": false,
+    "canonical_trip_producer_ownership_materialized": false,
+    "approved_site_or_privacy_correctness": false,
+    "runtime_or_executed_test_credit": false,
+    "benchmark_or_ncm_credit": false,
+    "release_or_publication_credit": false,
+    "gate_4_or_audit_completion_credit": false
+  },
+  "credit_boundary": {
+    "two_fresh_semantic_reviews_recorded": true,
+    "semantic_consensus_recorded": true,
+    "static_source_feature_ownership_materialized": false,
+    "static_route_feature_ownership_materialized": false,
+    "static_page_feature_ownership": false,
+    "static_controller_action_bridge_materialized": false,
+    "sibling_data_route_ownership": false,
+    "correctness": false,
+    "runtime": false,
+    "database": false,
+    "browser": false,
+    "build": false,
+    "executed_tests": false,
+    "remediation": false,
+    "benchmark": false,
+    "final_no_match_or_ncm": false,
+    "final_finding": false,
+    "feature_completion": false,
+    "pass": false,
+    "release": false,
+    "publication": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": false,
+  "overlay_materialization_complete": false,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-outcome-neutral-fleet-trip-playback-route-action-review-wave-37.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/raw-run-189r-independent-outcome-neutral-fleet-trip-playback-route-action-review-wave-37.json"
+  ],
+  "self_seal": {
+    "algorithm": "sha256-canonical-json-with-self-seal-omitted",
+    "sha256": "878d244b7b5eed9010d8e152e693840f82ee9dc14a32a56c17010329fae20d3f"
+  }
+}
