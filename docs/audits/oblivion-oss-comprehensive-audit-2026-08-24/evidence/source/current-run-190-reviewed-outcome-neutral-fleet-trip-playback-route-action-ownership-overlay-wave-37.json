@@ -1,0 +1,985 @@
+{
+  "schema_version": "run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37-v1",
+  "run_id": "RUN-190-REVIEWED-OUTCOME-NEUTRAL-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-37",
+  "status": "ONE_REVIEWED_FLEET_TRIP_PLAYBACK_ROUTE_ACTION_OWNER_AND_BRIDGE_INTEGRATED_STATIC_ONLY_ZERO_SIBLING_CORRECTNESS_RUNTIME_OR_COMPLETION_CREDIT",
+  "generated_on": "2026-08-31",
+  "pins": {
+    "checkpoint_commit": "e32dcf40d2c4e648464d73524704c3025ffe0651",
+    "checkpoint_tree": "d3bd0be17614790e2bf971d848ff6228b067b173",
+    "checkpoint_parents": [
+      "c055397fd9a8bd57ab5757f0e120c43fb9a14da1",
+      "b5ce255019294c3a0423b0adb53c3d0fa7bab467"
+    ],
+    "reviewed_application_commit": "d991b2898b70409ce7c019abe9ddbd8394e0b595",
+    "reviewed_application_tree": "46074d7ec2b2a75b6fc4c3fa67187d5b908de79a",
+    "current_subtrees": {
+      "app": "030e29afb6bf375a98461316aeb13c360a92a538",
+      "routes": "b62a85f59ba5f45a54fd666b3199a65453034272",
+      "resources/js": "8a851516cdb76ded362fb5912e3e930e45c8df86",
+      "resources/js/pages": "8ad1ecc5817310f2f45c64733ca72d771c798a2f",
+      "tests": "56f1d25aa65aa7c0b925ce46f36a921bc126b273",
+      "database": "d7ba5adb39f5dc79427a3d6946f719b2be3f41dc",
+      "bootstrap": "df6189abe5ab5343d88674c199c4ce46e6152a57",
+      "docs/architecture": "3444047114f5f446954b032dedc4e0c7892180bd",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24": "d55f1c4dbf8d18230806a0989efcab1185997890"
+    },
+    "whole_app_or_tests_subtree_equality_with_reviewed_snapshot_claimed": false,
+    "all_nine_reviewed_source_paths_byte_identical": true,
+    "governing_prompt": {
+      "path": "C:\\Users\\steph\\Downloads\\oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+      "sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+      "role": "GOVERNING_AUDIT_PROMPT"
+    },
+    "continuation_request": {
+      "path": "C:\\Users\\steph\\.codex\\attachments\\8b35b9fe-b295-4a84-bdf9-a8afb05b2daa\\pasted-text-1.txt",
+      "sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+      "role": "CONTINUATION_REQUEST_ONLY",
+      "is_governing_prompt": false
+    },
+    "generator": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.py",
+      "sha256": "0115154b4472f96977f0d82c286943af7b687240cd23f997d2d5e0a590e18599",
+      "blob_id": "2dc37fc5126f484254b1bb03b7c35be357772cdb",
+      "bytes": 41260,
+      "lines": 853
+    },
+    "inputs": {
+      "generators/integrate-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.py": "b5c7f04cd44ecd73dda9c7fe4a9e2e8616c68674cdc52d393ec696b06ad2327e",
+      "evidence/source/current-run-149-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.json": "12a52c434ecd18a5c6a644378070aa5ab046f5e7080726b983ded8d9c7377a55",
+      "evidence/source/current-run-153-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.json": "9b7e382f83787d807de8d752ecb3e6524280c707899aba78d47082765272e815",
+      "evidence/source/current-run-153r-independent-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-review-wave-26.json": "7f1da8394a8054f01f34fb943a3fba6601bf70ea06d69cf97033f2208edf4461",
+      "generators/integrate-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.py": "c732926f3112c987fbaaf3f398bc18b3d25027c7f1495c38016237a5cb6f28a3",
+      "evidence/source/current-run-170-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.json": "c739a36e1975b60d42988be3de36b9fe1ea88cf942752c90112f40ebaa04cd8d",
+      "evidence/source/current-run-170r-independent-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-review-wave-31.json": "62474100b0c2f027fa0c15f2bb841f08ad3de058da67725a931fcafec17dd139",
+      "generators/integrate-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-wave-34.py": "cdbeeae65d0d5d928d6356de7c2433d437b6f2bae9fd80bb7a942b97d41f6594",
+      "evidence/source/current-run-180-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-wave-34.json": "49b0bd12abbd4dd2b9ce0dbe9b6fd60ab79eea92861f6339407fbd05f0b7c925",
+      "evidence/source/current-run-180r-independent-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-review-wave-34.json": "c6038caa557277124cb58056a2882ce41d1f2ee402f91effb0e6bfab6fe95d96",
+      "evidence/source/current-run-181-reviewed-fleet-trip-index-route-action-reporting-wave-34.json": "c1db8b498b7344c2ab28f5c6373caaa8f2ac4a1d764e6129fb49c415234794a8",
+      "evidence/browser/current-audit-dashboard-verification-run-182-wave-34.json": "d3dc3ef6e842f0b5df74b27948ac6ef8abfda205516f6ac9b6a5d9c9858cd81e",
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
+      "03-feature-to-benchmark-matrix.csv": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+      "generators/build-outcome-neutral-fleet-trip-playback-route-action-cohort-wave-37.py": "ccb18a24eb698084736d3851fa1d205e6061e645faabd86400f8e0da50f05774",
+      "evidence/source/root-run-189-outcome-neutral-fleet-trip-playback-route-action-cohort-wave-37.json": "77b58c6c97153793bd1eda12107ee174d8ea926ede0de940918e42d411d51734",
+      "generators/materialize-independent-outcome-neutral-fleet-trip-playback-route-action-review-wave-37.py": "ee22f7dbbf652f326edfa14af0ba23985295c2ac782a26b6370b3acaca5ffa84",
+      "evidence/source/raw-run-189r-independent-outcome-neutral-fleet-trip-playback-route-action-review-wave-37.json": "2723e1a066fa6fda53f9d9f582903b5b7dea607b88b03edc490091318800903d"
+    },
+    "input_blobs": {
+      "generators/integrate-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.py": "e8d9d1c9889be589a22db6dfea53d3122adce247",
+      "evidence/source/current-run-149-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.json": "c5f0a3bda99167f66650d63bfdb35e18d8ed93b5",
+      "evidence/source/current-run-153-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-wave-26.json": "818b891cff9965193c60d83d0580c21a48d1a682",
+      "evidence/source/current-run-153r-independent-reviewed-outcome-neutral-fleet-vehicle-register-index-route-action-ownership-overlay-review-wave-26.json": "20bb3580ba2cb60205694d52aa72e16cd2f2a423",
+      "generators/integrate-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.py": "2603b130a0a674e6803413583c95b51bc3f83545",
+      "evidence/source/current-run-170-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-wave-31.json": "8cff90e1e86e5752cbfc3e59d03ccc5423e23ed6",
+      "evidence/source/current-run-170r-independent-reviewed-outcome-neutral-fleet-vehicle-alerts-config-route-action-ownership-overlay-review-wave-31.json": "fbcccd7e19ea57db52a1d6ca462aa107107159d1",
+      "generators/integrate-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-wave-34.py": "f3bd1cae87ff0b9f74bd1be8d5e963db91cd0813",
+      "evidence/source/current-run-180-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-wave-34.json": "b9d3d623d22e7ee8cad21fca62d703cd5881b0a9",
+      "evidence/source/current-run-180r-independent-reviewed-outcome-neutral-fleet-trip-index-route-action-ownership-overlay-review-wave-34.json": "4ee55ff346533b39848a69c8fe62347b4519d8ca",
+      "evidence/source/current-run-181-reviewed-fleet-trip-index-route-action-reporting-wave-34.json": "25cdf8834fcdd6fe966fb5d660c1b94cf479f585",
+      "evidence/browser/current-audit-dashboard-verification-run-182-wave-34.json": "3efd68bae4f397beb56293adadef0c42621e7acd",
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "66809274d25916f4e0d2426419bfde6e371ba1f1",
+      "03-feature-to-benchmark-matrix.csv": "1f5fdab3ae80ae4ec1b9bc4ee47eef695bdd5416",
+      "generators/build-outcome-neutral-fleet-trip-playback-route-action-cohort-wave-37.py": "01b8b63b676237c3fcba1bd44a5d8012d6edb817",
+      "evidence/source/root-run-189-outcome-neutral-fleet-trip-playback-route-action-cohort-wave-37.json": "e0721374fd269240828fece0e8b867f7e25820a9",
+      "generators/materialize-independent-outcome-neutral-fleet-trip-playback-route-action-review-wave-37.py": "77fc107b5781be19b38936f4152f2440f9116f3a",
+      "evidence/source/raw-run-189r-independent-outcome-neutral-fleet-trip-playback-route-action-review-wave-37.json": "5cee0253416ce3f0d6f4a63e12a0c4bc693f7817"
+    },
+    "input_map_sha256": "fc9d3dc1cb8677cd1d3b027d8342263ec06bac843d8a16b0ce90c99aa4e0864c",
+    "run189_packet_self_seal_sha256": "11d39b08909e6ad3ecbec73c824f26ec82f7bf226440d69df4667e84395cb13d",
+    "run189r_self_seal_sha256": "878d244b7b5eed9010d8e152e693840f82ee9dc14a32a56c17010329fae20d3f",
+    "semantic_consensus_record_sha256": "d9f89cb1c19d9894150d1df63fdd85482cdcf0a66fb2fe37297f2757aa810227",
+    "run190_computed_decision_sha256": "b3456ba2d566a616dbd314c50c4b9a4f8ed019193ecb60076e668cc046d27a7f"
+  },
+  "architecture_rule": "One operating organisation across multiple Sites. Exact permissions, approved Sites, canonical record ownership, direct-object concealment and privacy are the boundaries; no tenant design or tenant-isolation credit.",
+  "baseline": {
+    "source_owner_records": 666,
+    "route_owner_records": 309,
+    "page_owner_records": 357,
+    "static_controller_action_bridges": 97,
+    "reviewed_queue_surface_rows": 120,
+    "pending_unreviewed_queue_surface_rows": 387,
+    "latest_integrated_overlay": {
+      "run_id": "RUN-180-REVIEWED-OUTCOME-NEUTRAL-FLEET-TRIP-INDEX-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-34",
+      "status": "ONE_REVIEWED_FLEET_TRIP_INDEX_ROUTE_ACTION_OWNER_AND_BRIDGE_INTEGRATED_STATIC_ONLY_DISSENT_PRESERVED"
+    },
+    "latest_independent_overlay_review": {
+      "run_id": "RUN-180R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-TRIP-INDEX-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-34",
+      "status": "GO_THREE_PART_POST_COMMIT_REVIEW_COMPLETE_REPORTING_ONLY_ZERO_NEW_OR_DOWNSTREAM_CREDIT",
+      "new_or_current_or_downstream_credit": false
+    }
+  },
+  "reviewed_overlay": {
+    "producer_run_id": "RUN-189-OUTCOME-NEUTRAL-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-COHORT-WAVE-37",
+    "review_run_id": "RUN-189R-INDEPENDENT-OUTCOME-NEUTRAL-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-REVIEW-WAVE-37",
+    "reviewed_route_actions": 1,
+    "owner_route_actions": 1,
+    "accepted_source_owner_records": 1,
+    "accepted_route_owner_records": 1,
+    "accepted_page_owner_records": 0,
+    "accepted_controller_action_bridges": 1,
+    "accepted_sibling_or_adjacent_route_owners": 0,
+    "accepted_service_model_helper_page_caller_redirect_or_test_owners": 0,
+    "new_distinct_feature_ids": 0,
+    "current_static_overlay_credit_applied": true,
+    "correctness_or_downstream_credit_authorized": false,
+    "final_finding_credit_authorized": false
+  },
+  "reviewer_lineage": {
+    "accepted_semantic_reviews": [
+      {
+        "review_id": "RUN189R-SEMANTIC-A",
+        "reviewer_task": "/root/run189_semantic_a",
+        "review_role": "FRESH_SEMANTIC_SOURCE_REVIEWER_INDEPENDENT_OF_PRODUCER_AND_REVIEW_B",
+        "reviewed_on": "2026-08-31",
+        "identity": {
+          "queue_id": "RUN090-ROUTE-0086",
+          "source_record_id": "RUN077-ROUTE-0694",
+          "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+          "route_name": "fleet-assets.trips.playback",
+          "action": "App\\Http\\Controllers\\Fleet\\FleetTripController::show"
+        },
+        "integrity": {
+          "reviewed_generator_sha256": "ccb18a24eb698084736d3851fa1d205e6061e645faabd86400f8e0da50f05774",
+          "reviewed_generator_blob_id": "01b8b63b676237c3fcba1bd44a5d8012d6edb817",
+          "reviewed_receipt_sha256": "77b58c6c97153793bd1eda12107ee174d8ea926ede0de940918e42d411d51734",
+          "reviewed_receipt_self_seal_sha256": "11d39b08909e6ad3ecbec73c824f26ec82f7bf226440d69df4667e84395cb13d",
+          "reviewed_source_packet_sha256": "5c78cf40387a4eac26682ddf5dbde5ca5d6bdde33ab52f054702481b16128144",
+          "all_pinned_inputs_match": true,
+          "all_external_prompt_pins_match": true,
+          "all_nine_source_blobs_match": true,
+          "all_twenty_two_exact_loci_match": true,
+          "all_eight_method_slices_match": true,
+          "duplicate_json_keys": 0,
+          "blocking_discrepancies": 0
+        },
+        "verdict": "GO",
+        "outcome": "OWNER_ROUTE_ACTION",
+        "ownership_credit_recommended_for_later_overlay": true,
+        "rationale": "The show action directly resolves a Site-visible vehicle-linked FleetTrip, loads asset and driver context, audits the view, and renders material vehicle-specific trip state. This is a direct slice of Maintain vehicles and vehicle-specific state rather than route-name adjacency.",
+        "candidate_anchor_reconciliation": "The frozen VehicleController and vehicle-index anchors prevent automatic containment credit, but current Asset vehicle and FleetTrip semantics resolve the direct action trace without inheritance.",
+        "historical_task_pin_note": {
+          "embedded_application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+          "embedded_application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+          "role": "HISTORICAL_FROZEN_TASK_PROVENANCE_NOT_RUN189_APPLICATION_PIN",
+          "coherent_pair": true,
+          "changes_outcome": false
+        },
+        "noninheritance": {
+          "correctness_adjudicated": false,
+          "sibling_data_route_ownership_inherited": false,
+          "frontend_page_or_caller_ownership_inherited": false,
+          "legacy_redirect_ownership_inherited": false,
+          "fleet_trip_service_ownership_inherited": false,
+          "test_or_runtime_credit_inherited": false,
+          "remediation_history_credit_inherited": false,
+          "older_bundle_identity_inherited": false,
+          "queue_advance_authorized": false,
+          "integration_authorized": false
+        },
+        "review_record_sha256": "0247add20542aa4578ca20747796e01d6528b0b7b01fb93486ccba09253d728d"
+      },
+      {
+        "review_id": "RUN189R-SEMANTIC-B",
+        "reviewer_task": "/root/run189_semantic_b",
+        "review_role": "FRESH_SEMANTIC_SOURCE_REVIEWER_INDEPENDENT_OF_PRODUCER_AND_REVIEW_A",
+        "reviewed_on": "2026-08-31",
+        "identity": {
+          "queue_id": "RUN090-ROUTE-0086",
+          "source_record_id": "RUN077-ROUTE-0694",
+          "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+          "route_name": "fleet-assets.trips.playback",
+          "action": "App\\Http\\Controllers\\Fleet\\FleetTripController::show"
+        },
+        "integrity": {
+          "reviewed_generator_sha256": "ccb18a24eb698084736d3851fa1d205e6061e645faabd86400f8e0da50f05774",
+          "reviewed_generator_blob_id": "01b8b63b676237c3fcba1bd44a5d8012d6edb817",
+          "reviewed_receipt_sha256": "77b58c6c97153793bd1eda12107ee174d8ea926ede0de940918e42d411d51734",
+          "reviewed_receipt_self_seal_sha256": "11d39b08909e6ad3ecbec73c824f26ec82f7bf226440d69df4667e84395cb13d",
+          "reviewed_source_packet_sha256": "5c78cf40387a4eac26682ddf5dbde5ca5d6bdde33ab52f054702481b16128144",
+          "all_pinned_inputs_match": true,
+          "all_external_prompt_pins_match": true,
+          "all_nine_source_blobs_match": true,
+          "all_twenty_two_exact_loci_match": true,
+          "all_eight_method_slices_match": true,
+          "duplicate_json_keys": 0,
+          "blocking_discrepancies": 0
+        },
+        "verdict": "GO",
+        "outcome": "OWNER_ROUTE_ACTION",
+        "ownership_credit_recommended_for_later_overlay": true,
+        "rationale": "The action directly resolves a Site-visible FleetTrip, loads vehicle and driver context, and supplies timing, location, distance, duration, status, consent and management state to the playback view. This is a substantive route-action slice of the frozen user job.",
+        "candidate_anchor_reconciliation": "The frozen VehicleController and vehicle-index anchors block automatic containment credit; current direct action semantics independently establish the route-action relation.",
+        "noninheritance": {
+          "correctness_adjudicated": false,
+          "sibling_data_route_ownership_inherited": false,
+          "frontend_page_or_caller_ownership_inherited": false,
+          "legacy_redirect_ownership_inherited": false,
+          "fleet_trip_service_ownership_inherited": false,
+          "test_or_runtime_credit_inherited": false,
+          "remediation_history_credit_inherited": false,
+          "older_bundle_identity_inherited": false,
+          "queue_advance_authorized": false,
+          "integration_authorized": false
+        },
+        "review_record_sha256": "469fa03b2a408f95aca7636fae7a4ab0a16ff53cf38c69db7584a6e9d164cd17"
+      }
+    ],
+    "semantic_consensus": {
+      "synthesis_id": "RUN189R-SEMANTIC-CONSENSUS",
+      "accepted_review_record_sha256s": [
+        "0247add20542aa4578ca20747796e01d6528b0b7b01fb93486ccba09253d728d",
+        "469fa03b2a408f95aca7636fae7a4ab0a16ff53cf38c69db7584a6e9d164cd17"
+      ],
+      "fresh_independent_semantic_review_count": 2,
+      "outcomes": [
+        "OWNER_ROUTE_ACTION",
+        "OWNER_ROUTE_ACTION"
+      ],
+      "dissent_present": false,
+      "discrepancies": 0,
+      "consensus_outcome": "OWNER_ROUTE_ACTION",
+      "ownership_credit_recommended_for_later_overlay": true,
+      "ownership_credit_materialized_by_run189r": false,
+      "queue_advance_materialized_by_run189r": false,
+      "correctness_or_downstream_credit": false,
+      "synthesis_record_sha256": "d9f89cb1c19d9894150d1df63fdd85482cdcf0a66fb2fe37297f2757aa810227"
+    },
+    "run189r_decision": {
+      "verdict": "GO_OWNER_ROUTE_ACTION_FOR_LATER_BOUNDED_OVERLAY",
+      "outcome": "OWNER_ROUTE_ACTION",
+      "ownership_credit_recommended": true,
+      "ownership_credit_materialized": false,
+      "controller_action_bridge_materialized": false,
+      "queue_advance_materialized": false,
+      "overlay_materialization_authorized_after_final_exact_artifact_review": true,
+      "correctness_decision": false,
+      "finding": false
+    },
+    "run190_computed_decision_sha256": "b3456ba2d566a616dbd314c50c4b9a4f8ed019193ecb60076e668cc046d27a7f",
+    "accepted_final_exact_artifact_reviews": [
+      {
+        "review_id": "RUN189R-FINAL-ARTIFACT-A",
+        "reviewer_task": "/root/run189_cursor_plan",
+        "review_role": "FINAL_EXACT_ARTIFACT_REVIEWER_A_INDEPENDENT_OF_SEMANTIC_REVIEWERS_AND_REVIEW_B",
+        "verdict": "GO",
+        "discrepancies": 0,
+        "read_only": true,
+        "generator_or_application_execution": false,
+        "producer_supplied_payload_hash_claimed": false,
+        "independent_check_count_reported": null,
+        "reviewed_artifacts": {
+          "run189_generator_sha256": "ccb18a24eb698084736d3851fa1d205e6061e645faabd86400f8e0da50f05774",
+          "run189_receipt_sha256": "77b58c6c97153793bd1eda12107ee174d8ea926ede0de940918e42d411d51734",
+          "run189_receipt_self_seal_sha256": "11d39b08909e6ad3ecbec73c824f26ec82f7bf226440d69df4667e84395cb13d",
+          "run189r_generator_sha256": "ee22f7dbbf652f326edfa14af0ba23985295c2ac782a26b6370b3acaca5ffa84",
+          "run189r_receipt_sha256": "2723e1a066fa6fda53f9d9f582903b5b7dea607b88b03edc490091318800903d",
+          "run189r_receipt_self_seal_sha256": "878d244b7b5eed9010d8e152e693840f82ee9dc14a32a56c17010329fae20d3f"
+        },
+        "reviewed_semantic_records": [
+          "0247add20542aa4578ca20747796e01d6528b0b7b01fb93486ccba09253d728d",
+          "469fa03b2a408f95aca7636fae7a4ab0a16ff53cf38c69db7584a6e9d164cd17"
+        ],
+        "reviewed_semantic_consensus": "d9f89cb1c19d9894150d1df63fdd85482cdcf0a66fb2fe37297f2757aa810227",
+        "bounded_later_overlay": {
+          "maximum_route_owner_rows": 1,
+          "maximum_controller_action_bridges": 1,
+          "page_or_sibling_rows": 0,
+          "current_materialization_before_run190": false,
+          "current_queue_advance_before_run190": false,
+          "correctness_runtime_or_completion_credit": false
+        },
+        "review_record_sha256": "d67eef3feefadecaaef269d22398879dc04cb550d275fa0a2c8d7a7b8520bf0b"
+      },
+      {
+        "review_id": "RUN189R-FINAL-ARTIFACT-B",
+        "reviewer_task": "/root/run189_source_scope",
+        "review_role": "FINAL_EXACT_ARTIFACT_REVIEWER_B_INDEPENDENT_OF_SEMANTIC_REVIEWERS_AND_REVIEW_A",
+        "verdict": "GO",
+        "discrepancies": 0,
+        "read_only": true,
+        "generator_or_application_execution": false,
+        "producer_supplied_payload_hash_claimed": false,
+        "independent_check_count_reported": 142,
+        "reviewed_artifacts": {
+          "run189_generator_sha256": "ccb18a24eb698084736d3851fa1d205e6061e645faabd86400f8e0da50f05774",
+          "run189_receipt_sha256": "77b58c6c97153793bd1eda12107ee174d8ea926ede0de940918e42d411d51734",
+          "run189_receipt_self_seal_sha256": "11d39b08909e6ad3ecbec73c824f26ec82f7bf226440d69df4667e84395cb13d",
+          "run189r_generator_sha256": "ee22f7dbbf652f326edfa14af0ba23985295c2ac782a26b6370b3acaca5ffa84",
+          "run189r_receipt_sha256": "2723e1a066fa6fda53f9d9f582903b5b7dea607b88b03edc490091318800903d",
+          "run189r_receipt_self_seal_sha256": "878d244b7b5eed9010d8e152e693840f82ee9dc14a32a56c17010329fae20d3f"
+        },
+        "reviewed_semantic_records": [
+          "0247add20542aa4578ca20747796e01d6528b0b7b01fb93486ccba09253d728d",
+          "469fa03b2a408f95aca7636fae7a4ab0a16ff53cf38c69db7584a6e9d164cd17"
+        ],
+        "reviewed_semantic_consensus": "d9f89cb1c19d9894150d1df63fdd85482cdcf0a66fb2fe37297f2757aa810227",
+        "bounded_later_overlay": {
+          "maximum_route_owner_rows": 1,
+          "maximum_controller_action_bridges": 1,
+          "page_or_sibling_rows": 0,
+          "current_materialization_before_run190": false,
+          "current_queue_advance_before_run190": false,
+          "correctness_runtime_or_completion_credit": false
+        },
+        "review_record_sha256": "2b117150aa4b3152a0f576536210e082f15f91414f1ede48dc8d5c5804167009"
+      }
+    ],
+    "semantic_dissent_present": false,
+    "final_artifact_discrepancies": 0
+  },
+  "source_packet_boundary": {
+    "required_source_files": [
+      {
+        "path": "routes/fleet-assets.php",
+        "sha256": "4be79ba4a0957f81f3e99de8eea7f29a398f8a115957bd44af06dbbf78fe2c4c",
+        "blob_id": "f0b2b8c199ada1d8ef8bdb41c99bfc2ac02f93d2",
+        "bytes": 28332,
+        "lines": 351,
+        "review_loci_validated": true,
+        "review_loci": [
+          "49-58"
+        ],
+        "role": "selected_route_source",
+        "purpose": "permission group, exact selected page route and sibling data route context",
+        "context_only": false
+      },
+      {
+        "path": "app/Http/Controllers/Fleet/FleetTripController.php",
+        "sha256": "4a5f448e230c79e4effcad358ef65a5ba9fa6b9774c43d2df87e3485b9b5ad63",
+        "blob_id": "2373c95b30958399c8ed648915991c01a0fbc84c",
+        "bytes": 10934,
+        "lines": 281,
+        "review_loci_validated": true,
+        "review_loci": [
+          "17-119",
+          "178-280"
+        ],
+        "role": "selected_controller_action_and_visibility_helpers",
+        "purpose": "show action, sibling playback context and controller-local Site/driver visibility helpers",
+        "context_only": false
+      },
+      {
+        "path": "app/Services/Fleet/FleetTripService.php",
+        "sha256": "efaa796d73d55e4888aed8a45e6590be151bfa9b76b7910f8eaa25c5c04c5b80",
+        "blob_id": "5f1315483cfd755a1d8307f1588372d1a40cb8fd",
+        "bytes": 8476,
+        "lines": 246,
+        "review_loci_validated": true,
+        "review_loci": [
+          "12-105"
+        ],
+        "role": "canonical_trip_producer_relation",
+        "purpose": "telemetry-driven FleetTrip creation and lifecycle relation question only",
+        "context_only": true
+      },
+      {
+        "path": "resources/js/pages/fleet-assets/trips/playback.tsx",
+        "sha256": "9166ea5608fb3d5bfdc9f8f99cfd61de1931558127dbf243941ff572525bcee4",
+        "blob_id": "bbe106639a0fe02f0d943637b49bcba5a255a1a3",
+        "bytes": 16771,
+        "lines": 390,
+        "review_loci_validated": true,
+        "review_loci": [
+          "25-390"
+        ],
+        "role": "dedicated_page_consumer_context",
+        "purpose": "selected show response consumer; sibling data and write calls remain context only",
+        "context_only": true
+      },
+      {
+        "path": "resources/js/pages/fleet-assets/trips/index.tsx",
+        "sha256": "49bf092590254c9b3c4dbec54c0d6870769c844757162f6846270a7631e5c91b",
+        "blob_id": "836e26a6d7c328f247d85b65948e459f1daac7dd",
+        "bytes": 37803,
+        "lines": 888,
+        "review_loci_validated": true,
+        "review_loci": [
+          "706-719"
+        ],
+        "role": "direct_page_caller_context",
+        "purpose": "direct link to selected playback page only",
+        "context_only": true
+      },
+      {
+        "path": "routes/fleet.php",
+        "sha256": "f52b963aaea5d89eabf88db0624ad91579149a5d8d3c815a35f3b8d35feda165",
+        "blob_id": "b71d1451217c24ca2562dee41c83979474eaaedc",
+        "bytes": 2727,
+        "lines": 56,
+        "review_loci_validated": true,
+        "review_loci": [
+          "28-35"
+        ],
+        "role": "legacy_redirect_context",
+        "purpose": "legacy page redirect to selected route and separate data redirect only",
+        "context_only": true
+      },
+      {
+        "path": "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php",
+        "sha256": "071675ba9aec303176aa00758371cbedd966e944c172e75146743d3111f1031b",
+        "blob_id": "68eaf494014abf68924ab47eadd4cb2e8ef12e8d",
+        "bytes": 24787,
+        "lines": 670,
+        "review_loci_validated": true,
+        "review_loci": [
+          "141-552"
+        ],
+        "role": "remediation_test_source_context",
+        "purpose": "current page/data privacy test source only; no execution or ownership credit",
+        "context_only": true
+      },
+      {
+        "path": "tests/Feature/Fleet/FleetManagementTest.php",
+        "sha256": "6fff4bcc546d3288d979fa641da36733d7a5d7c7a08518ac5d434faab057d0b0",
+        "blob_id": "d5933409b4b25d175d4be2b5f61505a0ce7bf5d0",
+        "bytes": 8271,
+        "lines": 218,
+        "review_loci_validated": true,
+        "review_loci": [
+          "65-143"
+        ],
+        "role": "route_contract_test_source_context",
+        "purpose": "legacy redirects and selected page/data route source context only",
+        "context_only": true
+      },
+      {
+        "path": "docs/architecture/single-tenant-application.md",
+        "sha256": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c",
+        "blob_id": "d204082ce6b328ceb8518edcaebf77d2868d689b",
+        "bytes": 1936,
+        "lines": 21,
+        "review_loci_validated": true,
+        "review_loci": [
+          "1-21"
+        ],
+        "role": "architecture_boundary",
+        "purpose": "one-organisation multi-Site authorization boundary",
+        "context_only": false
+      }
+    ],
+    "required_source_file_count": 9,
+    "exact_current_loci": {
+      "permission_group": {
+        "source_anchor": "routes/fleet-assets.php:50",
+        "source_line": "Route::middleware('permission:fleet.viewAny')->group(function () {",
+        "source_line_sha256": "3712215f669220d4ced949e1f01b93f27b6efa070134ae2bbfb7bb44e75b0168"
+      },
+      "selected_route": {
+        "source_anchor": "routes/fleet-assets.php:55",
+        "source_line": "Route::get('/trips/{trip}/playback', [FleetTripController::class, 'show'])->whereNumber('trip')->name('fleet-assets.trips.playback');",
+        "source_line_sha256": "91416521952d4f2310d5dae8d278754f6e9f8682ede644ef6fc0e054c41d1d7f"
+      },
+      "sibling_data_route": {
+        "source_anchor": "routes/fleet-assets.php:56",
+        "source_line": "Route::get('/trips/{trip}/playback/data', [FleetTripController::class, 'playback'])->whereNumber('trip')->name('fleet-assets.trips.playback.data');",
+        "source_line_sha256": "9fa31e7b27ef6d4c9c3fe0eb10dce64c5ecff923cf333278681902af62688b23"
+      },
+      "selected_action": {
+        "source_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:24",
+        "source_line": "public function show(Request $request, int $trip)",
+        "source_line_sha256": "ad87f27965ccd3396a39f3fefead38148c6b0bcc4b335cf010ab7ba7fb87483d"
+      },
+      "visible_sites": {
+        "source_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:29",
+        "source_line": "$visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);",
+        "source_line_sha256": "76edd2ec215e597d8d6f3de9358f4726b2f03e5433200dd28c247281b00d40ea"
+      },
+      "visible_trip": {
+        "source_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:30",
+        "source_line": "$trip = $this->visibleTripsQuery($visibleSiteIds)->findOrFail($trip);",
+        "source_line_sha256": "3d11bd5162a68ba22bce25bfda8bccf9c23a4e639c34419af92a5325fc2f4471"
+      },
+      "render": {
+        "source_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:48",
+        "source_line": "return Inertia::render('fleet-assets/trips/playback', [",
+        "source_line_sha256": "0338730a7e33edb0216f9a23635451dd06735faec8d338f2ff8cadd002c80520"
+      },
+      "sibling_action": {
+        "source_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:88",
+        "source_line": "public function playback(Request $request, int $trip)",
+        "source_line_sha256": "6bdbfdc54fd967ff2b955c8df881b90bb1cc9950bc4bea31c088fe466b994c34"
+      },
+      "trip_visibility_helper": {
+        "source_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:179",
+        "source_line": "private function visibleTripsQuery(array $siteIds): Builder",
+        "source_line_sha256": "d694849da67ced7349c6727c5b206a31b3f420680e8aa26543edff8abb60df2f"
+      },
+      "asset_site_helper": {
+        "source_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:188",
+        "source_line": "private function applyTripAssetSiteScope(Builder $query, array $siteIds): Builder",
+        "source_line_sha256": "de44f2cb757b99ceadab77a87f22c0676fa31198198f635d3792d32d4f5784db"
+      },
+      "driver_visibility_helper": {
+        "source_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:253",
+        "source_line": "private function visibleDriverSessionsQuery(FleetTrip $trip, array $siteIds): Builder",
+        "source_line_sha256": "88ba15bf1ae3bd1ff1d0a68d8332c09869277d5bd6de2959c3b8b0f0160936fd"
+      },
+      "driver_site_helper": {
+        "source_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:263",
+        "source_line": "private function applyHistoricalTripDriverSiteScope(Builder $query, array $siteIds): Builder",
+        "source_line_sha256": "81a82e9fb0fca279b29ec8c90b7036d1a67cd571060574c4c9ec907287d414ef"
+      },
+      "canonical_trip_producer": {
+        "source_anchor": "app/Services/Fleet/FleetTripService.php:18",
+        "source_line": "public function handleTelemetry(",
+        "source_line_sha256": "ac482fc21732bb766885732976e604aafba26c9793a31df5d975bd8e8801d509"
+      },
+      "canonical_trip_creation": {
+        "source_anchor": "app/Services/Fleet/FleetTripService.php:44",
+        "source_line": "$openTrip = FleetTrip::create([",
+        "source_line_sha256": "87f00f152a597216f3881a782742e153c919e2f58bf9fda1bda37126e2193bbf"
+      },
+      "page_component": {
+        "source_anchor": "resources/js/pages/fleet-assets/trips/playback.tsx:56",
+        "source_line": "export default function FleetTripPlayback({",
+        "source_line_sha256": "280f0d6120bd3f89060c8477f03992c912108d16b1054b80c34f2b56bcdd96c7"
+      },
+      "page_data_fetch": {
+        "source_anchor": "resources/js/pages/fleet-assets/trips/playback.tsx:70",
+        "source_line": "fetch(`/fleet-assets/trips/${trip.id}/playback/data`)",
+        "source_line_sha256": "87c64b4344cd24296bdf62084304b39e1341ed5a1d297d3592277ad783f40c95"
+      },
+      "direct_page_caller": {
+        "source_anchor": "resources/js/pages/fleet-assets/trips/index.tsx:715",
+        "source_line": "href={`/fleet-assets/trips/${trip.id}/playback`}",
+        "source_line_sha256": "08849b31bdeec7f181d8ce53b0581080cd2c3209e6e5a5e20ddaf2f4688c6c79"
+      },
+      "legacy_page_redirect": {
+        "source_anchor": "routes/fleet.php:29",
+        "source_line": "Route::get('/fleet/trips/{trip}', fn (int $trip) => redirect(\"/fleet-assets/trips/{$trip}/playback\", 301))",
+        "source_line_sha256": "99c4eaf39602179947dbdf0e26a05b9ee96168db8a4d988ac7ec8c841cf058de"
+      },
+      "legacy_data_redirect": {
+        "source_anchor": "routes/fleet.php:33",
+        "source_line": "Route::get('/fleet/trips/{trip}/playback', fn (int $trip) => redirect(\"/fleet-assets/trips/{$trip}/playback/data\", 301))",
+        "source_line_sha256": "afc2298b631d8c32aaa7797f4a6d161154af9739a0bfb49a134d38ff8de84c74"
+      },
+      "privacy_test_context": {
+        "source_anchor": "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php:141",
+        "source_line": "public function test_site_limited_viewer_cannot_open_foreign_trip_page(): void",
+        "source_line_sha256": "d514ab121ef0a58e2db21a5a151daacab405a77cdaf494416d90f31cf8f6508b"
+      },
+      "route_contract_test_context": {
+        "source_anchor": "tests/Feature/Fleet/FleetManagementTest.php:98",
+        "source_line": "public function test_trip_playback_page_accessible_by_admin(): void",
+        "source_line_sha256": "5b18d8f8360a89734c0eafbc61a76485642b8cbbe8f98a9340cc625397ba4ef8"
+      },
+      "architecture": {
+        "source_anchor": "docs/architecture/single-tenant-application.md:3",
+        "source_line": "Oblivion Findings is a single-tenant application for one operating organisation across all of its sites. It is not a multi-tenant SaaS product.",
+        "source_line_sha256": "96f2979e665f9b3b297588fb7fbbd9a4ea1dd3c3f9161b216439adad3cad544a"
+      }
+    },
+    "selected_controller_action_and_context_slices": {
+      "show": {
+        "source_file": "app/Http/Controllers/Fleet/FleetTripController.php",
+        "source_file_sha256": "4a5f448e230c79e4effcad358ef65a5ba9fa6b9774c43d2df87e3485b9b5ad63",
+        "source_file_blob_id": "2373c95b30958399c8ed648915991c01a0fbc84c",
+        "method": "show",
+        "start_line": 24,
+        "end_line": 86,
+        "definition_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:24",
+        "text": "    public function show(Request $request, int $trip)\n    {\n        $user = $request->user();\n        abort_unless($user && $user->canDo('fleet.viewAny'), 403);\n\n        $visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);\n        $trip = $this->visibleTripsQuery($visibleSiteIds)->findOrFail($trip);\n        $trip->load('asset:id,name,asset_tag');\n\n        $visibleDriverSessions = $this->visibleDriverSessionsQuery($trip, $visibleSiteIds);\n        $currentDriverSession = $trip->driver_session_id\n            ? (clone $visibleDriverSessions)->with('user:id,name')->find($trip->driver_session_id)\n            : null;\n\n        AuditLogger::log('fleet.trip.view', $trip, [\n            'trip_id' => $trip->id,\n        ]);\n\n        $drivers = (clone $visibleDriverSessions)\n            ->with('user:id,name')\n            ->orderByDesc('started_at')\n            ->limit(10)\n            ->get();\n\n        return Inertia::render('fleet-assets/trips/playback', [\n            'trip' => [\n                'id' => $trip->id,\n                'asset_id' => $trip->asset_id,\n                'asset' => $trip->asset ? [\n                    'id' => $trip->asset->id,\n                    'name' => $trip->asset->name,\n                    'asset_tag' => $trip->asset->asset_tag,\n                ] : null,\n                'driver_session_id' => $currentDriverSession?->id,\n                'driver' => $currentDriverSession?->user ? [\n                    'id' => $currentDriverSession->user->id,\n                    'name' => $currentDriverSession->user->name,\n                ] : null,\n                'started_at' => optional($trip->started_at)->toISOString(),\n                'ended_at' => optional($trip->ended_at)->toISOString(),\n                'start_latitude' => $trip->start_latitude,\n                'start_longitude' => $trip->start_longitude,\n                'end_latitude' => $trip->end_latitude,\n                'end_longitude' => $trip->end_longitude,\n                'distance_km' => $trip->distance_km,\n                'duration_s' => $trip->duration_s,\n                'status' => $trip->status,\n                'consent_blocked' => $trip->consent_blocked,\n            ],\n            'driver_sessions' => $drivers->map(fn ($d) => [\n                'id' => $d->id,\n                'user' => $d->user ? [\n                    'id' => $d->user->id,\n                    'name' => $d->user->name,\n                ] : null,\n                'started_at' => optional($d->started_at)->toISOString(),\n                'ended_at' => optional($d->ended_at)->toISOString(),\n            ])->values(),\n            'can' => [\n                'manage' => $user->canDo('fleet.trips.manage'),\n            ],\n        ]);\n    }\n",
+        "text_sha256": "0de57b9513d13423d3307a8d033d8dbaffeba644f4dece86a1dab77362260ab2"
+      },
+      "playback": {
+        "source_file": "app/Http/Controllers/Fleet/FleetTripController.php",
+        "source_file_sha256": "4a5f448e230c79e4effcad358ef65a5ba9fa6b9774c43d2df87e3485b9b5ad63",
+        "source_file_blob_id": "2373c95b30958399c8ed648915991c01a0fbc84c",
+        "method": "playback",
+        "start_line": 88,
+        "end_line": 119,
+        "definition_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:88",
+        "text": "    public function playback(Request $request, int $trip)\n    {\n        $user = $request->user();\n        abort_unless($user && $user->canDo('fleet.viewAny'), 403);\n\n        $visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);\n        $trip = $this->visibleTripsQuery($visibleSiteIds)->findOrFail($trip);\n\n        $query = FleetTelemetryEvent::query()\n            ->where('asset_id', $trip->asset_id)\n            ->where('consent_blocked', false)\n            ->orderBy('occurred_at');\n\n        if ($trip->started_at) {\n            $query->where('occurred_at', '>=', $trip->started_at);\n        }\n        if ($trip->ended_at) {\n            $query->where('occurred_at', '<=', $trip->ended_at);\n        }\n\n        $points = $query->limit(2000)->get(['occurred_at', 'latitude', 'longitude', 'speed_kph']);\n\n        return response()->json([\n            'trip_id' => $trip->id,\n            'points' => $points->map(fn ($p) => [\n                'occurred_at' => optional($p->occurred_at)->toISOString(),\n                'lat' => $p->latitude,\n                'lng' => $p->longitude,\n                'speed_kph' => $p->speed_kph,\n            ])->values(),\n        ]);\n    }\n",
+        "text_sha256": "fccb20689ac4bdd36a2c55836b56a49e3825bfa2041163b620e415d1724f69a3"
+      },
+      "visibleTripsQuery": {
+        "source_file": "app/Http/Controllers/Fleet/FleetTripController.php",
+        "source_file_sha256": "4a5f448e230c79e4effcad358ef65a5ba9fa6b9774c43d2df87e3485b9b5ad63",
+        "source_file_blob_id": "2373c95b30958399c8ed648915991c01a0fbc84c",
+        "method": "visibleTripsQuery",
+        "start_line": 179,
+        "end_line": 185,
+        "definition_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:179",
+        "text": "    private function visibleTripsQuery(array $siteIds): Builder\n    {\n        return FleetTrip::query()->whereIn(\n            'asset_id',\n            $this->applyTripAssetSiteScope(Asset::query()->vehicles(), $siteIds)->select('assets.id'),\n        );\n    }\n",
+        "text_sha256": "cb4d7601f0d0f34ea6025e509a781a0391225c42ed9116398f84f22e08448cdf"
+      },
+      "applyTripAssetSiteScope": {
+        "source_file": "app/Http/Controllers/Fleet/FleetTripController.php",
+        "source_file_sha256": "4a5f448e230c79e4effcad358ef65a5ba9fa6b9774c43d2df87e3485b9b5ad63",
+        "source_file_blob_id": "2373c95b30958399c8ed648915991c01a0fbc84c",
+        "method": "applyTripAssetSiteScope",
+        "start_line": 188,
+        "end_line": 242,
+        "definition_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:188",
+        "text": "    private function applyTripAssetSiteScope(Builder $query, array $siteIds): Builder\n    {\n        if ($siteIds === []) {\n            return $query->whereRaw('1 = 0');\n        }\n\n        $siteColumn = $query->qualifyColumn('site_id');\n        $homeSiteColumn = $query->qualifyColumn('home_site_id');\n        $clientColumn = $query->qualifyColumn('client_id');\n\n        return $query->where(function (Builder $provenance) use (\n            $siteIds,\n            $siteColumn,\n            $homeSiteColumn,\n            $clientColumn,\n        ): void {\n            $provenance->where(function (Builder $directSite) use ($siteIds, $siteColumn, $clientColumn): void {\n                $directSite->whereIn($siteColumn, $siteIds)\n                    ->whereHas('site', fn (Builder $site) => $this->applyOperationalSiteScope($site))\n                    ->where(function (Builder $clientAgreement) use ($siteColumn, $clientColumn): void {\n                        $clientAgreement->whereNull($clientColumn)\n                            ->orWhereHas('client', fn (Builder $client) => $client\n                                ->whereColumn($client->qualifyColumn('site_id'), $siteColumn)\n                                ->whereHas('site', fn (Builder $site) => $this->applyOperationalSiteScope($site)));\n                    });\n            })->orWhere(function (Builder $homeSite) use (\n                $siteIds,\n                $siteColumn,\n                $homeSiteColumn,\n                $clientColumn,\n            ): void {\n                $homeSite->whereNull($siteColumn)\n                    ->whereIn($homeSiteColumn, $siteIds)\n                    ->whereHas('homeSite', fn (Builder $site) => $this->applyOperationalSiteScope($site))\n                    ->where(function (Builder $clientAgreement) use ($homeSiteColumn, $clientColumn): void {\n                        $clientAgreement->whereNull($clientColumn)\n                            ->orWhereHas('client', fn (Builder $client) => $client\n                                ->whereColumn($client->qualifyColumn('site_id'), $homeSiteColumn)\n                                ->whereHas('site', fn (Builder $site) => $this->applyOperationalSiteScope($site)));\n                    });\n            })->orWhere(function (Builder $clientSite) use (\n                $siteIds,\n                $siteColumn,\n                $homeSiteColumn,\n                $clientColumn,\n            ): void {\n                $clientSite->whereNull($siteColumn)\n                    ->whereNull($homeSiteColumn)\n                    ->whereNotNull($clientColumn)\n                    ->whereHas('client', fn (Builder $client) => $client\n                        ->whereIn($client->qualifyColumn('site_id'), $siteIds)\n                        ->whereHas('site', fn (Builder $site) => $this->applyOperationalSiteScope($site)));\n            });\n        });\n    }\n",
+        "text_sha256": "77999e7808e1b9be2b966dd56c3a8342026c7425467d7d91f8dc87679ad0486f"
+      },
+      "applyOperationalSiteScope": {
+        "source_file": "app/Http/Controllers/Fleet/FleetTripController.php",
+        "source_file_sha256": "4a5f448e230c79e4effcad358ef65a5ba9fa6b9774c43d2df87e3485b9b5ad63",
+        "source_file_blob_id": "2373c95b30958399c8ed648915991c01a0fbc84c",
+        "method": "applyOperationalSiteScope",
+        "start_line": 244,
+        "end_line": 250,
+        "definition_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:244",
+        "text": "    private function applyOperationalSiteScope(Builder $query): Builder\n    {\n        return $query\n            ->where($query->qualifyColumn('is_active'), true)\n            ->where($query->qualifyColumn('archived'), false)\n            ->whereNull($query->qualifyColumn('archived_at'));\n    }\n",
+        "text_sha256": "871bcd647c09cbb98bbb5bd1e9fe7f939298e5e5a62f62e6b89b96cd7e1ea4d0"
+      },
+      "visibleDriverSessionsQuery": {
+        "source_file": "app/Http/Controllers/Fleet/FleetTripController.php",
+        "source_file_sha256": "4a5f448e230c79e4effcad358ef65a5ba9fa6b9774c43d2df87e3485b9b5ad63",
+        "source_file_blob_id": "2373c95b30958399c8ed648915991c01a0fbc84c",
+        "method": "visibleDriverSessionsQuery",
+        "start_line": 253,
+        "end_line": 260,
+        "definition_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:253",
+        "text": "    private function visibleDriverSessionsQuery(FleetTrip $trip, array $siteIds): Builder\n    {\n        return FleetDriverSession::query()\n            ->where('asset_id', $trip->asset_id)\n            ->whereHas('user', function (Builder $userQuery) use ($siteIds): void {\n                $this->applyHistoricalTripDriverSiteScope($userQuery, $siteIds);\n            });\n    }\n",
+        "text_sha256": "ab421953b48fa3874fb87a4b3c2f4809b02f0987bfa941d0aa6427548688d771"
+      },
+      "applyHistoricalTripDriverSiteScope": {
+        "source_file": "app/Http/Controllers/Fleet/FleetTripController.php",
+        "source_file_sha256": "4a5f448e230c79e4effcad358ef65a5ba9fa6b9774c43d2df87e3485b9b5ad63",
+        "source_file_blob_id": "2373c95b30958399c8ed648915991c01a0fbc84c",
+        "method": "applyHistoricalTripDriverSiteScope",
+        "start_line": 263,
+        "end_line": 280,
+        "definition_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:263",
+        "text": "    private function applyHistoricalTripDriverSiteScope(Builder $query, array $siteIds): Builder\n    {\n        if ($siteIds === []) {\n            return $query->whereRaw('1 = 0');\n        }\n\n        $profiles = HrEmployeeProfile::withTrashed()\n            ->select('user_id')\n            ->where(function (Builder $siteQuery) use ($siteIds): void {\n                $siteQuery->whereIn('primary_site_id', $siteIds);\n\n                foreach ($siteIds as $siteId) {\n                    $siteQuery->orWhereJsonContains('secondary_site_ids', $siteId);\n                }\n            });\n\n        return $query->whereIn($query->qualifyColumn('id'), $profiles);\n    }\n",
+        "text_sha256": "bff9b99583085cb709dbf3fc09668f3ae929a2abd454726264f62b39509f37a5"
+      }
+    },
+    "canonical_trip_producer_slice": {
+      "source_file": "app/Services/Fleet/FleetTripService.php",
+      "source_file_sha256": "efaa796d73d55e4888aed8a45e6590be151bfa9b76b7910f8eaa25c5c04c5b80",
+      "source_file_blob_id": "5f1315483cfd755a1d8307f1588372d1a40cb8fd",
+      "method": "handleTelemetry",
+      "start_line": 18,
+      "end_line": 105,
+      "definition_anchor": "app/Services/Fleet/FleetTripService.php:18",
+      "text": "    public function handleTelemetry(\n        FleetTelemetryEvent $event,\n        FleetVehicleStateSnapshot $state,\n        ?FleetTelemetryEvent $previousEvent = null\n    ): void\n    {\n        $startSpeed = (float) config('fleet.trip.start_speed_kph', 5);\n        $stopSpeed = (float) config('fleet.trip.stop_speed_kph', 2);\n        $stopAfterMinutes = (int) config('fleet.trip.stop_after_minutes', 5);\n        $idleAfterMinutes = (int) config('fleet.behaviour.idle_after_minutes', 2);\n\n        $speed = $event->speed_kph ?? 0;\n        $moving = $speed >= $startSpeed;\n        $stopped = $speed <= $stopSpeed;\n\n        if ($moving) {\n            $state->last_moving_at = $event->occurred_at;\n        }\n\n        $openTrip = FleetTrip::query()\n            ->where('asset_id', $event->asset_id)\n            ->where('status', 'open')\n            ->latest('started_at')\n            ->first();\n\n        if ($moving && !$openTrip) {\n            $openTrip = FleetTrip::create([\n                'asset_id' => $event->asset_id,\n                'driver_session_id' => null,\n                'started_at' => $event->occurred_at ?? now(),\n                'start_latitude' => $event->latitude,\n                'start_longitude' => $event->longitude,\n                'status' => 'open',\n                'consent_blocked' => $event->consent_blocked,\n            ]);\n\n            $this->startSegment($openTrip, $event);\n        }\n\n        if ($openTrip) {\n            $distanceKm = $this->distance->kmBetween(\n                $state->latitude,\n                $state->longitude,\n                $event->latitude,\n                $event->longitude\n            );\n\n            if ($distanceKm > 0) {\n                $openTrip->distance_km += $distanceKm;\n            }\n\n            if ($event->occurred_at && $openTrip->started_at) {\n                // Pass `true` so Carbon 3 returns absolute seconds; the column\n                // is unsigned and would overflow on a negative diff.\n                $openTrip->duration_s = (int) $openTrip->started_at->diffInSeconds(\n                    $event->occurred_at,\n                    true,\n                );\n            }\n\n            if ($stopped && $state->last_moving_at instanceof Carbon) {\n                $idleMinutes = (int) $state->last_moving_at->diffInMinutes(\n                    $event->occurred_at,\n                    true,\n                );\n                if ($idleMinutes >= $stopAfterMinutes) {\n                    $openTrip->update([\n                        'ended_at' => $event->occurred_at,\n                        'end_latitude' => $event->latitude,\n                        'end_longitude' => $event->longitude,\n                        'status' => 'closed',\n                    ]);\n                    $state->last_trip_id = $openTrip->id;\n                    $this->endOpenSegment($openTrip, $event);\n                    if (config('fleet.maps.reverse_geocode_enabled')) {\n                        ReverseGeocodeFleetTrip::dispatch($openTrip->id);\n                    }\n                    $openTrip = null;\n                }\n            }\n\n            if ($openTrip) {\n                $this->updateSegments($openTrip, $event, $previousEvent, $moving, $stopped, $idleAfterMinutes);\n                $openTrip->save();\n                $state->last_trip_id = $openTrip->id;\n            }\n        }\n    }\n",
+      "text_sha256": "0bc04775e2664b777fb3c7b0a27e7a767cedaf39a85cada867e7a1cafdbc4439"
+    },
+    "sibling_data_action_is_context_only": true,
+    "dedicated_page_is_context_only": true,
+    "caller_and_legacy_redirects_are_context_only": true,
+    "test_files_are_source_context_only": true,
+    "test_execution_inherited": false,
+    "page_caller_sibling_or_service_ownership_inherited": false,
+    "source_review_complete": false,
+    "source_packet_completeness_claimed": false,
+    "packet_sha256": "5c78cf40387a4eac26682ddf5dbde5ca5d6bdde33ab52f054702481b16128144"
+  },
+  "remediation_and_history_noninheritance": {
+    "finding_id": "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
+    "current_reporting_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "run_183_sha256": "7bb1b1013cf67344c48e5a8b6e551bf3c769695e0384c2b333fb47286e53310a",
+    "run_183r_sha256": "170245898590f6429a171bbd8a41455f096b5b43340b840294735fdbc5522640",
+    "run_184_sha256": "c01d56df5512183ac8363c58ea73af4abf504ef3bc956967b43b15929d5e84e0",
+    "run_185_sha256": "e6965bba3f25b80e6ce70aa3656802956bed935d79aaf46576e1420f0c65e07c",
+    "remediation_files_or_runtime_recredited": false,
+    "red_reproduction_recredited": false,
+    "isolated_or_post_merge_green_recredited": false,
+    "supporting_regressions_recredited": false,
+    "historical_remediated_reporting_recredited": false,
+    "static_route_ownership_inherited_from_remediation": false,
+    "controller_action_bridge_inherited_from_remediation": false,
+    "correctness_inherited_from_static_identity": false,
+    "final_finding_inherited": false
+  },
+  "combined_counts": {
+    "source_denominator": 3929,
+    "source_owner_records": 667,
+    "route_owner_records": 310,
+    "page_owner_records": 357,
+    "static_controller_action_bridges": 98,
+    "source_owner_percent": "16.976330",
+    "source_residual_records": 3262,
+    "route_denominator": 3218,
+    "residual_explicit_unmapped_routes": 2891,
+    "page_denominator": 711,
+    "residual_explicit_unmapped_pages": 345,
+    "distinct_feature_ids": 256,
+    "distinct_route_feature_ids": 64,
+    "distinct_page_feature_ids": 242,
+    "route_page_feature_overlap": 50
+  },
+  "queue_accounting": {
+    "queue_surface_rows": 507,
+    "reviewed_queue_surface_rows": 121,
+    "pending_unreviewed_queue_surface_rows": 386,
+    "reviewed_owner_route_rows": 99,
+    "reviewed_shared_relation_rows": 10,
+    "reviewed_alias_rows": 5,
+    "reviewed_dead_or_retired_rows": 0,
+    "reviewed_evidence_gap_rows": 7,
+    "queue_surfaces_without_ownership": 408,
+    "new_reviewed_route_surface_rows": 1,
+    "new_owner_route_surface_rows": 1
+  },
+  "queue_boundary": {
+    "preceding_index_84_not_recredited": true,
+    "selected_index_85_integrated": true,
+    "next_unresolved_index": 86,
+    "next_unresolved_queue_id": "RUN090-ROUTE-0087",
+    "next_unresolved_route_record_id": "RUN077-ROUTE-0695",
+    "next_unresolved_route_name": "fleet-assets.trips.playback.data",
+    "next_unresolved_action_expression": "[FleetTripController::class, 'playback']",
+    "next_unresolved_queue_record_sha256": "ed12617b478e0a22014fb6c81402e5cf79aa574720e8ef8e2ce93f198a099893",
+    "reviewed_key_count": 121,
+    "reviewed_key_list_sha256": "2329f613c5310950191a5206fd764a78afc9e6f5bf0d502d0a65751a580f1393",
+    "reviewed_key_list_canonical_json_sha256": "5d45c0c6b47770e42d68f6d1ee44c82774346b5d8909648c85ce74b793c02c8e"
+  },
+  "noninheritance_boundary": {
+    "historical_remediation": {
+      "finding_id": "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
+      "current_reporting_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+      "run_183_sha256": "7bb1b1013cf67344c48e5a8b6e551bf3c769695e0384c2b333fb47286e53310a",
+      "run_183r_sha256": "170245898590f6429a171bbd8a41455f096b5b43340b840294735fdbc5522640",
+      "run_184_sha256": "c01d56df5512183ac8363c58ea73af4abf504ef3bc956967b43b15929d5e84e0",
+      "run_185_sha256": "e6965bba3f25b80e6ce70aa3656802956bed935d79aaf46576e1420f0c65e07c",
+      "remediation_files_or_runtime_recredited": false,
+      "red_reproduction_recredited": false,
+      "isolated_or_post_merge_green_recredited": false,
+      "supporting_regressions_recredited": false,
+      "historical_remediated_reporting_recredited": false,
+      "static_route_ownership_inherited_from_remediation": false,
+      "controller_action_bridge_inherited_from_remediation": false,
+      "correctness_inherited_from_static_identity": false,
+      "final_finding_inherited": false
+    },
+    "historical_route_or_task_hash_presented_as_current": false,
+    "page_caller_redirect_service_model_helper_or_test_inherited_or_recredited": false,
+    "sibling_playback_data_route_identity_or_outcome_inherited": false,
+    "older_2026_08_12_bundle_role": "NON_GOVERNING_EXCLUDED_FROM_IDENTITY_MAPPING_BENCHMARK_AND_CREDIT",
+    "older_2026_08_12_feature_identity_imported": false,
+    "older_2026_08_12_mapping_or_benchmark_credit_imported": false
+  },
+  "overlay_source_records": [
+    {
+      "overlay_mapping_id": "RUN190-ROUTE-01",
+      "candidate_record_sha256": "b188512066f812df668c88c4ce38d02e2af8b9a972d04decf41c60b0aa2df64c",
+      "queue_record_self_seal_sha256": "f9df043e4557240020de213961c847fb56b8cd0e2d9b9144ec0b7a877ff84943",
+      "review_receipt_self_seal_sha256": "878d244b7b5eed9010d8e152e693840f82ee9dc14a32a56c17010329fae20d3f",
+      "semantic_consensus_record_sha256": "d9f89cb1c19d9894150d1df63fdd85482cdcf0a66fb2fe37297f2757aa810227",
+      "run190_computed_decision_sha256": "b3456ba2d566a616dbd314c50c4b9a4f8ed019193ecb60076e668cc046d27a7f",
+      "run189r_later_overlay_contract_sha256": "69507753b418b28c401c3bef15530581f3141e123d8eeb25a08f21c427685ca6",
+      "surface": "ROUTE_SOURCE_RECORD",
+      "source_record_id": "RUN077-ROUTE-0694",
+      "source_record_key": "route|RUN077-ROUTE-0694|CAP-FLEET-VEHICLE-REGISTER",
+      "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "feature_class": "H",
+      "module": "Fleet & Assets",
+      "user_job": "Maintain vehicles and vehicle-specific state",
+      "source": {
+        "route_file": "routes/fleet-assets.php",
+        "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_key": "routes/fleet-assets.php:55:9:get:11",
+        "source_anchor": "routes/fleet-assets.php:55",
+        "source_locator": "routes/fleet-assets.php:55:9:get",
+        "route_method": "get",
+        "literal_uri": "/trips/{trip}/playback",
+        "literal_route_name": "fleet-assets.trips.playback",
+        "action_expression": "[FleetTripController::class, 'show']",
+        "statement_excerpt": "Route::get('/trips/{trip}/playback', [FleetTripController::class, 'show'])->whereNumber('trip')->name('fleet-assets.trips.playback');",
+        "statement_sha256": "a6194d98789884a0fce35263cfaaabd785d72b2965ae1dd6baa616d749f0615d"
+      },
+      "source_provenance": {
+        "immutable_queue_route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "immutable_queue_route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "current_review_route_file_sha256": "4be79ba4a0957f81f3e99de8eea7f29a398f8a115957bd44af06dbbf78fe2c4c",
+        "current_review_route_file_blob_id": "f0b2b8c199ada1d8ef8bdb41c99bfc2ac02f93d2",
+        "exact_statement_preserved_across_drift": true,
+        "historical_hash_not_presented_as_current": true
+      },
+      "review_outcome": "OWNER_ROUTE_ACTION",
+      "accepted_semantic_review_ids": [
+        "RUN189R-SEMANTIC-A",
+        "RUN189R-SEMANTIC-B"
+      ],
+      "accepted_semantic_review_record_sha256s": [
+        "0247add20542aa4578ca20747796e01d6528b0b7b01fb93486ccba09253d728d",
+        "469fa03b2a408f95aca7636fae7a4ab0a16ff53cf38c69db7584a6e9d164cd17"
+      ],
+      "accepted_final_exact_artifact_review_record_sha256s": [
+        "d67eef3feefadecaaef269d22398879dc04cb550d275fa0a2c8d7a7b8520bf0b",
+        "2b117150aa4b3152a0f576536210e082f15f91414f1ede48dc8d5c5804167009"
+      ],
+      "semantic_dissent_present": false,
+      "static_source_feature_ownership_credit": true,
+      "sibling_data_route_ownership_credit": false,
+      "credit_boundary": {
+        "page_ownership": false,
+        "adjacent_route_ownership": false,
+        "frontend_caller_or_redirect_ownership": false,
+        "service_model_helper_or_test_ownership": false,
+        "framework_route_reachability": false,
+        "canonical_object_ownership_correctness": false,
+        "approved_site_scope_correctness": false,
+        "permission_correctness": false,
+        "privacy_correctness": false,
+        "direct_object_concealment_correctness": false,
+        "runtime": false,
+        "database": false,
+        "build": false,
+        "application_browser": false,
+        "executed_tests": false,
+        "benchmark": false,
+        "final_no_match_or_NCM": false,
+        "final_finding": false,
+        "completion": false,
+        "gate_4": false,
+        "publication": false,
+        "audit_complete": false
+      },
+      "overlay_row_sha256": "31a2f128dacd47d73377db8422e2d89448909d9f4d98fe8089fa0522cb0ddfb2"
+    }
+  ],
+  "new_static_controller_action_bridges": [
+    {
+      "bridge_id": "RUN190-BRIDGE-01",
+      "candidate_record_sha256": "b188512066f812df668c88c4ce38d02e2af8b9a972d04decf41c60b0aa2df64c",
+      "queue_record_self_seal_sha256": "f9df043e4557240020de213961c847fb56b8cd0e2d9b9144ec0b7a877ff84943",
+      "review_receipt_self_seal_sha256": "878d244b7b5eed9010d8e152e693840f82ee9dc14a32a56c17010329fae20d3f",
+      "semantic_consensus_record_sha256": "d9f89cb1c19d9894150d1df63fdd85482cdcf0a66fb2fe37297f2757aa810227",
+      "run190_computed_decision_sha256": "b3456ba2d566a616dbd314c50c4b9a4f8ed019193ecb60076e668cc046d27a7f",
+      "accepted_semantic_review_record_sha256s": [
+        "0247add20542aa4578ca20747796e01d6528b0b7b01fb93486ccba09253d728d",
+        "469fa03b2a408f95aca7636fae7a4ab0a16ff53cf38c69db7584a6e9d164cd17"
+      ],
+      "accepted_final_exact_artifact_review_record_sha256s": [
+        "d67eef3feefadecaaef269d22398879dc04cb550d275fa0a2c8d7a7b8520bf0b",
+        "2b117150aa4b3152a0f576536210e082f15f91414f1ede48dc8d5c5804167009"
+      ],
+      "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "route_record_id": "RUN077-ROUTE-0694",
+      "controller_fqcn": "App\\Http\\Controllers\\Fleet\\FleetTripController",
+      "controller_file": "app/Http/Controllers/Fleet/FleetTripController.php",
+      "controller_file_sha256": "4a5f448e230c79e4effcad358ef65a5ba9fa6b9774c43d2df87e3485b9b5ad63",
+      "controller_file_blob_id": "2373c95b30958399c8ed648915991c01a0fbc84c",
+      "method": "show",
+      "definition_anchor": "app/Http/Controllers/Fleet/FleetTripController.php:24",
+      "method_review_slice_sha256": "0de57b9513d13423d3307a8d033d8dbaffeba644f4dece86a1dab77362260ab2",
+      "review_outcome": "OWNER_ROUTE_ACTION",
+      "semantic_dissent_present": false,
+      "static_controller_action_bridge_credit": true,
+      "page_ownership_credit": false,
+      "sibling_data_route_ownership_credit": false,
+      "service_model_helper_caller_redirect_or_test_ownership_credit": false,
+      "correctness_credit": false,
+      "site_permission_privacy_or_direct_object_credit": false,
+      "runtime_credit": false,
+      "application_browser_credit": false,
+      "executed_test_credit": false,
+      "benchmark_credit": false,
+      "final_finding_credit": false,
+      "completion_credit": false,
+      "publication_credit": false,
+      "bridge_row_sha256": "a8934922a42c1270c62276c2dc345066372a8ea73fa3ca0875cd3c75020fc5c9"
+    }
+  ],
+  "reviewed_non_owner_outcomes": [],
+  "identity": {
+    "hash_algorithm": "sha256-of-lf-joined-sorted-unique-utf8",
+    "prior_source_record_key_list_sha256": "1648a470ca0293c4c065b30925b8eda5a9f78d35fa64935e644a3354e17cdbba",
+    "combined_source_record_key_list_sha256": "2e5f82279c71860a6fc2576859fb4351a6e3fbd3010f7c9f2fe598b48facf5a6",
+    "prior_bridge_key_list_sha256": "6ab1b8c1045ac6c159ba4aa5856ac58e648263a530f4f7c3031e4eed5d84fa32",
+    "combined_bridge_key_list_sha256": "354fd9239de4233eff3e1b20b7df5c2c519e11c8a90b88490cab9513e9f1b42c",
+    "prior_reviewed_queue_key_list_sha256": "5dbcecd3986300fe255fdb75efe6013c07f3adc4071745ebebf0c4a525ee99c9",
+    "combined_reviewed_queue_key_list_sha256": "2329f613c5310950191a5206fd764a78afc9e6f5bf0d502d0a65751a580f1393",
+    "canonical_json_reviewed_key_hashes": {
+      "prior": "738c7836dd770e12d67de62d4f28441825814d619bb641e070e25468786fb75e",
+      "combined": "5d45c0c6b47770e42d68f6d1ee44c82774346b5d8909648c85ce74b793c02c8e"
+    },
+    "new_overlay_source_records_sha256": "20be0f18f623a94231f2a88b2eb62d3e9f4bd785bf33d0822434267997936b38",
+    "new_action_bridges_sha256": "5608dd3ed0b33de029adcff9b7e05031b281c8afe956c94feff83d1d1726e605",
+    "accepted_semantic_review_record_sha256s": [
+      "0247add20542aa4578ca20747796e01d6528b0b7b01fb93486ccba09253d728d",
+      "469fa03b2a408f95aca7636fae7a4ab0a16ff53cf38c69db7584a6e9d164cd17"
+    ],
+    "accepted_final_exact_artifact_review_record_sha256s": [
+      "d67eef3feefadecaaef269d22398879dc04cb550d275fa0a2c8d7a7b8520bf0b",
+      "2b117150aa4b3152a0f576536210e082f15f91414f1ede48dc8d5c5804167009"
+    ],
+    "semantic_consensus_record_sha256": "d9f89cb1c19d9894150d1df63fdd85482cdcf0a66fb2fe37297f2757aa810227",
+    "run190_computed_decision_sha256": "b3456ba2d566a616dbd314c50c4b9a4f8ed019193ecb60076e668cc046d27a7f"
+  },
+  "outcome_conservation": {
+    "reviewed_outcomes_equation": "1 = 1 owner + 0 shared + 0 evidence gap",
+    "bounded_source_equation": "3929 = 667 owner + 3262 non-owner residual",
+    "owner_surface_equation": "667 = 310 route + 357 page",
+    "feature_union_equation": "256 = 64 route + 242 page - 50 overlap",
+    "route_universe_equation": "3218 = 310 owner + 12 shared + 5 alias + 0 dead + 2891 residual",
+    "page_universe_equation": "711 = 357 owner + 9 shared + 0 alias + 0 dead + 345 residual",
+    "queue_equation": "507 = 121 reviewed + 386 pending",
+    "reviewed_queue_equation": "121 = 99 owner + 10 shared + 5 alias + 0 dead + 7 evidence gap",
+    "queue_without_ownership_equation": "408 = 386 pending + 10 shared + 5 alias + 0 dead + 7 evidence gap"
+  },
+  "credit_boundary": {
+    "STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_1_RECORD": true,
+    "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_1_ACTION": true,
+    "static_page_feature_ownership": false,
+    "sibling_or_adjacent_route_ownership": false,
+    "frontend_page_caller_or_redirect_ownership": false,
+    "service_model_helper_or_test_ownership": false,
+    "complete_route_page_feature_crosswalk": false,
+    "framework_route_reachability": false,
+    "canonical_object_ownership_correctness": false,
+    "approved_site_scope_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_concealment_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "executed_tests": false,
+    "application_source_mutation": false,
+    "matrix_mutation": false,
+    "benchmark": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "release": false,
+    "publication": false,
+    "pass": false,
+    "final_finding": false,
+    "feature_completion": false,
+    "completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "mutation_attestation": {
+    "application_source_changed_by_run190": false,
+    "test_files_changed_by_run190": false,
+    "matrix_changed": false,
+    "reports_changed": false,
+    "dashboard_generator_changed": false,
+    "dashboard_html_changed": false,
+    "runtime_or_external_system_changed": false,
+    "audit_artifacts_only": true,
+    "run190_producer_scope_contains_only_generator_and_receipt": true
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json"
+  ],
+  "self_seal": {
+    "algorithm": "sha256-canonical-json-with-self-seal-omitted",
+    "sha256": "16cbb874448ec053f976594cfe031ed1834601d66c8b1ffe7bb79a06336d4142"
+  }
+}
