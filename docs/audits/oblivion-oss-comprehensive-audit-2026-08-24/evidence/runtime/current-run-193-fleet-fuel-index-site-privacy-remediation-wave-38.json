@@ -1,0 +1,625 @@
+{
+  "schema_version": "run-193-fleet-fuel-index-site-privacy-remediation-wave-38-v1",
+  "run_id": "RUN-193-FLEET-FUEL-INDEX-SITE-PRIVACY-01-REMEDIATION-WAVE-38",
+  "status": "CURRENT_FLEET_FUEL_INDEX_SITE_PRIVACY_DEFECT_REPRODUCED_REMEDIATED_LOCALLY_INTEGRATED_BOUNDED_VERIFIED_NOT_PUBLISHED_REPORTING_NOT_YET_AUTHORIZED_ZERO_STATIC_OWNERSHIP_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "materialized_on": "2026-09-01",
+  "architecture_boundary": "One operating organisation across multiple Sites; approved Site access, exact roles and permissions, canonical Asset provenance, direct-object denial, and privacy are the boundaries. Site is provenance, not a tenant boundary.",
+  "pins": {
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "continuation_prompt_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "application_baseline_commit": "df65322f8eb7d7d0f1623c4bcb8cc8c87573b71d",
+    "application_baseline_tree": "0bd43711942416069675075ce3d515b92b9eaf7d",
+    "fix_commit": "2ec4b70e379c6f8cf38c1cb67f5d676fea52cf75",
+    "fix_tree": "b6e17efbf1b92b4a12bc01c55e8f245b2e206922",
+    "fix_parent": "df65322f8eb7d7d0f1623c4bcb8cc8c87573b71d",
+    "fix_commit_subject": "fix(fleet): scope fuel index to visible sites",
+    "stable_patch_id": "636771c0b1d9cbe50b2204febaa41679d340aba9",
+    "clean_audit_release_commit": "9019b44cb1017931fd0491a90f96ac32a6c4420c",
+    "clean_audit_release_tree": "81a4a14e31c88c9731f24a6addee85377ac54256",
+    "local_main_merge_commit": "04c32c36fdda6ce60ce281c06ad68aaa78527422",
+    "local_main_tree": "6f85ddc1f4e8551c99528cc0c872b37da6c7763a",
+    "merge_parents": [
+      "9019b44cb1017931fd0491a90f96ac32a6c4420c",
+      "2ec4b70e379c6f8cf38c1cb67f5d676fea52cf75"
+    ],
+    "merge_subject": "merge: scope Fleet fuel index to approved Sites",
+    "audit_advance_from_baseline": {
+      "path_count": 24,
+      "clean_audit_release_equals_application_baseline": false,
+      "transferred_paths_unchanged": true
+    },
+    "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead": 76,
+    "local_main_behind": 0,
+    "application_remote_publication_observed": false,
+    "publication_authorized": false,
+    "materializer": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.py",
+      "sha256": "105632bc2c4e50de3e8cfdd55fb25810fbbe5307537bd90b0e153b25f7c4e319",
+      "git_blob_id": "bacd3d5003073bb58efe407388ea770429b63a95",
+      "bytes": 37025,
+      "lines": 884
+    },
+    "baseline_controller": {
+      "path": "app/Http/Controllers/FleetAssets/VehicleController.php",
+      "sha256": "ba1ecc7e876c352a78122a3b292648d834ed40c8e09ab8893b9d9150e5614c49",
+      "git_blob_id": "c6b75b8f33bb7774f74d27a4bc01bf07766c3212",
+      "bytes": 54669,
+      "lines": 1263
+    },
+    "fix_source_and_regression_test": [
+      {
+        "path": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "sha256": "c8547f3bb83e0d26a4c7ed7be7030ebf4e906f0d42a1d5bb11699399b8eb3f0f",
+        "git_blob_id": "478f7c46fa39e2d0b515bd76b96ad52aa61881d8",
+        "bytes": 55493,
+        "lines": 1280,
+        "insertions": 25,
+        "deletions": 8
+      },
+      {
+        "path": "tests/Feature/FleetAssets/FleetFuelIndexSitePrivacyTest.php",
+        "sha256": "1cf82ef3c86a53aaf91443c241fdc1c4c027aacb87e2004cc9e59f94121b11da",
+        "git_blob_id": "54abf3786d28e38887ad95ce9a7ab3b01d868db3",
+        "bytes": 20771,
+        "lines": 516,
+        "insertions": 516,
+        "deletions": 0
+      }
+    ],
+    "merged_source_and_regression_test": [
+      {
+        "path": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "sha256": "c8547f3bb83e0d26a4c7ed7be7030ebf4e906f0d42a1d5bb11699399b8eb3f0f",
+        "git_blob_id": "478f7c46fa39e2d0b515bd76b96ad52aa61881d8",
+        "bytes": 55493,
+        "lines": 1280,
+        "insertions": 25,
+        "deletions": 8
+      },
+      {
+        "path": "tests/Feature/FleetAssets/FleetFuelIndexSitePrivacyTest.php",
+        "sha256": "1cf82ef3c86a53aaf91443c241fdc1c4c027aacb87e2004cc9e59f94121b11da",
+        "git_blob_id": "54abf3786d28e38887ad95ce9a7ab3b01d868db3",
+        "bytes": 20771,
+        "lines": 516,
+        "insertions": 516,
+        "deletions": 0
+      }
+    ],
+    "current_route_source": {
+      "path": "routes/fleet-assets.php",
+      "sha256": "4be79ba4a0957f81f3e99de8eea7f29a398f8a115957bd44af06dbbf78fe2c4c",
+      "git_blob_id": "f0b2b8c199ada1d8ef8bdb41c99bfc2ac02f93d2",
+      "bytes": 28332,
+      "lines": 351
+    },
+    "current_findings_before_run_193": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/findings.json",
+      "sha256": "91ccad95997c802f56c68a3cfc2678ae2364e7bad47c3f11ecaa55f4fc3e4843",
+      "git_blob_id": "4b407f1137b121f6d5c0ad123bbd7a8fdb4223ce",
+      "bytes": 643616,
+      "lines": 11357
+    },
+    "supporting_regression_tests": [
+      {
+        "path": "tests/Feature/FleetAssets/FleetTripIndexSitePrivacyTest.php",
+        "sha256": "932a35eaca38ec714874f05aa875388b67ccad3105b39b83c5df85510c27b9ce",
+        "git_blob_id": "d58b141ac5e7c837a3bf27d5fa4494716849f60b",
+        "bytes": 22167,
+        "lines": 521
+      },
+      {
+        "path": "tests/Feature/Fleet/FleetManagementTest.php",
+        "sha256": "6fff4bcc546d3288d979fa641da36733d7a5d7c7a08518ac5d434faab057d0b0",
+        "git_blob_id": "d5933409b4b25d175d4be2b5f61505a0ce7bf5d0",
+        "bytes": 8271,
+        "lines": 218
+      }
+    ],
+    "advanced_main_disjoint_records": [
+      {
+        "path": "app/Console/Commands/CheckRiskReviews.php",
+        "sha256": "d42c5ee5c04ddee5ac1a4c4f617e2aaa913ecacec121bb61908553c2018b0a05",
+        "git_blob_id": "30d33c5d57b90d0555197cfb78900fe4e837f9da",
+        "bytes": 1360,
+        "lines": 46
+      },
+      {
+        "path": "app/Domain/Governance/Jobs/EscalateOverdueActionItems.php",
+        "sha256": "ecb8cd2d8282d8b24c4ee564c56645f79350615b10e3ea4f04439140d10317de",
+        "git_blob_id": "1d301ecea6962a375960f9ad76b1b5ddfecfb52c",
+        "bytes": 1990,
+        "lines": 57
+      },
+      {
+        "path": "app/Domain/Governance/Jobs/SendComplianceReminder.php",
+        "sha256": "37c9b4805637dc699f4e8dd77efb12e489b90660c1dc90302db4a65e99ea35ee",
+        "git_blob_id": "426c8436cd45bdc0ac8fc4e810c358b7db69b487",
+        "bytes": 2719,
+        "lines": 88
+      },
+      {
+        "path": "app/Domain/Governance/Jobs/SendVotingReminder.php",
+        "sha256": "b4ae2a09228129e0bab8a2e07dfe7cc2b3f4f8c43d2995a336ac00d377419d5a",
+        "git_blob_id": "aada7ffde6073f38fc7324a5d2dc0130b75ab6e2",
+        "bytes": 1699,
+        "lines": 55
+      },
+      {
+        "path": "app/Domain/Hr/Jobs/RunHrScheduledReportsJob.php",
+        "sha256": "6d5bba3a0317c2963a73c44f4e27acc179548dd760bab2736189a05e17185014",
+        "git_blob_id": "d50f52b54296d06e3dc52528655c05f71e86506f",
+        "bytes": 5030,
+        "lines": 134
+      },
+      {
+        "path": "app/Domain/Roadmap/Jobs/SendRoadmapDigestJob.php",
+        "sha256": "bbbb907e97af5d4b8bd941761d00c97a687fb0436aefc414de258932139526c9",
+        "git_blob_id": "4c5faf45c6768833087e25cadef9f1f107a31720",
+        "bytes": 2663,
+        "lines": 75
+      },
+      {
+        "path": "app/Jobs/ChecklistDueJob.php",
+        "sha256": "899ab96fe2cc8b9e460d1464e282b217a953c992f6bd90fe905d61eba7403c0e",
+        "git_blob_id": "3f439690c17b00d66fc9b8e7177f33f9b0825a12",
+        "bytes": 2328,
+        "lines": 78
+      },
+      {
+        "path": "app/Jobs/HazardOverdueJob.php",
+        "sha256": "02161f4b2544a6db068020e63a68a9c3808febffdca86ba252caa8f4cc53b80b",
+        "git_blob_id": "11cd0e802ae8f3b089dd2f4e6d66ce38400f845d",
+        "bytes": 2920,
+        "lines": 81
+      },
+      {
+        "path": "app/Jobs/InspectionDueJob.php",
+        "sha256": "6d879596f7546f12cd0784e40e75627e9cafb04f350e6d87e98bc5c25721ada7",
+        "git_blob_id": "8fe16c2b2e12f7a317a5eb098154e4ce08784f39",
+        "bytes": 2779,
+        "lines": 79
+      },
+      {
+        "path": "app/Jobs/SendEventReminderJob.php",
+        "sha256": "a92544d74a4bcf5086ea5914d5487dc5ac22963c31f7b12331e9f78e95c0b21d",
+        "git_blob_id": "b5c76f3a633cae18b72ea6b69ca4429661809372",
+        "bytes": 2904,
+        "lines": 86
+      },
+      {
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+        "sha256": "8d19569e7bfb256edeecdc754e2bc47e2ddad3ecd8de099e3bb0dad9b50e313b",
+        "git_blob_id": "fb0ba424878117bf1362aea77c892a00fda32b95",
+        "bytes": 317284,
+        "lines": 78
+      },
+      {
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json",
+        "sha256": "cc95b38ece501bea317e78ef7769a7813e3a5a6c2041330e249fd196974cbb88",
+        "git_blob_id": "afc60d0a321921fe9cf3660c0e76a0b58dcfb20e",
+        "bytes": 62044,
+        "lines": 1736
+      },
+      {
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py",
+        "sha256": "e2b5c461cd9f22e0dba35d3555788534a3d244ea40a3c3424d1b80b003a6c242",
+        "git_blob_id": "4a79b8441c84d4824642f08c6ba9d7908e035184",
+        "bytes": 735472,
+        "lines": 6459
+      },
+      {
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-192-audit-dashboard-verification-wave-37.py",
+        "sha256": "899eb63bf6416801187334c12af8c781029c457e0f7e2cbbaf75604991fbe14f",
+        "git_blob_id": "3f3953e6d79a05d23b8e430f6879ab679d38b5fc",
+        "bytes": 68208,
+        "lines": 1683
+      },
+      {
+        "path": "tests/Feature/Governance/ActionItemEscalationRecipientAuthorizationTest.php",
+        "sha256": "fb4522ee2fcd948f43b2ec8e8822c0c9d9eb103be4e3571ddfa5249384350ef3",
+        "git_blob_id": "c606a7344a605621e92e53b8e564c32d26323069",
+        "bytes": 6157,
+        "lines": 151
+      },
+      {
+        "path": "tests/Feature/Governance/ComplianceReminderQueuedRecipientAuthorizationTest.php",
+        "sha256": "f89af22ae81ba40d64fb7e4d8e4fb044c42e57b5804f698d68bc6a28ddbce721",
+        "git_blob_id": "8ee6afbdc180aff3cf08ce9329da0f60476429eb",
+        "bytes": 6440,
+        "lines": 173
+      },
+      {
+        "path": "tests/Feature/Governance/RiskReviewReminderAuthorizationTest.php",
+        "sha256": "a1d6c8a8cc9b59d366d0c5c27a9a4128bc34b6627c40ca5a5f771e5bf5a5ca13",
+        "git_blob_id": "f5bf7c79c66e61b4d214a91f8a2d9f4cd5edae91",
+        "bytes": 4730,
+        "lines": 127
+      },
+      {
+        "path": "tests/Feature/Governance/VotingReminderQueuedAuthorizationTest.php",
+        "sha256": "4bd483368aff4a0303d59bb5a18fdd9c487f2e729f20ef9d4e29ae31eb41d9c7",
+        "git_blob_id": "9cc612022dcb8e90001df75c004ae77be97af0b6",
+        "bytes": 6598,
+        "lines": 156
+      },
+      {
+        "path": "tests/Feature/Hr/HrScheduledReportRecipientRevalidationTest.php",
+        "sha256": "0f4ac79b138ec67bce1cf83b65fb8ae5bf8a2921ca95aa3a241798f895e2856e",
+        "git_blob_id": "1ec50b8a9caa9e905b648b836a615576dbbddf42",
+        "bytes": 7926,
+        "lines": 208
+      },
+      {
+        "path": "tests/Feature/Roadmap/RoadmapDigestRecipientAuthorizationTest.php",
+        "sha256": "c10f68076aa9364741f4fb17be04d873690e38849dd21e40289d38c0efda0a5f",
+        "git_blob_id": "bde5abfb0a290787b069605f87c3defd16a958a2",
+        "bytes": 5274,
+        "lines": 141
+      },
+      {
+        "path": "tests/Feature/Sites/Calendar/SiteCalendarReminderJobTest.php",
+        "sha256": "7334a4e616e9274ba00e94ea339d26b3fda8e9ba131034eadd11e27306f22772",
+        "git_blob_id": "76c3cd341296bd1f65fa52e83c6958d301c9bba0",
+        "bytes": 7529,
+        "lines": 202
+      },
+      {
+        "path": "tests/Feature/Sites/ChecklistDueJobRecipientPrivacyTest.php",
+        "sha256": "b12fe279bc6f66dfa997502dd00b639817a8bb3bf4af5adae4b5e4de396baec5",
+        "git_blob_id": "48d89dc235374f0a34ccc544fff565e1865310e6",
+        "bytes": 8679,
+        "lines": 225
+      },
+      {
+        "path": "tests/Feature/Sites/HazardOverdueJobSitePrivacyTest.php",
+        "sha256": "9c3ccf27a5c3cbae5ed9bab5ff092a3e57fb146f939cf14c2cc336b3b2fdb822",
+        "git_blob_id": "8daa34747d062445ed890160f263707fa946d30f",
+        "bytes": 6850,
+        "lines": 169
+      },
+      {
+        "path": "tests/Feature/Sites/InspectionDueJobRecipientPrivacyTest.php",
+        "sha256": "5d06215e3283f949aaa27d0247abd98fe72af8179432bc7c6c9baf57c6815fc0",
+        "git_blob_id": "eab91285b0246b31a80ea85a04c46546eb46d880",
+        "bytes": 7530,
+        "lines": 183
+      }
+    ]
+  },
+  "issue_first_disposition": {
+    "finding_id": "FLEET-FUEL-INDEX-SITE-PRIVACY-01",
+    "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "feature_identity_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "selected_route": {
+      "queue_id": "RUN090-ROUTE-0088",
+      "route_record_id": "RUN077-ROUTE-0696",
+      "route_name": "fleet-assets.fuel.index",
+      "controller_action": "VehicleController::fuel"
+    },
+    "verdict": "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED",
+    "new_discovery_stopped_after_confirmation": true,
+    "exclusive_remediation_paths": [
+      "app/Http/Controllers/FleetAssets/VehicleController.php",
+      "tests/Feature/FleetAssets/FleetFuelIndexSitePrivacyTest.php"
+    ],
+    "red_baseline": {
+      "commit": "df65322f8eb7d7d0f1623c4bcb8cc8c87573b71d",
+      "permanent_six_case_reproduction": {
+        "cases": 6,
+        "failed": 6,
+        "assertions_reported": 65,
+        "duration_seconds": 152.37,
+        "exit_code": 1
+      },
+      "passing_denominator_credit": 0,
+      "observations": [
+        "foreign-Site fuel rows and nested logger identity were visible",
+        "foreign fuel data influenced CSV, monthly hero, summary, and efficiency projections",
+        "foreign and missing vehicle filters were not concealed consistently",
+        "canonical direct, home, client, archived-Site, and current-user boundaries were not enforced consistently"
+      ]
+    }
+  },
+  "remediation": {
+    "summary": "The fuel index now derives one visible operational-vehicle universe from the actor's current approved Sites and applies it consistently to rows, nested logger identity, CSV, filters, monthly hero metrics, summaries, and trip-derived efficiency projections.",
+    "production_files": 1,
+    "regression_test_files": 1,
+    "changed_paths": 2,
+    "insertions": 541,
+    "deletions": 8,
+    "selected_get_route_and_csv_branch_only": true,
+    "ordinary_viewer_approved_site_scope": true,
+    "fleet_manage_operational_site_bypass_preserved": true,
+    "archived_site_concealment": true,
+    "foreign_or_missing_vehicle_filter_concealment_404": true,
+    "nested_logger_identity_redaction": true,
+    "canonical_direct_home_and_client_site_provenance": true,
+    "rows_filters_summary_efficiency_and_hero_use_consistent_visible_universe": true,
+    "route_declarations_changed": false,
+    "pages_components_copy_or_layout_changed": false,
+    "security_devices_or_user_site_access_service_changed": false,
+    "third_party_source_assets_wording_or_layout_copied": false,
+    "single_tenant_multi_site_boundary_preserved": true
+  },
+  "delegated_runtime_execution": {
+    "execution_owners": {
+      "red_isolated_and_post_merge": "separate Continue OSS audit fixes task"
+    },
+    "run_193_producer_executed_tests": false,
+    "root_post_merge_reran_tests_for_run_193": false,
+    "baseline_original_red": {
+      "cases": 6,
+      "failed": 6,
+      "passed": 0,
+      "assertions_reported": 65,
+      "duration_seconds": 152.37,
+      "exit_code": 1,
+      "credit": "REPRODUCTION_ONLY_ZERO_PASSING_DENOMINATOR_CREDIT"
+    },
+    "isolated_green_focused": {
+      "tests": 6,
+      "assertions": 206,
+      "duration_seconds": 147.44,
+      "exit_code": 0,
+      "added_to_bounded_disposition_denominator": false
+    },
+    "isolated_supporting_vehicle_controller_regressions": {
+      "tests": 20,
+      "assertions": 215,
+      "duration_seconds": 156.15,
+      "exit_code": 0,
+      "reported_separately": true,
+      "added_to_bounded_disposition_denominator": false,
+      "scope": "FleetTripIndexSitePrivacyTest plus FleetManagementTest"
+    },
+    "post_merge_authoritative_three_file_context": {
+      "tests": 26,
+      "assertions": 421,
+      "duration_seconds": 196.34,
+      "exit_code": 0,
+      "focused_component": {
+        "tests": 6,
+        "assertions": 206,
+        "unique_bounded_disposition_denominator_credit_after_run_193r_go": true
+      },
+      "supporting_component": {
+        "tests": 20,
+        "assertions": 215,
+        "added_to_bounded_disposition_denominator": false
+      }
+    },
+    "focused_cases": [
+      "approved-Site viewer receives only visible fuel rows, nested logger identity, vehicle choices, monthly hero metrics, summary, and efficiency projections",
+      "CSV export excludes foreign-Site rows, vehicle identity, logger identity, and notes",
+      "asset filters accept visible vehicles and conceal foreign or missing vehicles with 404",
+      "fuel visibility follows canonical direct, home, and client-Site provenance and fails closed for conflicts or unattributed vehicles",
+      "ended, inactive, missing-profile, and permission-revoked viewers receive no foreign data or are denied by the existing permission boundary",
+      "fleet.manage sees operational Sites while archived-Site fuel remains concealed"
+    ],
+    "focused_replay_aggregated_more_than_once": false,
+    "unique_bounded_accounting": {
+      "prior": {
+        "tests": 155,
+        "assertions": 2403
+      },
+      "increment_after_run_193r_go": {
+        "tests": 6,
+        "assertions": 206
+      },
+      "proposed_after_run_194_reporting": {
+        "tests": 161,
+        "assertions": 2609
+      }
+    },
+    "syntax": {
+      "isolated_files_passed": 2,
+      "post_merge_files_passed": 2,
+      "result": "PASS"
+    },
+    "pint": {
+      "isolated": "PASS",
+      "post_merge": "PASS"
+    },
+    "git_diff_and_check": "PASS",
+    "full_suite_or_coverage_credit": false
+  },
+  "independent_static_review": {
+    "reported_delegated_read_only_post_diff_reviews": 2,
+    "total_read_only_reviews": 2,
+    "verdict": "GO",
+    "findings": 0,
+    "reviewers_executed_tests": false,
+    "reviewers_wrote_files": false,
+    "exact_merge_commit_tree_parents_and_two_path_delta_verified": true,
+    "bounded_site_privacy_contract_verified": true,
+    "exact_run_193_receipt_review_completed": false,
+    "new_record_reporting_authorized": false,
+    "run_193r_still_required": true
+  },
+  "cleanup_evidence": {
+    "isolated_worktree": "C:/w/fleet-fuel-index-site-privacy-01",
+    "isolated_worktree_removed": true,
+    "isolated_branch": "codex/fleet-fuel-index-site-privacy-01-20260831",
+    "isolated_branch_deleted": false,
+    "recovery_branch_retained": true,
+    "numeric_pid_test_schema_count": 0,
+    "audit_owned_php_or_php_cgi_process_count": 0,
+    "global_php_or_php_cgi_process_count_asserted": true,
+    "primary_main_clean_before_audit_writes": true
+  },
+  "static_ownership_boundary": {
+    "owner_records": 667,
+    "route_owners": 310,
+    "page_owners": 357,
+    "action_bridges": 98,
+    "queue_total": 507,
+    "queue_reviewed": 121,
+    "queue_pending": 386,
+    "queue_owned": 99,
+    "queue_without_ownership": 408,
+    "next_zero_based_index": 86,
+    "next_queue_id": "RUN090-ROUTE-0087",
+    "next_route_record_id": "RUN077-ROUTE-0695",
+    "next_route_name": "fleet-assets.trips.playback.data",
+    "finding_candidate_zero_based_index": 87,
+    "finding_candidate_queue_id": "RUN090-ROUTE-0088",
+    "finding_candidate_route_record_id": "RUN077-ROUTE-0696",
+    "finding_candidate_route_name": "fleet-assets.fuel.index",
+    "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "ownership_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "current_controller_sha256": "c8547f3bb83e0d26a4c7ed7be7030ebf4e906f0d42a1d5bb11699399b8eb3f0f",
+    "current_controller_definition_line": 824,
+    "correctness_does_not_adjudicate_static_ownership": true,
+    "fresh_outcome_neutral_ownership_review_required_later": true
+  },
+  "benchmark_boundary": {
+    "mapped": 2,
+    "total": 340,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338,
+    "changed_by_run_193": false
+  },
+  "noninheritance_boundary": {
+    "isolated_green_replay_recredited": false,
+    "supporting_vehicle_controller_regressions_recredited": false,
+    "red_failures_or_assertions_recredited": false,
+    "static_route_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "static_page_or_frontend_ownership": false,
+    "queue_matrix_or_feature_union_change": false,
+    "trip_playback_toggle_personal_fuel_store_or_adjacent_route_correctness": false,
+    "security_devices_or_user_site_access_service_correctness": false,
+    "broader_fleet_permission_privacy_or_direct_object_correctness": false,
+    "application_browser_or_ease": false,
+    "benchmark_mapping_or_final_no_match_NCM": false,
+    "full_suite_coverage_feature_module_pass_or_release": false,
+    "publication_final_finding_completion_or_audit_completion": false
+  },
+  "reporting_boundary": {
+    "current_findings_snapshot": {
+      "retained_record_count": 15,
+      "current_provisional_count": 8,
+      "historical_already_fixed_count": 2,
+      "historical_remediated_count": 5,
+      "fleet_fuel_index_site_privacy_record_present": false
+    },
+    "current_retained_identity_count": 15,
+    "current_split": "8 provisional + 2 historical already-fixed + 5 historical remediated",
+    "current_bounded_disposition": {
+      "tests": 155,
+      "assertions": 2403
+    },
+    "pending_new_record_id": "FLEET-FUEL-INDEX-SITE-PRIVACY-01",
+    "pending_reporting_delta": {
+      "retained_claim_records": 1,
+      "current_provisional_source_claims": 0,
+      "historical_already_fixed_records": 0,
+      "historical_remediated_records": 1,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "proposed_after_independent_exact_artifact_review": {
+      "retained_claim_records": 16,
+      "current_provisional_source_claims": 8,
+      "historical_already_fixed_records": 2,
+      "historical_remediated_records": 6,
+      "bounded_disposition_tests": 161,
+      "bounded_disposition_assertions": 2609,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "independent_review_authorized": false,
+    "run_193_changes_live_reporting": false,
+    "run_193r_required": true,
+    "run_194_reporting_required_after_go": true,
+    "run_195_fresh_dashboard_verification_required_after_reporting": true
+  },
+  "credit_boundary": {
+    "historical_condition_confirmed": true,
+    "current_defect_reproduced": true,
+    "application_remediation": true,
+    "bounded_runtime": true,
+    "bounded_selected_get_and_csv_execution": true,
+    "bounded_site_privacy_correctness": true,
+    "application_commit_integrated_local_main": true,
+    "application_commit_published": false,
+    "new_historical_remediated_record_reporting": false,
+    "static_route_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "framework_route_reachability_complete": false,
+    "application_browser": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "full_feature_or_module": false,
+    "release": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_gates": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/runtime/current-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.json"
+  ],
+  "receipt_self_seal_sha256": "762bbfbba5fd76fb284ee36fb9854004c224512671acd4b144adaa24f41973c4"
+}
