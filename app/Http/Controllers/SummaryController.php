@@ -7,11 +7,14 @@ use App\Models\Client;
 use App\Models\Site;
 use App\Models\Summary;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class SummaryController extends Controller
 {
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function my(Request $request)
     {
         $user = $request->user();
@@ -28,7 +31,7 @@ class SummaryController extends Controller
 
         if ($viewer->id !== $user->id) {
             abort_unless($viewer->canDo('summaries.viewAny') || $viewer->canDo('timeline.viewAny') || $viewer->canDo('staff.viewAny'), 403);
-            abort_unless($this->sharesOrganization($viewer, $user), 403);
+            abort_unless($this->canAccessCurrentStaff($viewer, $user), 403);
         }
 
         $range = $this->parseRange($request);
@@ -109,11 +112,15 @@ class SummaryController extends Controller
             return;
         }
 
-        $target = $scopeType === 'staff'
-            ? User::query()->findOrFail($scopeId)
-            : Site::query()->findOrFail($scopeId);
+        if ($scopeType === 'staff') {
+            $target = User::query()->findOrFail($scopeId);
+            abort_unless($this->canAccessCurrentStaff($user, $target), 403);
 
-        abort_unless($this->sharesOrganization($user, $target), 403);
+            return;
+        }
+
+        $site = Site::query()->findOrFail($scopeId);
+        $this->siteAccess->assertCanAccessSiteId($user, (int) $site->id);
     }
 
     private function parseRange(Request $request): array
@@ -144,10 +151,15 @@ class SummaryController extends Controller
         ];
     }
 
-    private function sharesOrganization(User $viewer, User|Site $target): bool
+    private function canAccessCurrentStaff(User $viewer, User $target): bool
     {
-        return $viewer->organization_id === null
-            || $target->organization_id === null
-            || (int) $viewer->organization_id === (int) $target->organization_id;
+        $query = User::query()->whereKey($target->id);
+        $this->siteAccess->applyStaffScope(
+            $query,
+            $viewer,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
+
+        return $query->exists();
     }
 }

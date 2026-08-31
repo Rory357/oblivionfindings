@@ -8,6 +8,7 @@ use App\Models\Summary;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\Llm\LlmClient;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Bus\Queueable;
@@ -100,13 +101,12 @@ class GenerateSummaryJob implements ShouldQueue
             throw new AuthorizationException('Summary generation is not authorized.');
         }
 
+        $siteAccess = app(UserSiteAccessService::class);
         $authorized = match ($this->scopeType) {
             'client' => ($client = Client::query()->find($this->scopeId))
                 && Gate::forUser($requester)->allows('view', $client),
-            'staff' => ($staff = User::query()->find($this->scopeId))
-                && $this->sharesOrganization($requester->organization_id, $staff->organization_id),
-            'site' => ($site = Site::query()->find($this->scopeId))
-                && $this->sharesOrganization($requester->organization_id, $site->organization_id),
+            'staff' => $this->canAccessCurrentStaff($siteAccess, $requester),
+            'site' => $this->canAccessCurrentSite($siteAccess, $requester),
             default => false,
         };
 
@@ -115,11 +115,24 @@ class GenerateSummaryJob implements ShouldQueue
         }
     }
 
-    private function sharesOrganization(?int $viewerOrganizationId, ?int $targetOrganizationId): bool
+    private function canAccessCurrentStaff(UserSiteAccessService $siteAccess, User $requester): bool
     {
-        return $viewerOrganizationId === null
-            || $targetOrganizationId === null
-            || $viewerOrganizationId === $targetOrganizationId;
+        $query = User::query()->whereKey($this->scopeId);
+        $siteAccess->applyStaffScope(
+            $query,
+            $requester,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
+
+        return $query->exists();
+    }
+
+    private function canAccessCurrentSite(UserSiteAccessService $siteAccess, User $requester): bool
+    {
+        $query = Site::query()->whereKey($this->scopeId);
+        $siteAccess->applySiteScope($query, $requester);
+
+        return $query->exists();
     }
 
     private function deterministicSummary($events, Carbon $start, Carbon $end): string
