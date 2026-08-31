@@ -278,6 +278,10 @@ dashboard_run_185 = read_json_strict("evidence/browser/current-audit-dashboard-v
 run_186_remediation = read_json_strict("evidence/runtime/current-run-186-monitoring-metric-replay-dedupe-remediation-wave-36.json")
 run_186r_review = read_json_strict("evidence/runtime/current-run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36.json")
 run_187_reporting = read_json_strict("evidence/source/current-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.json")
+dashboard_run_188 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json")
+reviewed_fleet_trip_playback_overlay = read_json_strict("evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json")
+reviewed_fleet_trip_playback_overlay_review = read_json_strict("evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json")
+run_191_reporting = read_json_strict("evidence/source/current-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.json")
 findings_register = read_json_strict("findings.json")
 assert sha256_file("evidence/source/current-canonical-feature-identity-wave-01.json") == "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
 assert sha256_file("evidence/source/current-canonical-identity-agent-register.json") == "21ebd8b004b5ade11aa01281958cda2be2ca966d1fb7c46576e039fab5f47baf"
@@ -4499,7 +4503,81 @@ run_187_without_seal = dict(run_187_reporting)
 run_187_seal = run_187_without_seal.pop("receipt_self_seal_sha256")
 assert canonical_sha256(run_187_without_seal) == run_187_seal
 
-reviewed_fleet_daily_check_overlay = reviewed_fleet_trip_index_overlay
+assert sha256_file("generators/materialize-run-188-audit-dashboard-verification-wave-36.py") == "863328dbaeff2f039ba19f5f33d4109468a6b15ababfaeadcf4fd016f91e77a9"
+assert sha256_file("evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json") == "80e54a76673af5aa8fc00e0738c7e7ee219f17d6bb22d2646e37c1cbd2081a56"
+assert dashboard_run_188["run_id"] == "RUN-188-AUDIT-DASHBOARD-VERIFICATION-WAVE-36"
+assert dashboard_run_188["verification"]["viewports_verified"] == 4
+assert dashboard_run_188["verification"]["visible_static_checks_passed"] == 152
+assert dashboard_run_188["verification"]["navigation_clicks_passed"] == 10
+assert dashboard_run_188["verification"]["post_materialization_filesystem_resources"] == "471/471"
+assert dashboard_run_188["verification"]["anchor_elements"] == 888
+assert dashboard_run_188["pins"]["run_188_final_dashboard"]["sha256"] == "3d65bd82b8bc0f650158c4587f9618a03079f75d51e83496dc7d71addf257d79"
+run_188_without_seal = dict(dashboard_run_188)
+run_188_seal = run_188_without_seal.pop("receipt_self_seal_sha256")
+assert run_188_seal == "a3feac39603045a78926b38393c9109afdd13b53b6a6338c1d53ef84f7bdc243"
+assert canonical_sha256(run_188_without_seal) == run_188_seal
+
+assert sha256_file("generators/integrate-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.py") == "0115154b4472f96977f0d82c286943af7b687240cd23f997d2d5e0a590e18599"
+assert sha256_file("evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json") == "88494bb887c78f488df3915c86a8ad47b2176da469aedda3803151b8edd4a708"
+assert reviewed_fleet_trip_playback_overlay["run_id"] == "RUN-190-REVIEWED-OUTCOME-NEUTRAL-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-37"
+assert reviewed_fleet_trip_playback_overlay["reviewed_overlay"]["accepted_route_owner_records"] == 1
+assert reviewed_fleet_trip_playback_overlay["reviewed_overlay"]["accepted_page_owner_records"] == 0
+assert reviewed_fleet_trip_playback_overlay["reviewed_overlay"]["accepted_controller_action_bridges"] == 1
+assert reviewed_fleet_trip_playback_overlay["combined_counts"]["source_owner_records"] == 667
+assert reviewed_fleet_trip_playback_overlay["combined_counts"]["route_owner_records"] == 310
+assert reviewed_fleet_trip_playback_overlay["combined_counts"]["page_owner_records"] == 357
+assert reviewed_fleet_trip_playback_overlay["combined_counts"]["static_controller_action_bridges"] == 98
+assert reviewed_fleet_trip_playback_overlay["queue_accounting"]["reviewed_queue_surface_rows"] == 121
+assert reviewed_fleet_trip_playback_overlay["queue_accounting"]["pending_unreviewed_queue_surface_rows"] == 386
+assert reviewed_fleet_trip_playback_overlay["queue_accounting"]["reviewed_owner_route_rows"] == 99
+assert reviewed_fleet_trip_playback_overlay["queue_accounting"]["queue_surfaces_without_ownership"] == 408
+assert reviewed_fleet_trip_playback_overlay["queue_boundary"]["next_unresolved_index"] == 86
+assert reviewed_fleet_trip_playback_overlay["queue_boundary"]["next_unresolved_queue_id"] == "RUN090-ROUTE-0087"
+assert reviewed_fleet_trip_playback_overlay["queue_boundary"]["next_unresolved_route_record_id"] == "RUN077-ROUTE-0695"
+assert reviewed_fleet_trip_playback_overlay["queue_boundary"]["next_unresolved_route_name"] == "fleet-assets.trips.playback.data"
+assert reviewed_fleet_trip_playback_overlay["queue_boundary"]["next_unresolved_action_expression"] == "[FleetTripController::class, 'playback']"
+assert reviewed_fleet_trip_playback_overlay["queue_boundary"]["next_unresolved_queue_record_sha256"] == "ed12617b478e0a22014fb6c81402e5cf79aa574720e8ef8e2ce93f198a099893"
+assert reviewed_fleet_trip_playback_overlay["overlay_source_records"][0]["overlay_row_sha256"] == "31a2f128dacd47d73377db8422e2d89448909d9f4d98fe8089fa0522cb0ddfb2"
+assert reviewed_fleet_trip_playback_overlay["new_static_controller_action_bridges"][0]["bridge_row_sha256"] == "a8934922a42c1270c62276c2dc345066372a8ea73fa3ca0875cd3c75020fc5c9"
+assert {key for key, value in reviewed_fleet_trip_playback_overlay["credit_boundary"].items() if value} == {
+    "STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_1_RECORD",
+    "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_1_ACTION",
+}
+run_190_without_seal = dict(reviewed_fleet_trip_playback_overlay)
+run_190_seal = run_190_without_seal.pop("self_seal")
+assert run_190_seal["sha256"] == "16cbb874448ec053f976594cfe031ed1834601d66c8b1ffe7bb79a06336d4142"
+assert canonical_sha256(run_190_without_seal) == run_190_seal["sha256"]
+
+assert sha256_file("generators/materialize-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.py") == "ec87f7eb11ab139278e7247880ae8a4adb8546cc55ce8ed76d2c2ea79603f132"
+assert sha256_file("evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json") == "36376b3e40a2611cf814c2b034ecf0157f5fdae480d7e893a8aa6992286b3b3b"
+assert reviewed_fleet_trip_playback_overlay_review["run_id"] == "RUN-190R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-37"
+assert reviewed_fleet_trip_playback_overlay_review["decision"]["independent_reviews"] == 2
+assert reviewed_fleet_trip_playback_overlay_review["decision"]["discrepancies"] == 0
+assert reviewed_fleet_trip_playback_overlay_review["decision"]["reporting_materialization_authorized"] is True
+assert {key for key, value in reviewed_fleet_trip_playback_overlay_review["credit_boundary"].items() if value} == {
+    "INDEPENDENT_OVERLAY_REVIEW_FOR_REPORTING",
+}
+run_190r_without_seal = dict(reviewed_fleet_trip_playback_overlay_review)
+run_190r_seal = run_190r_without_seal.pop("self_seal")
+assert run_190r_seal["sha256"] == "1a9767955433c71d958c21557e3084ecb5b66a3b7e190324d4fd387f5267e503"
+assert canonical_sha256(run_190r_without_seal) == run_190r_seal["sha256"]
+
+assert run_191_reporting["run_id"] == "RUN-191-REVIEWED-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-REPORTING-WAVE-37"
+assert run_191_reporting["reporting_snapshot"]["combined_counts"]["source_owner_records"] == 667
+assert run_191_reporting["reporting_snapshot"]["queue_accounting"]["reviewed_queue_surface_rows"] == 121
+assert run_191_reporting["dashboard_forward_gate"]["required_run"] == "RUN-192"
+assert run_191_reporting["dashboard_forward_gate"]["dashboard_html_changed_by_run_191"] is False
+assert {key for key, value in run_191_reporting["credit_boundary"].items() if value} == {
+    "live_findings_register_and_reporting_status",
+}
+assert len(run_191_reporting["completion_gates"]) == 26
+assert not any(run_191_reporting["completion_gates"].values())
+assert all(value is False for value in run_191_reporting["completion_boundary"].values())
+run_191_without_seal = dict(run_191_reporting)
+run_191_seal = run_191_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_191_without_seal) == run_191_seal
+
+reviewed_fleet_daily_check_overlay = findings_register["current_static_source_feature_ownership"]
 
 required_artifacts = [
     "00-executive-summary.md", "01-repository-module-map.md",
@@ -5654,6 +5732,89 @@ run_187_template_rewrites = [
 for old, new in run_187_template_rewrites:
     assert old in current_template_text, f"Expected RUN-187 template rewrite target: {old}"
     current_template_text = current_template_text.replace(old, new)
+
+run_191_template_rewrites = [
+    ('<a href="#checkpoint">RUN-187</a>', '<a href="#checkpoint">RUN-191</a>'),
+    (
+        "RUN-185–187 Monitoring metric replay remediation reporting checkpoint",
+        "RUN-188–191 Fleet playback route/action ownership reporting checkpoint",
+    ),
+    (
+        "dashboard HTML frozen pending RUN-188</li>",
+        "dashboard HTML later verified by RUN-188</li><li>RUN-188: exact RUN-187 dashboard verified at 4/4 viewports · 152/152 visible checks · 10/10 navigation · 471/471 resources · 888 anchors · zero application credit</li><li>RUN-189/R: index 85 fleet-assets.trips.playback / FleetTripController::show independently reviewed OWNER twice · no ownership materialized by the packet or review</li><li>RUN-190: exactly one playback/show route owner and controller-action bridge integrated · zero sibling data-route, page, remediation, correctness, runtime, benchmark, finding, or completion credit</li><li>RUN-190R: two sealed post-commit GO reviews · reporting only · next index 86 fleet-assets.trips.playback.data / FleetTripController::playback</li><li>RUN-191: live static ledger reported at $static_owner_records owners / $static_action_bridges bridges and $queue_reviewed reviewed / $queue_pending pending · dashboard HTML frozen pending RUN-192</li>",
+    ),
+    (
+        "The current RUN-187 register retains 15 identities:",
+        "The current RUN-191 register retains 15 identities:",
+    ),
+    (
+        "current RUN-187 split of 15 retained claim identities",
+        "current RUN-191 split of 15 retained claim identities",
+    ),
+    (
+        "RUN-155–187 bounded disposition provenance, remediation, and reporting",
+        "RUN-155–191 bounded disposition provenance, remediation, and reporting",
+    ),
+    (
+        "index 85 ownership PENDING_FRESH_SEMANTIC_REVIEW · full-suite green unproved",
+        "selected playback/show route owner and bridge integrated separately by RUN-190 · sibling playback.data at index 86 pending · full-suite green unproved",
+    ),
+    (
+        "the playback CAP association remains candidate-only and index 85 ownership is PENDING_FRESH_SEMANTIC_REVIEW.",
+        "the playback finding CAP association remains candidate-only; RUN-190 separately integrates only the selected playback/show route owner and bridge, while index 86 playback.data remains pending.",
+    ),
+    (
+        "RUN-071–187 current reporting checkpoint",
+        "RUN-071–191 current reporting checkpoint",
+    ),
+    (
+        "RUN-071–187 completion-gate checkpoint",
+        "RUN-071–191 completion-gate checkpoint",
+    ),
+    (
+        "RUN-071–187 evidence lineage",
+        "RUN-071–191 evidence lineage",
+    ),
+    (
+        "Every current raw, generated, reviewed, and integrated RUN-077–187",
+        "Every current raw, generated, reviewed, and integrated RUN-077–191",
+    ),
+    (
+        "RUN-180/R current Fleet trip-index route/action ownership",
+        "RUN-190/R current Fleet playback/show route/action ownership",
+    ),
+    (
+        "RUN-090 frozen denominator / RUN-180R current accounting",
+        "RUN-090 frozen denominator / RUN-190R current accounting",
+    ),
+    (
+        "index 83 is not recredited, index 84 fleet-assets.trips.index is integrated, and index 85 fleet-assets.trips.playback is next",
+        "index 84 is not recredited, index 85 fleet-assets.trips.playback is integrated, and index 86 fleet-assets.trips.playback.data is next",
+    ),
+    (
+        "visible 666/309/357 ownership, 97 bridges, 120/387 queue accounting, 98 owned/409 without ownership",
+        "visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership",
+    ),
+    (
+        "Fresh RUN-188 audit-dashboard verification required",
+        "Fresh RUN-192 audit-dashboard verification required",
+    ),
+    (
+        "The exact RUN-187 reporting dashboard must be generated and checked in RUN-188",
+        "The exact RUN-191 reporting dashboard must be generated and checked in RUN-192",
+    ),
+    (
+        "RUN-187 is the current reporting generator execution and RUN-188 remains the fresh exact-dashboard gate.",
+        "RUN-188 verifies only the superseded RUN-187 dashboard; RUN-189/R establish the bounded playback/show decision without materializing ownership, RUN-190 integrates exactly one route owner and bridge, RUN-190R authorizes reporting only, RUN-191 is the current reporting transaction, and RUN-192 remains the fresh exact-dashboard gate.",
+    ),
+    (
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">RUN-188 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">RUN-188 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json">RUN-190 Fleet playback/show ownership-overlay receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json">RUN-190R independent overlay-review receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.json">RUN-191 reporting receipt</a> (verified and hashed in the current evidence list) · <a href="generators/materialize-run-192-audit-dashboard-verification-wave-37.py">RUN-192 audit-dashboard verification materializer</a> (forward reference; intentionally unhashed) · <a href="evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json">RUN-192 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+    ),
+]
+for old, new in run_191_template_rewrites:
+    assert old in current_template_text, f"Expected RUN-191 template rewrite target: {old}"
+    current_template_text = current_template_text.replace(old, new)
 TEMPLATE = Template(current_template_text)
 
 
@@ -5999,23 +6160,24 @@ dashboard = TEMPLATE.substitute(
 )
 
 current_visible_boundaries = [
-    '<a href="#checkpoint">RUN-187</a>',
+    '<a href="#checkpoint">RUN-191</a>',
     '<a href="#findings">Finding status</a>',
-    "666 owners · 309 routes + 357 pages · 97 bridges",
-    "120 reviewed / 387 pending",
-    "98 owned / 409 without ownership",
-    "16.950878%",
-    "3,263 records remain",
-    "RUN-185–187 Monitoring metric replay remediation reporting checkpoint",
+    "667 owners · 310 routes + 357 pages · 98 bridges",
+    "121 reviewed / 386 pending",
+    "99 owned / 408 without ownership",
+    "16.976330%",
+    "3,262 records remain",
+    "RUN-188–191 Fleet playback route/action ownership reporting checkpoint",
     "fleet-assets.vehicles.alerts-config",
     "RUN090-ROUTE-0084 / RUN077-ROUTE-0692",
     "VehicleController::alertsConfig",
     "CAP-FLEET-VEHICLE-REGISTER",
-    "index 83 is not recredited",
-    "index 84 fleet-assets.trips.index is integrated",
-    "next index 85 RUN090-ROUTE-0086 / RUN077-ROUTE-0694",
+    "index 84 is not recredited",
+    "index 85 fleet-assets.trips.playback is integrated",
+    "next index 86 RUN090-ROUTE-0087 / RUN077-ROUTE-0695",
     "fleet-assets.trips.index",
     "fleet-assets.trips.playback",
+    "fleet-assets.trips.playback.data",
     "three provisional-not-final observations",
     "RUN-168: exact RUN-167 dashboard verified at 4/4 viewports",
     "RUN-169/R: queue index 83 Fleet alerts-config candidate independently reviewed OWNER",
@@ -6051,17 +6213,29 @@ current_visible_boundaries = [
     "null feature and candidate IDs",
     "zero static ownership",
     "RUN-187: Monitoring metric replay historical-remediated record added",
+    "RUN-188: exact RUN-187 dashboard verified at 4/4 viewports",
+    "152/152 visible checks",
+    "471/471 resources",
+    "888 anchors",
+    "RUN-189/R: index 85 fleet-assets.trips.playback / FleetTripController::show independently reviewed OWNER twice",
+    "RUN-190: exactly one playback/show route owner and controller-action bridge integrated",
+    "RUN-190R: two sealed post-commit GO reviews",
+    "RUN-191: live static ledger reported",
     "15 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 5 historical remediated",
     "155 / 2,403",
     "155/2,403 unique bounded disposition total",
-    "RUN-071–187 current reporting checkpoint",
-    "RUN-071–187 completion-gate checkpoint",
-    "RUN-071–187 evidence lineage",
-    "Every current raw, generated, reviewed, and integrated RUN-077–187",
+    "RUN-071–191 current reporting checkpoint",
+    "RUN-071–191 completion-gate checkpoint",
+    "RUN-071–191 evidence lineage",
+    "Every current raw, generated, reviewed, and integrated RUN-077–191",
     "RUN-186 corrected Monitoring metric-replay execution",
     "final post-corrective-merge Monitoring 56/472",
     "initial Monitoring 49/392",
-    "RUN-188 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)",
+    "RUN-188 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list)",
+    "RUN-190 Fleet playback/show ownership-overlay receipt",
+    "RUN-190R independent overlay-review receipt",
+    "RUN-191 reporting receipt",
+    "RUN-192 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)",
     "MON-METRIC-REPLAY-DEDUPE-01",
     "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
     "MON-METRIC-REPLAY-DEDUPE-01 is also remediated on local main only and unpublished",
@@ -6101,7 +6275,8 @@ current_visible_boundaries = [
     "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
     "candidate feature association only",
     "index 84 static route owner and action bridge integrated separately by RUN-180/R–181",
-    "index 85 ownership PENDING_FRESH_SEMANTIC_REVIEW",
+    "selected playback/show route owner and bridge integrated separately by RUN-190",
+    "sibling playback.data at index 86 pending",
     "root red 2 failed / 19 assertions",
     "expanded red 5 failed / 55 assertions",
     "post-merge Fleet trip-index tests / 175 assertions",
@@ -6132,7 +6307,7 @@ current_visible_boundaries = [
     "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated",
     "two broader INR failures reproduce at base",
     "full-suite green false",
-    "Fresh RUN-188 audit-dashboard verification required",
+    "Fresh RUN-192 audit-dashboard verification required",
     "cf0090ec9724",
     "0b1920dade92",
     "7b2b5688c90e",
@@ -6144,13 +6319,13 @@ current_visible_boundaries = [
     "RUN-153/R establish the historical 664 bounded source-owner records (307 routes + 357 pages)",
     "at that historical checkpoint 116 queue rows were reviewed, 391 remained pending, and 413 remained without ownership",
     "662 historical cumulative owner records",
-    "RUN-180/R current Fleet trip-index route/action ownership",
-    "RUN-090 frozen denominator / RUN-180R current accounting",
-    "index 83 is not recredited, index 84 fleet-assets.trips.index is integrated, and index 85 fleet-assets.trips.playback is next",
+    "RUN-190/R current Fleet playback/show route/action ownership",
+    "RUN-090 frozen denominator / RUN-190R current accounting",
+    "index 84 is not recredited, index 85 fleet-assets.trips.playback is integrated, and index 86 fleet-assets.trips.playback.data is next",
     "RUN-168 verifies that exact dashboard",
     "RUN-182 verifies only the superseded RUN-181 HTML",
     "exact dashboard later verified by RUN-185",
-    "visible 666/309/357 ownership, 97 bridges, 120/387 queue accounting, 98 owned/409 without ownership",
+    "visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership",
 ]
 assert all(boundary in dashboard for boundary in current_visible_boundaries)
 assert "0 current application tests" not in dashboard

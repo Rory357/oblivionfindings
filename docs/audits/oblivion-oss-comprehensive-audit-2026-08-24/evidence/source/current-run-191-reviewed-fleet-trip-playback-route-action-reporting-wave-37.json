@@ -1,0 +1,450 @@
+{
+  "schema_version": "run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37-v1",
+  "run_id": "RUN-191-REVIEWED-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-REPORTING-WAVE-37",
+  "status": "FLEET_TRIP_PLAYBACK_REVIEWED_OWNERSHIP_REPORTING_MATERIALIZED_DASHBOARD_RUN192_REQUIRED_ZERO_NEW_OWNERSHIP_CORRECTNESS_RUNTIME_PUBLICATION_FINDING_OR_COMPLETION_CREDIT",
+  "materialized_on": "2026-08-31",
+  "architecture_rule": "One operating organisation across multiple Sites. Exact permissions, approved Sites, canonical ownership, direct-object concealment and privacy are the boundaries; no tenant design.",
+  "pins": {
+    "checkpoint_commit": "b35d267efd067ac8fab8c4ac8111dad993c65444",
+    "checkpoint_tree": "a3a756d977cae205e8f504eb5e918e0252d3cc58",
+    "checkpoint_parent": "8b4e5acbbc75db6ea2b966b0cd8d82beff2b4213",
+    "checkpoint_subject": "audit: seal RUN190R playback ownership review",
+    "branch": "main",
+    "origin_main_observed_without_refetch": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "origin_main_behind": 0,
+    "origin_main_ahead": 52,
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "continuation_request_sha256": "1fe63113afd626f671e3af401e66106b24efb91727a8bfc0573673060f8bd32d",
+    "continuation_request_is_not_governing_prompt": true,
+    "generator": {
+      "path": "generators/materialize-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.py",
+      "sha256": "f5a9bc02efa6927d83c38bd0c0f14dd4c65e143a2c85116888235aa5ef912c58",
+      "git_blob_id": "aec37f7a0e59122c66968ca1cff6191e969a00f5",
+      "bytes": 38963,
+      "lines": 842
+    },
+    "lineage_file_sha256s": {
+      "generators/materialize-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.py": "342e5cddf6e8e4150a20e43e7efbfa56abc8754af97055e1a66eb59582dcde65",
+      "evidence/source/current-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.json": "e84d36fee04b9d39cea9da1d247d92394abf12df4452ffc5d672b9d5cd375412",
+      "generators/materialize-run-188-audit-dashboard-verification-wave-36.py": "863328dbaeff2f039ba19f5f33d4109468a6b15ababfaeadcf4fd016f91e77a9",
+      "evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json": "80e54a76673af5aa8fc00e0738c7e7ee219f17d6bb22d2646e37c1cbd2081a56",
+      "generators/integrate-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.py": "0115154b4472f96977f0d82c286943af7b687240cd23f997d2d5e0a590e18599",
+      "evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json": "88494bb887c78f488df3915c86a8ad47b2176da469aedda3803151b8edd4a708",
+      "generators/materialize-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.py": "ec87f7eb11ab139278e7247880ae8a4adb8546cc55ce8ed76d2c2ea79603f132",
+      "evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json": "36376b3e40a2611cf814c2b034ecf0157f5fdae480d7e893a8aa6992286b3b3b"
+    },
+    "lineage_self_seals": {
+      "evidence/source/current-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.json": "ed9fe03582bc147a5524bb2810051e0721cfaa65257893d3f18066b7afa39c97",
+      "evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json": "a3feac39603045a78926b38393c9109afdd13b53b6a6338c1d53ef84f7bdc243",
+      "evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json": "16cbb874448ec053f976594cfe031ed1834601d66c8b1ffe7bb79a06336d4142",
+      "evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json": "1a9767955433c71d958c21557e3084ecb5b66a3b7e190324d4fd387f5267e503"
+    },
+    "baseline_findings_ordered_record_sha256": "c323094ec2ec143ed1a037f6b3c96f4e796cf2dd7bf9bf407d6a049e2c98ec33",
+    "baseline_findings_record_count": 15,
+    "matrix_sha256": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+    "matrix_git_blob_id": "1f5fdab3ae80ae4ec1b9bc4ee47eef695bdd5416",
+    "frozen_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "3d65bd82b8bc0f650158c4587f9618a03079f75d51e83496dc7d71addf257d79",
+      "git_blob_id": "4c6dc53cc4070e626ff0489f4c80e4177709d4ae",
+      "bytes": 314007,
+      "lines": 78
+    }
+  },
+  "reporting_transition": {
+    "reported_integrated_run": "RUN-190-REVIEWED-OUTCOME-NEUTRAL-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-37",
+    "reported_independent_review_run": "RUN-190R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-TRIP-PLAYBACK-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-37",
+    "selected_queue_index": 85,
+    "selected_route_name": "fleet-assets.trips.playback",
+    "selected_controller_action": "FleetTripController::show",
+    "reported_existing_route_owner_records": 1,
+    "reported_existing_controller_action_bridges": 1,
+    "run_191_new_ownership_records": 0,
+    "next_unresolved_index": 86,
+    "next_unresolved_route_name": "fleet-assets.trips.playback.data",
+    "next_unresolved_controller_action": "FleetTripController::playback"
+  },
+  "reporting_snapshot": {
+    "combined_counts": {
+      "source_owner_records": 667,
+      "route_owner_records": 310,
+      "page_owner_records": 357,
+      "static_controller_action_bridges": 98,
+      "bounded_source_denominator": 3929,
+      "bounded_source_residual": 3262,
+      "bounded_source_ownership_percent": "16.976330",
+      "route_universe": 3218,
+      "route_residual": 2891,
+      "page_universe": 711,
+      "page_residual": 345,
+      "feature_union": 256,
+      "route_feature_ids": 64,
+      "page_feature_ids": 242,
+      "route_page_feature_overlap": 50
+    },
+    "queue_accounting": {
+      "direct_exact_queue_records": 507,
+      "reviewed_queue_surface_rows": 121,
+      "pending_unreviewed_queue_surface_rows": 386,
+      "owner_queue_surface_rows": 99,
+      "queue_surfaces_without_ownership": 408
+    },
+    "finding_and_execution_accounting": {
+      "finding_records": 15,
+      "provisional_findings": 8,
+      "historical_already_fixed": 2,
+      "historical_remediated": 5,
+      "bounded_execution_tests": 155,
+      "bounded_execution_assertions": 2403,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "benchmark_accounting": {
+      "benchmark_mapped": 2,
+      "benchmark_targets": 340,
+      "final_no_match_or_NCM": 0,
+      "benchmark_unresolved": 338
+    }
+  },
+  "review_authorization": {
+    "independent_review_count": 2,
+    "reporting_materialization_authorized": true,
+    "review_record_sha256s": [
+      "fffe65c879b5e59cdc81d97c9ffd51bb967a4fa958eebbc2b71f1b10efb848c9",
+      "2557d71096bc9737d40dda88e52e780e9671abae4342b9c96e9ac30e3f377990"
+    ],
+    "synthesis_record_sha256": "f0b19d23eb3e2fc5ddc0aea6d441f558f17731e0b47b4dd0db8cf0bb047851a9",
+    "decision_record_sha256": "dc6490c07f8228036689d9c3210487426d7d0cd3a7e75540a6c377eace39621b",
+    "new_ownership_credit_authorized": false,
+    "downstream_credit_authorized": false
+  },
+  "identity": {
+    "combined_source_record_key_list_sha256": "2e5f82279c71860a6fc2576859fb4351a6e3fbd3010f7c9f2fe598b48facf5a6",
+    "combined_bridge_key_list_sha256": "354fd9239de4233eff3e1b20b7df5c2c519e11c8a90b88490cab9513e9f1b42c",
+    "reviewed_key_list_sha256": "2329f613c5310950191a5206fd764a78afc9e6f5bf0d502d0a65751a580f1393",
+    "reviewed_key_list_canonical_json_sha256": "5d45c0c6b47770e42d68f6d1ee44c82774346b5d8909648c85ce74b793c02c8e",
+    "new_overlay_source_records_sha256": "20be0f18f623a94231f2a88b2eb62d3e9f4bd785bf33d0822434267997936b38",
+    "new_bridge_collection_sha256": "5608dd3ed0b33de029adcff9b7e05031b281c8afe956c94feff83d1d1726e605",
+    "overlay_row_sha256": "31a2f128dacd47d73377db8422e2d89448909d9f4d98fe8089fa0522cb0ddfb2",
+    "bridge_row_sha256": "a8934922a42c1270c62276c2dc345066372a8ea73fa3ca0875cd3c75020fc5c9",
+    "next_unresolved_queue_record_sha256": "ed12617b478e0a22014fb6c81402e5cf79aa574720e8ef8e2ce93f198a099893"
+  },
+  "outcome_conservation": {
+    "source_equation": "3929 = 667 owners + 3262 residual",
+    "owner_equation": "667 = 310 routes + 357 pages",
+    "route_equation": "3218 = 310 owners + 12 shared + 5 alias + 0 dead + 2891 residual",
+    "page_equation": "711 = 357 owners + 9 shared + 0 alias + 0 dead + 345 residual",
+    "feature_equation": "256 = 64 route + 242 page - 50 overlap",
+    "queue_equation": "507 = 121 reviewed + 386 pending",
+    "reviewed_equation": "121 = 99 owner + 10 shared + 5 alias + 0 dead + 7 evidence gap",
+    "without_ownership_equation": "408 = 386 pending + 10 shared + 5 alias + 0 dead + 7 evidence gap",
+    "finding_equation": "15 = 8 provisional + 2 historical already fixed + 5 historical remediated",
+    "all_equations_reconciled": true
+  },
+  "noninheritance_boundary": {
+    "sibling_playback_data_route_ownership": false,
+    "page_or_frontend_ownership": false,
+    "caller_redirect_service_model_helper_or_test_ownership": false,
+    "remediation_or_correctness": false,
+    "approved_site_permission_privacy_or_direct_object": false,
+    "runtime_database_build_or_browser": false,
+    "benchmark_finding_completion_or_publication": false
+  },
+  "dashboard_forward_gate": {
+    "required_run": "RUN-192",
+    "run_188_historical_dashboard_verified": true,
+    "run_188_dashboard_sha256": "3d65bd82b8bc0f650158c4587f9618a03079f75d51e83496dc7d71addf257d79",
+    "run_191_dashboard_bytes_preserved": true,
+    "dashboard_html_changed_by_run_191": false,
+    "run_191_builder_executed": false,
+    "run_192_generator_path": "generators/materialize-run-192-audit-dashboard-verification-wave-37.py",
+    "run_192_receipt_path": "evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json",
+    "run_192_paths_intentionally_unhashed_until_materialized": true,
+    "run_192_fresh_generation_and_four_viewport_verification_required": true
+  },
+  "reporting_transaction": {
+    "baseline_reporting_surfaces": [
+      {
+        "path": "00-executive-summary.md",
+        "sha256": "e01925e0739d94dd8c276160b1f9587a8790b551d056372371e000e93788bf22",
+        "git_blob_id": "07600c307272e0d745b20a1c47de59ddb594bcbc",
+        "bytes": 150668,
+        "lines": 598
+      },
+      {
+        "path": "01-repository-module-map.md",
+        "sha256": "aade98ec13ff442f188d1121c7d58d1928424961e26ceadae50d003adc11d53f",
+        "git_blob_id": "0bf84f2ca66333a9cb5c128b4bfa310a5f452b38",
+        "bytes": 48814,
+        "lines": 262
+      },
+      {
+        "path": "07-module-findings.md",
+        "sha256": "2faa57cc3223844f81adfee9bc6eb6f1fefa550a1c5d95138f9839f5672cb77c",
+        "git_blob_id": "73648afa9bad514958a8da5cf28497e3c49bf66b",
+        "bytes": 362136,
+        "lines": 835
+      },
+      {
+        "path": "11-prioritised-roadmap.md",
+        "sha256": "623e2fd37ebc521abb66f62e01549130b87b5fc3a2002a59355967cf8b20542f",
+        "git_blob_id": "1314db6588564da31f3ba7667f75aec75ca44d7a",
+        "bytes": 17304,
+        "lines": 76
+      },
+      {
+        "path": "12-native-build-and-do-not-copy-register.md",
+        "sha256": "24bb7a08bb6e87aaf015018b601f4699784745bbab32138e7e56fcdda074132b",
+        "git_blob_id": "0f6eb9cbedd6cb0c406ce782e3960907494c3abf",
+        "bytes": 118616,
+        "lines": 509
+      },
+      {
+        "path": "13-unresolved-questions-and-evidence-gaps.md",
+        "sha256": "125182436c75293abc67e4ca59f94bcb4b78961fd87d0496da518000691cfe2d",
+        "git_blob_id": "ee1df149c2b8da55f4357920afae0fed31e553f7",
+        "bytes": 42765,
+        "lines": 111
+      },
+      {
+        "path": "findings.json",
+        "sha256": "9c4aae028a358f0d1cb005fa31650ab7c696fb71731fb6961ccc4962f2cac5c9",
+        "git_blob_id": "22c2766988b684c8a3c3f6cd8b817ce37741f4b2",
+        "bytes": 630225,
+        "lines": 11115
+      },
+      {
+        "path": "generators/build-current-audit-dashboard.py",
+        "sha256": "fd0c4c13d4299934f2347f434b47f349cbc16c45ac39802724b4a11a0eee50c0",
+        "git_blob_id": "61797d438347a97ec8c6c559aa4e17a8f2100133",
+        "bytes": 717366,
+        "lines": 6242
+      }
+    ],
+    "materialized_reporting_surfaces": [
+      {
+        "path": "00-executive-summary.md",
+        "sha256": "4e9533a2e927b738e92a4a108850c3f13b8c7d8b192f36bd980ce08ddcb9610e",
+        "git_blob_id": "d71a83f628bc7179a246cf9032033620eec3a0af",
+        "bytes": 153614,
+        "lines": 608
+      },
+      {
+        "path": "01-repository-module-map.md",
+        "sha256": "d5c0f04984a42bb8b55afde6ed25d6da685214bb0f03a404ccf1d6349d6c3ca2",
+        "git_blob_id": "65b2e74b4536b54b5ee4d660ea6a00de637d9284",
+        "bytes": 49235,
+        "lines": 262
+      },
+      {
+        "path": "07-module-findings.md",
+        "sha256": "84132b2b7fbc519ae33b704e6c9ddb0bb9f01a356e01f71fdea083e4e2d41bba",
+        "git_blob_id": "fb9875b9d1cfa85bbe69508214995a685cd1df1f",
+        "bytes": 363022,
+        "lines": 835
+      },
+      {
+        "path": "11-prioritised-roadmap.md",
+        "sha256": "33c3eee2e06196b487b88e8f44023b440d57e48e676cb4b4c073a6ebcc3ac822",
+        "git_blob_id": "9a8ea8dc2b6bca754d3d54f8b4cef1b55886ee2c",
+        "bytes": 17611,
+        "lines": 76
+      },
+      {
+        "path": "12-native-build-and-do-not-copy-register.md",
+        "sha256": "3bddd5657c4d5f83ad37ef92b50ee6aef633758fb093f5b83a85a60206825616",
+        "git_blob_id": "bc1a3c20cad4f273b6b237840509a53bc3150fec",
+        "bytes": 118850,
+        "lines": 509
+      },
+      {
+        "path": "13-unresolved-questions-and-evidence-gaps.md",
+        "sha256": "da58fdcdd7a792c1e5873b95ebffc0ab3a22104e7bd0ff12d1463316fa1ca86a",
+        "git_blob_id": "b090ee721e774ee67e0f8d8776544fe0ea0c6d72",
+        "bytes": 44396,
+        "lines": 115
+      },
+      {
+        "path": "findings.json",
+        "sha256": "91ccad95997c802f56c68a3cfc2678ae2364e7bad47c3f11ecaa55f4fc3e4843",
+        "git_blob_id": "4b407f1137b121f6d5c0ad123bbd7a8fdb4223ce",
+        "bytes": 643616,
+        "lines": 11357
+      },
+      {
+        "path": "generators/build-current-audit-dashboard.py",
+        "sha256": "3fa7cb8be9a12d6e7c53999cb05a04187083ee1e44bf3646690607b10d4dd4aa",
+        "git_blob_id": "e52609fcc80802413dd1926fe9b315a5875688b6",
+        "bytes": 732053,
+        "lines": 6417
+      }
+    ],
+    "preserved_surfaces": [
+      {
+        "path": "02-eight-pass-coverage-ledger.csv",
+        "sha256": "ee4dc3126113884b4b8661dc3a3d13ac6a61b9661b2cace58fe82dcbe1d2a4a6",
+        "git_blob_id": "15fa304f839cacd35005848f3841dd740d2cf4cc",
+        "bytes": 29396,
+        "lines": 39
+      },
+      {
+        "path": "03-feature-to-benchmark-matrix.csv",
+        "sha256": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+        "git_blob_id": "1f5fdab3ae80ae4ec1b9bc4ee47eef695bdd5416",
+        "bytes": 557989,
+        "lines": 341
+      },
+      {
+        "path": "04-workflow-usability-scorecard.csv",
+        "sha256": "ea6879340229541c198b5ac654bde6d26d38eaefdd29ff66e1026263f9546faa",
+        "git_blob_id": "b3afe88d2e9e62bbc2dcd3f1a5bf4af2fb82c4fa",
+        "bytes": 855259,
+        "lines": 301
+      },
+      {
+        "path": "05-browser-visual-coverage-matrix.csv",
+        "sha256": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84",
+        "git_blob_id": "0bafaae0142327cfa6a6cdeda90b9163562fc654",
+        "bytes": 8973775,
+        "lines": 2813
+      },
+      {
+        "path": "06-open-source-benchmark-register.csv",
+        "sha256": "5a3898855f1ffffb1a493496a57f6532bdc464552e4577c9e7c97f83c9793884",
+        "git_blob_id": "f96ef7ac1f6e19f614bdce8d663cfd08ec795995",
+        "bytes": 350420,
+        "lines": 99
+      },
+      {
+        "path": "08-cross-module-journeys.md",
+        "sha256": "ef4471ba75ac9080e4565989e4b038bf7d0ad306cad1984019882457517c853c",
+        "git_blob_id": "d48c9022d124186fe301a757e3ec8f9d86371031",
+        "bytes": 53981,
+        "lines": 309
+      },
+      {
+        "path": "09-ui-ux-accessibility-visual-consistency.md",
+        "sha256": "27fa04e15cbd0eedb92514835884d0344db09f279a2295cea94ae0d1071a6e7c",
+        "git_blob_id": "b919b27b7c64abd6faf9bdaa97783f6e64ac107d",
+        "bytes": 9449,
+        "lines": 123
+      },
+      {
+        "path": "10-architecture-data-integration-security.md",
+        "sha256": "ca5667b1c042024f32f320254baf063dd4bcd2c4b12972cf2aac29c02d782b22",
+        "git_blob_id": "8e78b5d3cb2467db37a8186ff07ab2c1608ee05d",
+        "bytes": 18532,
+        "lines": 191
+      },
+      {
+        "path": "audit-dashboard.html",
+        "sha256": "3d65bd82b8bc0f650158c4587f9618a03079f75d51e83496dc7d71addf257d79",
+        "git_blob_id": "4c6dc53cc4070e626ff0489f4c80e4177709d4ae",
+        "bytes": 314007,
+        "lines": 78
+      },
+      {
+        "path": "inventory.json",
+        "sha256": "46cd688dd9543b186a608e950754abe9e30389a792156719f8a999130dfca5fa",
+        "git_blob_id": "4f7cca5ec277edeac52c553818e35545219711c5",
+        "bytes": 2580297,
+        "lines": 96004
+      }
+    ],
+    "dashboard_builder_source_validated_not_executed": true,
+    "dashboard_byte_identical_to_head": true,
+    "exact_dirty_paths_before_receipt": [
+      "00-executive-summary.md",
+      "01-repository-module-map.md",
+      "07-module-findings.md",
+      "11-prioritised-roadmap.md",
+      "12-native-build-and-do-not-copy-register.md",
+      "13-unresolved-questions-and-evidence-gaps.md",
+      "findings.json",
+      "generators/build-current-audit-dashboard.py",
+      "generators/materialize-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.py"
+    ],
+    "exact_dirty_paths_after_receipt": [
+      "00-executive-summary.md",
+      "01-repository-module-map.md",
+      "07-module-findings.md",
+      "11-prioritised-roadmap.md",
+      "12-native-build-and-do-not-copy-register.md",
+      "13-unresolved-questions-and-evidence-gaps.md",
+      "evidence/source/current-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.json",
+      "findings.json",
+      "generators/build-current-audit-dashboard.py",
+      "generators/materialize-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.py"
+    ]
+  },
+  "credit_boundary": {
+    "live_findings_register_and_reporting_status": true,
+    "queue_advance": false,
+    "new_source_ownership": false,
+    "new_route_ownership": false,
+    "new_page_ownership": false,
+    "new_controller_action_bridge": false,
+    "dashboard_artifact": false,
+    "correctness": false,
+    "approved_site_or_privacy": false,
+    "application_runtime": false,
+    "database": false,
+    "build_execution": false,
+    "application_browser": false,
+    "executed_product_tests": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "final_finding": false,
+    "release": false,
+    "publication": false,
+    "pass": false,
+    "feature_or_module_completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "completion_gates": {
+    "1": false,
+    "2": false,
+    "3": false,
+    "4": false,
+    "5": false,
+    "6": false,
+    "7": false,
+    "8": false,
+    "9": false,
+    "10": false,
+    "11": false,
+    "12": false,
+    "13": false,
+    "14": false,
+    "15": false,
+    "16": false,
+    "17": false,
+    "18": false,
+    "19": false,
+    "20": false,
+    "21": false,
+    "22": false,
+    "23": false,
+    "24": false,
+    "25": false,
+    "26": false
+  },
+  "completion_boundary": {
+    "residual_semantic_complete": false,
+    "execution_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "run_192_dashboard_complete": false,
+    "feature_or_module_complete": false,
+    "gate_4_complete": false,
+    "publication_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": false,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "evidence/source/current-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.json"
+  ],
+  "receipt_self_seal_sha256": "0ebeb1a84398f2a5e5622e7cdcf91b1250c2b60c6b57138ece7c72c1dc791e27"
+}
