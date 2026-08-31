@@ -11,8 +11,8 @@ use Carbon\CarbonInterface;
 
 /**
  * When a shift requires the 'driver' coverage role, validates that the
- * staff member's driving licence has not expired and will not expire
- * before the shift starts, and that their driver eligibility has not been
+ * staff member's driving licence has not expired and will remain valid
+ * throughout the planned shift, and that their driver eligibility has not been
  * suspended.
  *
  * Complements CoverageRoleService (which checks status + can_drive_clients)
@@ -74,12 +74,24 @@ class DriverLicenceExpiryRule implements EligibilityRuleInterface
                 'severity' => 'block',
                 'overrideable' => false,
                 'message' => 'Driver eligibility is suspended'
-                    . ($eligibility->suspension_reason ? " ({$eligibility->suspension_reason})" : '')
-                    . '.',
+                    .($eligibility->suspension_reason ? " ({$eligibility->suspension_reason})" : '')
+                    .'.',
             ];
         }
 
-        // Licence expiry not recorded.
+        $dutyWindow = $this->plannedDutyWindow($shift);
+        if ($dutyWindow === null) {
+            return [
+                'rule' => 'driver_licence',
+                'passed' => false,
+                'severity' => 'block',
+                'overrideable' => false,
+                'message' => 'The planned shift duty window is invalid, so driver licence coverage cannot be verified.',
+            ];
+        }
+
+        // Licence expiry not recorded. This remains an overrideable warning
+        // only after the planned driver-duty window itself has been validated.
         if (! $eligibility->licence_expires_at) {
             return [
                 'rule' => 'driver_licence',
@@ -93,13 +105,9 @@ class DriverLicenceExpiryRule implements EligibilityRuleInterface
         $licenceExpiry = $eligibility->licence_expires_at instanceof CarbonInterface
             ? $eligibility->licence_expires_at
             : Carbon::parse($eligibility->licence_expires_at);
+        $licenceExpiresOn = $licenceExpiry->toDateString();
 
-        $shiftStart = $shift->starts_at instanceof CarbonInterface
-            ? $shift->starts_at
-            : Carbon::parse($shift->starts_at);
-
-        // Expired before shift starts.
-        if ($licenceExpiry->lt($shiftStart)) {
+        if ($licenceExpiresOn < $dutyWindow['starts_on']) {
             return [
                 'rule' => 'driver_licence',
                 'passed' => false,
@@ -109,11 +117,21 @@ class DriverLicenceExpiryRule implements EligibilityRuleInterface
             ];
         }
 
+        if ($licenceExpiresOn < $dutyWindow['last_duty_on']) {
+            return [
+                'rule' => 'driver_licence',
+                'passed' => false,
+                'severity' => 'block',
+                'overrideable' => false,
+                'message' => "Driving licence does not remain valid for this entire shift (expires {$licenceExpiry->format('j M Y')}).",
+            ];
+        }
+
         // Expiring within warning window. Compute whole days from the shift to
-        // the (not-yet-passed) expiry off the day boundaries so the sign is
-        // unambiguous — `$expiry->diffInDays($shiftStart, false)` is negative
-        // for any future expiry and would warn on every valid licence.
-        $daysUntilExpiry = $shiftStart->copy()->startOfDay()->diffInDays($licenceExpiry->copy()->startOfDay());
+        // the (not-yet-passed) expiry using the worker-local calendar. Shift
+        // datetimes are UTC-backed while the licence is a date-only credential.
+        $daysUntilExpiry = Carbon::parse($dutyWindow['starts_on'], $dutyWindow['timezone'])
+            ->diffInDays(Carbon::parse($licenceExpiresOn, $dutyWindow['timezone']));
 
         if ($daysUntilExpiry <= self::EXPIRY_WARNING_DAYS) {
             return [
@@ -121,11 +139,53 @@ class DriverLicenceExpiryRule implements EligibilityRuleInterface
                 'passed' => false,
                 'severity' => 'warning',
                 'overrideable' => true,
-                'message' => "Driving licence expires on {$licenceExpiry->format('j M Y')} (within " . self::EXPIRY_WARNING_DAYS . " days).",
+                'message' => "Driving licence expires on {$licenceExpiry->format('j M Y')} (within ".self::EXPIRY_WARNING_DAYS.' days).',
             ];
         }
 
         return self::pass();
+    }
+
+    /**
+     * Shifts are half-open intervals: the instant at ends_at is no longer duty.
+     * Resolve the final included instant in the configured worker calendar so a
+     * shift ending exactly at midnight remains covered by the preceding date.
+     *
+     * @return array{starts_on: string, last_duty_on: string, timezone: string}|null
+     */
+    protected function plannedDutyWindow(Shift $shift): ?array
+    {
+        $startsAt = $this->resolveInstant($shift->starts_at);
+        $endsAt = $this->resolveInstant($shift->ends_at);
+
+        if (! $startsAt || ! $endsAt || $endsAt->lessThanOrEqualTo($startsAt)) {
+            return null;
+        }
+
+        $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+
+        return [
+            'starts_on' => $startsAt->copy()->setTimezone($timezone)->toDateString(),
+            'last_duty_on' => $endsAt->copy()->subMicrosecond()->setTimezone($timezone)->toDateString(),
+            'timezone' => $timezone,
+        ];
+    }
+
+    protected function resolveInstant(mixed $value): ?CarbonInterface
+    {
+        if ($value instanceof CarbonInterface) {
+            return $value;
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
