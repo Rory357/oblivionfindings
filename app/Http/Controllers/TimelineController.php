@@ -7,6 +7,7 @@ use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\Clients\ClientProfileSectionAccess;
 use App\Services\Medication\MedicationTimelineVisibilityService;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -15,6 +16,7 @@ class TimelineController extends Controller
     public function __construct(
         protected ClientProfileSectionAccess $sectionAccess,
         private readonly MedicationTimelineVisibilityService $medicationTimeline,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     public function my(Request $request)
@@ -33,7 +35,7 @@ class TimelineController extends Controller
 
         if ($viewer->id !== $user->id) {
             abort_unless($viewer->canDo('timeline.viewAny') || $viewer->canDo('staff.viewAny'), 403);
-            abort_unless($this->sharesOrganization($viewer, $user), 403);
+            abort_unless($this->canAccessCurrentStaff($viewer, $user), 403);
         }
 
         $range = $this->parseRange($request);
@@ -189,10 +191,15 @@ class TimelineController extends Controller
         ];
     }
 
-    private function sharesOrganization(User $viewer, User $target): bool
+    private function canAccessCurrentStaff(User $viewer, User $target): bool
     {
-        return $viewer->organization_id === null
-            || $target->organization_id === null
-            || (int) $viewer->organization_id === (int) $target->organization_id;
+        $query = User::query()->whereKey($target->id);
+        $this->siteAccess->applyStaffScope(
+            $query,
+            $viewer,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
+
+        return $query->exists();
     }
 }

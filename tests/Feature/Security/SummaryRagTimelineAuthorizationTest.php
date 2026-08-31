@@ -1,9 +1,11 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Jobs\GenerateSummaryJob;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Summary;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -74,6 +76,18 @@ function summaryRagTimelinePortalUser(Client $client): User
     $client->portalUsers()->attach($user->id, ['relation' => 'next_of_kin']);
 
     return $user;
+}
+
+function summaryRagTimelineAssignSite(User $user, Site $site, array $secondarySiteIds = []): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => $secondarySiteIds,
+        'is_active' => true,
+        'start_date' => now()->subDay()->toDateString(),
+        'end_date' => null,
+    ]);
 }
 
 it('denies linked portal identities from the generic client summary reader', function () {
@@ -176,35 +190,149 @@ it('rejects a queued generic summary job attributed to a portal identity', funct
     expect(Summary::query()->count())->toBe(0);
 });
 
-it('denies a staff summary reader targeting a user in another organization', function () {
+it('denies a staff summary reader targeting current staff outside approved Sites', function () {
+    $viewerSite = Site::factory()->create(['is_active' => true]);
+    $remoteSite = Site::factory()->create(['is_active' => true]);
     $viewer = summaryRagTimelineUser(1, ['summaries.viewAny']);
-    $foreignStaff = User::factory()->create(['organization_id' => 2]);
+    $remoteStaff = summaryRagTimelineUser(1, []);
+    summaryRagTimelineAssignSite($viewer, $viewerSite);
+    summaryRagTimelineAssignSite($remoteStaff, $remoteSite);
 
     $this->actingAs($viewer)
-        ->get(route('summaries.staff', $foreignStaff, false))
+        ->get(route('summaries.staff', $remoteStaff, false))
         ->assertForbidden();
 });
 
-it('denies a staff timeline reader targeting a user in another organization', function () {
+it('denies a staff timeline reader targeting current staff outside approved Sites', function () {
+    $viewerSite = Site::factory()->create(['is_active' => true]);
+    $remoteSite = Site::factory()->create(['is_active' => true]);
     $viewer = summaryRagTimelineUser(1, ['timeline.viewAny']);
-    $foreignStaff = User::factory()->create(['organization_id' => 2]);
+    $remoteStaff = summaryRagTimelineUser(1, []);
+    summaryRagTimelineAssignSite($viewer, $viewerSite);
+    summaryRagTimelineAssignSite($remoteStaff, $remoteSite);
 
     $this->actingAs($viewer)
-        ->get(route('timeline.staff', $foreignStaff, false))
+        ->get(route('timeline.staff', $remoteStaff, false))
         ->assertForbidden();
 });
 
-it('preserves staff summary and timeline reads for a target in the same organization', function () {
+it('preserves staff summary and timeline reads for current staff at an approved Site', function () {
+    $site = Site::factory()->create(['is_active' => true]);
     $viewer = summaryRagTimelineUser(1, [
         'summaries.viewAny',
         'timeline.viewAny',
     ]);
-    $localStaff = User::factory()->create(['organization_id' => 1]);
+    $localStaff = summaryRagTimelineUser(1, []);
+    summaryRagTimelineAssignSite($viewer, $site);
+    summaryRagTimelineAssignSite($localStaff, $site);
 
     $this->actingAs($viewer)
         ->get(route('summaries.staff', $localStaff, false))
         ->assertOk();
     $this->get(route('timeline.staff', $localStaff, false))->assertOk();
+});
+
+it('rejects staff and Site summary generation outside current approved Sites before dispatch', function () {
+    Bus::fake([GenerateSummaryJob::class]);
+
+    $viewerSite = Site::factory()->create(['is_active' => true]);
+    $remoteSite = Site::factory()->create(['is_active' => true]);
+    $viewer = summaryRagTimelineUser(1, ['summaries.generate']);
+    $remoteStaff = summaryRagTimelineUser(1, []);
+    summaryRagTimelineAssignSite($viewer, $viewerSite);
+    summaryRagTimelineAssignSite($remoteStaff, $remoteSite);
+
+    foreach ([
+        ['scope_type' => 'staff', 'scope_id' => $remoteStaff->id],
+        ['scope_type' => 'site', 'scope_id' => $remoteSite->id],
+    ] as $scope) {
+        $this->actingAs($viewer)
+            ->post(route('summaries.generate', [], false), [
+                ...$scope,
+                'from' => '2026-07-01',
+                'to' => '2026-07-07',
+            ])
+            ->assertForbidden();
+    }
+
+    Bus::assertNotDispatched(GenerateSummaryJob::class);
+});
+
+it('revalidates current Site access before a queued staff summary reads or writes', function () {
+    $site = Site::factory()->create(['is_active' => true]);
+    $viewer = summaryRagTimelineUser(1, ['summaries.generate']);
+    $localStaff = summaryRagTimelineUser(1, []);
+    summaryRagTimelineAssignSite($viewer, $site);
+    summaryRagTimelineAssignSite($localStaff, $site);
+
+    $job = new GenerateSummaryJob(
+        'staff',
+        $localStaff->id,
+        '2026-07-01T00:00:00+12:00',
+        '2026-07-07T23:59:59+12:00',
+        $viewer->id,
+    );
+
+    $viewer->hrEmployeeProfile()->update(['is_active' => false]);
+
+    expect(fn () => $job->handle())
+        ->toThrow(AuthorizationException::class);
+    expect(Summary::query()->count())->toBe(0);
+});
+
+it('revalidates the exact approved Site before a queued Site summary reads or writes', function () {
+    $site = Site::factory()->create(['is_active' => true]);
+    $otherSite = Site::factory()->create(['is_active' => true]);
+    $viewer = summaryRagTimelineUser(1, ['summaries.generate']);
+    summaryRagTimelineAssignSite($viewer, $site);
+
+    $job = new GenerateSummaryJob(
+        'site',
+        $site->id,
+        '2026-07-01T00:00:00+12:00',
+        '2026-07-07T23:59:59+12:00',
+        $viewer->id,
+    );
+
+    $viewer->hrEmployeeProfile()->update(['primary_site_id' => $otherSite->id]);
+
+    expect(fn () => $job->handle())
+        ->toThrow(AuthorizationException::class);
+    expect(Summary::query()->count())->toBe(0);
+});
+
+it('preserves same-Site queued staff generation and the explicit HR all-Sites reader bypass', function () {
+    $viewerSite = Site::factory()->create(['is_active' => true]);
+    $remoteSite = Site::factory()->create(['is_active' => true]);
+    $viewer = summaryRagTimelineUser(1, [
+        'summaries.generate',
+        'summaries.viewAny',
+        'timeline.viewAny',
+        'hr.employees.viewAllSites',
+    ]);
+    $sameSiteStaff = summaryRagTimelineUser(1, []);
+    $remoteStaff = summaryRagTimelineUser(1, []);
+    summaryRagTimelineAssignSite($viewer, $viewerSite);
+    summaryRagTimelineAssignSite($sameSiteStaff, $viewerSite);
+    summaryRagTimelineAssignSite($remoteStaff, $remoteSite);
+
+    (new GenerateSummaryJob(
+        'staff',
+        $sameSiteStaff->id,
+        '2026-07-01T00:00:00+12:00',
+        '2026-07-07T23:59:59+12:00',
+        $viewer->id,
+    ))->handle();
+
+    expect(Summary::query()
+        ->where('scope_type', 'staff')
+        ->where('scope_id', $sameSiteStaff->id)
+        ->exists())->toBeTrue();
+
+    $this->actingAs($viewer)
+        ->get(route('summaries.staff', $remoteStaff, false))
+        ->assertOk();
+    $this->get(route('timeline.staff', $remoteStaff, false))->assertOk();
 });
 
 it('requires an exact RAG capability before listing queryable clients', function () {
