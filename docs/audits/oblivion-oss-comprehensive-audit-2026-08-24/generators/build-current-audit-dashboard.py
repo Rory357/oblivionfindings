@@ -25,10 +25,6 @@ CURRENT_RUN_156R_COMMIT = "81abe37faa126f98ce47c7ca90cf569fe9c43c0d"
 RUN_167_REPORTING_COMMIT = "66fa21bfa3a59205fec9a8a756dc211a8510e419"
 RUN_168_VERIFIED_DASHBOARD_COMMIT = "e488bd3edcda0f154f87e8bbed972f14db409b82"
 RUN_184_REPORTING_COMMIT = "15b2c988f4bb7f737727cc777ab32ad771c4be06"
-SUPERSEDED_PRE_REVIEW_RUN_185_DASHBOARD_SHA256 = {
-    "07168e6b686eb0c976b18391e53979db2c605c7f9901bfdb73f4bf792c3b791c",
-    "b1c93c817244512e21e6e322cbec6617b87aed08fe52c268c292ef0bc53a812b",
-}
 CURRENT_RUN_146_MUTATED_PATHS = {
     "00-executive-summary.md",
     "03-feature-to-benchmark-matrix.csv",
@@ -4141,6 +4137,11 @@ run_182_dashboard_payload = git_file_at_commit(
     "audit-dashboard.html",
 )
 assert hashlib.sha256(run_182_dashboard_payload).hexdigest() == "8779848cc1a95ef82f2c5eba1a542e5a4784559f75ef20e9eb06696abde56457"
+run_185_dashboard_payload = git_file_at_commit(
+    "badd86d566f3354e455b92f12ab683ce6d29c965",
+    "audit-dashboard.html",
+)
+assert hashlib.sha256(run_185_dashboard_payload).hexdigest() == "3c339da7e05349a7bd5cbed9ec4986e3b4871eb04d497d26078e92268a67e5e7"
 
 assert sha256_file("generators/build-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.py") == "61c895a305f743f102765c9f86d38843c3ce61bcc1a8684a672aa2d7cd6ee157"
 assert sha256_file("evidence/source/root-run-179-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.json") == "5505cf17bb68d3e534116ea9d33e501e0222714b6e3779d0ec6b70f819cc3b0a"
@@ -6225,12 +6226,8 @@ for stale_attribution in (
 output_path = AUDIT_DIR / "audit-dashboard.html"
 output_bytes = (dashboard.rstrip() + "\n").encode("utf-8")
 existing_output_bytes = output_path.read_bytes()
-assert (
-    existing_output_bytes in (run_182_dashboard_payload, output_bytes)
-    or hashlib.sha256(existing_output_bytes).hexdigest()
-    in SUPERSEDED_PRE_REVIEW_RUN_185_DASHBOARD_SHA256
-)
-temporary_path = output_path.with_name(f".{output_path.name}.tmp-run185-dashboard")
+assert existing_output_bytes in (run_185_dashboard_payload, output_bytes)
+temporary_path = output_path.with_name(f".{output_path.name}.tmp-run188-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"
 try:
     with temporary_path.open("xb") as handle:
