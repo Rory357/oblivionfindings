@@ -3,12 +3,14 @@
 namespace App\Jobs;
 
 use App\Models\SiteChecklistRun;
+use App\Models\User;
 use App\Notifications\ChecklistDueNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Gate;
 
 class ChecklistDueJob implements ShouldQueue
 {
@@ -28,12 +30,12 @@ class ChecklistDueJob implements ShouldQueue
         $runs = SiteChecklistRun::query()
             ->where('status', 'scheduled')
             ->whereDate('scheduled_date', $tomorrow)
-            ->with(['site:id,name', 'assignment.assignedTo:id,name', 'template:id,name'])
+            ->with(['site:id,name,type', 'assignment.assignedTo:id,name', 'template:id,name'])
             ->get();
 
         foreach ($runs as $run) {
-            $user = $run->assignment?->assignedTo;
-            
+            $user = $this->eligibleRecipient($run);
+
             if ($user) {
                 $user->notify(new ChecklistDueNotification($run, 'reminder'));
             }
@@ -43,7 +45,7 @@ class ChecklistDueJob implements ShouldQueue
         $overdueRuns = SiteChecklistRun::query()
             ->whereIn('status', ['scheduled', 'in_progress'])
             ->whereDate('scheduled_date', '<', $today)
-            ->with(['site:id,name', 'assignment.assignedTo:id,name', 'template:id,name'])
+            ->with(['site:id,name,type', 'assignment.assignedTo:id,name', 'template:id,name'])
             ->get();
 
         foreach ($overdueRuns as $run) {
@@ -52,11 +54,25 @@ class ChecklistDueJob implements ShouldQueue
                 $run->update(['status' => 'overdue']);
             }
 
-            $user = $run->assignment?->assignedTo;
-            
+            $user = $this->eligibleRecipient($run);
+
             if ($user) {
                 $user->notify(new ChecklistDueNotification($run, 'overdue'));
             }
         }
+    }
+
+    private function eligibleRecipient(SiteChecklistRun $run): ?User
+    {
+        $recipientId = $run->effectiveAssigneeUserId();
+        if ($recipientId === null) {
+            return null;
+        }
+
+        $recipient = User::query()->find($recipientId);
+
+        return $recipient && Gate::forUser($recipient)->allows('execute', $run)
+            ? $recipient
+            : null;
     }
 }
