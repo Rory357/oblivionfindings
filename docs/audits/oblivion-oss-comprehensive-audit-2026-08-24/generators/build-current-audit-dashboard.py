@@ -282,6 +282,10 @@ dashboard_run_188 = read_json_strict("evidence/browser/current-audit-dashboard-v
 reviewed_fleet_trip_playback_overlay = read_json_strict("evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json")
 reviewed_fleet_trip_playback_overlay_review = read_json_strict("evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json")
 run_191_reporting = read_json_strict("evidence/source/current-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.json")
+dashboard_run_192 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json")
+run_193_remediation = read_json_strict("evidence/runtime/current-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.json")
+run_193r_review = read_json_strict("evidence/runtime/current-run-193r-independent-fleet-fuel-index-site-privacy-remediation-review-wave-38.json")
+run_194_reporting = read_json_strict("evidence/source/current-run-194-fleet-fuel-index-site-privacy-remediation-reporting-wave-38.json")
 findings_register = read_json_strict("findings.json")
 assert sha256_file("evidence/source/current-canonical-feature-identity-wave-01.json") == "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
 assert sha256_file("evidence/source/current-canonical-identity-agent-register.json") == "21ebd8b004b5ade11aa01281958cda2be2ca966d1fb7c46576e039fab5f47baf"
@@ -3361,7 +3365,7 @@ historical_discovery_claims = {row["finding_id"]: row["source_claim"] for row in
 assert len(historical_discovery_claims) == 12
 
 assert findings_register["schema_version"] == "oblivion_audit_findings_v2_mixed_current_status"
-assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_FIVE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
+assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_SIX_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
 assert findings_register["generated_on"] == "2026-08-31"
 assert findings_register["architecture_rule"] == "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries."
 findings_pins = findings_register["pins"]
@@ -3405,6 +3409,24 @@ assert findings_pins["fleet_trip_playback_site_privacy_stable_patch_id"] == "12c
 assert findings_pins["fleet_trip_playback_site_privacy_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
 assert findings_pins["run_183_fleet_trip_playback_site_privacy_remediation_sha256"] == "7bb1b1013cf67344c48e5a8b6e551bf3c769695e0384c2b333fb47286e53310a"
 assert findings_pins["run_183r_independent_artifact_review_sha256"] == "170245898590f6429a171bbd8a41455f096b5b43340b840294735fdbc5522640"
+assert findings_pins["fleet_fuel_index_site_privacy_baseline_commit"] == "df65322f8eb7d7d0f1623c4bcb8cc8c87573b71d"
+assert findings_pins["fleet_fuel_index_site_privacy_baseline_tree"] == "0bd43711942416069675075ce3d515b92b9eaf7d"
+assert findings_pins["fleet_fuel_index_site_privacy_fix_commit"] == "2ec4b70e379c6f8cf38c1cb67f5d676fea52cf75"
+assert findings_pins["fleet_fuel_index_site_privacy_fix_tree"] == "b6e17efbf1b92b4a12bc01c55e8f245b2e206922"
+assert findings_pins["fleet_fuel_index_site_privacy_advanced_main_commit"] == "9019b44cb1017931fd0491a90f96ac32a6c4420c"
+assert findings_pins["fleet_fuel_index_site_privacy_advanced_main_tree"] == "81a4a14e31c88c9731f24a6addee85377ac54256"
+assert findings_pins["fleet_fuel_index_site_privacy_local_main_merge_commit"] == "04c32c36fdda6ce60ce281c06ad68aaa78527422"
+assert findings_pins["fleet_fuel_index_site_privacy_local_main_tree"] == "6f85ddc1f4e8551c99528cc0c872b37da6c7763a"
+assert findings_pins["fleet_fuel_index_site_privacy_stable_patch_id"] == "636771c0b1d9cbe50b2204febaa41679d340aba9"
+assert findings_pins["fleet_fuel_index_site_privacy_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
+assert findings_pins["run_192_dashboard_verification_materializer_sha256"] == "899eb63bf6416801187334c12af8c781029c457e0f7e2cbbaf75604991fbe14f"
+assert findings_pins["run_192_dashboard_verification_sha256"] == "cc95b38ece501bea317e78ef7769a7813e3a5a6c2041330e249fd196974cbb88"
+assert findings_pins["run_192_dashboard_verification_self_seal_sha256"] == "a112198be2915cfc8a88b31b38a9cb33c90ad407b6da83f85fac5deae6727995"
+assert findings_pins["run_192_verified_dashboard_sha256"] == "8d19569e7bfb256edeecdc754e2bc47e2ddad3ecd8de099e3bb0dad9b50e313b"
+assert findings_pins["run_193_fleet_fuel_index_site_privacy_remediation_generator_sha256"] == "105632bc2c4e50de3e8cfdd55fb25810fbbe5307537bd90b0e153b25f7c4e319"
+assert findings_pins["run_193_fleet_fuel_index_site_privacy_remediation_sha256"] == "1396205a5f63d4571b0e5b738f00f3a7cadc8ab93499a012e0e0f827b70b495f"
+assert findings_pins["run_193r_independent_artifact_review_materializer_sha256"] == "953d8d68aa2a869fe5c82f495de60b351c49b53f846955167f7f1434964541ac"
+assert findings_pins["run_193r_independent_artifact_review_sha256"] == "87a1157f26bbfaf062ec22bceb616bf4f54c72f908cddfd68c2b59db91cbbb41"
 assert findings_pins["monitoring_metric_replay_application_baseline_commit"] == "a900f078c9c05f587f6f7884f5fe715076891416"
 assert findings_pins["monitoring_metric_replay_initial_fix_commit"] == "f521bc0b87222e56b4822e7cb9c935486e279e76"
 assert findings_pins["monitoring_metric_replay_initial_merge_commit"] == "778c00a5d09511aee1a836a689d7bb1b56ce4ff6"
@@ -3417,10 +3439,11 @@ assert findings_pins["run_185_dashboard_verification_sha256"] == "e6965bba3f25b8
 assert findings_pins["run_186_monitoring_metric_replay_dedupe_remediation_sha256"] == "bf2cd03ca2ab7aeb6a9d1093b3c08aba5a1bc29342cc4fda6fa57ef286c2f1e5"
 assert findings_pins["run_186r_independent_artifact_review_sha256"] == "035271d7bfcd4256a59f01e9953f9cd8074466c0389f74ce82325a46ee6a6af7"
 live_findings = findings_register["records"]
-assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 15
+assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 16
 assert {row["id"] for row in live_findings} == set(historical_discovery_claims) | {
     "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
     "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
+    "FLEET-FUEL-INDEX-SITE-PRIVACY-01",
     "MON-METRIC-REPLAY-DEDUPE-01",
 }
 provisional_findings = [
@@ -3437,7 +3460,7 @@ historical_remediated_findings = [
 ]
 assert len(provisional_findings) == findings_register["counts"]["provisional_source_claims"] == 8
 assert len(historical_fixed_findings) == findings_register["counts"]["historical_already_fixed"] == 2
-assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 5
+assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 6
 historical_fixed_by_id = {row["id"]: row for row in historical_fixed_findings}
 assert set(historical_fixed_by_id) == {"MED-RBAC-01", "MED-CD-ATOMICITY-01"}
 assert historical_fixed_by_id["MED-RBAC-01"]["current_adjudication"]["verdict"] == "ALREADY_FIXED"
@@ -3479,6 +3502,7 @@ assert set(historical_remediated_by_id) == {
     "SAFE-ALERT-DEDUP-IDENTITY-01",
     "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
     "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
+    "FLEET-FUEL-INDEX-SITE-PRIVACY-01",
     "MON-METRIC-REPLAY-DEDUPE-01",
 }
 scope_finding = historical_remediated_by_id["MED-CD-SCOPE-01"]
@@ -3526,6 +3550,22 @@ assert fleet_playback_finding["current_adjudication"]["published_to_origin_main"
 assert fleet_playback_finding["route_url"]["ownership_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
 assert fleet_playback_finding["evidence"]["tests_executed"] == 11
 assert fleet_playback_finding["evidence"]["assertions"] == 167
+fleet_fuel_finding = historical_remediated_by_id["FLEET-FUEL-INDEX-SITE-PRIVACY-01"]
+assert fleet_fuel_finding["feature_id"] == fleet_fuel_finding["candidate_feature_id"] == "CAP-FLEET-VEHICLE-REGISTER"
+assert fleet_fuel_finding["feature_identity_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
+assert fleet_fuel_finding["feature_id_role"] == "CANDIDATE_REPORTING_ASSOCIATION_ONLY_ZERO_STATIC_OWNERSHIP_CREDIT"
+assert fleet_fuel_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED"
+assert fleet_fuel_finding["current_adjudication"]["application_commit"] == "04c32c36fdda6ce60ce281c06ad68aaa78527422"
+assert fleet_fuel_finding["current_adjudication"]["repository_tree"] == "6f85ddc1f4e8551c99528cc0c872b37da6c7763a"
+assert fleet_fuel_finding["current_adjudication"]["published_to_origin_main"] is False
+assert fleet_fuel_finding["route_url"]["ownership_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
+assert fleet_fuel_finding["route_url"]["queue_id"] == "RUN090-ROUTE-0088"
+assert fleet_fuel_finding["route_url"]["route_record_id"] == "RUN077-ROUTE-0696"
+assert fleet_fuel_finding["evidence"]["tests_executed"] == 6
+assert fleet_fuel_finding["evidence"]["assertions"] == 206
+assert fleet_fuel_finding["evidence"]["supporting_tests"] == 20
+assert fleet_fuel_finding["evidence"]["supporting_assertions"] == 215
+assert fleet_fuel_finding["current_adjudication"]["independent_visible_row_logger_site_redaction_inherited"] is False
 metric_finding = historical_remediated_by_id["MON-METRIC-REPLAY-DEDUPE-01"]
 assert metric_finding["feature_id"] is None
 assert metric_finding["candidate_feature_id"] is None
@@ -3553,8 +3593,8 @@ assert metric_finding["option_a_deployment_boundary"]["migration_deployment_cred
 assert metric_finding["option_a_deployment_boundary"]["release_or_publication_credit"] is False
 assert all(row["completion_credit"] is False for row in live_findings)
 assert all(all(value is False for value in row["credit"].values()) for row in live_findings)
-assert findings_register["counts"]["bounded_disposition_tests_passed"] == 155
-assert findings_register["counts"]["bounded_disposition_assertions"] == 2403
+assert findings_register["counts"]["bounded_disposition_tests_passed"] == 161
+assert findings_register["counts"]["bounded_disposition_assertions"] == 2609
 assert "5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution" in findings_register["counts"]["bounded_disposition_sum_basis"]
@@ -3592,11 +3632,20 @@ assert findings_register["counts"]["monitoring_metric_replay_initial_superseded_
 assert findings_register["counts"]["monitoring_metric_replay_initial_superseded_assertions"] == 392
 assert findings_register["counts"]["monitoring_metric_replay_initial_post_merge_verdict"] == "NO_GO_ZERO_DENOMINATOR_CREDIT"
 assert findings_register["counts"]["monitoring_metric_replay_option_a_deployment_verified"] is False
+assert findings_register["counts"]["fleet_fuel_index_site_privacy_focused_tests"] == 6
+assert findings_register["counts"]["fleet_fuel_index_site_privacy_focused_assertions"] == 206
+assert findings_register["counts"]["fleet_fuel_index_site_privacy_supporting_tests"] == 20
+assert findings_register["counts"]["fleet_fuel_index_site_privacy_supporting_assertions"] == 215
+assert findings_register["counts"]["fleet_fuel_index_site_privacy_baseline_failed"] == 6
+assert findings_register["counts"]["fleet_fuel_index_site_privacy_baseline_passed"] == 0
+assert findings_register["counts"]["fleet_fuel_index_site_privacy_baseline_assertions"] == 65
+assert "unique 6/206 post-merge focused component" in findings_register["counts"]["bounded_disposition_sum_basis"]
+assert "any second count from combined 26/421" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert findings_register["counts"]["final_P0"] == findings_register["counts"]["final_P1"] == 0
-assert findings_register["reconciliation"]["retained_record_count"] == 15
+assert findings_register["reconciliation"]["retained_record_count"] == 16
 assert findings_register["reconciliation"]["current_provisional_count"] == 8
 assert findings_register["reconciliation"]["historical_already_fixed_count"] == 2
-assert findings_register["reconciliation"]["historical_remediated_count"] == 5
+assert findings_register["reconciliation"]["historical_remediated_count"] == 6
 assert findings_register["reconciliation"]["every_non_null_primary_feature_id_in_canonical_matrix"] is True
 assert findings_register["reconciliation"]["records_without_primary_or_candidate_feature_id"] == ["MON-METRIC-REPLAY-DEDUPE-01"]
 
@@ -4151,6 +4200,11 @@ run_188_dashboard_payload = git_file_at_commit(
     "audit-dashboard.html",
 )
 assert hashlib.sha256(run_188_dashboard_payload).hexdigest() == "3d65bd82b8bc0f650158c4587f9618a03079f75d51e83496dc7d71addf257d79"
+run_192_dashboard_payload = git_file_at_commit(
+    "c35fcbe0445b39ea51ade9e5861172f188ff822d",
+    "audit-dashboard.html",
+)
+assert hashlib.sha256(run_192_dashboard_payload).hexdigest() == "8d19569e7bfb256edeecdc754e2bc47e2ddad3ecd8de099e3bb0dad9b50e313b"
 
 assert sha256_file("generators/build-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.py") == "61c895a305f743f102765c9f86d38843c3ce61bcc1a8684a672aa2d7cd6ee157"
 assert sha256_file("evidence/source/root-run-179-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.json") == "5505cf17bb68d3e534116ea9d33e501e0222714b6e3779d0ec6b70f819cc3b0a"
@@ -4582,6 +4636,167 @@ run_191_without_seal = dict(run_191_reporting)
 run_191_seal = run_191_without_seal.pop("receipt_self_seal_sha256")
 assert canonical_sha256(run_191_without_seal) == run_191_seal
 
+assert sha256_file("evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json") == "cc95b38ece501bea317e78ef7769a7813e3a5a6c2041330e249fd196974cbb88"
+assert dashboard_run_192["run_id"] == "RUN-192-AUDIT-DASHBOARD-VERIFICATION-WAVE-37"
+assert dashboard_run_192["status"] == "VERIFIED_EXACT_ARTIFACT_ONLY"
+assert dashboard_run_192["pins"]["final_run_192_dashboard"]["sha256"] == "8d19569e7bfb256edeecdc754e2bc47e2ddad3ecd8de099e3bb0dad9b50e313b"
+assert dashboard_run_192["pins"]["final_run_192_builder"]["sha256"] == "e2b5c461cd9f22e0dba35d3555788534a3d244ea40a3c3424d1b80b003a6c242"
+assert dashboard_run_192["browser_verification"]["viewports_verified"] == 4
+assert dashboard_run_192["browser_verification"]["expected_viewports"] == 4
+assert all(
+    viewport["visible_text_passed"] == viewport["visible_text_total"] == 30
+    for viewport in dashboard_run_192["browser_verification"]["viewports"].values()
+)
+assert dashboard_run_192["browser_verification"]["navigation_passed"] == 10
+assert dashboard_run_192["browser_verification"]["navigation_total"] == 10
+assert dashboard_run_192["browser_verification"]["browser_finalization_complete"] is True
+assert dashboard_run_192["browser_verification"]["live_application_browser"] is False
+assert dashboard_run_192["html_and_resource_graph"]["unique_local_resources"] == 476
+assert dashboard_run_192["html_and_resource_graph"]["existing_unique_local_resources"] == 476
+assert dashboard_run_192["html_and_resource_graph"]["anchor_element_count"] == 893
+assert dashboard_run_192["html_and_resource_graph"]["duplicate_id_count"] == 0
+assert dashboard_run_192["html_and_resource_graph"]["hash_mismatches"] == []
+assert dashboard_run_192["final_http_head_verification"] == {
+    "expected_unique_local_resources": 476,
+    "verified_count": 476,
+    "failure_count": 0,
+    "complete": True,
+}
+assert dashboard_run_192["browser_verification"]["browser_warning_or_error_count"] == 0
+assert dashboard_run_192["schema_version"] == "oblivion-audit-dashboard-verification-v1"
+cleanup_192 = dashboard_run_192["root_browser_resource_cleanup"]
+assert cleanup_192["listeners_after_cleanup"] == 0
+assert cleanup_192["exact_pid_present_after_cleanup"] is False
+assert cleanup_192["matching_loopback_server_processes_after_cleanup"] == 0
+assert cleanup_192["cleanup_finalized"] is True
+assert dashboard_run_192["artifact_completion_test_met"] is True
+assert dashboard_run_192["audit_completion_test_met"] is False
+canonical_completion_gate_names = {row["name"] for row in dashboard_run_192["completion_gates"]}
+assert canonical_completion_gate_names == set(dashboard_run_192["completion_boundary"])
+assert len(dashboard_run_192["completion_gates"]) == 26
+assert [row["gate"] for row in dashboard_run_192["completion_gates"]] == list(range(1, 27))
+assert not any(row["complete"] for row in dashboard_run_192["completion_gates"])
+assert all(value is False for value in dashboard_run_192["completion_boundary"].values())
+assert {key for key, value in dashboard_run_192["credit_boundary"].items() if value} == {
+    "exact_audit_dashboard_artifact",
+}
+run_192_without_seal = dict(dashboard_run_192)
+run_192_seal = run_192_without_seal.pop("receipt_self_seal_sha256")
+assert run_192_seal == "a112198be2915cfc8a88b31b38a9cb33c90ad407b6da83f85fac5deae6727995"
+assert canonical_sha256(run_192_without_seal) == run_192_seal
+
+assert sha256_file("evidence/runtime/current-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.json") == "1396205a5f63d4571b0e5b738f00f3a7cadc8ab93499a012e0e0f827b70b495f"
+assert run_193_remediation["run_id"] == "RUN-193-FLEET-FUEL-INDEX-SITE-PRIVACY-01-REMEDIATION-WAVE-38"
+assert run_193_remediation["schema_version"] == "run-193-fleet-fuel-index-site-privacy-remediation-wave-38-v1"
+assert run_193_remediation["status"] == "CURRENT_FLEET_FUEL_INDEX_SITE_PRIVACY_DEFECT_REPRODUCED_REMEDIATED_LOCALLY_INTEGRATED_BOUNDED_VERIFIED_NOT_PUBLISHED_REPORTING_NOT_YET_AUTHORIZED_ZERO_STATIC_OWNERSHIP_FINAL_FINDING_OR_COMPLETION_CREDIT"
+assert run_193_remediation["pins"]["application_baseline_commit"] == "df65322f8eb7d7d0f1623c4bcb8cc8c87573b71d"
+assert run_193_remediation["pins"]["fix_commit"] == "2ec4b70e379c6f8cf38c1cb67f5d676fea52cf75"
+assert run_193_remediation["pins"]["local_main_merge_commit"] == "04c32c36fdda6ce60ce281c06ad68aaa78527422"
+assert run_193_remediation["pins"]["stable_patch_id"] == "636771c0b1d9cbe50b2204febaa41679d340aba9"
+assert run_193_remediation["delegated_runtime_execution"]["baseline_original_red"] == {
+    "cases": 6,
+    "failed": 6,
+    "passed": 0,
+    "assertions_reported": 65,
+    "duration_seconds": 152.37,
+    "exit_code": 1,
+    "credit": "REPRODUCTION_ONLY_ZERO_PASSING_DENOMINATOR_CREDIT",
+}
+assert run_193_remediation["delegated_runtime_execution"]["post_merge_authoritative_three_file_context"]["focused_component"]["tests"] == 6
+assert run_193_remediation["delegated_runtime_execution"]["post_merge_authoritative_three_file_context"]["focused_component"]["assertions"] == 206
+assert run_193_remediation["delegated_runtime_execution"]["isolated_supporting_vehicle_controller_regressions"]["tests"] == 20
+assert run_193_remediation["delegated_runtime_execution"]["isolated_supporting_vehicle_controller_regressions"]["assertions"] == 215
+assert run_193_remediation["static_ownership_boundary"]["next_zero_based_index"] == 86
+assert run_193_remediation["static_ownership_boundary"]["finding_candidate_zero_based_index"] == 87
+assert run_193_remediation["static_ownership_boundary"]["ownership_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
+assert set(run_193_remediation["completion_gates"]) == canonical_completion_gate_names
+assert set(run_193_remediation["completion_boundary"]) == canonical_completion_gate_names
+assert len(run_193_remediation["completion_gates"]) == 26
+assert not any(run_193_remediation["completion_gates"].values())
+assert all(value is False for value in run_193_remediation["completion_boundary"].values())
+assert {key for key, value in run_193_remediation["credit_boundary"].items() if value} == {
+    "historical_condition_confirmed",
+    "current_defect_reproduced",
+    "application_remediation",
+    "bounded_runtime",
+    "bounded_selected_get_and_csv_execution",
+    "bounded_site_privacy_correctness",
+    "application_commit_integrated_local_main",
+}
+assert run_193_remediation["artifact_completion_test_met"] is True
+assert run_193_remediation["audit_completion_test_met"] is False
+run_193_without_seal = dict(run_193_remediation)
+run_193_seal = run_193_without_seal.pop("receipt_self_seal_sha256")
+assert run_193_seal == "762bbfbba5fd76fb284ee36fb9854004c224512671acd4b144adaa24f41973c4"
+assert canonical_sha256(run_193_without_seal) == run_193_seal
+
+assert sha256_file("evidence/runtime/current-run-193r-independent-fleet-fuel-index-site-privacy-remediation-review-wave-38.json") == "87a1157f26bbfaf062ec22bceb616bf4f54c72f908cddfd68c2b59db91cbbb41"
+assert run_193r_review["run_id"] == "RUN-193R-INDEPENDENT-FLEET-FUEL-INDEX-SITE-PRIVACY-01-REMEDIATION-REVIEW-WAVE-38"
+assert run_193r_review["schema_version"] == "run-193r-independent-fleet-fuel-index-site-privacy-remediation-review-wave-38-v1"
+assert run_193r_review["status"] == "GO_EXACT_RUN193_ARTIFACT_REVIEW_NEW_HISTORICAL_REMEDIATED_REPORTING_AUTHORIZED_ZERO_STATIC_OWNERSHIP_PUBLICATION_FINAL_FINDING_OR_COMPLETION_CREDIT"
+assert run_193r_review["review"]["independent_exact_artifact_reviewers"] == 3
+assert run_193r_review["review"]["all_reviewers_read_only"] is True
+assert all(run_193r_review["review"]["checks"].values())
+assert run_193r_review["review"]["discrepancies"] == []
+assert run_193r_review["decision"]["verdict"] == "GO"
+assert run_193r_review["decision"]["blocking_discrepancies"] == 0
+assert run_193r_review["decision"]["new_historical_remediated_record_reporting_authorized"] is True
+assert run_193r_review["decision"]["authorized_live_reporting_run"] == "RUN-194"
+assert run_193r_review["decision"]["authorized_finding_id"] == "FLEET-FUEL-INDEX-SITE-PRIVACY-01"
+assert run_193r_review["decision"]["run_195_fresh_dashboard_verification_required"] is True
+assert run_193r_review["decision"]["authorized_unique_bounded_disposition_increment"]["resulting_tests"] == 161
+assert run_193r_review["decision"]["authorized_unique_bounded_disposition_increment"]["resulting_assertions"] == 2609
+assert run_193r_review["decision"]["static_ownership_remains_pending"]["next_zero_based_index"] == 86
+assert run_193r_review["decision"]["static_ownership_remains_pending"]["finding_candidate_zero_based_index"] == 87
+assert set(run_193r_review["completion_gates"]) == canonical_completion_gate_names
+assert set(run_193r_review["completion_boundary"]) == canonical_completion_gate_names
+assert len(run_193r_review["completion_gates"]) == 26
+assert not any(run_193r_review["completion_gates"].values())
+assert all(value is False for value in run_193r_review["completion_boundary"].values())
+assert {key for key, value in run_193r_review["credit_boundary"].items() if value} == {
+    "independent_exact_artifact_review_for_new_historical_remediated_reporting",
+}
+assert run_193r_review["artifact_completion_test_met"] is True
+assert run_193r_review["audit_completion_test_met"] is False
+run_193r_without_seal = dict(run_193r_review)
+run_193r_seal = run_193r_without_seal.pop("receipt_self_seal_sha256")
+assert run_193r_seal == "df7f90f33692f0ff81a143bb3406238d8a2831caad47b295b7a1b784863a06e2"
+assert canonical_sha256(run_193r_without_seal) == run_193r_seal
+
+assert run_194_reporting["run_id"] == "RUN-194-FLEET-FUEL-INDEX-SITE-PRIVACY-01-REMEDIATION-REPORTING-WAVE-38"
+assert run_194_reporting["schema_version"] == "run-194-fleet-fuel-index-site-privacy-remediation-reporting-wave-38-v1"
+assert run_194_reporting["status"] == "FLEET_FUEL_INDEX_SITE_PRIVACY_HISTORICAL_REMEDIATION_REPORTING_MATERIALIZED_DASHBOARD_RUN195_REQUIRED_ZERO_STATIC_PUBLICATION_FINAL_FINDING_OR_COMPLETION_CREDIT"
+assert run_194_reporting["reporting_transition"]["finding_id"] == "FLEET-FUEL-INDEX-SITE-PRIVACY-01"
+assert run_194_reporting["reporting_transition"]["counts_after"]["retained_claim_records"] == 16
+assert run_194_reporting["reporting_transition"]["counts_after"]["historical_remediated"] == 6
+assert run_194_reporting["bounded_execution_accounting"]["unique_total"] == {"tests": 161, "assertions": 2609}
+assert run_194_reporting["preservation_boundary"]["static_ownership"] == {
+    "owners": 667,
+    "routes": 310,
+    "pages": 357,
+    "controller_action_bridges": 98,
+}
+assert run_194_reporting["preservation_boundary"]["queue"]["next_zero_based_index"] == 86
+assert run_194_reporting["dashboard_forward_gate"]["required_run"] == "RUN-195"
+assert run_194_reporting["dashboard_forward_gate"]["dashboard_html_changed_by_run_194"] is False
+assert run_194_reporting["dashboard_forward_gate"]["generator"] == "generators/materialize-run-195-audit-dashboard-verification-wave-38.py"
+assert run_194_reporting["dashboard_forward_gate"]["receipt"] == "evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json"
+assert run_194_reporting["dashboard_forward_gate"]["fresh_four_viewport_navigation_resource_console_verification_required"] is True
+assert run_194_reporting["dashboard_forward_gate"]["forward_paths_intentionally_unhashed"] is True
+assert {key for key, value in run_194_reporting["credit_boundary"].items() if value} == {
+    "live_findings_register_and_reporting_status",
+}
+assert set(run_194_reporting["completion_gates"]) == canonical_completion_gate_names
+assert set(run_194_reporting["completion_boundary"]) == canonical_completion_gate_names
+assert len(run_194_reporting["completion_gates"]) == 26
+assert not any(run_194_reporting["completion_gates"].values())
+assert all(value is False for value in run_194_reporting["completion_boundary"].values())
+assert run_194_reporting["artifact_completion_test_met"] is True
+assert run_194_reporting["audit_completion_test_met"] is False
+run_194_without_seal = dict(run_194_reporting)
+run_194_seal = run_194_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_194_without_seal) == run_194_seal
+
 reviewed_fleet_daily_check_overlay = findings_register["current_static_source_feature_ownership"]
 
 required_artifacts = [
@@ -4637,9 +4852,17 @@ fleet_playback_row_status = (
     "route owner and action bridge integrated separately by RUN-190/R · sibling playback.data "
     "at index 86 remains pending · zero remediation or correctness inheritance · not a final finding"
 )
+fleet_fuel_row_status = (
+    "historical issue · remediated on local main · not published to origin/main · "
+    "selected GET index/CSV Site privacy and row-scoped attached identity only · candidate feature "
+    "association only · index 87 static route owner and action bridge remain pending behind index 86 "
+    "playback.data · zero static ownership, adjacent-route, or independent logger-Site inheritance · "
+    "not a final finding"
+)
 finding_claim_labels = dict(historical_discovery_claims)
 finding_claim_labels["FLEET-TRIP-INDEX-SITE-PRIVACY-01"] = fleet_finding["impact"]
 finding_claim_labels["FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"] = fleet_playback_finding["impact"]
+finding_claim_labels["FLEET-FUEL-INDEX-SITE-PRIVACY-01"] = fleet_fuel_finding["impact"]
 finding_claim_labels["MON-METRIC-REPLAY-DEDUPE-01"] = metric_finding["impact"]
 assert set(finding_claim_labels) == {row["id"] for row in live_findings}
 finding_rows = "".join(
@@ -4659,12 +4882,16 @@ finding_rows = "".join(
                         fleet_playback_row_status
                         if row["id"] == "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"
                         else (
-                            "historical issue · already fixed on current main · not a final finding"
-                            if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                            fleet_fuel_row_status
+                            if row["id"] == "FLEET-FUEL-INDEX-SITE-PRIVACY-01"
                             else (
-                                "historical issue · remediated on current main · not a final finding"
-                                if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
-                                else "current provisional P1 · independent review pending"
+                                "historical issue · already fixed on current main · not a final finding"
+                                if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                else (
+                                    "historical issue · remediated on current main · not a final finding"
+                                    if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                    else "current provisional P1 · independent review pending"
+                                )
                             )
                         )
                     )
@@ -4683,6 +4910,8 @@ assert expected_atomicity_row in finding_rows
 assert finding_rows.count(atomicity_row_status) == 1
 assert finding_rows.count(safe_row_status) == 1
 assert finding_rows.count(fleet_row_status) == 1
+assert finding_rows.count(fleet_playback_row_status) == 1
+assert finding_rows.count(fleet_fuel_row_status) == 1
 expected_metric_row = (
     '<tr><td class="mono">MON-METRIC-REPLAY-DEDUPE-01</td><td>'
     f'{html.escape(metric_finding["impact"])}</td>'
@@ -5828,6 +6057,97 @@ run_191_template_rewrites = [
 for old, new in run_191_template_rewrites:
     assert old in current_template_text, f"Expected RUN-191 template rewrite target: {old}"
     current_template_text = current_template_text.replace(old, new)
+
+run_194_template_rewrites = [
+    ('<a href="#checkpoint">RUN-191</a>', '<a href="#checkpoint">RUN-194</a>'),
+    (
+        "RUN-188–191 Fleet playback route/action ownership reporting checkpoint",
+        "RUN-192–194 Fleet Fuel index Site-privacy remediation reporting checkpoint",
+    ),
+    (
+        "RUN-191: live static ledger reported at $static_owner_records owners / $static_action_bridges bridges and $queue_reviewed reviewed / $queue_pending pending · dashboard HTML frozen pending RUN-192</li>",
+        "RUN-191: live static ledger reported at $static_owner_records owners / $static_action_bridges bridges and $queue_reviewed reviewed / $queue_pending pending · dashboard HTML later verified by RUN-192</li><li>RUN-192: exact RUN-191 dashboard verified at 4/4 viewports · 30/30 named visible checks per viewport · 10/10 navigation · 476/476 resources · 893 anchors · zero application credit</li><li>RUN-193: Fleet Fuel index/CSV Site-privacy defect reproduced and remediated in exactly two transferred paths · unique post-merge focused $fleet_fuel_tests/$fleet_fuel_assertions counted once · local main only · not published</li><li>RUN-193R: exact remediation artifacts independently reviewed GO · one new historical-remediated record authorized · zero static ownership or queue advance</li><li>RUN-194: Fuel historical-remediated record added · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-195</li>",
+    ),
+    (
+        "The current RUN-191 register retains 15 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; MON-METRIC-REPLAY-DEDUPE-01 is the new historical-remediated record with null feature and candidate IDs, UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW identity, and zero static-ownership credit.",
+        "The current RUN-194 register retains 16 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; FLEET-FUEL-INDEX-SITE-PRIVACY-01 is the new historical-remediated record with candidate-only CAP-FLEET-VEHICLE-REGISTER association, pending index-87 ownership behind index 86 playback.data, and zero static-ownership credit.",
+    ),
+    (
+        "The current RUN-191 register retains $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated.",
+        "The current RUN-194 register retains $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated. FLEET-FUEL-INDEX-SITE-PRIVACY-01 adds only bounded selected Fuel GET-index/CSV Site-privacy remediation reporting; Fuel remains candidate index 87 with zero owner, bridge, page, or queue credit, while playback.data index 86 remains next.",
+    ),
+    (
+        "$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 15 retained · none final",
+        "$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 16 retained · none final",
+    ),
+    (
+        "$fleet_playback_tests/$fleet_playback_assertions Fleet playback + $metric_tests/$metric_assertions final corrected Monitoring replay; initial $metric_initial_tests/$metric_initial_assertions and all other replay/support remain separate",
+        "$fleet_playback_tests/$fleet_playback_assertions Fleet playback + $metric_tests/$metric_assertions final corrected Monitoring replay + $fleet_fuel_tests/$fleet_fuel_assertions Fleet Fuel; initial $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, and all other replay/support remain separate",
+    ),
+    (
+        "The register retains 15 claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. MON-METRIC-REPLAY-DEDUPE-01 has null feature and candidate IDs, UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW identity, and zero static ownership.",
+        "The register retains 16 claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. MON-METRIC-REPLAY-DEDUPE-01 retains null feature and candidate IDs and zero static ownership. FLEET-FUEL-INDEX-SITE-PRIVACY-01 is candidate-only for CAP-FLEET-VEHICLE-REGISTER; row-attached logger identity follows foreign-row concealment only, with no independent logger-Site authorization for an otherwise visible row.",
+    ),
+    (
+        "15 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
+        "16 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
+    ),
+    (
+        "RUN-155–191 bounded disposition provenance, remediation, and reporting",
+        "RUN-155–194 bounded disposition provenance, remediation, and reporting",
+    ),
+    (
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from separately bounded RUN-159 MED-RBAC, RUN-162 MED-CD-SCOPE, RUN-166 manual-entry MED-CD-ATOMICITY, RUN-173 post-merge SAFE, RUN-176 post-merge Fleet trip-index, RUN-183 post-merge Fleet playback, and RUN-186 final post-corrective-merge Monitoring metric-replay focused executions, no represented wave grants broader or full-suite application runtime or coverage; only MED-RBAC, MED-CD-SCOPE, post-merge SAFE, post-merge Fleet trip-index, post-merge Fleet playback, and the final post-corrective-merge Monitoring $metric_tests/$metric_assertions contribute once to the current $unique_bounded_tests/$unique_bounded_assertions total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions and all Monitoring replays/subsets are excluded.",
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from separately bounded RUN-159 MED-RBAC, RUN-162 MED-CD-SCOPE, RUN-166 manual-entry MED-CD-ATOMICITY, RUN-173 post-merge SAFE, RUN-176 post-merge Fleet trip-index, RUN-183 post-merge Fleet playback, RUN-186 final post-corrective-merge Monitoring metric-replay, and RUN-193 post-merge Fleet Fuel focused executions, no represented wave grants broader or full-suite application runtime or coverage; only MED-RBAC, MED-CD-SCOPE, post-merge SAFE, post-merge Fleet trip-index, post-merge Fleet playback, final post-corrective-merge Monitoring $metric_tests/$metric_assertions, and the unique post-merge Fuel $fleet_fuel_tests/$fleet_fuel_assertions component contribute once to the current $unique_bounded_tests/$unique_bounded_assertions total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, Fuel red $fleet_fuel_red_failed/$fleet_fuel_red_assertions, isolated Fuel replay, supporting $fleet_fuel_supporting_tests/$fleet_fuel_supporting_assertions, and any second count from combined 26/421 are excluded.",
+    ),
+    (
+        "Exactly two matrix rows have static benchmark-mapping credit. RUN-159, RUN-162, RUN-166, RUN-173, RUN-176, RUN-183, and RUN-186/R retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, post-merge Fleet trip-index $fleet_tests/$fleet_assertions, post-merge Fleet playback $fleet_playback_tests/$fleet_playback_assertions, and final post-corrective-merge Monitoring $metric_tests/$metric_assertions contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions and every Monitoring replay/subset remain excluded.",
+        "Exactly two matrix rows have static benchmark-mapping credit. RUN-159, RUN-162, RUN-166, RUN-173, RUN-176, RUN-183, RUN-186/R, and RUN-193/R retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, post-merge Fleet trip-index $fleet_tests/$fleet_assertions, post-merge Fleet playback $fleet_playback_tests/$fleet_playback_assertions, final post-corrective-merge Monitoring $metric_tests/$metric_assertions, and the unique post-merge Fuel $fleet_fuel_tests/$fleet_fuel_assertions component contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, and every other replay/subset remain excluded.",
+    ),
+    (
+        "RUN-159 establishes bounded MED-RBAC execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution; RUN-173 adds one post-merge $safe_tests/$safe_assertions SAFE focused execution, RUN-176 adds one post-merge $fleet_tests/$fleet_assertions Fleet index execution, RUN-183 adds one post-merge $fleet_playback_tests/$fleet_playback_assertions Fleet playback execution, and RUN-186 adds only the final post-corrective-merge $metric_tests/$metric_assertions Monitoring metric-replay execution to the unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, all Monitoring replays/subsets, supporting suites, adjacent filters, red failures, terminal-fixture failures, and atomicity remain separate or excluded, and none establishes full-suite, coverage, application-browser, ease, release, Pass, publication, or completion credit.",
+        "RUN-159 establishes bounded MED-RBAC execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution; RUN-173 adds one post-merge $safe_tests/$safe_assertions SAFE focused execution, RUN-176 adds one post-merge $fleet_tests/$fleet_assertions Fleet index execution, RUN-183 adds one post-merge $fleet_playback_tests/$fleet_playback_assertions Fleet playback execution, RUN-186 adds only the final post-corrective-merge $metric_tests/$metric_assertions Monitoring metric-replay execution, and RUN-193 adds only the unique post-merge $fleet_fuel_tests/$fleet_fuel_assertions Fuel component to the unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, all Monitoring replays/subsets, Fuel red/replay/support/combined-overlap, supporting suites, adjacent filters, red failures, terminal-fixture failures, and atomicity remain separate or excluded, and none establishes full-suite, coverage, application-browser, ease, release, Pass, publication, or completion credit.",
+    ),
+    (
+        "</tr><tr><td>RUN-186 corrected Monitoring metric-replay execution</td><td>only final post-corrective-merge $metric_tests tests / $metric_assertions assertions counted once; initial $metric_initial_tests/$metric_initial_assertions, final isolated replay, red reproduction, intermediate subsets, stopped run, DNS, Facility, and overlapping support excluded</td><td class=\"partial\">null feature and candidate IDs · zero static ownership · option-A deployment prerequisite unverified · poisoned subsecond evidence requires operator reconciliation · no deployment, publication, full-suite, or completion credit</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+        "</tr><tr><td>RUN-186 corrected Monitoring metric-replay execution</td><td>only final post-corrective-merge $metric_tests tests / $metric_assertions assertions counted once; initial $metric_initial_tests/$metric_initial_assertions, final isolated replay, red reproduction, intermediate subsets, stopped run, DNS, Facility, and overlapping support excluded</td><td class=\"partial\">null feature and candidate IDs · zero static ownership · option-A deployment prerequisite unverified · poisoned subsecond evidence requires operator reconciliation · no deployment, publication, full-suite, or completion credit</td></tr><tr><td>RUN-193 Fleet Fuel index Site-privacy execution</td><td>$fleet_fuel_tests post-merge focused tests / $fleet_fuel_assertions assertions counted once; baseline $fleet_fuel_red_failed failed + $fleet_fuel_red_passed passed / $fleet_fuel_red_assertions assertions, isolated $fleet_fuel_tests/$fleet_fuel_assertions replay, supporting $fleet_fuel_supporting_tests/$fleet_fuel_supporting_assertions regressions, and any second count from combined 26/421 excluded</td><td class=\"partial\">selected GET index/CSV rows, filters, month-to-date totals, rolling 30-day entry count, efficiency inputs, provenance, archived Sites, and row-scoped attached identity only · candidate index 87 pending behind index 86 · baseline $fleet_fuel_baseline_short · fix $fleet_fuel_fix_short · local merge $fleet_fuel_merge_short · origin/main $fleet_fuel_origin_short unchanged · full-suite green unproved</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+    ),
+    (
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, bounded Fleet evidence, RUN-185 exact-dashboard verification, and RUN-186/R Monitoring metric-replay evidence, reported in RUN-187, with fresh RUN-188 dashboard verification required.",
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, bounded Fleet evidence, RUN-192 exact-dashboard verification, and RUN-193/R Fleet Fuel evidence, reported in RUN-194, with fresh RUN-195 dashboard verification required.",
+    ),
+    ("RUN-001 through RUN-187 are represented by audit artifacts.", "RUN-001 through RUN-194 are represented by audit artifacts."),
+    ("RUN-071–191 current reporting checkpoint", "RUN-071–194 current reporting checkpoint"),
+    ("RUN-071–191 completion-gate checkpoint", "RUN-071–194 completion-gate checkpoint"),
+    ("RUN-071–191 evidence lineage", "RUN-071–194 evidence lineage"),
+    (
+        "Every current raw, generated, reviewed, and integrated RUN-077–191",
+        "Every current raw, generated, reviewed, and integrated RUN-077–194",
+    ),
+    ("current RUN-191 split of 15 retained claim identities", "current RUN-194 split of 16 retained claim identities"),
+    ("Fresh RUN-192 audit-dashboard verification required", "Fresh RUN-195 audit-dashboard verification required"),
+    (
+        "The exact RUN-191 reporting dashboard must be generated and checked in RUN-192",
+        "The exact RUN-194 reporting dashboard must be generated and checked in RUN-195",
+    ),
+    (
+        "RUN-188 verifies only the superseded RUN-187 dashboard; RUN-189/R establish the bounded playback/show decision without materializing ownership, RUN-190 integrates exactly one route owner and bridge, RUN-190R authorizes reporting only, RUN-191 is the current reporting transaction, and RUN-192 remains the fresh exact-dashboard gate.",
+        "RUN-188 verifies only the superseded RUN-187 dashboard; RUN-189/R–191 establish and report only the playback/show owner and bridge. RUN-192 verifies the exact RUN-191 dashboard; RUN-193 reproduces and locally integrates the bounded Fuel index/CSV Site-privacy remediation, RUN-193R authorizes one historical-remediated record, RUN-194 changes only live reporting while preserving the RUN-192 HTML, and RUN-195 remains the fresh exact-dashboard gate.",
+    ),
+    (
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">RUN-188 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json">RUN-190 Fleet playback/show ownership-overlay receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json">RUN-190R independent overlay-review receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.json">RUN-191 reporting receipt</a> (verified and hashed in the current evidence list) · <a href="generators/materialize-run-192-audit-dashboard-verification-wave-37.py">RUN-192 audit-dashboard verification materializer</a> (forward reference; intentionally unhashed) · <a href="evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json">RUN-192 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+        '<a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">RUN-188 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json">RUN-190 Fleet playback/show ownership-overlay receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json">RUN-190R independent overlay-review receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.json">RUN-191 reporting receipt</a> (verified and hashed in the current evidence list) · <a href="generators/materialize-run-192-audit-dashboard-verification-wave-37.py">RUN-192 audit-dashboard verification materializer</a> (verified and hashed in the current evidence list) · <a href="evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json">RUN-192 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/runtime/current-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.json">RUN-193 Fleet Fuel remediation receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/runtime/current-run-193r-independent-fleet-fuel-index-site-privacy-remediation-review-wave-38.json">RUN-193R independent Fuel review receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-194-fleet-fuel-index-site-privacy-remediation-reporting-wave-38.json">RUN-194 reporting receipt</a> (verified and hashed in the current evidence list) · <a href="generators/materialize-run-195-audit-dashboard-verification-wave-38.py">RUN-195 audit-dashboard verification materializer</a> (forward reference; intentionally unhashed) · <a href="evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json">RUN-195 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
+    ),
+]
+run_194_rewrite_expected_counts = {
+    "current RUN-191 split of 15 retained claim identities": 2,
+}
+for old, new in run_194_template_rewrites:
+    expected_count = run_194_rewrite_expected_counts.get(old, 1)
+    assert current_template_text.count(old) == expected_count, (
+        f"Expected {expected_count} RUN-194 template rewrite target(s): {old}"
+    )
+    current_template_text = current_template_text.replace(old, new)
 TEMPLATE = Template(current_template_text)
 
 
@@ -6067,6 +6387,17 @@ dashboard = TEMPLATE.substitute(
     fleet_playback_baseline_short=run_183_remediation["pins"]["application_baseline_commit"][:12],
     fleet_playback_fix_short=run_183_remediation["pins"]["fix_commit"][:12],
     fleet_playback_merge_short=run_183_remediation["pins"]["local_main_merge_commit"][:12],
+    fleet_fuel_red_failed=run_193_remediation["delegated_runtime_execution"]["baseline_original_red"]["failed"],
+    fleet_fuel_red_passed=run_193_remediation["delegated_runtime_execution"]["baseline_original_red"]["passed"],
+    fleet_fuel_red_assertions=run_193_remediation["delegated_runtime_execution"]["baseline_original_red"]["assertions_reported"],
+    fleet_fuel_tests=run_193_remediation["delegated_runtime_execution"]["post_merge_authoritative_three_file_context"]["focused_component"]["tests"],
+    fleet_fuel_assertions=run_193_remediation["delegated_runtime_execution"]["post_merge_authoritative_three_file_context"]["focused_component"]["assertions"],
+    fleet_fuel_supporting_tests=run_193_remediation["delegated_runtime_execution"]["isolated_supporting_vehicle_controller_regressions"]["tests"],
+    fleet_fuel_supporting_assertions=run_193_remediation["delegated_runtime_execution"]["isolated_supporting_vehicle_controller_regressions"]["assertions"],
+    fleet_fuel_baseline_short=run_193_remediation["pins"]["application_baseline_commit"][:12],
+    fleet_fuel_fix_short=run_193_remediation["pins"]["fix_commit"][:12],
+    fleet_fuel_merge_short=run_193_remediation["pins"]["local_main_merge_commit"][:12],
+    fleet_fuel_origin_short=run_193_remediation["pins"]["origin_main_observed"][:12],
     metric_tests=metric_finding["evidence"]["tests_executed"],
     metric_assertions=metric_finding["evidence"]["assertions"],
     metric_initial_tests=metric_finding["evidence"]["initial_superseded_tests"],
@@ -6173,14 +6504,14 @@ dashboard = TEMPLATE.substitute(
 )
 
 current_visible_boundaries = [
-    '<a href="#checkpoint">RUN-191</a>',
+    '<a href="#checkpoint">RUN-194</a>',
     '<a href="#findings">Finding status</a>',
     "667 = 310 route + 357 page",
     "121 reviewed / 386 pending",
     "reviewed = 99 owned + 10 shared + 5 alias + 7 gap",
     "16.976330%",
     "3,262 records remain",
-    "RUN-188–191 Fleet playback route/action ownership reporting checkpoint",
+    "RUN-192–194 Fleet Fuel index Site-privacy remediation reporting checkpoint",
     "fleet-assets.vehicles.alerts-config",
     "RUN090-ROUTE-0084 / RUN077-ROUTE-0692",
     "VehicleController::alertsConfig",
@@ -6234,13 +6565,19 @@ current_visible_boundaries = [
     "RUN-190: exactly one playback/show route owner and controller-action bridge integrated",
     "RUN-190R: two sealed post-commit GO reviews",
     "RUN-191: live static ledger reported",
-    "15 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 5 historical remediated",
-    "155 / 2,403",
-    "155/2,403 unique bounded disposition total",
-    "RUN-071–191 current reporting checkpoint",
-    "RUN-071–191 completion-gate checkpoint",
-    "RUN-071–191 evidence lineage",
-    "Every current raw, generated, reviewed, and integrated RUN-077–191",
+    "RUN-192: exact RUN-191 dashboard verified at 4/4 viewports",
+    "30/30 named visible checks per viewport",
+    "10/10 navigation · 476/476 resources · 893 anchors",
+    "RUN-193: Fleet Fuel index/CSV Site-privacy defect reproduced and remediated in exactly two transferred paths",
+    "RUN-193R: exact remediation artifacts independently reviewed GO",
+    "RUN-194: Fuel historical-remediated record added",
+    "16 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 6 historical remediated",
+    "161 / 2,609",
+    "161/2,609 unique bounded disposition total",
+    "RUN-071–194 current reporting checkpoint",
+    "RUN-071–194 completion-gate checkpoint",
+    "RUN-071–194 evidence lineage",
+    "Every current raw, generated, reviewed, and integrated RUN-077–194",
     "RUN-186 corrected Monitoring metric-replay execution",
     "final post-corrective-merge Monitoring 56/472",
     "initial Monitoring 49/392",
@@ -6248,7 +6585,13 @@ current_visible_boundaries = [
     "RUN-190 Fleet playback/show ownership-overlay receipt",
     "RUN-190R independent overlay-review receipt",
     "RUN-191 reporting receipt",
-    "RUN-192 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)",
+    "RUN-192 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list)",
+    "RUN-193 Fleet Fuel remediation receipt",
+    "RUN-193R independent Fuel review receipt",
+    "RUN-194 reporting receipt",
+    "RUN-195 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)",
+    "RUN-195 audit-dashboard verification materializer</a> (forward reference; intentionally unhashed)",
+    "dashboard HTML frozen pending RUN-195",
     "MON-METRIC-REPLAY-DEDUPE-01",
     "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
     "MON-METRIC-REPLAY-DEDUPE-01 is also remediated on local main only and unpublished",
@@ -6299,6 +6642,16 @@ current_visible_boundaries = [
     "baseline 3 failed + 2 passed / 30 assertions",
     "RUN-183 adds one post-merge 11/167 Fleet playback execution",
     "supporting 20/215",
+    "FLEET-FUEL-INDEX-SITE-PRIVACY-01",
+    "selected GET index/CSV rows",
+    "month-to-date totals",
+    "rolling 30-day entry count",
+    "row-scoped attached identity only",
+    "baseline 6 failed + 0 passed / 65 assertions",
+    "unique post-merge focused 6/206",
+    "supporting 20/215 regressions",
+    "candidate index 87 pending behind index 86",
+    "baseline df65322f8eb7 · fix 2ec4b70e379c · local merge 04c32c36fdda · origin/main c39b07654705 unchanged",
     "14 retained",
     "15 claim identities",
     "13a7f37da9c9",
@@ -6320,7 +6673,7 @@ current_visible_boundaries = [
     "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated",
     "two broader INR failures reproduce at base",
     "full-suite green false",
-    "Fresh RUN-192 audit-dashboard verification required",
+    "Fresh RUN-195 audit-dashboard verification required",
     "cf0090ec9724",
     "0b1920dade92",
     "7b2b5688c90e",
@@ -6344,6 +6697,16 @@ missing_current_visible_boundaries = [
     boundary for boundary in current_visible_boundaries if boundary not in dashboard
 ]
 assert not missing_current_visible_boundaries, missing_current_visible_boundaries
+assert '<a href="#checkpoint">RUN-191</a>' not in dashboard
+for stale_current in (
+    "RUN-071–191 current reporting checkpoint",
+    "RUN-071–191 completion-gate checkpoint",
+    "RUN-071–191 evidence lineage",
+    "Every current raw, generated, reviewed, and integrated RUN-077–191",
+    "current RUN-191 split of 15 retained claim identities",
+    "Fresh RUN-192 audit-dashboard verification required",
+):
+    assert stale_current not in dashboard
 assert "0 current application tests" not in dashboard
 assert "vendor absent; setup not run" not in dashboard
 assert "Fresh RUN-158 audit-dashboard verification required" not in dashboard
@@ -6437,14 +6800,19 @@ output_path = AUDIT_DIR / "audit-dashboard.html"
 output_bytes = (dashboard.rstrip() + "\n").encode("utf-8")
 existing_output_bytes = output_path.read_bytes()
 assert (
-    existing_output_bytes in (run_185_dashboard_payload, run_188_dashboard_payload, output_bytes)
+    existing_output_bytes in (
+        run_185_dashboard_payload,
+        run_188_dashboard_payload,
+        run_192_dashboard_payload,
+        output_bytes,
+    )
     or hashlib.sha256(existing_output_bytes).hexdigest()
     in {
         "decae30e09dae8f239ebb00ecb758bdf290edd5d4ca8f69904686c8f7a67d5c2",
         "5548a5cb461c2c13ef237a2c622db597289c6bfc9f14bb992a3c89a498a4666a",
     }
 )
-temporary_path = output_path.with_name(f".{output_path.name}.tmp-run192-dashboard")
+temporary_path = output_path.with_name(f".{output_path.name}.tmp-run195-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"
 try:
     with temporary_path.open("xb") as handle:

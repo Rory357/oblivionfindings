@@ -1,7 +1,7 @@
 {
   "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
-  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_FIVE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
-  "generated_on": "2026-08-31",
+  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_SIX_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
+  "generated_on": "2026-09-01",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
@@ -51,6 +51,20 @@
     "fleet_trip_playback_site_privacy_origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
     "run_183_fleet_trip_playback_site_privacy_remediation_sha256": "7bb1b1013cf67344c48e5a8b6e551bf3c769695e0384c2b333fb47286e53310a",
     "run_183r_independent_artifact_review_sha256": "170245898590f6429a171bbd8a41455f096b5b43340b840294735fdbc5522640",
+    "fleet_fuel_index_site_privacy_baseline_commit": "df65322f8eb7d7d0f1623c4bcb8cc8c87573b71d",
+    "fleet_fuel_index_site_privacy_baseline_tree": "0bd43711942416069675075ce3d515b92b9eaf7d",
+    "fleet_fuel_index_site_privacy_fix_commit": "2ec4b70e379c6f8cf38c1cb67f5d676fea52cf75",
+    "fleet_fuel_index_site_privacy_fix_tree": "b6e17efbf1b92b4a12bc01c55e8f245b2e206922",
+    "fleet_fuel_index_site_privacy_advanced_main_commit": "9019b44cb1017931fd0491a90f96ac32a6c4420c",
+    "fleet_fuel_index_site_privacy_advanced_main_tree": "81a4a14e31c88c9731f24a6addee85377ac54256",
+    "fleet_fuel_index_site_privacy_local_main_merge_commit": "04c32c36fdda6ce60ce281c06ad68aaa78527422",
+    "fleet_fuel_index_site_privacy_local_main_tree": "6f85ddc1f4e8551c99528cc0c872b37da6c7763a",
+    "fleet_fuel_index_site_privacy_stable_patch_id": "636771c0b1d9cbe50b2204febaa41679d340aba9",
+    "fleet_fuel_index_site_privacy_origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "run_193_fleet_fuel_index_site_privacy_remediation_generator_sha256": "105632bc2c4e50de3e8cfdd55fb25810fbbe5307537bd90b0e153b25f7c4e319",
+    "run_193_fleet_fuel_index_site_privacy_remediation_sha256": "1396205a5f63d4571b0e5b738f00f3a7cadc8ab93499a012e0e0f827b70b495f",
+    "run_193r_independent_artifact_review_materializer_sha256": "953d8d68aa2a869fe5c82f495de60b351c49b53f846955167f7f1434964541ac",
+    "run_193r_independent_artifact_review_sha256": "87a1157f26bbfaf062ec22bceb616bf4f54c72f908cddfd68c2b59db91cbbb41",
     "monitoring_metric_replay_application_baseline_commit": "a900f078c9c05f587f6f7884f5fe715076891416",
     "monitoring_metric_replay_initial_fix_commit": "f521bc0b87222e56b4822e7cb9c935486e279e76",
     "monitoring_metric_replay_initial_merge_commit": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
@@ -70,6 +84,10 @@
     "run_190_fleet_trip_playback_route_action_overlay_receipt_sha256": "88494bb887c78f488df3915c86a8ad47b2176da469aedda3803151b8edd4a708",
     "run_190r_fleet_trip_playback_route_action_overlay_review_materializer_sha256": "ec87f7eb11ab139278e7247880ae8a4adb8546cc55ce8ed76d2c2ea79603f132",
     "run_190r_fleet_trip_playback_route_action_overlay_review_receipt_sha256": "36376b3e40a2611cf814c2b034ecf0157f5fdae480d7e893a8aa6992286b3b3b",
+    "run_192_dashboard_verification_materializer_sha256": "899eb63bf6416801187334c12af8c781029c457e0f7e2cbbaf75604991fbe14f",
+    "run_192_dashboard_verification_sha256": "cc95b38ece501bea317e78ef7769a7813e3a5a6c2041330e249fd196974cbb88",
+    "run_192_dashboard_verification_self_seal_sha256": "a112198be2915cfc8a88b31b38a9cb33c90ad407b6da83f85fac5deae6727995",
+    "run_192_verified_dashboard_sha256": "8d19569e7bfb256edeecdc754e2bc47e2ddad3ecd8de099e3bb0dad9b50e313b",
     "audit_checkpoint_parent": "35a5228b26c54684718495c33281b24c0992de02",
     "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
     "base_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
@@ -271,20 +289,20 @@
     "system_data_features": 40,
     "canonical_submodules": null,
     "historical_discovery_claim_records": 12,
-    "current_retained_claim_records": 15,
+    "current_retained_claim_records": 16,
     "current_provisional_source_claims": 8,
     "historical_already_fixed_records": 2,
-    "historical_remediated_records": 5
+    "historical_remediated_records": 6
   },
   "counts": {
-    "retained_claim_records": 15,
+    "retained_claim_records": 16,
     "provisional_source_claims": 8,
     "provisional_P1": 8,
     "historical_already_fixed": 2,
-    "historical_remediated": 5,
-    "bounded_disposition_tests_passed": 155,
-    "bounded_disposition_assertions": 2403,
-    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY plus only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, the initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO, the root 1-test red reproduction, every intermediate corrective subset or stopped run, the final isolated corrective 56/472 replay, DNS 63/186, Facility execution, and every overlapping supporting execution",
+    "historical_remediated": 6,
+    "bounded_disposition_tests_passed": 161,
+    "bounded_disposition_assertions": 2609,
+    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY plus only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution plus the unique 6/206 post-merge focused component of the combined FLEET-FUEL-INDEX-SITE-PRIVACY run; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, the initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO, the root 1-test red reproduction, every intermediate corrective subset or stopped run, the final isolated corrective 56/472 replay, DNS 63/186, Facility execution, Fuel red 6-failed/65-assertion reproduction, isolated Fuel 6/206 replay, supporting Fuel 20/215 regressions, any second count from combined 26/421, and every overlapping supporting execution",
     "med_rbac_bounded_tests": 73,
     "med_rbac_bounded_test_assertions": 1481,
     "med_cd_scope_focused_tests": 5,
@@ -294,7 +312,7 @@
     "med_cd_atomicity_race_subscenarios": 3,
     "med_cd_atomicity_supporting_tests": 43,
     "med_cd_atomicity_supporting_assertions": 716,
-    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764 and RUN-184 99/1931 totals, and remains excluded from the current RUN-187 155/2403 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
+    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764, RUN-184 99/1931, and RUN-187 155/2403 totals, and remains excluded from the current RUN-194 161/2609 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
     "safe_alert_dedup_focused_tests": 5,
     "safe_alert_dedup_focused_assertions": 60,
     "safe_alert_dedup_supporting_control_room_bridge_tests": 28,
@@ -313,6 +331,13 @@
     "fleet_trip_playback_site_privacy_baseline_failed": 3,
     "fleet_trip_playback_site_privacy_baseline_passed": 2,
     "fleet_trip_playback_site_privacy_baseline_assertions": 30,
+    "fleet_fuel_index_site_privacy_focused_tests": 6,
+    "fleet_fuel_index_site_privacy_focused_assertions": 206,
+    "fleet_fuel_index_site_privacy_supporting_tests": 20,
+    "fleet_fuel_index_site_privacy_supporting_assertions": 215,
+    "fleet_fuel_index_site_privacy_baseline_failed": 6,
+    "fleet_fuel_index_site_privacy_baseline_passed": 0,
+    "fleet_fuel_index_site_privacy_baseline_assertions": 65,
     "monitoring_metric_replay_dedupe_focused_tests": 56,
     "monitoring_metric_replay_dedupe_focused_assertions": 472,
     "monitoring_metric_replay_initial_superseded_tests": 49,
@@ -415,20 +440,20 @@
       "audit_completion": 0
     }
   },
-  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and five retained historical remediated records remain reviewable. RUN-186/R establish and independently authorize only the MON-METRIC-REPLAY-DEDUPE-01 historical-remediated record. The initial 49/392 isolated and post-merge runs were later adjudicated NO-GO and receive no denominator credit; only the final post-corrective-merge 56/472 execution extends 99/1931 to 155/2403. The final corrected isolated replay, red reproduction, intermediate subsets, stopped run, DNS, Facility, and overlapping support remain separate and uncredited. Monitoring has no canonical or candidate feature association: feature_id and candidate_feature_id are null with UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW, and no static owner, bridge, page, queue, matrix, feature-union, DNS, or Facility credit follows. Option A is a deployment prerequisite only: quiesce old monitoring workers; reconcile pending or incoherent rows; apply migration 000110; then start new workers after cutover reconciliation; poisoned subsecond evidence requires operator reconciliation. This prerequisite has no production migration, deployment, publication, or release credit. Origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; both Monitoring integrations in this remediation lineage remain local-only and unpublished. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
+  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and six retained historical remediated records remain reviewable. RUN-193/R establish and independently authorize only the new FLEET-FUEL-INDEX-SITE-PRIVACY-01 historical-remediated record. Its unique post-merge focused 6/206 component extends the prior RUN-187 155/2403 denominator to 161/2609 exactly once; the red 6-failed/65-assertion reproduction, isolated 6/206 replay, supporting 20/215 regressions, and any second count from combined 26/421 remain separate and uncredited. The Fuel record is a candidate reporting association to CAP-FLEET-VEHICLE-REGISTER with zero static route owner, controller-action bridge, page, queue, matrix, feature-union, independent visible-row logger-Site redaction, write-path, adjacent-route, browser, benchmark, publication, release, or completion credit. Its logger proof is row-scoped only: foreign-row attached identity does not escape through rows or CSV, but no independent logger directory or profile authorization is established. Earlier Monitoring option-A deployment prerequisites and all prior noninheritance boundaries remain unchanged. Origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; Fleet Fuel integration remains local-only and unpublished. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
   "reconciliation": {
     "retained_record_ids_unique": true,
     "current_provisional_ids_unique": true,
-    "retained_record_count": 15,
+    "retained_record_count": 16,
     "current_provisional_count": 8,
     "historical_already_fixed_count": 2,
-    "historical_remediated_count": 5,
+    "historical_remediated_count": 6,
     "every_non_null_primary_feature_id_in_canonical_matrix": true,
     "records_without_primary_or_candidate_feature_id": [
       "MON-METRIC-REPLAY-DEDUPE-01"
     ],
     "final_ids_cross_file_reconciled": false,
-    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01, and MON-METRIC-REPLAY-DEDUPE-01 are retained as historical remediated; the other 8 records remain provisional. Monitoring remediation is limited to canonical metric replay, durable value-free receipts, partial recovery, current-evidence tuple ordering, and the explicit option-A cutover boundary. It has null feature_id and candidate_feature_id, UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW status, and zero static ownership. RUN-190 separately integrates only queue index 85 fleet-assets.trips.playback / FleetTripController::show as one static route owner and bridge; index 86 playback.data remains pending, and no finding, page, sibling-route, remediation, correctness, runtime, benchmark, feature-union, DNS, or Facility credit is inherited. Browser, deployment, publication, release, full-suite coverage, and completion credit are not inherited. None satisfies the cross-file final-finding gate."
+    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01, MON-METRIC-REPLAY-DEDUPE-01, and FLEET-FUEL-INDEX-SITE-PRIVACY-01 are retained as historical remediated; the other 8 records remain provisional. Fuel remediation is limited to the selected GET index and CSV row universe, vehicle choices, aggregates, efficiency inputs, filter concealment, and row-attached identity. It is only a candidate reporting association to CAP-FLEET-VEHICLE-REGISTER, remains PENDING_FRESH_SEMANTIC_REVIEW, and receives zero static ownership. RUN-190 separately integrates only queue index 85 fleet-assets.trips.playback / FleetTripController::show as one static route owner and bridge; index 86 playback.data remains pending, while Fuel is candidate index 87 and receives no queue advance. No finding, page, sibling-route, remediation, correctness, runtime, browser, benchmark, feature-union, publication, release, full-suite, or completion credit is inherited. None satisfies the cross-file final-finding gate."
   },
   "records": [
     {
@@ -3524,6 +3549,240 @@
         "pass": false,
         "completion": false
       }
+    },
+    {
+      "id": "FLEET-FUEL-INDEX-SITE-PRIVACY-01",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+      "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "feature_identity_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+      "feature_id_role": "CANDIDATE_REPORTING_ASSOCIATION_ONLY_ZERO_STATIC_OWNERSHIP_CREDIT",
+      "related_feature_ids": [],
+      "historical_provenance": {
+        "application_commit": "df65322f8eb7d7d0f1623c4bcb8cc8c87573b71d",
+        "application_tree": "0bd43711942416069675075ce3d515b92b9eaf7d",
+        "classification": "REAL_HISTORICAL_FLEET_FUEL_INDEX_SITE_PRIVACY_CONDITION",
+        "historical_risk": "Foreign-Site fuel rows and their row-attached logger identity could be disclosed, while foreign data could influence CSV, vehicle choices, monthly hero, summary, and trip-derived efficiency projections; foreign or missing vehicle filters were not consistently concealed.",
+        "preserved_identity_only": true,
+        "new_record_authorized_by_run_193r": true,
+        "record_present_before_run_194": false,
+        "pre_run_194_register_sha256": "91ccad95997c802f56c68a3cfc2678ae2364e7bad47c3f11ecaa55f4fc3e4843"
+      },
+      "current_adjudication": {
+        "application_baseline_commit": "df65322f8eb7d7d0f1623c4bcb8cc8c87573b71d",
+        "application_baseline_tree": "0bd43711942416069675075ce3d515b92b9eaf7d",
+        "fix_commit": "2ec4b70e379c6f8cf38c1cb67f5d676fea52cf75",
+        "fix_tree": "b6e17efbf1b92b4a12bc01c55e8f245b2e206922",
+        "advanced_main_commit": "9019b44cb1017931fd0491a90f96ac32a6c4420c",
+        "advanced_main_tree": "81a4a14e31c88c9731f24a6addee85377ac54256",
+        "application_commit": "04c32c36fdda6ce60ce281c06ad68aaa78527422",
+        "repository_tree": "6f85ddc1f4e8551c99528cc0c872b37da6c7763a",
+        "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+        "stable_patch_id": "636771c0b1d9cbe50b2204febaa41679d340aba9",
+        "verdict": "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED",
+        "scope": "Selected GET /fleet-assets/fuel index and CSV branch only, including approved operational-Site fuel-row visibility, canonical direct/home/client Asset provenance, fail-closed conflicting or unattributed provenance, archived-Site exclusion, foreign and missing Asset-filter concealment, row-attached vehicle/logger identity, vehicle choices, month-to-date hero and summary totals, the rolling 30-day entry count, and trip-derived per-vehicle efficiency.",
+        "run_193_receipt": "evidence/runtime/current-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.json",
+        "run_193_receipt_sha256": "1396205a5f63d4571b0e5b738f00f3a7cadc8ab93499a012e0e0f827b70b495f",
+        "run_193r_review": "evidence/runtime/current-run-193r-independent-fleet-fuel-index-site-privacy-remediation-review-wave-38.json",
+        "run_193r_review_sha256": "87a1157f26bbfaf062ec22bceb616bf4f54c72f908cddfd68c2b59db91cbbb41",
+        "application_remediation_required": true,
+        "application_source_changed": true,
+        "integrated_to_main": true,
+        "published_to_origin_main": false,
+        "publication_authorized": false,
+        "static_route_feature_ownership_inherited": false,
+        "static_controller_action_bridge_inherited": false,
+        "static_page_or_frontend_ownership_inherited": false,
+        "queue_advance_inherited": false,
+        "route_frontend_or_write_path_correctness_inherited": false,
+        "independent_visible_row_logger_site_redaction_inherited": false,
+        "trip_playback_toggle_personal_fuel_store_or_adjacent_route_correctness_inherited": false,
+        "security_devices_or_user_site_access_service_correctness_inherited": false,
+        "broader_fleet_correctness_inherited": false
+      },
+      "passes": [
+        "P2",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Fleet & Assets",
+        "submodule": "SELECTED_FUEL_INDEX_SITE_PRIVACY_BOUNDARY",
+        "submodule_status": "CANDIDATE_REPORTING_ASSOCIATION_ONLY_ZERO_STATIC_OWNERSHIP_CREDIT"
+      },
+      "actor_and_job": {
+        "actor": "Approved-Site fleet fuel viewer",
+        "secondary_actors": "Actor with fleet.manage, foreign, missing, archived, inactive, unattributed and conflicted Asset provenance, primary and secondary approved Site assignments, ended/inactive/missing-profile/permission-revoked viewers, and row-attached logger identity in bounded tests",
+        "job": "Review and export vehicle fuel history without receiving fuel-row, vehicle, row-attached logger, note, or aggregate data outside approved operational Sites",
+        "status": "BOUNDED_TEST_ACTORS_VALIDATED_NOT_REPRESENTATIVE_SIGNED_IN_BROWSER"
+      },
+      "route_url": {
+        "route_names": "fleet-assets.fuel.index",
+        "route_paths": "routes/fleet-assets.php:57",
+        "raw_route_path_field": "routes/fleet-assets.php:57",
+        "queue_id": "RUN090-ROUTE-0088",
+        "route_record_id": "RUN077-ROUTE-0696",
+        "controller_action": "VehicleController::fuel",
+        "ownership_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+        "status": "BOUNDED_CURRENT_SOURCE_AND_RUNTIME_SCOPE_ONLY"
+      },
+      "frontend_anchor": {
+        "page_files": "resources/js/pages/fleet-assets/fuel/index.tsx",
+        "raw_page_file_field": "resources/js/pages/fleet-assets/fuel/index.tsx",
+        "application_commit": "04c32c36fdda6ce60ce281c06ad68aaa78527422",
+        "status": "SOURCE_LOCATOR_ONLY_ZERO_STATIC_PAGE_OR_FRONTEND_OWNERSHIP_CREDIT"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_RETAINED_HISTORICAL_RECORD"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Http/Controllers/FleetAssets/VehicleController.php:824",
+        "claim_anchors": [
+          "routes/fleet-assets.php:57",
+          "app/Http/Controllers/FleetAssets/VehicleController.php:824",
+          "tests/Feature/FleetAssets/FleetFuelIndexSitePrivacyTest.php:128-516"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "BOUNDED_CONTROLLER_QUERY_PROJECTION_AND_REGRESSION_REVIEW",
+        "application_commit": "04c32c36fdda6ce60ce281c06ad68aaa78527422"
+      },
+      "current_behaviour": {
+        "classification": "REMEDIATED_LOCAL_MAIN_BOUNDED_VERIFIED_NOT_PUBLISHED",
+        "summary": "Fuel index and CSV now derive one visible operational Asset universe from canonical direct, home, then client Site provenance and apply it to rows, filters, month-to-date fuel totals, the rolling 30-day entry count, trip-distance efficiency, and row-attached vehicle/logger identity. Foreign or missing Asset filters are concealed with 404; archived, inactive, unattributed and conflicted provenance fails closed; fleet.manage retains the operational-Site bypass. This row-scoped proof does not establish an independent logger-Site redaction rule for a logger attached to an otherwise visible fuel row.",
+        "runtime_observed": true,
+        "runtime_scope": "One unique post-merge focused component passed 6 tests / 206 assertions. The unchanged-source 6-failed/65-assertion reproduction, isolated 6/206 replay, supporting 20/215 Fleet regressions, and combined 26/421 aggregate are reported separately and not counted again."
+      },
+      "current_workflow": {
+        "matrix_summary": "Bounded controller remediation applies one canonical visible-vehicle boundary to the selected Fuel index page and CSV projection while preserving the legitimate fleet.manage operational-Site exception.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "BOUNDED_APPROVED_SITE_STANDARD_VIEWER_MANAGER_PAGE_CSV_ROW_FILTER_AGGREGATE_EFFICIENCY_AND_ROW_ATTACHED_IDENTITY_PATHS_EXECUTED; REPRESENTATIVE_BROWSER_EASE_WRITE_PATH_AND_BROADER_FLEET_WORKFLOW_NOT_EXECUTED"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-fleet-vehicle-register.md"
+      },
+      "evidence": {
+        "current_remediation_receipt": "evidence/runtime/current-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.json",
+        "independent_artifact_review": "evidence/runtime/current-run-193r-independent-fleet-fuel-index-site-privacy-remediation-review-wave-38.json",
+        "claim_anchors": [
+          "routes/fleet-assets.php:57",
+          "app/Http/Controllers/FleetAssets/VehicleController.php:824",
+          "tests/Feature/FleetAssets/FleetFuelIndexSitePrivacyTest.php:128-516"
+        ],
+        "test_commands_executed": 1,
+        "tests_executed": 6,
+        "assertions": 206,
+        "supporting_tests": 20,
+        "supporting_assertions": 215,
+        "baseline_failed_cases": 6,
+        "baseline_passed_cases": 0,
+        "baseline_assertions": 65,
+        "browser_cells": 0,
+        "database_checks": 1,
+        "database_cleanup": "numeric PID-suffixed test schemas absent; zero Fleet-owned PHP or Pest processes; isolated worktree removed cleanly"
+      },
+      "problem_root_cause": "Fuel row, export, filter, aggregate, and efficiency queries did not reuse one actor-visible operational-vehicle universe; row-attached logger fields consequently followed globally selected rows.",
+      "impact": "Before remediation, a user could receive foreign-Site fuel rows, row-attached vehicle and logger identity, notes, vehicle choices, CSV data, month-to-date fuel totals, a rolling 30-day entry count, and per-vehicle efficiency information.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve Fuel index and CSV access for approved operational Sites while deriving the Asset universe from canonical direct, home, then client provenance.",
+        "Conceal foreign and missing Asset filters and fail closed for archived, inactive, unattributed or conflicted Asset provenance; preserve the explicit fleet.manage operational-Site bypass.",
+        "Scope fuel rows, row-attached vehicle/logger identity, vehicle choices, month-to-date fuel totals, the rolling 30-day entry count, and efficiency inputs to that same Asset universe without copying third-party wording, assets, source, or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": "Reuse one fail-closed visible-vehicle query for page, CSV, filter, aggregate, and efficiency inputs, then project row-attached identity only from rows already inside that boundary.",
+        "status": "IMPLEMENTED_NATIVELY_WITHOUT_BENCHMARK_OR_DESIGN_CREDIT"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [],
+      "rbac_privacy": "One operating organisation across multiple Sites; approved Site access, exact action permissions, canonical Asset provenance, direct-object denial, and row-scoped identity privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "HISTORICAL_REMEDIATED_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Completed: unchanged-source six-case reproduction produced 6 failed / 65 assertions at the df65322 baseline",
+        "Completed: narrow controller plus permanent regression-test remediation integrated to local main at 04c32c36fdda6ce60ce281c06ad68aaa78527422 without publication",
+        "Completed: unique post-merge 6 tests / 206 assertions plus separately reported isolated 6/206 and supporting 20/215 evidence with independent artifact GO",
+        "Retained non-inherited gaps: queue-index-87 route/action owner, page/frontend ownership, independent visible-row logger-Site redaction, store/write paths, representative browser, benchmark, release, and completion"
+      ],
+      "confidence": {
+        "level": "HIGH_FOR_BOUNDED_FLEET_FUEL_INDEX_SITE_PRIVACY_REMEDIATION_DISPOSITION",
+        "evidence_gap": "Static route-feature ownership, controller-action bridge, page/frontend ownership, representative signed-in application browser, full-suite/coverage, ease, target-specific benchmark, independent visible-row logger-Site redaction, store/write paths, adjacent Fleet routes, and broader Fleet correctness remain unexecuted or unadjudicated."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording, or distinctive layout may be copied.",
+      "interim_safeguard": "When reviewing Fuel data, verify the selected vehicle, fuel rows, row-attached identity, filters, totals, and efficiency all remain inside approved operational Sites.",
+      "acceptance_criteria": {
+        "given_when_then": "Given an ordinary fleet.viewAny user with approved primary or secondary Site access, a fleet.manage user, and visible, foreign, missing, archived, inactive, unattributed and conflicted Assets under canonical direct/home/client provenance, when the Fuel index or CSV is requested, then only visible-Asset rows and their row-attached vehicle/logger identity are returned; foreign and missing Asset filters return 404; ended, inactive, missing-profile and permission-revoked viewers gain no foreign data; fleet.manage sees operational but not archived Sites; and vehicle choices, month-to-date fuel totals, the rolling 30-day entry count, and efficiency inputs use the same visible Asset universe without granting fuel.store, trip/playback, other Fleet-route, page, browser, benchmark, module, or completion credit.",
+        "status": "BOUNDED_MET_FOR_HISTORICAL_CLAIM_REMEDIATION_NOT_FINAL_FINDING_OR_FEATURE_COMPLETION"
+      },
+      "validation_plan": {
+        "required": "Retain focused row, CSV, filter concealment, direct/home/client provenance, conflict/unattributed/archived/inactive fail-closed, current-profile and permission, fleet.manage, vehicle-choice, aggregate, and efficiency regression coverage; keep write paths, independent visible-row logger-Site semantics, adjacent routes, and ownership separate.",
+        "unit": "NOT_SEPARATELY_REQUIRED_FOR_THIS_REMEDIATION",
+        "feature": "EXECUTED_6_TESTS_206_ASSERTIONS_ON_LOCAL_MAIN",
+        "architecture": "STATIC_MERGE_GO_PLUS_EXACT_ARTIFACT_GO",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED_OR_CREDITED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [],
+      "independent_review": {
+        "status": "COMPLETED_TWO_STATIC_GO_REVIEWS_PLUS_THREE_EXACT_ARTIFACT_GO_REVIEWS",
+        "reviewer": "independent controller/test reviewers and RUN-193R three-reviewer exact-artifact review",
+        "disagreements": "None. Reviews preserved canonical Asset-Site provenance, fail-closed filtering, row-scoped attached identity, aggregate and efficiency scoping, test-denominator separation, nonpublication, pending static ownership, and every stated noninheritance boundary.",
+        "reconciliation": "RUN-193 establishes reproduction, remediation, bounded delegated runtime, local integration, and nonpublication. RUN-193R alone authorizes one new historical-remediated record; RUN-194 alone changes the live register."
+      },
+      "unresolved_fields": [
+        "static feature owner and controller-action bridge for queue index 87",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline, and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "full-suite coverage, representative signed-in application browser, route/frontend/write ownership, independent visible-row logger-Site semantics, adjacent Fleet routes, and broader Fleet correctness"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
     }
   ],
   "current_static_linkage": {
@@ -3918,6 +4177,23 @@
       "audit_complete": false,
       "superseded_by_run_191_reporting_sources": true,
       "run_192_dashboard_verification_required": true
+    },
+    "run_192": {
+      "run_id": "RUN-192-AUDIT-DASHBOARD-VERIFICATION-WAVE-37",
+      "receipt_sha256": "cc95b38ece501bea317e78ef7769a7813e3a5a6c2041330e249fd196974cbb88",
+      "receipt_self_seal_sha256": "a112198be2915cfc8a88b31b38a9cb33c90ad407b6da83f85fac5deae6727995",
+      "dashboard_sha256": "8d19569e7bfb256edeecdc754e2bc47e2ddad3ecd8de099e3bb0dad9b50e313b",
+      "status": "VERIFIED_EXACT_ARTIFACT_ONLY",
+      "viewports": "4/4",
+      "visible_boundary_checks": "30/30 per viewport",
+      "navigation": "10/10",
+      "unique_local_resources": "476/476",
+      "anchor_elements": "893/893",
+      "application_browser_credit": false,
+      "publication_credit": false,
+      "audit_complete": false,
+      "superseded_by_run_194_reporting_sources": true,
+      "run_195_dashboard_verification_required": true
     }
   },
   "current_designated_application_access_preflight": {
