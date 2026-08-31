@@ -2,14 +2,20 @@
 
 namespace App\Jobs;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Shift;
 use App\Models\ShiftTask;
+use App\Models\User;
 use App\Notifications\ShiftTaskDueNotification;
 use App\Services\Facility\FacilitySignalService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class ShiftTaskDueJob implements ShouldQueue
 {
@@ -39,33 +45,82 @@ class ShiftTaskDueJob implements ShouldQueue
             ->orderBy('id')
             ->chunkById(100, function ($tasks) use ($signalService, $now): void {
                 foreach ($tasks as $task) {
-                    $dueAt = $task->scheduledFor();
-                    $worker = $task->shift?->staff;
+                    DB::transaction(function () use ($task, $signalService, $now): void {
+                        $currentTask = ShiftTask::query()
+                            ->lockForUpdate()
+                            ->find($task->id);
+                        $shift = $currentTask
+                            ? Shift::query()
+                                ->with([
+                                    'client:id,first_name,last_name,site_id',
+                                    'site:id,name',
+                                ])
+                                ->lockForUpdate()
+                                ->find($currentTask->shift_id)
+                            : null;
 
-                    if (! $dueAt || $dueAt->gt($now) || ! $worker) {
-                        continue;
-                    }
+                        if ($currentTask && $shift) {
+                            $currentTask->setRelation('shift', $shift);
+                        }
 
-                    $claimedAt = now();
-                    $claimed = ShiftTask::query()
-                        ->whereKey($task->id)
-                        ->whereNull('reminder_sent_at')
-                        ->update(['reminder_sent_at' => $claimedAt]);
+                        if (
+                            ! $currentTask
+                            || $currentTask->reminder_sent_at
+                            || $currentTask->is_completed
+                            || ! $shift
+                            || ! in_array($shift->status, ['scheduled', 'in_progress'], true)
+                            || ! $shift->user_id
+                        ) {
+                            return;
+                        }
 
-                    if ($claimed === 0) {
-                        continue;
-                    }
+                        $dueAt = $currentTask->scheduledFor();
+                        if (! $dueAt || $dueAt->gt($now)) {
+                            return;
+                        }
 
-                    try {
-                        $worker->notify(new ShiftTaskDueNotification($task));
-                        $signalService->emitShiftTaskDue($task, $worker);
-                    } catch (\Throwable $exception) {
-                        ShiftTask::query()
-                            ->whereKey($task->id)
-                            ->update(['reminder_sent_at' => null]);
+                        $worker = User::query()->lockForUpdate()->find($shift->user_id);
+                        if (! $worker) {
+                            return;
+                        }
 
-                        throw $exception;
-                    }
+                        $profile = HrEmployeeProfile::query()
+                            ->where('user_id', $worker->id)
+                            ->lockForUpdate()
+                            ->first();
+                        $worker->setRelation('hrEmployeeProfile', $profile);
+
+                        try {
+                            (new UserSiteAccessService)->assertCanAccessShift($worker, $shift);
+                        } catch (HttpExceptionInterface) {
+                            return;
+                        }
+
+                        $claimedAt = now();
+                        $claimed = ShiftTask::query()
+                            ->whereKey($currentTask->id)
+                            ->whereNull('reminder_sent_at')
+                            ->where('is_completed', false)
+                            ->update(['reminder_sent_at' => $claimedAt]);
+
+                        if ($claimed === 0) {
+                            return;
+                        }
+
+                        $currentTask->reminder_sent_at = $claimedAt;
+
+                        try {
+                            $worker->notify(new ShiftTaskDueNotification($currentTask));
+                            $signalService->emitShiftTaskDue($currentTask, $worker);
+                        } catch (\Throwable $exception) {
+                            ShiftTask::query()
+                                ->whereKey($currentTask->id)
+                                ->where('reminder_sent_at', $claimedAt)
+                                ->update(['reminder_sent_at' => null]);
+
+                            throw $exception;
+                        }
+                    });
                 }
             });
     }

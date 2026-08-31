@@ -3,13 +3,16 @@
 namespace App\Notifications;
 
 use App\Models\ShiftTask;
+use App\Models\User;
 use App\Models\UserNotificationPreference;
 use App\Notifications\Channels\PushChannel;
+use App\Services\UserSiteAccessService;
 use App\Support\ShiftTaskSupport;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class ShiftTaskDueNotification extends Notification implements ShouldQueue
 {
@@ -24,7 +27,12 @@ class ShiftTaskDueNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $preference = $this->preference($notifiable);
+        $recipient = $this->currentAuthorizedRecipient($notifiable);
+        if (! $recipient) {
+            return [];
+        }
+
+        $preference = $this->preference($recipient);
         if ($preference && ! $preference->enabled) {
             return [];
         }
@@ -41,6 +49,11 @@ class ShiftTaskDueNotification extends Notification implements ShouldQueue
         }
 
         return $channels;
+    }
+
+    public function shouldSend(object $notifiable, string $channel): bool
+    {
+        return $this->currentAuthorizedRecipient($notifiable) !== null;
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -113,5 +126,48 @@ class ShiftTaskDueNotification extends Notification implements ShouldQueue
             ->where('user_id', $notifiable->id)
             ->where('key', $this->pushPreferenceKey)
             ->first();
+    }
+
+    private function currentAuthorizedRecipient(object $notifiable): ?User
+    {
+        $notifiableId = method_exists($notifiable, 'getKey')
+            ? $notifiable->getKey()
+            : ($notifiable->id ?? null);
+        if (! is_numeric($notifiableId) || (int) $notifiableId <= 0) {
+            return null;
+        }
+
+        $recipient = User::query()->find((int) $notifiableId);
+        $task = ShiftTask::query()->with([
+            'shift.client:id,first_name,last_name,site_id',
+            'shift.site:id,name',
+        ])->find($this->task->getKey());
+        $shift = $task?->shift;
+
+        if (
+            ! $recipient
+            || ! $task
+            || $task->is_completed
+            || ! $shift
+            || ! in_array($shift->status, ['scheduled', 'in_progress'], true)
+            || (int) $shift->user_id !== (int) $recipient->id
+        ) {
+            return null;
+        }
+
+        $dueAt = $task->scheduledFor();
+        if (! $dueAt || $dueAt->isFuture()) {
+            return null;
+        }
+
+        try {
+            (new UserSiteAccessService)->assertCanAccessShift($recipient, $shift);
+        } catch (HttpExceptionInterface) {
+            return null;
+        }
+
+        $this->task = $task;
+
+        return $recipient;
     }
 }
