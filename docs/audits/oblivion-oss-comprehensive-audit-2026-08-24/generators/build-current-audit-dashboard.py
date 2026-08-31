@@ -3219,6 +3219,26 @@ for label, path in (
     ("RUN-186R independent Monitoring metric replay remediation review", "evidence/runtime/current-run-186r-independent-monitoring-metric-replay-dedupe-remediation-review-wave-36.json"),
     ("RUN-187 Monitoring metric replay remediation-reporting materializer", "generators/materialize-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.py"),
     ("RUN-187 Monitoring metric replay remediation-reporting receipt", "evidence/source/current-run-187-monitoring-metric-replay-dedupe-remediation-reporting-wave-36.json"),
+    ("RUN-188 exact RUN-187 audit-dashboard verification materializer", "generators/materialize-run-188-audit-dashboard-verification-wave-36.py"),
+    ("RUN-188 exact RUN-187 audit-dashboard verification", "evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json"),
+    ("RUN-189 Fleet playback route/action cohort generator", "generators/build-outcome-neutral-fleet-trip-playback-route-action-cohort-wave-37.py"),
+    ("RUN-189 Fleet playback route/action cohort", "evidence/source/root-run-189-outcome-neutral-fleet-trip-playback-route-action-cohort-wave-37.json"),
+    ("RUN-189R Fleet playback route/action review materializer", "generators/materialize-independent-outcome-neutral-fleet-trip-playback-route-action-review-wave-37.py"),
+    ("RUN-189R Fleet playback route/action review", "evidence/source/raw-run-189r-independent-outcome-neutral-fleet-trip-playback-route-action-review-wave-37.json"),
+    ("RUN-190 Fleet playback route/action overlay generator", "generators/integrate-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.py"),
+    ("RUN-190 Fleet playback route/action ownership overlay", "evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json"),
+    ("RUN-190R Fleet playback route/action overlay-review materializer", "generators/materialize-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.py"),
+    ("RUN-190R Fleet playback route/action overlay review", "evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json"),
+    ("RUN-191 Fleet playback route/action reporting materializer", "generators/materialize-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.py"),
+    ("RUN-191 Fleet playback route/action reporting receipt", "evidence/source/current-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.json"),
+    ("RUN-192 exact RUN-191 audit-dashboard verification materializer", "generators/materialize-run-192-audit-dashboard-verification-wave-37.py"),
+    ("RUN-192 exact RUN-191 audit-dashboard verification", "evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json"),
+    ("RUN-193 Fleet Fuel index Site-privacy remediation materializer", "generators/materialize-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.py"),
+    ("RUN-193 Fleet Fuel index Site-privacy remediation receipt", "evidence/runtime/current-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.json"),
+    ("RUN-193R independent Fleet Fuel remediation-review materializer", "generators/materialize-independent-run-193-fleet-fuel-index-site-privacy-remediation-review-wave-38.py"),
+    ("RUN-193R independent Fleet Fuel remediation review", "evidence/runtime/current-run-193r-independent-fleet-fuel-index-site-privacy-remediation-review-wave-38.json"),
+    ("RUN-194 Fleet Fuel remediation-reporting materializer", "generators/materialize-run-194-fleet-fuel-index-site-privacy-remediation-reporting-wave-38.py"),
+    ("RUN-194 Fleet Fuel remediation-reporting receipt", "evidence/source/current-run-194-fleet-fuel-index-site-privacy-remediation-reporting-wave-38.json"),
 ):
     if path not in checkpoint_paths:
         checkpoint_evidence.append((label, path))
@@ -3231,9 +3251,9 @@ checkpoint_evidence_links = "".join(
 checkpoint_evidence_links += (
     '<li><a href="task-scripts/">RUN-072 task-script directory (300 files)</a> '
     f'<code>{html.escape(usability_materialization["outputs"]["task_scripts"]["bundle_sha256"])}</code></li>'
-    '<li><a href="generators/materialize-run-188-audit-dashboard-verification-wave-36.py">RUN-188 audit-dashboard verification materializer</a> '
+    '<li><a href="generators/materialize-run-195-audit-dashboard-verification-wave-38.py">RUN-195 audit-dashboard verification materializer</a> '
     '<span>forward generator; fresh exact-artifact verification required</span></li>'
-    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">RUN-188 audit-dashboard verification receipt</a> '
+    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json">RUN-195 audit-dashboard verification receipt</a> '
     '<span>forward receipt; intentionally unhashed to avoid an evidence cycle</span></li>'
 )
 start_ready_ids = "<br>".join(
@@ -3366,7 +3386,7 @@ assert len(historical_discovery_claims) == 12
 
 assert findings_register["schema_version"] == "oblivion_audit_findings_v2_mixed_current_status"
 assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_SIX_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
-assert findings_register["generated_on"] == "2026-08-31"
+assert findings_register["generated_on"] == "2026-09-01"
 assert findings_register["architecture_rule"] == "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries."
 findings_pins = findings_register["pins"]
 assert findings_pins["governing_prompt_sha256"] == "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
@@ -6138,6 +6158,14 @@ run_194_template_rewrites = [
         '<a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">RUN-188 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json">RUN-190 Fleet playback/show ownership-overlay receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json">RUN-190R independent overlay-review receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.json">RUN-191 reporting receipt</a> (verified and hashed in the current evidence list) · <a href="generators/materialize-run-192-audit-dashboard-verification-wave-37.py">RUN-192 audit-dashboard verification materializer</a> (forward reference; intentionally unhashed) · <a href="evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json">RUN-192 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
         '<a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">RUN-188 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-190-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-wave-37.json">RUN-190 Fleet playback/show ownership-overlay receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-190r-independent-reviewed-outcome-neutral-fleet-trip-playback-route-action-ownership-overlay-review-wave-37.json">RUN-190R independent overlay-review receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-191-reviewed-fleet-trip-playback-route-action-reporting-wave-37.json">RUN-191 reporting receipt</a> (verified and hashed in the current evidence list) · <a href="generators/materialize-run-192-audit-dashboard-verification-wave-37.py">RUN-192 audit-dashboard verification materializer</a> (verified and hashed in the current evidence list) · <a href="evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json">RUN-192 responsive audit-dashboard verification receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/runtime/current-run-193-fleet-fuel-index-site-privacy-remediation-wave-38.json">RUN-193 Fleet Fuel remediation receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/runtime/current-run-193r-independent-fleet-fuel-index-site-privacy-remediation-review-wave-38.json">RUN-193R independent Fuel review receipt</a> (verified and hashed in the current evidence list) · <a href="evidence/source/current-run-194-fleet-fuel-index-site-privacy-remediation-reporting-wave-38.json">RUN-194 reporting receipt</a> (verified and hashed in the current evidence list) · <a href="generators/materialize-run-195-audit-dashboard-verification-wave-38.py">RUN-195 audit-dashboard verification materializer</a> (forward reference; intentionally unhashed) · <a href="evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json">RUN-195 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)',
     ),
+    (
+        "RUN-151, RUN-155, RUN-158, RUN-161, RUN-164, RUN-168, RUN-172, and RUN-175 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-177 reporting sources or the RUN-178 dashboard that will be generated from them.",
+        "RUN-151, RUN-155, RUN-158, RUN-161, RUN-164, RUN-168, RUN-172, RUN-175, RUN-178, RUN-182, RUN-185, RUN-188, and RUN-192 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-194 reporting sources or the RUN-195 dashboard generated from them.",
+    ),
+    (
+        '<li><a href="evidence/browser/current-audit-dashboard-verification-run-172-wave-31.json">Superseded RUN-172 verification GO</a></li></ul>',
+        '<li><a href="evidence/browser/current-audit-dashboard-verification-run-172-wave-31.json">Superseded RUN-172 verification GO</a></li><li><a href="evidence/browser/current-audit-dashboard-verification-run-175-wave-32.json">Superseded RUN-175 verification GO</a></li><li><a href="evidence/browser/current-audit-dashboard-verification-run-178-wave-33.json">Superseded RUN-178 verification GO</a></li><li><a href="evidence/browser/current-audit-dashboard-verification-run-182-wave-34.json">Superseded RUN-182 verification GO</a></li><li><a href="evidence/browser/current-audit-dashboard-verification-run-185-wave-35.json">Superseded RUN-185 verification GO</a></li><li><a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">Superseded RUN-188 verification GO</a></li><li><a href="evidence/browser/current-audit-dashboard-verification-run-192-wave-37.json">Superseded RUN-192 verification GO</a></li></ul>',
+    ),
 ]
 run_194_rewrite_expected_counts = {
     "current RUN-191 split of 15 retained claim identities": 2,
@@ -6148,6 +6176,31 @@ for old, new in run_194_template_rewrites:
         f"Expected {expected_count} RUN-194 template rewrite target(s): {old}"
     )
     current_template_text = current_template_text.replace(old, new)
+
+fresh_run_195_section_start = (
+    '<section class="panel"><h2>Fresh RUN-195 audit-dashboard verification required</h2><p>'
+)
+fresh_run_195_section_end = '</p><ul class="list">'
+assert current_template_text.count(fresh_run_195_section_start) == 1
+fresh_run_195_start_index = current_template_text.index(fresh_run_195_section_start)
+fresh_run_195_body_start = fresh_run_195_start_index + len(fresh_run_195_section_start)
+fresh_run_195_body_end = current_template_text.index(
+    fresh_run_195_section_end,
+    fresh_run_195_body_start,
+)
+fresh_run_195_body = (
+    "The exact RUN-194 reporting dashboard must be generated and checked in RUN-195 at 1440×900, 1280×800, 1024×768, and 390×844. "
+    "RUN-188 verifies only the superseded RUN-187 HTML; RUN-189/R–191 establish and report only the playback/show owner and bridge. "
+    "RUN-192 verifies the exact RUN-191 HTML; RUN-193 reproduces and locally integrates the bounded Fleet Fuel index/CSV Site-privacy remediation, RUN-193R authorizes one historical-remediated record, and RUN-194 changes only live reporting while preserving the verified RUN-192 HTML byte-for-byte. "
+    "None supplies audit-dashboard verification for the new RUN-195 HTML. "
+    "The linked RUN-195 receipt must record page overflow, bounded mobile table scrolling, navigation, local links, anchors, duplicate authored IDs, console output, visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership, 16 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 6 historical remediated, 161/2,609 uniquely counted bounded tests/assertions, exact separation of RUN-159 MED-RBAC 73/1,481, RUN-162 MED-CD-SCOPE 5/48, RUN-173 SAFE 5/60, RUN-176 Fleet trip-index 5/175, RUN-183 Fleet playback 11/167, final corrected RUN-186 Monitoring metric replay 56/472, and RUN-193 Fleet Fuel 6/206, with all red/replay/support/combined overlaps excluded, current 2/340 benchmark mapping, 0/340 final no-match/NCM, 338 unresolved targets, one operating organisation across multiple Sites, Gate 4 open, and every non-bounded runtime, application-browser, final-finding, release, Pass, feature-completion, and audit-complete zero-credit boundary. "
+    "It verifies the RUN-194 audit artifact only and grants no application-browser, responsive-application, visual, workflow, release, Pass, feature-completion, or audit-complete credit."
+)
+current_template_text = (
+    current_template_text[:fresh_run_195_body_start]
+    + fresh_run_195_body
+    + current_template_text[fresh_run_195_body_end:]
+)
 TEMPLATE = Template(current_template_text)
 
 
@@ -6653,12 +6706,10 @@ current_visible_boundaries = [
     "candidate index 87 pending behind index 86",
     "baseline df65322f8eb7 · fix 2ec4b70e379c · local merge 04c32c36fdda · origin/main c39b07654705 unchanged",
     "14 retained",
-    "15 claim identities",
     "13a7f37da9c9",
     "790bc11e3fb2",
     "c643c9e5eecf",
     "3 claim-specific test functions / 146 assertions / 3 synchronized two-process races",
-    "reported separately from the historical 78/1,529 and current 155/2,403",
     "supporting 43/716 overlaps",
     "73 bounded tests / 1,481 assertions",
     "5 focused tests / 48 assertions",
@@ -6689,9 +6740,16 @@ current_visible_boundaries = [
     "RUN-090 frozen denominator / RUN-190R current accounting",
     "index 84 is not recredited, index 85 fleet-assets.trips.playback is integrated, and index 86 fleet-assets.trips.playback.data is next",
     "RUN-168 verifies that exact dashboard",
-    "RUN-182 verifies only the superseded RUN-181 HTML",
+    "RUN-188 verifies only the superseded RUN-187 HTML",
     "exact dashboard later verified by RUN-185",
     "visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership",
+    "no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-194 reporting sources or the RUN-195 dashboard generated from them",
+    "None supplies audit-dashboard verification for the new RUN-195 HTML.",
+    "The linked RUN-195 receipt must record",
+    "It verifies the RUN-194 audit artifact only",
+    "RUN-188 exact RUN-187 audit-dashboard verification materializer",
+    "RUN-194 Fleet Fuel remediation-reporting receipt",
+    "RUN-195 audit-dashboard verification materializer",
 ]
 missing_current_visible_boundaries = [
     boundary for boundary in current_visible_boundaries if boundary not in dashboard
@@ -6705,6 +6763,12 @@ for stale_current in (
     "Every current raw, generated, reviewed, and integrated RUN-077–191",
     "current RUN-191 split of 15 retained claim identities",
     "Fresh RUN-192 audit-dashboard verification required",
+    "current RUN-177 reporting sources or the RUN-178 dashboard",
+    "new RUN-188 HTML",
+    "The linked RUN-188 receipt must record",
+    "It verifies the RUN-187 audit artifact only",
+    '<a href="generators/materialize-run-188-audit-dashboard-verification-wave-36.py">RUN-188 audit-dashboard verification materializer</a> <span>forward generator',
+    '<a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">RUN-188 audit-dashboard verification receipt</a> <span>forward receipt',
 ):
     assert stale_current not in dashboard
 assert "0 current application tests" not in dashboard
@@ -6810,6 +6874,7 @@ assert (
     in {
         "decae30e09dae8f239ebb00ecb758bdf290edd5d4ca8f69904686c8f7a67d5c2",
         "5548a5cb461c2c13ef237a2c622db597289c6bfc9f14bb992a3c89a498a4666a",
+        "966c93ed940d2fb58e4510e65442b10faab2ea5d966e66abb4acc2695fb1a091",
     }
 )
 temporary_path = output_path.with_name(f".{output_path.name}.tmp-run195-dashboard")

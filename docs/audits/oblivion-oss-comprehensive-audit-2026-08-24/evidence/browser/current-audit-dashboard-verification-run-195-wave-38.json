@@ -1,0 +1,767 @@
+{
+  "schema_version": "run-195-audit-dashboard-verification-wave-38-v1",
+  "run_id": "RUN-195-AUDIT-DASHBOARD-VERIFICATION-WAVE-38",
+  "generated_at": null,
+  "pins": {
+    "run_194_commit": "47a6d231c52a78c9f0f606e41d4492d754771027",
+    "run_194_tree": "c1e262a50c67797b819d3f1085ece2782b41237e",
+    "run_194_parent": "39a5d97d7d0ff9ea03070e90193581479f423022",
+    "origin_main": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead": 78,
+    "local_main_behind": 0,
+    "run_194_materializer": {
+      "path": "generators/materialize-run-194-fleet-fuel-index-site-privacy-remediation-reporting-wave-38.py",
+      "sha256": "816f8e9449a434eef79e64ec5cb7d10a4e6f1628a8c099a441c9beab0fac17f8",
+      "git_blob_id": "9f758662b5265c4f8c43f08d45ae897333746f92",
+      "bytes": 40384,
+      "lines": 768
+    },
+    "run_194_receipt": {
+      "path": "evidence/source/current-run-194-fleet-fuel-index-site-privacy-remediation-reporting-wave-38.json",
+      "sha256": "84663ee10905b82203e32203a78d1086b4388bf68617718b975b812d08b8e63d",
+      "git_blob_id": "2f8b8eeb63a99e58c7b77fa77f4bbcc50ea18f8b",
+      "bytes": 18867,
+      "lines": 452
+    },
+    "run_194_receipt_self_seal_sha256": "e6e882b0db2a391d64432f88d577d67b362de78090c910d5f902051a6e738a96",
+    "committed_findings": {
+      "path": "findings.json",
+      "sha256": "268b63e20dcc40ecc0ba772e8431a9d8a35c9df9bfa98197abdfc273e972e525",
+      "git_blob_id": "6735e906278726d34dcbd6aba30e5feb5f60b27f",
+      "bytes": 664123,
+      "lines": 11633
+    },
+    "committed_run_194_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "cd93d61882ef577695eb1765f44c9a4b7b3bda853881dce58de5e3c46dd31e82",
+      "git_blob_id": "cd41915fb6a42d0314536c7f4cc0cfdc9761c5ba",
+      "bytes": 777100,
+      "lines": 6827
+    },
+    "committed_run_192_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "8d19569e7bfb256edeecdc754e2bc47e2ddad3ecd8de099e3bb0dad9b50e313b",
+      "git_blob_id": "fb0ba424878117bf1362aea77c892a00fda32b95",
+      "bytes": 317284,
+      "lines": 78
+    },
+    "final_run_195_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "44fe804d6671672fbe0c2cc73d2f0917f4042c466901419f9b76d89ecbdfd5a4",
+      "git_blob_id": "3971a40720327b053f83ad5d8a812f14ccbc8ead",
+      "bytes": 785868,
+      "lines": 6892
+    },
+    "final_run_195_builder_diff": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "binary_diff_sha256": "38a2fbb775c00cdfad999262402761bfeac69dea2877990030c5c69ad80a9e50",
+      "numstat": {
+        "added": 71,
+        "deleted": 6
+      }
+    },
+    "final_run_195_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+      "git_blob_id": "6b8bd0606ed2aade854bd9f17d5022c542ddd856",
+      "bytes": 331400,
+      "lines": 78
+    },
+    "final_run_195_dashboard_diff": {
+      "path": "audit-dashboard.html",
+      "binary_diff_sha256": "ff9c98272a67c064764a89b3002b2a5aada6a48b7be145028a30f25790f8e4f8",
+      "numstat": {
+        "added": 17,
+        "deleted": 17
+      }
+    },
+    "run_195_materializer": {
+      "path": "generators/materialize-run-195-audit-dashboard-verification-wave-38.py",
+      "sha256": "349576404fe3ff96f1ceeeb9f7fa85887150246fc73bba3d9b48549415509c8d",
+      "git_blob_id": "a2857a1c7bde476379bca15e76c9f31831ec9923",
+      "bytes": 54098,
+      "lines": 1386
+    }
+  },
+  "reported_snapshot": {
+    "static": {
+      "source_owner_records": 667,
+      "route_owner_records": 310,
+      "page_owner_records": 357,
+      "static_controller_action_bridges": 98,
+      "bounded_source_denominator": 3929,
+      "bounded_source_residual": 3262,
+      "bounded_source_ownership_percent": "16.976330"
+    },
+    "queue": {
+      "reviewed": 121,
+      "pending": 386,
+      "owned": 99,
+      "shared": 10,
+      "alias": 5,
+      "gap": 7,
+      "without_ownership": 408
+    },
+    "finding_lineage": {
+      "records": 16,
+      "provisional": 8,
+      "historical_already_fixed": 2,
+      "historical_remediated": 6,
+      "bounded_tests": 161,
+      "bounded_assertions": 2609,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "benchmark": {
+      "mapped": 2,
+      "targets": 340,
+      "final_no_match_or_NCM": 0,
+      "unresolved": 338
+    }
+  },
+  "reported_transition": {
+    "from_dashboard_sha256": "8d19569e7bfb256edeecdc754e2bc47e2ddad3ecd8de099e3bb0dad9b50e313b",
+    "to_dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+    "reported_finding_id": "FLEET-FUEL-INDEX-SITE-PRIVACY-01",
+    "run_194_forward_gate_satisfied_by_this_artifact": true,
+    "static_ownership_or_queue_advance": false,
+    "new_application_finding": false
+  },
+  "generation": {
+    "builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "44fe804d6671672fbe0c2cc73d2f0917f4042c466901419f9b76d89ecbdfd5a4",
+      "git_blob_id": "3971a40720327b053f83ad5d8a812f14ccbc8ead",
+      "bytes": 785868,
+      "lines": 6892
+    },
+    "dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+      "git_blob_id": "6b8bd0606ed2aade854bd9f17d5022c542ddd856",
+      "bytes": 331400,
+      "lines": 78
+    },
+    "builder_diff": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "binary_diff_sha256": "38a2fbb775c00cdfad999262402761bfeac69dea2877990030c5c69ad80a9e50",
+      "numstat": {
+        "added": 71,
+        "deleted": 6
+      }
+    },
+    "dashboard_diff": {
+      "path": "audit-dashboard.html",
+      "binary_diff_sha256": "ff9c98272a67c064764a89b3002b2a5aada6a48b7be145028a30f25790f8e4f8",
+      "numstat": {
+        "added": 17,
+        "deleted": 17
+      }
+    },
+    "builder_executed_twice_with_identical_dashboard_bytes": true,
+    "source_literal_boundaries": 193,
+    "output_utf8_lf": true
+  },
+  "superseded_run_192_observation": {
+    "dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "8d19569e7bfb256edeecdc754e2bc47e2ddad3ecd8de099e3bb0dad9b50e313b",
+      "git_blob_id": "fb0ba424878117bf1362aea77c892a00fda32b95",
+      "bytes": 317284,
+      "lines": 78
+    },
+    "superseded_by_dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+    "no_current_browser_credit_inherited": true
+  },
+  "current_browser_input": {
+    "path": "C:\\Users\\steph\\.codex\\attachments\\8b35b9fe-b295-4a84-bdf9-a8afb05b2daa\\run195-browser-observation-wave-38.json",
+    "sha256": "dc55ddf284498358bab9f53d738649c013f4b4fcfeed54ffb925994999cccd22",
+    "bytes": 34350,
+    "lines": 976,
+    "observation_self_seal_sha256": "6a59fe66d0dba07bee138d78b38ff14390d703889403b68fc95861fa1ee38c25"
+  },
+  "current_browser_verification": {
+    "browser": {
+      "name": "Codex in-app browser",
+      "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+      "tab_id": "19"
+    },
+    "artifact": {
+      "url": "http://127.0.0.1:43217/audit-dashboard.html",
+      "document_title": "Oblivion Findings current-source audit",
+      "server_host": "127.0.0.1",
+      "server_port": 43217,
+      "server_pid": 35108,
+      "server_executable": "C:\\Users\\steph\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+      "http_status": 200,
+      "response_content_length": 331400,
+      "browser_fetched_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+      "observed_at": "2026-09-01T10:39:53.592265+12:00"
+    },
+    "viewports": {
+      "1440x900": {
+        "visible_text_passed": 39,
+        "visible_text_total": 39,
+        "anchor_elements": 944,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      },
+      "1280x800": {
+        "visible_text_passed": 39,
+        "visible_text_total": 39,
+        "anchor_elements": 944,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      },
+      "1024x768": {
+        "visible_text_passed": 39,
+        "visible_text_total": 39,
+        "anchor_elements": 944,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      },
+      "390x844": {
+        "visible_text_passed": 39,
+        "visible_text_total": 39,
+        "anchor_elements": 944,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      }
+    },
+    "navigation": [
+      {
+        "label": "Progress",
+        "expected_hash": "#progress",
+        "observed_hash": "#progress",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:43217/audit-dashboard.html#progress",
+        "final_url": "http://127.0.0.1:43217/audit-dashboard.html#progress",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00"
+      },
+      {
+        "label": "RUN-194",
+        "expected_hash": "#checkpoint",
+        "observed_hash": "#checkpoint",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:43217/audit-dashboard.html#checkpoint",
+        "final_url": "http://127.0.0.1:43217/audit-dashboard.html#checkpoint",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00"
+      },
+      {
+        "label": "Pages",
+        "expected_hash": "#pages",
+        "observed_hash": "#pages",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:43217/audit-dashboard.html#pages",
+        "final_url": "http://127.0.0.1:43217/audit-dashboard.html#pages",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00"
+      },
+      {
+        "label": "Static census",
+        "expected_hash": "#static-census",
+        "observed_hash": "#static-census",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:43217/audit-dashboard.html#static-census",
+        "final_url": "http://127.0.0.1:43217/audit-dashboard.html#static-census",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00"
+      },
+      {
+        "label": "Runtime gates",
+        "expected_hash": "#runtime",
+        "observed_hash": "#runtime",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:43217/audit-dashboard.html#runtime",
+        "final_url": "http://127.0.0.1:43217/audit-dashboard.html#runtime",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00"
+      },
+      {
+        "label": "Benchmarks",
+        "expected_hash": "#benchmarks",
+        "observed_hash": "#benchmarks",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:43217/audit-dashboard.html#benchmarks",
+        "final_url": "http://127.0.0.1:43217/audit-dashboard.html#benchmarks",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00"
+      },
+      {
+        "label": "Modules",
+        "expected_hash": "#modules",
+        "observed_hash": "#modules",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:43217/audit-dashboard.html#modules",
+        "final_url": "http://127.0.0.1:43217/audit-dashboard.html#modules",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00"
+      },
+      {
+        "label": "Finding status",
+        "expected_hash": "#findings",
+        "observed_hash": "#findings",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:43217/audit-dashboard.html#findings",
+        "final_url": "http://127.0.0.1:43217/audit-dashboard.html#findings",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00"
+      },
+      {
+        "label": "Architecture",
+        "expected_hash": "#architecture",
+        "observed_hash": "#architecture",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:43217/audit-dashboard.html#architecture",
+        "final_url": "http://127.0.0.1:43217/audit-dashboard.html#architecture",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00"
+      },
+      {
+        "label": "Gaps",
+        "expected_hash": "#gaps",
+        "observed_hash": "#gaps",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:43217/audit-dashboard.html#gaps",
+        "final_url": "http://127.0.0.1:43217/audit-dashboard.html#gaps",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00"
+      }
+    ],
+    "console": {
+      "messages": [],
+      "page_errors": [],
+      "warning_or_error_logs": [],
+      "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+      "tab_id": "19",
+      "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+      "observed_at": "2026-09-01T10:39:53.592265+12:00"
+    },
+    "visual_checks": {
+      "desktop_result": "GO_NO_CLIPPING_OR_OVERLAP",
+      "mobile_result": "GO_NO_CLIPPING_OR_OVERLAP",
+      "mobile_navigation_horizontally_scrollable_at_390x844": true,
+      "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+      "tab_id": "19",
+      "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+      "observed_at": "2026-09-01T10:39:53.592265+12:00"
+    },
+    "screenshots": [
+      {
+        "viewport": "1440x900",
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      },
+      {
+        "viewport": "1280x800",
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      },
+      {
+        "viewport": "1024x768",
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      },
+      {
+        "viewport": "390x844",
+        "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+        "tab_id": "19",
+        "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+        "observed_at": "2026-09-01T10:39:53.592265+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      }
+    ],
+    "deliverable": {
+      "dashboard_tab_marked_deliverable": true,
+      "current_exact_dashboard_tab_retained": true,
+      "browser_viewport_override_reset": true,
+      "provider_id": "-f212-4901-940d-6bb6bd3f36ed",
+      "tab_id": "19",
+      "dashboard_sha256": "9a87dc70a7b190347ca7029c12abf8e025e4c722a6256502ba8c1c9af542f3b9",
+      "observed_at": "2026-09-01T10:39:53.592265+12:00"
+    },
+    "observation_self_seal_sha256": "6a59fe66d0dba07bee138d78b38ff14390d703889403b68fc95861fa1ee38c25"
+  },
+  "html_graph": {
+    "source_literal_boundary_count": 193,
+    "browser_visible_text_boundary_count": 39,
+    "missing_browser_visible_text_boundaries_before_browser": [],
+    "href_attribute_count": 945,
+    "anchor_element_count": 944,
+    "fragment_anchor_count": 10,
+    "authored_id_count": 10,
+    "duplicate_id_count": 0,
+    "heading_count": 26,
+    "section_count": 26,
+    "table_count": 10,
+    "table_wrap_count": 10,
+    "local_relative_link_occurrences": 934,
+    "unique_local_resources": 491,
+    "existing_unique_local_resources": 491,
+    "missing_local_resources_before_receipt_write": [],
+    "hash_bearing_link_pairs": 805,
+    "hashed_file_occurrences": 803,
+    "unique_hashed_files": 417,
+    "hashed_directory_occurrences": 2,
+    "hash_mismatches": [],
+    "ordered_navigation_label_hash_pairs_verified": true
+  },
+  "http_head_verification": {
+    "expected_unique_resources": 491,
+    "verified_count": 491,
+    "failure_count": 0,
+    "complete": true
+  },
+  "server_cleanup": {
+    "temporary_loopback_host": "127.0.0.1",
+    "temporary_loopback_port": 43217,
+    "temporary_server_pid": 35108,
+    "listeners_after_cleanup": 0,
+    "exact_server_pid_present_after_cleanup": false,
+    "matching_loopback_processes_after_cleanup": 0,
+    "complete": true
+  },
+  "finding_boundary": {
+    "finding_id": "FLEET-FUEL-INDEX-SITE-PRIVACY-01",
+    "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "selected_get_index_and_csv_site_privacy_only": true,
+    "candidate_feature_association_only": true,
+    "static_ownership_credit": false,
+    "adjacent_route_credit": false,
+    "independent_logger_site_inheritance_credit": false,
+    "final_finding": false
+  },
+  "execution_boundary": {
+    "bounded_unique_tests": 161,
+    "bounded_unique_assertions": 2609,
+    "run_195_application_runtime_or_tests_executed": false,
+    "run_195_browser_scope": "static audit-dashboard HTML only",
+    "full_suite_or_coverage": false
+  },
+  "benchmark_boundary": {
+    "mapped": 2,
+    "targets": 340,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338,
+    "run_195_benchmark_credit": false
+  },
+  "noninheritance": {
+    "application_browser": false,
+    "application_correctness": false,
+    "application_privacy": false,
+    "application_runtime": false,
+    "static_route_or_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_advance": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "deployment": false,
+    "release": false,
+    "publication": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "worktree_attestation": {
+    "staged_paths": [],
+    "modified_paths": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py"
+    ],
+    "untracked_paths": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-195-audit-dashboard-verification-wave-38.py",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json"
+    ],
+    "application_or_test_dirt": [],
+    "summary_timeline_reserved_paths_unchanged": true,
+    "my_day_reserved_paths_unchanged": true
+  },
+  "mutation_attestation": {
+    "materializer_writes_only": "evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json",
+    "atomic_exclusive_temp_write": true,
+    "fsync_before_replace": true,
+    "stale_temp_refused": true,
+    "optimized_python_refused": true,
+    "strict_duplicate_key_free_json": true,
+    "canonical_self_seal": true
+  },
+  "credit_boundary": {
+    "exact_run_195_dashboard_artifact_verification": true,
+    "application_source_or_test_change": false,
+    "application_runtime_reexecution": false,
+    "application_browser": false,
+    "correctness_or_privacy_finding": false,
+    "static_route_or_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_advance": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "full_suite_or_coverage": false,
+    "pass": false,
+    "deployment": false,
+    "release": false,
+    "publication": false,
+    "final_finding": false,
+    "feature_or_module_completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "completion_gates": [
+    {
+      "name": "routes_classified",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "inertia_pages_classified",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "features_in_canonical_register",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "routes_and_pages_mapped_to_feature_id",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "features_with_verified_benchmark_or_final_ncm",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "human_features_with_task_script_and_ten_scores",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "common_and_safety_journeys_cross_reviewed",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "hero_banner_instances_classified",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "overlay_implementations_and_triggers_classified",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "safe_routes_observed_at_desktop",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "selected_families_and_journeys_all_viewports",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "required_visual_states_classified",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "material_visual_finding_families_resampled",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "models_classified",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "policies_classified",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "service_domain_entries_classified",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "critical_async_owners_classified",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "modules_with_all_eight_passes",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "prompt_benchmark_projects_formally_triaged",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "p0_p1_complete_finding_fields",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "redesigns_neutral_native_no_copy",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "ease_4_5_claims_independently_reviewed",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "browser_claims_labeled",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "visual_inconsistencies_complete_context",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "official_source_inference_specialist_split",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "all_agents_returned_reconciled_represented_none_live",
+      "complete": false,
+      "reason": "RUN195 verifies one exact dashboard artifact only"
+    }
+  ],
+  "artifact_scope": {
+    "materializer": "generators/materialize-run-195-audit-dashboard-verification-wave-38.py",
+    "receipt": "evidence/browser/current-audit-dashboard-verification-run-195-wave-38.json",
+    "builder": "generators/build-current-audit-dashboard.py",
+    "dashboard": "audit-dashboard.html",
+    "path_count": 4
+  },
+  "remote_state": {
+    "origin_main": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "push_performed": false,
+    "publication_claimed": false
+  },
+  "finalization_state": {
+    "browser_complete": true,
+    "resource_complete": true,
+    "cleanup_complete": true,
+    "navigation_verified_count": 10,
+    "browser_warning_error_count": 0,
+    "dashboard_tab_marked_deliverable": true
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "receipt_self_seal_sha256": "a3dc0871156ba4c6376a92a4cacab8b8697fa0efcd49dea42d212533aff6b284"
+}
