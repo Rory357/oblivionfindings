@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class RunHrScheduledReportsJob implements ShouldQueue
@@ -70,8 +71,8 @@ class RunHrScheduledReportsJob implements ShouldQueue
     protected function notifyRecipients(HrReportSubscription $subscription, HrReportExport $export): void
     {
         $recipientIds = collect($subscription->recipient_user_ids ?? [])
-            ->filter(fn ($id) => is_numeric($id))
-            ->map(fn ($id) => (int) $id)
+            ->map(fn (mixed $id): ?int => $this->canonicalRecipientId($id))
+            ->filter()
             ->unique()
             ->values();
 
@@ -79,13 +80,27 @@ class RunHrScheduledReportsJob implements ShouldQueue
             return;
         }
 
+        $workerDate = Carbon::now((string) config('app.worker_timezone', 'Pacific/Auckland'))
+            ->toDateString();
+
         User::query()
             ->whereIn('id', $recipientIds->all())
             ->whereNotNull('approved_at')
-            ->with(['roles.permissions', 'permissionOverrides'])
-            ->chunkById(100, function ($users) use ($export) {
+            ->with([
+                'hrEmployeeProfile' => fn ($profile) => $profile->withTrashed(),
+                'permissionOverrides',
+                'roles.permissions',
+            ])
+            ->chunkById(100, function ($users) use ($export, $workerDate) {
                 foreach ($users as $user) {
-                    if (! $user->canDo('hr.reports.view')) {
+                    $profile = $user->hrEmployeeProfile;
+                    if (($profile && (
+                        $profile->trashed()
+                        || ! $profile->is_active
+                        || ! $profile->start_date
+                        || $profile->start_date->toDateString() > $workerDate
+                        || ($profile->end_date && $profile->end_date->toDateString() < $workerDate)
+                    )) || ! $user->canDo('hr.reports.view')) {
                         continue;
                     }
 
@@ -100,5 +115,20 @@ class RunHrScheduledReportsJob implements ShouldQueue
                     }
                 }
             });
+    }
+
+    private function canonicalRecipientId(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value > 0 ? $value : null;
+        }
+
+        if (! is_string($value) || preg_match('/^[1-9][0-9]*$/D', $value) !== 1) {
+            return null;
+        }
+
+        $id = (int) $value;
+
+        return $id > 0 && (string) $id === $value ? $id : null;
     }
 }
