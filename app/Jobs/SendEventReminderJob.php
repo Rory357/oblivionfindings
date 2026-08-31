@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\SiteCalendarEvent;
+use App\Models\User;
 use App\Notifications\EventReminderNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -23,40 +24,62 @@ class SendEventReminderJob implements ShouldQueue
     public function handle(): void
     {
         $now = now();
-        $windowStart = $now->copy();
-        $windowEnd = $now->copy()->addMinutes(10);
+        $windowStart = $now->copy()->subMinutes(5);
 
-        // Find events with reminders due
         $events = SiteCalendarEvent::query()
-            ->where('start_at', '>', $now)
-            ->whereNull('last_reminder_sent_at')
+            ->where('start_at', '>', $windowStart)
             ->whereNotNull('reminder_minutes')
             ->whereIn('status', ['approved', 'draft'])
             ->whereHas('owner')
             ->get();
 
         foreach ($events as $event) {
-            $reminderMinutes = $event->reminder_minutes ?? [];
-            
+            $lastSentAt = $event->last_reminder_sent_at;
+            $reminderMinutes = collect($event->reminder_minutes ?? [])
+                ->map(function (mixed $minutes): ?int {
+                    if (is_int($minutes)) {
+                        return $minutes >= 0 ? $minutes : null;
+                    }
+
+                    if (! is_string($minutes) || preg_match('/^(0|[1-9][0-9]*)$/D', $minutes) !== 1) {
+                        return null;
+                    }
+
+                    $validated = filter_var($minutes, FILTER_VALIDATE_INT, [
+                        'options' => [
+                            'min_range' => 0,
+                            'max_range' => PHP_INT_MAX,
+                        ],
+                    ]);
+
+                    return is_int($validated) ? $validated : null;
+                })
+                ->filter(fn (?int $minutes): bool => $minutes !== null)
+                ->unique()
+                ->sortDesc()
+                ->values();
+
             foreach ($reminderMinutes as $minutes) {
                 $reminderTime = $event->start_at->copy()->subMinutes($minutes);
-                
-                // Check if reminder is due (within window)
-                if ($reminderTime >= $windowStart && $reminderTime <= $windowEnd) {
-                    // Send to owner
-                    if ($event->owner) {
-                        $event->owner->notify(new EventReminderNotification($event, $minutes));
-                    }
-                    
-                    // Send to attendees
-                    if (!empty($event->attendee_user_ids)) {
-                        $attendees = \App\Models\User::whereIn('id', $event->attendee_user_ids)->get();
-                        Notification::send($attendees, new EventReminderNotification($event, $minutes));
-                    }
-                    
-                    $event->update(['last_reminder_sent_at' => $now]);
-                    break; // Only send one reminder per job run
+
+                if (! $reminderTime->gt($windowStart) || $reminderTime->gt($now)) {
+                    continue;
                 }
+
+                if ($lastSentAt !== null && ! $reminderTime->gt($lastSentAt)) {
+                    continue;
+                }
+
+                $recipientIds = collect([
+                    $event->owner_user_id,
+                    ...($event->attendee_user_ids ?? []),
+                ])->filter()->unique()->values();
+                $recipients = User::query()->whereKey($recipientIds)->get();
+
+                Notification::send($recipients, new EventReminderNotification($event, $minutes));
+
+                $event->update(['last_reminder_sent_at' => $reminderTime]);
+                $lastSentAt = $reminderTime;
             }
         }
     }
