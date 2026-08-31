@@ -15,8 +15,9 @@ use App\Notifications\It\TicketRepliedNotification;
 use App\Notifications\It\TicketResolvedNotification;
 use App\Notifications\It\TicketSlaNotification;
 use App\Services\AuditLogger;
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use DateTimeImmutable;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Notifications\Events\NotificationFailed;
@@ -30,6 +31,8 @@ use Throwable;
 
 class ItEmailDeliveryService
 {
+    public const int MAX_PROVIDER_FUTURE_SKEW_SECONDS = 300;
+
     public function __construct(private readonly ItWorkAccessService $workAccess) {}
 
     /**
@@ -118,9 +121,9 @@ class ItEmailDeliveryService
         if (! in_array($status, ['delivered', 'failed', 'bounced'], true)) {
             throw new DomainException('Unsupported provider delivery status.');
         }
-        $eventAt = $occurredAt instanceof CarbonInterface
-            ? $occurredAt
-            : ($occurredAt ? Carbon::parse($occurredAt) : now());
+
+        $receivedAt = now()->toImmutable()->utc();
+        $eventAt = self::resolveProviderEventAt($occurredAt, $receivedAt);
 
         return DB::transaction(function () use ($notificationUuid, $status, $error, $providerMessageId, $eventAt): ItEmailDelivery {
             $delivery = ItEmailDelivery::query()
@@ -163,6 +166,54 @@ class ItEmailDeliveryService
 
             return $delivery->fresh();
         });
+    }
+
+    public static function resolveProviderEventAt(
+        CarbonInterface|string|null $occurredAt,
+        CarbonInterface $receivedAt,
+    ): CarbonImmutable {
+        $receipt = CarbonImmutable::instance($receivedAt)->utc();
+
+        if ($occurredAt === null) {
+            return $receipt;
+        }
+
+        if ($occurredAt instanceof CarbonInterface) {
+            $eventAt = CarbonImmutable::instance($occurredAt)->utc();
+        } else {
+            $matched = preg_match(
+                '/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/D',
+                $occurredAt,
+                $matches,
+            ) === 1;
+
+            if (! $matched) {
+                throw new DomainException('The provider delivery timestamp must be an absolute ISO 8601 timestamp.');
+            }
+
+            $normalized = $matches[1]
+                .'.'.str_pad($matches[2] ?? '', 6, '0')
+                .$matches[3];
+            $parsed = DateTimeImmutable::createFromFormat(
+                '!Y-m-d\TH:i:s.uP',
+                $normalized,
+            );
+            $parseErrors = DateTimeImmutable::getLastErrors();
+            if (
+                $parsed === false
+                || ($parseErrors !== false && ($parseErrors['warning_count'] > 0 || $parseErrors['error_count'] > 0))
+            ) {
+                throw new DomainException('The provider delivery timestamp must be a valid absolute ISO 8601 timestamp.');
+            }
+
+            $eventAt = CarbonImmutable::instance($parsed)->utc();
+        }
+
+        if ($eventAt->greaterThan($receipt->addSeconds(self::MAX_PROVIDER_FUTURE_SKEW_SECONDS))) {
+            throw new DomainException('The provider delivery timestamp is too far in the future.');
+        }
+
+        return $eventAt;
     }
 
     public function canRetryDelivery(ItEmailDelivery $delivery, User $actor): bool
