@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Gate;
 
 class SendVotingReminder implements ShouldQueue
 {
@@ -22,6 +23,33 @@ class SendVotingReminder implements ShouldQueue
 
     public function handle(): void
     {
-        $this->boardMember->user->notify(new VotingReminderNotification($this->resolution));
+        $resolution = Resolution::query()->find($this->resolution->getKey());
+        if (! $resolution?->isOpen()) {
+            return;
+        }
+
+        $boardMember = BoardMember::query()
+            ->active()
+            ->with(['user.permissionOverrides', 'user.roles.permissions'])
+            ->find($this->boardMember->getKey());
+        if (! $boardMember?->canVote()) {
+            return;
+        }
+
+        $user = $boardMember->user;
+        if (! $user?->approved_at) {
+            return;
+        }
+
+        if ($resolution->votes()->where('board_member_id', $boardMember->id)->exists()
+            || $resolution->conflictDeclarations()
+                ->where('board_member_id', $boardMember->id)
+                ->where('withdrew_from_voting', true)
+                ->exists()
+            || Gate::forUser($user)->denies('vote', $resolution)) {
+            return;
+        }
+
+        $user->notify(new VotingReminderNotification($resolution));
     }
 }
