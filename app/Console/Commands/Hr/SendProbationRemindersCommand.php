@@ -6,14 +6,17 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Domain\Hr\Notifications\ProbationReviewDueNotification;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Daily probation sweep (audit fix round 2, item 1a): active employees whose
  * probation_end_date is within 14 days — or already past — with no concluding
  * probation review on file get a ProbationReviewDueNotification to their
- * manager (manager_user_id; fallback: every provider_manager).
+ * current Site-eligible manager (manager_user_id; fallback: the first
+ * deterministic current Site-eligible provider_manager).
  *
  * A review "concludes" probation when its status is passed / failed, or it is
  * completed with a pass / fail recommendation ({@see HrProbationReview} —
@@ -31,20 +34,31 @@ class SendProbationRemindersCommand extends Command
 
     protected $description = 'Notify managers of probation reviews due within 14 days (or overdue) with no completed review recorded.';
 
-    public function handle(): int
+    public function handle(UserSiteAccessService $siteAccess): int
     {
-        $today = now()->startOfDay();
+        $startedAt = now();
+        $today = $startedAt->copy()->startOfDay();
+        $profileEligibilityDate = $startedAt
+            ->copy()
+            ->setTimezone(config('app.worker_timezone', 'Pacific/Auckland'))
+            ->toDateString();
         $horizon = $today->copy()->addDays(14);
         $sent = 0;
 
         HrEmployeeProfile::query()
             ->where('is_active', true)
+            ->where(function ($query) use ($profileEligibilityDate): void {
+                $query->whereNull('start_date')->orWhereDate('start_date', '<=', $profileEligibilityDate);
+            })
+            ->where(function ($query) use ($profileEligibilityDate): void {
+                $query->whereNull('end_date')->orWhereDate('end_date', '>=', $profileEligibilityDate);
+            })
             ->whereNotNull('probation_end_date')
             ->where('probation_end_date', '<=', $horizon)
             ->whereNull('probation_reminder_sent_at')
             ->whereNotNull('user_id')
             ->with(['user:id,name', 'manager:id,name,email'])
-            ->chunkById(200, function ($profiles) use (&$sent, $today) {
+            ->chunkById(200, function ($profiles) use (&$sent, $siteAccess, $today, $profileEligibilityDate) {
                 foreach ($profiles as $profile) {
                     if (! $profile->user) {
                         continue;
@@ -66,7 +80,7 @@ class SendProbationRemindersCommand extends Command
                         continue;
                     }
 
-                    $recipients = $this->recipientsFor($profile);
+                    $recipients = $this->recipientsFor($profile, $siteAccess, $profileEligibilityDate);
                     if ($recipients->isEmpty()) {
                         Log::info('Probation reminder skipped — no manager or provider_manager recipient.', [
                             'employee_profile_id' => $profile->id,
@@ -106,23 +120,76 @@ class SendProbationRemindersCommand extends Command
     }
 
     /**
-     * The employee's manager; when none is set, every provider_manager
-     * (matches the approver-fallback convention in LeaveService).
+     * The employee's current Site-eligible manager, followed by the first
+     * deterministic current Site-eligible provider-manager fallback.
      *
-     * @return \Illuminate\Support\Collection<int, User>
+     * @return Collection<int, User>
      */
-    private function recipientsFor(HrEmployeeProfile $profile): \Illuminate\Support\Collection
-    {
-        if ($profile->manager_user_id && $profile->manager) {
-            return collect([$profile->manager]);
+    private function recipientsFor(
+        HrEmployeeProfile $profile,
+        UserSiteAccessService $siteAccess,
+        string $profileEligibilityDate,
+    ): Collection {
+        $employeeSiteIds = collect([
+            $profile->primary_site_id,
+            ...(is_array($profile->secondary_site_ids) ? $profile->secondary_site_ids : []),
+        ])
+            ->filter(fn ($siteId) => filled($siteId))
+            ->map(fn ($siteId) => (int) $siteId)
+            ->filter(fn (int $siteId) => $siteId > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($employeeSiteIds === []) {
+            return collect();
         }
 
-        return User::query()
-            ->where(function ($q) {
-                $q->where('role', 'provider_manager')
-                    ->orWhereHas('roles', fn ($r) => $r->where('name', 'provider_manager'));
+        $fallbackIds = User::query()
+            ->where(function ($query): void {
+                $query->where('role', 'provider_manager')
+                    ->orWhereHas('roles', fn ($roleQuery) => $roleQuery->where('name', 'provider_manager'));
             })
-            ->whereNotNull('approved_at')
-            ->get();
+            ->orderBy('id')
+            ->pluck('id');
+
+        $candidateIds = collect([$profile->manager_user_id])
+            ->concat($fallbackIds)
+            ->filter()
+            ->map(fn ($userId) => (int) $userId)
+            ->unique();
+
+        foreach ($candidateIds as $candidateId) {
+            $recipient = User::query()
+                ->whereKey($candidateId)
+                ->whereNotNull('approved_at')
+                ->whereNotIn('role', ['client', 'next_of_kin'])
+                ->whereDoesntHave('roles', fn ($query) => $query->whereIn('name', ['client', 'next_of_kin']))
+                ->whereHas('hrEmployeeProfile', function ($query) use ($profileEligibilityDate): void {
+                    $query->where('is_active', true)
+                        ->where(function ($startQuery) use ($profileEligibilityDate): void {
+                            $startQuery->whereNull('start_date')->orWhereDate('start_date', '<=', $profileEligibilityDate);
+                        })
+                        ->where(function ($endQuery) use ($profileEligibilityDate): void {
+                            $endQuery->whereNull('end_date')->orWhereDate('end_date', '>=', $profileEligibilityDate);
+                        });
+                })
+                ->first();
+
+            if (! $recipient) {
+                continue;
+            }
+
+            $recipientSiteIds = $siteAccess->accessibleSiteIds(
+                $recipient,
+                UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+            );
+
+            if (array_intersect($employeeSiteIds, $recipientSiteIds) !== []) {
+                return collect([$recipient]);
+            }
+        }
+
+        return collect();
     }
 }
