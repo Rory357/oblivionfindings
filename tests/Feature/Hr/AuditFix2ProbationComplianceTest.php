@@ -60,8 +60,14 @@ test('probation reminder notifies the manager and dedupes on re-run', function (
     Notification::fake();
 
     $manager = User::factory()->create(['approved_at' => now()]);
+    af2bProfile($manager, [
+        'primary_site_id' => $this->site->id,
+        'position_title' => 'Service Manager',
+        'position_role' => 'service_manager',
+    ]);
     $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $profile = af2bProfile($worker, [
+        'primary_site_id' => $this->site->id,
         'manager_user_id' => $manager->id,
         'probation_end_date' => now()->addDays(7)->toDateString(),
     ]);
