@@ -549,6 +549,56 @@ class FleetTripPlaybackSitePrivacyTest extends TestCase
             ->assertJsonPath('points.1999.occurred_at', $startedAt->copy()->addSeconds(1999)->toISOString());
     }
 
+    public function test_playback_data_caps_only_after_excluding_coordinate_less_events(): void
+    {
+        $vehicle = Asset::factory()->vehicle()->create([
+            'site_id' => $this->visibleSite->id,
+            'home_site_id' => $this->visibleSite->id,
+            'name' => 'RUN200 ELIGIBLE POINT VEHICLE',
+            'status' => 'active',
+        ]);
+        $startedAt = now()->subDays(8);
+        $session = $this->driverSession($vehicle, $this->visibleDriver, $startedAt);
+        $trip = $this->trip($vehicle, $session, $startedAt, -36.7, 174.7);
+        $trip->update(['ended_at' => $startedAt->copy()->addHour()]);
+
+        $createdAt = now();
+        $events = [];
+        for ($offset = 0; $offset < 2000; $offset++) {
+            $events[] = [
+                'asset_id' => $vehicle->id,
+                'vendor' => 'run200-coordinate-less',
+                'vendor_message_id' => "RUN200-COORDINATE-LESS-{$offset}",
+                'occurred_at' => $startedAt->copy()->addSeconds($offset),
+                'received_at' => $startedAt->copy()->addSeconds($offset),
+                'latitude' => $offset % 2 === 0 ? null : -36.7000000,
+                'longitude' => $offset % 2 === 0 ? 174.7000000 : null,
+                'speed_kph' => 0.0,
+                'event_type' => 'location_report',
+                'idempotency_key' => hash('sha256', "RUN200-COORDINATE-LESS-{$offset}"),
+                'raw_payload' => '[]',
+                'consent_blocked' => false,
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ];
+        }
+        foreach (array_chunk($events, 500) as $chunk) {
+            FleetTelemetryEvent::query()->insert($chunk);
+        }
+
+        $eligibleAt = $startedAt->copy()->addSeconds(2000);
+        $this->telemetry($vehicle, $eligibleAt, -36.8123456, 174.7123456, 41.5);
+
+        $this->actingAs($this->viewer)
+            ->getJson("/fleet-assets/trips/{$trip->id}/playback/data")
+            ->assertOk()
+            ->assertJsonPath('trip_id', $trip->id)
+            ->assertJsonCount(1, 'points')
+            ->assertJsonPath('points.0.occurred_at', $eligibleAt->toISOString())
+            ->assertJsonPath('points.0.lat', '-36.8123456')
+            ->assertJsonPath('points.0.lng', '174.7123456');
+    }
+
     /** @param list<int> $secondarySiteIds */
     private function siteUser(Site $site, string $name, array $secondarySiteIds = []): User
     {
