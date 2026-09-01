@@ -14,6 +14,10 @@ from pathlib import Path
 from string import Template
 
 
+if not __debug__:
+    raise SystemExit("Refusing optimized Python: dashboard validation requires assertions")
+
+
 AUDIT_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = AUDIT_DIR.parents[2]
 HISTORICAL_RUN_080_MATRIX_SHA256 = "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390"
@@ -6464,8 +6468,8 @@ run_197_template_rewrites = [
         "The register retains 17 claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. MON-METRIC-REPLAY-DEDUPE-01 and SUMMARY-TIMELINE-SITE-PRIVACY-01 retain null feature and candidate IDs and zero static ownership. FLEET-FUEL-INDEX-SITE-PRIVACY-01 remains candidate-only for CAP-FLEET-VEHICLE-REGISTER; row-attached logger identity follows foreign-row concealment only, with no independent logger-Site authorization for an otherwise visible row.",
     ),
     (
-        "16 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
-        "17 retained claim identities split into $finding_count current provisional P1, $historical_fixed_count historical already-fixed, and $historical_remediated_count historical remediated",
+        "16 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 6 historical remediated",
+        "17 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 7 historical remediated",
     ),
     (
         "RUN-155–194 bounded disposition provenance, remediation, and reporting",
@@ -6487,6 +6491,14 @@ run_197_template_rewrites = [
     (
         "The exact RUN-194 reporting dashboard must be generated and checked in RUN-195",
         "The exact RUN-197 reporting dashboard must be generated and checked in RUN-198",
+    ),
+    (
+        "RUN-188 verifies only the superseded RUN-187 dashboard; RUN-189/R–191 establish and report only the playback/show owner and bridge. RUN-192 verifies the exact RUN-191 dashboard; RUN-193 reproduces and locally integrates the bounded Fuel index/CSV Site-privacy remediation, RUN-193R authorizes one historical-remediated record, RUN-194 changes only live reporting while preserving the RUN-192 HTML, and RUN-195 remains the fresh exact-dashboard gate.",
+        "RUN-188 verifies only the superseded RUN-187 dashboard; RUN-189/R–191 establish and report only the playback/show owner and bridge. RUN-192 verifies the exact RUN-191 dashboard; RUN-193 reproduces and locally integrates the bounded Fuel index/CSV Site-privacy remediation, RUN-193R authorizes one historical-remediated record, and RUN-194 changes only live reporting while preserving the RUN-192 HTML. RUN-195 verifies only the superseded RUN-194 dashboard; RUN-196/R establish and independently review the bounded Summary/timeline Site-privacy remediation, RUN-197 is the current reporting transaction, and RUN-198 remains the fresh exact-dashboard gate.",
+    ),
+    (
+        "RUN-151, RUN-155, RUN-158, RUN-161, RUN-164, RUN-168, RUN-172, RUN-175, RUN-178, RUN-182, RUN-185, RUN-188, and RUN-192 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-194 reporting sources or the RUN-195 dashboard generated from them.",
+        "RUN-151, RUN-155, RUN-158, RUN-161, RUN-164, RUN-168, RUN-172, RUN-175, RUN-178, RUN-182, RUN-185, RUN-188, RUN-192, and RUN-195 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-197 reporting sources or the RUN-198 dashboard generated from them.",
     ),
     (
         "RUN-188 verifies only the superseded RUN-187 HTML; RUN-189/R–191 establish and report only the playback/show owner and bridge. RUN-192 verifies the exact RUN-191 HTML; RUN-193 reproduces and locally integrates the bounded Fleet Fuel index/CSV Site-privacy remediation, RUN-193R authorizes one historical-remediated record, and RUN-194 changes only live reporting while preserving the verified RUN-192 HTML byte-for-byte. None supplies audit-dashboard verification for the new RUN-195 HTML.",
@@ -6521,8 +6533,14 @@ run_197_template_rewrites = [
         "</tr><tr><td>RUN-193 Fleet Fuel index Site-privacy execution</td><td>$fleet_fuel_tests post-merge focused tests / $fleet_fuel_assertions assertions counted once; baseline $fleet_fuel_red_failed failed + $fleet_fuel_red_passed passed / $fleet_fuel_red_assertions assertions, isolated $fleet_fuel_tests/$fleet_fuel_assertions replay, supporting $fleet_fuel_supporting_tests/$fleet_fuel_supporting_assertions regressions, and any second count from combined 26/421 excluded</td><td class=\"partial\">selected GET index/CSV rows, filters, month-to-date totals, rolling 30-day entry count, efficiency inputs, provenance, archived Sites, and row-scoped attached identity only · candidate index 87 pending behind index 86 · baseline $fleet_fuel_baseline_short · fix $fleet_fuel_fix_short · local merge $fleet_fuel_merge_short · origin/main $fleet_fuel_origin_short unchanged · full-suite green unproved</td></tr><tr><td>RUN-196 Summary/timeline Site-privacy execution</td><td>$summary_tests focused tests / $summary_assertions assertions counted once; baseline $summary_red_failed failed + $summary_red_passed passed / $summary_red_assertions assertions, zero-assertion vendor-junction attempt, eMAR $summary_supporting_tests/$summary_supporting_assertions support, shared post-merge $summary_shared_tests/$summary_shared_assertions, and wrong-path pre-test invocation excluded</td><td class=\"partial\">self and existing actions preserved · other-staff reads require active shared-Site scope unless hr.employees.viewAllSites · client Gate unchanged · queued requester revalidated before protected reads/writes · feature unassigned · baseline $summary_baseline_short · fix $summary_fix_short · local merge $summary_merge_short · current main $summary_current_main_short · origin/main $summary_origin_short unchanged</td></tr><tr><td>RUN-089 designated-application preflight</td>",
     ),
 ]
+run_197_rewrite_expected_counts = {
+    "current RUN-194 split of 16 retained claim identities": 2,
+}
 for old, new in run_197_template_rewrites:
-    assert current_template_text.count(old) == 1, f"Expected one RUN-197 template rewrite target: {old}"
+    expected_count = run_197_rewrite_expected_counts.get(old, 1)
+    assert current_template_text.count(old) == expected_count, (
+        f"Expected {expected_count} RUN-197 template rewrite target(s): {old}"
+    )
     current_template_text = current_template_text.replace(old, new)
 
 fresh_run_198_section_start = (
@@ -7119,7 +7137,7 @@ current_visible_boundaries = [
     "RUN-090 frozen denominator / RUN-190R current accounting",
     "index 84 is not recredited, index 85 fleet-assets.trips.playback is integrated, and index 86 fleet-assets.trips.playback.data is next",
     "RUN-168 verifies that exact dashboard",
-    "RUN-188 verifies only the superseded RUN-187 HTML",
+    "RUN-195 verifies only the superseded RUN-194 HTML",
     "exact dashboard later verified by RUN-185",
     "visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership",
     "None supplies audit-dashboard verification for the new RUN-198 HTML.",
@@ -7147,6 +7165,8 @@ for stale_current in (
     "It verifies the RUN-187 audit artifact only",
     '<a href="generators/materialize-run-188-audit-dashboard-verification-wave-36.py">RUN-188 audit-dashboard verification materializer</a> <span>forward generator',
     '<a href="evidence/browser/current-audit-dashboard-verification-run-188-wave-36.json">RUN-188 audit-dashboard verification receipt</a> <span>forward receipt',
+    "current RUN-194 reporting sources or the RUN-195 dashboard generated from them",
+    "RUN-195 remains the fresh exact-dashboard gate.",
 ):
     assert stale_current not in dashboard
 assert "0 current application tests" not in dashboard
