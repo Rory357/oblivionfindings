@@ -1,6 +1,6 @@
 {
   "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
-  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_SEVEN_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
+  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_EIGHT_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
   "generated_on": "2026-09-01",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
@@ -80,6 +80,16 @@
     "run_196_summary_timeline_site_privacy_remediation_sha256": "96c275826a695a4b41b98891bd6560e6592be415c43fa360f1730c0c7fe9013a",
     "run_196r_independent_artifact_review_materializer_sha256": "0c4fb643e608fa73fdc6118a7b83d1024123cd7857b84c36a136b51b3244edc8",
     "run_196r_independent_artifact_review_sha256": "a53d2b279cf1becff1e7b851d522a43fb2cacfc05f5099250da910c9d3fbe151",
+    "shift_task_due_recipient_revalidation_baseline_commit": "47a6d231c52a78c9f0f606e41d4492d754771027",
+    "shift_task_due_recipient_revalidation_baseline_tree": "c1e262a50c67797b819d3f1085ece2782b41237e",
+    "shift_task_due_recipient_revalidation_audit_release_commit": "ca3425103d6d75dc728418464d03e7e72983925b",
+    "shift_task_due_recipient_revalidation_audit_release_tree": "662962768c24c0c0eb2231dcd42caf49cfe9c910",
+    "shift_task_due_recipient_revalidation_fix_commit": "6186176d30a9b4061f859eef8d069e8739ef3d88",
+    "shift_task_due_recipient_revalidation_fix_tree": "a089d5212e9674bb0e7915c96806867e52d1015f",
+    "shift_task_due_recipient_revalidation_local_main_merge_commit": "e2593cbdd0791aca2ea7b1e9b254d07bf7f8e84f",
+    "shift_task_due_recipient_revalidation_local_main_tree": "071edd9408f27206bc6962157e4a84c30590f701",
+    "shift_task_due_recipient_revalidation_stable_patch_id": "af8be2614ff89b34632299424cdd28e011ee1d84",
+    "shift_task_due_recipient_revalidation_origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
     "monitoring_metric_replay_application_baseline_commit": "a900f078c9c05f587f6f7884f5fe715076891416",
     "monitoring_metric_replay_initial_fix_commit": "f521bc0b87222e56b4822e7cb9c935486e279e76",
     "monitoring_metric_replay_initial_merge_commit": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
@@ -304,20 +314,20 @@
     "system_data_features": 40,
     "canonical_submodules": null,
     "historical_discovery_claim_records": 12,
-    "current_retained_claim_records": 17,
+    "current_retained_claim_records": 18,
     "current_provisional_source_claims": 8,
     "historical_already_fixed_records": 2,
-    "historical_remediated_records": 7
+    "historical_remediated_records": 8
   },
   "counts": {
-    "retained_claim_records": 17,
+    "retained_claim_records": 18,
     "provisional_source_claims": 8,
     "provisional_P1": 8,
     "historical_already_fixed": 2,
-    "historical_remediated": 7,
-    "bounded_disposition_tests_passed": 176,
-    "bounded_disposition_assertions": 2641,
-    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY plus only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution plus the unique 6/206 post-merge focused component of the combined FLEET-FUEL-INDEX-SITE-PRIVACY run plus the unique isolated focused 15/32 SUMMARY-TIMELINE-SITE-PRIVACY execution; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, the initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO, the root 1-test red reproduction, every intermediate corrective subset or stopped run, the final isolated corrective 56/472 replay, DNS 63/186, Facility execution, Fuel red 6-failed/65-assertion reproduction, isolated Fuel 6/206 replay, supporting Fuel 20/215 regressions, any second count from combined 26/421, Summary red 1-failed/5-passed/9-assertion reproduction, the zero-assertion vendor-junction run, Emar 2/238 supporting compatibility, shared post-merge 40/438, and every overlapping supporting execution",
+    "historical_remediated": 8,
+    "bounded_disposition_tests_passed": 185,
+    "bounded_disposition_assertions": 2691,
+    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY plus only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution plus the unique 6/206 post-merge focused component of the combined FLEET-FUEL-INDEX-SITE-PRIVACY run plus the unique isolated focused 15/32 SUMMARY-TIMELINE-SITE-PRIVACY execution plus one post-merge 9/50 SHIFT-TASK-DUE-RECIPIENT-REVALIDATION execution; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, the initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO, the root 1-test red reproduction, every intermediate corrective subset or stopped run, the final isolated corrective 56/472 replay, DNS 63/186, Facility execution, Fuel red 6-failed/65-assertion reproduction, isolated Fuel 6/206 replay, supporting Fuel 20/215 regressions, any second count from combined 26/421, Summary red 1-failed/5-passed/9-assertion reproduction, the zero-assertion vendor-junction run, Emar 2/238 supporting compatibility, shared post-merge 40/438, Shift-task red 1-failed/3-passed/1-pending/14-assertion reproduction, intermediate 5/30 and cache proofs, isolated final 9/50 duplicate replay, any second count from post-merge 9/50, and every overlapping supporting execution",
     "med_rbac_bounded_tests": 73,
     "med_rbac_bounded_test_assertions": 1481,
     "med_cd_scope_focused_tests": 5,
@@ -327,7 +337,7 @@
     "med_cd_atomicity_race_subscenarios": 3,
     "med_cd_atomicity_supporting_tests": 43,
     "med_cd_atomicity_supporting_assertions": 716,
-    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764, RUN-184 99/1931, RUN-187 155/2403, and RUN-194 161/2609 totals, and remains excluded from the current RUN-197 176/2641 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
+    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764, RUN-184 99/1931, RUN-187 155/2403, RUN-194 161/2609, and RUN-197 176/2641 totals, and remains excluded from the current RUN-199 185/2691 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
     "safe_alert_dedup_focused_tests": 5,
     "safe_alert_dedup_focused_assertions": 60,
     "safe_alert_dedup_supporting_control_room_bridge_tests": 28,
@@ -362,6 +372,17 @@
     "summary_timeline_site_privacy_baseline_assertions": 9,
     "summary_timeline_site_privacy_shared_post_merge_tests": 40,
     "summary_timeline_site_privacy_shared_post_merge_assertions": 438,
+    "shift_task_due_recipient_revalidation_focused_tests": 9,
+    "shift_task_due_recipient_revalidation_focused_assertions": 50,
+    "shift_task_due_recipient_revalidation_baseline_failed": 1,
+    "shift_task_due_recipient_revalidation_baseline_passed": 3,
+    "shift_task_due_recipient_revalidation_baseline_pending": 1,
+    "shift_task_due_recipient_revalidation_baseline_assertions": 14,
+    "shift_task_due_recipient_revalidation_intermediate_tests": 5,
+    "shift_task_due_recipient_revalidation_intermediate_assertions": 30,
+    "shift_task_due_recipient_revalidation_isolated_replay_tests": 9,
+    "shift_task_due_recipient_revalidation_isolated_replay_assertions": 50,
+    "shift_task_due_recipient_revalidation_aggregation_basis": "Only the unique post-merge focused 9/50 execution counts once. Red 1-failed/3-passed/1-pending/14 assertions, intermediate 5/30 and cache proofs, and isolated final 9/50 are excluded.",
     "monitoring_metric_replay_dedupe_focused_tests": 56,
     "monitoring_metric_replay_dedupe_focused_assertions": 472,
     "monitoring_metric_replay_initial_superseded_tests": 49,
@@ -464,21 +485,22 @@
       "audit_completion": 0
     }
   },
-  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and seven retained historical remediated records remain reviewable. RUN-196/R establish and independently authorize only the new SUMMARY-TIMELINE-SITE-PRIVACY-01 historical-remediated record. Its unique focused 15/32 execution extends the prior RUN-194 161/2609 denominator to 176/2641 exactly once; the red 1-failed/5-passed/9-assertion reproduction, zero-assertion vendor-junction run, Emar 2/238 supporting compatibility, and shared post-merge 40/438 remain separate and uncredited. The Summary record has null feature and candidate IDs with zero route owner, controller-action bridge, page, queue, matrix, feature-union, My Day, adjacent-surface, browser, benchmark, publication, release, or completion credit. Its queue proof is bounded to canonical active shared-Site staff access, the hr.employees.viewAllSites exception, unchanged client Gate behavior, and requester revalidation before protected reads and writes. Earlier Monitoring option-A deployment prerequisites, Fleet candidate-only associations, and all prior noninheritance boundaries remain unchanged. Origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; Summary integration and reporting remain local-only and unpublished. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
+  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and eight retained historical remediated records remain reviewable. RUN-199 adds only SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01 as a feature-unassigned historical-remediated record. Its unique post-merge 9/50 execution extends the RUN-197 denominator from 176/2641 to 185/2691 exactly once; the red 1-failed/3-passed/1-pending/14-assertion reproduction, intermediate 5/30 and cache proofs, isolated final 9/50 replay, and any second count from post-merge 9/50 remain separate and uncredited. The Shift-task record has null feature and candidate IDs with zero route owner, controller-action bridge, page, queue, matrix, feature-union, My Day, Control Room, adjacent-surface, browser, benchmark, publication, release, or completion credit. Its proof is bounded to canonical current task, Shift, assignee, employee and approved-Site revalidation before marker, notification or signal, plus fresh queued revalidation before channel selection and delivery. Same-Site post-alert reassignment reconciliation, rerouting to a replacement assignee, external delivery exactly-once, transactional outbox behavior, and broader push correctness remain excluded. Earlier Summary, Monitoring, Fleet, and all prior noninheritance boundaries remain unchanged. Origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; remediation and reporting remain local-only and unpublished. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
   "reconciliation": {
     "retained_record_ids_unique": true,
     "current_provisional_ids_unique": true,
-    "retained_record_count": 17,
+    "retained_record_count": 18,
     "current_provisional_count": 8,
     "historical_already_fixed_count": 2,
-    "historical_remediated_count": 7,
+    "historical_remediated_count": 8,
     "every_non_null_primary_feature_id_in_canonical_matrix": true,
     "records_without_primary_or_candidate_feature_id": [
       "MON-METRIC-REPLAY-DEDUPE-01",
-      "SUMMARY-TIMELINE-SITE-PRIVACY-01"
+      "SUMMARY-TIMELINE-SITE-PRIVACY-01",
+      "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01"
     ],
     "final_ids_cross_file_reconciled": false,
-    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01, MON-METRIC-REPLAY-DEDUPE-01, FLEET-FUEL-INDEX-SITE-PRIVACY-01, and SUMMARY-TIMELINE-SITE-PRIVACY-01 are retained as historical remediated; the other 8 records remain provisional. Summary remediation is limited to canonical active shared-Site staff summary/timeline access and queued requester revalidation, preserves the explicit hr.employees.viewAllSites exception and unchanged client Gate behavior, has null feature and candidate IDs, and receives zero static ownership. RUN-190 separately integrates only queue index 85 fleet-assets.trips.playback / FleetTripController::show as one static route owner and bridge; index 86 playback.data remains pending, while Fuel is candidate index 87 and receives no queue advance. My Day, adjacent surfaces, page/frontend ownership, browser, benchmark, publication, release, full-suite, feature/module, final-finding, and completion credit are not inherited. None satisfies the cross-file final-finding gate."
+    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01, MON-METRIC-REPLAY-DEDUPE-01, FLEET-FUEL-INDEX-SITE-PRIVACY-01, SUMMARY-TIMELINE-SITE-PRIVACY-01, and SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01 are retained as historical remediated; the other 8 records remain provisional. Shift-task remediation is limited to fresh canonical task, Shift, assignee, employee and approved-Site revalidation before reminder claim, notification or Facility signal and again at queued channel selection/delivery. It has null feature and candidate IDs and receives zero static ownership. Same-Site post-alert reassignment reconciliation, replacement-recipient rerouting, external delivery exactly-once, transactional outbox behavior, UserSiteAccessService correctness, broader push behavior, My Day, Control Room, adjacent surfaces, page/frontend ownership, browser, benchmark, publication, release, full-suite, feature/module, final-finding, and completion credit are not inherited. RUN-190 separately integrates only queue index 85 fleet-assets.trips.playback / FleetTripController::show as one static route owner and bridge; index 86 playback.data remains pending, while Fuel is candidate index 87 and receives no queue advance. None satisfies the cross-file final-finding gate."
   },
   "records": [
     {
@@ -4033,6 +4055,258 @@
         "observed workflow and ten-dimension current/target ease measures",
         "target-specific benchmark or exhaustive final no-match",
         "full-suite coverage, representative signed-in browser, adjacent summary/timeline surfaces, My Day, and broader staff/client authorization"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+      "feature_id": null,
+      "candidate_feature_id": null,
+      "feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+      "feature_id_role": "NO_CANONICAL_OR_CANDIDATE_FEATURE_ASSOCIATION_ZERO_STATIC_OWNERSHIP_CREDIT",
+      "related_feature_ids": [],
+      "historical_provenance": {
+        "application_commit": "47a6d231c52a78c9f0f606e41d4492d754771027",
+        "application_tree": "c1e262a50c67797b819d3f1085ece2782b41237e",
+        "classification": "REAL_HISTORICAL_SHIFT_TASK_DUE_RECIPIENT_REVALIDATION_CONDITION",
+        "historical_risk": "The scheduler could claim and disclose Shift-task, client, Site, and due content to an assignee who no longer had current employment or approved Site access, while queued delivery could proceed after reassignment or revocation.",
+        "preserved_identity_only": true,
+        "new_record_authorized_by_run_199_reporting_review": true,
+        "record_present_before_run_199": false,
+        "pre_run_199_register_sha256": "2ef3e5a31844b09006d2727cc2bd8709b69679c96ad5a1d1cc3284ade7109065"
+      },
+      "current_adjudication": {
+        "application_baseline_commit": "47a6d231c52a78c9f0f606e41d4492d754771027",
+        "application_baseline_tree": "c1e262a50c67797b819d3f1085ece2782b41237e",
+        "audit_release_commit": "ca3425103d6d75dc728418464d03e7e72983925b",
+        "audit_release_tree": "662962768c24c0c0eb2231dcd42caf49cfe9c910",
+        "fix_commit": "6186176d30a9b4061f859eef8d069e8739ef3d88",
+        "fix_tree": "a089d5212e9674bb0e7915c96806867e52d1015f",
+        "stable_patch_id": "af8be2614ff89b34632299424cdd28e011ee1d84",
+        "application_commit": "e2593cbdd0791aca2ea7b1e9b254d07bf7f8e84f",
+        "repository_tree": "071edd9408f27206bc6962157e4a84c30590f701",
+        "current_local_main_commit_at_run_199": "e2593cbdd0791aca2ea7b1e9b254d07bf7f8e84f",
+        "current_local_main_tree_at_run_199": "071edd9408f27206bc6962157e4a84c30590f701",
+        "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+        "verdict": "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED",
+        "scope": "Shift-task due scheduler and queued notification recipient revalidation: canonical current task, Shift, assignee, employee and approved Site access before the scheduler-time marker, notification or Facility signal, plus fresh queue-time revalidation before channel selection and delivery without retroactively clearing a claimed marker or retracting a signal.",
+        "run_199_reporting_receipt": "evidence/source/current-run-199-shift-task-due-recipient-revalidation-remediation-reporting-wave-40.json",
+        "coordination_handoff_transcription": "evidence/source/current-run-199-shift-task-due-recipient-revalidation-coordination-handoff-wave-40.json",
+        "delegated_execution_evidence_kind": "EXACT_COORDINATION_HANDOFF_NOT_REEXECUTED_BY_RUN_199",
+        "independent_review_evidence_kind": "ONE_FINAL_INDEPENDENT_SOURCE_TEST_GO_REPORTED_BY_COORDINATION_HANDOFF",
+        "application_remediation_required": true,
+        "application_source_changed": true,
+        "integrated_to_main": true,
+        "published_to_origin_main": false,
+        "publication_authorized": false,
+        "feature_identity_assigned": false,
+        "static_route_or_page_feature_ownership_inherited": false,
+        "static_controller_action_bridge_inherited": false,
+        "queue_advance_inherited": false,
+        "my_day_or_control_room_credit_inherited": false,
+        "post_alert_same_site_reassignment_reconciliation_inherited": false,
+        "replacement_assignee_rerouting_inherited": false,
+        "external_delivery_exactly_once_inherited": false,
+        "transactional_outbox_inherited": false,
+        "broader_push_or_access_service_correctness_inherited": false
+      },
+      "passes": [
+        "P2",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Rostering",
+        "submodule": "SHIFT_TASK_DUE_RECIPIENT_REVALIDATION_BOUNDARY",
+        "submodule_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW_ZERO_STATIC_OWNERSHIP_CREDIT"
+      },
+      "actor_and_job": {
+        "actor": "Shift task assignee",
+        "secondary_actors": "Current local assignee, remote-Site assignee, inactive worker, reassigned recipient, permission-revoked recipient, and valid notification-channel recipient in bounded tests; ended and missing-profile states remain source-inferred",
+        "job": "Receive a due Shift-task reminder and related signal only while still the canonical current eligible assignee with approved access to the Shift Site",
+        "status": "BOUNDED_TEST_ACTORS_VALIDATED_NOT_REPRESENTATIVE_SIGNED_IN_BROWSER"
+      },
+      "route_url": {
+        "route_names": null,
+        "route_paths": null,
+        "raw_route_path_field": null,
+        "ownership_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+        "status": "NO_ROUTE_ASSOCIATION_OR_STATIC_ROUTE_OWNERSHIP_CREDIT"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": null,
+        "application_commit": "e2593cbdd0791aca2ea7b1e9b254d07bf7f8e84f",
+        "status": "NO_FRONTEND_ASSOCIATION_OR_CREDIT"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_RETAINED_HISTORICAL_RECORD"
+      },
+      "backend_anchor": {
+        "matrix_anchors": null,
+        "claim_anchors": [
+          "app/Jobs/ShiftTaskDueJob.php",
+          "app/Notifications/ShiftTaskDueNotification.php",
+          "tests/Feature/ShiftTaskDueJobTest.php",
+          "tests/Feature/PushNotificationsWebPushTest.php"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "BOUNDED_JOB_NOTIFICATION_AND_REGRESSION_REVIEW",
+        "application_commit": "e2593cbdd0791aca2ea7b1e9b254d07bf7f8e84f"
+      },
+      "current_behaviour": {
+        "classification": "REMEDIATED_LOCAL_MAIN_BOUNDED_VERIFIED_NOT_PUBLISHED",
+        "summary": "The scheduler now locks and reloads the current task, Shift, assignee, employee profile, assignment, due and completion state, canonical Shift/client/Site provenance, and approved Site access before claiming the marker, notifying, or signalling. A scheduler-time denial leaves reminder_sent_at null and produces neither notification nor signal. Queued delivery reloads and revalidates the same recipient/task/Shift/Site boundary before channel selection and before each channel delivery; queue-time denial suppresses delivery but does not clear an already-claimed marker or retract an already-emitted signal.",
+        "runtime_observed": true,
+        "runtime_scope": "Only one post-merge focused 9 tests / 50 assertions execution contributes once. The 1-failed/3-passed/1-pending/14-assertion reproduction, intermediate 5/30 and cache proofs, isolated final 9/50 replay, and any second count of the post-merge 9/50 execution are reported separately and not counted."
+      },
+      "current_workflow": {
+        "matrix_summary": "Bounded scheduled Shift-task recipient and queued-delivery revalidation contract only; no canonical feature, route, page, representative browser, or module completion is established.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "BOUNDED_DUE_OVERNIGHT_ASSIGNMENT_EMPLOYEE_SITE_CHANNEL_AND_QUEUED_REVALIDATION_PATHS_EXECUTED; REPRESENTATIVE_BROWSER_EASE_STATIC_OWNERSHIP_REPLACEMENT_REROUTING_EXTERNAL_DELIVERY_AND_BROADER_CONTEXT_NOT_EXECUTED"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": null
+      },
+      "evidence": {
+        "current_remediation_receipt": null,
+        "reporting_receipt": "evidence/source/current-run-199-shift-task-due-recipient-revalidation-remediation-reporting-wave-40.json",
+        "coordination_handoff_transcription": "evidence/source/current-run-199-shift-task-due-recipient-revalidation-coordination-handoff-wave-40.json",
+        "independent_artifact_review": "MESSAGE_BOUND_HANDOFF_PLUS_GIT_AND_INDEPENDENT_SOURCE_REVIEW",
+        "delegated_evidence_source": "evidence/source/current-run-199-shift-task-due-recipient-revalidation-coordination-handoff-wave-40.json",
+        "delegated_not_reexecuted_by_run_199": true,
+        "claim_anchors": [
+          "app/Jobs/ShiftTaskDueJob.php",
+          "app/Notifications/ShiftTaskDueNotification.php",
+          "tests/Feature/ShiftTaskDueJobTest.php",
+          "tests/Feature/PushNotificationsWebPushTest.php"
+        ],
+        "test_commands_executed": null,
+        "credited_test_commands": 1,
+        "test_command_text": null,
+        "test_files": [
+          "tests/Feature/ShiftTaskDueJobTest.php",
+          "tests/Feature/PushNotificationsWebPushTest.php"
+        ],
+        "tests_executed": 9,
+        "assertions": 50,
+        "isolated_focused_tests": 9,
+        "isolated_focused_assertions": 50,
+        "intermediate_tests": 5,
+        "intermediate_assertions": 30,
+        "baseline_failed_cases": 1,
+        "baseline_passed_cases": 3,
+        "baseline_pending_cases": 1,
+        "baseline_assertions": 14,
+        "browser_cells": 0,
+        "database_checks": null,
+        "database_cleanup": "global PHP/Pest zero; exact numeric PID-suffixed schemas zero; isolated worktree removed cleanly"
+      },
+      "problem_root_cause": "The scheduler relied on an eager-loaded Shift assignee and claimed the reminder marker before current employment, canonical Site provenance, and approved Site authorization were revalidated; the queued notification selected channels from preferences without reloading the current task, Shift, or recipient.",
+      "impact": "Before remediation, remote, inactive, ended, revoked, or otherwise non-current recipients could receive protected Shift-task, client, Site, due, and direct-link content, and a reassignment or revocation after enqueue did not suppress delivery.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Resolve and lock the current task, Shift, assignee and employee state before claiming a reminder marker or exposing protected content.",
+        "Require canonical Shift, client and Site convergence plus current approved Site access before notification or Facility signal delivery.",
+        "Repeat fresh recipient, task, Shift and Site authorization at queued channel selection and delivery without copying third-party wording, assets, source, or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": "Apply one current canonical recipient-and-Site rule before reminder claim and repeat it at actual queued delivery so stale scheduler and queue snapshots fail closed.",
+        "status": "IMPLEMENTED_NATIVELY_WITHOUT_BENCHMARK_OR_DESIGN_CREDIT"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [],
+      "rbac_privacy": "One operating organisation across multiple Sites; current approved Site access, exact action capability, canonical Shift and recipient ownership, direct-object denial, and privacy are the boundaries, not tenant isolation.",
+      "priority": "P1",
+      "priority_status": "HISTORICAL_REMEDIATED_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Completed: focused unchanged-source reproduction observed remote-Site and inactive assignees receiving notifications at baseline 47a6d231c52a78c9f0f606e41d4492d754771027",
+        "Completed: exact four-path native remediation integrated to local main at e2593cbdd0791aca2ea7b1e9b254d07bf7f8e84f without publication",
+        "Completed: isolated and post-merge focused 9 tests / 50 assertions plus independent source and reporting-semantics GO; only the post-merge execution counts once",
+        "Retained non-inherited gaps: canonical feature identity, static route/page/action ownership, replacement-recipient reconciliation, external delivery exactly-once, broader push behavior, representative browser, benchmark, release, and completion"
+      ],
+      "confidence": {
+        "level": "HIGH_FOR_BOUNDED_SHIFT_TASK_DUE_RECIPIENT_REVALIDATION_DISPOSITION",
+        "evidence_gap": "Canonical or candidate feature identity, static route/page/action ownership, representative signed-in application browser, full-suite/coverage, ease, target-specific benchmark, same-Site post-alert reassignment reconciliation, replacement-recipient rerouting, external delivery exactly-once, broader push behavior, My Day, Control Room, and broader Shift correctness remain unexecuted or unadjudicated."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording, or distinctive layout may be copied.",
+      "interim_safeguard": "Before relying on a due Shift-task notification or Facility signal, verify the task is still incomplete and due, the Shift is current, the recipient is still the canonical assignee and employee, and approved access to the canonical Shift Site remains active.",
+      "acceptance_criteria": {
+        "given_when_then": "Given valid local, remote-Site, inactive, reassigned, revoked, overnight, duplicate-claim, and channel-preference states, when the scheduler claims and queues a Shift-task due reminder and the queue later selects or sends a channel, then only the current eligible assignee with approved access to the canonical Shift Site receives protected content; a scheduler-time denial leaves the marker null and emits neither notification nor signal; a queue-time denial suppresses delivery without retroactively clearing a marker or retracting a signal; and valid due/overnight, once-only marker, preferences, content, and exception rollback remain compatible without granting replacement-rerouting, external exactly-once, adjacent-surface, browser, benchmark, module, or completion credit.",
+        "status": "BOUNDED_MET_FOR_HISTORICAL_CLAIM_REMEDIATION_NOT_FINAL_FINDING_OR_FEATURE_COMPLETION"
+      },
+      "validation_plan": {
+        "required": "Retain focused valid local, remote-Site, inactive, reassigned, revoked, per-item batch, due/overnight, marker, Facility signal, channel-preference and delivery-time revalidation coverage; keep UserSiteAccessService, models, schema, routes, scheduler, frontend, push transport, My Day, Control Room, replacement-recipient reconciliation, external delivery and broader Shift correctness separate.",
+        "unit": "NOT_SEPARATELY_REQUIRED_FOR_THIS_REMEDIATION",
+        "feature": "EXECUTED_9_TESTS_50_ASSERTIONS_IN_ISOLATED_AND_POST_MERGE_FOCUSED_RUNS_COUNTED_ONCE",
+        "architecture": "STATIC_SOURCE_TEST_GO_PLUS_INDEPENDENT_REPORTING_SEMANTICS_REVIEW",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED_OR_CREDITED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "canonical or candidate feature identity remains unassigned",
+        "no committed issue-specific runtime or independent-review receipt exists; runtime details remain delegated handoff evidence"
+      ],
+      "independent_review": {
+        "status": "COMPLETED_SOURCE_AND_REPORTING_SEMANTICS_GO_MESSAGE_BOUND_EVIDENCE",
+        "reviewer": "independent source and reporting-semantics reviewer",
+        "disagreements": "Two bounded remediation NO-GOs were corrected before seal: per-attempt fresh Site-access service resolution prevented scoped-cache object-ID reuse, and the existing push preference fixture gained valid canonical Site and current-profile provenance without weakening production authorization.",
+        "reconciliation": "The delegated handoff establishes reproduction, exact four-path remediation, focused runtime, local integration, cleanup, and nonpublication. Git and independent source review confirm the bounded behavior and lineage. RUN-199 alone changes the live register and does not convert message-bound runtime into a committed remediation receipt."
+      },
+      "unresolved_fields": [
+        "canonical or candidate FEATURE-ID and static source ownership",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline, and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "full-suite coverage, representative signed-in browser, same-Site post-alert reassignment reconciliation, replacement-recipient rerouting, external delivery exactly-once, broader push behavior, My Day, Control Room, and broader Shift correctness"
       ],
       "completion_credit": false,
       "credit": {

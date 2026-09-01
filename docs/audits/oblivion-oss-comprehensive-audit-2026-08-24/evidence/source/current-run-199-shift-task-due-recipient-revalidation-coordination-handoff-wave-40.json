@@ -1,0 +1,157 @@
+{
+  "schema_version": "oblivion_shift_task_due_recipient_revalidation_coordination_handoff_v1",
+  "evidence_kind": "COORDINATION_HANDOFF_TRANSCRIPTION_NOT_ORIGINAL_RUNTIME_RECEIPT",
+  "status": "SEALED_DELEGATED_EVIDENCE_FOR_BOUNDED_REPORTING_ONLY",
+  "evidence_date": "2026-09-01",
+  "source": {
+    "source_thread_id": "01a04fe4-0a67-7912-bae7-e133b73475fd",
+    "source_task_title": "Continue OSS audit fixes",
+    "transcription_basis": "User-visible codex_delegation coordination handoffs plus Git-verifiable lineage and one independent read-only source/reporting review in the audit task.",
+    "original_issue_specific_runtime_receipt_present": false,
+    "original_issue_specific_independent_review_receipt_present": false,
+    "run_199_reexecuted_application_tests": false,
+    "run_199_claims_original_runtime_authorship": false
+  },
+  "finding": {
+    "id": "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01",
+    "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "feature_id": null,
+    "candidate_feature_id": null,
+    "related_feature_ids": [],
+    "feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+    "priority": "P1",
+    "priority_boundary": "HISTORICAL_REMEDIATED_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT"
+  },
+  "pins": {
+    "application_baseline_commit": "47a6d231c52a78c9f0f606e41d4492d754771027",
+    "application_baseline_tree": "c1e262a50c67797b819d3f1085ece2782b41237e",
+    "advanced_main_commit": "ca3425103d6d75dc728418464d03e7e72983925b",
+    "advanced_main_tree": "662962768c24c0c0eb2231dcd42caf49cfe9c910",
+    "sealed_fix_commit": "6186176d30a9b4061f859eef8d069e8739ef3d88",
+    "sealed_fix_tree": "a089d5212e9674bb0e7915c96806867e52d1015f",
+    "stable_patch_id": "af8be2614ff89b34632299424cdd28e011ee1d84",
+    "local_main_merge_commit": "e2593cbdd0791aca2ea7b1e9b254d07bf7f8e84f",
+    "local_main_merge_tree": "071edd9408f27206bc6962157e4a84c30590f701",
+    "local_main_merge_parents": [
+      "ca3425103d6d75dc728418464d03e7e72983925b",
+      "6186176d30a9b4061f859eef8d069e8739ef3d88"
+    ],
+    "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29"
+  },
+  "exact_application_test_paths": [
+    {
+      "path": "app/Jobs/ShiftTaskDueJob.php",
+      "merge_blob": "959da2db7bed1f295de19123a87f082dfee91b6c"
+    },
+    {
+      "path": "app/Notifications/ShiftTaskDueNotification.php",
+      "merge_blob": "bd2f10f497afbe0fcdfdcfb9142f78167f07340d"
+    },
+    {
+      "path": "tests/Feature/ShiftTaskDueJobTest.php",
+      "merge_blob": "f50251d48acd0393d382be8a01f1fa11adc1e444"
+    },
+    {
+      "path": "tests/Feature/PushNotificationsWebPushTest.php",
+      "merge_blob": "0e7d650735e7208d39ed6e015c52f649e6f2f71e"
+    }
+  ],
+  "reproduction": {
+    "command_text": null,
+    "test_files": [
+      "tests/Feature/ShiftTaskDueJobTest.php",
+      "tests/Feature/PushNotificationsWebPushTest.php"
+    ],
+    "failed": 1,
+    "passed": 3,
+    "pending": 1,
+    "assertions": 14,
+    "duration_seconds": 146.19,
+    "exit_code": 1,
+    "observed_failure": "Remote-Site and inactive assignees were notified on unchanged baseline source.",
+    "credit": "REPRODUCTION_ONLY_ZERO_BOUNDED_PASS_DENOMINATOR_CREDIT"
+  },
+  "remediated_contract": {
+    "scheduler_boundary": "Lock and reload the current task, Shift, assignee and employee profile; require incomplete due work, scheduled or in-progress Shift status, canonical Shift/client/Site convergence, and current approved Site access before claiming reminder_sent_at, notifying, or signalling.",
+    "ineligible_boundary": "At scheduler time, ineligible recipients leave reminder_sent_at null and receive neither notification nor Facility signal.",
+    "queued_delivery_boundary": "Reload and revalidate current task, Shift, recipient, assignment, completion, due state and approved Site access before channel selection and before each channel exposes content. Queue-time denial suppresses delivery only; it does not clear an already-claimed marker or retract an already-emitted Facility signal.",
+    "compatibility": "Preserve due and overnight behavior, database claim and duplicate suppression, preferences and channels, content, valid Facility signal behavior, and exception rollback.",
+    "architecture": "One operating organisation across multiple Sites; current approved Site access, exact capability, canonical Shift and recipient ownership, direct-object denial, and privacy are the boundaries, not tenant isolation."
+  },
+  "verification": {
+    "intermediate_tests": 5,
+    "intermediate_assertions": 30,
+    "intermediate_credit": false,
+    "isolated_final": {
+      "tests": 9,
+      "assertions": 50,
+      "duration_seconds": 157.03,
+      "exit_code": 0,
+      "credit": "DUPLICATE_REPLAY_ZERO_ADDITIONAL_DENOMINATOR_CREDIT"
+    },
+    "post_merge": {
+      "tests": 9,
+      "assertions": 50,
+      "duration_seconds": 156.65,
+      "exit_code": 0,
+      "credit": "COUNT_ONCE_IN_BOUNDED_DISPOSITION_DENOMINATOR"
+    },
+    "php_syntax_paths_passed": 4,
+    "scoped_pint_passed": true,
+    "git_diff_check_passed": true,
+    "first_parent_delta_exact": true,
+    "merge_blobs_byte_identical_to_sealed_fix": true
+  },
+  "independent_review": {
+    "final_status": "GO",
+    "reviewer_count_known": false,
+    "reviewer_identity_recorded": false,
+    "review_scope": "Independent source, test, Git-lineage, bounded-contract, and reporting-semantics review.",
+    "corrected_no_go_items": [
+      "Use a fresh per-attempt Site-access service so scoped-cache object-ID reuse cannot leak authorization across a scheduler batch.",
+      "Give the existing push-preference fixture valid canonical Site and current-profile provenance without weakening production authorization."
+    ],
+    "remaining_actionable_findings": 0
+  },
+  "cleanup": {
+    "global_php_pest_process_count": 0,
+    "numeric_pid_suffixed_schema_count": 0,
+    "primary_status_clean_after_merge": true,
+    "isolated_worktree_removed_cleanly": true,
+    "recovery_branch_retained": true,
+    "push_performed": false
+  },
+  "bounded_accounting": {
+    "previous_unique_tests": 176,
+    "previous_unique_assertions": 2641,
+    "credited_increment_tests": 9,
+    "credited_increment_assertions": 50,
+    "current_unique_tests": 185,
+    "current_unique_assertions": 2691,
+    "exclusions": [
+      "Red 1 failed plus 3 passed plus 1 pending and 14 assertions.",
+      "Intermediate 5 tests and 30 assertions plus cache proofs.",
+      "Isolated final 9 tests and 50 assertions as a duplicate replay.",
+      "Any second count of the post-merge 9 tests and 50 assertions."
+    ]
+  },
+  "noninheritance": {
+    "same_site_post_alert_reassignment_reconciliation": false,
+    "replacement_assignee_rerouting": false,
+    "external_notification_delivery_exactly_once": false,
+    "transactional_outbox": false,
+    "user_site_access_service_correctness": false,
+    "broader_push_behavior": false,
+    "my_day_or_control_room_correctness": false,
+    "route_page_bridge_queue_or_matrix_ownership": false,
+    "representative_application_browser": false,
+    "full_suite_or_coverage": false,
+    "benchmark_or_ncm": false,
+    "deployment_publication_or_release": false,
+    "feature_module_pass_or_completion": false,
+    "final_finding": false,
+    "gate_4_or_audit_completion": false
+  },
+  "completion_credit": false,
+  "receipt_self_seal_sha256": "d693fc1367ec2b44304354b2d2b709b5ea7ee8840fc5f0d0d711936526b9e47e"
+}

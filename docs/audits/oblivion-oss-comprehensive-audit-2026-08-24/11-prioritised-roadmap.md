@@ -86,3 +86,11 @@ RUN-194 counts only the unique Fuel post-merge focused 6/206 once, moving the li
 ## RUN-197 Summary/timeline remediation reporting priority
 
 RUN-197 counts only the unique focused Summary/timeline 15/32 once, moving the live register to **17 = 8 + 2 + 7** and unique bounded execution to **176/2,641**. Static ownership remains **667/310/357/98**; queue remains **507/121/386/99/408**; index 86 remains next; benchmark remains **2/340**, NCM **0**, unresolved **338**; P0/P1 remain **0/0**; Gate 4 and all 26 completion gates remain false. RUN-197 freezes the exact RUN-195 HTML, so the immediate reporting priority is fresh RUN-198 dashboard generation and exact four-viewport verification. Thereafter continue the issue-first cursor without inheriting Summary route/page/bridge/queue/My Day/adjacent-surface/browser/benchmark/module/completion credit.
+
+## RUN-199 Shift-task due recipient-revalidation reporting priority
+
+RUN-199 counts only one unique post-merge Shift-task **9/50** execution, moving the live register to **18 = 8 + 2 + 8** and unique bounded execution to **185/2,691**. Red 1-failed + 3-passed + 1-pending / 14 assertions, intermediate 5/30 and cache proofs, isolated final 9/50, and any duplicate post-merge count remain excluded.
+
+The immediate safe sequence is: retain the new record as feature-unassigned and zero-static-credit; preserve current **667/310/357/98** ownership, **507/121/386/99/408** queue accounting, index **86** next, benchmark **2/340**, NCM **0**, unresolved **338**, P0/P1 **0/0**, Gate 4 open, and all 26 completion gates false; then generate and exactly verify the refreshed RUN-200 dashboard before resuming the issue-first cursor.
+
+Do not inherit post-alert same-Site reassignment reconciliation, replacement-recipient rerouting, external delivery exactly-once, transactional outbox behavior, UserSiteAccessService correctness, broader push behavior, My Day, Control Room, route/page/bridge/queue ownership, application-browser, benchmark, deployment, publication, release, module, Pass, final-finding, feature-completion, or audit-completion credit.
