@@ -16,6 +16,8 @@ use App\Models\ShiftSignal;
 use App\Models\Site;
 use App\Models\User;
 use App\Notifications\EligibilityEscalationNotification;
+use App\Services\ShiftSignalService;
+use App\Services\ShiftStaffEligibilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -25,9 +27,13 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
     use RefreshDatabase;
 
     protected Site $site;
+
     protected Client $client;
+
     protected ServiceContext $serviceContext;
+
     protected User $staff;
+
     protected User $manager;
 
     protected function setUp(): void
@@ -43,7 +49,7 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
         HrEmployeeProfile::query()->create([
             'tenant_id' => 1,
             'user_id' => $this->staff->id,
-            'employee_number' => 'ESC-' . $this->staff->id,
+            'employee_number' => 'ESC-'.$this->staff->id,
             'work_email' => $this->staff->email,
             'position_title' => 'Support Worker',
             'position_role' => 'support_worker',
@@ -51,6 +57,19 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
             'start_date' => now()->subYear()->toDateString(),
             'is_active' => true,
             'manager_user_id' => $this->manager->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+        ]);
+        HrEmployeeProfile::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $this->manager->id,
+            'employee_number' => 'ESC-MGR-'.$this->manager->id,
+            'work_email' => $this->manager->email,
+            'position_title' => 'Service Manager',
+            'position_role' => 'service_manager',
+            'employment_type' => 'full_time',
+            'start_date' => now()->subYear()->toDateString(),
+            'is_active' => true,
             'primary_site_id' => $this->site->id,
             'secondary_site_ids' => [],
         ]);
@@ -66,7 +85,7 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
         $this->createEligibilitySignal($shift, now()->subHours(12)); // 12h ago, threshold is 24h
 
         (new EscalateUnresolvedEligibilityJob(thresholdHours: 24))
-            ->handle(app(\App\Services\ShiftStaffEligibilityService::class), app(\App\Services\ShiftSignalService::class));
+            ->handle(app(ShiftStaffEligibilityService::class), app(ShiftSignalService::class));
 
         Notification::assertNothingSent();
     }
@@ -81,7 +100,7 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
         $this->createEligibilitySignal($shift, now()->subHours(30)); // 30h ago
 
         (new EscalateUnresolvedEligibilityJob(thresholdHours: 24))
-            ->handle(app(\App\Services\ShiftStaffEligibilityService::class), app(\App\Services\ShiftSignalService::class));
+            ->handle(app(ShiftStaffEligibilityService::class), app(ShiftSignalService::class));
 
         Notification::assertSentTo($this->manager, EligibilityEscalationNotification::class);
     }
@@ -96,7 +115,7 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
         $this->createEligibilitySignal($shift, now()->subHours(30)); // signal is old
 
         (new EscalateUnresolvedEligibilityJob(thresholdHours: 24))
-            ->handle(app(\App\Services\ShiftStaffEligibilityService::class), app(\App\Services\ShiftSignalService::class));
+            ->handle(app(ShiftStaffEligibilityService::class), app(ShiftSignalService::class));
 
         // Shift is now valid — re-evaluation should pass, no escalation.
         Notification::assertNothingSent();
@@ -115,7 +134,7 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
         $shift->update(['user_id' => null, 'status' => 'draft']);
 
         (new EscalateUnresolvedEligibilityJob(thresholdHours: 24))
-            ->handle(app(\App\Services\ShiftStaffEligibilityService::class), app(\App\Services\ShiftSignalService::class));
+            ->handle(app(ShiftStaffEligibilityService::class), app(ShiftSignalService::class));
 
         Notification::assertNothingSent();
     }
@@ -129,8 +148,8 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
         $shift = $this->makeFutureBlockedShift();
         $this->createEligibilitySignal($shift, now()->subHours(30));
 
-        $service = app(\App\Services\ShiftStaffEligibilityService::class);
-        $signals = app(\App\Services\ShiftSignalService::class);
+        $service = app(ShiftStaffEligibilityService::class);
+        $signals = app(ShiftSignalService::class);
 
         // First run — should escalate.
         (new EscalateUnresolvedEligibilityJob(thresholdHours: 24))->handle($service, $signals);
@@ -161,12 +180,20 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
         $providerManager = User::factory()->create(['approved_at' => now()]);
         $role = Role::firstOrCreate(['name' => 'provider_manager']);
         $providerManager->roles()->attach($role);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $providerManager->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
 
         $shift = $this->makeFutureBlockedShift();
         $this->createEligibilitySignal($shift, now()->subHours(30));
 
         (new EscalateUnresolvedEligibilityJob(thresholdHours: 24))
-            ->handle(app(\App\Services\ShiftStaffEligibilityService::class), app(\App\Services\ShiftSignalService::class));
+            ->handle(app(ShiftStaffEligibilityService::class), app(ShiftSignalService::class));
 
         Notification::assertSentTo($providerManager, EligibilityEscalationNotification::class);
     }
@@ -182,7 +209,7 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
         $this->createEligibilitySignal($shift, $signalTime);
 
         (new EscalateUnresolvedEligibilityJob(thresholdHours: 24))
-            ->handle(app(\App\Services\ShiftStaffEligibilityService::class), app(\App\Services\ShiftSignalService::class));
+            ->handle(app(ShiftStaffEligibilityService::class), app(ShiftSignalService::class));
 
         Notification::assertSentTo($this->manager, function (EligibilityEscalationNotification $n) {
             $this->assertEquals($this->staff->name, $n->staffName);
@@ -276,7 +303,7 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
             'signal_type' => RecalculateFutureShiftEligibility::SIGNAL_TYPE,
             'severity_hint' => 'high',
             'occurred_at' => $occurredAt,
-            'idempotency_key' => hash('sha256', 'test-signal-' . $shift->id . '-' . $occurredAt->toDateString()),
+            'idempotency_key' => hash('sha256', 'test-signal-'.$shift->id.'-'.$occurredAt->toDateString()),
             'payload' => [
                 'staff_name' => $shift->staff?->name ?? 'Test',
                 'blocking_reasons' => ['Test compliance block'],

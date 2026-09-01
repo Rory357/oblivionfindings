@@ -9,12 +9,14 @@ use App\Models\User;
 use App\Notifications\EligibilityEscalationNotification;
 use App\Services\ShiftSignalService;
 use App\Services\ShiftStaffEligibilityService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * Escalation companion to RecalculateFutureShiftEligibility.
@@ -86,7 +88,7 @@ class EscalateUnresolvedEligibilityJob implements ShouldQueue
 
                 // Emit escalation signal — emitForShift uses firstOrCreate
                 // on idempotency_key, so repeated runs won't duplicate.
-                $windowKey = 'escalation-' . $signal->occurred_at->toDateString();
+                $windowKey = 'escalation-'.$signal->occurred_at->toDateString();
                 $escalationSignal = $signals->emitForShift(
                     shift: $shift,
                     signalType: self::ESCALATION_SIGNAL_TYPE,
@@ -126,7 +128,12 @@ class EscalateUnresolvedEligibilityJob implements ShouldQueue
 
     protected function notifyEscalation(Shift $shift, ShiftSignal $originalSignal, array $blockingReasons): void
     {
-        $recipient = $this->resolveEscalationRecipient($shift);
+        $shift = $this->currentShift($shift);
+        if (! $shift) {
+            return;
+        }
+
+        $recipient = $this->resolveEscalationRecipientForCurrentShift($shift);
 
         if (! $recipient) {
             return;
@@ -161,35 +168,84 @@ class EscalateUnresolvedEligibilityJob implements ShouldQueue
      */
     protected function resolveEscalationRecipient(Shift $shift): ?User
     {
-        $staffProfile = HrEmployeeProfile::where('user_id', $shift->user_id)
-            ->where('is_active', true)
-            ->first(['manager_user_id']);
-
-        $directManager = $staffProfile?->manager_user_id
-            ? User::find($staffProfile->manager_user_id)
-            : null;
-
-        // Try manager's manager first.
-        if ($directManager) {
-            $managerProfile = HrEmployeeProfile::where('user_id', $directManager->id)
-                ->where('is_active', true)
-                ->first(['manager_user_id']);
-
-            $seniorManager = $managerProfile?->manager_user_id
-                ? User::find($managerProfile->manager_user_id)
-                : null;
-
-            if ($seniorManager) {
-                return $seniorManager;
-            }
-
-            // No senior manager — re-notify the direct manager as escalation.
-            return $directManager;
+        $shift = $this->currentShift($shift);
+        if (! $shift) {
+            return null;
         }
 
-        // No hierarchy — fall back to provider_manager or admin.
-        return User::whereHas('roles', fn ($q) => $q->whereIn('name', ['provider_manager', 'admin']))
+        return $this->resolveEscalationRecipientForCurrentShift($shift);
+    }
+
+    private function resolveEscalationRecipientForCurrentShift(Shift $shift): ?User
+    {
+        $staffProfile = $this->currentProfileForUserId((int) $shift->user_id);
+        $directManagerId = $staffProfile?->manager_user_id;
+        $directManagerProfile = $directManagerId
+            ? $this->currentProfileForUserId((int) $directManagerId)
+            : null;
+        $candidateIds = collect([
+            $directManagerProfile?->manager_user_id,
+            $directManagerId,
+        ]);
+
+        $fallbackIds = User::query()
+            ->whereHas('roles', fn ($query) => $query->whereIn('name', ['provider_manager', 'admin']))
+            ->orderBy('id')
+            ->pluck('id');
+
+        foreach ($candidateIds->concat($fallbackIds)->filter()->unique() as $candidateId) {
+            $recipient = $this->eligibleRecipientForShift((int) $candidateId, $shift);
+            if ($recipient) {
+                return $recipient;
+            }
+        }
+
+        return null;
+    }
+
+    private function currentShift(Shift $shift): ?Shift
+    {
+        return Shift::query()->with([
+            'staff:id,name,email',
+            'site:id,name',
+            'client:id,site_id',
+        ])->find($shift->getKey());
+    }
+
+    private function currentProfileForUserId(int $userId): ?HrEmployeeProfile
+    {
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+
+        return HrEmployeeProfile::query()
+            ->where('user_id', $userId)
+            ->where('is_active', true)
+            ->where(function ($query) use ($today): void {
+                $query->whereNull('start_date')->orWhereDate('start_date', '<=', $today);
+            })
+            ->where(function ($query) use ($today): void {
+                $query->whereNull('end_date')->orWhereDate('end_date', '>=', $today);
+            })
             ->first();
     }
 
+    private function eligibleRecipientForShift(int $userId, Shift $shift): ?User
+    {
+        $recipient = User::query()
+            ->whereKey($userId)
+            ->whereNotNull('approved_at')
+            ->whereNotIn('role', ['client', 'next_of_kin'])
+            ->whereDoesntHave('roles', fn ($query) => $query->whereIn('name', ['client', 'next_of_kin']))
+            ->first();
+        if (! $recipient) {
+            return null;
+        }
+
+        try {
+            (new UserSiteAccessService)->assertCanAccessShift($recipient, $shift);
+        } catch (HttpExceptionInterface) {
+            return null;
+        }
+
+        return $recipient;
+    }
 }
