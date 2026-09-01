@@ -98,7 +98,8 @@ class FleetTripController extends Controller
             ->where('consent_blocked', false)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
-            ->orderBy('occurred_at');
+            ->orderBy('occurred_at')
+            ->orderBy('id');
 
         if ($trip->started_at) {
             $query->where('occurred_at', '>=', $trip->started_at);
@@ -107,10 +108,15 @@ class FleetTripController extends Controller
             $query->where('occurred_at', '<=', $trip->ended_at);
         }
 
-        $points = $query->limit(2000)->get(['occurred_at', 'latitude', 'longitude', 'speed_kph']);
+        $eligiblePoints = $query
+            ->limit(2001)
+            ->get(['occurred_at', 'latitude', 'longitude', 'speed_kph']);
+        $truncated = $eligiblePoints->count() > 2000;
+        $points = $eligiblePoints->take(2000);
 
         return response()->json([
             'trip_id' => $trip->id,
+            'truncated' => $truncated,
             'points' => $points->map(fn ($p) => [
                 'occurred_at' => optional($p->occurred_at)->toISOString(),
                 'lat' => $p->latitude,

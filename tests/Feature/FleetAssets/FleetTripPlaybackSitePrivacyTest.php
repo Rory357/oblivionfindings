@@ -544,6 +544,20 @@ class FleetTripPlaybackSitePrivacyTest extends TestCase
             ->getJson("/fleet-assets/trips/{$trip->id}/playback/data")
             ->assertOk()
             ->assertJsonPath('trip_id', $trip->id)
+            ->assertJsonPath('truncated', true)
+            ->assertJsonCount(2000, 'points')
+            ->assertJsonPath('points.0.occurred_at', $startedAt->toISOString())
+            ->assertJsonPath('points.1999.occurred_at', $startedAt->copy()->addSeconds(1999)->toISOString());
+
+        FleetTelemetryEvent::query()
+            ->where('asset_id', $vehicle->id)
+            ->where('occurred_at', $startedAt->copy()->addSeconds(2000))
+            ->delete();
+
+        $this->actingAs($this->viewer)
+            ->getJson("/fleet-assets/trips/{$trip->id}/playback/data")
+            ->assertOk()
+            ->assertJsonPath('truncated', false)
             ->assertJsonCount(2000, 'points')
             ->assertJsonPath('points.0.occurred_at', $startedAt->toISOString())
             ->assertJsonPath('points.1999.occurred_at', $startedAt->copy()->addSeconds(1999)->toISOString());
@@ -593,10 +607,38 @@ class FleetTripPlaybackSitePrivacyTest extends TestCase
             ->getJson("/fleet-assets/trips/{$trip->id}/playback/data")
             ->assertOk()
             ->assertJsonPath('trip_id', $trip->id)
+            ->assertJsonPath('truncated', false)
             ->assertJsonCount(1, 'points')
             ->assertJsonPath('points.0.occurred_at', $eligibleAt->toISOString())
             ->assertJsonPath('points.0.lat', '-36.8123456')
             ->assertJsonPath('points.0.lng', '174.7123456');
+    }
+
+    public function test_playback_data_orders_equal_time_points_by_id(): void
+    {
+        $vehicle = Asset::factory()->vehicle()->create([
+            'site_id' => $this->visibleSite->id,
+            'home_site_id' => $this->visibleSite->id,
+            'name' => 'RUN205 TIE ORDER VEHICLE',
+            'status' => 'active',
+        ]);
+        $startedAt = now()->subDays(9);
+        $session = $this->driverSession($vehicle, $this->visibleDriver, $startedAt);
+        $trip = $this->trip($vehicle, $session, $startedAt, -36.7, 174.7);
+        $trip->update(['ended_at' => $startedAt->copy()->addMinute()]);
+
+        $first = $this->telemetry($vehicle, $startedAt->copy()->addSeconds(30), -36.7100000, 174.7100000, 10.0);
+        $second = $this->telemetry($vehicle, $startedAt->copy()->addSeconds(30), -36.7200000, 174.7200000, 20.0);
+
+        $this->assertLessThan($second->id, $first->id);
+
+        $this->actingAs($this->viewer)
+            ->getJson("/fleet-assets/trips/{$trip->id}/playback/data")
+            ->assertOk()
+            ->assertJsonPath('truncated', false)
+            ->assertJsonCount(2, 'points')
+            ->assertJsonPath('points.0.lat', '-36.7100000')
+            ->assertJsonPath('points.1.lat', '-36.7200000');
     }
 
     /** @param list<int> $secondarySiteIds */
