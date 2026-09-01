@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use App\Models\UserNotificationPreference;
 use App\Notifications\Channels\PushChannel;
@@ -103,10 +105,20 @@ it('fans a Laravel notification out to Expo and browser push subscriptions', fun
 });
 
 it('honours shift task due notification channel preferences before push dispatch', function () {
-    $user = User::factory()->create();
-    $client = Client::factory()->create();
+    $site = Site::factory()->create();
+    $user = User::factory()->frontlineWorker()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => '2025-01-01',
+        'end_date' => null,
+    ]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $shift = Shift::factory()->create([
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'user_id' => $user->id,
         'starts_at' => Carbon::parse('2026-06-01 09:00:00', 'Pacific/Auckland')->utc(),
         'ends_at' => Carbon::parse('2026-06-01 13:00:00', 'Pacific/Auckland')->utc(),
