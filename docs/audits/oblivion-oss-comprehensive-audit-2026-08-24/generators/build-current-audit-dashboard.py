@@ -3409,7 +3409,7 @@ historical_discovery_claims = {row["finding_id"]: row["source_claim"] for row in
 assert len(historical_discovery_claims) == 12
 
 assert findings_register["schema_version"] == "oblivion_audit_findings_v2_mixed_current_status"
-assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_SEVEN_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
+assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_EIGHT_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
 assert findings_register["generated_on"] == "2026-09-01"
 assert findings_register["architecture_rule"] == "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries."
 findings_pins = findings_register["pins"]
@@ -5285,12 +5285,19 @@ summary_row_status = (
     "feature unassigned · zero static ownership, adjacent-surface, My Day, browser, benchmark, "
     "publication, or completion inheritance · not a final finding"
 )
+shift_task_row_status = (
+    "historical issue · remediated on local main · not published to origin/main · "
+    "scheduler-time and queued-delivery recipient revalidation only · feature unassigned · "
+    "delegated coordination transcription, not an original runtime receipt · zero static ownership, "
+    "browser, benchmark, publication, or completion inheritance · not a final finding"
+)
 finding_claim_labels = dict(historical_discovery_claims)
 finding_claim_labels["FLEET-TRIP-INDEX-SITE-PRIVACY-01"] = fleet_finding["impact"]
 finding_claim_labels["FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"] = fleet_playback_finding["impact"]
 finding_claim_labels["FLEET-FUEL-INDEX-SITE-PRIVACY-01"] = fleet_fuel_finding["impact"]
 finding_claim_labels["MON-METRIC-REPLAY-DEDUPE-01"] = metric_finding["impact"]
 finding_claim_labels["SUMMARY-TIMELINE-SITE-PRIVACY-01"] = summary_finding["impact"]
+finding_claim_labels["SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01"] = shift_task_finding["impact"]
 assert set(finding_claim_labels) == {row["id"] for row in live_findings}
 finding_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td class=\"partial\">{}</td></tr>".format(
@@ -5315,12 +5322,16 @@ finding_rows = "".join(
                                 summary_row_status
                                 if row["id"] == "SUMMARY-TIMELINE-SITE-PRIVACY-01"
                                 else (
-                                    "historical issue · already fixed on current main · not a final finding"
-                                    if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                    shift_task_row_status
+                                    if row["id"] == "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01"
                                     else (
-                                        "historical issue · remediated on current main · not a final finding"
-                                        if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
-                                        else "current provisional P1 · independent review pending"
+                                        "historical issue · already fixed on current main · not a final finding"
+                                        if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                        else (
+                                            "historical issue · remediated on current main · not a final finding"
+                                            if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                            else "current provisional P1 · independent review pending"
+                                        )
                                     )
                                 )
                             )
@@ -5343,6 +5354,8 @@ assert finding_rows.count(safe_row_status) == 1
 assert finding_rows.count(fleet_row_status) == 1
 assert finding_rows.count(fleet_playback_row_status) == 1
 assert finding_rows.count(fleet_fuel_row_status) == 1
+assert finding_rows.count(summary_row_status) == 1
+assert finding_rows.count(shift_task_row_status) == 1
 expected_metric_row = (
     '<tr><td class="mono">MON-METRIC-REPLAY-DEDUPE-01</td><td>'
     f'{html.escape(metric_finding["impact"])}</td>'
@@ -7451,7 +7464,7 @@ current_visible_boundaries = [
     "RUN-090 frozen denominator / RUN-190R current accounting",
     "index 84 is not recredited, index 85 fleet-assets.trips.playback is integrated, and index 86 fleet-assets.trips.playback.data is next",
     "RUN-168 verifies that exact dashboard",
-    "RUN-195 verifies only the superseded RUN-194 HTML",
+    "RUN-198 verifies only the superseded RUN-197 HTML",
     "exact dashboard later verified by RUN-185",
     "visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership",
     "None supplies audit-dashboard verification for the new RUN-200 HTML.",

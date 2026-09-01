@@ -1,0 +1,796 @@
+{
+  "schema_version": "run-200-audit-dashboard-verification-wave-40-v1",
+  "run_id": "RUN-200-AUDIT-DASHBOARD-VERIFICATION-WAVE-40",
+  "generated_at": null,
+  "pins": {
+    "run_199_commit": "f7c6f9ee476534cbbc13042b68d5388e0681b535",
+    "run_199_tree": "33f69dc0848cca66ad317e42ba8a61eba46ac1e4",
+    "run_199_parent": "e2593cbdd0791aca2ea7b1e9b254d07bf7f8e84f",
+    "origin_main": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead": 89,
+    "local_main_behind": 0,
+    "run_199_materializer": {
+      "path": "generators/materialize-run-199-shift-task-due-recipient-revalidation-remediation-reporting-wave-40.py",
+      "sha256": "951d6473a65ccb0d2f550bac5274fefb5d2123ed2df7c63eb4762f05a9790e41",
+      "git_blob_id": "9572affa65897763a708109545ab943067d179b3",
+      "bytes": 40399,
+      "lines": 906
+    },
+    "run_199_receipt": {
+      "path": "evidence/source/current-run-199-shift-task-due-recipient-revalidation-remediation-reporting-wave-40.json",
+      "sha256": "4488aec63fc8f0151f778dab76081aeb061dfae5aa4cce227e60a101278d1c61",
+      "git_blob_id": "ef1e7ea9e8772694fbfe8e582f38d53ae0acd41f",
+      "bytes": 20143,
+      "lines": 484
+    },
+    "run_199_receipt_self_seal_sha256": "023eecca8d3069607c1f53bca8710f4c423baa3094e76dff3b3d2e9f86f1ef7d",
+    "run_199_coordination_handoff": {
+      "path": "evidence/source/current-run-199-shift-task-due-recipient-revalidation-coordination-handoff-wave-40.json",
+      "sha256": "344875fbcbcd92b9d739071065aa130ba78be3003d69e17fba0e3c486005c3a8",
+      "git_blob_id": "ee967684f3486daf26d88d874c85dbad613e97ce",
+      "bytes": 7457,
+      "lines": 157
+    },
+    "run_199_coordination_handoff_self_seal_sha256": "d693fc1367ec2b44304354b2d2b709b5ea7ee8840fc5f0d0d711936526b9e47e",
+    "run_198_receipt": {
+      "path": "evidence/browser/current-audit-dashboard-verification-run-198-wave-39.json",
+      "sha256": "7585c000789063b598aa67e944584592a6e36f259484745817c7ece8c0739d52",
+      "git_blob_id": "660cfc9e8956e388726ba9cd1dcf6b86347d3d71",
+      "bytes": 29875,
+      "lines": 787
+    },
+    "run_198_receipt_self_seal_sha256": "215f6fa5e14afd42f2263df2327f8d79c146005292c68471e10f5b0f06aa26f0",
+    "committed_findings": {
+      "path": "findings.json",
+      "sha256": "3578c7a31f6592ee548f50d4afa130febf34d1dbaa0de448fb1cdc6c2600af0c",
+      "git_blob_id": "33110838401d15a5cdf6cd6a6ed4c251776544c0",
+      "bytes": 703303,
+      "lines": 12168
+    },
+    "committed_run_199_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "977226ccc22768aa020ff60c8a641a8bc3e9b550b382314739f21506f307c2ea",
+      "git_blob_id": "11d99c30e86d66d7ff65afaf8791526343116041",
+      "bytes": 866943,
+      "lines": 7616
+    },
+    "committed_run_198_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "4432da4fecc7c9afa0096b46c3568249fccdaa8f0b987bfef4bc1eb07e24bd3a",
+      "git_blob_id": "a5d714122dd3f957d1f371051707da88d42fa9ff",
+      "bytes": 339486,
+      "lines": 78
+    },
+    "final_run_200_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "758adcd30cef1ad8fc7c8f5b78934b26c8f59f3b56e52e24f973048306192856",
+      "git_blob_id": "c0af06caba049aba520a39ec57451262b817be27",
+      "bytes": 867807,
+      "lines": 7629
+    },
+    "final_run_200_builder_diff": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "binary_diff_sha256": "e9ff20e1599da4b7b903661cce3904b9027735a92546d8afd5185063b1f09c97",
+      "numstat": {
+        "added": 20,
+        "deleted": 7
+      }
+    },
+    "final_run_200_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+      "git_blob_id": "765c149116283e35cd74aeb2269fe4516fd1465e",
+      "bytes": 345157,
+      "lines": 78
+    },
+    "final_run_200_dashboard_diff": {
+      "path": "audit-dashboard.html",
+      "binary_diff_sha256": "23f3f963f61f1e1b661573ee11ab904d8b2a14a54ad9418ec814c8d46f67b51f",
+      "numstat": {
+        "added": 17,
+        "deleted": 17
+      }
+    },
+    "run_200_materializer": {
+      "path": "generators/materialize-run-200-audit-dashboard-verification-wave-40.py",
+      "sha256": "023d06929555d20dbc242bb998e05ee7fc60c0917d0e62b39ab56356a74de578",
+      "git_blob_id": "32b774f1ab1f46bb8a01c0cffcd552e065b9b503",
+      "bytes": 55301,
+      "lines": 1446
+    }
+  },
+  "reported_snapshot": {
+    "static": {
+      "source_owner_records": 667,
+      "route_owner_records": 310,
+      "page_owner_records": 357,
+      "static_controller_action_bridges": 98,
+      "bounded_source_denominator": 3929,
+      "bounded_source_residual": 3262,
+      "bounded_source_ownership_percent": "16.976330"
+    },
+    "queue": {
+      "reviewed": 121,
+      "pending": 386,
+      "owned": 99,
+      "shared": 10,
+      "alias": 5,
+      "gap": 7,
+      "without_ownership": 408
+    },
+    "finding_lineage": {
+      "records": 18,
+      "provisional": 8,
+      "historical_already_fixed": 2,
+      "historical_remediated": 8,
+      "bounded_tests": 185,
+      "bounded_assertions": 2691,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "benchmark": {
+      "mapped": 2,
+      "targets": 340,
+      "final_no_match_or_NCM": 0,
+      "unresolved": 338
+    }
+  },
+  "reported_transition": {
+    "from_dashboard_sha256": "4432da4fecc7c9afa0096b46c3568249fccdaa8f0b987bfef4bc1eb07e24bd3a",
+    "to_dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+    "reported_finding_id": "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01",
+    "run_199_forward_gate_satisfied_by_this_artifact": true,
+    "static_ownership_or_queue_advance": false,
+    "new_application_finding": false
+  },
+  "generation": {
+    "builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "758adcd30cef1ad8fc7c8f5b78934b26c8f59f3b56e52e24f973048306192856",
+      "git_blob_id": "c0af06caba049aba520a39ec57451262b817be27",
+      "bytes": 867807,
+      "lines": 7629
+    },
+    "dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+      "git_blob_id": "765c149116283e35cd74aeb2269fe4516fd1465e",
+      "bytes": 345157,
+      "lines": 78
+    },
+    "builder_diff": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "binary_diff_sha256": "e9ff20e1599da4b7b903661cce3904b9027735a92546d8afd5185063b1f09c97",
+      "numstat": {
+        "added": 20,
+        "deleted": 7
+      }
+    },
+    "dashboard_diff": {
+      "path": "audit-dashboard.html",
+      "binary_diff_sha256": "23f3f963f61f1e1b661573ee11ab904d8b2a14a54ad9418ec814c8d46f67b51f",
+      "numstat": {
+        "added": 17,
+        "deleted": 17
+      }
+    },
+    "final_builder_and_dashboard_exact_bytes_pinned": true,
+    "source_literal_boundaries": 226,
+    "output_utf8_lf": true
+  },
+  "superseded_run_198_observation": {
+    "dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "4432da4fecc7c9afa0096b46c3568249fccdaa8f0b987bfef4bc1eb07e24bd3a",
+      "git_blob_id": "a5d714122dd3f957d1f371051707da88d42fa9ff",
+      "bytes": 339486,
+      "lines": 78
+    },
+    "receipt": {
+      "path": "evidence/browser/current-audit-dashboard-verification-run-198-wave-39.json",
+      "sha256": "7585c000789063b598aa67e944584592a6e36f259484745817c7ece8c0739d52",
+      "git_blob_id": "660cfc9e8956e388726ba9cd1dcf6b86347d3d71",
+      "bytes": 29875,
+      "lines": 787
+    },
+    "receipt_artifact_completion_test_met": true,
+    "superseded_by_dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+    "no_current_browser_credit_inherited": true
+  },
+  "current_browser_input": {
+    "path": "C:\\Users\\steph\\.codex\\tmp\\oblivion-run200\\browser-observation.json",
+    "sha256": "c6dce50ab6240870f62e65e332ac073af9dd1052d7adce91451c3bd1ea159398",
+    "bytes": 35661,
+    "lines": 1120,
+    "observation_self_seal_sha256": "5484fe33b0a43db20107f1f8fb1b3df716db77de191f6dea4890345bed721392"
+  },
+  "current_browser_verification": {
+    "browser": {
+      "name": "Codex in-app browser",
+      "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+      "tab_id": "19"
+    },
+    "artifact": {
+      "url": "http://127.0.0.1:61523/audit-dashboard.html",
+      "document_title": "Oblivion Findings current-source audit",
+      "server_host": "127.0.0.1",
+      "server_port": 61523,
+      "server_pid": 5724,
+      "server_executable": "C:\\Users\\steph\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+      "http_status": 200,
+      "response_content_length": 345157,
+      "browser_fetched_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+      "observed_at": "2026-09-01T13:06:35.082646+12:00"
+    },
+    "viewports": {
+      "1440x900": {
+        "visible_text_passed": 48,
+        "visible_text_total": 48,
+        "anchor_elements": 985,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      },
+      "1280x800": {
+        "visible_text_passed": 48,
+        "visible_text_total": 48,
+        "anchor_elements": 985,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      },
+      "1024x768": {
+        "visible_text_passed": 48,
+        "visible_text_total": 48,
+        "anchor_elements": 985,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      },
+      "390x844": {
+        "visible_text_passed": 48,
+        "visible_text_total": 48,
+        "anchor_elements": 985,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      }
+    },
+    "navigation": [
+      {
+        "label": "Progress",
+        "expected_hash": "#progress",
+        "observed_hash": "#progress",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:61523/audit-dashboard.html#progress",
+        "final_url": "http://127.0.0.1:61523/audit-dashboard.html#progress",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00"
+      },
+      {
+        "label": "RUN-199",
+        "expected_hash": "#checkpoint",
+        "observed_hash": "#checkpoint",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:61523/audit-dashboard.html#checkpoint",
+        "final_url": "http://127.0.0.1:61523/audit-dashboard.html#checkpoint",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00"
+      },
+      {
+        "label": "Pages",
+        "expected_hash": "#pages",
+        "observed_hash": "#pages",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:61523/audit-dashboard.html#pages",
+        "final_url": "http://127.0.0.1:61523/audit-dashboard.html#pages",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00"
+      },
+      {
+        "label": "Static census",
+        "expected_hash": "#static-census",
+        "observed_hash": "#static-census",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:61523/audit-dashboard.html#static-census",
+        "final_url": "http://127.0.0.1:61523/audit-dashboard.html#static-census",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00"
+      },
+      {
+        "label": "Runtime gates",
+        "expected_hash": "#runtime",
+        "observed_hash": "#runtime",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:61523/audit-dashboard.html#runtime",
+        "final_url": "http://127.0.0.1:61523/audit-dashboard.html#runtime",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00"
+      },
+      {
+        "label": "Benchmarks",
+        "expected_hash": "#benchmarks",
+        "observed_hash": "#benchmarks",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:61523/audit-dashboard.html#benchmarks",
+        "final_url": "http://127.0.0.1:61523/audit-dashboard.html#benchmarks",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00"
+      },
+      {
+        "label": "Modules",
+        "expected_hash": "#modules",
+        "observed_hash": "#modules",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:61523/audit-dashboard.html#modules",
+        "final_url": "http://127.0.0.1:61523/audit-dashboard.html#modules",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00"
+      },
+      {
+        "label": "Finding status",
+        "expected_hash": "#findings",
+        "observed_hash": "#findings",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:61523/audit-dashboard.html#findings",
+        "final_url": "http://127.0.0.1:61523/audit-dashboard.html#findings",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00"
+      },
+      {
+        "label": "Architecture",
+        "expected_hash": "#architecture",
+        "observed_hash": "#architecture",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:61523/audit-dashboard.html#architecture",
+        "final_url": "http://127.0.0.1:61523/audit-dashboard.html#architecture",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00"
+      },
+      {
+        "label": "Gaps",
+        "expected_hash": "#gaps",
+        "observed_hash": "#gaps",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:61523/audit-dashboard.html#gaps",
+        "final_url": "http://127.0.0.1:61523/audit-dashboard.html#gaps",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00"
+      }
+    ],
+    "console": {
+      "messages": [],
+      "page_errors": [],
+      "warning_or_error_logs": [],
+      "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+      "tab_id": "19",
+      "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+      "observed_at": "2026-09-01T13:06:35.082646+12:00"
+    },
+    "visual_checks": {
+      "desktop_result": "GO_NO_CLIPPING_OR_OVERLAP",
+      "mobile_result": "GO_NO_CLIPPING_OR_OVERLAP",
+      "mobile_navigation_horizontally_scrollable_at_390x844": true,
+      "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+      "tab_id": "19",
+      "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+      "observed_at": "2026-09-01T13:06:35.082646+12:00"
+    },
+    "screenshots": [
+      {
+        "viewport": "1440x900",
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      },
+      {
+        "viewport": "1280x800",
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      },
+      {
+        "viewport": "1024x768",
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      },
+      {
+        "viewport": "390x844",
+        "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+        "tab_id": "19",
+        "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+        "observed_at": "2026-09-01T13:06:35.082646+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      }
+    ],
+    "deliverable": {
+      "dashboard_tab_marked_deliverable": true,
+      "current_exact_dashboard_tab_retained": true,
+      "browser_viewport_override_reset": true,
+      "provider_id": "-43b3-4993-a47b-2e70eb024fbe",
+      "tab_id": "19",
+      "dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+      "observed_at": "2026-09-01T13:06:35.082646+12:00"
+    },
+    "observation_self_seal_sha256": "5484fe33b0a43db20107f1f8fb1b3df716db77de191f6dea4890345bed721392"
+  },
+  "html_graph": {
+    "source_literal_boundary_count": 226,
+    "browser_visible_text_boundary_count": 48,
+    "missing_browser_visible_text_boundaries_before_browser": [],
+    "href_attribute_count": 986,
+    "anchor_element_count": 985,
+    "fragment_anchor_count": 10,
+    "authored_id_count": 10,
+    "duplicate_id_count": 0,
+    "heading_count": 26,
+    "section_count": 26,
+    "table_count": 10,
+    "table_wrap_count": 10,
+    "local_relative_link_occurrences": 975,
+    "unique_local_resources": 504,
+    "existing_unique_local_resources": 504,
+    "missing_local_resources_before_receipt_write": [],
+    "hash_bearing_link_pairs": 831,
+    "hashed_file_occurrences": 829,
+    "unique_hashed_files": 430,
+    "hashed_directory_occurrences": 2,
+    "hash_mismatches": [],
+    "ordered_navigation_label_hash_pairs_verified": true
+  },
+  "http_head_verification": {
+    "expected_unique_resources": 504,
+    "verified_count": 504,
+    "failure_count": 0,
+    "complete": true
+  },
+  "server_cleanup": {
+    "temporary_loopback_host": "127.0.0.1",
+    "temporary_loopback_port": 61523,
+    "temporary_server_pid": 5724,
+    "temporary_server_executable": "C:\\Users\\steph\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+    "listeners_after_cleanup": 0,
+    "exact_server_pid_present_after_cleanup": false,
+    "matching_loopback_processes_after_cleanup": 0,
+    "complete": true
+  },
+  "finding_boundary": {
+    "finding_id": "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01",
+    "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "scheduler_and_queued_recipient_revalidation_only": true,
+    "delegated_coordination_transcription_not_original_runtime_receipt": true,
+    "feature_identity_unassigned": true,
+    "static_ownership_credit": false,
+    "adjacent_surface_credit": false,
+    "my_day_credit": false,
+    "application_browser_credit": false,
+    "benchmark_credit": false,
+    "final_finding": false
+  },
+  "execution_boundary": {
+    "bounded_unique_tests": 185,
+    "bounded_unique_assertions": 2691,
+    "run_200_application_runtime_or_tests_executed": false,
+    "run_200_browser_scope": "static audit-dashboard HTML only",
+    "full_suite_or_coverage": false
+  },
+  "benchmark_boundary": {
+    "mapped": 2,
+    "targets": 340,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338,
+    "run_200_benchmark_credit": false
+  },
+  "noninheritance": {
+    "application_browser": false,
+    "responsive_application_or_visual_credit": false,
+    "application_correctness": false,
+    "application_privacy": false,
+    "application_runtime": false,
+    "static_route_or_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_advance": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "deployment": false,
+    "release": false,
+    "publication": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "worktree_attestation": {
+    "staged_paths": [],
+    "modified_paths": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py"
+    ],
+    "untracked_paths": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-200-audit-dashboard-verification-wave-40.py",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-200-wave-40.json"
+    ],
+    "application_or_test_dirt": [],
+    "shift_task_paths_match_run_199_exact_blobs": true
+  },
+  "mutation_attestation": {
+    "materializer_writes_only": "evidence/browser/current-audit-dashboard-verification-run-200-wave-40.json",
+    "atomic_exclusive_temp_write": true,
+    "fsync_before_replace": true,
+    "stale_temp_refused": true,
+    "optimized_python_refused": true,
+    "strict_duplicate_key_free_json": true,
+    "canonical_self_seal": true
+  },
+  "credit_boundary": {
+    "exact_run_200_dashboard_artifact_verification": true,
+    "application_source_or_test_change": false,
+    "application_runtime_reexecution": false,
+    "application_browser": false,
+    "responsive_application_or_visual_credit": false,
+    "correctness_or_privacy_finding": false,
+    "static_route_or_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_advance": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "full_suite_or_coverage": false,
+    "pass": false,
+    "deployment": false,
+    "release": false,
+    "publication": false,
+    "final_finding": false,
+    "feature_or_module_completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "completion_gates": [
+    {
+      "name": "routes_classified",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "inertia_pages_classified",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "features_in_canonical_register",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "routes_and_pages_mapped_to_feature_id",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "features_with_verified_benchmark_or_final_ncm",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "human_features_with_task_script_and_ten_scores",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "common_and_safety_journeys_cross_reviewed",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "hero_banner_instances_classified",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "overlay_implementations_and_triggers_classified",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "safe_routes_observed_at_desktop",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "selected_families_and_journeys_all_viewports",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "required_visual_states_classified",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "material_visual_finding_families_resampled",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "models_classified",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "policies_classified",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "service_domain_entries_classified",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "critical_async_owners_classified",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "modules_with_all_eight_passes",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "prompt_benchmark_projects_formally_triaged",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "p0_p1_complete_finding_fields",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "redesigns_neutral_native_no_copy",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "ease_4_5_claims_independently_reviewed",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "browser_claims_labeled",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "visual_inconsistencies_complete_context",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "official_source_inference_specialist_split",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "all_agents_returned_reconciled_represented_none_live",
+      "complete": false,
+      "reason": "RUN200 verifies one exact dashboard artifact only"
+    }
+  ],
+  "artifact_scope": {
+    "materializer": "generators/materialize-run-200-audit-dashboard-verification-wave-40.py",
+    "receipt": "evidence/browser/current-audit-dashboard-verification-run-200-wave-40.json",
+    "builder": "generators/build-current-audit-dashboard.py",
+    "dashboard": "audit-dashboard.html",
+    "path_count": 4
+  },
+  "remote_state": {
+    "origin_main": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "push_performed": false,
+    "publication_claimed": false
+  },
+  "finalization_state": {
+    "browser_complete": true,
+    "resource_complete": true,
+    "cleanup_complete": true,
+    "navigation_verified_count": 10,
+    "browser_warning_error_count": 0,
+    "dashboard_tab_marked_deliverable": true
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "receipt_self_seal_sha256": "493b62087f2df1f2ff776f68c162fceb38ab69763a0b2554ba0148dd6c58d216"
+}
