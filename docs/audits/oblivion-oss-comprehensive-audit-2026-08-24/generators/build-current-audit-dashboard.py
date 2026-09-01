@@ -300,6 +300,9 @@ run_199_reporting = read_json_strict("evidence/source/current-run-199-shift-task
 dashboard_run_200 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-200-wave-40.json")
 run_201_coordination_handoff = read_json_strict("evidence/source/current-run-201-elig-shift-notification-site-privacy-coordination-handoff-wave-41.json")
 run_201_reporting = read_json_strict("evidence/source/current-run-201-elig-shift-notification-site-privacy-remediation-reporting-wave-41.json")
+dashboard_run_202 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-202-wave-41.json")
+run_203_coordination_handoff = read_json_strict("evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json")
+run_203_reporting = read_json_strict("evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.json")
 findings_register = read_json_strict("findings.json")
 assert sha256_file("evidence/source/current-canonical-feature-identity-wave-01.json") == "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
 assert sha256_file("evidence/source/current-canonical-identity-agent-register.json") == "21ebd8b004b5ade11aa01281958cda2be2ca966d1fb7c46576e039fab5f47baf"
@@ -3271,6 +3274,11 @@ for label, path in (
     ("RUN-201 Shift eligibility-alert coordination-handoff transcription", "evidence/source/current-run-201-elig-shift-notification-site-privacy-coordination-handoff-wave-41.json"),
     ("RUN-201 Shift eligibility-alert remediation-reporting materializer", "generators/materialize-run-201-elig-shift-notification-site-privacy-remediation-reporting-wave-41.py"),
     ("RUN-201 Shift eligibility-alert remediation-reporting receipt", "evidence/source/current-run-201-elig-shift-notification-site-privacy-remediation-reporting-wave-41.json"),
+    ("RUN-202 exact RUN-201 audit-dashboard verification materializer", "generators/materialize-run-202-audit-dashboard-verification-wave-41.py"),
+    ("RUN-202 exact RUN-201 audit-dashboard verification", "evidence/browser/current-audit-dashboard-verification-run-202-wave-41.json"),
+    ("RUN-203 Fleet playback data-point eligibility coordination-handoff transcription", "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json"),
+    ("RUN-203 Fleet playback data-point eligibility remediation-reporting materializer", "generators/materialize-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.py"),
+    ("RUN-203 Fleet playback data-point eligibility remediation-reporting receipt", "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.json"),
 ):
     if path not in checkpoint_paths:
         checkpoint_evidence.append((label, path))
@@ -3283,9 +3291,9 @@ checkpoint_evidence_links = "".join(
 checkpoint_evidence_links += (
     '<li><a href="task-scripts/">RUN-072 task-script directory (300 files)</a> '
     f'<code>{html.escape(usability_materialization["outputs"]["task_scripts"]["bundle_sha256"])}</code></li>'
-    '<li><a href="generators/materialize-run-202-audit-dashboard-verification-wave-41.py">RUN-202 audit-dashboard verification materializer</a> '
+    '<li><a href="generators/materialize-run-204-audit-dashboard-verification-wave-42.py">RUN-204 audit-dashboard verification materializer</a> '
     '<span>forward generator; fresh exact-artifact verification required</span></li>'
-    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-202-wave-41.json">RUN-202 audit-dashboard verification receipt</a> '
+    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-204-wave-42.json">RUN-204 audit-dashboard verification receipt</a> '
     '<span>forward receipt; intentionally unhashed to avoid an evidence cycle</span></li>'
 )
 start_ready_ids = "<br>".join(
@@ -3417,7 +3425,7 @@ historical_discovery_claims = {row["finding_id"]: row["source_claim"] for row in
 assert len(historical_discovery_claims) == 12
 
 assert findings_register["schema_version"] == "oblivion_audit_findings_v2_mixed_current_status"
-assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_NINE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
+assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_TEN_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
 assert findings_register["generated_on"] == "2026-09-01"
 assert findings_register["architecture_rule"] == "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries."
 findings_pins = findings_register["pins"]
@@ -3529,8 +3537,22 @@ assert findings_pins["elig_shift_notification_site_privacy_local_main_merge_comm
 assert findings_pins["elig_shift_notification_site_privacy_local_main_tree"] == "50ba282b5ded0d8d0d4f9fb19bf8e79f3ce96014"
 assert findings_pins["elig_shift_notification_site_privacy_stable_patch_id"] == "1381114bba1a102630a020211a07b303a1d6240d"
 assert findings_pins["elig_shift_notification_site_privacy_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
+assert findings_pins["run_202_dashboard_verification_materializer_sha256"] == "05685136cf43f637e0835c8f8301f270c60466fce79868ffb033922095333355"
+assert findings_pins["run_202_dashboard_verification_sha256"] == "b63ed9585a03cc852d0f772be42de303f0866c73e80cc8522e8de0d328887471"
+assert findings_pins["run_202_dashboard_verification_self_seal_sha256"] == "a4d296e2a3f779bfa2c7cf34233958a37dc74bb5f6e4f7d78a867d6cb12dc3b8"
+assert findings_pins["run_202_verified_dashboard_sha256"] == "1876db1ff590c86fb30cefb74368b0241c72d9b75966fcbf1a36d6b1096b30e3"
+assert findings_pins["fleet_trip_playback_data_point_eligibility_baseline_commit"] == "9c01f5a4f57f96722015278d1df3c3bd111aa95c"
+assert findings_pins["fleet_trip_playback_data_point_eligibility_baseline_tree"] == "c9b0f223e5c63870cc5c04708babece98c00435f"
+assert findings_pins["fleet_trip_playback_data_point_eligibility_audit_release_commit"] == "b61a2abd48a3d80ef91f6edcdf51d3ad253715e6"
+assert findings_pins["fleet_trip_playback_data_point_eligibility_audit_release_tree"] == "1d8dd6ca99282df8d8f72f21eba6807a1e8f8b4b"
+assert findings_pins["fleet_trip_playback_data_point_eligibility_fix_commit"] == "9c40c51a26048b00d035bf13745a20385794d86b"
+assert findings_pins["fleet_trip_playback_data_point_eligibility_fix_tree"] == "319ec45b5939900c1f00be447ab28486caa821ea"
+assert findings_pins["fleet_trip_playback_data_point_eligibility_local_main_merge_commit"] == "ba39cbc36694164ca9e0f232efd2de00013191b5"
+assert findings_pins["fleet_trip_playback_data_point_eligibility_local_main_tree"] == "1b384bc15377dbf1e2410580681cd46613ab9ef6"
+assert findings_pins["fleet_trip_playback_data_point_eligibility_stable_patch_id"] == "93126baf39d11dc22f1fc3f1d990fa1d376222b6"
+assert findings_pins["fleet_trip_playback_data_point_eligibility_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
 live_findings = findings_register["records"]
-assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 19
+assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 20
 assert {row["id"] for row in live_findings} == set(historical_discovery_claims) | {
     "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
     "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
@@ -3539,6 +3561,7 @@ assert {row["id"] for row in live_findings} == set(historical_discovery_claims) 
     "SUMMARY-TIMELINE-SITE-PRIVACY-01",
     "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01",
     "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01",
+    "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01",
 }
 provisional_findings = [
     row for row in live_findings
@@ -3554,7 +3577,7 @@ historical_remediated_findings = [
 ]
 assert len(provisional_findings) == findings_register["counts"]["provisional_source_claims"] == 8
 assert len(historical_fixed_findings) == findings_register["counts"]["historical_already_fixed"] == 2
-assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 9
+assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 10
 historical_fixed_by_id = {row["id"]: row for row in historical_fixed_findings}
 assert set(historical_fixed_by_id) == {"MED-RBAC-01", "MED-CD-ATOMICITY-01"}
 assert historical_fixed_by_id["MED-RBAC-01"]["current_adjudication"]["verdict"] == "ALREADY_FIXED"
@@ -3601,6 +3624,7 @@ assert set(historical_remediated_by_id) == {
     "SUMMARY-TIMELINE-SITE-PRIVACY-01",
     "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01",
     "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01",
+    "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01",
 }
 scope_finding = historical_remediated_by_id["MED-CD-SCOPE-01"]
 assert scope_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED"
@@ -3800,10 +3824,51 @@ assert all(
         "publication_authorized",
     )
 )
+fleet_playback_data_finding = historical_remediated_by_id["FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01"]
+assert fleet_playback_data_finding["feature_id"] == "CAP-FLEET-VEHICLE-REGISTER"
+assert fleet_playback_data_finding["candidate_feature_id"] == "CAP-FLEET-VEHICLE-REGISTER"
+assert fleet_playback_data_finding["related_feature_ids"] == []
+assert fleet_playback_data_finding["feature_identity_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
+assert fleet_playback_data_finding["feature_id_role"] == "CANDIDATE_REPORTING_ASSOCIATION_ONLY_ZERO_STATIC_OWNERSHIP_CREDIT"
+assert fleet_playback_data_finding["route_url"]["ownership_status"] == "PENDING_FRESH_SEMANTIC_REVIEW"
+assert fleet_playback_data_finding["route_url"]["route_names"] == "fleet-assets.trips.playback.data"
+assert fleet_playback_data_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED"
+assert fleet_playback_data_finding["current_adjudication"]["application_commit"] == "ba39cbc36694164ca9e0f232efd2de00013191b5"
+assert fleet_playback_data_finding["current_adjudication"]["repository_tree"] == "1b384bc15377dbf1e2410580681cd46613ab9ef6"
+assert fleet_playback_data_finding["current_adjudication"]["coordination_handoff_transcription"] == "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json"
+assert fleet_playback_data_finding["evidence"]["coordination_handoff_transcription"] == "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json"
+assert fleet_playback_data_finding["evidence"]["delegated_not_reexecuted_by_run_203"] is True
+assert fleet_playback_data_finding["evidence"]["test_commands_executed"] is None
+assert fleet_playback_data_finding["evidence"]["test_command_text"] is None
+assert fleet_playback_data_finding["evidence"]["tests_executed"] == 27
+assert fleet_playback_data_finding["evidence"]["assertions"] == 213
+assert fleet_playback_data_finding["evidence"]["credited_component_tests"] == 1
+assert fleet_playback_data_finding["evidence"]["credited_component_assertions"] == 6
+assert fleet_playback_data_finding["evidence"]["baseline_failed_cases"] == 1
+assert fleet_playback_data_finding["evidence"]["baseline_passed_cases"] == 0
+assert fleet_playback_data_finding["evidence"]["baseline_pending_cases"] == 0
+assert fleet_playback_data_finding["evidence"]["baseline_assertions"] == 3
+assert "coordinate-incomplete" in fleet_playback_data_finding["acceptance_criteria"]["given_when_then"]
+assert "2,000" in fleet_playback_data_finding["acceptance_criteria"]["given_when_then"]
+assert all(
+    fleet_playback_data_finding["current_adjudication"][key] is False
+    for key in (
+        "static_route_or_page_feature_ownership_inherited",
+        "static_controller_action_bridge_inherited",
+        "queue_advance_inherited",
+        "prior_playback_privacy_credit_inherited",
+        "fleet_management_correctness_inherited",
+        "permission_site_or_direct_object_credit_inherited",
+        "telemetry_ingest_lifecycle_or_range_credit_inherited",
+        "map_frontend_or_adjacent_fleet_credit_inherited",
+        "published_to_origin_main",
+        "publication_authorized",
+    )
+)
 assert all(row["completion_credit"] is False for row in live_findings)
 assert all(all(value is False for value in row["credit"].values()) for row in live_findings)
-assert findings_register["counts"]["bounded_disposition_tests_passed"] == 198
-assert findings_register["counts"]["bounded_disposition_assertions"] == 2716
+assert findings_register["counts"]["bounded_disposition_tests_passed"] == 199
+assert findings_register["counts"]["bounded_disposition_assertions"] == 2722
 assert "5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution" in findings_register["counts"]["bounded_disposition_sum_basis"]
@@ -3884,13 +3949,25 @@ assert findings_register["counts"]["elig_shift_notification_site_privacy_isolate
 assert findings_register["counts"]["elig_shift_notification_site_privacy_isolated_replay_assertions"] == 25
 assert "one post-merge 13/25 ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY execution" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "Only the unique post-merge focused 13/25 execution counts once" in findings_register["counts"]["elig_shift_notification_site_privacy_aggregation_basis"]
+assert findings_register["counts"]["fleet_trip_playback_data_point_eligibility_credited_tests"] == 1
+assert findings_register["counts"]["fleet_trip_playback_data_point_eligibility_credited_assertions"] == 6
+assert findings_register["counts"]["fleet_trip_playback_data_point_eligibility_baseline_failed"] == 1
+assert findings_register["counts"]["fleet_trip_playback_data_point_eligibility_baseline_assertions"] == 3
+assert findings_register["counts"]["fleet_trip_playback_data_point_eligibility_isolated_focused_tests"] == 1
+assert findings_register["counts"]["fleet_trip_playback_data_point_eligibility_isolated_focused_assertions"] == 6
+assert findings_register["counts"]["fleet_trip_playback_data_point_eligibility_isolated_combined_tests"] == 27
+assert findings_register["counts"]["fleet_trip_playback_data_point_eligibility_isolated_combined_assertions"] == 213
+assert findings_register["counts"]["fleet_trip_playback_data_point_eligibility_post_merge_combined_tests"] == 27
+assert findings_register["counts"]["fleet_trip_playback_data_point_eligibility_post_merge_combined_assertions"] == 213
+assert "only the new post-merge 1/6 FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY component" in findings_register["counts"]["bounded_disposition_sum_basis"]
+assert "Only the new post-merge regression component 1/6 counts once" in findings_register["counts"]["fleet_trip_playback_data_point_eligibility_aggregation_basis"]
 assert findings_register["counts"]["final_P0"] == findings_register["counts"]["final_P1"] == 0
-assert findings_register["denominators"]["current_retained_claim_records"] == 19
-assert findings_register["denominators"]["historical_remediated_records"] == 9
-assert findings_register["reconciliation"]["retained_record_count"] == 19
+assert findings_register["denominators"]["current_retained_claim_records"] == 20
+assert findings_register["denominators"]["historical_remediated_records"] == 10
+assert findings_register["reconciliation"]["retained_record_count"] == 20
 assert findings_register["reconciliation"]["current_provisional_count"] == 8
 assert findings_register["reconciliation"]["historical_already_fixed_count"] == 2
-assert findings_register["reconciliation"]["historical_remediated_count"] == 9
+assert findings_register["reconciliation"]["historical_remediated_count"] == 10
 assert findings_register["reconciliation"]["every_non_null_primary_feature_id_in_canonical_matrix"] is True
 assert findings_register["reconciliation"]["records_without_primary_or_candidate_feature_id"] == [
     "MON-METRIC-REPLAY-DEDUPE-01",
@@ -4470,6 +4547,11 @@ run_200_dashboard_payload = git_file_at_commit(
     "audit-dashboard.html",
 )
 assert hashlib.sha256(run_200_dashboard_payload).hexdigest() == "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205"
+run_202_dashboard_payload = git_file_at_commit(
+    "b61a2abd48a3d80ef91f6edcdf51d3ad253715e6",
+    "audit-dashboard.html",
+)
+assert hashlib.sha256(run_202_dashboard_payload).hexdigest() == "1876db1ff590c86fb30cefb74368b0241c72d9b75966fcbf1a36d6b1096b30e3"
 
 assert sha256_file("generators/build-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.py") == "61c895a305f743f102765c9f86d38843c3ce61bcc1a8684a672aa2d7cd6ee157"
 assert sha256_file("evidence/source/root-run-179-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.json") == "5505cf17bb68d3e534116ea9d33e501e0222714b6e3779d0ec6b70f819cc3b0a"
@@ -5367,6 +5449,122 @@ run_201_without_seal = dict(run_201_reporting)
 run_201_seal = run_201_without_seal.pop("receipt_self_seal_sha256")
 assert canonical_sha256(run_201_without_seal) == run_201_seal
 
+assert sha256_file("generators/materialize-run-202-audit-dashboard-verification-wave-41.py") == "05685136cf43f637e0835c8f8301f270c60466fce79868ffb033922095333355"
+assert sha256_file("evidence/browser/current-audit-dashboard-verification-run-202-wave-41.json") == "b63ed9585a03cc852d0f772be42de303f0866c73e80cc8522e8de0d328887471"
+assert dashboard_run_202["schema_version"] == "run-202-audit-dashboard-verification-wave-41-v1"
+assert dashboard_run_202["run_id"] == "RUN-202-AUDIT-DASHBOARD-VERIFICATION-WAVE-41"
+assert dashboard_run_202["pins"]["final_run_202_dashboard"] == {
+    "path": "audit-dashboard.html",
+    "sha256": "1876db1ff590c86fb30cefb74368b0241c72d9b75966fcbf1a36d6b1096b30e3",
+    "git_blob_id": "03442cdb7ec6e17ae55b61494932171bff1e33f4",
+    "bytes": 350017,
+    "lines": 78,
+}
+assert set(dashboard_run_202["current_browser_verification"]["viewports"]) == {
+    "1440x900", "1280x800", "1024x768", "390x844",
+}
+assert all(
+    row["visible_text_passed"] == row["visible_text_total"] == 48
+    and row["page_horizontal_overflow"] is False
+    and row["table_containment_failures"] == 0
+    for row in dashboard_run_202["current_browser_verification"]["viewports"].values()
+)
+assert len(dashboard_run_202["current_browser_verification"]["navigation"]) == 10
+assert dashboard_run_202["http_head_verification"] == {
+    "expected_unique_resources": 509,
+    "verified_count": 509,
+    "failure_count": 0,
+    "complete": True,
+}
+assert {key for key, value in dashboard_run_202["credit_boundary"].items() if value} == {
+    "exact_run_202_dashboard_artifact_verification",
+}
+assert len(dashboard_run_202["completion_gates"]) == 26
+assert not any(row["complete"] for row in dashboard_run_202["completion_gates"])
+run_202_without_seal = dict(dashboard_run_202)
+run_202_seal = run_202_without_seal.pop("receipt_self_seal_sha256")
+assert run_202_seal == "a4d296e2a3f779bfa2c7cf34233958a37dc74bb5f6e4f7d78a867d6cb12dc3b8"
+assert canonical_sha256(run_202_without_seal) == run_202_seal
+
+assert sha256_file("evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json") == "ef75a5c6392225fb5c50d3f2964f4cc9d4bf2eda6646b4cdf65968c674d762cd"
+assert run_203_coordination_handoff["schema_version"] == "oblivion_fleet_trip_playback_data_point_eligibility_coordination_handoff_v1"
+assert run_203_coordination_handoff["evidence_kind"] == "COORDINATION_HANDOFF_TRANSCRIPTION_NOT_ORIGINAL_RUNTIME_RECEIPT"
+assert run_203_coordination_handoff["status"] == "SEALED_DELEGATED_EVIDENCE_FOR_BOUNDED_REPORTING_ONLY"
+assert run_203_coordination_handoff["finding"]["id"] == "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01"
+assert run_203_coordination_handoff["source"]["original_issue_specific_runtime_receipt_present"] is False
+assert run_203_coordination_handoff["source"]["original_issue_specific_independent_review_receipt_present"] is False
+assert run_203_coordination_handoff["source"]["run_203_reexecuted_application_tests"] is False
+assert run_203_coordination_handoff["source"]["run_203_claims_original_runtime_authorship"] is False
+assert run_203_coordination_handoff["bounded_accounting"] == {
+    "previous_unique_tests": 198,
+    "previous_unique_assertions": 2716,
+    "credited_increment_tests": 1,
+    "credited_increment_assertions": 6,
+    "current_unique_tests": 199,
+    "current_unique_assertions": 2722,
+    "exclusions": [
+        "Valid red reproduction: 1 failed test and 3 assertions.",
+        "Environment-invalid shared-vendor/classmap red attempt in full.",
+        "Isolated focused 1 test and 6 assertions as a duplicate replay.",
+        "Isolated combined 27 tests and 213 assertions as replay and support evidence.",
+        "The previously credited playback 11 tests and 167 assertions inside the post-merge combined run.",
+        "The unchanged FleetManagement 15 tests and 40 assertions inside the post-merge combined run.",
+        "Any second count of the post-merge combined 27 tests and 213 assertions.",
+    ],
+}
+assert run_203_coordination_handoff["invalid_reproduction_attempt"]["credit"] is False
+assert not any(run_203_coordination_handoff["noninheritance"].values())
+assert run_203_coordination_handoff["completion_credit"] is False
+run_203_handoff_without_seal = dict(run_203_coordination_handoff)
+run_203_handoff_seal = run_203_handoff_without_seal.pop("receipt_self_seal_sha256")
+assert run_203_handoff_seal == "a4b9ca491ffd65a11551bb850fd067a45980c8b1fa9084623a56e081e833acbd"
+assert canonical_sha256(run_203_handoff_without_seal) == run_203_handoff_seal
+
+assert sha256_file("generators/materialize-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.py") == "bae4f9a4584cc528a09e4375c0f5aca57dbe2e225c49adb14d0e3ae89b10ba9c"
+assert run_203_reporting["schema_version"] == "run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42-v1"
+assert run_203_reporting["run_id"] == "RUN-203-FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01-REMEDIATION-REPORTING-WAVE-42"
+assert run_203_reporting["status"] == (
+    "FLEET_TRIP_PLAYBACK_DATA_POINT_ELIGIBILITY_HISTORICAL_REMEDIATION_REPORTING_"
+    "MATERIALIZED_DASHBOARD_RUN204_REQUIRED_ZERO_STATIC_PUBLICATION_FINAL_FINDING_"
+    "OR_COMPLETION_CREDIT"
+)
+assert run_203_reporting["scope"]["finding_id"] == "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01"
+assert run_203_reporting["pins"]["coordination_handoff"]["sha256"] == "ef75a5c6392225fb5c50d3f2964f4cc9d4bf2eda6646b4cdf65968c674d762cd"
+assert run_203_reporting["pins"]["coordination_handoff"]["git_blob_id"] == "7035edf7f20c04d35b7cffd9e967c857fd1ceff0"
+assert run_203_reporting["pins"]["coordination_handoff"]["receipt_self_seal_sha256"] == run_203_handoff_seal
+assert run_203_reporting["materializer"]["sha256"] == sha256_file("generators/materialize-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.py")
+assert run_203_reporting["pins"]["reporting_sources"]["generators/build-current-audit-dashboard.py"]["sha256"] == sha256_file("generators/build-current-audit-dashboard.py")
+assert run_203_reporting["reporting_transition"]["counts_after"] == {
+    "retained_claim_records": 20,
+    "provisional_source_claims": 8,
+    "historical_already_fixed": 2,
+    "historical_remediated": 10,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_203_reporting["reporting_transition"]["static_ownership_or_queue_advance"] is False
+assert run_203_reporting["bounded_execution_accounting"]["unique_total"] == {
+    "tests": 199,
+    "assertions": 2722,
+}
+assert run_203_reporting["bounded_execution_accounting"]["credited_increment"] == {
+    "tests": 1,
+    "assertions": 6,
+}
+assert run_203_reporting["preservation_boundary"]["queue"]["next_zero_based_index"] == 86
+assert run_203_reporting["preservation_boundary"]["queue"]["next_route_name"] == "fleet-assets.trips.playback.data"
+assert run_203_reporting["dashboard_forward_gate"]["required_run"] == "RUN-204"
+assert run_203_reporting["dashboard_forward_gate"]["dashboard_html_changed_by_run_203"] is False
+assert run_203_reporting["dashboard_forward_gate"]["preserved_run_202_dashboard_sha256"] == "1876db1ff590c86fb30cefb74368b0241c72d9b75966fcbf1a36d6b1096b30e3"
+assert {key for key, value in run_203_reporting["credit_boundary"].items() if value} == {
+    "live_findings_register_and_reporting_status",
+}
+assert len(run_203_reporting["completion_gates"]) == 26
+assert not any(row["complete"] for row in run_203_reporting["completion_gates"])
+run_203_without_seal = dict(run_203_reporting)
+run_203_seal = run_203_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_203_without_seal) == run_203_seal
+
 reviewed_fleet_daily_check_overlay = findings_register["current_static_source_feature_ownership"]
 
 required_artifacts = [
@@ -5447,6 +5645,14 @@ elig_shift_row_status = (
     "feature unassigned · delegated coordination transcription, not an original runtime receipt · zero static ownership, "
     "browser, benchmark, publication, or completion inheritance · not a final finding"
 )
+fleet_playback_data_row_status = (
+    "historical issue · remediated on local main · not published to origin/main · "
+    "coordinate-complete playback rows before ordering and the 2,000-point cap only · "
+    "candidate feature association only · playback.data index 86 remains pending fresh semantic review · "
+    "delegated coordination transcription, not an original runtime receipt · zero static ownership, queue, "
+    "prior privacy, telemetry lifecycle/range, map/frontend, adjacent Fleet, browser, benchmark, publication, "
+    "or completion inheritance · not a final finding"
+)
 finding_claim_labels = dict(historical_discovery_claims)
 finding_claim_labels["FLEET-TRIP-INDEX-SITE-PRIVACY-01"] = fleet_finding["impact"]
 finding_claim_labels["FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"] = fleet_playback_finding["impact"]
@@ -5455,6 +5661,7 @@ finding_claim_labels["MON-METRIC-REPLAY-DEDUPE-01"] = metric_finding["impact"]
 finding_claim_labels["SUMMARY-TIMELINE-SITE-PRIVACY-01"] = summary_finding["impact"]
 finding_claim_labels["SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01"] = shift_task_finding["impact"]
 finding_claim_labels["ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01"] = elig_shift_finding["impact"]
+finding_claim_labels["FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01"] = fleet_playback_data_finding["impact"]
 assert set(finding_claim_labels) == {row["id"] for row in live_findings}
 finding_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td class=\"partial\">{}</td></tr>".format(
@@ -5485,12 +5692,16 @@ finding_rows = "".join(
                                         elig_shift_row_status
                                         if row["id"] == "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01"
                                         else (
-                                            "historical issue · already fixed on current main · not a final finding"
-                                            if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                            fleet_playback_data_row_status
+                                            if row["id"] == "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01"
                                             else (
-                                                "historical issue · remediated on current main · not a final finding"
-                                                if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
-                                                else "current provisional P1 · independent review pending"
+                                                "historical issue · already fixed on current main · not a final finding"
+                                                if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                                else (
+                                                    "historical issue · remediated on current main · not a final finding"
+                                                    if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                                    else "current provisional P1 · independent review pending"
+                                                )
                                             )
                                         )
                                     )
@@ -5517,6 +5728,8 @@ assert finding_rows.count(fleet_playback_row_status) == 1
 assert finding_rows.count(fleet_fuel_row_status) == 1
 assert finding_rows.count(summary_row_status) == 1
 assert finding_rows.count(shift_task_row_status) == 1
+assert finding_rows.count(elig_shift_row_status) == 1
+assert finding_rows.count(fleet_playback_data_row_status) == 1
 expected_metric_row = (
     '<tr><td class="mono">MON-METRIC-REPLAY-DEDUPE-01</td><td>'
     f'{html.escape(metric_finding["impact"])}</td>'
@@ -7126,6 +7339,112 @@ current_template_text = (
     + fresh_run_202_body
     + current_template_text[fresh_run_202_body_end:]
 )
+
+run_203_template_rewrites = [
+    ('<a href="#checkpoint">RUN-201</a>', '<a href="#checkpoint">RUN-203</a>'),
+    (
+        "RUN-200–201 Shift eligibility-alert recipient Site-privacy checkpoint",
+        "RUN-202–203 Fleet playback data-point eligibility checkpoint",
+    ),
+    (
+        "RUN-199: Shift-task due recipient-revalidation reproduced and remediated in exactly four paths · historical 8 provisional + 2 already-fixed + 8 remediated · historical 185/2,691 unique bounded disposition total · dashboard HTML later verified by RUN-200</li><li>RUN-200: exact RUN-199 dashboard verified at 4/4 viewports · 48/48 named visible checks per viewport · 10/10 navigation · 504/504 resources · zero application credit</li><li>RUN-201: Shift eligibility-alert recipient Site privacy reproduced and remediated in exactly four paths · one post-merge $elig_shift_tests/$elig_shift_assertions execution counted once · delegated coordination transcription, not an original runtime receipt · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-202</li>",
+        "RUN-199: Shift-task due recipient-revalidation reproduced and remediated in exactly four paths · historical 8 provisional + 2 already-fixed + 8 remediated · historical 185/2,691 unique bounded disposition total · dashboard HTML later verified by RUN-200</li><li>RUN-200: exact RUN-199 dashboard verified at 4/4 viewports · 48/48 named visible checks per viewport · 10/10 navigation · 504/504 resources · zero application credit</li><li>RUN-201: Shift eligibility-alert recipient Site privacy reproduced and remediated in exactly four paths · historical 8 provisional + 2 already-fixed + 9 remediated · historical 198/2,716 unique bounded disposition total · dashboard HTML later verified by RUN-202</li><li>RUN-202: exact RUN-201 dashboard verified at 4/4 viewports · 48/48 named visible checks per viewport · 10/10 navigation · 509/509 resources · zero application credit</li><li>RUN-203: Fleet playback data-point eligibility reproduced and remediated in exactly two paths · only the new post-merge $fleet_playback_data_tests/$fleet_playback_data_assertions component counted once · delegated coordination transcription, not an original runtime receipt · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-204</li>",
+    ),
+    (
+        "The current RUN-201 register retains 19 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 is the new historical-remediated record with null feature and candidate IDs, UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW identity, and zero static-ownership credit.",
+        "The current RUN-203 register retains 20 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01 is the new historical-remediated record with candidate/reporting association only to CAP-FLEET-VEHICLE-REGISTER, PENDING_FRESH_SEMANTIC_REVIEW identity, and zero static-ownership credit.",
+    ),
+    (
+        "The current RUN-201 register retains $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated. ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 adds only bounded current approved canonical-Shift-Site recipient and one canonical current Shift payload-snapshot reporting; feature identity remains unassigned with zero owner, bridge, page, or queue credit, while playback.data index 86 remains next.",
+        "The current RUN-203 register retains $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated. FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01 adds only bounded coordinate-complete row eligibility before ordering and the 2,000-point cap; its CAP-FLEET-VEHICLE-REGISTER association is candidate/reporting-only with zero owner, bridge, page, queue, or prior-playback-privacy credit, and playback.data index 86 remains pending fresh semantic review.",
+    ),
+    (
+        "$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 19 retained · none final",
+        "$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 20 retained · none final",
+    ),
+    (
+        "$fleet_playback_tests/$fleet_playback_assertions Fleet playback + $metric_tests/$metric_assertions final corrected Monitoring replay + $fleet_fuel_tests/$fleet_fuel_assertions Fleet Fuel + $summary_tests/$summary_assertions Summary/timeline + $shift_task_tests/$shift_task_assertions Shift-task + $elig_shift_tests/$elig_shift_assertions eligibility-alert Site privacy; initial $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, Summary red/zero-assertion/$summary_supporting_tests/$summary_supporting_assertions support/$summary_shared_tests/$summary_shared_assertions shared execution, Shift-task red/intermediate/cache/isolated replay/duplicate post-merge execution, eligibility-alert red/intermediate-NO-GO/isolated replay/duplicate post-merge execution, and all other replay/support remain separate",
+        "$fleet_playback_tests/$fleet_playback_assertions Fleet playback + $metric_tests/$metric_assertions final corrected Monitoring replay + $fleet_fuel_tests/$fleet_fuel_assertions Fleet Fuel + $summary_tests/$summary_assertions Summary/timeline + $shift_task_tests/$shift_task_assertions Shift-task + $elig_shift_tests/$elig_shift_assertions eligibility-alert Site privacy + $fleet_playback_data_tests/$fleet_playback_data_assertions Fleet playback data-point eligibility; initial $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, Summary red/zero-assertion/$summary_supporting_tests/$summary_supporting_assertions support/$summary_shared_tests/$summary_shared_assertions shared execution, Shift-task and eligibility-alert red/intermediate/replay/duplicate post-merge execution, playback-data red/environment-invalid/isolated/combined/prior-playback/FleetManagement/duplicate post-merge execution, and all other replay/support remain separate",
+    ),
+    (
+        "The register retains 19 claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. MON-METRIC-REPLAY-DEDUPE-01, SUMMARY-TIMELINE-SITE-PRIVACY-01, SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01, and ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 retain null feature and candidate IDs and zero static ownership. FLEET-FUEL-INDEX-SITE-PRIVACY-01 remains candidate-only for CAP-FLEET-VEHICLE-REGISTER; row-attached logger identity follows foreign-row concealment only, with no independent logger-Site authorization for an otherwise visible row.",
+        "The register retains 20 claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. MON-METRIC-REPLAY-DEDUPE-01, SUMMARY-TIMELINE-SITE-PRIVACY-01, SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01, and ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 retain null feature and candidate IDs and zero static ownership. FLEET-FUEL-INDEX-SITE-PRIVACY-01 and FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01 remain candidate-only for CAP-FLEET-VEHICLE-REGISTER; the new playback-data record grants no static owner, bridge, queue, prior privacy, telemetry lifecycle/range, map/frontend, or adjacent Fleet credit.",
+    ),
+    (
+        "19 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 9 historical remediated",
+        "20 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 10 historical remediated",
+    ),
+    ("RUN-155–201 bounded disposition provenance, remediation, and reporting", "RUN-155–203 bounded disposition provenance, remediation, and reporting"),
+    ("RUN-001 through RUN-201 are represented by audit artifacts.", "RUN-001 through RUN-203 are represented by audit artifacts."),
+    ("RUN-071–201 current reporting checkpoint", "RUN-071–203 current reporting checkpoint"),
+    ("RUN-071–201 completion-gate checkpoint", "RUN-071–203 completion-gate checkpoint"),
+    ("RUN-071–201 evidence lineage", "RUN-071–203 evidence lineage"),
+    ("Every current raw, generated, reviewed, and integrated RUN-077–201", "Every current raw, generated, reviewed, and integrated RUN-077–203"),
+    ("current RUN-201 split of 19 retained claim identities", "current RUN-203 split of 20 retained claim identities"),
+    ("Fresh RUN-202 audit-dashboard verification required", "Fresh RUN-204 audit-dashboard verification required"),
+    (
+        "RUN-195 verifies the exact RUN-194 dashboard; RUN-196/R–197 establish and report the bounded Summary/timeline remediation. RUN-198 verifies the exact RUN-197 dashboard; RUN-199 establishes and reports the bounded Shift-task remediation. RUN-200 verifies the exact RUN-199 dashboard; RUN-201 is the current Shift eligibility-alert Site-privacy reporting transaction, and RUN-202 remains the fresh exact-dashboard gate.",
+        "RUN-198 verifies the exact RUN-197 dashboard; RUN-199 establishes and reports the bounded Shift-task remediation. RUN-200 verifies the exact RUN-199 dashboard; RUN-201 establishes and reports the bounded Shift eligibility-alert Site-privacy remediation. RUN-202 verifies the exact RUN-201 dashboard; RUN-203 is the current Fleet playback data-point eligibility reporting transaction, and RUN-204 remains the fresh exact-dashboard gate.",
+    ),
+    (
+        "RUN-151, RUN-155, RUN-158, RUN-161, RUN-164, RUN-168, RUN-172, RUN-175, RUN-178, RUN-182, RUN-185, RUN-188, RUN-192, RUN-195, RUN-198, and RUN-200 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-201 reporting sources or the RUN-202 dashboard generated from them.",
+        "RUN-151, RUN-155, RUN-158, RUN-161, RUN-164, RUN-168, RUN-172, RUN-175, RUN-178, RUN-182, RUN-185, RUN-188, RUN-192, RUN-195, RUN-198, RUN-200, and RUN-202 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-203 reporting sources or the RUN-204 dashboard generated from them.",
+    ),
+    ("It verifies the RUN-201 audit artifact only", "It verifies the RUN-203 audit artifact only"),
+    (
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, bounded Fleet evidence, RUN-200 exact-dashboard verification, and bounded delegated Shift eligibility-alert coordination evidence reported in RUN-201, with fresh RUN-202 dashboard verification required.",
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, bounded Fleet evidence, RUN-202 exact-dashboard verification, and bounded delegated Fleet playback data-point eligibility coordination evidence reported in RUN-203, with fresh RUN-204 dashboard verification required.",
+    ),
+    (
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from separately bounded RUN-159 MED-RBAC, RUN-162 MED-CD-SCOPE, RUN-166 manual-entry MED-CD-ATOMICITY, RUN-173 post-merge SAFE, RUN-176 post-merge Fleet trip-index, RUN-183 post-merge Fleet playback, RUN-186 final post-corrective-merge Monitoring metric-replay, and RUN-193 post-merge Fleet Fuel focused executions, no represented wave grants broader or full-suite application runtime or coverage; only MED-RBAC, MED-CD-SCOPE, post-merge SAFE, post-merge Fleet trip-index, post-merge Fleet playback, final post-corrective-merge Monitoring $metric_tests/$metric_assertions, and the unique post-merge Fuel $fleet_fuel_tests/$fleet_fuel_assertions component contribute once to the current $unique_bounded_tests/$unique_bounded_assertions total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, Fuel red $fleet_fuel_red_failed/$fleet_fuel_red_assertions, isolated Fuel replay, supporting $fleet_fuel_supporting_tests/$fleet_fuel_supporting_assertions, and any second count from combined 26/421 are excluded.",
+        "RUN-145 grants exactly two target-specific static benchmark-mapping credits. Apart from separately bounded RUN-159 MED-RBAC, RUN-162 MED-CD-SCOPE, RUN-166 manual-entry MED-CD-ATOMICITY, RUN-173 post-merge SAFE, RUN-176 post-merge Fleet trip-index, RUN-183 post-merge Fleet playback, RUN-186 final post-corrective-merge Monitoring metric-replay, RUN-193 post-merge Fleet Fuel, RUN-196 focused Summary/timeline, RUN-199 post-merge Shift-task, RUN-201 post-merge eligibility-alert, and RUN-203 post-merge Fleet playback data-point eligibility executions, no represented wave grants broader or full-suite application runtime or coverage; only MED-RBAC, MED-CD-SCOPE, post-merge SAFE, post-merge Fleet trip-index, post-merge Fleet playback, final post-corrective-merge Monitoring $metric_tests/$metric_assertions, the unique post-merge Fuel $fleet_fuel_tests/$fleet_fuel_assertions component, focused Summary/timeline $summary_tests/$summary_assertions, one post-merge Shift-task $shift_task_tests/$shift_task_assertions, one post-merge eligibility-alert $elig_shift_tests/$elig_shift_assertions, and only the new post-merge Fleet playback data-point eligibility $fleet_playback_data_tests/$fleet_playback_data_assertions component contribute once to the current $unique_bounded_tests/$unique_bounded_assertions total. Every red, environment-invalid, replay, supporting, overlapping, or duplicate post-merge execution remains excluded.",
+    ),
+    (
+        "RUN-159 establishes bounded MED-RBAC execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution; RUN-173 adds one post-merge $safe_tests/$safe_assertions SAFE focused execution, RUN-176 adds one post-merge $fleet_tests/$fleet_assertions Fleet index execution, RUN-183 adds one post-merge $fleet_playback_tests/$fleet_playback_assertions Fleet playback execution, RUN-186 adds only the final post-corrective-merge $metric_tests/$metric_assertions Monitoring metric-replay execution, and RUN-193 adds only the unique post-merge $fleet_fuel_tests/$fleet_fuel_assertions Fuel component to the unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, all Monitoring replays/subsets, Fuel red/replay/support/combined-overlap, supporting suites, adjacent filters, red failures, terminal-fixture failures, and atomicity remain separate or excluded, and none establishes full-suite, coverage, application-browser, ease, release, Pass, publication, or completion credit.",
+        "RUN-159 establishes bounded MED-RBAC execution; RUN-162 separately establishes focused MED-CD-SCOPE remediation execution; RUN-166 separately establishes bounded manual-entry MED-CD-ATOMICITY execution; RUN-173 adds one post-merge $safe_tests/$safe_assertions SAFE focused execution, RUN-176 adds one post-merge $fleet_tests/$fleet_assertions Fleet index execution, RUN-183 adds one post-merge $fleet_playback_tests/$fleet_playback_assertions Fleet playback execution, RUN-186 adds only the final post-corrective-merge $metric_tests/$metric_assertions Monitoring metric-replay execution, RUN-193 adds only the unique post-merge $fleet_fuel_tests/$fleet_fuel_assertions Fuel component, RUN-196 adds focused Summary/timeline $summary_tests/$summary_assertions, RUN-199 adds one post-merge Shift-task $shift_task_tests/$shift_task_assertions, RUN-201 adds one post-merge eligibility-alert $elig_shift_tests/$elig_shift_assertions, and RUN-203 adds only the new post-merge Fleet playback data-point eligibility $fleet_playback_data_tests/$fleet_playback_data_assertions component to the unique bounded total. Every red, environment-invalid, replay, supporting, overlapping, or duplicate post-merge execution remains separate or excluded, and none establishes full-suite, coverage, application-browser, ease, release, Pass, publication, or completion credit.",
+    ),
+    (
+        "RUN-159, RUN-162, RUN-166, RUN-173, RUN-176, RUN-183, RUN-186/R, RUN-193/R, RUN-196/R, RUN-199, and RUN-201 retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, post-merge Fleet trip-index $fleet_tests/$fleet_assertions, post-merge Fleet playback $fleet_playback_tests/$fleet_playback_assertions, final post-corrective-merge Monitoring $metric_tests/$metric_assertions, unique post-merge Fuel $fleet_fuel_tests/$fleet_fuel_assertions, focused Summary/timeline $summary_tests/$summary_assertions, one post-merge Shift-task $shift_task_tests/$shift_task_assertions, and one post-merge eligibility-alert $elig_shift_tests/$elig_shift_assertions execution contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, Summary red/zero-assertion/$summary_supporting_tests/$summary_supporting_assertions support/$summary_shared_tests/$summary_shared_assertions shared execution, Shift-task red/intermediate/cache/isolated replay/duplicate post-merge execution, eligibility-alert red $elig_shift_red_failed-failed/$elig_shift_red_passed-passed/$elig_shift_red_pending-pending/$elig_shift_red_assertions-assertion reproduction, intermediate reviewer-NO-GO $elig_shift_intermediate_tests/$elig_shift_intermediate_assertions, isolated final $elig_shift_tests/$elig_shift_assertions replay, any duplicate post-merge count, and every other replay/subset remain excluded.",
+        "RUN-159, RUN-162, RUN-166, RUN-173, RUN-176, RUN-183, RUN-186/R, RUN-193/R, RUN-196/R, RUN-199, RUN-201, and RUN-203 retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, post-merge Fleet trip-index $fleet_tests/$fleet_assertions, post-merge Fleet playback $fleet_playback_tests/$fleet_playback_assertions, final post-corrective-merge Monitoring $metric_tests/$metric_assertions, unique post-merge Fuel $fleet_fuel_tests/$fleet_fuel_assertions, focused Summary/timeline $summary_tests/$summary_assertions, one post-merge Shift-task $shift_task_tests/$shift_task_assertions, one post-merge eligibility-alert $elig_shift_tests/$elig_shift_assertions, and only the new post-merge Fleet playback data-point eligibility $fleet_playback_data_tests/$fleet_playback_data_assertions component contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, Summary red/zero-assertion/$summary_supporting_tests/$summary_supporting_assertions support/$summary_shared_tests/$summary_shared_assertions shared execution, Shift-task and eligibility-alert red/intermediate/replay/duplicate post-merge execution, playback-data red $fleet_playback_data_red_failed-failed/$fleet_playback_data_red_passed-passed/$fleet_playback_data_red_pending-pending/$fleet_playback_data_red_assertions-assertion reproduction, environment-invalid shared-vendor/classmap attempt, isolated focused $fleet_playback_data_isolated_tests/$fleet_playback_data_isolated_assertions, combined $fleet_playback_data_combined_tests/$fleet_playback_data_combined_assertions, prior playback $fleet_playback_data_prior_tests/$fleet_playback_data_prior_assertions, unchanged FleetManagement $fleet_playback_data_supporting_tests/$fleet_playback_data_supporting_assertions, any duplicate post-merge count, and every other replay/subset remain excluded.",
+    ),
+    (
+        "</tr><tr><td>RUN-201 Shift eligibility-alert Site-privacy execution</td><td>$elig_shift_tests post-merge focused tests / $elig_shift_assertions assertions counted once; red $elig_shift_red_failed failed + $elig_shift_red_passed passed + $elig_shift_red_pending pending / $elig_shift_red_assertions assertion, intermediate reviewer-NO-GO $elig_shift_intermediate_tests/$elig_shift_intermediate_assertions, isolated final $elig_shift_tests/$elig_shift_assertions replay, and duplicate post-merge counting excluded</td><td class=\"partial\">current active/non-ended employee and approved canonical-Shift-Site recipient · deterministic fallback continuation · one canonical current Shift authorization/payload snapshot · feature unassigned · delegated coordination transcription, not an original runtime receipt · baseline $elig_shift_baseline_short · fix $elig_shift_fix_short · local merge $elig_shift_merge_short · origin/main $elig_shift_origin_short unchanged</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+        "</tr><tr><td>RUN-201 Shift eligibility-alert Site-privacy execution</td><td>$elig_shift_tests post-merge focused tests / $elig_shift_assertions assertions counted once; red $elig_shift_red_failed failed + $elig_shift_red_passed passed + $elig_shift_red_pending pending / $elig_shift_red_assertions assertion, intermediate reviewer-NO-GO $elig_shift_intermediate_tests/$elig_shift_intermediate_assertions, isolated final $elig_shift_tests/$elig_shift_assertions replay, and duplicate post-merge counting excluded</td><td class=\"partial\">current active/non-ended employee and approved canonical-Shift-Site recipient · deterministic fallback continuation · one canonical current Shift authorization/payload snapshot · feature unassigned · delegated coordination transcription, not an original runtime receipt · baseline $elig_shift_baseline_short · fix $elig_shift_fix_short · local merge $elig_shift_merge_short · origin/main $elig_shift_origin_short unchanged</td></tr><tr><td>RUN-203 Fleet playback data-point eligibility execution</td><td>only the new post-merge $fleet_playback_data_tests/$fleet_playback_data_assertions regression component counted once inside $fleet_playback_data_combined_tests/$fleet_playback_data_combined_assertions; valid red $fleet_playback_data_red_failed failed + $fleet_playback_data_red_passed passed + $fleet_playback_data_red_pending pending / $fleet_playback_data_red_assertions assertions, environment-invalid shared-vendor/classmap attempt, isolated $fleet_playback_data_isolated_tests/$fleet_playback_data_isolated_assertions, prior playback $fleet_playback_data_prior_tests/$fleet_playback_data_prior_assertions, unchanged FleetManagement $fleet_playback_data_supporting_tests/$fleet_playback_data_supporting_assertions, and duplicate combined counting excluded</td><td class=\"partial\">coordinate-complete rows before ordering and the 2,000-point cap only · candidate/reporting association to CAP-FLEET-VEHICLE-REGISTER · index 86 remains pending fresh semantic review · delegated coordination transcription, not an original runtime receipt · baseline $fleet_playback_data_baseline_short · fix $fleet_playback_data_fix_short · local merge $fleet_playback_data_merge_short · origin/main $fleet_playback_data_origin_short unchanged</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+    ),
+]
+run_203_rewrite_expected_counts = {
+    "current RUN-201 split of 19 retained claim identities": 2,
+}
+for old, new in run_203_template_rewrites:
+    expected_count = run_203_rewrite_expected_counts.get(old, 1)
+    assert current_template_text.count(old) == expected_count, (
+        f"Expected {expected_count} RUN-203 template rewrite target(s): {old}"
+    )
+    current_template_text = current_template_text.replace(old, new)
+
+fresh_run_204_section_start = (
+    '<section class="panel"><h2>Fresh RUN-204 audit-dashboard verification required</h2><p>'
+)
+fresh_run_204_section_end = '</p><ul class="list">'
+assert current_template_text.count(fresh_run_204_section_start) == 1
+fresh_run_204_start_index = current_template_text.index(fresh_run_204_section_start)
+fresh_run_204_body_start = fresh_run_204_start_index + len(fresh_run_204_section_start)
+fresh_run_204_body_end = current_template_text.index(
+    fresh_run_204_section_end,
+    fresh_run_204_body_start,
+)
+fresh_run_204_body = (
+    "The exact RUN-203 reporting dashboard must be generated and checked in RUN-204 at 1440×900, 1280×800, 1024×768, and 390×844. "
+    "RUN-202 verifies only the superseded RUN-201 HTML at 4/4 viewports, 48/48 named visible checks per viewport, 10/10 navigation targets, and 509/509 local resources; FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01 was reproduced and locally integrated in exactly two paths, and RUN-203 changes only live reporting while preserving the verified RUN-202 HTML byte-for-byte. "
+    "None supplies audit-dashboard verification for the new RUN-204 HTML. "
+    "The linked RUN-204 receipt must record page overflow, bounded mobile table scrolling, navigation, local links, anchors, duplicate authored IDs, console output, visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership, 20 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 10 historical remediated, 199/2,722 uniquely counted bounded tests/assertions, only the new post-merge Fleet playback data-point eligibility 1/6 component counted once, all playback-data red/environment-invalid/isolated/combined/prior-playback/FleetManagement/duplicate-postmerge executions excluded, current 2/340 benchmark mapping, 0/340 final no-match/NCM, 338 unresolved targets, one operating organisation across multiple Sites, Gate 4 open, and every non-bounded runtime, application-browser, final-finding, release, Pass, feature-completion, and audit-complete zero-credit boundary. "
+    "It verifies the RUN-203 audit artifact only and grants no application-browser, responsive-application, visual, workflow, release, Pass, feature-completion, or audit-complete credit."
+)
+current_template_text = (
+    current_template_text[:fresh_run_204_body_start]
+    + fresh_run_204_body
+    + current_template_text[fresh_run_204_body_end:]
+)
 TEMPLATE = Template(current_template_text)
 
 
@@ -7414,6 +7733,24 @@ dashboard = TEMPLATE.substitute(
     elig_shift_fix_short=run_201_coordination_handoff["pins"]["sealed_fix_commit"][:12],
     elig_shift_merge_short=run_201_coordination_handoff["pins"]["local_main_merge_commit"][:12],
     elig_shift_origin_short=run_201_coordination_handoff["pins"]["origin_main_observed"][:12],
+    fleet_playback_data_red_failed=run_203_coordination_handoff["reproduction"]["failed"],
+    fleet_playback_data_red_passed=run_203_coordination_handoff["reproduction"]["passed"],
+    fleet_playback_data_red_pending=run_203_coordination_handoff["reproduction"]["pending"],
+    fleet_playback_data_red_assertions=run_203_coordination_handoff["reproduction"]["assertions"],
+    fleet_playback_data_isolated_tests=run_203_coordination_handoff["verification"]["isolated_focused"]["tests"],
+    fleet_playback_data_isolated_assertions=run_203_coordination_handoff["verification"]["isolated_focused"]["assertions"],
+    fleet_playback_data_combined_tests=run_203_coordination_handoff["verification"]["post_merge_combined"]["tests"],
+    fleet_playback_data_combined_assertions=run_203_coordination_handoff["verification"]["post_merge_combined"]["assertions"],
+    fleet_playback_data_tests=run_203_coordination_handoff["verification"]["post_merge_combined"]["credited_component"]["tests"],
+    fleet_playback_data_assertions=run_203_coordination_handoff["verification"]["post_merge_combined"]["credited_component"]["assertions"],
+    fleet_playback_data_prior_tests=run_203_coordination_handoff["verification"]["post_merge_combined"]["already_credited_playback_component"]["tests"],
+    fleet_playback_data_prior_assertions=run_203_coordination_handoff["verification"]["post_merge_combined"]["already_credited_playback_component"]["assertions"],
+    fleet_playback_data_supporting_tests=run_203_coordination_handoff["verification"]["post_merge_combined"]["unchanged_fleet_management_component"]["tests"],
+    fleet_playback_data_supporting_assertions=run_203_coordination_handoff["verification"]["post_merge_combined"]["unchanged_fleet_management_component"]["assertions"],
+    fleet_playback_data_baseline_short=run_203_coordination_handoff["pins"]["application_baseline_commit"][:12],
+    fleet_playback_data_fix_short=run_203_coordination_handoff["pins"]["sealed_fix_commit"][:12],
+    fleet_playback_data_merge_short=run_203_coordination_handoff["pins"]["local_main_merge_commit"][:12],
+    fleet_playback_data_origin_short=run_203_coordination_handoff["pins"]["origin_main_observed"][:12],
     metric_tests=metric_finding["evidence"]["tests_executed"],
     metric_assertions=metric_finding["evidence"]["assertions"],
     metric_initial_tests=metric_finding["evidence"]["initial_superseded_tests"],
@@ -7520,14 +7857,14 @@ dashboard = TEMPLATE.substitute(
 )
 
 current_visible_boundaries = [
-    '<a href="#checkpoint">RUN-201</a>',
+    '<a href="#checkpoint">RUN-203</a>',
     '<a href="#findings">Finding status</a>',
     "667 = 310 route + 357 page",
     "121 reviewed / 386 pending",
     "reviewed = 99 owned + 10 shared + 5 alias + 7 gap",
     "16.976330%",
     "3,262 records remain",
-    "RUN-200–201 Shift eligibility-alert recipient Site-privacy checkpoint",
+    "RUN-202–203 Fleet playback data-point eligibility checkpoint",
     "fleet-assets.vehicles.alerts-config",
     "RUN090-ROUTE-0084 / RUN077-ROUTE-0692",
     "VehicleController::alertsConfig",
@@ -7597,13 +7934,15 @@ current_visible_boundaries = [
     "48/48 named visible checks per viewport",
     "10/10 navigation · 499/499 resources · 969 anchors",
     "RUN-199: Shift-task due recipient-revalidation reproduced and remediated in exactly four paths",
-    "19 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 9 historical remediated",
-    "198 / 2,716",
-    "198/2,716 unique bounded disposition total",
-    "RUN-071–201 current reporting checkpoint",
-    "RUN-071–201 completion-gate checkpoint",
-    "RUN-071–201 evidence lineage",
-    "Every current raw, generated, reviewed, and integrated RUN-077–201",
+    "RUN-202: exact RUN-201 dashboard verified at 4/4 viewports",
+    "RUN-203: Fleet playback data-point eligibility reproduced and remediated in exactly two paths",
+    "20 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 10 historical remediated",
+    "199 / 2,722",
+    "199/2,722 unique bounded disposition total",
+    "RUN-071–203 current reporting checkpoint",
+    "RUN-071–203 completion-gate checkpoint",
+    "RUN-071–203 evidence lineage",
+    "Every current raw, generated, reviewed, and integrated RUN-077–203",
     "RUN-186 corrected Monitoring metric-replay execution",
     "final post-corrective-merge Monitoring 56/472",
     "initial Monitoring 49/392",
@@ -7627,9 +7966,12 @@ current_visible_boundaries = [
     "RUN-201 Shift eligibility-alert coordination-handoff transcription",
     "RUN-201 Shift eligibility-alert remediation-reporting materializer",
     "RUN-201 Shift eligibility-alert remediation-reporting receipt",
-    "RUN-202 audit-dashboard verification materializer",
-    "RUN-202 audit-dashboard verification receipt",
-    "dashboard HTML frozen pending RUN-202",
+    "RUN-202 exact RUN-201 audit-dashboard verification materializer",
+    "RUN-202 exact RUN-201 audit-dashboard verification",
+    "RUN-203 Fleet playback data-point eligibility coordination-handoff transcription",
+    "RUN-203 Fleet playback data-point eligibility remediation-reporting materializer",
+    "RUN-203 Fleet playback data-point eligibility remediation-reporting receipt",
+    "dashboard HTML frozen pending RUN-204",
     "MON-METRIC-REPLAY-DEDUPE-01",
     "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
     "MON-METRIC-REPLAY-DEDUPE-01 is also remediated on local main only and unpublished",
@@ -7680,6 +8022,16 @@ current_visible_boundaries = [
     "baseline 3 failed + 2 passed / 30 assertions",
     "RUN-183 adds one post-merge 11/167 Fleet playback execution",
     "supporting 20/215",
+    "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01",
+    "RUN-203 Fleet playback data-point eligibility execution",
+    "coordinate-complete rows before ordering and the 2,000-point cap only",
+    "candidate/reporting association to CAP-FLEET-VEHICLE-REGISTER",
+    "index 86 remains pending fresh semantic review",
+    "only the new post-merge 1/6 regression component counted once",
+    "environment-invalid shared-vendor/classmap attempt",
+    "prior playback 11/167",
+    "unchanged FleetManagement 15/40",
+    "baseline 9c01f5a4f57f · fix 9c40c51a2604 · local merge ba39cbc36694 · origin/main c39b07654705 unchanged",
     "FLEET-FUEL-INDEX-SITE-PRIVACY-01",
     "selected GET index/CSV rows",
     "month-to-date totals",
@@ -7724,7 +8076,7 @@ current_visible_boundaries = [
     "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated",
     "two broader INR failures reproduce at base",
     "full-suite green false",
-    "Fresh RUN-202 audit-dashboard verification required",
+    "Fresh RUN-204 audit-dashboard verification required",
     "cf0090ec9724",
     "0b1920dade92",
     "7b2b5688c90e",
@@ -7740,12 +8092,12 @@ current_visible_boundaries = [
     "RUN-090 frozen denominator / RUN-190R current accounting",
     "index 84 is not recredited, index 85 fleet-assets.trips.playback is integrated, and index 86 fleet-assets.trips.playback.data is next",
     "RUN-168 verifies that exact dashboard",
-    "RUN-200 verifies only the superseded RUN-199 HTML",
+    "RUN-202 verifies only the superseded RUN-201 HTML",
     "exact dashboard later verified by RUN-185",
     "visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership",
-    "None supplies audit-dashboard verification for the new RUN-202 HTML.",
-    "The linked RUN-202 receipt must record",
-    "It verifies the RUN-201 audit artifact only",
+    "None supplies audit-dashboard verification for the new RUN-204 HTML.",
+    "The linked RUN-204 receipt must record",
+    "It verifies the RUN-203 audit artifact only",
     "RUN-188 exact RUN-187 audit-dashboard verification materializer",
     "RUN-194 Fleet Fuel remediation-reporting receipt",
     "RUN-198 audit-dashboard verification materializer",
@@ -7755,6 +8107,7 @@ missing_current_visible_boundaries = [
 ]
 assert not missing_current_visible_boundaries, missing_current_visible_boundaries
 assert '<a href="#checkpoint">RUN-191</a>' not in dashboard
+assert '<a href="#checkpoint">RUN-201</a>' not in dashboard
 for stale_current in (
     "RUN-071–191 current reporting checkpoint",
     "RUN-071–191 completion-gate checkpoint",
@@ -7779,6 +8132,18 @@ for stale_current in (
     "It verifies the RUN-197 audit artifact only",
     '<a href="generators/materialize-run-198-audit-dashboard-verification-wave-39.py">RUN-198 audit-dashboard verification materializer</a> <span>forward generator',
     '<a href="evidence/browser/current-audit-dashboard-verification-run-198-wave-39.json">RUN-198 audit-dashboard verification receipt</a> <span>forward receipt',
+    "RUN-071–201 current reporting checkpoint",
+    "RUN-071–201 completion-gate checkpoint",
+    "RUN-071–201 evidence lineage",
+    "Every current raw, generated, reviewed, and integrated RUN-077–201",
+    "current RUN-201 split of 19 retained claim identities",
+    "Fresh RUN-202 audit-dashboard verification required",
+    "current RUN-201 reporting sources or the RUN-202 dashboard generated from them",
+    "None supplies audit-dashboard verification for the new RUN-202 HTML.",
+    "The linked RUN-202 receipt must record",
+    "It verifies the RUN-201 audit artifact only",
+    '<a href="generators/materialize-run-202-audit-dashboard-verification-wave-41.py">RUN-202 audit-dashboard verification materializer</a> <span>forward generator',
+    '<a href="evidence/browser/current-audit-dashboard-verification-run-202-wave-41.json">RUN-202 audit-dashboard verification receipt</a> <span>forward receipt',
 ):
     assert stale_current not in dashboard
 assert "0 current application tests" not in dashboard
@@ -7881,6 +8246,7 @@ assert (
         run_195_dashboard_payload,
         run_198_dashboard_payload,
         run_200_dashboard_payload,
+        run_202_dashboard_payload,
         output_bytes,
     )
     or hashlib.sha256(existing_output_bytes).hexdigest()
@@ -7890,7 +8256,7 @@ assert (
         "966c93ed940d2fb58e4510e65442b10faab2ea5d966e66abb4acc2695fb1a091",
     }
 )
-temporary_path = output_path.with_name(f".{output_path.name}.tmp-run202-dashboard")
+temporary_path = output_path.with_name(f".{output_path.name}.tmp-run204-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"
 try:
     with temporary_path.open("xb") as handle:

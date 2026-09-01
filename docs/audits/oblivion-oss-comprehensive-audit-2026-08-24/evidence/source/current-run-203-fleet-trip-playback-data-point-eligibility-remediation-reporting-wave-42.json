@@ -1,0 +1,506 @@
+{
+  "schema_version": "run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42-v1",
+  "run_id": "RUN-203-FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01-REMEDIATION-REPORTING-WAVE-42",
+  "status": "FLEET_TRIP_PLAYBACK_DATA_POINT_ELIGIBILITY_HISTORICAL_REMEDIATION_REPORTING_MATERIALIZED_DASHBOARD_RUN204_REQUIRED_ZERO_STATIC_PUBLICATION_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "evidence_date": "2026-09-01",
+  "scope": {
+    "finding_id": "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01",
+    "type": "AUDIT_REPORTING_ONLY",
+    "architecture": "SINGLE_ORGANISATION_MULTI_SITE",
+    "application_or_test_source_mutated_by_run_203": false,
+    "runtime_database_browser_or_build_executed_by_run_203": false,
+    "dashboard_html_mutated_by_run_203": false,
+    "delegated_runtime_or_review_authorship_claimed_by_run_203": false
+  },
+  "pins": {
+    "reporting_input_commit": "ba39cbc36694164ca9e0f232efd2de00013191b5",
+    "reporting_input_tree": "1b384bc15377dbf1e2410580681cd46613ab9ef6",
+    "reporting_input_parents": [
+      "b61a2abd48a3d80ef91f6edcdf51d3ad253715e6",
+      "9c40c51a26048b00d035bf13745a20385794d86b"
+    ],
+    "reporting_input_subject": "merge: filter Fleet playback points before cap",
+    "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "application_baseline": {
+      "commit": "9c01f5a4f57f96722015278d1df3c3bd111aa95c",
+      "tree": "c9b0f223e5c63870cc5c04708babece98c00435f"
+    },
+    "advanced_main_before_merge": {
+      "commit": "b61a2abd48a3d80ef91f6edcdf51d3ad253715e6",
+      "tree": "1d8dd6ca99282df8d8f72f21eba6807a1e8f8b4b"
+    },
+    "sealed_fix": {
+      "commit": "9c40c51a26048b00d035bf13745a20385794d86b",
+      "tree": "319ec45b5939900c1f00be447ab28486caa821ea",
+      "stable_patch_id": "93126baf39d11dc22f1fc3f1d990fa1d376222b6"
+    },
+    "exact_application_test_blobs": {
+      "app/Http/Controllers/Fleet/FleetTripController.php": "c8c16d928610206281720571c64ab6d5b7c7010d",
+      "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php": "013595266e53c0d31c8be95b3736fede630d0b3e"
+    },
+    "run_202_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "1876db1ff590c86fb30cefb74368b0241c72d9b75966fcbf1a36d6b1096b30e3",
+      "bytes": 350017,
+      "lines": 78
+    },
+    "run_202_materializer": {
+      "path": "generators/materialize-run-202-audit-dashboard-verification-wave-41.py",
+      "sha256": "05685136cf43f637e0835c8f8301f270c60466fce79868ffb033922095333355",
+      "bytes": 57239,
+      "lines": 1486
+    },
+    "run_202_receipt": {
+      "path": "evidence/browser/current-audit-dashboard-verification-run-202-wave-41.json",
+      "sha256": "b63ed9585a03cc852d0f772be42de303f0866c73e80cc8522e8de0d328887471",
+      "bytes": 30379,
+      "lines": 788
+    },
+    "run_202_receipt_self_seal_sha256": "a4d296e2a3f779bfa2c7cf34233958a37dc74bb5f6e4f7d78a867d6cb12dc3b8",
+    "coordination_handoff": {
+      "path": "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json",
+      "sha256": "ef75a5c6392225fb5c50d3f2964f4cc9d4bf2eda6646b4cdf65968c674d762cd",
+      "bytes": 8093,
+      "lines": 174,
+      "git_blob_id": "7035edf7f20c04d35b7cffd9e967c857fd1ceff0",
+      "receipt_self_seal_sha256": "a4b9ca491ffd65a11551bb850fd067a45980c8b1fa9084623a56e081e833acbd"
+    },
+    "pre_run_203_findings_sha256": "bf2e9fd34cfe4d2f5188d91ebd3431ac6d92a296035d83e05caf77cb5fee142f",
+    "pre_run_203_builder_sha256": "a2197052c211eccf6f00f3b43b280564f22d1b2f92491623973b3c5e49bf8767",
+    "reporting_sources": {
+      "00-executive-summary.md": {
+        "path": "00-executive-summary.md",
+        "sha256": "a3913b1966d24f2dbcfc0b98b4b3f5233e824609f236b0f459b9aa738e2839de",
+        "bytes": 171290,
+        "lines": 672
+      },
+      "01-repository-module-map.md": {
+        "path": "01-repository-module-map.md",
+        "sha256": "189f2de3e00a2575e289bda9e44fb29eec0313dec0c26fe80258289a3db04f1c",
+        "bytes": 57357,
+        "lines": 304
+      },
+      "07-module-findings.md": {
+        "path": "07-module-findings.md",
+        "sha256": "6d985d00e00edaf2baf07ef27da44c161a82d42e3fac802b7199ca180998d255",
+        "bytes": 380473,
+        "lines": 914
+      },
+      "11-prioritised-roadmap.md": {
+        "path": "11-prioritised-roadmap.md",
+        "sha256": "457ee2b6fdb47f178ddb31bc8108a2daa59142e993ffe949e0100bd591b7eb6e",
+        "bytes": 25786,
+        "lines": 110
+      },
+      "12-native-build-and-do-not-copy-register.md": {
+        "path": "12-native-build-and-do-not-copy-register.md",
+        "sha256": "24e8e4e33bb31926ce8a2d3ca980f1c74d628b3b139b14eaf77f8024a8d36bee",
+        "bytes": 126272,
+        "lines": 547
+      },
+      "13-unresolved-questions-and-evidence-gaps.md": {
+        "path": "13-unresolved-questions-and-evidence-gaps.md",
+        "sha256": "a8eb3c6d50b645f287fd7d85f8fea4143efb8eb38ccdc74358bc726ee3011f8e",
+        "bytes": 53682,
+        "lines": 159
+      },
+      "findings.json": {
+        "path": "findings.json",
+        "sha256": "88a66599242d986c6306a1bbd02c95c4088dfc18c5beef5279d68cdd4c6531b2",
+        "bytes": 744275,
+        "lines": 12725
+      },
+      "generators/build-current-audit-dashboard.py": {
+        "path": "generators/build-current-audit-dashboard.py",
+        "sha256": "981030fb81e9ac769f617517702b19f3169865bb535faf9053e873f70ade7ca9",
+        "bytes": 950053,
+        "lines": 8271
+      },
+      "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json": {
+        "path": "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json",
+        "sha256": "ef75a5c6392225fb5c50d3f2964f4cc9d4bf2eda6646b4cdf65968c674d762cd",
+        "bytes": 8093,
+        "lines": 174
+      }
+    }
+  },
+  "reporting_transition": {
+    "finding_id": "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01",
+    "counts_before": {
+      "retained_claim_records": 19,
+      "provisional_source_claims": 8,
+      "historical_already_fixed": 2,
+      "historical_remediated": 9,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "counts_after": {
+      "retained_claim_records": 20,
+      "provisional_source_claims": 8,
+      "historical_already_fixed": 2,
+      "historical_remediated": 10,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "feature_identity_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "static_ownership_or_queue_advance": false
+  },
+  "bounded_execution_accounting": {
+    "prior_unique_total": {
+      "tests": 198,
+      "assertions": 2716
+    },
+    "credited_increment": {
+      "tests": 1,
+      "assertions": 6
+    },
+    "unique_total": {
+      "tests": 199,
+      "assertions": 2722
+    },
+    "new_post_merge_component_counted_once": true,
+    "delegated_coordination_evidence_not_reexecuted_by_run_203": true,
+    "excluded": {
+      "valid_red_reproduction": {
+        "failed": 1,
+        "assertions": 3
+      },
+      "environment_invalid_classmap_attempt": "ZERO_EVIDENCE_CREDIT",
+      "isolated_focused_replay": {
+        "tests": 1,
+        "assertions": 6
+      },
+      "isolated_combined_replay_support": {
+        "tests": 27,
+        "assertions": 213
+      },
+      "prior_playback_component": {
+        "tests": 11,
+        "assertions": 167
+      },
+      "unchanged_fleet_management": {
+        "tests": 15,
+        "assertions": 40
+      },
+      "duplicate_post_merge_combined": {
+        "tests": 27,
+        "assertions": 213
+      }
+    }
+  },
+  "preservation_boundary": {
+    "static_ownership": {
+      "owners": 667,
+      "routes": 310,
+      "pages": 357,
+      "controller_action_bridges": 98
+    },
+    "queue": {
+      "total": 507,
+      "reviewed": 121,
+      "pending": 386,
+      "owned": 99,
+      "without_ownership": 408,
+      "next_zero_based_index": 86,
+      "next_queue_id": "RUN090-ROUTE-0087",
+      "next_route_record_id": "RUN077-ROUTE-0695",
+      "next_route_name": "fleet-assets.trips.playback.data",
+      "next_controller_action": "FleetTripController::playback"
+    },
+    "benchmark": {
+      "mapped": 2,
+      "targets": 340,
+      "final_no_match_or_NCM": 0,
+      "unresolved": 338
+    },
+    "final_priority": {
+      "P0": 0,
+      "P1": 0
+    },
+    "completion_gates_true": 0
+  },
+  "dashboard_forward_gate": {
+    "required_run": "RUN-204",
+    "dashboard_html_changed_by_run_203": false,
+    "preserved_run_202_dashboard_sha256": "1876db1ff590c86fb30cefb74368b0241c72d9b75966fcbf1a36d6b1096b30e3",
+    "generator": "generators/materialize-run-204-audit-dashboard-verification-wave-42.py",
+    "receipt": "evidence/browser/current-audit-dashboard-verification-run-204-wave-42.json",
+    "fresh_four_viewport_navigation_resource_console_verification_required": true,
+    "forward_paths_intentionally_unhashed": true
+  },
+  "evidence_quality_boundary": {
+    "coordination_handoff_transcription_only": true,
+    "original_issue_specific_runtime_receipt_present": false,
+    "original_issue_specific_independent_review_receipt_present": false,
+    "run_203_reexecuted_application_tests": false,
+    "run_203_claims_original_runtime_or_review_authorship": false,
+    "git_lineage_and_exact_blobs_reverified": true,
+    "delegated_evidence_not_promoted_to_browser_release_or_completion": true,
+    "environment_invalid_shared_vendor_classmap_attempt_zero_credit": true,
+    "only_new_post_merge_one_test_six_assertion_component_counted": true
+  },
+  "worktree_attestation": {
+    "owned_paths": [
+      "00-executive-summary.md",
+      "01-repository-module-map.md",
+      "07-module-findings.md",
+      "11-prioritised-roadmap.md",
+      "12-native-build-and-do-not-copy-register.md",
+      "13-unresolved-questions-and-evidence-gaps.md",
+      "findings.json",
+      "generators/build-current-audit-dashboard.py",
+      "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json",
+      "generators/materialize-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.py",
+      "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.json"
+    ],
+    "path_count": 11,
+    "accepted_dirty_states_before_write": {
+      "initial_materialization": {
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/00-executive-summary.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/01-repository-module-map.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/07-module-findings.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/11-prioritised-roadmap.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/12-native-build-and-do-not-copy-register.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/13-unresolved-questions-and-evidence-gaps.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/findings.json": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json": "??",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.py": "??"
+      },
+      "deterministic_rerun": {
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/00-executive-summary.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/01-repository-module-map.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/07-module-findings.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/11-prioritised-roadmap.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/12-native-build-and-do-not-copy-register.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/13-unresolved-questions-and-evidence-gaps.md": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/findings.json": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py": " M",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json": "??",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.py": "??",
+        "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.json": "??"
+      }
+    },
+    "application_or_test_dirt": [],
+    "dashboard_html_dirty": false,
+    "builder_compilation_only": true
+  },
+  "materializer": {
+    "path": "generators/materialize-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.py",
+    "sha256": "bae4f9a4584cc528a09e4375c0f5aca57dbe2e225c49adb14d0e3ae89b10ba9c",
+    "bytes": 51197,
+    "lines": 1247
+  },
+  "mutation_attestation": {
+    "materializer_writes_only": [
+      "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.json"
+    ],
+    "atomic_exclusive_temp_write": true,
+    "fsync_before_replace": true,
+    "stale_temp_refused": true,
+    "optimized_python_refused": true,
+    "strict_duplicate_key_free_json": true,
+    "canonical_self_seal": true,
+    "deterministic_rerun_bytes": true
+  },
+  "credit_boundary": {
+    "live_findings_register_and_reporting_status": true,
+    "application_source_or_test_change_by_run_203": false,
+    "application_runtime_reexecution_by_run_203": false,
+    "application_browser": false,
+    "responsive_application_or_visual_credit": false,
+    "audit_dashboard_build_execution_by_run_203": false,
+    "static_route_or_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_advance": false,
+    "prior_playback_site_privacy_credit": false,
+    "fleet_management_correctness": false,
+    "permission_site_or_direct_object_correctness": false,
+    "telemetry_ingest_lifecycle_range_or_write_correctness": false,
+    "map_frontend_or_adjacent_fleet_correctness": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "full_suite_or_coverage": false,
+    "pass": false,
+    "deployment": false,
+    "release": false,
+    "publication": false,
+    "final_finding": false,
+    "feature_or_module_completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "completion_gates": [
+    {
+      "name": "routes_classified",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "inertia_pages_classified",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "features_in_canonical_register",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "routes_and_pages_mapped_to_feature_id",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "features_with_verified_benchmark_or_final_ncm",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "human_features_with_task_script_and_ten_scores",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "common_and_safety_journeys_cross_reviewed",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "hero_banner_instances_classified",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "overlay_implementations_and_triggers_classified",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "safe_routes_observed_at_desktop",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "selected_families_and_journeys_all_viewports",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "required_visual_states_classified",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "material_visual_finding_families_resampled",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "models_classified",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "policies_classified",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "service_domain_entries_classified",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "critical_async_owners_classified",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "modules_with_all_eight_passes",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "prompt_benchmark_projects_formally_triaged",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "p0_p1_complete_finding_fields",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "redesigns_neutral_native_no_copy",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "ease_4_5_claims_independently_reviewed",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "browser_claims_labeled",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "visual_inconsistencies_complete_context",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "official_source_inference_specialist_split",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    },
+    {
+      "name": "all_agents_returned_reconciled_represented_none_live",
+      "complete": false,
+      "reason": "RUN203 reports one bounded historical remediation record only"
+    }
+  ],
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "remote_state": {
+    "origin_main": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead": 96,
+    "local_main_behind": 0,
+    "push_performed": false,
+    "publication_claimed": false
+  },
+  "receipt_self_seal_sha256": "44cadf139df15144c11495d9f5287fe6b43f9bcbe25572d75a926d334b7c0594"
+}

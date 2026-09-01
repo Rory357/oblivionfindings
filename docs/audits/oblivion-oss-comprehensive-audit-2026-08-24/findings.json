@@ -1,6 +1,6 @@
 {
   "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
-  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_NINE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
+  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_TEN_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
   "generated_on": "2026-09-01",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
@@ -94,6 +94,10 @@
     "run_200_dashboard_verification_sha256": "59b80aa14c8841f412d9b76003cc8f2dcd135634cd9394a43523bad31f62c520",
     "run_200_dashboard_verification_self_seal_sha256": "493b62087f2df1f2ff776f68c162fceb38ab69763a0b2554ba0148dd6c58d216",
     "run_200_verified_dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+    "run_202_dashboard_verification_materializer_sha256": "05685136cf43f637e0835c8f8301f270c60466fce79868ffb033922095333355",
+    "run_202_dashboard_verification_sha256": "b63ed9585a03cc852d0f772be42de303f0866c73e80cc8522e8de0d328887471",
+    "run_202_dashboard_verification_self_seal_sha256": "a4d296e2a3f779bfa2c7cf34233958a37dc74bb5f6e4f7d78a867d6cb12dc3b8",
+    "run_202_verified_dashboard_sha256": "1876db1ff590c86fb30cefb74368b0241c72d9b75966fcbf1a36d6b1096b30e3",
     "elig_shift_notification_site_privacy_baseline_commit": "f7c6f9ee476534cbbc13042b68d5388e0681b535",
     "elig_shift_notification_site_privacy_baseline_tree": "33f69dc0848cca66ad317e42ba8a61eba46ac1e4",
     "elig_shift_notification_site_privacy_audit_release_commit": "9c01f5a4f57f96722015278d1df3c3bd111aa95c",
@@ -104,6 +108,16 @@
     "elig_shift_notification_site_privacy_local_main_tree": "50ba282b5ded0d8d0d4f9fb19bf8e79f3ce96014",
     "elig_shift_notification_site_privacy_stable_patch_id": "1381114bba1a102630a020211a07b303a1d6240d",
     "elig_shift_notification_site_privacy_origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "fleet_trip_playback_data_point_eligibility_baseline_commit": "9c01f5a4f57f96722015278d1df3c3bd111aa95c",
+    "fleet_trip_playback_data_point_eligibility_baseline_tree": "c9b0f223e5c63870cc5c04708babece98c00435f",
+    "fleet_trip_playback_data_point_eligibility_audit_release_commit": "b61a2abd48a3d80ef91f6edcdf51d3ad253715e6",
+    "fleet_trip_playback_data_point_eligibility_audit_release_tree": "1d8dd6ca99282df8d8f72f21eba6807a1e8f8b4b",
+    "fleet_trip_playback_data_point_eligibility_fix_commit": "9c40c51a26048b00d035bf13745a20385794d86b",
+    "fleet_trip_playback_data_point_eligibility_fix_tree": "319ec45b5939900c1f00be447ab28486caa821ea",
+    "fleet_trip_playback_data_point_eligibility_local_main_merge_commit": "ba39cbc36694164ca9e0f232efd2de00013191b5",
+    "fleet_trip_playback_data_point_eligibility_local_main_tree": "1b384bc15377dbf1e2410580681cd46613ab9ef6",
+    "fleet_trip_playback_data_point_eligibility_stable_patch_id": "93126baf39d11dc22f1fc3f1d990fa1d376222b6",
+    "fleet_trip_playback_data_point_eligibility_origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
     "monitoring_metric_replay_application_baseline_commit": "a900f078c9c05f587f6f7884f5fe715076891416",
     "monitoring_metric_replay_initial_fix_commit": "f521bc0b87222e56b4822e7cb9c935486e279e76",
     "monitoring_metric_replay_initial_merge_commit": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
@@ -328,20 +342,20 @@
     "system_data_features": 40,
     "canonical_submodules": null,
     "historical_discovery_claim_records": 12,
-    "current_retained_claim_records": 19,
+    "current_retained_claim_records": 20,
     "current_provisional_source_claims": 8,
     "historical_already_fixed_records": 2,
-    "historical_remediated_records": 9
+    "historical_remediated_records": 10
   },
   "counts": {
-    "retained_claim_records": 19,
+    "retained_claim_records": 20,
     "provisional_source_claims": 8,
     "provisional_P1": 8,
     "historical_already_fixed": 2,
-    "historical_remediated": 9,
-    "bounded_disposition_tests_passed": 198,
-    "bounded_disposition_assertions": 2716,
-    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY plus only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution plus the unique 6/206 post-merge focused component of the combined FLEET-FUEL-INDEX-SITE-PRIVACY run plus the unique isolated focused 15/32 SUMMARY-TIMELINE-SITE-PRIVACY execution plus one post-merge 9/50 SHIFT-TASK-DUE-RECIPIENT-REVALIDATION execution plus one post-merge 13/25 ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY execution; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, the initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO, the root 1-test red reproduction, every intermediate corrective subset or stopped run, the final isolated corrective 56/472 replay, DNS 63/186, Facility execution, Fuel red 6-failed/65-assertion reproduction, isolated Fuel 6/206 replay, supporting Fuel 20/215 regressions, any second count from combined 26/421, Summary red 1-failed/5-passed/9-assertion reproduction, the zero-assertion vendor-junction run, Emar 2/238 supporting compatibility, shared post-merge 40/438, Shift-task red 1-failed/3-passed/1-pending/14-assertion reproduction, intermediate 5/30 and cache proofs, isolated final 9/50 duplicate replay, any second count from post-merge 9/50, eligibility-alert red 1-failed/0-passed/4-pending/1-assertion reproduction, reviewer-NO-GO intermediate 12/23, isolated final 13/25 replay, any second count from post-merge 13/25, and every overlapping supporting execution",
+    "historical_remediated": 10,
+    "bounded_disposition_tests_passed": 199,
+    "bounded_disposition_assertions": 2722,
+    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY plus only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution plus the unique 6/206 post-merge focused component of the combined FLEET-FUEL-INDEX-SITE-PRIVACY run plus the unique isolated focused 15/32 SUMMARY-TIMELINE-SITE-PRIVACY execution plus one post-merge 9/50 SHIFT-TASK-DUE-RECIPIENT-REVALIDATION execution plus one post-merge 13/25 ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY execution plus only the new post-merge 1/6 FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY component; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, the initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO, the root 1-test red reproduction, every intermediate corrective subset or stopped run, the final isolated corrective 56/472 replay, DNS 63/186, Facility execution, Fuel red 6-failed/65-assertion reproduction, isolated Fuel 6/206 replay, supporting Fuel 20/215 regressions, any second count from combined 26/421, Summary red 1-failed/5-passed/9-assertion reproduction, the zero-assertion vendor-junction run, Emar 2/238 supporting compatibility, shared post-merge 40/438, Shift-task red 1-failed/3-passed/1-pending/14-assertion reproduction, intermediate 5/30 and cache proofs, isolated final 9/50 duplicate replay, any second count from post-merge 9/50, eligibility-alert red 1-failed/0-passed/4-pending/1-assertion reproduction, reviewer-NO-GO intermediate 12/23, isolated final 13/25 replay, any second count from post-merge 13/25, playback point-eligibility valid red 1/3, environment-invalid shared-vendor/classmap attempt, isolated focused 1/6, isolated combined 27/213, prior playback 11/167, unchanged FleetManagement 15/40, any second count from post-merge 27/213, and every overlapping supporting execution",
     "med_rbac_bounded_tests": 73,
     "med_rbac_bounded_test_assertions": 1481,
     "med_cd_scope_focused_tests": 5,
@@ -351,7 +365,7 @@
     "med_cd_atomicity_race_subscenarios": 3,
     "med_cd_atomicity_supporting_tests": 43,
     "med_cd_atomicity_supporting_assertions": 716,
-    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764, RUN-184 99/1931, RUN-187 155/2403, RUN-194 161/2609, RUN-197 176/2641, and RUN-199 185/2691 totals, and remains excluded from the current RUN-201 198/2716 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
+    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764, RUN-184 99/1931, RUN-187 155/2403, RUN-194 161/2609, RUN-197 176/2641, RUN-199 185/2691, and RUN-201 198/2716 totals, and remains excluded from the current RUN-203 199/2722 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
     "safe_alert_dedup_focused_tests": 5,
     "safe_alert_dedup_focused_assertions": 60,
     "safe_alert_dedup_supporting_control_room_bridge_tests": 28,
@@ -408,6 +422,17 @@
     "elig_shift_notification_site_privacy_isolated_replay_tests": 13,
     "elig_shift_notification_site_privacy_isolated_replay_assertions": 25,
     "elig_shift_notification_site_privacy_aggregation_basis": "Only the unique post-merge focused 13/25 execution counts once. Red 1-failed/0-passed/4-pending/1 assertion, reviewer-NO-GO intermediate 12/23, and isolated final 13/25 are excluded.",
+    "fleet_trip_playback_data_point_eligibility_credited_tests": 1,
+    "fleet_trip_playback_data_point_eligibility_credited_assertions": 6,
+    "fleet_trip_playback_data_point_eligibility_baseline_failed": 1,
+    "fleet_trip_playback_data_point_eligibility_baseline_assertions": 3,
+    "fleet_trip_playback_data_point_eligibility_isolated_focused_tests": 1,
+    "fleet_trip_playback_data_point_eligibility_isolated_focused_assertions": 6,
+    "fleet_trip_playback_data_point_eligibility_isolated_combined_tests": 27,
+    "fleet_trip_playback_data_point_eligibility_isolated_combined_assertions": 213,
+    "fleet_trip_playback_data_point_eligibility_post_merge_combined_tests": 27,
+    "fleet_trip_playback_data_point_eligibility_post_merge_combined_assertions": 213,
+    "fleet_trip_playback_data_point_eligibility_aggregation_basis": "Only the new post-merge regression component 1/6 counts once. The valid red 1/3, environment-invalid shared-vendor/classmap attempt, isolated focused 1/6, isolated combined 27/213, prior playback 11/167, unchanged FleetManagement 15/40, and any second count from post-merge 27/213 are excluded.",
     "monitoring_metric_replay_dedupe_focused_tests": 56,
     "monitoring_metric_replay_dedupe_focused_assertions": 472,
     "monitoring_metric_replay_initial_superseded_tests": 49,
@@ -510,14 +535,14 @@
       "audit_completion": 0
     }
   },
-  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and nine retained historical remediated records remain reviewable. RUN-201 adds only ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 as a feature-unassigned historical-remediated record. Its unique post-merge 13/25 execution extends the RUN-199 denominator from 185/2691 to 198/2716 exactly once; the red 1-failed/0-passed/4-pending/1-assertion reproduction, reviewer-NO-GO intermediate 12/23, isolated final 13/25 replay, and any second count from post-merge 13/25 remain separate and uncredited. The eligibility-alert record has null feature and candidate IDs with zero route owner, controller-action bridge, page, queue, matrix, feature-union, browser, benchmark, publication, release, or completion credit. Its proof is bounded to current active, non-ended employee provenance and approved access to the canonical Shift Site for direct, senior, provider-manager, and administrator alert recipients, deterministic skipping of inaccessible candidates, and one canonical current Shift snapshot shared by recipient authorization and protected payload construction. Broader eligibility evaluation, signal/idempotency semantics, hierarchy correctness outside that recipient order, scheduler cadence, real queue workers, concurrency, and external delivery remain excluded. Earlier Shift-task, Summary, Monitoring, Fleet, and all prior noninheritance boundaries remain unchanged. Origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; remediation and reporting remain local-only and unpublished. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
+  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and ten retained historical remediated records remain reviewable. RUN-203 adds only FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01 as a CAP-FLEET-VEHICLE-REGISTER candidate-associated historical-remediated record with zero static ownership. Its unique post-merge 1/6 component extends the RUN-201 denominator from 198/2716 to 199/2722 exactly once; the valid red 1/3, environment-invalid shared-vendor/classmap attempt, isolated focused 1/6, isolated combined 27/213, prior playback 11/167, unchanged FleetManagement 15/40, and any second count from post-merge 27/213 remain separate and uncredited. The proof is bounded to filtering rows with both latitude and longitude before chronological ordering and the 2,000-point cap so earlier incomplete rows cannot crowd out a later eligible point. Queue index 86 playback.data remains unresolved; no route owner, controller-action bridge, page, queue, matrix, feature-union, permission, Site, direct-object, write, telemetry-ingest/lifecycle/range, map/frontend, adjacent-Fleet, browser, benchmark, publication, release, or completion credit follows. Earlier eligibility-alert, Shift-task, Summary, Monitoring, Fleet privacy, and all prior noninheritance boundaries remain unchanged. Origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; remediation and reporting remain local-only and unpublished. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
   "reconciliation": {
     "retained_record_ids_unique": true,
     "current_provisional_ids_unique": true,
-    "retained_record_count": 19,
+    "retained_record_count": 20,
     "current_provisional_count": 8,
     "historical_already_fixed_count": 2,
-    "historical_remediated_count": 9,
+    "historical_remediated_count": 10,
     "every_non_null_primary_feature_id_in_canonical_matrix": true,
     "records_without_primary_or_candidate_feature_id": [
       "MON-METRIC-REPLAY-DEDUPE-01",
@@ -526,7 +551,7 @@
       "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01"
     ],
     "final_ids_cross_file_reconciled": false,
-    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01, MON-METRIC-REPLAY-DEDUPE-01, FLEET-FUEL-INDEX-SITE-PRIVACY-01, SUMMARY-TIMELINE-SITE-PRIVACY-01, SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01, and ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 are retained as historical remediated; the other 8 records remain provisional. Eligibility-alert remediation is limited to current active, non-ended employee provenance and approved canonical-Shift-Site access for direct, senior, provider-manager, and administrator recipients, deterministic skipping of inaccessible candidates, and a single reloaded canonical Shift snapshot for both authorization and protected payload construction. It has null feature and candidate IDs and receives zero static ownership. Broader eligibility evaluation, signal/idempotency semantics, hierarchy correctness outside the bounded recipient order, scheduler cadence, real queue workers, concurrency, external delivery, adjacent surfaces, page/frontend ownership, browser, benchmark, publication, release, full-suite, feature/module, final-finding, and completion credit are not inherited. RUN-190 separately integrates only queue index 85 fleet-assets.trips.playback / FleetTripController::show as one static route owner and bridge; index 86 playback.data remains pending, while Fuel is candidate index 87 and receives no queue advance. None satisfies the cross-file final-finding gate."
+    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01, MON-METRIC-REPLAY-DEDUPE-01, FLEET-FUEL-INDEX-SITE-PRIVACY-01, SUMMARY-TIMELINE-SITE-PRIVACY-01, SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01, ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01, and FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01 are retained as historical remediated; the other 8 records remain provisional. The new Fleet proof is limited to filtering rows with both coordinates before ordering and the 2,000-point cap. It keeps only a candidate/reporting association to CAP-FLEET-VEHICLE-REGISTER and receives zero static ownership. Permission, Site, direct-object, write, ingestion, telemetry lifecycle or range validity, map/frontend, adjacent Fleet, browser, benchmark, publication, release, full-suite, feature/module, final-finding, and completion credit are not inherited. RUN-190 separately integrates only queue index 85 fleet-assets.trips.playback / FleetTripController::show as one static route owner and bridge; index 86 playback.data remains pending, while Fuel is candidate index 87 and receives no queue advance. Monitoring, Summary, Shift-task, and eligibility-alert remain the exact four records without a primary or candidate feature identity. None satisfies the cross-file final-finding gate."
   },
   "records": [
     {
@@ -4588,6 +4613,257 @@
         "observed workflow and ten-dimension current/target ease measures",
         "target-specific benchmark or exhaustive final no-match",
         "full-suite coverage, representative signed-in browser, scheduler cadence, real queue workers, concurrency, external delivery, broader eligibility evaluation, signal/idempotency, hierarchy behavior, and adjacent notification correctness"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+      "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "feature_identity_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+      "feature_id_role": "CANDIDATE_REPORTING_ASSOCIATION_ONLY_ZERO_STATIC_OWNERSHIP_CREDIT",
+      "related_feature_ids": [],
+      "historical_provenance": {
+        "application_commit": "9c01f5a4f57f96722015278d1df3c3bd111aa95c",
+        "application_tree": "c9b0f223e5c63870cc5c04708babece98c00435f",
+        "classification": "REAL_HISTORICAL_FLEET_TRIP_PLAYBACK_DATA_POINT_ELIGIBILITY_CONDITION",
+        "historical_risk": "The playback query applied its 2,000-row cap before excluding coordinate-incomplete telemetry, allowing earlier unusable rows to crowd a later eligible point out of the returned playback path.",
+        "preserved_identity_only": true,
+        "new_record_authorized_by_run_203_reporting_review": true,
+        "record_present_before_run_203": false,
+        "pre_run_203_register_sha256": "bf2e9fd34cfe4d2f5188d91ebd3431ac6d92a296035d83e05caf77cb5fee142f"
+      },
+      "current_adjudication": {
+        "application_baseline_commit": "9c01f5a4f57f96722015278d1df3c3bd111aa95c",
+        "application_baseline_tree": "c9b0f223e5c63870cc5c04708babece98c00435f",
+        "audit_release_commit": "b61a2abd48a3d80ef91f6edcdf51d3ad253715e6",
+        "audit_release_tree": "1d8dd6ca99282df8d8f72f21eba6807a1e8f8b4b",
+        "fix_commit": "9c40c51a26048b00d035bf13745a20385794d86b",
+        "fix_tree": "319ec45b5939900c1f00be447ab28486caa821ea",
+        "stable_patch_id": "93126baf39d11dc22f1fc3f1d990fa1d376222b6",
+        "application_commit": "ba39cbc36694164ca9e0f232efd2de00013191b5",
+        "repository_tree": "1b384bc15377dbf1e2410580681cd46613ab9ef6",
+        "current_local_main_commit_at_run_203": "ba39cbc36694164ca9e0f232efd2de00013191b5",
+        "current_local_main_tree_at_run_203": "1b384bc15377dbf1e2410580681cd46613ab9ef6",
+        "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+        "verdict": "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED",
+        "scope": "Fleet trip playback data-point eligibility: require both coordinates before chronological ordering and the 2,000-row cap so earlier coordinate-incomplete rows cannot crowd out later eligible points.",
+        "run_203_reporting_receipt": "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.json",
+        "coordination_handoff_transcription": "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json",
+        "delegated_execution_evidence_kind": "EXACT_COORDINATION_HANDOFF_NOT_REEXECUTED_BY_RUN_203",
+        "independent_review_evidence_kind": "FINAL_CONTROLLER_TEST_CREDIT_AND_REPORTING_GO_MESSAGE_BOUND_HANDOFF_PLUS_GIT_REVIEW",
+        "application_remediation_required": true,
+        "application_source_changed": true,
+        "integrated_to_main": true,
+        "published_to_origin_main": false,
+        "publication_authorized": false,
+        "feature_identity_assigned": false,
+        "candidate_feature_association_only": true,
+        "static_route_or_page_feature_ownership_inherited": false,
+        "static_controller_action_bridge_inherited": false,
+        "queue_advance_inherited": false,
+        "prior_playback_privacy_credit_inherited": false,
+        "fleet_management_correctness_inherited": false,
+        "permission_site_or_direct_object_credit_inherited": false,
+        "telemetry_ingest_lifecycle_or_range_credit_inherited": false,
+        "map_frontend_or_adjacent_fleet_credit_inherited": false
+      },
+      "passes": [
+        "P2",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Fleet & Assets",
+        "submodule": "TRIP_PLAYBACK_DATA_POINT_ELIGIBILITY_BOUNDARY",
+        "submodule_status": "CANDIDATE_REPORTING_ASSOCIATION_PENDING_FRESH_SEMANTIC_REVIEW_ZERO_STATIC_OWNERSHIP_CREDIT"
+      },
+      "actor_and_job": {
+        "actor": "Approved Fleet trip playback reader",
+        "secondary_actors": "Coordinate-complete point, latitude-only point, longitude-only point, coordinate-less point, capped historical telemetry set, and existing Fleet compatibility actors in bounded tests",
+        "job": "Receive the eligible chronological trip playback path without unusable telemetry consuming the bounded result window",
+        "status": "BOUNDED_TEST_ACTORS_VALIDATED_NOT_REPRESENTATIVE_SIGNED_IN_BROWSER"
+      },
+      "route_url": {
+        "route_names": "fleet-assets.trips.playback.data",
+        "route_paths": "routes/fleet-assets.php:56",
+        "raw_route_path_field": "/trips/{trip}/playback/data",
+        "ownership_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+        "status": "CANDIDATE_ROUTE_LOCATOR_ONLY_ZERO_STATIC_ROUTE_OR_BRIDGE_OWNERSHIP_CREDIT"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": null,
+        "application_commit": "ba39cbc36694164ca9e0f232efd2de00013191b5",
+        "status": "NO_FRONTEND_ASSOCIATION_OR_CREDIT"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_RETAINED_HISTORICAL_RECORD"
+      },
+      "backend_anchor": {
+        "matrix_anchors": null,
+        "claim_anchors": [
+          "app/Http/Controllers/Fleet/FleetTripController.php:88-121",
+          "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php:552-600"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "BOUNDED_CONTROLLER_QUERY_AND_REGRESSION_REVIEW",
+        "application_commit": "ba39cbc36694164ca9e0f232efd2de00013191b5"
+      },
+      "current_behaviour": {
+        "classification": "REMEDIATED_LOCAL_MAIN_BOUNDED_VERIFIED_NOT_PUBLISHED",
+        "summary": "The playback query requires non-null latitude and longitude before chronological ordering and the 2,000-point cap, so coordinate-incomplete rows cannot consume cap slots or displace a later eligible point.",
+        "runtime_observed": true,
+        "runtime_scope": "Only the new post-merge regression component 1 test / 6 assertions contributes once. The valid red 1/3, environment-invalid classmap attempt, isolated focused 1/6, isolated combined 27/213, prior playback 11/167, unchanged FleetManagement 15/40, and any duplicate combined-suite count are reported separately and not counted."
+      },
+      "current_workflow": {
+        "matrix_summary": "Bounded Fleet trip playback data-point filter-before-cap contract only; no static data-route ownership, representative browser, wider telemetry correctness, or feature completion is established.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "BOUNDED_COORDINATE_COMPLETENESS_BEFORE_ORDER_AND_CAP_EXECUTED; REPRESENTATIVE_BROWSER_EASE_STATIC_OWNERSHIP_INGESTION_RANGE_LIFECYCLE_MAP_FRONTEND_AND_ADJACENT_FLEET_NOT_EXECUTED"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": null
+      },
+      "evidence": {
+        "current_remediation_receipt": null,
+        "reporting_receipt": "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.json",
+        "coordination_handoff_transcription": "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json",
+        "independent_artifact_review": "MESSAGE_BOUND_HANDOFF_PLUS_GIT_AND_INDEPENDENT_SOURCE_CREDIT_REVIEW",
+        "delegated_evidence_source": "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json",
+        "delegated_not_reexecuted_by_run_203": true,
+        "claim_anchors": [
+          "app/Http/Controllers/Fleet/FleetTripController.php:88-121",
+          "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php:552-600"
+        ],
+        "test_commands_executed": null,
+        "credited_test_commands": 1,
+        "test_command_text": null,
+        "test_files": [
+          "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php",
+          "tests/Feature/Fleet/FleetManagementTest.php"
+        ],
+        "tests_executed": 27,
+        "assertions": 213,
+        "credited_component_tests": 1,
+        "credited_component_assertions": 6,
+        "isolated_focused_tests": 1,
+        "isolated_focused_assertions": 6,
+        "isolated_combined_tests": 27,
+        "isolated_combined_assertions": 213,
+        "baseline_failed_cases": 1,
+        "baseline_passed_cases": 0,
+        "baseline_pending_cases": 0,
+        "baseline_assertions": 3,
+        "browser_cells": 0,
+        "database_checks": null,
+        "database_cleanup": "global PHP/Pest zero; exact numeric PID-suffixed schemas zero; isolated worktree removed cleanly"
+      },
+      "problem_root_cause": "Coordinate completeness was applied only after the telemetry query had ordered and limited rows, so unusable early rows consumed the finite playback-data window.",
+      "impact": "Before remediation, a trip with more than 2,000 earlier coordinate-incomplete telemetry rows could omit a later valid playback location, producing an incomplete route projection despite eligible source data.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Require both latitude and longitude before chronological ordering and the 2,000-point cap.",
+        "Prevent coordinate-incomplete rows from crowding later eligible telemetry out of the returned playback path.",
+        "Preserve the existing native trip, Asset, consent, time, ordering, response-shape, Site/privacy, and compatibility boundaries without copying third-party wording, assets, source, or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": "Apply playback eligibility predicates at the data source before ordering and the bounded result cap.",
+        "status": "IMPLEMENTED_NATIVELY_WITHOUT_BENCHMARK_OR_DESIGN_CREDIT"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [],
+      "rbac_privacy": "One operating organisation across multiple Sites; current approved Site access, canonical Asset and trip provenance, direct-object denial, consent, and privacy remain the boundaries, not tenant isolation.",
+      "priority": "P1",
+      "priority_status": "HISTORICAL_REMEDIATED_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Completed: focused unchanged-source reproduction observed a later coordinate-complete point crowded out by more than 2,000 earlier incomplete rows at baseline 9c01f5a4f57f96722015278d1df3c3bd111aa95c",
+        "Completed: exact two-path native remediation integrated to local main at ba39cbc36694164ca9e0f232efd2de00013191b5 without publication",
+        "Completed: isolated and post-merge focused/combined execution plus independent final source and credit review; only the new post-merge 1/6 component counts once",
+        "Retained non-inherited gaps: static index-86 route/action ownership, coordinate range or speed validity, ingestion, retention, lifecycle, writes/collector, map/frontend, adjacent Fleet, representative browser, benchmark, release, and completion"
+      ],
+      "confidence": {
+        "level": "HIGH_FOR_BOUNDED_FLEET_TRIP_PLAYBACK_DATA_POINT_ELIGIBILITY_DISPOSITION",
+        "evidence_gap": "Static playback-data route/action ownership, representative signed-in application browser, full-suite/coverage, ease, target-specific benchmark, coordinate range and speed validity, ingestion, retention, lifecycle, write/collector behavior, map/frontend rendering, and adjacent Fleet correctness remain unexecuted or unadjudicated."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording, or distinctive layout may be copied.",
+      "interim_safeguard": "Before relying on a capped playback response, confirm coordinate completeness is enforced before ordering and limiting the telemetry query rather than only during response projection.",
+      "acceptance_criteria": {
+        "given_when_then": "Given more than 2,000 earlier coordinate-incomplete telemetry rows and a later coordinate-complete point for the same eligible trip, when playback data is requested, then incomplete rows do not consume cap slots, the later eligible point remains present in chronological response order, and existing trip, Asset, consent, time, Site/privacy, and response contracts remain compatible without granting broader telemetry, browser, benchmark, module, or completion credit.",
+        "status": "BOUNDED_MET_FOR_HISTORICAL_CLAIM_REMEDIATION_NOT_FINAL_FINDING_OR_FEATURE_COMPLETION"
+      },
+      "validation_plan": {
+        "required": "Retain the permanent cap-after-coordinate-filter regression and named playback/Fleet-management compatibility coverage; keep static route ownership, coordinate range/speed validity, ingestion, retention, lifecycle, write/collector, frontend map, browser, and adjacent Fleet behavior separate.",
+        "unit": "NOT_SEPARATELY_EXECUTED",
+        "feature": "EXECUTED_NEW_1_TEST_6_ASSERTION_COMPONENT_INSIDE_POST_MERGE_27_TEST_213_ASSERTION_RUN_COUNTED_ONCE",
+        "architecture": "STATIC_CONTROLLER_TEST_GO_PLUS_INDEPENDENT_CREDIT_AND_REPORTING_SEMANTICS_REVIEW",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED_OR_CREDITED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "candidate feature association remains pending fresh semantic review and grants no static ownership",
+        "queue index 86 playback-data route/action ownership remains unresolved",
+        "no committed issue-specific runtime or independent-review receipt exists; runtime details remain delegated handoff evidence"
+      ],
+      "independent_review": {
+        "status": "COMPLETED_SOURCE_TEST_CREDIT_AND_REPORTING_SEMANTICS_GO_MESSAGE_BOUND_EVIDENCE",
+        "reviewer": "independent controller, regression-test, credit, and reporting-semantics reviewers",
+        "disagreements": "The shared-vendor/classmap red attempt was rejected as environment-invalid and receives zero evidence credit; only the pinned isolated reproduction and final merged source are retained.",
+        "reconciliation": "The delegated handoff establishes reproduction, exact two-path remediation, focused and combined runtime, local integration, cleanup, and nonpublication. Git and independent source/credit review confirm the bounded behavior, 1/6 unique increment, and lineage. RUN-203 alone changes the live register and does not convert message-bound runtime into a committed remediation receipt."
+      },
+      "unresolved_fields": [
+        "canonical feature identity and static queue index-86 route/action ownership",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline, and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "full-suite coverage, representative signed-in browser, coordinate range and speed validity, ingestion, retention, lifecycle, write/collector behavior, map/frontend rendering, and adjacent Fleet correctness"
       ],
       "completion_credit": false,
       "credit": {

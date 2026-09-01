@@ -1,0 +1,174 @@
+{
+  "schema_version": "oblivion_fleet_trip_playback_data_point_eligibility_coordination_handoff_v1",
+  "evidence_kind": "COORDINATION_HANDOFF_TRANSCRIPTION_NOT_ORIGINAL_RUNTIME_RECEIPT",
+  "status": "SEALED_DELEGATED_EVIDENCE_FOR_BOUNDED_REPORTING_ONLY",
+  "evidence_date": "2026-09-01",
+  "source": {
+    "source_thread_id": "01a04fe4-0a67-7912-bae7-e133b73475fd",
+    "source_task_title": "Continue OSS audit fixes",
+    "transcription_basis": "User-visible codex_delegation coordination handoffs plus Git-verifiable lineage and independent read-only source, test, credit, and reporting review in the audit task.",
+    "original_issue_specific_runtime_receipt_present": false,
+    "original_issue_specific_independent_review_receipt_present": false,
+    "run_203_reexecuted_application_tests": false,
+    "run_203_claims_original_runtime_authorship": false
+  },
+  "finding": {
+    "id": "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01",
+    "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "related_feature_ids": [],
+    "feature_identity_status": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "priority": "P1",
+    "priority_boundary": "HISTORICAL_REMEDIATED_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT"
+  },
+  "pins": {
+    "application_baseline_commit": "9c01f5a4f57f96722015278d1df3c3bd111aa95c",
+    "application_baseline_tree": "c9b0f223e5c63870cc5c04708babece98c00435f",
+    "advanced_main_commit": "b61a2abd48a3d80ef91f6edcdf51d3ad253715e6",
+    "advanced_main_tree": "1d8dd6ca99282df8d8f72f21eba6807a1e8f8b4b",
+    "sealed_fix_commit": "9c40c51a26048b00d035bf13745a20385794d86b",
+    "sealed_fix_tree": "319ec45b5939900c1f00be447ab28486caa821ea",
+    "stable_patch_id": "93126baf39d11dc22f1fc3f1d990fa1d376222b6",
+    "local_main_merge_commit": "ba39cbc36694164ca9e0f232efd2de00013191b5",
+    "local_main_merge_tree": "1b384bc15377dbf1e2410580681cd46613ab9ef6",
+    "local_main_merge_parents": [
+      "b61a2abd48a3d80ef91f6edcdf51d3ad253715e6",
+      "9c40c51a26048b00d035bf13745a20385794d86b"
+    ],
+    "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29"
+  },
+  "exact_application_test_paths": [
+    {
+      "path": "app/Http/Controllers/Fleet/FleetTripController.php",
+      "merge_blob": "c8c16d928610206281720571c64ab6d5b7c7010d"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php",
+      "merge_blob": "013595266e53c0d31c8be95b3736fede630d0b3e"
+    }
+  ],
+  "reproduction": {
+    "command_text": null,
+    "test_files": [
+      "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php"
+    ],
+    "failed": 1,
+    "passed": 0,
+    "pending": 0,
+    "assertions": 3,
+    "duration_seconds": 153.91,
+    "exit_code": 1,
+    "observed_failure": "More than 2,000 earlier coordinate-incomplete trip telemetry rows occupied the chronological cap before projection, crowding a later coordinate-complete point out of playback data.",
+    "credit": "REPRODUCTION_ONLY_ZERO_BOUNDED_PASS_DENOMINATOR_CREDIT"
+  },
+  "invalid_reproduction_attempt": {
+    "classification": "ENVIRONMENT_INVALID_SHARED_VENDOR_CLASSMAP_ZERO_EVIDENCE_CREDIT",
+    "reason": "A later red attempt used a shared vendor/classmap state that did not prove the pinned isolated application snapshot.",
+    "tests": null,
+    "assertions": null,
+    "credit": false
+  },
+  "remediated_contract": {
+    "point_eligibility_boundary": "Require both latitude and longitude to be non-null in the telemetry query before chronological ordering and the 2,000-point cap are applied.",
+    "cap_boundary": "Earlier partial or coordinate-less rows cannot consume the bounded playback-data result window and crowd out later coordinate-complete rows.",
+    "compatibility": "Preserve only the existing trip, vehicle, time-range, consent, approved-Site, driver-session, projection, and response behavior exercised by the named 27/213 playback and Fleet-management run; telemetry lifecycle beyond those assertions remains excluded.",
+    "architecture": "One operating organisation across multiple Sites; current approved Site access, canonical Asset and trip provenance, direct-object denial, consent, and privacy remain the boundaries, not tenant isolation."
+  },
+  "verification": {
+    "isolated_focused": {
+      "tests": 1,
+      "assertions": 6,
+      "duration_seconds": 160.74,
+      "exit_code": 0,
+      "credit": "DUPLICATE_REPLAY_ZERO_ADDITIONAL_DENOMINATOR_CREDIT"
+    },
+    "isolated_combined": {
+      "tests": 27,
+      "assertions": 213,
+      "duration_seconds": 168.04,
+      "exit_code": 0,
+      "credit": "SUPPORT_AND_REPLAY_ZERO_ADDITIONAL_DENOMINATOR_CREDIT"
+    },
+    "post_merge_combined": {
+      "tests": 27,
+      "assertions": 213,
+      "duration_seconds": 185.24,
+      "exit_code": 0,
+      "credited_component": {
+        "test_method": "test_playback_data_caps_only_after_excluding_coordinate_less_events",
+        "tests": 1,
+        "assertions": 6,
+        "credit": "COUNT_ONCE_IN_BOUNDED_DISPOSITION_DENOMINATOR"
+      },
+      "already_credited_playback_component": {
+        "tests": 11,
+        "assertions": 167,
+        "credit": "PRIOR_RUN_183_COMPONENT_ZERO_REPEAT_CREDIT"
+      },
+      "unchanged_fleet_management_component": {
+        "tests": 15,
+        "assertions": 40,
+        "credit": "COMPATIBILITY_SUPPORT_ZERO_BOUNDED_DENOMINATOR_CREDIT"
+      }
+    },
+    "php_syntax_paths_passed": 2,
+    "scoped_pint_passed": true,
+    "git_diff_check_passed": true,
+    "first_parent_delta_exact": true,
+    "merge_blobs_byte_identical_to_sealed_fix": true
+  },
+  "independent_review": {
+    "final_status": "GO",
+    "reviewer_count_known": false,
+    "reviewer_identity_recorded": false,
+    "review_scope": "Independent controller, regression-test, Git-lineage, bounded-credit, and reporting-semantics review.",
+    "remaining_actionable_findings": 0
+  },
+  "cleanup": {
+    "global_php_pest_process_count": 0,
+    "numeric_pid_suffixed_schema_count": 0,
+    "primary_status_clean_after_merge": true,
+    "isolated_worktree_removed_cleanly": true,
+    "recovery_branch_retained": true,
+    "local_main_ahead": 96,
+    "local_main_behind": 0,
+    "push_performed": false
+  },
+  "bounded_accounting": {
+    "previous_unique_tests": 198,
+    "previous_unique_assertions": 2716,
+    "credited_increment_tests": 1,
+    "credited_increment_assertions": 6,
+    "current_unique_tests": 199,
+    "current_unique_assertions": 2722,
+    "exclusions": [
+      "Valid red reproduction: 1 failed test and 3 assertions.",
+      "Environment-invalid shared-vendor/classmap red attempt in full.",
+      "Isolated focused 1 test and 6 assertions as a duplicate replay.",
+      "Isolated combined 27 tests and 213 assertions as replay and support evidence.",
+      "The previously credited playback 11 tests and 167 assertions inside the post-merge combined run.",
+      "The unchanged FleetManagement 15 tests and 40 assertions inside the post-merge combined run.",
+      "Any second count of the post-merge combined 27 tests and 213 assertions."
+    ]
+  },
+  "noninheritance": {
+    "prior_playback_site_privacy_credit": false,
+    "fleet_management_correctness_credit": false,
+    "route_or_index_86_static_ownership": false,
+    "controller_action_bridge_page_queue_matrix_or_feature_union_ownership": false,
+    "canonical_feature_identity_or_static_ownership": false,
+    "permission_site_direct_object_or_write_path_correctness": false,
+    "telemetry_ingest_lifecycle_range_validity_or_map_frontend_correctness": false,
+    "adjacent_fleet_routes_or_surfaces": false,
+    "representative_application_browser": false,
+    "full_suite_or_coverage": false,
+    "benchmark_or_ncm": false,
+    "deployment_publication_or_release": false,
+    "feature_module_pass_or_completion": false,
+    "final_finding": false,
+    "gate_4_or_audit_completion": false
+  },
+  "completion_credit": false,
+  "receipt_self_seal_sha256": "a4b9ca491ffd65a11551bb850fd067a45980c8b1fa9084623a56e081e833acbd"
+}
