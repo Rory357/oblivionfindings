@@ -1,0 +1,160 @@
+{
+  "schema_version": "oblivion_elig_shift_notification_site_privacy_coordination_handoff_v1",
+  "evidence_kind": "COORDINATION_HANDOFF_TRANSCRIPTION_NOT_ORIGINAL_RUNTIME_RECEIPT",
+  "status": "SEALED_DELEGATED_EVIDENCE_FOR_BOUNDED_REPORTING_ONLY",
+  "evidence_date": "2026-09-01",
+  "source": {
+    "source_thread_id": "01a050e0-5909-7812-8630-1f12835072c7",
+    "source_task_title": "Continue fixes without overlap",
+    "transcription_basis": "User-visible codex_delegation coordination handoffs plus Git-verifiable lineage and one independent read-only source/reporting review in the audit task.",
+    "original_issue_specific_runtime_receipt_present": false,
+    "original_issue_specific_independent_review_receipt_present": false,
+    "run_201_reexecuted_application_tests": false,
+    "run_201_claims_original_runtime_authorship": false
+  },
+  "finding": {
+    "id": "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01",
+    "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "feature_id": null,
+    "candidate_feature_id": null,
+    "related_feature_ids": [],
+    "feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+    "priority": "P1",
+    "priority_boundary": "HISTORICAL_REMEDIATED_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT"
+  },
+  "pins": {
+    "application_baseline_commit": "f7c6f9ee476534cbbc13042b68d5388e0681b535",
+    "application_baseline_tree": "33f69dc0848cca66ad317e42ba8a61eba46ac1e4",
+    "advanced_main_commit": "9c01f5a4f57f96722015278d1df3c3bd111aa95c",
+    "advanced_main_tree": "c9b0f223e5c63870cc5c04708babece98c00435f",
+    "sealed_fix_commit": "95fb2677a417c69c2008fefcc0cf9404984c9b54",
+    "sealed_fix_tree": "412d3dc3ff3f9fd864b626b565ce419372cd2ee2",
+    "stable_patch_id": "1381114bba1a102630a020211a07b303a1d6240d",
+    "local_main_merge_commit": "1382dd4a48b35d9f9155c2dd501a8a3f4f60d47c",
+    "local_main_merge_tree": "50ba282b5ded0d8d0d4f9fb19bf8e79f3ce96014",
+    "local_main_merge_parents": [
+      "9c01f5a4f57f96722015278d1df3c3bd111aa95c",
+      "95fb2677a417c69c2008fefcc0cf9404984c9b54"
+    ],
+    "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29"
+  },
+  "exact_application_test_paths": [
+    {
+      "path": "app/Jobs/EscalateUnresolvedEligibilityJob.php",
+      "merge_blob": "360d1fafa858341f1ffbc0ceecf64fda449fc5ec"
+    },
+    {
+      "path": "app/Jobs/RecalculateFutureShiftEligibility.php",
+      "merge_blob": "5bb72f86adb6165bf43b4f489f59e61bef3eb5bf"
+    },
+    {
+      "path": "tests/Feature/Rostering/ShiftEligibilityNotificationRecipientPrivacyTest.php",
+      "merge_blob": "056116c106f00740d1d51bb125ad924b98ebe225"
+    },
+    {
+      "path": "tests/Unit/Jobs/EscalateUnresolvedEligibilityJobTest.php",
+      "merge_blob": "4e30b5ed794b7260255a045c74a02f18619679da"
+    }
+  ],
+  "reproduction": {
+    "command_text": null,
+    "test_files": [
+      "tests/Feature/Rostering/ShiftEligibilityNotificationRecipientPrivacyTest.php"
+    ],
+    "failed": 1,
+    "passed": 0,
+    "pending": 4,
+    "assertions": 1,
+    "duration_seconds": 147.32,
+    "exit_code": 1,
+    "observed_failure": "A direct manager without access to the Shift Site received protected shift eligibility notification content on unchanged baseline source.",
+    "credit": "REPRODUCTION_ONLY_ZERO_BOUNDED_PASS_DENOMINATOR_CREDIT"
+  },
+  "remediated_contract": {
+    "canonical_shift_boundary": "Reload one current canonical Shift snapshot, including staff, Site and client provenance, before selecting a recipient or rendering protected payload fields.",
+    "recipient_boundary": "Require the direct, senior or fallback manager to be currently approved, non-client, non-next-of-kin, covered by a current active employee profile where hierarchy is used, and authorized for the canonical Shift through current approved Site access.",
+    "fallback_boundary": "Skip inaccessible hierarchy and fallback candidates in deterministic order; use the next currently eligible same-Site candidate and send nothing when no eligible recipient exists.",
+    "compatibility": "Preserve eligibility evaluation, signal emission and idempotency, unresolved-threshold behavior, resolved or unassigned suppression, notification types and content, and the existing provider-manager or administrator fallback order for eligible recipients.",
+    "architecture": "One operating organisation across multiple Sites; current approved Site access, exact role and capability, canonical Shift provenance, direct-object denial, and privacy are the boundaries, not tenant isolation."
+  },
+  "verification": {
+    "intermediate": {
+      "tests": 12,
+      "assertions": 23,
+      "status": "NO_GO_STALE_SHIFT_SNAPSHOT",
+      "credit": false
+    },
+    "isolated_final": {
+      "tests": 13,
+      "assertions": 25,
+      "duration_seconds": 154.07,
+      "exit_code": 0,
+      "credit": "DUPLICATE_REPLAY_ZERO_ADDITIONAL_DENOMINATOR_CREDIT"
+    },
+    "post_merge": {
+      "tests": 13,
+      "assertions": 25,
+      "duration_seconds": 151.22,
+      "exit_code": 0,
+      "credit": "COUNT_ONCE_IN_BOUNDED_DISPOSITION_DENOMINATOR"
+    },
+    "php_syntax_paths_passed": 4,
+    "scoped_pint_passed": true,
+    "git_diff_check_passed": true,
+    "first_parent_delta_exact": true,
+    "merge_blobs_byte_identical_to_sealed_fix": true
+  },
+  "independent_review": {
+    "final_status": "GO",
+    "reviewer_count_known": false,
+    "reviewer_identity_recorded": false,
+    "review_scope": "Independent production, test, Git-lineage, bounded-contract, and reporting-semantics review.",
+    "corrected_no_go_items": [
+      "Reload one canonical current Shift snapshot for both recipient authorization and protected notification payload instead of authorizing one snapshot and rendering another."
+    ],
+    "remaining_actionable_findings": 0
+  },
+  "cleanup": {
+    "global_php_pest_process_count": 0,
+    "numeric_pid_suffixed_schema_count": 0,
+    "primary_status_clean_after_merge": true,
+    "isolated_worktree_removed_cleanly": true,
+    "recovery_branch_retained": true,
+    "local_main_ahead": 92,
+    "local_main_behind": 0,
+    "push_performed": false
+  },
+  "bounded_accounting": {
+    "previous_unique_tests": 185,
+    "previous_unique_assertions": 2691,
+    "credited_increment_tests": 13,
+    "credited_increment_assertions": 25,
+    "current_unique_tests": 198,
+    "current_unique_assertions": 2716,
+    "exclusions": [
+      "Red 1 failed plus 0 passed plus 4 pending and 1 assertion.",
+      "Intermediate 12 tests and 23 assertions adjudicated NO-GO for a stale Shift snapshot.",
+      "Isolated final 13 tests and 25 assertions as a duplicate replay.",
+      "Any second count of the post-merge 13 tests and 25 assertions."
+    ]
+  },
+  "noninheritance": {
+    "shift_signal_emission_or_idempotency_correctness": false,
+    "eligibility_rule_or_blocking_reason_correctness": false,
+    "user_site_access_service_correctness": false,
+    "provider_manager_or_admin_role_model_correctness": false,
+    "notification_transport_or_external_delivery_exactly_once": false,
+    "transactional_outbox_or_retry_recovery": false,
+    "broader_roster_shift_or_hr_privacy": false,
+    "route_page_bridge_queue_or_matrix_ownership": false,
+    "representative_application_browser": false,
+    "full_suite_or_coverage": false,
+    "benchmark_or_ncm": false,
+    "deployment_publication_or_release": false,
+    "feature_module_pass_or_completion": false,
+    "final_finding": false,
+    "gate_4_or_audit_completion": false
+  },
+  "completion_credit": false,
+  "receipt_self_seal_sha256": "225a2548c1f2d0120e3edd5ef26feb02ad8616085a36aa2d502e81700e0da587"
+}

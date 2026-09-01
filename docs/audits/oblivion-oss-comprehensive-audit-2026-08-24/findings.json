@@ -1,6 +1,6 @@
 {
   "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
-  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_EIGHT_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
+  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_NINE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
   "generated_on": "2026-09-01",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
@@ -90,6 +90,20 @@
     "shift_task_due_recipient_revalidation_local_main_tree": "071edd9408f27206bc6962157e4a84c30590f701",
     "shift_task_due_recipient_revalidation_stable_patch_id": "af8be2614ff89b34632299424cdd28e011ee1d84",
     "shift_task_due_recipient_revalidation_origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "run_200_dashboard_verification_materializer_sha256": "023d06929555d20dbc242bb998e05ee7fc60c0917d0e62b39ab56356a74de578",
+    "run_200_dashboard_verification_sha256": "59b80aa14c8841f412d9b76003cc8f2dcd135634cd9394a43523bad31f62c520",
+    "run_200_dashboard_verification_self_seal_sha256": "493b62087f2df1f2ff776f68c162fceb38ab69763a0b2554ba0148dd6c58d216",
+    "run_200_verified_dashboard_sha256": "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205",
+    "elig_shift_notification_site_privacy_baseline_commit": "f7c6f9ee476534cbbc13042b68d5388e0681b535",
+    "elig_shift_notification_site_privacy_baseline_tree": "33f69dc0848cca66ad317e42ba8a61eba46ac1e4",
+    "elig_shift_notification_site_privacy_audit_release_commit": "9c01f5a4f57f96722015278d1df3c3bd111aa95c",
+    "elig_shift_notification_site_privacy_audit_release_tree": "c9b0f223e5c63870cc5c04708babece98c00435f",
+    "elig_shift_notification_site_privacy_fix_commit": "95fb2677a417c69c2008fefcc0cf9404984c9b54",
+    "elig_shift_notification_site_privacy_fix_tree": "412d3dc3ff3f9fd864b626b565ce419372cd2ee2",
+    "elig_shift_notification_site_privacy_local_main_merge_commit": "1382dd4a48b35d9f9155c2dd501a8a3f4f60d47c",
+    "elig_shift_notification_site_privacy_local_main_tree": "50ba282b5ded0d8d0d4f9fb19bf8e79f3ce96014",
+    "elig_shift_notification_site_privacy_stable_patch_id": "1381114bba1a102630a020211a07b303a1d6240d",
+    "elig_shift_notification_site_privacy_origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
     "monitoring_metric_replay_application_baseline_commit": "a900f078c9c05f587f6f7884f5fe715076891416",
     "monitoring_metric_replay_initial_fix_commit": "f521bc0b87222e56b4822e7cb9c935486e279e76",
     "monitoring_metric_replay_initial_merge_commit": "778c00a5d09511aee1a836a689d7bb1b56ce4ff6",
@@ -314,20 +328,20 @@
     "system_data_features": 40,
     "canonical_submodules": null,
     "historical_discovery_claim_records": 12,
-    "current_retained_claim_records": 18,
+    "current_retained_claim_records": 19,
     "current_provisional_source_claims": 8,
     "historical_already_fixed_records": 2,
-    "historical_remediated_records": 8
+    "historical_remediated_records": 9
   },
   "counts": {
-    "retained_claim_records": 18,
+    "retained_claim_records": 19,
     "provisional_source_claims": 8,
     "provisional_P1": 8,
     "historical_already_fixed": 2,
-    "historical_remediated": 8,
-    "bounded_disposition_tests_passed": 185,
-    "bounded_disposition_assertions": 2691,
-    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY plus only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution plus the unique 6/206 post-merge focused component of the combined FLEET-FUEL-INDEX-SITE-PRIVACY run plus the unique isolated focused 15/32 SUMMARY-TIMELINE-SITE-PRIVACY execution plus one post-merge 9/50 SHIFT-TASK-DUE-RECIPIENT-REVALIDATION execution; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, the initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO, the root 1-test red reproduction, every intermediate corrective subset or stopped run, the final isolated corrective 56/472 replay, DNS 63/186, Facility execution, Fuel red 6-failed/65-assertion reproduction, isolated Fuel 6/206 replay, supporting Fuel 20/215 regressions, any second count from combined 26/421, Summary red 1-failed/5-passed/9-assertion reproduction, the zero-assertion vendor-junction run, Emar 2/238 supporting compatibility, shared post-merge 40/438, Shift-task red 1-failed/3-passed/1-pending/14-assertion reproduction, intermediate 5/30 and cache proofs, isolated final 9/50 duplicate replay, any second count from post-merge 9/50, and every overlapping supporting execution",
+    "historical_remediated": 9,
+    "bounded_disposition_tests_passed": 198,
+    "bounded_disposition_assertions": 2716,
+    "bounded_disposition_sum_basis": "73/1481 MED-RBAC plus 5/48 focused MED-CD-SCOPE plus 5/60 post-merge focused SAFE-ALERT-DEDUP-IDENTITY plus 5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY plus 11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY plus only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution plus the unique 6/206 post-merge focused component of the combined FLEET-FUEL-INDEX-SITE-PRIVACY run plus the unique isolated focused 15/32 SUMMARY-TIMELINE-SITE-PRIVACY execution plus one post-merge 9/50 SHIFT-TASK-DUE-RECIPIENT-REVALIDATION execution plus one post-merge 13/25 ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY execution; excludes RUN-166 MED-CD-ATOMICITY commands, SAFE red and isolated-green replay execution, 28/73 ControlRoomBridgeWiringTest, 3/5 HsEvent safeguarding filter, six pre-bridge terminal fixture failures, trip-index red/replay/supporting execution, playback baseline 3-failed/2-passed/30-assertion reproduction, isolated playback 11/167 replay, supporting playback 20/215 regressions, the initial Monitoring 49/392 isolated and post-merge runs later adjudicated NO-GO, the root 1-test red reproduction, every intermediate corrective subset or stopped run, the final isolated corrective 56/472 replay, DNS 63/186, Facility execution, Fuel red 6-failed/65-assertion reproduction, isolated Fuel 6/206 replay, supporting Fuel 20/215 regressions, any second count from combined 26/421, Summary red 1-failed/5-passed/9-assertion reproduction, the zero-assertion vendor-junction run, Emar 2/238 supporting compatibility, shared post-merge 40/438, Shift-task red 1-failed/3-passed/1-pending/14-assertion reproduction, intermediate 5/30 and cache proofs, isolated final 9/50 duplicate replay, any second count from post-merge 9/50, eligibility-alert red 1-failed/0-passed/4-pending/1-assertion reproduction, reviewer-NO-GO intermediate 12/23, isolated final 13/25 replay, any second count from post-merge 13/25, and every overlapping supporting execution",
     "med_rbac_bounded_tests": 73,
     "med_rbac_bounded_test_assertions": 1481,
     "med_cd_scope_focused_tests": 5,
@@ -337,7 +351,7 @@
     "med_cd_atomicity_race_subscenarios": 3,
     "med_cd_atomicity_supporting_tests": 43,
     "med_cd_atomicity_supporting_assertions": 716,
-    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764, RUN-184 99/1931, RUN-187 155/2403, RUN-194 161/2609, and RUN-197 176/2641 totals, and remains excluded from the current RUN-199 185/2691 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
+    "med_cd_atomicity_aggregation_basis": "reported separately from the then-current 78/1529 at RUN-167, remained excluded from the historical RUN-177 88/1764, RUN-184 99/1931, RUN-187 155/2403, RUN-194 161/2609, RUN-197 176/2641, and RUN-199 185/2691 totals, and remains excluded from the current RUN-201 198/2716 total because the supporting command overlaps prior denominators and the 10-assertion rollback test includes an uncredited balance-check half",
     "safe_alert_dedup_focused_tests": 5,
     "safe_alert_dedup_focused_assertions": 60,
     "safe_alert_dedup_supporting_control_room_bridge_tests": 28,
@@ -383,6 +397,17 @@
     "shift_task_due_recipient_revalidation_isolated_replay_tests": 9,
     "shift_task_due_recipient_revalidation_isolated_replay_assertions": 50,
     "shift_task_due_recipient_revalidation_aggregation_basis": "Only the unique post-merge focused 9/50 execution counts once. Red 1-failed/3-passed/1-pending/14 assertions, intermediate 5/30 and cache proofs, and isolated final 9/50 are excluded.",
+    "elig_shift_notification_site_privacy_focused_tests": 13,
+    "elig_shift_notification_site_privacy_focused_assertions": 25,
+    "elig_shift_notification_site_privacy_baseline_failed": 1,
+    "elig_shift_notification_site_privacy_baseline_passed": 0,
+    "elig_shift_notification_site_privacy_baseline_pending": 4,
+    "elig_shift_notification_site_privacy_baseline_assertions": 1,
+    "elig_shift_notification_site_privacy_intermediate_no_go_tests": 12,
+    "elig_shift_notification_site_privacy_intermediate_no_go_assertions": 23,
+    "elig_shift_notification_site_privacy_isolated_replay_tests": 13,
+    "elig_shift_notification_site_privacy_isolated_replay_assertions": 25,
+    "elig_shift_notification_site_privacy_aggregation_basis": "Only the unique post-merge focused 13/25 execution counts once. Red 1-failed/0-passed/4-pending/1 assertion, reviewer-NO-GO intermediate 12/23, and isolated final 13/25 are excluded.",
     "monitoring_metric_replay_dedupe_focused_tests": 56,
     "monitoring_metric_replay_dedupe_focused_assertions": 472,
     "monitoring_metric_replay_initial_superseded_tests": 49,
@@ -485,22 +510,23 @@
       "audit_completion": 0
     }
   },
-  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and eight retained historical remediated records remain reviewable. RUN-199 adds only SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01 as a feature-unassigned historical-remediated record. Its unique post-merge 9/50 execution extends the RUN-197 denominator from 176/2641 to 185/2691 exactly once; the red 1-failed/3-passed/1-pending/14-assertion reproduction, intermediate 5/30 and cache proofs, isolated final 9/50 replay, and any second count from post-merge 9/50 remain separate and uncredited. The Shift-task record has null feature and candidate IDs with zero route owner, controller-action bridge, page, queue, matrix, feature-union, My Day, Control Room, adjacent-surface, browser, benchmark, publication, release, or completion credit. Its proof is bounded to canonical current task, Shift, assignee, employee and approved-Site revalidation before marker, notification or signal, plus fresh queued revalidation before channel selection and delivery. Same-Site post-alert reassignment reconciliation, rerouting to a replacement assignee, external delivery exactly-once, transactional outbox behavior, and broader push correctness remain excluded. Earlier Summary, Monitoring, Fleet, and all prior noninheritance boundaries remain unchanged. Origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; remediation and reporting remain local-only and unpublished. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
+  "credit_boundary": "Eight current provisional records, two retained historical already-fixed records, and nine retained historical remediated records remain reviewable. RUN-201 adds only ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 as a feature-unassigned historical-remediated record. Its unique post-merge 13/25 execution extends the RUN-199 denominator from 185/2691 to 198/2716 exactly once; the red 1-failed/0-passed/4-pending/1-assertion reproduction, reviewer-NO-GO intermediate 12/23, isolated final 13/25 replay, and any second count from post-merge 13/25 remain separate and uncredited. The eligibility-alert record has null feature and candidate IDs with zero route owner, controller-action bridge, page, queue, matrix, feature-union, browser, benchmark, publication, release, or completion credit. Its proof is bounded to current active, non-ended employee provenance and approved access to the canonical Shift Site for direct, senior, provider-manager, and administrator alert recipients, deterministic skipping of inaccessible candidates, and one canonical current Shift snapshot shared by recipient authorization and protected payload construction. Broader eligibility evaluation, signal/idempotency semantics, hierarchy correctness outside that recipient order, scheduler cadence, real queue workers, concurrency, and external delivery remain excluded. Earlier Shift-task, Summary, Monitoring, Fleet, and all prior noninheritance boundaries remain unchanged. Origin/main remains c39b076547056b1e158c604957a04bd8b75b0f29; remediation and reporting remain local-only and unpublished. No final finding, benchmark, application-browser, ease, full-suite coverage, Pass, feature-completion, Gate 4, or audit-completion gate follows.",
   "reconciliation": {
     "retained_record_ids_unique": true,
     "current_provisional_ids_unique": true,
-    "retained_record_count": 18,
+    "retained_record_count": 19,
     "current_provisional_count": 8,
     "historical_already_fixed_count": 2,
-    "historical_remediated_count": 8,
+    "historical_remediated_count": 9,
     "every_non_null_primary_feature_id_in_canonical_matrix": true,
     "records_without_primary_or_candidate_feature_id": [
       "MON-METRIC-REPLAY-DEDUPE-01",
       "SUMMARY-TIMELINE-SITE-PRIVACY-01",
-      "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01"
+      "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01",
+      "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01"
     ],
     "final_ids_cross_file_reconciled": false,
-    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01, MON-METRIC-REPLAY-DEDUPE-01, FLEET-FUEL-INDEX-SITE-PRIVACY-01, SUMMARY-TIMELINE-SITE-PRIVACY-01, and SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01 are retained as historical remediated; the other 8 records remain provisional. Shift-task remediation is limited to fresh canonical task, Shift, assignee, employee and approved-Site revalidation before reminder claim, notification or Facility signal and again at queued channel selection/delivery. It has null feature and candidate IDs and receives zero static ownership. Same-Site post-alert reassignment reconciliation, replacement-recipient rerouting, external delivery exactly-once, transactional outbox behavior, UserSiteAccessService correctness, broader push behavior, My Day, Control Room, adjacent surfaces, page/frontend ownership, browser, benchmark, publication, release, full-suite, feature/module, final-finding, and completion credit are not inherited. RUN-190 separately integrates only queue index 85 fleet-assets.trips.playback / FleetTripController::show as one static route owner and bridge; index 86 playback.data remains pending, while Fuel is candidate index 87 and receives no queue advance. None satisfies the cross-file final-finding gate."
+    "reason": "There are no final finding IDs. MED-RBAC-01 and the bounded manual-entry clause of MED-CD-ATOMICITY-01 are retained as historical already fixed; MED-CD-SCOPE-01, SAFE-ALERT-DEDUP-IDENTITY-01, FLEET-TRIP-INDEX-SITE-PRIVACY-01, FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01, MON-METRIC-REPLAY-DEDUPE-01, FLEET-FUEL-INDEX-SITE-PRIVACY-01, SUMMARY-TIMELINE-SITE-PRIVACY-01, SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01, and ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 are retained as historical remediated; the other 8 records remain provisional. Eligibility-alert remediation is limited to current active, non-ended employee provenance and approved canonical-Shift-Site access for direct, senior, provider-manager, and administrator recipients, deterministic skipping of inaccessible candidates, and a single reloaded canonical Shift snapshot for both authorization and protected payload construction. It has null feature and candidate IDs and receives zero static ownership. Broader eligibility evaluation, signal/idempotency semantics, hierarchy correctness outside the bounded recipient order, scheduler cadence, real queue workers, concurrency, external delivery, adjacent surfaces, page/frontend ownership, browser, benchmark, publication, release, full-suite, feature/module, final-finding, and completion credit are not inherited. RUN-190 separately integrates only queue index 85 fleet-assets.trips.playback / FleetTripController::show as one static route owner and bridge; index 86 playback.data remains pending, while Fuel is candidate index 87 and receives no queue advance. None satisfies the cross-file final-finding gate."
   },
   "records": [
     {
@@ -4307,6 +4333,261 @@
         "observed workflow and ten-dimension current/target ease measures",
         "target-specific benchmark or exhaustive final no-match",
         "full-suite coverage, representative signed-in browser, same-Site post-alert reassignment reconciliation, replacement-recipient rerouting, external delivery exactly-once, broader push behavior, My Day, Control Room, and broader Shift correctness"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+      "feature_id": null,
+      "candidate_feature_id": null,
+      "feature_identity_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+      "feature_id_role": "NO_CANONICAL_OR_CANDIDATE_FEATURE_ASSOCIATION_ZERO_STATIC_OWNERSHIP_CREDIT",
+      "related_feature_ids": [],
+      "historical_provenance": {
+        "application_commit": "f7c6f9ee476534cbbc13042b68d5388e0681b535",
+        "application_tree": "33f69dc0848cca66ad317e42ba8a61eba46ac1e4",
+        "classification": "REAL_HISTORICAL_SHIFT_ELIGIBILITY_ALERT_RECIPIENT_SITE_PRIVACY_CONDITION",
+        "historical_risk": "Eligibility-alert jobs could disclose protected Shift, staff, client, Site, date, and reason content to direct or fallback recipients who no longer had current approved access to the canonical Shift Site, and a stale Shift snapshot could diverge authorization from the delivered payload.",
+        "preserved_identity_only": true,
+        "new_record_authorized_by_run_201_reporting_review": true,
+        "record_present_before_run_201": false,
+        "pre_run_201_register_sha256": "3578c7a31f6592ee548f50d4afa130febf34d1dbaa0de448fb1cdc6c2600af0c"
+      },
+      "current_adjudication": {
+        "application_baseline_commit": "f7c6f9ee476534cbbc13042b68d5388e0681b535",
+        "application_baseline_tree": "33f69dc0848cca66ad317e42ba8a61eba46ac1e4",
+        "audit_release_commit": "9c01f5a4f57f96722015278d1df3c3bd111aa95c",
+        "audit_release_tree": "c9b0f223e5c63870cc5c04708babece98c00435f",
+        "fix_commit": "95fb2677a417c69c2008fefcc0cf9404984c9b54",
+        "fix_tree": "412d3dc3ff3f9fd864b626b565ce419372cd2ee2",
+        "stable_patch_id": "1381114bba1a102630a020211a07b303a1d6240d",
+        "application_commit": "1382dd4a48b35d9f9155c2dd501a8a3f4f60d47c",
+        "repository_tree": "50ba282b5ded0d8d0d4f9fb19bf8e79f3ce96014",
+        "current_local_main_commit_at_run_201": "1382dd4a48b35d9f9155c2dd501a8a3f4f60d47c",
+        "current_local_main_tree_at_run_201": "50ba282b5ded0d8d0d4f9fb19bf8e79f3ce96014",
+        "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+        "verdict": "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED",
+        "scope": "Shift eligibility-alert recipient Site privacy: current active, non-ended employee provenance and approved canonical-Shift-Site access for direct, senior, provider-manager, and administrator recipients; deterministic continuation past inaccessible candidates; and one canonical current Shift snapshot reused for authorization and protected notification payload construction.",
+        "run_201_reporting_receipt": "evidence/source/current-run-201-elig-shift-notification-site-privacy-remediation-reporting-wave-41.json",
+        "coordination_handoff_transcription": "evidence/source/current-run-201-elig-shift-notification-site-privacy-coordination-handoff-wave-41.json",
+        "delegated_execution_evidence_kind": "EXACT_COORDINATION_HANDOFF_NOT_REEXECUTED_BY_RUN_201",
+        "independent_review_evidence_kind": "ONE_FINAL_INDEPENDENT_SOURCE_TEST_GO_REPORTED_BY_COORDINATION_HANDOFF_PLUS_GIT_REVIEW",
+        "application_remediation_required": true,
+        "application_source_changed": true,
+        "integrated_to_main": true,
+        "published_to_origin_main": false,
+        "publication_authorized": false,
+        "feature_identity_assigned": false,
+        "static_route_or_page_feature_ownership_inherited": false,
+        "static_controller_action_bridge_inherited": false,
+        "queue_advance_inherited": false,
+        "eligibility_evaluation_credit_inherited": false,
+        "signal_or_idempotency_credit_inherited": false,
+        "scheduler_or_real_worker_credit_inherited": false,
+        "external_delivery_credit_inherited": false,
+        "shift_signal_emission_or_idempotency_correctness_inherited": false,
+        "eligibility_rule_correctness_inherited": false,
+        "user_site_access_service_correctness_inherited": false,
+        "notification_transport_or_outbox_correctness_inherited": false,
+        "broader_roster_shift_or_hr_privacy_inherited": false
+      },
+      "passes": [
+        "P2",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Rostering",
+        "submodule": "SHIFT_ELIGIBILITY_ALERT_RECIPIENT_SITE_PRIVACY_BOUNDARY",
+        "submodule_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW_ZERO_STATIC_OWNERSHIP_CREDIT"
+      },
+      "actor_and_job": {
+        "actor": "Eligibility-alert recipient",
+        "secondary_actors": "Direct manager, senior manager, provider manager, administrator, remote-Site manager, inaccessible fallback candidate, current approved fallback candidate, and stale queued Shift snapshot in bounded tests",
+        "job": "Receive protected Shift eligibility-alert content only while currently eligible and approved for the canonical Shift Site",
+        "status": "BOUNDED_TEST_ACTORS_VALIDATED_NOT_REPRESENTATIVE_SIGNED_IN_BROWSER"
+      },
+      "route_url": {
+        "route_names": null,
+        "route_paths": null,
+        "raw_route_path_field": null,
+        "ownership_status": "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
+        "status": "NO_ROUTE_ASSOCIATION_OR_STATIC_ROUTE_OWNERSHIP_CREDIT"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": null,
+        "application_commit": "1382dd4a48b35d9f9155c2dd501a8a3f4f60d47c",
+        "status": "NO_FRONTEND_ASSOCIATION_OR_CREDIT"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_RETAINED_HISTORICAL_RECORD"
+      },
+      "backend_anchor": {
+        "matrix_anchors": null,
+        "claim_anchors": [
+          "app/Jobs/EscalateUnresolvedEligibilityJob.php",
+          "app/Jobs/RecalculateFutureShiftEligibility.php",
+          "tests/Feature/Rostering/ShiftEligibilityNotificationRecipientPrivacyTest.php",
+          "tests/Unit/Jobs/EscalateUnresolvedEligibilityJobTest.php"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "BOUNDED_JOB_AND_REGRESSION_REVIEW",
+        "application_commit": "1382dd4a48b35d9f9155c2dd501a8a3f4f60d47c"
+      },
+      "current_behaviour": {
+        "classification": "REMEDIATED_LOCAL_MAIN_BOUNDED_VERIFIED_NOT_PUBLISHED",
+        "summary": "Both jobs require current active, non-ended employee provenance and approved access to the canonical Shift Site for direct, senior, provider-manager, and administrator recipients; they continue deterministically past inaccessible candidates. Each job reloads one canonical current Shift snapshot before recipient selection and uses that same snapshot for protected notification payload construction.",
+        "runtime_observed": true,
+        "runtime_scope": "Only one post-merge focused 13 tests / 25 assertions execution contributes once. The 1-failed/0-passed/4-pending/1-assertion reproduction, reviewer-NO-GO intermediate 12/23, isolated final 13/25 replay, and any second count of post-merge 13/25 are reported separately and not counted."
+      },
+      "current_workflow": {
+        "matrix_summary": "Bounded Shift eligibility-alert recipient and payload Site-privacy contract only; no canonical feature, route, page, representative browser, scheduler cadence, real-worker execution, or module completion is established.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "BOUNDED_DIRECT_SENIOR_FALLBACK_SITE_ACCESS_AND_STALE_SHIFT_PAYLOAD_PATHS_EXECUTED; REPRESENTATIVE_BROWSER_EASE_STATIC_OWNERSHIP_SCHEDULER_WORKER_CONCURRENCY_EXTERNAL_DELIVERY_AND_BROADER_ELIGIBILITY_NOT_EXECUTED"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": null
+      },
+      "evidence": {
+        "current_remediation_receipt": null,
+        "reporting_receipt": "evidence/source/current-run-201-elig-shift-notification-site-privacy-remediation-reporting-wave-41.json",
+        "coordination_handoff_transcription": "evidence/source/current-run-201-elig-shift-notification-site-privacy-coordination-handoff-wave-41.json",
+        "independent_artifact_review": "MESSAGE_BOUND_HANDOFF_PLUS_GIT_AND_INDEPENDENT_SOURCE_REVIEW",
+        "delegated_evidence_source": "evidence/source/current-run-201-elig-shift-notification-site-privacy-coordination-handoff-wave-41.json",
+        "delegated_not_reexecuted_by_run_201": true,
+        "claim_anchors": [
+          "app/Jobs/EscalateUnresolvedEligibilityJob.php",
+          "app/Jobs/RecalculateFutureShiftEligibility.php",
+          "tests/Feature/Rostering/ShiftEligibilityNotificationRecipientPrivacyTest.php",
+          "tests/Unit/Jobs/EscalateUnresolvedEligibilityJobTest.php"
+        ],
+        "test_commands_executed": null,
+        "credited_test_commands": 1,
+        "test_command_text": null,
+        "test_files": [
+          "tests/Feature/Rostering/ShiftEligibilityNotificationRecipientPrivacyTest.php",
+          "tests/Unit/Jobs/EscalateUnresolvedEligibilityJobTest.php"
+        ],
+        "tests_executed": 13,
+        "assertions": 25,
+        "isolated_focused_tests": 13,
+        "isolated_focused_assertions": 25,
+        "intermediate_no_go_tests": 12,
+        "intermediate_no_go_assertions": 23,
+        "baseline_failed_cases": 1,
+        "baseline_passed_cases": 0,
+        "baseline_pending_cases": 4,
+        "baseline_assertions": 1,
+        "browser_cells": 0,
+        "database_checks": null,
+        "database_cleanup": "global PHP/Pest zero; exact numeric PID-suffixed schemas zero; isolated worktree removed cleanly"
+      },
+      "problem_root_cause": "Eligibility-alert recipient resolution selected direct and fallback users without requiring current approved access to the canonical Shift Site, and stale in-memory Shift state could be used independently for authorization and protected payload construction.",
+      "impact": "Before remediation, a remote, ended, inactive, missing-profile, revoked, or otherwise inaccessible direct or fallback recipient could receive protected Shift, staff, client, Site, date, and reason content; later Shift changes could also make authorization and payload provenance diverge.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Require current active, non-ended employee provenance and approved access to the canonical Shift Site for every direct, senior, provider-manager, and administrator eligibility-alert candidate.",
+        "Continue deterministically past inaccessible fallback candidates without disclosing protected content.",
+        "Reload one canonical current Shift snapshot before recipient selection and reuse it for protected payload construction without copying third-party wording, assets, source, or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": "Apply one current canonical Shift-and-recipient Site-access boundary to both recipient selection and payload construction, with deterministic fallback continuation.",
+        "status": "IMPLEMENTED_NATIVELY_WITHOUT_BENCHMARK_OR_DESIGN_CREDIT"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [],
+      "rbac_privacy": "One operating organisation across multiple Sites; current approved Site access, exact action capability, canonical Shift ownership, direct-object denial, and privacy are the boundaries, not tenant isolation.",
+      "priority": "P1",
+      "priority_status": "HISTORICAL_REMEDIATED_P1_NOT_CURRENT_PROVISIONAL_OR_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Completed: focused unchanged-source reproduction observed a remote direct manager receiving a protected Shift eligibility alert at baseline f7c6f9ee476534cbbc13042b68d5388e0681b535",
+        "Completed: exact four-path native remediation integrated to local main at 1382dd4a48b35d9f9155c2dd501a8a3f4f60d47c without publication",
+        "Completed: isolated and post-merge focused 13 tests / 25 assertions plus independent final source review; only the post-merge execution counts once",
+        "Retained non-inherited gaps: canonical feature identity, static route/page/action ownership, broader eligibility, signal/idempotency, scheduler/worker/concurrency/external delivery, representative browser, benchmark, release, and completion"
+      ],
+      "confidence": {
+        "level": "HIGH_FOR_BOUNDED_SHIFT_ELIGIBILITY_ALERT_RECIPIENT_SITE_PRIVACY_DISPOSITION",
+        "evidence_gap": "Canonical or candidate feature identity, static route/page/action ownership, representative signed-in application browser, full-suite/coverage, ease, target-specific benchmark, scheduler cadence, real queue workers, concurrency, external delivery, broader eligibility evaluation, signal/idempotency, hierarchy behavior, and adjacent notification correctness remain unexecuted or unadjudicated."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording, or distinctive layout may be copied.",
+      "interim_safeguard": "Before relying on a Shift eligibility alert, verify the recipient has a current active employee profile and approved access to the current canonical Shift Site and that the delivered staff, client, Site, date, and reason values come from that same Shift snapshot.",
+      "acceptance_criteria": {
+        "given_when_then": "Given direct, senior, fallback, remote-Site, ended, inactive, missing-profile, revoked, valid approved, and stale-Shift states, when eligibility-alert jobs select a recipient and construct protected content, then only a current active recipient with approved access to the same canonical Shift Site receives the alert; inaccessible candidates are skipped deterministically; authorization and payload use one canonical current Shift snapshot; and existing eligibility evaluation, signal/idempotency, hierarchy and content contracts remain compatible without granting scheduler, worker, concurrency, external-delivery, browser, benchmark, module, or completion credit.",
+        "status": "BOUNDED_MET_FOR_HISTORICAL_CLAIM_REMEDIATION_NOT_FINAL_FINDING_OR_FEATURE_COMPLETION"
+      },
+      "validation_plan": {
+        "required": "Retain focused direct, senior, fallback, remote-Site, inactive/ended/missing-profile/revoked, deterministic continuation, canonical-current-Shift payload, and valid-recipient compatibility coverage; keep access service, eligibility evaluation, signals/idempotency, scheduler cadence, real workers, concurrency, external delivery, routes, frontend, and broader Rostering/HR correctness separate.",
+        "unit": "EXECUTED_BOUNDED_JOB_UNIT_REGRESSION_WITH_FEATURE_SUITE",
+        "feature": "EXECUTED_13_TESTS_25_ASSERTIONS_IN_ISOLATED_AND_POST_MERGE_FOCUSED_RUNS_COUNTED_ONCE",
+        "architecture": "STATIC_SOURCE_TEST_GO_PLUS_INDEPENDENT_REPORTING_SEMANTICS_REVIEW",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED_OR_CREDITED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "canonical or candidate feature identity remains unassigned",
+        "no committed issue-specific runtime or independent-review receipt exists; runtime details remain delegated handoff evidence"
+      ],
+      "independent_review": {
+        "status": "COMPLETED_SOURCE_AND_REPORTING_SEMANTICS_GO_MESSAGE_BOUND_EVIDENCE",
+        "reviewer": "independent source and reporting-semantics reviewer",
+        "disagreements": "An intermediate 12/23 green was rejected because an already-loaded Shift could authorize one Site while the notification payload exposed later persisted staff, client, Site, or time values. The jobs were corrected to reload one canonical current Shift snapshot and use it for both authorization and payload construction before the final 13/25 seal.",
+        "reconciliation": "The delegated handoff establishes reproduction, exact four-path remediation, focused runtime, local integration, cleanup, and nonpublication. Git and independent source review confirm the bounded behavior and lineage. RUN-201 alone changes the live register and does not convert message-bound runtime into a committed remediation receipt."
+      },
+      "unresolved_fields": [
+        "canonical or candidate FEATURE-ID and static source ownership",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline, and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "full-suite coverage, representative signed-in browser, scheduler cadence, real queue workers, concurrency, external delivery, broader eligibility evaluation, signal/idempotency, hierarchy behavior, and adjacent notification correctness"
       ],
       "completion_credit": false,
       "credit": {

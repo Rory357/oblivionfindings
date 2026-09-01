@@ -297,6 +297,9 @@ run_197_reporting = read_json_strict("evidence/source/current-run-197-summary-ti
 dashboard_run_198 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-198-wave-39.json")
 run_199_coordination_handoff = read_json_strict("evidence/source/current-run-199-shift-task-due-recipient-revalidation-coordination-handoff-wave-40.json")
 run_199_reporting = read_json_strict("evidence/source/current-run-199-shift-task-due-recipient-revalidation-remediation-reporting-wave-40.json")
+dashboard_run_200 = read_json_strict("evidence/browser/current-audit-dashboard-verification-run-200-wave-40.json")
+run_201_coordination_handoff = read_json_strict("evidence/source/current-run-201-elig-shift-notification-site-privacy-coordination-handoff-wave-41.json")
+run_201_reporting = read_json_strict("evidence/source/current-run-201-elig-shift-notification-site-privacy-remediation-reporting-wave-41.json")
 findings_register = read_json_strict("findings.json")
 assert sha256_file("evidence/source/current-canonical-feature-identity-wave-01.json") == "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
 assert sha256_file("evidence/source/current-canonical-identity-agent-register.json") == "21ebd8b004b5ade11aa01281958cda2be2ca966d1fb7c46576e039fab5f47baf"
@@ -3263,6 +3266,11 @@ for label, path in (
     ("RUN-199 Shift-task coordination-handoff transcription", "evidence/source/current-run-199-shift-task-due-recipient-revalidation-coordination-handoff-wave-40.json"),
     ("RUN-199 Shift-task remediation-reporting materializer", "generators/materialize-run-199-shift-task-due-recipient-revalidation-remediation-reporting-wave-40.py"),
     ("RUN-199 Shift-task remediation-reporting receipt", "evidence/source/current-run-199-shift-task-due-recipient-revalidation-remediation-reporting-wave-40.json"),
+    ("RUN-200 exact RUN-199 audit-dashboard verification materializer", "generators/materialize-run-200-audit-dashboard-verification-wave-40.py"),
+    ("RUN-200 exact RUN-199 audit-dashboard verification", "evidence/browser/current-audit-dashboard-verification-run-200-wave-40.json"),
+    ("RUN-201 Shift eligibility-alert coordination-handoff transcription", "evidence/source/current-run-201-elig-shift-notification-site-privacy-coordination-handoff-wave-41.json"),
+    ("RUN-201 Shift eligibility-alert remediation-reporting materializer", "generators/materialize-run-201-elig-shift-notification-site-privacy-remediation-reporting-wave-41.py"),
+    ("RUN-201 Shift eligibility-alert remediation-reporting receipt", "evidence/source/current-run-201-elig-shift-notification-site-privacy-remediation-reporting-wave-41.json"),
 ):
     if path not in checkpoint_paths:
         checkpoint_evidence.append((label, path))
@@ -3275,9 +3283,9 @@ checkpoint_evidence_links = "".join(
 checkpoint_evidence_links += (
     '<li><a href="task-scripts/">RUN-072 task-script directory (300 files)</a> '
     f'<code>{html.escape(usability_materialization["outputs"]["task_scripts"]["bundle_sha256"])}</code></li>'
-    '<li><a href="generators/materialize-run-200-audit-dashboard-verification-wave-40.py">RUN-200 audit-dashboard verification materializer</a> '
+    '<li><a href="generators/materialize-run-202-audit-dashboard-verification-wave-41.py">RUN-202 audit-dashboard verification materializer</a> '
     '<span>forward generator; fresh exact-artifact verification required</span></li>'
-    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-200-wave-40.json">RUN-200 audit-dashboard verification receipt</a> '
+    '<li><a href="evidence/browser/current-audit-dashboard-verification-run-202-wave-41.json">RUN-202 audit-dashboard verification receipt</a> '
     '<span>forward receipt; intentionally unhashed to avoid an evidence cycle</span></li>'
 )
 start_ready_ids = "<br>".join(
@@ -3409,7 +3417,7 @@ historical_discovery_claims = {row["finding_id"]: row["source_claim"] for row in
 assert len(historical_discovery_claims) == 12
 
 assert findings_register["schema_version"] == "oblivion_audit_findings_v2_mixed_current_status"
-assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_EIGHT_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
+assert findings_register["audit_status"] == "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_NINE_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT"
 assert findings_register["generated_on"] == "2026-09-01"
 assert findings_register["architecture_rule"] == "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries."
 findings_pins = findings_register["pins"]
@@ -3507,8 +3515,22 @@ assert findings_pins["shift_task_due_recipient_revalidation_local_main_merge_com
 assert findings_pins["shift_task_due_recipient_revalidation_local_main_tree"] == "071edd9408f27206bc6962157e4a84c30590f701"
 assert findings_pins["shift_task_due_recipient_revalidation_stable_patch_id"] == "af8be2614ff89b34632299424cdd28e011ee1d84"
 assert findings_pins["shift_task_due_recipient_revalidation_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
+assert findings_pins["run_200_dashboard_verification_materializer_sha256"] == "023d06929555d20dbc242bb998e05ee7fc60c0917d0e62b39ab56356a74de578"
+assert findings_pins["run_200_dashboard_verification_sha256"] == "59b80aa14c8841f412d9b76003cc8f2dcd135634cd9394a43523bad31f62c520"
+assert findings_pins["run_200_dashboard_verification_self_seal_sha256"] == "493b62087f2df1f2ff776f68c162fceb38ab69763a0b2554ba0148dd6c58d216"
+assert findings_pins["run_200_verified_dashboard_sha256"] == "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205"
+assert findings_pins["elig_shift_notification_site_privacy_baseline_commit"] == "f7c6f9ee476534cbbc13042b68d5388e0681b535"
+assert findings_pins["elig_shift_notification_site_privacy_baseline_tree"] == "33f69dc0848cca66ad317e42ba8a61eba46ac1e4"
+assert findings_pins["elig_shift_notification_site_privacy_audit_release_commit"] == "9c01f5a4f57f96722015278d1df3c3bd111aa95c"
+assert findings_pins["elig_shift_notification_site_privacy_audit_release_tree"] == "c9b0f223e5c63870cc5c04708babece98c00435f"
+assert findings_pins["elig_shift_notification_site_privacy_fix_commit"] == "95fb2677a417c69c2008fefcc0cf9404984c9b54"
+assert findings_pins["elig_shift_notification_site_privacy_fix_tree"] == "412d3dc3ff3f9fd864b626b565ce419372cd2ee2"
+assert findings_pins["elig_shift_notification_site_privacy_local_main_merge_commit"] == "1382dd4a48b35d9f9155c2dd501a8a3f4f60d47c"
+assert findings_pins["elig_shift_notification_site_privacy_local_main_tree"] == "50ba282b5ded0d8d0d4f9fb19bf8e79f3ce96014"
+assert findings_pins["elig_shift_notification_site_privacy_stable_patch_id"] == "1381114bba1a102630a020211a07b303a1d6240d"
+assert findings_pins["elig_shift_notification_site_privacy_origin_main_observed"] == "c39b076547056b1e158c604957a04bd8b75b0f29"
 live_findings = findings_register["records"]
-assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 18
+assert len(live_findings) == findings_register["counts"]["retained_claim_records"] == 19
 assert {row["id"] for row in live_findings} == set(historical_discovery_claims) | {
     "FLEET-TRIP-INDEX-SITE-PRIVACY-01",
     "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
@@ -3516,6 +3538,7 @@ assert {row["id"] for row in live_findings} == set(historical_discovery_claims) 
     "MON-METRIC-REPLAY-DEDUPE-01",
     "SUMMARY-TIMELINE-SITE-PRIVACY-01",
     "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01",
+    "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01",
 }
 provisional_findings = [
     row for row in live_findings
@@ -3531,7 +3554,7 @@ historical_remediated_findings = [
 ]
 assert len(provisional_findings) == findings_register["counts"]["provisional_source_claims"] == 8
 assert len(historical_fixed_findings) == findings_register["counts"]["historical_already_fixed"] == 2
-assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 8
+assert len(historical_remediated_findings) == findings_register["counts"]["historical_remediated"] == 9
 historical_fixed_by_id = {row["id"]: row for row in historical_fixed_findings}
 assert set(historical_fixed_by_id) == {"MED-RBAC-01", "MED-CD-ATOMICITY-01"}
 assert historical_fixed_by_id["MED-RBAC-01"]["current_adjudication"]["verdict"] == "ALREADY_FIXED"
@@ -3577,6 +3600,7 @@ assert set(historical_remediated_by_id) == {
     "MON-METRIC-REPLAY-DEDUPE-01",
     "SUMMARY-TIMELINE-SITE-PRIVACY-01",
     "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01",
+    "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01",
 }
 scope_finding = historical_remediated_by_id["MED-CD-SCOPE-01"]
 assert scope_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED"
@@ -3736,10 +3760,50 @@ assert all(
         "publication_authorized",
     )
 )
+elig_shift_finding = historical_remediated_by_id["ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01"]
+assert elig_shift_finding["feature_id"] is None
+assert elig_shift_finding["candidate_feature_id"] is None
+assert elig_shift_finding["related_feature_ids"] == []
+assert elig_shift_finding["feature_identity_status"] == "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW"
+assert elig_shift_finding["feature_id_role"] == "NO_CANONICAL_OR_CANDIDATE_FEATURE_ASSOCIATION_ZERO_STATIC_OWNERSHIP_CREDIT"
+assert elig_shift_finding["route_url"]["ownership_status"] == "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW"
+assert elig_shift_finding["current_adjudication"]["verdict"] == "REPRODUCED_AND_REMEDIATED_LOCAL_MAIN_NOT_PUBLISHED"
+assert elig_shift_finding["current_adjudication"]["application_commit"] == "1382dd4a48b35d9f9155c2dd501a8a3f4f60d47c"
+assert elig_shift_finding["current_adjudication"]["repository_tree"] == "50ba282b5ded0d8d0d4f9fb19bf8e79f3ce96014"
+assert elig_shift_finding["current_adjudication"]["coordination_handoff_transcription"] == "evidence/source/current-run-201-elig-shift-notification-site-privacy-coordination-handoff-wave-41.json"
+assert elig_shift_finding["evidence"]["coordination_handoff_transcription"] == "evidence/source/current-run-201-elig-shift-notification-site-privacy-coordination-handoff-wave-41.json"
+assert elig_shift_finding["evidence"]["delegated_not_reexecuted_by_run_201"] is True
+assert elig_shift_finding["evidence"]["test_commands_executed"] is None
+assert elig_shift_finding["evidence"]["test_command_text"] is None
+assert elig_shift_finding["evidence"]["tests_executed"] == 13
+assert elig_shift_finding["evidence"]["assertions"] == 25
+assert elig_shift_finding["evidence"]["baseline_failed_cases"] == 1
+assert elig_shift_finding["evidence"]["baseline_passed_cases"] == 0
+assert elig_shift_finding["evidence"]["baseline_pending_cases"] == 4
+assert elig_shift_finding["evidence"]["baseline_assertions"] == 1
+assert elig_shift_finding["evidence"]["intermediate_no_go_tests"] == 12
+assert elig_shift_finding["evidence"]["intermediate_no_go_assertions"] == 23
+assert "canonical current Shift" in elig_shift_finding["acceptance_criteria"]["given_when_then"]
+assert "remote" in elig_shift_finding["acceptance_criteria"]["given_when_then"]
+assert all(
+    elig_shift_finding["current_adjudication"][key] is False
+    for key in (
+        "static_route_or_page_feature_ownership_inherited",
+        "static_controller_action_bridge_inherited",
+        "queue_advance_inherited",
+        "shift_signal_emission_or_idempotency_correctness_inherited",
+        "eligibility_rule_correctness_inherited",
+        "user_site_access_service_correctness_inherited",
+        "notification_transport_or_outbox_correctness_inherited",
+        "broader_roster_shift_or_hr_privacy_inherited",
+        "published_to_origin_main",
+        "publication_authorized",
+    )
+)
 assert all(row["completion_credit"] is False for row in live_findings)
 assert all(all(value is False for value in row["credit"].values()) for row in live_findings)
-assert findings_register["counts"]["bounded_disposition_tests_passed"] == 185
-assert findings_register["counts"]["bounded_disposition_assertions"] == 2691
+assert findings_register["counts"]["bounded_disposition_tests_passed"] == 198
+assert findings_register["counts"]["bounded_disposition_assertions"] == 2716
 assert "5/175 post-merge focused FLEET-TRIP-INDEX-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "11/167 post-merge focused FLEET-TRIP-PLAYBACK-SITE-PRIVACY" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "only the final post-corrective-merge 56/472 MON-METRIC-REPLAY-DEDUPE execution" in findings_register["counts"]["bounded_disposition_sum_basis"]
@@ -3808,16 +3872,31 @@ assert findings_register["counts"]["shift_task_due_recipient_revalidation_isolat
 assert findings_register["counts"]["shift_task_due_recipient_revalidation_isolated_replay_assertions"] == 50
 assert "one post-merge 9/50 SHIFT-TASK-DUE-RECIPIENT-REVALIDATION execution" in findings_register["counts"]["bounded_disposition_sum_basis"]
 assert "Only the unique post-merge focused 9/50 execution counts once" in findings_register["counts"]["shift_task_due_recipient_revalidation_aggregation_basis"]
+assert findings_register["counts"]["elig_shift_notification_site_privacy_focused_tests"] == 13
+assert findings_register["counts"]["elig_shift_notification_site_privacy_focused_assertions"] == 25
+assert findings_register["counts"]["elig_shift_notification_site_privacy_baseline_failed"] == 1
+assert findings_register["counts"]["elig_shift_notification_site_privacy_baseline_passed"] == 0
+assert findings_register["counts"]["elig_shift_notification_site_privacy_baseline_pending"] == 4
+assert findings_register["counts"]["elig_shift_notification_site_privacy_baseline_assertions"] == 1
+assert findings_register["counts"]["elig_shift_notification_site_privacy_intermediate_no_go_tests"] == 12
+assert findings_register["counts"]["elig_shift_notification_site_privacy_intermediate_no_go_assertions"] == 23
+assert findings_register["counts"]["elig_shift_notification_site_privacy_isolated_replay_tests"] == 13
+assert findings_register["counts"]["elig_shift_notification_site_privacy_isolated_replay_assertions"] == 25
+assert "one post-merge 13/25 ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY execution" in findings_register["counts"]["bounded_disposition_sum_basis"]
+assert "Only the unique post-merge focused 13/25 execution counts once" in findings_register["counts"]["elig_shift_notification_site_privacy_aggregation_basis"]
 assert findings_register["counts"]["final_P0"] == findings_register["counts"]["final_P1"] == 0
-assert findings_register["reconciliation"]["retained_record_count"] == 18
+assert findings_register["denominators"]["current_retained_claim_records"] == 19
+assert findings_register["denominators"]["historical_remediated_records"] == 9
+assert findings_register["reconciliation"]["retained_record_count"] == 19
 assert findings_register["reconciliation"]["current_provisional_count"] == 8
 assert findings_register["reconciliation"]["historical_already_fixed_count"] == 2
-assert findings_register["reconciliation"]["historical_remediated_count"] == 8
+assert findings_register["reconciliation"]["historical_remediated_count"] == 9
 assert findings_register["reconciliation"]["every_non_null_primary_feature_id_in_canonical_matrix"] is True
 assert findings_register["reconciliation"]["records_without_primary_or_candidate_feature_id"] == [
     "MON-METRIC-REPLAY-DEDUPE-01",
     "SUMMARY-TIMELINE-SITE-PRIVACY-01",
     "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01",
+    "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01",
 ]
 
 assert run_163_reporting["schema_version"] == "run-163-med-cd-scope-remediation-reporting-wave-29-v1"
@@ -4386,6 +4465,11 @@ run_198_dashboard_payload = git_file_at_commit(
     "audit-dashboard.html",
 )
 assert hashlib.sha256(run_198_dashboard_payload).hexdigest() == "4432da4fecc7c9afa0096b46c3568249fccdaa8f0b987bfef4bc1eb07e24bd3a"
+run_200_dashboard_payload = git_file_at_commit(
+    "9c01f5a4f57f96722015278d1df3c3bd111aa95c",
+    "audit-dashboard.html",
+)
+assert hashlib.sha256(run_200_dashboard_payload).hexdigest() == "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205"
 
 assert sha256_file("generators/build-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.py") == "61c895a305f743f102765c9f86d38843c3ce61bcc1a8684a672aa2d7cd6ee157"
 assert sha256_file("evidence/source/root-run-179-outcome-neutral-fleet-trip-index-route-action-cohort-wave-34.json") == "5505cf17bb68d3e534116ea9d33e501e0222714b6e3779d0ec6b70f819cc3b0a"
@@ -5217,6 +5301,72 @@ run_199_without_seal = dict(run_199_reporting)
 run_199_seal = run_199_without_seal.pop("receipt_self_seal_sha256")
 assert canonical_sha256(run_199_without_seal) == run_199_seal
 
+assert sha256_file("generators/materialize-run-200-audit-dashboard-verification-wave-40.py") == "023d06929555d20dbc242bb998e05ee7fc60c0917d0e62b39ab56356a74de578"
+assert sha256_file("evidence/browser/current-audit-dashboard-verification-run-200-wave-40.json") == "59b80aa14c8841f412d9b76003cc8f2dcd135634cd9394a43523bad31f62c520"
+assert dashboard_run_200["schema_version"] == "run-200-audit-dashboard-verification-wave-40-v1"
+assert dashboard_run_200["run_id"] == "RUN-200-AUDIT-DASHBOARD-VERIFICATION-WAVE-40"
+assert dashboard_run_200["pins"]["final_run_200_dashboard"]["sha256"] == "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205"
+assert set(dashboard_run_200["current_browser_verification"]["viewports"]) == {
+    "1440x900", "1280x800", "1024x768", "390x844",
+}
+assert all(
+    row["visible_text_passed"] == row["visible_text_total"] == 48
+    and row["page_horizontal_overflow"] is False
+    and row["table_containment_failures"] == 0
+    for row in dashboard_run_200["current_browser_verification"]["viewports"].values()
+)
+assert len(dashboard_run_200["current_browser_verification"]["navigation"]) == 10
+assert dashboard_run_200["http_head_verification"]["expected_unique_resources"] == 504
+assert dashboard_run_200["http_head_verification"]["verified_count"] == 504
+assert dashboard_run_200["http_head_verification"]["failure_count"] == 0
+assert len(dashboard_run_200["completion_gates"]) == 26
+assert not any(row["complete"] for row in dashboard_run_200["completion_gates"])
+run_200_without_seal = dict(dashboard_run_200)
+run_200_seal = run_200_without_seal.pop("receipt_self_seal_sha256")
+assert run_200_seal == "493b62087f2df1f2ff776f68c162fceb38ab69763a0b2554ba0148dd6c58d216"
+assert canonical_sha256(run_200_without_seal) == run_200_seal
+
+assert sha256_file("evidence/source/current-run-201-elig-shift-notification-site-privacy-coordination-handoff-wave-41.json") == "f17c4c8d91dd040fb0b142196f65fa2c7657160bfc232404d9b6fe629bd156b7"
+assert sha256_file("generators/materialize-run-201-elig-shift-notification-site-privacy-remediation-reporting-wave-41.py") == "d358b4c091f57568a3516538e5e052085f824e671f6bf7141540e958154dcb04"
+assert run_201_coordination_handoff["schema_version"] == "oblivion_elig_shift_notification_site_privacy_coordination_handoff_v1"
+assert run_201_coordination_handoff["evidence_kind"] == "COORDINATION_HANDOFF_TRANSCRIPTION_NOT_ORIGINAL_RUNTIME_RECEIPT"
+assert run_201_coordination_handoff["status"] == "SEALED_DELEGATED_EVIDENCE_FOR_BOUNDED_REPORTING_ONLY"
+assert run_201_coordination_handoff["finding"]["id"] == "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01"
+assert run_201_coordination_handoff["bounded_accounting"]["current_unique_tests"] == 198
+assert run_201_coordination_handoff["bounded_accounting"]["current_unique_assertions"] == 2716
+assert not any(run_201_coordination_handoff["noninheritance"].values())
+assert run_201_coordination_handoff["completion_credit"] is False
+run_201_handoff_without_seal = dict(run_201_coordination_handoff)
+run_201_handoff_seal = run_201_handoff_without_seal.pop("receipt_self_seal_sha256")
+assert run_201_handoff_seal == "225a2548c1f2d0120e3edd5ef26feb02ad8616085a36aa2d502e81700e0da587"
+assert canonical_sha256(run_201_handoff_without_seal) == run_201_handoff_seal
+
+assert run_201_reporting["run_id"] == "RUN-201-ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01-REMEDIATION-REPORTING-WAVE-41"
+assert run_201_reporting["reporting_transition"]["finding_id"] == "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01"
+assert run_201_reporting["reporting_transition"]["counts_after"] == {
+    "retained_claim_records": 19,
+    "provisional_source_claims": 8,
+    "historical_already_fixed": 2,
+    "historical_remediated": 9,
+    "final_P0": 0,
+    "final_P1": 0,
+}
+assert run_201_reporting["bounded_execution_accounting"]["unique_total"] == {
+    "tests": 198,
+    "assertions": 2716,
+}
+assert run_201_reporting["dashboard_forward_gate"]["required_run"] == "RUN-202"
+assert run_201_reporting["dashboard_forward_gate"]["dashboard_html_changed_by_run_201"] is False
+assert run_201_reporting["dashboard_forward_gate"]["preserved_run_200_dashboard_sha256"] == "f643ca1ec1716cfb2b32864aba1a97e8d69c3e726453707a3ce71e76b3c43205"
+assert {key for key, value in run_201_reporting["credit_boundary"].items() if value} == {
+    "live_findings_register_and_reporting_status",
+}
+assert len(run_201_reporting["completion_gates"]) == 26
+assert not any(row["complete"] for row in run_201_reporting["completion_gates"])
+run_201_without_seal = dict(run_201_reporting)
+run_201_seal = run_201_without_seal.pop("receipt_self_seal_sha256")
+assert canonical_sha256(run_201_without_seal) == run_201_seal
+
 reviewed_fleet_daily_check_overlay = findings_register["current_static_source_feature_ownership"]
 
 required_artifacts = [
@@ -5291,6 +5441,12 @@ shift_task_row_status = (
     "delegated coordination transcription, not an original runtime receipt · zero static ownership, "
     "browser, benchmark, publication, or completion inheritance · not a final finding"
 )
+elig_shift_row_status = (
+    "historical issue · remediated on local main · not published to origin/main · "
+    "current approved canonical-Shift-Site eligibility-alert recipients and one canonical current Shift payload snapshot only · "
+    "feature unassigned · delegated coordination transcription, not an original runtime receipt · zero static ownership, "
+    "browser, benchmark, publication, or completion inheritance · not a final finding"
+)
 finding_claim_labels = dict(historical_discovery_claims)
 finding_claim_labels["FLEET-TRIP-INDEX-SITE-PRIVACY-01"] = fleet_finding["impact"]
 finding_claim_labels["FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01"] = fleet_playback_finding["impact"]
@@ -5298,6 +5454,7 @@ finding_claim_labels["FLEET-FUEL-INDEX-SITE-PRIVACY-01"] = fleet_fuel_finding["i
 finding_claim_labels["MON-METRIC-REPLAY-DEDUPE-01"] = metric_finding["impact"]
 finding_claim_labels["SUMMARY-TIMELINE-SITE-PRIVACY-01"] = summary_finding["impact"]
 finding_claim_labels["SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01"] = shift_task_finding["impact"]
+finding_claim_labels["ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01"] = elig_shift_finding["impact"]
 assert set(finding_claim_labels) == {row["id"] for row in live_findings}
 finding_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td class=\"partial\">{}</td></tr>".format(
@@ -5325,12 +5482,16 @@ finding_rows = "".join(
                                     shift_task_row_status
                                     if row["id"] == "SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01"
                                     else (
-                                        "historical issue · already fixed on current main · not a final finding"
-                                        if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                        elig_shift_row_status
+                                        if row["id"] == "ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01"
                                         else (
-                                            "historical issue · remediated on current main · not a final finding"
-                                            if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
-                                            else "current provisional P1 · independent review pending"
+                                            "historical issue · already fixed on current main · not a final finding"
+                                            if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_ALREADY_FIXED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                            else (
+                                                "historical issue · remediated on current main · not a final finding"
+                                                if row["record_status"] == "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING"
+                                                else "current provisional P1 · independent review pending"
+                                            )
                                         )
                                     )
                                 )
@@ -6866,6 +7027,105 @@ current_template_text = (
     + fresh_run_200_body
     + current_template_text[fresh_run_200_body_end:]
 )
+
+run_201_template_rewrites = [
+    ('<a href="#checkpoint">RUN-199</a>', '<a href="#checkpoint">RUN-201</a>'),
+    (
+        "RUN-198–199 Shift-task due recipient-revalidation checkpoint",
+        "RUN-200–201 Shift eligibility-alert recipient Site-privacy checkpoint",
+    ),
+    (
+        "RUN-199: Shift-task due recipient-revalidation reproduced and remediated in exactly four paths · one post-merge $shift_task_tests/$shift_task_assertions execution counted once · delegated coordination transcription, not an original runtime receipt · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-200</li>",
+        "RUN-199: Shift-task due recipient-revalidation reproduced and remediated in exactly four paths · historical 8 provisional + 2 already-fixed + 8 remediated · historical 185/2,691 unique bounded disposition total · dashboard HTML later verified by RUN-200</li><li>RUN-200: exact RUN-199 dashboard verified at 4/4 viewports · 48/48 named visible checks per viewport · 10/10 navigation · 504/504 resources · zero application credit</li><li>RUN-201: Shift eligibility-alert recipient Site privacy reproduced and remediated in exactly four paths · one post-merge $elig_shift_tests/$elig_shift_assertions execution counted once · delegated coordination transcription, not an original runtime receipt · $finding_count provisional + $historical_fixed_count already-fixed + $historical_remediated_count remediated · $unique_bounded_tests/$unique_bounded_assertions unique bounded disposition total · dashboard HTML frozen pending RUN-202</li>",
+    ),
+    (
+        "The current RUN-199 register retains 18 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01 is the new historical-remediated record with null feature and candidate IDs, UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW identity, and zero static-ownership credit.",
+        "The current RUN-201 register retains 19 identities: $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated; ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 is the new historical-remediated record with null feature and candidate IDs, UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW identity, and zero static-ownership credit.",
+    ),
+    (
+        "The current RUN-199 register retains $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated. SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01 adds only bounded scheduler-time and queued-delivery recipient revalidation reporting; feature identity remains unassigned with zero owner, bridge, page, or queue credit, while playback.data index 86 remains next.",
+        "The current RUN-201 register retains $finding_count current provisional + $historical_fixed_count historical already-fixed + $historical_remediated_count historical remediated. ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 adds only bounded current approved canonical-Shift-Site recipient and one canonical current Shift payload-snapshot reporting; feature identity remains unassigned with zero owner, bridge, page, or queue credit, while playback.data index 86 remains next.",
+    ),
+    (
+        "$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 18 retained · none final",
+        "$historical_fixed_count historical already-fixed · $historical_remediated_count historical remediated · 19 retained · none final",
+    ),
+    (
+        "$fleet_playback_tests/$fleet_playback_assertions Fleet playback + $metric_tests/$metric_assertions final corrected Monitoring replay + $fleet_fuel_tests/$fleet_fuel_assertions Fleet Fuel + $summary_tests/$summary_assertions Summary/timeline + $shift_task_tests/$shift_task_assertions Shift-task; initial $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, Summary red/zero-assertion/$summary_supporting_tests/$summary_supporting_assertions support/$summary_shared_tests/$summary_shared_assertions shared execution, Shift-task red/intermediate/cache/isolated replay/duplicate post-merge execution, and all other replay/support remain separate",
+        "$fleet_playback_tests/$fleet_playback_assertions Fleet playback + $metric_tests/$metric_assertions final corrected Monitoring replay + $fleet_fuel_tests/$fleet_fuel_assertions Fleet Fuel + $summary_tests/$summary_assertions Summary/timeline + $shift_task_tests/$shift_task_assertions Shift-task + $elig_shift_tests/$elig_shift_assertions eligibility-alert Site privacy; initial $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, Summary red/zero-assertion/$summary_supporting_tests/$summary_supporting_assertions support/$summary_shared_tests/$summary_shared_assertions shared execution, Shift-task red/intermediate/cache/isolated replay/duplicate post-merge execution, eligibility-alert red/intermediate-NO-GO/isolated replay/duplicate post-merge execution, and all other replay/support remain separate",
+    ),
+    (
+        "The register retains 18 claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. MON-METRIC-REPLAY-DEDUPE-01, SUMMARY-TIMELINE-SITE-PRIVACY-01, and SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01 retain null feature and candidate IDs and zero static ownership. FLEET-FUEL-INDEX-SITE-PRIVACY-01 remains candidate-only for CAP-FLEET-VEHICLE-REGISTER; row-attached logger identity follows foreign-row concealment only, with no independent logger-Site authorization for an otherwise visible row.",
+        "The register retains 19 claim identities: $finding_count remain current provisional P1 claims, $historical_fixed_count are historical already-fixed records on current main, and $historical_remediated_count are historical remediated records. MON-METRIC-REPLAY-DEDUPE-01, SUMMARY-TIMELINE-SITE-PRIVACY-01, SHIFT-TASK-DUE-RECIPIENT-REVALIDATION-01, and ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 retain null feature and candidate IDs and zero static ownership. FLEET-FUEL-INDEX-SITE-PRIVACY-01 remains candidate-only for CAP-FLEET-VEHICLE-REGISTER; row-attached logger identity follows foreign-row concealment only, with no independent logger-Site authorization for an otherwise visible row.",
+    ),
+    (
+        "18 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 8 historical remediated",
+        "19 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 9 historical remediated",
+    ),
+    ("RUN-155–199 bounded disposition provenance, remediation, and reporting", "RUN-155–201 bounded disposition provenance, remediation, and reporting"),
+    ("RUN-001 through RUN-199 are represented by audit artifacts.", "RUN-001 through RUN-201 are represented by audit artifacts."),
+    ("RUN-071–199 current reporting checkpoint", "RUN-071–201 current reporting checkpoint"),
+    ("RUN-071–199 completion-gate checkpoint", "RUN-071–201 completion-gate checkpoint"),
+    ("RUN-071–199 evidence lineage", "RUN-071–201 evidence lineage"),
+    ("Every current raw, generated, reviewed, and integrated RUN-077–199", "Every current raw, generated, reviewed, and integrated RUN-077–201"),
+    ("current RUN-199 split of 18 retained claim identities", "current RUN-201 split of 19 retained claim identities"),
+    ("Fresh RUN-200 audit-dashboard verification required", "Fresh RUN-202 audit-dashboard verification required"),
+    ("The exact RUN-199 reporting dashboard must be generated and checked in RUN-200", "The exact RUN-201 reporting dashboard must be generated and checked in RUN-202"),
+    (
+        "RUN-192 verifies only the superseded RUN-191 dashboard; RUN-193/R–194 establish and report the bounded Fuel remediation. RUN-195 verifies the exact RUN-194 dashboard; RUN-196/R–197 establish and report the bounded Summary/timeline remediation. RUN-198 verifies the exact RUN-197 dashboard; RUN-199 is the current Shift-task due recipient-revalidation reporting transaction, and RUN-200 remains the fresh exact-dashboard gate.",
+        "RUN-195 verifies the exact RUN-194 dashboard; RUN-196/R–197 establish and report the bounded Summary/timeline remediation. RUN-198 verifies the exact RUN-197 dashboard; RUN-199 establishes and reports the bounded Shift-task remediation. RUN-200 verifies the exact RUN-199 dashboard; RUN-201 is the current Shift eligibility-alert Site-privacy reporting transaction, and RUN-202 remains the fresh exact-dashboard gate.",
+    ),
+    (
+        "RUN-151, RUN-155, RUN-158, RUN-161, RUN-164, RUN-168, RUN-172, RUN-175, RUN-178, RUN-182, RUN-185, RUN-188, RUN-192, RUN-195, and RUN-198 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-199 reporting sources or the RUN-200 dashboard generated from them.",
+        "RUN-151, RUN-155, RUN-158, RUN-161, RUN-164, RUN-168, RUN-172, RUN-175, RUN-178, RUN-182, RUN-185, RUN-188, RUN-192, RUN-195, RUN-198, and RUN-200 responsive verification are immutable history for their exact superseded HTML; no prior viewport, overflow, navigation, table, link, anchor, or console proof transfers to the current RUN-201 reporting sources or the RUN-202 dashboard generated from them.",
+    ),
+    ("It verifies the RUN-199 audit artifact only", "It verifies the RUN-201 audit artifact only"),
+    (
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, bounded Fleet evidence, RUN-198 exact-dashboard verification, and bounded delegated Shift-task coordination evidence reported in RUN-199, with fresh RUN-200 dashboard verification required.",
+        "Generated deterministically from independently reviewed static, Git/source, claim-specific runtime/remediation, exact-artifact, bounded Fleet evidence, RUN-200 exact-dashboard verification, and bounded delegated Shift eligibility-alert coordination evidence reported in RUN-201, with fresh RUN-202 dashboard verification required.",
+    ),
+    (
+        "RUN-159, RUN-162, RUN-166, RUN-173, RUN-176, RUN-183, RUN-186/R, RUN-193/R, RUN-196/R, and RUN-199 retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, post-merge Fleet trip-index $fleet_tests/$fleet_assertions, post-merge Fleet playback $fleet_playback_tests/$fleet_playback_assertions, final post-corrective-merge Monitoring $metric_tests/$metric_assertions, unique post-merge Fuel $fleet_fuel_tests/$fleet_fuel_assertions, focused Summary/timeline $summary_tests/$summary_assertions, and one post-merge Shift-task $shift_task_tests/$shift_task_assertions execution contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, Summary red/zero-assertion/$summary_supporting_tests/$summary_supporting_assertions support/$summary_shared_tests/$summary_shared_assertions shared execution, Shift-task red $shift_task_red_failed-failed/$shift_task_red_passed-passed/$shift_task_red_pending-pending/$shift_task_red_assertions-assertion reproduction, intermediate $shift_task_intermediate_tests/$shift_task_intermediate_assertions and cache proofs, isolated final $shift_task_tests/$shift_task_assertions replay, any duplicate post-merge count, and every other replay/subset remain excluded.",
+        "RUN-159, RUN-162, RUN-166, RUN-173, RUN-176, RUN-183, RUN-186/R, RUN-193/R, RUN-196/R, RUN-199, and RUN-201 retain separate evidence boundaries; only MED-RBAC $med_rbac_tests/$med_rbac_assertions, MED-CD-SCOPE $med_cd_tests/$med_cd_assertions, post-merge SAFE $safe_tests/$safe_assertions, post-merge Fleet trip-index $fleet_tests/$fleet_assertions, post-merge Fleet playback $fleet_playback_tests/$fleet_playback_assertions, final post-corrective-merge Monitoring $metric_tests/$metric_assertions, unique post-merge Fuel $fleet_fuel_tests/$fleet_fuel_assertions, focused Summary/timeline $summary_tests/$summary_assertions, one post-merge Shift-task $shift_task_tests/$shift_task_assertions, and one post-merge eligibility-alert $elig_shift_tests/$elig_shift_assertions execution contribute once to the current $unique_bounded_tests/$unique_bounded_assertions unique bounded total. The initial Monitoring $metric_initial_tests/$metric_initial_assertions, Fuel red/replay/support, Summary red/zero-assertion/$summary_supporting_tests/$summary_supporting_assertions support/$summary_shared_tests/$summary_shared_assertions shared execution, Shift-task red/intermediate/cache/isolated replay/duplicate post-merge execution, eligibility-alert red $elig_shift_red_failed-failed/$elig_shift_red_passed-passed/$elig_shift_red_pending-pending/$elig_shift_red_assertions-assertion reproduction, intermediate reviewer-NO-GO $elig_shift_intermediate_tests/$elig_shift_intermediate_assertions, isolated final $elig_shift_tests/$elig_shift_assertions replay, any duplicate post-merge count, and every other replay/subset remain excluded.",
+    ),
+    (
+        "</tr><tr><td>RUN-199 Shift-task due recipient-revalidation execution</td><td>$shift_task_tests post-merge focused tests / $shift_task_assertions assertions counted once; red $shift_task_red_failed failed + $shift_task_red_passed passed + $shift_task_red_pending pending / $shift_task_red_assertions assertions, intermediate $shift_task_intermediate_tests/$shift_task_intermediate_assertions and cache proofs, isolated final $shift_task_tests/$shift_task_assertions replay, and duplicate post-merge counting excluded</td><td class=\"partial\">scheduler-time denial leaves marker null and emits neither notification nor Facility signal · queue-time denial suppresses delivery without clearing a claimed marker or retracting a signal · feature unassigned · delegated coordination transcription, not an original runtime receipt · baseline $shift_task_baseline_short · fix $shift_task_fix_short · local merge $shift_task_merge_short · origin/main $shift_task_origin_short unchanged</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+        "</tr><tr><td>RUN-199 Shift-task due recipient-revalidation execution</td><td>$shift_task_tests post-merge focused tests / $shift_task_assertions assertions counted once; red $shift_task_red_failed failed + $shift_task_red_passed passed + $shift_task_red_pending pending / $shift_task_red_assertions assertions, intermediate $shift_task_intermediate_tests/$shift_task_intermediate_assertions and cache proofs, isolated final $shift_task_tests/$shift_task_assertions replay, and duplicate post-merge counting excluded</td><td class=\"partial\">scheduler-time denial leaves marker null and emits neither notification nor Facility signal · queue-time denial suppresses delivery without clearing a claimed marker or retracting a signal · feature unassigned · delegated coordination transcription, not an original runtime receipt · baseline $shift_task_baseline_short · fix $shift_task_fix_short · local merge $shift_task_merge_short · origin/main $shift_task_origin_short unchanged</td></tr><tr><td>RUN-201 Shift eligibility-alert Site-privacy execution</td><td>$elig_shift_tests post-merge focused tests / $elig_shift_assertions assertions counted once; red $elig_shift_red_failed failed + $elig_shift_red_passed passed + $elig_shift_red_pending pending / $elig_shift_red_assertions assertion, intermediate reviewer-NO-GO $elig_shift_intermediate_tests/$elig_shift_intermediate_assertions, isolated final $elig_shift_tests/$elig_shift_assertions replay, and duplicate post-merge counting excluded</td><td class=\"partial\">current active/non-ended employee and approved canonical-Shift-Site recipient · deterministic fallback continuation · one canonical current Shift authorization/payload snapshot · feature unassigned · delegated coordination transcription, not an original runtime receipt · baseline $elig_shift_baseline_short · fix $elig_shift_fix_short · local merge $elig_shift_merge_short · origin/main $elig_shift_origin_short unchanged</td></tr><tr><td>RUN-089 designated-application preflight</td>",
+    ),
+]
+run_201_rewrite_expected_counts = {
+    "current RUN-199 split of 18 retained claim identities": 2,
+}
+for old, new in run_201_template_rewrites:
+    expected_count = run_201_rewrite_expected_counts.get(old, 1)
+    assert current_template_text.count(old) == expected_count, (
+        f"Expected {expected_count} RUN-201 template rewrite target(s): {old}"
+    )
+    current_template_text = current_template_text.replace(old, new)
+
+fresh_run_202_section_start = (
+    '<section class="panel"><h2>Fresh RUN-202 audit-dashboard verification required</h2><p>'
+)
+fresh_run_202_section_end = '</p><ul class="list">'
+assert current_template_text.count(fresh_run_202_section_start) == 1
+fresh_run_202_start_index = current_template_text.index(fresh_run_202_section_start)
+fresh_run_202_body_start = fresh_run_202_start_index + len(fresh_run_202_section_start)
+fresh_run_202_body_end = current_template_text.index(
+    fresh_run_202_section_end,
+    fresh_run_202_body_start,
+)
+fresh_run_202_body = (
+    "The exact RUN-201 reporting dashboard must be generated and checked in RUN-202 at 1440×900, 1280×800, 1024×768, and 390×844. "
+    "RUN-200 verifies only the superseded RUN-199 HTML; ELIG-SHIFT-NOTIFICATION-SITE-PRIVACY-01 was reproduced and locally integrated in exactly four paths, and RUN-201 changes only live reporting while preserving the verified RUN-200 HTML byte-for-byte. "
+    "None supplies audit-dashboard verification for the new RUN-202 HTML. "
+    "The linked RUN-202 receipt must record page overflow, bounded mobile table scrolling, navigation, local links, anchors, duplicate authored IDs, console output, visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership, 19 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 9 historical remediated, 198/2,716 uniquely counted bounded tests/assertions, post-merge eligibility-alert 13/25 counted once, all eligibility-alert red/intermediate-NO-GO/isolated-replay/duplicate-postmerge executions excluded, current 2/340 benchmark mapping, 0/340 final no-match/NCM, 338 unresolved targets, one operating organisation across multiple Sites, Gate 4 open, and every non-bounded runtime, application-browser, final-finding, release, Pass, feature-completion, and audit-complete zero-credit boundary. "
+    "It verifies the RUN-201 audit artifact only and grants no application-browser, responsive-application, visual, workflow, release, Pass, feature-completion, or audit-complete credit."
+)
+current_template_text = (
+    current_template_text[:fresh_run_202_body_start]
+    + fresh_run_202_body
+    + current_template_text[fresh_run_202_body_end:]
+)
 TEMPLATE = Template(current_template_text)
 
 
@@ -7142,6 +7402,18 @@ dashboard = TEMPLATE.substitute(
     shift_task_fix_short=run_199_coordination_handoff["pins"]["sealed_fix_commit"][:12],
     shift_task_merge_short=run_199_coordination_handoff["pins"]["local_main_merge_commit"][:12],
     shift_task_origin_short=run_199_coordination_handoff["pins"]["origin_main_observed"][:12],
+    elig_shift_red_failed=run_201_coordination_handoff["reproduction"]["failed"],
+    elig_shift_red_passed=run_201_coordination_handoff["reproduction"]["passed"],
+    elig_shift_red_pending=run_201_coordination_handoff["reproduction"]["pending"],
+    elig_shift_red_assertions=run_201_coordination_handoff["reproduction"]["assertions"],
+    elig_shift_intermediate_tests=run_201_coordination_handoff["verification"]["intermediate"]["tests"],
+    elig_shift_intermediate_assertions=run_201_coordination_handoff["verification"]["intermediate"]["assertions"],
+    elig_shift_tests=run_201_coordination_handoff["verification"]["post_merge"]["tests"],
+    elig_shift_assertions=run_201_coordination_handoff["verification"]["post_merge"]["assertions"],
+    elig_shift_baseline_short=run_201_coordination_handoff["pins"]["application_baseline_commit"][:12],
+    elig_shift_fix_short=run_201_coordination_handoff["pins"]["sealed_fix_commit"][:12],
+    elig_shift_merge_short=run_201_coordination_handoff["pins"]["local_main_merge_commit"][:12],
+    elig_shift_origin_short=run_201_coordination_handoff["pins"]["origin_main_observed"][:12],
     metric_tests=metric_finding["evidence"]["tests_executed"],
     metric_assertions=metric_finding["evidence"]["assertions"],
     metric_initial_tests=metric_finding["evidence"]["initial_superseded_tests"],
@@ -7248,14 +7520,14 @@ dashboard = TEMPLATE.substitute(
 )
 
 current_visible_boundaries = [
-    '<a href="#checkpoint">RUN-199</a>',
+    '<a href="#checkpoint">RUN-201</a>',
     '<a href="#findings">Finding status</a>',
     "667 = 310 route + 357 page",
     "121 reviewed / 386 pending",
     "reviewed = 99 owned + 10 shared + 5 alias + 7 gap",
     "16.976330%",
     "3,262 records remain",
-    "RUN-198–199 Shift-task due recipient-revalidation checkpoint",
+    "RUN-200–201 Shift eligibility-alert recipient Site-privacy checkpoint",
     "fleet-assets.vehicles.alerts-config",
     "RUN090-ROUTE-0084 / RUN077-ROUTE-0692",
     "VehicleController::alertsConfig",
@@ -7325,13 +7597,13 @@ current_visible_boundaries = [
     "48/48 named visible checks per viewport",
     "10/10 navigation · 499/499 resources · 969 anchors",
     "RUN-199: Shift-task due recipient-revalidation reproduced and remediated in exactly four paths",
-    "18 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 8 historical remediated",
-    "185 / 2,691",
-    "185/2,691 unique bounded disposition total",
-    "RUN-071–199 current reporting checkpoint",
-    "RUN-071–199 completion-gate checkpoint",
-    "RUN-071–199 evidence lineage",
-    "Every current raw, generated, reviewed, and integrated RUN-077–199",
+    "19 retained claim identities split into 8 current provisional P1, 2 historical already-fixed, and 9 historical remediated",
+    "198 / 2,716",
+    "198/2,716 unique bounded disposition total",
+    "RUN-071–201 current reporting checkpoint",
+    "RUN-071–201 completion-gate checkpoint",
+    "RUN-071–201 evidence lineage",
+    "Every current raw, generated, reviewed, and integrated RUN-077–201",
     "RUN-186 corrected Monitoring metric-replay execution",
     "final post-corrective-merge Monitoring 56/472",
     "initial Monitoring 49/392",
@@ -7351,9 +7623,13 @@ current_visible_boundaries = [
     "RUN-199 Shift-task coordination-handoff transcription",
     "RUN-199 reporting materializer",
     "RUN-199 reporting receipt",
-    "RUN-200 responsive audit-dashboard verification receipt</a> (forward reference until materialized; intentionally unhashed)",
-    "RUN-200 audit-dashboard verification materializer</a> (forward reference; intentionally unhashed)",
-    "dashboard HTML frozen pending RUN-200",
+    "RUN-200 exact RUN-199 audit-dashboard verification",
+    "RUN-201 Shift eligibility-alert coordination-handoff transcription",
+    "RUN-201 Shift eligibility-alert remediation-reporting materializer",
+    "RUN-201 Shift eligibility-alert remediation-reporting receipt",
+    "RUN-202 audit-dashboard verification materializer",
+    "RUN-202 audit-dashboard verification receipt",
+    "dashboard HTML frozen pending RUN-202",
     "MON-METRIC-REPLAY-DEDUPE-01",
     "UNASSIGNED_PENDING_FRESH_SEMANTIC_REVIEW",
     "MON-METRIC-REPLAY-DEDUPE-01 is also remediated on local main only and unpublished",
@@ -7426,7 +7702,7 @@ current_visible_boundaries = [
     "RUN-199 Shift-task due recipient-revalidation execution",
     "scheduler-time denial leaves marker null and emits neither notification nor Facility signal",
     "queue-time denial suppresses delivery without clearing a claimed marker or retracting a signal",
-    "one post-merge Shift-task 9/50 execution",
+    "one post-merge eligibility-alert 13/25 execution",
     "delegated coordination transcription, not an original runtime receipt",
     "baseline 47a6d231c52a · fix 6186176d30a9 · local merge e2593cbdd079 · origin/main c39b07654705 unchanged",
     "14 retained",
@@ -7448,7 +7724,7 @@ current_visible_boundaries = [
     "balance-check, destruction, delivery/adjustment/loss and sibling-writer, forced transient-deadlock retry, and stress/repeated-schedule scope remains unadjudicated",
     "two broader INR failures reproduce at base",
     "full-suite green false",
-    "Fresh RUN-200 audit-dashboard verification required",
+    "Fresh RUN-202 audit-dashboard verification required",
     "cf0090ec9724",
     "0b1920dade92",
     "7b2b5688c90e",
@@ -7464,16 +7740,15 @@ current_visible_boundaries = [
     "RUN-090 frozen denominator / RUN-190R current accounting",
     "index 84 is not recredited, index 85 fleet-assets.trips.playback is integrated, and index 86 fleet-assets.trips.playback.data is next",
     "RUN-168 verifies that exact dashboard",
-    "RUN-198 verifies only the superseded RUN-197 HTML",
+    "RUN-200 verifies only the superseded RUN-199 HTML",
     "exact dashboard later verified by RUN-185",
     "visible 667/310/357 ownership, 98 bridges, 121/386 queue accounting, 99 owned/408 without ownership",
-    "None supplies audit-dashboard verification for the new RUN-200 HTML.",
-    "The linked RUN-200 receipt must record",
-    "It verifies the RUN-199 audit artifact only",
+    "None supplies audit-dashboard verification for the new RUN-202 HTML.",
+    "The linked RUN-202 receipt must record",
+    "It verifies the RUN-201 audit artifact only",
     "RUN-188 exact RUN-187 audit-dashboard verification materializer",
     "RUN-194 Fleet Fuel remediation-reporting receipt",
     "RUN-198 audit-dashboard verification materializer",
-    "RUN-200 audit-dashboard verification materializer",
 ]
 missing_current_visible_boundaries = [
     boundary for boundary in current_visible_boundaries if boundary not in dashboard
@@ -7605,6 +7880,7 @@ assert (
         run_192_dashboard_payload,
         run_195_dashboard_payload,
         run_198_dashboard_payload,
+        run_200_dashboard_payload,
         output_bytes,
     )
     or hashlib.sha256(existing_output_bytes).hexdigest()
@@ -7614,7 +7890,7 @@ assert (
         "966c93ed940d2fb58e4510e65442b10faab2ea5d966e66abb4acc2695fb1a091",
     }
 )
-temporary_path = output_path.with_name(f".{output_path.name}.tmp-run200-dashboard")
+temporary_path = output_path.with_name(f".{output_path.name}.tmp-run202-dashboard")
 assert not temporary_path.exists(), f"Refusing to overwrite stale dashboard temp: {temporary_path}"
 try:
     with temporary_path.open("xb") as handle:
