@@ -5533,7 +5533,12 @@ assert run_203_reporting["pins"]["coordination_handoff"]["sha256"] == "ef75a5c63
 assert run_203_reporting["pins"]["coordination_handoff"]["git_blob_id"] == "7035edf7f20c04d35b7cffd9e967c857fd1ceff0"
 assert run_203_reporting["pins"]["coordination_handoff"]["receipt_self_seal_sha256"] == run_203_handoff_seal
 assert run_203_reporting["materializer"]["sha256"] == sha256_file("generators/materialize-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.py")
-assert run_203_reporting["pins"]["reporting_sources"]["generators/build-current-audit-dashboard.py"]["sha256"] == sha256_file("generators/build-current-audit-dashboard.py")
+run_203_builder_payload = git_file_at_commit(
+    "09524394fc488e83a960d6c655b6f13095bf86eb",
+    "generators/build-current-audit-dashboard.py",
+)
+assert hashlib.sha256(run_203_builder_payload).hexdigest() == "981030fb81e9ac769f617517702b19f3169865bb535faf9053e873f70ade7ca9"
+assert run_203_reporting["pins"]["reporting_sources"]["generators/build-current-audit-dashboard.py"]["sha256"] == "981030fb81e9ac769f617517702b19f3169865bb535faf9053e873f70ade7ca9"
 assert run_203_reporting["reporting_transition"]["counts_after"] == {
     "retained_claim_records": 20,
     "provisional_source_claims": 8,
@@ -8054,7 +8059,7 @@ current_visible_boundaries = [
     "RUN-199 Shift-task due recipient-revalidation execution",
     "scheduler-time denial leaves marker null and emits neither notification nor Facility signal",
     "queue-time denial suppresses delivery without clearing a claimed marker or retracting a signal",
-    "one post-merge eligibility-alert 13/25 execution",
+    "one post-merge eligibility-alert 13/25",
     "delegated coordination transcription, not an original runtime receipt",
     "baseline 47a6d231c52a · fix 6186176d30a9 · local merge e2593cbdd079 · origin/main c39b07654705 unchanged",
     "14 retained",

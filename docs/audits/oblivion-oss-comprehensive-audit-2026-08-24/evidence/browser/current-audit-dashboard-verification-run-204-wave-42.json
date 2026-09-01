@@ -1,0 +1,810 @@
+{
+  "schema_version": "run-204-audit-dashboard-verification-wave-42-v1",
+  "run_id": "RUN-204-AUDIT-DASHBOARD-VERIFICATION-WAVE-42",
+  "generated_at": null,
+  "pins": {
+    "run_203_commit": "09524394fc488e83a960d6c655b6f13095bf86eb",
+    "run_203_tree": "b7f511203e0845abf22f103a1eeb1c1512e23352",
+    "run_203_parent": "ba39cbc36694164ca9e0f232efd2de00013191b5",
+    "origin_main": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "local_main_ahead": 97,
+    "local_main_behind": 0,
+    "run_203_materializer": {
+      "path": "generators/materialize-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.py",
+      "sha256": "bae4f9a4584cc528a09e4375c0f5aca57dbe2e225c49adb14d0e3ae89b10ba9c",
+      "git_blob_id": "db022dc6ec4a85518ff6e232ab781970ef691cc4",
+      "bytes": 51197,
+      "lines": 1247
+    },
+    "run_203_receipt": {
+      "path": "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-remediation-reporting-wave-42.json",
+      "sha256": "aeaeddffb45d6eb7b668cbb159b054329d725a368fee7a32fe6f98a8807e492f",
+      "git_blob_id": "daf68521d5bea181dd49c3b05ad52ad6fb1f3a2a",
+      "bytes": 21099,
+      "lines": 506
+    },
+    "run_203_receipt_self_seal_sha256": "44cadf139df15144c11495d9f5287fe6b43f9bcbe25572d75a926d334b7c0594",
+    "run_203_coordination_handoff": {
+      "path": "evidence/source/current-run-203-fleet-trip-playback-data-point-eligibility-coordination-handoff-wave-42.json",
+      "sha256": "ef75a5c6392225fb5c50d3f2964f4cc9d4bf2eda6646b4cdf65968c674d762cd",
+      "git_blob_id": "7035edf7f20c04d35b7cffd9e967c857fd1ceff0",
+      "bytes": 8093,
+      "lines": 174
+    },
+    "run_203_coordination_handoff_self_seal_sha256": "a4b9ca491ffd65a11551bb850fd067a45980c8b1fa9084623a56e081e833acbd",
+    "run_202_receipt": {
+      "path": "evidence/browser/current-audit-dashboard-verification-run-202-wave-41.json",
+      "sha256": "b63ed9585a03cc852d0f772be42de303f0866c73e80cc8522e8de0d328887471",
+      "git_blob_id": "80ad75f5f2ee5349a1d6509e2f5b15a2c682cfbc",
+      "bytes": 30379,
+      "lines": 788
+    },
+    "run_202_receipt_self_seal_sha256": "a4d296e2a3f779bfa2c7cf34233958a37dc74bb5f6e4f7d78a867d6cb12dc3b8",
+    "committed_findings": {
+      "path": "findings.json",
+      "sha256": "88a66599242d986c6306a1bbd02c95c4088dfc18c5beef5279d68cdd4c6531b2",
+      "git_blob_id": "d3b4bfbcb5478eef5e8d77787dd1de7dbc06dead",
+      "bytes": 744275,
+      "lines": 12725
+    },
+    "committed_run_203_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "981030fb81e9ac769f617517702b19f3169865bb535faf9053e873f70ade7ca9",
+      "git_blob_id": "e0c180b04795609fe1ed8e06475dda4c510648f6",
+      "bytes": 950053,
+      "lines": 8271
+    },
+    "committed_run_202_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "1876db1ff590c86fb30cefb74368b0241c72d9b75966fcbf1a36d6b1096b30e3",
+      "git_blob_id": "03442cdb7ec6e17ae55b61494932171bff1e33f4",
+      "bytes": 350017,
+      "lines": 78
+    },
+    "final_run_204_builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "ace457993251ae83065c3297a44d1af4059bcfb96f6d3c94baec74926b977854",
+      "git_blob_id": "aaec31b0adf13c1379ff8d6170a3ff2357ce47e4",
+      "bytes": 950327,
+      "lines": 8276
+    },
+    "final_run_204_builder_diff": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "binary_diff_sha256": "168be8878bc25cb2f5ce414a9ee2299380042668433fdc5b276b2d85ff46a664",
+      "numstat": {
+        "added": 7,
+        "deleted": 2
+      }
+    },
+    "final_run_204_builder_unchanged_from_run_203": false,
+    "final_run_204_dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+      "git_blob_id": "c1cf8a9db57c52720d47a41fccdf1d50c22e6ab7",
+      "bytes": 355785,
+      "lines": 78
+    },
+    "final_run_204_dashboard_diff": {
+      "path": "audit-dashboard.html",
+      "binary_diff_sha256": "485b144f8a742df1f5776de8ebd5e2b2556a09609bf547a0bb9c7312f29bc577",
+      "numstat": {
+        "added": 17,
+        "deleted": 17
+      }
+    },
+    "run_204_materializer": {
+      "path": "generators/materialize-run-204-audit-dashboard-verification-wave-42.py",
+      "sha256": "1ce2e73757dbf5aa703ea50d9d0ad9f40c329b9b0d760d8235d3897e5a668852",
+      "git_blob_id": "ab7ee98fb4deafa75ee1bca253b848667d3dbb1c",
+      "bytes": 58555,
+      "lines": 1507
+    }
+  },
+  "reported_snapshot": {
+    "static": {
+      "source_owner_records": 667,
+      "route_owner_records": 310,
+      "page_owner_records": 357,
+      "static_controller_action_bridges": 98,
+      "bounded_source_denominator": 3929,
+      "bounded_source_residual": 3262,
+      "bounded_source_ownership_percent": "16.976330"
+    },
+    "queue": {
+      "reviewed": 121,
+      "pending": 386,
+      "owned": 99,
+      "shared": 10,
+      "alias": 5,
+      "gap": 7,
+      "without_ownership": 408
+    },
+    "finding_lineage": {
+      "records": 20,
+      "provisional": 8,
+      "historical_already_fixed": 2,
+      "historical_remediated": 10,
+      "bounded_tests": 199,
+      "bounded_assertions": 2722,
+      "final_P0": 0,
+      "final_P1": 0
+    },
+    "benchmark": {
+      "mapped": 2,
+      "targets": 340,
+      "final_no_match_or_NCM": 0,
+      "unresolved": 338
+    }
+  },
+  "reported_transition": {
+    "from_dashboard_sha256": "1876db1ff590c86fb30cefb74368b0241c72d9b75966fcbf1a36d6b1096b30e3",
+    "to_dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+    "reported_finding_id": "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01",
+    "run_203_forward_gate_satisfied_by_this_artifact": true,
+    "static_ownership_or_queue_advance": false,
+    "new_application_finding": false
+  },
+  "generation": {
+    "builder": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "sha256": "ace457993251ae83065c3297a44d1af4059bcfb96f6d3c94baec74926b977854",
+      "git_blob_id": "aaec31b0adf13c1379ff8d6170a3ff2357ce47e4",
+      "bytes": 950327,
+      "lines": 8276
+    },
+    "builder_diff": {
+      "path": "generators/build-current-audit-dashboard.py",
+      "binary_diff_sha256": "168be8878bc25cb2f5ce414a9ee2299380042668433fdc5b276b2d85ff46a664",
+      "numstat": {
+        "added": 7,
+        "deleted": 2
+      }
+    },
+    "builder_unchanged_from_run_203": false,
+    "builder_changes_run204_assertion_only": true,
+    "dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+      "git_blob_id": "c1cf8a9db57c52720d47a41fccdf1d50c22e6ab7",
+      "bytes": 355785,
+      "lines": 78
+    },
+    "dashboard_diff": {
+      "path": "audit-dashboard.html",
+      "binary_diff_sha256": "485b144f8a742df1f5776de8ebd5e2b2556a09609bf547a0bb9c7312f29bc577",
+      "numstat": {
+        "added": 17,
+        "deleted": 17
+      }
+    },
+    "final_builder_and_dashboard_exact_bytes_pinned": true,
+    "invoker_attested_builder_execution_count": 2,
+    "invoker_attested_builder_execution_sha256s": [
+      "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+      "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682"
+    ],
+    "invoker_attested_deterministic_rerun_bytes_match": true,
+    "source_literal_boundaries": 244,
+    "output_utf8_lf": true
+  },
+  "superseded_run_202_observation": {
+    "dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "1876db1ff590c86fb30cefb74368b0241c72d9b75966fcbf1a36d6b1096b30e3",
+      "git_blob_id": "03442cdb7ec6e17ae55b61494932171bff1e33f4",
+      "bytes": 350017,
+      "lines": 78
+    },
+    "receipt": {
+      "path": "evidence/browser/current-audit-dashboard-verification-run-202-wave-41.json",
+      "sha256": "b63ed9585a03cc852d0f772be42de303f0866c73e80cc8522e8de0d328887471",
+      "git_blob_id": "80ad75f5f2ee5349a1d6509e2f5b15a2c682cfbc",
+      "bytes": 30379,
+      "lines": 788
+    },
+    "receipt_artifact_completion_test_met": true,
+    "superseded_by_dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+    "no_current_browser_credit_inherited": true
+  },
+  "current_browser_input": {
+    "path": "C:\\Users\\steph\\.codex\\visualizations\\2026\\08\\29\\01a04c0b-0e5a-7cd3-a3c3-527f9be22e67\\run-204-dashboard-browser-observation-wave-42.json",
+    "sha256": "a30e56f9bbe108d5d62317d4f5f1234c53537d08151a6ac8f03c8a2a6e3bb173",
+    "bytes": 36145,
+    "lines": 1120,
+    "observation_self_seal_sha256": "99eb747a84df940cadfc61472aacf986870ea46326cd16faa9963bc5d4243050"
+  },
+  "current_browser_verification": {
+    "browser": {
+      "name": "Codex in-app browser",
+      "provider_id": "-c847-48f0-b802-6f5718996731",
+      "tab_id": "16"
+    },
+    "artifact": {
+      "url": "http://127.0.0.1:54872/audit-dashboard.html",
+      "document_title": "Oblivion Findings current-source audit",
+      "server_host": "127.0.0.1",
+      "server_port": 54872,
+      "server_pid": 6532,
+      "server_executable": "C:\\Users\\steph\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+      "http_status": 200,
+      "response_content_length": 355785,
+      "browser_fetched_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+      "observed_at": "2026-09-01T15:33:23.563965+12:00"
+    },
+    "viewports": {
+      "1440x900": {
+        "visible_text_passed": 48,
+        "visible_text_total": 48,
+        "anchor_elements": 1005,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      },
+      "1280x800": {
+        "visible_text_passed": 48,
+        "visible_text_total": 48,
+        "anchor_elements": 1005,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      },
+      "1024x768": {
+        "visible_text_passed": 48,
+        "visible_text_total": 48,
+        "anchor_elements": 1005,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      },
+      "390x844": {
+        "visible_text_passed": 48,
+        "visible_text_total": 48,
+        "anchor_elements": 1005,
+        "fragment_anchors": 10,
+        "authored_ids": 10,
+        "browser_dom_ids": 11,
+        "browser_only_injected_id_count": 1,
+        "page_horizontal_overflow": false,
+        "table_containment_failures": 0
+      }
+    },
+    "navigation": [
+      {
+        "label": "Progress",
+        "expected_hash": "#progress",
+        "observed_hash": "#progress",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:54872/audit-dashboard.html#progress",
+        "final_url": "http://127.0.0.1:54872/audit-dashboard.html#progress",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00"
+      },
+      {
+        "label": "RUN-203",
+        "expected_hash": "#checkpoint",
+        "observed_hash": "#checkpoint",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:54872/audit-dashboard.html#checkpoint",
+        "final_url": "http://127.0.0.1:54872/audit-dashboard.html#checkpoint",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00"
+      },
+      {
+        "label": "Pages",
+        "expected_hash": "#pages",
+        "observed_hash": "#pages",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:54872/audit-dashboard.html#pages",
+        "final_url": "http://127.0.0.1:54872/audit-dashboard.html#pages",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00"
+      },
+      {
+        "label": "Static census",
+        "expected_hash": "#static-census",
+        "observed_hash": "#static-census",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:54872/audit-dashboard.html#static-census",
+        "final_url": "http://127.0.0.1:54872/audit-dashboard.html#static-census",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00"
+      },
+      {
+        "label": "Runtime gates",
+        "expected_hash": "#runtime",
+        "observed_hash": "#runtime",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:54872/audit-dashboard.html#runtime",
+        "final_url": "http://127.0.0.1:54872/audit-dashboard.html#runtime",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00"
+      },
+      {
+        "label": "Benchmarks",
+        "expected_hash": "#benchmarks",
+        "observed_hash": "#benchmarks",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:54872/audit-dashboard.html#benchmarks",
+        "final_url": "http://127.0.0.1:54872/audit-dashboard.html#benchmarks",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00"
+      },
+      {
+        "label": "Modules",
+        "expected_hash": "#modules",
+        "observed_hash": "#modules",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:54872/audit-dashboard.html#modules",
+        "final_url": "http://127.0.0.1:54872/audit-dashboard.html#modules",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00"
+      },
+      {
+        "label": "Finding status",
+        "expected_hash": "#findings",
+        "observed_hash": "#findings",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:54872/audit-dashboard.html#findings",
+        "final_url": "http://127.0.0.1:54872/audit-dashboard.html#findings",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00"
+      },
+      {
+        "label": "Architecture",
+        "expected_hash": "#architecture",
+        "observed_hash": "#architecture",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:54872/audit-dashboard.html#architecture",
+        "final_url": "http://127.0.0.1:54872/audit-dashboard.html#architecture",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00"
+      },
+      {
+        "label": "Gaps",
+        "expected_hash": "#gaps",
+        "observed_hash": "#gaps",
+        "browser_click_performed": true,
+        "loaded_url": "http://127.0.0.1:54872/audit-dashboard.html#gaps",
+        "final_url": "http://127.0.0.1:54872/audit-dashboard.html#gaps",
+        "target_exists": true,
+        "target_visible": true,
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00"
+      }
+    ],
+    "console": {
+      "messages": [],
+      "page_errors": [],
+      "warning_or_error_logs": [],
+      "provider_id": "-c847-48f0-b802-6f5718996731",
+      "tab_id": "16",
+      "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+      "observed_at": "2026-09-01T15:33:23.563965+12:00"
+    },
+    "visual_checks": {
+      "desktop_result": "GO_NO_CLIPPING_OR_OVERLAP",
+      "mobile_result": "GO_NO_CLIPPING_OR_OVERLAP",
+      "mobile_navigation_horizontally_scrollable_at_390x844": true,
+      "provider_id": "-c847-48f0-b802-6f5718996731",
+      "tab_id": "16",
+      "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+      "observed_at": "2026-09-01T15:33:23.563965+12:00"
+    },
+    "screenshots": [
+      {
+        "viewport": "1440x900",
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      },
+      {
+        "viewport": "1280x800",
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      },
+      {
+        "viewport": "1024x768",
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      },
+      {
+        "viewport": "390x844",
+        "provider_id": "-c847-48f0-b802-6f5718996731",
+        "tab_id": "16",
+        "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+        "observed_at": "2026-09-01T15:33:23.563965+12:00",
+        "captured": true,
+        "retained": false,
+        "visual_inspection": "GO_NO_CLIPPING_OR_OVERLAP"
+      }
+    ],
+    "deliverable": {
+      "dashboard_tab_marked_deliverable": true,
+      "current_exact_dashboard_tab_retained": true,
+      "browser_viewport_override_reset": true,
+      "provider_id": "-c847-48f0-b802-6f5718996731",
+      "tab_id": "16",
+      "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682",
+      "observed_at": "2026-09-01T15:33:23.563965+12:00"
+    },
+    "observation_self_seal_sha256": "99eb747a84df940cadfc61472aacf986870ea46326cd16faa9963bc5d4243050"
+  },
+  "html_graph": {
+    "source_literal_boundary_count": 244,
+    "browser_visible_text_boundary_count": 48,
+    "missing_browser_visible_text_boundaries_before_browser": [],
+    "href_attribute_count": 1006,
+    "anchor_element_count": 1005,
+    "fragment_anchor_count": 10,
+    "authored_id_count": 10,
+    "duplicate_id_count": 0,
+    "heading_count": 26,
+    "section_count": 26,
+    "table_count": 10,
+    "table_wrap_count": 10,
+    "local_relative_link_occurrences": 995,
+    "unique_local_resources": 514,
+    "existing_unique_local_resources": 514,
+    "missing_local_resources_before_receipt_write": [],
+    "hash_bearing_link_pairs": 851,
+    "hashed_file_occurrences": 849,
+    "unique_hashed_files": 440,
+    "hashed_directory_occurrences": 2,
+    "hash_mismatches": [],
+    "ordered_navigation_label_hash_pairs_verified": true
+  },
+  "http_head_verification": {
+    "expected_unique_resources": 514,
+    "verified_count": 514,
+    "failure_count": 0,
+    "complete": true
+  },
+  "server_cleanup": {
+    "temporary_loopback_host": "127.0.0.1",
+    "temporary_loopback_port": 54872,
+    "temporary_server_pid": 6532,
+    "temporary_server_executable": "C:\\Users\\steph\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+    "listeners_after_cleanup": 0,
+    "exact_server_pid_present_after_cleanup": false,
+    "matching_loopback_processes_after_cleanup": 0,
+    "complete": true
+  },
+  "finding_boundary": {
+    "finding_id": "FLEET-TRIP-PLAYBACK-DATA-POINT-ELIGIBILITY-01",
+    "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "coordinate_complete_rows_before_ordering_and_cap_only": true,
+    "delegated_coordination_transcription_not_original_runtime_receipt": true,
+    "candidate_feature_association_only": true,
+    "playback_data_queue_index_86_pending_fresh_review": true,
+    "static_ownership_credit": false,
+    "prior_playback_privacy_credit": false,
+    "telemetry_lifecycle_range_or_write_credit": false,
+    "map_frontend_or_adjacent_fleet_credit": false,
+    "application_browser_credit": false,
+    "benchmark_credit": false,
+    "final_finding": false
+  },
+  "execution_boundary": {
+    "bounded_unique_tests": 199,
+    "bounded_unique_assertions": 2722,
+    "run_204_application_runtime_or_tests_executed": false,
+    "run_204_browser_scope": "static audit-dashboard HTML only",
+    "full_suite_or_coverage": false
+  },
+  "benchmark_boundary": {
+    "mapped": 2,
+    "targets": 340,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338,
+    "run_204_benchmark_credit": false
+  },
+  "noninheritance": {
+    "application_browser": false,
+    "responsive_application_or_visual_credit": false,
+    "application_correctness": false,
+    "application_privacy": false,
+    "application_runtime": false,
+    "static_route_or_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_advance": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "deployment": false,
+    "release": false,
+    "publication": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "worktree_attestation": {
+    "staged_paths": [],
+    "modified_paths": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py"
+    ],
+    "untracked_paths": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-204-audit-dashboard-verification-wave-42.py",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-204-wave-42.json"
+    ],
+    "application_or_test_dirt": [],
+    "builder_matches_committed_run_203_exact_blob": false,
+    "builder_matches_final_run_204_exact_blob": true,
+    "builder_changes_run204_assertion_only": true,
+    "fleet_playback_data_paths_match_run_203_exact_blobs": true
+  },
+  "mutation_attestation": {
+    "materializer_writes_only": "evidence/browser/current-audit-dashboard-verification-run-204-wave-42.json",
+    "atomic_exclusive_temp_write": true,
+    "fsync_before_replace": true,
+    "stale_temp_refused": true,
+    "optimized_python_refused": true,
+    "strict_duplicate_key_free_json": true,
+    "canonical_self_seal": true
+  },
+  "credit_boundary": {
+    "exact_run_204_dashboard_artifact_verification": true,
+    "application_source_or_test_change": false,
+    "application_runtime_reexecution": false,
+    "application_browser": false,
+    "responsive_application_or_visual_credit": false,
+    "correctness_or_privacy_finding": false,
+    "static_route_or_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_advance": false,
+    "benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "full_suite_or_coverage": false,
+    "pass": false,
+    "deployment": false,
+    "release": false,
+    "publication": false,
+    "final_finding": false,
+    "feature_or_module_completion": false,
+    "gate_4": false,
+    "audit_complete": false
+  },
+  "completion_gates": [
+    {
+      "name": "routes_classified",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "inertia_pages_classified",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "features_in_canonical_register",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "routes_and_pages_mapped_to_feature_id",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "features_with_verified_benchmark_or_final_ncm",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "human_features_with_task_script_and_ten_scores",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "common_and_safety_journeys_cross_reviewed",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "hero_banner_instances_classified",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "overlay_implementations_and_triggers_classified",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "safe_routes_observed_at_desktop",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "selected_families_and_journeys_all_viewports",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "required_visual_states_classified",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "material_visual_finding_families_resampled",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "models_classified",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "policies_classified",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "service_domain_entries_classified",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "critical_async_owners_classified",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "modules_with_all_eight_passes",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "prompt_benchmark_projects_formally_triaged",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "p0_p1_complete_finding_fields",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "redesigns_neutral_native_no_copy",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "ease_4_5_claims_independently_reviewed",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "browser_claims_labeled",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "visual_inconsistencies_complete_context",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "official_source_inference_specialist_split",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    },
+    {
+      "name": "all_agents_returned_reconciled_represented_none_live",
+      "complete": false,
+      "reason": "RUN204 verifies one exact dashboard artifact only"
+    }
+  ],
+  "artifact_scope": {
+    "materializer": "generators/materialize-run-204-audit-dashboard-verification-wave-42.py",
+    "receipt": "evidence/browser/current-audit-dashboard-verification-run-204-wave-42.json",
+    "builder": "generators/build-current-audit-dashboard.py",
+    "dashboard": "audit-dashboard.html",
+    "repository_mutation_path_count": 4
+  },
+  "remote_state": {
+    "origin_main": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "push_performed": false,
+    "publication_claimed": false
+  },
+  "finalization_state": {
+    "browser_complete": true,
+    "resource_complete": true,
+    "cleanup_complete": true,
+    "navigation_verified_count": 10,
+    "browser_warning_error_count": 0,
+    "dashboard_tab_marked_deliverable": true
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "completion_boundary": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "receipt_self_seal_sha256": "f1d19715698e7a901471be2f2e18e5f51a3dd2c592f381d78a2e5168d7e10a4c"
+}
