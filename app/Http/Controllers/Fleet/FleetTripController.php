@@ -96,6 +96,8 @@ class FleetTripController extends Controller
         $query = FleetTelemetryEvent::query()
             ->where('asset_id', $trip->asset_id)
             ->where('consent_blocked', false)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
             ->orderBy('occurred_at');
 
         if ($trip->started_at) {
