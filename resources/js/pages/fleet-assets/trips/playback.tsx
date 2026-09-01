@@ -59,6 +59,7 @@ export default function FleetTripPlayback({
     can,
 }: Props) {
     const [points, setPoints] = useState<{ lat: number; lng: number }[]>([]);
+    const [truncated, setTruncated] = useState(false);
     const [selectedDriver, setSelectedDriver] = useState(
         trip.driver_session_id?.toString() || '',
     );
@@ -67,6 +68,7 @@ export default function FleetTripPlayback({
     const [confirmDelete, setConfirmDelete] = useState(false);
 
     useEffect(() => {
+        setTruncated(false);
         fetch(`/fleet-assets/trips/${trip.id}/playback/data`)
             .then((res) => res.json())
             .then((data) => {
@@ -77,8 +79,12 @@ export default function FleetTripPlayback({
                         lng: Number(p.lng),
                     }));
                 setPoints(rows);
+                setTruncated(data.truncated === true);
             })
-            .catch(() => setPoints([]));
+            .catch(() => {
+                setPoints([]);
+                setTruncated(false);
+            });
     }, [trip.id]);
 
     const center =
@@ -209,13 +215,30 @@ export default function FleetTripPlayback({
 
                 <div className="grid gap-4 lg:grid-cols-3">
                     {/* Map */}
-                    <div className="lg:col-span-2">
+                    <div className="space-y-3 lg:col-span-2">
                         <LeafletMap
                             center={center}
                             zoom={12}
                             polyline={points}
+                            polylineOptions={{
+                                showEndpoints: !truncated,
+                            }}
                             height={480}
                         />
+                        {truncated && (
+                            <div
+                                role="status"
+                                className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning"
+                            >
+                                <p className="font-semibold">
+                                    Route preview is incomplete
+                                </p>
+                                <p>
+                                    Only the first 2,000 route points are shown.
+                                    The true trip endpoint is not shown.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Trip Details */}
