@@ -8,12 +8,14 @@ use App\Models\User;
 use App\Notifications\ShiftEligibilityWarningNotification;
 use App\Services\ShiftSignalService;
 use App\Services\ShiftStaffEligibilityService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * Nightly job that scans future scheduled shifts with assigned staff
@@ -61,6 +63,7 @@ class RecalculateFutureShiftEligibility implements ShouldQueue
                             'shift_id' => $shift->id,
                             'error' => $e->getMessage(),
                         ]);
+
                         continue;
                     }
 
@@ -94,18 +97,29 @@ class RecalculateFutureShiftEligibility implements ShouldQueue
 
     protected function notifyManager(Shift $shift, array $blockingReasons): void
     {
-        $staffProfile = HrEmployeeProfile::where('user_id', $shift->user_id)
-            ->where('is_active', true)
-            ->first(['manager_user_id']);
+        $shift = $this->currentShift($shift);
+        if (! $shift) {
+            return;
+        }
 
-        $manager = $staffProfile?->manager_user_id
-            ? User::find($staffProfile->manager_user_id)
-            : null;
+        $staffProfile = $this->currentProfileForUserId((int) $shift->user_id);
+        $manager = $this->eligibleRecipientForShift(
+            $staffProfile?->manager_user_id,
+            $shift,
+        );
 
-        // Fall back to any provider_manager if no direct manager.
         if (! $manager) {
-            $manager = User::whereHas('roles', fn ($q) => $q->where('name', 'provider_manager'))
-                ->first();
+            $fallbackIds = User::query()
+                ->whereHas('roles', fn ($query) => $query->where('name', 'provider_manager'))
+                ->orderBy('id')
+                ->pluck('id');
+
+            foreach ($fallbackIds as $fallbackId) {
+                $manager = $this->eligibleRecipientForShift((int) $fallbackId, $shift);
+                if ($manager) {
+                    break;
+                }
+            }
         }
 
         if (! $manager) {
@@ -129,5 +143,55 @@ class RecalculateFutureShiftEligibility implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function currentShift(Shift $shift): ?Shift
+    {
+        return Shift::query()->with([
+            'staff:id,name,email',
+            'site:id,name',
+            'client:id,site_id',
+        ])->find($shift->getKey());
+    }
+
+    private function currentProfileForUserId(int $userId): ?HrEmployeeProfile
+    {
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+
+        return HrEmployeeProfile::query()
+            ->where('user_id', $userId)
+            ->where('is_active', true)
+            ->where(function ($query) use ($today): void {
+                $query->whereNull('start_date')->orWhereDate('start_date', '<=', $today);
+            })
+            ->where(function ($query) use ($today): void {
+                $query->whereNull('end_date')->orWhereDate('end_date', '>=', $today);
+            })
+            ->first();
+    }
+
+    private function eligibleRecipientForShift(?int $userId, Shift $shift): ?User
+    {
+        if (! $userId) {
+            return null;
+        }
+
+        $recipient = User::query()
+            ->whereKey($userId)
+            ->whereNotNull('approved_at')
+            ->whereNotIn('role', ['client', 'next_of_kin'])
+            ->whereDoesntHave('roles', fn ($query) => $query->whereIn('name', ['client', 'next_of_kin']))
+            ->first();
+        if (! $recipient) {
+            return null;
+        }
+
+        try {
+            (new UserSiteAccessService)->assertCanAccessShift($recipient, $shift);
+        } catch (HttpExceptionInterface) {
+            return null;
+        }
+
+        return $recipient;
     }
 }
