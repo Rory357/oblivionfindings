@@ -46,10 +46,10 @@ test.describe('Security & Devices native monitor lifecycle', () => {
         await chooseSelectOption(
             page,
             'Policy profile',
-            'Playwright mutating monitoring',
+            fixture.monitorProfileName,
         );
         await page.getByLabel('Monitor name').fill(createdName);
-        await page.getByLabel('Approved target').fill('203.0.113.10');
+        await page.getByLabel('Approved target').fill(fixture.monitorTarget);
         await page.getByRole('button', { name: 'Create direct monitor' }).click();
 
         await expect(page.getByText(createdName).first()).toBeVisible({

@@ -74,6 +74,18 @@ test.describe('Security & Devices discovery and collector lifecycle', () => {
         await expect(applyDialog).toBeVisible();
         await applyDialog.getByRole('button', { name: 'Queue discovery run' }).click();
 
+        await updatedCard.getByRole('button', { name: 'Deactivate' }).click();
+        const deactivateDialog = page.getByRole('dialog', {
+            name: new RegExp(`Deactivate ${updatedScopeName}`),
+        });
+        await expect(deactivateDialog).toBeVisible();
+        await chooseSelectOption(
+            page,
+            'Operational reason',
+            'Approved network retired',
+        );
+        await page.getByRole('button', { name: 'Deactivate scope' }).click();
+
         await page.goto('/security-devices/discovery?tab=collectors');
         await expect(page.getByText(fixture.collectorName).first()).toBeVisible();
 
