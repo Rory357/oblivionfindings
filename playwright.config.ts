@@ -30,7 +30,11 @@ const itSecurityDesktopOnlySpecs = [
     'network-it-workspace-acceptance',
     'operations-workspaces-acceptance',
     'security-devices-accessibility',
+    'security-devices-commands',
+    'security-devices-device-crud',
+    'security-devices-discovery-lifecycle',
     'security-devices-estate-operations',
+    'security-devices-monitoring-lifecycle',
     'security-devices-navigation',
     'security-devices-workspace-shell',
     'security-workspace-acceptance',
@@ -122,3 +126,4 @@ export default defineConfig({
         timeout: 120_000,
     },
 });
+
