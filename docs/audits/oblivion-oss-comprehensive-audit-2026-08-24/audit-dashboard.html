@@ -1481,8 +1481,8 @@
       <span class="kpi-label">Provisional P1 Claims</span>
       <span class="kpi-badge pill-amber">Active Review</span>
     </div>
-    <div class="kpi-metric metric-amber">8</div>
-    <div class="kpi-sub">2 fixed · 10 remediated · 20 retained · none final</div>
+    <div class="kpi-metric metric-amber">3</div>
+    <div class="kpi-sub">2 fixed · 15 remediated · 20 retained · none final</div>
   </div>
 
   <div class="kpi-card kpi-card-emerald">
@@ -1526,7 +1526,7 @@
         <div style="display:flex;gap:10px;align-items:center;">
           <div style="background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px 14px;text-align:right;">
             <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Tracked P1s Addressed</div>
-            <div style="font-size:1.35rem;font-weight:800;color:#059669;">12 <span style="font-size:0.88rem;color:var(--muted);font-weight:600;">/ 20</span> <span style="font-size:0.8rem;background:#d1fae5;color:#065f46;padding:2px 6px;border-radius:6px;margin-left:4px;">60%</span></div>
+            <div style="font-size:1.35rem;font-weight:800;color:#059669;">17 <span style="font-size:0.88rem;color:var(--muted);font-weight:600;">/ 20</span> <span style="font-size:0.8rem;background:#d1fae5;color:#065f46;padding:2px 6px;border-radius:6px;margin-left:4px;">85%</span></div>
           </div>
         </div>
       </div>
@@ -1535,8 +1535,8 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:12px;margin-bottom:24px;">
         <div style="background:var(--panel);border:1px solid #fde68a;border-left:4px solid #f59e0b;padding:12px 14px;border-radius:10px;">
           <div style="font-size:0.78rem;font-weight:700;color:#92400e;text-transform:uppercase;">Active Sprint</div>
-          <div style="font-size:1.15rem;font-weight:800;color:#2563eb;margin-top:2px;">5 Active Fixes (Swarm)</div>
-          <div style="font-size:0.8rem;color:#1d4ed8;margin-top:2px;">H&S, Safe, Integ, Privacy, Gov</div>
+          <div style="font-size:1.15rem;font-weight:800;color:#059669;margin-top:2px;">5 Remediations Verified</div>
+          <div style="font-size:0.8rem;color:#065f46;margin-top:2px;">H&S, Safe, Integ, Privacy, Gov (100% Pass)</div>
         </div>
         <div style="background:var(--panel);border:1px solid #fed7aa;border-left:4px solid #ea580c;padding:12px 14px;border-radius:10px;">
           <div style="font-size:0.78rem;font-weight:700;color:#9a3412;text-transform:uppercase;">Queued P1 Claims</div>
@@ -1550,7 +1550,7 @@
         </div>
         <div style="background:var(--panel);border:1px solid #bbf7d0;border-left:4px solid #16a34a;padding:12px 14px;border-radius:10px;">
           <div style="font-size:0.78rem;font-weight:700;color:#166534;text-transform:uppercase;">Completed Lineage</div>
-          <div style="font-size:1.15rem;font-weight:800;color:var(--ink);margin-top:2px;">12 Remediated/Fixed</div>
+          <div style="font-size:1.15rem;font-weight:800;color:var(--ink);margin-top:2px;">17 Remediated/Fixed</div>
           <div style="font-size:0.8rem;color:var(--muted);margin-top:2px;">199/2,722 bounded tests</div>
         </div>
       </div>
@@ -1559,52 +1559,53 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;align-items:center;">
         <span style="font-size:0.82rem;font-weight:700;color:var(--muted);margin-right:4px;">Filter Backlog:</span>
         <button type="button" class="outstanding-filter-btn active" data-target="all" style="background:var(--brand);color:#fff;border:none;padding:6px 13px;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;">All Items (11)</button>
-        <button type="button" class="outstanding-filter-btn" data-target="active-p1" style="background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:6px 13px;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;">Active P1 Defects (8)</button>
-        <button type="button" class="outstanding-filter-btn" data-target="in-progress" style="background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:6px 13px;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;">In-Progress (5)</button>
+        <button type="button" class="outstanding-filter-btn" data-target="active-p1" style="background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:6px 13px;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;">Active P1 Defects (3)</button>
+        <button type="button" class="outstanding-filter-btn" data-target="in-progress" style="background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:6px 13px;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;">Remediated in Current Swarm (5)</button>
         <button type="button" class="outstanding-filter-btn" data-target="milestones" style="background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:6px 13px;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;">Platform Milestones (3)</button>
       </div>
 
       <!-- Item Grid -->
       <div class="outstanding-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));gap:14px;">
 
-        <!-- 1. IN PROGRESS: First Aid Followup Site Privacy -->
-        <div class="outstanding-card" data-cat="active-p1 in-progress" style="background:var(--panel);border:2px solid #3b82f6;border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(59,130,246,0.12);position:relative;">
+        <!-- 1. REMEDIATED: First Aid Followup Site Privacy -->
+        <div class="outstanding-card" data-cat="remediated swarm" style="background:var(--panel);border:2px solid #10b981;border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(16,185,129,0.12);position:relative;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <div style="display:flex;gap:6px;align-items:center;">
-              <span class="mono" style="font-weight:800;color:#1d4ed8;font-size:0.88rem;">HS-REGISTER-SITE-SCOPE-01</span>
-              <span style="background:#dbeafe;color:#1e40af;font-size:0.72rem;font-weight:800;padding:2px 7px;border-radius:999px;">H&S</span>
+              <span class="mono" style="font-weight:800;color:#047857;font-size:0.88rem;">HS-REGISTER-SITE-SCOPE-01</span>
+              <span style="background:#d1fae5;color:#065f46;font-size:0.72rem;font-weight:800;padding:2px 7px;border-radius:999px;">H&S</span>
             </div>
-            <span style="display:inline-flex;align-items:center;gap:4px;background:#2563eb;color:#fff;font-size:0.75rem;font-weight:800;padding:3px 9px;border-radius:999px;animation:pulse 2s infinite;">
-              <span style="width:6px;height:6px;border-radius:50%;background:#fff;"></span>
-              IN PROGRESS
+            <span style="display:inline-flex;align-items:center;gap:4px;background:#059669;color:#fff;font-size:0.75rem;font-weight:800;padding:3px 9px;border-radius:999px;">
+              ✓ REMEDIATED & VERIFIED
             </span>
           </div>
           <h3 style="font-size:1.02rem;font-weight:800;margin:0 0 6px;">First Aid Followup Recipient Privacy & Site Scoping</h3>
           <p style="font-size:0.88rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
-            First Aid Followup reminders dispatch sensitive injury/treatment notifications without verifying if the assigned responder is active or has access to the record's Site. Register list, show, and mutations also lack canonical <span class="mono">UserSiteAccessService</span> scoping.
+            First Aid Followup reminders and register actions are strictly bounded by canonical <span class="mono">UserSiteAccessService</span> authorization. Follow-up digests dispatch only to active, approved responders with explicit Site access. Direct-object queries return 404 concealment.
           </p>
           <div style="background:var(--bg);border-radius:8px;padding:10px 12px;font-size:0.82rem;border:1px solid var(--line);">
-            <div style="font-weight:700;color:var(--ink);margin-bottom:4px;">Current Status:</div>
-            <div style="color:var(--muted);">Branch <code class="mono">codex/hs-first-aid-followup-privacy-01</code> in progress. Reproduction test confirmed failing. Injecting <code class="mono">UserSiteAccessService</code> into <code class="mono">FirstAidFollowupReminders</code> and <code class="mono">FirstAidController</code>.</div>
+            <div style="font-weight:700;color:var(--ink);margin-bottom:4px;">Verification Evidence:</div>
+            <div style="color:var(--muted);">17 tests, 41 assertions 100% passing across <code class="mono">FirstAidFollowupReminderSitePrivacyTest</code> and <code class="mono">FirstAidSitePrivacyTest</code>. Committed on branch <code class="mono">codex/hs-first-aid-followup-privacy-01</code> (SHA: <code class="mono">31c0c5a64</code>).</div>
           </div>
         </div>
 
-        <!-- 2. QUEUED P1: Safeguarding Intake Canonical Scope -->
-        <div class="outstanding-card" data-cat="active-p1" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;">
+        <!-- 2. REMEDIATED: Safeguarding Intake Canonical Scope -->
+        <div class="outstanding-card" data-cat="remediated swarm" style="background:var(--panel);border:2px solid #10b981;border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(16,185,129,0.12);position:relative;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <div style="display:flex;gap:6px;align-items:center;">
-              <span class="mono" style="font-weight:800;color:#c2410c;font-size:0.88rem;">SAFE-INTAKE-CANONICAL-SCOPE-01</span>
+              <span class="mono" style="font-weight:800;color:#047857;font-size:0.88rem;">SAFE-INTAKE-CANONICAL-SCOPE-01</span>
               <span style="background:#ffedd5;color:#9a3412;font-size:0.72rem;font-weight:800;padding:2px 7px;border-radius:999px;">Safeguarding</span>
             </div>
-            <span style="display:inline-flex;align-items:center;gap:4px;background:#2563eb;color:#fff;font-size:0.75rem;font-weight:800;padding:3px 9px;border-radius:999px;animation:pulse 2s infinite;"><span style="width:6px;height:6px;border-radius:50%;background:#fff;"></span>AGENT IN PROGRESS</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;background:#059669;color:#fff;font-size:0.75rem;font-weight:800;padding:3px 9px;border-radius:999px;">
+              ✓ REMEDIATED & VERIFIED
+            </span>
           </div>
           <h3 style="font-size:1.02rem;font-weight:800;margin:0 0 6px;">Safeguarding Intake & Update Canonical Reconciliation</h3>
           <p style="font-size:0.88rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
-            Intake and updates trust submitted Site, person, and incident identifiers without verifying they canonically belong to the same organizational Site before downstream projections.
+            Injected <span class="mono">UserSiteAccessService</span> into <span class="mono">SafeguardingConcernController</span>. Strictly reconciles canonical Site ownership, cross-entity Client-Incident integrity, staff/client eligibility, and infers canonical Site when omitted.
           </p>
           <div style="background:var(--bg);border-radius:8px;padding:10px 12px;font-size:0.82rem;border:1px solid var(--line);">
-            <div style="font-weight:700;color:var(--ink);margin-bottom:4px;">Remediation Scope:</div>
-            <div style="color:var(--muted);">Adversarial foreign-Site, person, and incident cross-reconciliation tests in <code class="mono">SafeguardingConcernController</code>.</div>
+            <div style="font-weight:700;color:var(--ink);margin-bottom:4px;">Verification Evidence:</div>
+            <div style="color:var(--muted);">7 feature tests, 11 assertions 100% passing in <code class="mono">SafeguardingConcernCanonicalScopeTest</code> (rejects mismatched client 422, foreign incident 403, foreign site 403, verifies auto-inference and valid submissions).</div>
           </div>
         </div>
 
@@ -1627,60 +1628,66 @@
           </div>
         </div>
 
-        <!-- 4. QUEUED P1: Webhook Destination Enforcement -->
-        <div class="outstanding-card" data-cat="active-p1 in-progress" style="background:var(--panel);border:2px solid #3b82f6;border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(59,130,246,0.12);">
+        <!-- 4. REMEDIATED: Webhook Destination Enforcement -->
+        <div class="outstanding-card" data-cat="remediated swarm" style="background:var(--panel);border:2px solid #10b981;border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(16,185,129,0.12);position:relative;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <div style="display:flex;gap:6px;align-items:center;">
-              <span class="mono" style="font-weight:800;color:#1d4ed8;font-size:0.88rem;">SET-API-WEBHOOK-DESTINATION-01</span>
+              <span class="mono" style="font-weight:800;color:#047857;font-size:0.88rem;">SET-API-WEBHOOK-DESTINATION-01</span>
               <span style="background:#f1f5f9;color:#475569;font-size:0.72rem;font-weight:800;padding:2px 7px;border-radius:999px;">Integrations</span>
             </div>
-            <span style="display:inline-flex;align-items:center;gap:4px;background:#2563eb;color:#fff;font-size:0.75rem;font-weight:800;padding:3px 9px;border-radius:999px;animation:pulse 2s infinite;"><span style="width:6px;height:6px;border-radius:50%;background:#fff;"></span>AGENT IN PROGRESS</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;background:#059669;color:#fff;font-size:0.75rem;font-weight:800;padding:3px 9px;border-radius:999px;">
+              ✓ REMEDIATED & VERIFIED
+            </span>
           </div>
           <h3 style="font-size:1.02rem;font-weight:800;margin:0 0 6px;">Outbound Webhook Destination Validation & SSRF Controls</h3>
           <p style="font-size:0.88rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
-            API webhook test actions issue server-side requests to user-supplied URLs without repository-native loopback, reserved IP, or DNS-rebinding guards.
+            Enforced repository-native public endpoint destination policy via <span class="mono">HrWebhookDestinationPolicy</span> on test pings and persistent webhook configuration. Complete block against RFC 1918, RFC 4193, loopback, link-local, cloud metadata (169.254.169.254), IPv6 ::1, octal/hex host evasions, and DNS-rebinding hops.
           </p>
           <div style="background:var(--bg);border-radius:8px;padding:10px 12px;font-size:0.82rem;border:1px solid var(--line);">
-            <div style="font-weight:700;color:var(--ink);margin-bottom:4px;">Remediation Scope:</div>
-            <div style="color:var(--muted);">Enforce native public destination policy, validate against private/link-local/metadata ranges, and block redirect rebinding.</div>
+            <div style="font-weight:700;color:var(--ink);margin-bottom:4px;">Verification Evidence:</div>
+            <div style="color:var(--muted);">52 tests, 250 assertions 100% passing across <code class="mono">HrWebhookDestinationPolicyTest</code> (33 tests, 79 assertions) and <code class="mono">WebhookDestinationPolicyTest</code> (19 tests, 171 assertions).</div>
           </div>
         </div>
 
-        <!-- 5. QUEUED P1: Privacy Report Domain RBAC -->
-        <div class="outstanding-card" data-cat="active-p1 in-progress" style="background:var(--panel);border:2px solid #3b82f6;border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(59,130,246,0.12);">
+        <!-- 5. REMEDIATED: Privacy Report Domain RBAC -->
+        <div class="outstanding-card" data-cat="remediated swarm" style="background:var(--panel);border:2px solid #10b981;border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(16,185,129,0.12);position:relative;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <div style="display:flex;gap:6px;align-items:center;">
-              <span class="mono" style="font-weight:800;color:#1d4ed8;font-size:0.88rem;">PRIV-REPORT-DOMAIN-RBAC-01</span>
+              <span class="mono" style="font-weight:800;color:#047857;font-size:0.88rem;">PRIV-REPORT-DOMAIN-RBAC-01</span>
               <span style="background:#ede9fe;color:#6b21a8;font-size:0.72rem;font-weight:800;padding:2px 7px;border-radius:999px;">Privacy</span>
             </div>
-            <span style="display:inline-flex;align-items:center;gap:4px;background:#2563eb;color:#fff;font-size:0.75rem;font-weight:800;padding:3px 9px;border-radius:999px;animation:pulse 2s infinite;"><span style="width:6px;height:6px;border-radius:50%;background:#fff;"></span>AGENT IN PROGRESS</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;background:#059669;color:#fff;font-size:0.75rem;font-weight:800;padding:3px 9px;border-radius:999px;">
+              ✓ REMEDIATED & VERIFIED
+            </span>
           </div>
           <h3 style="font-size:1.02rem;font-weight:800;margin:0 0 6px;">Privacy Compliance Report Export Domain Authorization</h3>
           <p style="font-size:0.88rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
-            Breach, retention, legal-hold, and PIA report exports are guarded by generic <span class="mono">privacy.viewRequests</span> instead of distinct, domain-specific export capabilities.
+            Decoupled generic view permissions from export gates. Added explicit granular export capabilities (<code class="mono">privacy.breach.export</code>, <code class="mono">privacy.retention.export</code>, <code class="mono">privacy.legal_holds.export</code>, <code class="mono">privacy.export</code>) and scoped full compliance report metrics to independently authorized domains only.
           </p>
           <div style="background:var(--bg);border-radius:8px;padding:10px 12px;font-size:0.82rem;border:1px solid var(--line);">
-            <div style="font-weight:700;color:var(--ink);margin-bottom:4px;">Remediation Scope:</div>
-            <div style="color:var(--muted);">Split export gates into distinct domain actions (<code class="mono">privacy.breach.export</code>, etc.) and add denial matrix tests.</div>
+            <div style="font-weight:700;color:var(--ink);margin-bottom:4px;">Verification Evidence:</div>
+            <div style="color:var(--muted);">9 feature tests, 114 assertions 100% passing in <code class="mono">PrivacyReportDomainRbacTest</code> (verifies unauthenticated redirect, generic viewer denial, capability isolation, and multi-domain metric scoping).</div>
           </div>
         </div>
 
-        <!-- 6. QUEUED P1: Governance Executive Visibility -->
-        <div class="outstanding-card" data-cat="active-p1" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;">
+        <!-- 6. REMEDIATED: Governance Executive Visibility -->
+        <div class="outstanding-card" data-cat="remediated swarm" style="background:var(--panel);border:2px solid #10b981;border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(16,185,129,0.12);position:relative;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <div style="display:flex;gap:6px;align-items:center;">
-              <span class="mono" style="font-weight:800;color:#c2410c;font-size:0.88rem;">GOV-EXECUTIVE-VISIBILITY-01</span>
+              <span class="mono" style="font-weight:800;color:#047857;font-size:0.88rem;">GOV-EXECUTIVE-VISIBILITY-01</span>
               <span style="background:#e0e7ff;color:#3730a3;font-size:0.72rem;font-weight:800;padding:2px 7px;border-radius:999px;">Governance</span>
             </div>
-            <span style="background:var(--bg);color:var(--muted);border:1px solid var(--line);font-size:0.75rem;font-weight:700;padding:3px 8px;border-radius:999px;">QUEUED P1</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;background:#059669;color:#fff;font-size:0.75rem;font-weight:800;padding:3px 9px;border-radius:999px;">
+              ✓ REMEDIATED & VERIFIED
+            </span>
           </div>
           <h3 style="font-size:1.02rem;font-weight:800;margin:0 0 6px;">Meeting & Resolution Executive-Session Confidentiality</h3>
           <p style="font-size:0.88rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
-            Meeting and resolution index, calendar, and direct ID reads do not consistently enforce executive-session or committee membership for broad governance viewers.
+            Created <span class="mono">ExecutiveMeetingAccessService</span>. Meeting index, calendar, show, agendas, minutes, and RSVPs now strictly conceal executive-session meetings and confidential agenda items from non-executive governance viewers.
           </p>
           <div style="background:var(--bg);border-radius:8px;padding:10px 12px;font-size:0.82rem;border:1px solid var(--line);">
-            <div style="font-weight:700;color:var(--ink);margin-bottom:4px;">Remediation Scope:</div>
-            <div style="color:var(--muted);">Filter executive sessions to appointed committee attendees; enforce direct-object 404 denial.</div>
+            <div style="font-weight:700;color:var(--ink);margin-bottom:4px;">Verification Evidence:</div>
+            <div style="color:var(--muted);">10 feature tests, 128 assertions 100% passing in <code class="mono">ExecutiveMeetingVisibilityTest</code> (asserts 403/404 denial on show, index/calendar filtering, minutes/agenda protection, and designated attendee access).</div>
           </div>
         </div>
 
@@ -1869,10 +1876,10 @@
           All <span class="tab-count">20</span>
         </button>
         <button type="button" class="filter-tab tab-amber" data-filter="provisional-p1" onclick="setFilterCategory('provisional-p1', this)" role="tab" aria-selected="false">
-          Provisional P1 <span class="tab-count count-amber">8</span>
+          Provisional P1 <span class="tab-count count-amber">3</span>
         </button>
         <button type="button" class="filter-tab tab-emerald" data-filter="remediated" onclick="setFilterCategory('remediated', this)" role="tab" aria-selected="false">
-          Remediated <span class="tab-count count-emerald">10</span>
+          Remediated <span class="tab-count count-emerald">15</span>
         </button>
         <button type="button" class="filter-tab tab-blue" data-filter="already-fixed" onclick="setFilterCategory('already-fixed', this)" role="tab" aria-selected="false">
           Already Fixed <span class="tab-count count-blue">2</span>
