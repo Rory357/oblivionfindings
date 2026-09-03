@@ -33,6 +33,7 @@ class SafeguardingConcernController extends Controller
     public function __construct(
         private readonly SafeguardingSensitivityService $sensitivity,
         private readonly SafeguardingConcernPolicy $concernPolicy,
+        private readonly \App\Services\UserSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -240,6 +241,7 @@ class SafeguardingConcernController extends Controller
         ]);
 
         $validated = $this->normalizeConcernInput($request, $validated);
+        $this->reconcileCanonicalIntakeScope($request, $validated);
         $validated['is_sensitive'] = $request->boolean('is_sensitive');
 
         $validated['reported_by_user_id'] = auth()->id();
@@ -320,6 +322,7 @@ class SafeguardingConcernController extends Controller
         ]);
 
         $validated = $this->normalizeConcernInput($request, $validated);
+        $this->reconcileCanonicalIntakeScope($request, $validated, $concern);
 
         $validated['updated_by'] = auth()->id();
 
@@ -1173,5 +1176,80 @@ class SafeguardingConcernController extends Controller
         $trimmed = trim($value);
 
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function reconcileCanonicalIntakeScope(Request $request, array &$validated, ?SafeguardingConcern $existing = null): void
+    {
+        $user = $request->user();
+        if (! $user) {
+            abort(401);
+        }
+
+        $siteId = $validated['site_id'] ?? $existing?->site_id;
+
+        // 1. Assert actor has access to site if specified
+        if ($siteId) {
+            $this->siteAccess->assertCanAccessSiteId($user, (int) $siteId);
+        }
+
+        // 2. Canonical Client reconciliation
+        $subjectType = $validated['subject_type'] ?? $existing?->subject_type;
+        $subjectId = $validated['subject_id'] ?? $existing?->subject_id;
+        $isClientSubject = in_array($subjectType, ['client', Client::class], true);
+        $isStaffSubject = in_array($subjectType, ['staff', User::class], true);
+
+        if ($isClientSubject && $subjectId) {
+            $client = Client::findOrFail($subjectId);
+            $this->siteAccess->assertCanAccessClientId($user, (int) $client->id);
+
+            // Reconcile client's canonical site with the concern's site
+            if ($client->site_id) {
+                if ($siteId && (int) $client->site_id !== (int) $siteId) {
+                    throw ValidationException::withMessages([
+                        'subject_id' => ['The selected client does not belong to the chosen site.'],
+                    ]);
+                }
+                if (! $siteId) {
+                    $validated['site_id'] = $client->site_id;
+                    $siteId = $client->site_id;
+                }
+            }
+        }
+
+        // 3. Canonical Staff reconciliation
+        if ($isStaffSubject && $subjectId && $siteId) {
+            $this->siteAccess->assertCanUseCurrentStaffAtSite($user, (int) $subjectId, (int) $siteId);
+        }
+
+        // 4. Canonical Incident reconciliation
+        $incidentId = $validated['related_incident_id'] ?? $existing?->related_incident_id;
+        if ($incidentId) {
+            $incident = \App\Models\ClientIncident::findOrFail($incidentId);
+
+            if ($siteId) {
+                $this->siteAccess->assertCanUseClientIncidentAtSite($user, $incident, (int) $siteId);
+            }
+
+            if ($isClientSubject && $subjectId) {
+                if ((int) $incident->client_id !== (int) $subjectId) {
+                    throw ValidationException::withMessages([
+                        'related_incident_id' => ['The linked incident does not belong to the subject client.'],
+                    ]);
+                }
+            }
+        }
+
+        // 5. Perpetrator reconciliation
+        $perpType = $validated['alleged_perpetrator_type'] ?? $existing?->alleged_perpetrator_type;
+        $perpId = $validated['alleged_perpetrator_id'] ?? $existing?->alleged_perpetrator_id;
+        $isClientPerp = in_array($perpType, ['client', Client::class], true);
+        $isStaffPerp = in_array($perpType, ['staff', User::class], true);
+
+        if ($isStaffPerp && $perpId && $siteId) {
+            $this->siteAccess->assertCanUseCurrentStaffAtSite($user, (int) $perpId, (int) $siteId);
+        }
+        if ($isClientPerp && $perpId) {
+            $this->siteAccess->assertCanAccessClientId($user, (int) $perpId);
+        }
     }
 }
