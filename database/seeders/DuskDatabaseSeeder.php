@@ -140,6 +140,7 @@ class DuskDatabaseSeeder extends Seeder
             'governance.documents.manage', 'governance.documents.view',
             'governance.evaluations.manage', 'governance.evaluations.view',
             'governance.interests.manage', 'governance.interests.view',
+            'governance.executive.view',
             'governance.meetings.manage', 'governance.meetings.view',
             'governance.packs.manage', 'governance.packs.view',
             'governance.performance.manage', 'governance.performance.view',

@@ -17,6 +17,7 @@ class GovernancePermissionsSeeder extends Seeder
             // Meetings
             ['key' => 'governance.meetings.view', 'description' => 'View Board Meetings'],
             ['key' => 'governance.meetings.manage', 'description' => 'Manage Board Meetings'],
+            ['key' => 'governance.executive.view', 'description' => 'View Executive Session Meetings'],
 
             // Resolutions
             ['key' => 'governance.resolutions.view', 'description' => 'View Resolutions'],

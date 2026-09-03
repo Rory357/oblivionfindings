@@ -3,10 +3,15 @@
 namespace App\Domain\Governance\Policies;
 
 use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Services\ExecutiveMeetingAccessService;
 use App\Models\User;
 
 class GovernanceMeetingPolicy
 {
+    public function __construct(
+        protected ExecutiveMeetingAccessService $executiveAccess,
+    ) {}
+
     public function viewAny(User $user): bool
     {
         return $user->hasRole('admin', 'board_chair', 'board_secretary', 'board_member', 'board_observer');
@@ -14,17 +19,7 @@ class GovernanceMeetingPolicy
 
     public function view(User $user, GovernanceMeeting $meeting): bool
     {
-        // Board members can view all meetings
-        if ($user->hasRole('admin', 'board_chair', 'board_secretary', 'board_member', 'board_observer')) {
-            return true;
-        }
-
-        // CEO can view non-executive sessions
-        if ($user->hasRole('ceo') && !$meeting->isExecutiveSession()) {
-            return true;
-        }
-
-        return false;
+        return $this->executiveAccess->canViewMeeting($user, $meeting);
     }
 
     public function create(User $user): bool
@@ -38,16 +33,28 @@ class GovernanceMeetingPolicy
             return false;
         }
 
+        if ($meeting->isExecutiveSession() && ! $this->executiveAccess->canViewMeeting($user, $meeting)) {
+            return false;
+        }
+
         return $user->hasRole('admin', 'board_chair', 'board_secretary');
     }
 
     public function delete(User $user, GovernanceMeeting $meeting): bool
     {
+        if ($meeting->isExecutiveSession() && ! $this->executiveAccess->canViewMeeting($user, $meeting)) {
+            return false;
+        }
+
         return $user->hasRole('admin', 'board_chair');
     }
 
     public function manageMinutes(User $user, GovernanceMeeting $meeting): bool
     {
+        if ($meeting->isExecutiveSession() && ! $this->executiveAccess->canViewMeeting($user, $meeting)) {
+            return false;
+        }
+
         // Secretary or Chair can manage minutes
         if ($meeting->secretary_id && $user->id === $meeting->secretary?->user_id) {
             return true;
@@ -62,6 +69,10 @@ class GovernanceMeetingPolicy
 
     public function approveMinutes(User $user, GovernanceMeeting $meeting): bool
     {
+        if ($meeting->isExecutiveSession() && ! $this->executiveAccess->canViewMeeting($user, $meeting)) {
+            return false;
+        }
+
         // Only Chair can approve minutes
         if ($meeting->chair_id && $user->id === $meeting->chair?->user_id) {
             return true;
@@ -76,12 +87,20 @@ class GovernanceMeetingPolicy
             return false;
         }
 
+        if ($meeting->isExecutiveSession() && ! $this->executiveAccess->canViewMeeting($user, $meeting)) {
+            return false;
+        }
+
         return $user->hasRole('admin', 'board_chair', 'board_secretary');
     }
 
     public function distributePack(User $user, GovernanceMeeting $meeting): bool
     {
         if (!$meeting->canDistributePack()) {
+            return false;
+        }
+
+        if ($meeting->isExecutiveSession() && ! $this->executiveAccess->canViewMeeting($user, $meeting)) {
             return false;
         }
 

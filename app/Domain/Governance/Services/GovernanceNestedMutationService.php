@@ -22,6 +22,7 @@ class GovernanceNestedMutationService
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
+        private readonly ExecutiveMeetingAccessService $executiveAccess,
     ) {}
 
     public function assertAgendaItemBound(
@@ -30,12 +31,18 @@ class GovernanceNestedMutationService
         MeetingAgendaItem $item,
     ): void {
         $this->authorizeMeeting($actor, $meeting);
+        if ($item->is_confidential) {
+            abort_unless($this->executiveAccess->canManageConfidentialAgenda($actor, $meeting), 403);
+        }
         $meeting->agendaItems()->whereKey($item->getKey())->firstOrFail();
     }
 
     public function addAgendaItem(User $actor, GovernanceMeeting $meeting, array $data): MeetingAgendaItem
     {
         $this->authorizeMeeting($actor, $meeting);
+        if (! empty($data['is_confidential'])) {
+            abort_unless($this->executiveAccess->canManageConfidentialAgenda($actor, $meeting), 403);
+        }
 
         return DB::transaction(function () use ($actor, $meeting, $data): MeetingAgendaItem {
             $lockedMeeting = $this->lockMeeting($actor, (int) $meeting->getKey());

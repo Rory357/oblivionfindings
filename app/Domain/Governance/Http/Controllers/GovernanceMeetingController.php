@@ -12,6 +12,7 @@ use App\Domain\Governance\Models\MeetingAttendance;
 use App\Domain\Governance\Models\MeetingMinute;
 use App\Domain\Governance\Models\MeetingRsvp;
 use App\Domain\Governance\Services\BoardPackAccessService;
+use App\Domain\Governance\Services\ExecutiveMeetingAccessService;
 use App\Domain\Governance\Services\GovernanceNestedMutationService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Domain\Governance\Support\GovernancePresenter;
@@ -27,6 +28,7 @@ class GovernanceMeetingController extends Controller
         protected GovernancePresenter $presenter,
         protected GovernanceNestedMutationService $nestedMutations,
         protected BoardPackAccessService $boardPackAccess,
+        protected ExecutiveMeetingAccessService $executiveAccess,
     ) {}
 
     public function create()
@@ -42,9 +44,10 @@ class GovernanceMeetingController extends Controller
 
     public function index(Request $request)
     {
-        $meetings = GovernanceMeeting::with(['chair.user', 'secretary.user'])
-            ->orderByDesc('scheduled_at')
-            ->paginate(15);
+        $meetings = $this->executiveAccess->applyMeetingVisibilityScope(
+            GovernanceMeeting::with(['chair.user', 'secretary.user'])->orderByDesc('scheduled_at'),
+            $request->user()
+        )->paginate(15);
 
         return Inertia::render('Governance/Meetings/Index', [
             'meetings' => $meetings,
@@ -71,6 +74,8 @@ class GovernanceMeetingController extends Controller
         $query = GovernanceMeeting::query()
             ->with(['chair.user', 'secretary.user'])
             ->whereBetween('scheduled_at', [$viewStart, $viewEnd]);
+
+        $query = $this->executiveAccess->applyMeetingVisibilityScope($query, $request->user());
 
         if ($meetingType !== 'all') {
             $query->where('meeting_type', $meetingType);
@@ -127,6 +132,8 @@ class GovernanceMeetingController extends Controller
 
     public function show(Request $request, GovernanceMeeting $meeting)
     {
+        $this->authorize('view', $meeting);
+
         $meeting->load([
             'chair.user',
             'secretary.user',
@@ -139,6 +146,13 @@ class GovernanceMeetingController extends Controller
         ]);
 
         $viewer = $request->user();
+
+        // Scope confidential agenda items for viewers without executive access
+        $visibleAgendaItems = $meeting->agendaItems->filter(
+            fn (MeetingAgendaItem $item) => $this->executiveAccess->canViewAgendaItem($viewer, $meeting, $item)
+        )->values();
+        $meeting->setRelation('agendaItems', $visibleAgendaItems);
+
         $visiblePack = $this->boardPackAccess->visiblePack($viewer, $meeting->boardPack);
         $meeting->setRelation('boardPack', $visiblePack);
 
@@ -178,8 +192,13 @@ class GovernanceMeetingController extends Controller
 
     public function store(StoreMeetingRequest $request)
     {
+        $validated = $request->validated();
+        if (($validated['meeting_type'] ?? null) === 'executive_session') {
+            abort_unless($this->executiveAccess->hasExecutiveAuthority($request->user()), 403);
+        }
+
         $meeting = GovernanceMeeting::create([
-            ...$request->validated(),
+            ...$validated,
             'created_by' => auth()->id(),
         ]);
 
@@ -189,7 +208,14 @@ class GovernanceMeetingController extends Controller
 
     public function update(UpdateMeetingRequest $request, GovernanceMeeting $meeting)
     {
-        $meeting->update($request->validated());
+        $this->authorize('update', $meeting);
+
+        $validated = $request->validated();
+        if (($validated['meeting_type'] ?? null) === 'executive_session' && ! $meeting->isExecutiveSession()) {
+            abort_unless($this->executiveAccess->hasExecutiveAuthority($request->user()), 403);
+        }
+
+        $meeting->update($validated);
 
         return redirect()->route('governance.meetings.show', $meeting)
             ->with('success', 'Meeting updated successfully.');
@@ -218,6 +244,10 @@ class GovernanceMeetingController extends Controller
             'is_confidential' => 'boolean',
         ]);
 
+        if (! empty($validated['is_confidential'])) {
+            abort_unless($this->executiveAccess->canManageConfidentialAgenda($request->user(), $meeting), 403);
+        }
+
         $this->nestedMutations->addAgendaItem($request->user(), $meeting, $validated);
 
         return redirect()->back()->with('success', 'Agenda item added.');
@@ -225,6 +255,12 @@ class GovernanceMeetingController extends Controller
 
     public function updateAgendaItem(Request $request, GovernanceMeeting $meeting, MeetingAgendaItem $item)
     {
+        $this->authorize('update', $meeting);
+
+        if ($item->is_confidential) {
+            abort_unless($this->executiveAccess->canManageConfidentialAgenda($request->user(), $meeting), 403);
+        }
+
         $this->nestedMutations->assertAgendaItemBound($request->user(), $meeting, $item);
 
         $validated = $request->validate([
@@ -233,7 +269,12 @@ class GovernanceMeetingController extends Controller
             'presenter_id' => 'nullable|exists:users,id',
             'duration_minutes' => 'sometimes|integer|min:5|max:120',
             'order' => 'sometimes|integer|min:1',
+            'is_confidential' => 'sometimes|boolean',
         ]);
+
+        if (! empty($validated['is_confidential'])) {
+            abort_unless($this->executiveAccess->canManageConfidentialAgenda($request->user(), $meeting), 403);
+        }
 
         $this->nestedMutations->updateAgendaItem($request->user(), $meeting, $item, $validated);
 
@@ -242,6 +283,12 @@ class GovernanceMeetingController extends Controller
 
     public function removeAgendaItem(Request $request, GovernanceMeeting $meeting, MeetingAgendaItem $item)
     {
+        $this->authorize('update', $meeting);
+
+        if ($item->is_confidential) {
+            abort_unless($this->executiveAccess->canManageConfidentialAgenda($request->user(), $meeting), 403);
+        }
+
         $this->nestedMutations->removeAgendaItem($request->user(), $meeting, $item);
 
         return redirect()->back()->with('success', 'Agenda item removed.');
@@ -389,6 +436,8 @@ class GovernanceMeetingController extends Controller
 
     public function submitRsvp(Request $request, GovernanceMeeting $meeting)
     {
+        $this->authorize('view', $meeting);
+
         $validated = $request->validate([
             'status' => 'required|in:attending,apology,tentative',
             'dietary_requirements' => 'nullable|string|max:255',
