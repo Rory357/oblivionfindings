@@ -43,7 +43,7 @@ class SafetySignalDeliveryRecoveryService
     public function recover(int $limit = 100, bool $reportOnly = false): array
     {
         $limit = max(1, min($limit, 1000));
-        $reconciled = ['fleet' => 0, 'shift' => 0, 'device' => 0, 'incident' => 0, 'facility' => 0];
+        $reconciled = ['fleet' => 0, 'shift' => 0, 'device' => 0, 'incident' => 0, 'facility' => 0, 'safeguarding' => 0];
         $queued = ['fleet' => 0, 'shift' => 0, 'device' => 0, 'incident' => 0, 'facility' => 0];
 
         if (! $reportOnly) {
@@ -57,6 +57,7 @@ class SafetySignalDeliveryRecoveryService
             $reconciled['device'] = $this->reconcileDevice($limit);
             $reconciled['incident'] = $this->reconcileIncident($limit);
             $reconciled['facility'] = $this->reconcileFacility($limit);
+            $reconciled['safeguarding'] = $this->reconcileSafeguarding($limit);
             $queued['fleet'] = $this->dispatchEligible(
                 FleetSignalOutbox::class,
                 fn (int $id) => DispatchFleetSignalOutbox::dispatch($id),
@@ -290,6 +291,120 @@ class SafetySignalDeliveryRecoveryService
                 );
                 $count += $outbox->wasRecentlyCreated ? 1 : 0;
             });
+
+        return $count;
+    }
+
+    public function reconcileSafeguarding(int $limit = 100): int
+    {
+        $limit = max(1, min($limit, 1000));
+        $count = 0;
+
+        $concerns = \App\Models\SafeguardingConcern::query()
+            ->whereNull('deleted_at')
+            ->where(function ($query): void {
+                $query->whereNull('concern_type')
+                    ->orWhere('concern_type', '!=', 'incident_escalation')
+                    ->orWhereNull('related_incident_id');
+            })
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
+
+        $bridge = app(\App\Services\ControlRoom\ComprehensiveAlertBridgeService::class);
+        $hsEventService = app(\App\Services\HealthSafety\HsEventService::class);
+
+        foreach ($concerns as $concern) {
+            $recoveredSomething = false;
+
+            // 1. Reconcile HsEvent if missing
+            $key = \App\Models\HsEvent::buildIdempotencyKey(
+                get_class($concern),
+                $concern->getKey(),
+                \App\Models\HsEvent::CATEGORY_SAFEGUARDING,
+            );
+
+            $hsEvent = \App\Models\HsEvent::where('idempotency_key', $key)->first();
+            if (! $hsEvent) {
+                try {
+                    $severity = $concern->severity === 'critical' ? 'critical' : 'high';
+                    $hsEvent = $hsEventService->recordEvent([
+                        'source' => $concern,
+                        'event_category' => \App\Models\HsEvent::CATEGORY_SAFEGUARDING,
+                        'severity' => $severity,
+                        'occurred_at' => $concern->occurred_at ?? now(),
+                        'reported_at' => $concern->reported_at ?? now(),
+                        'site_id' => $concern->site_id,
+                        'client_id' => in_array($concern->subject_type, ['client', \App\Models\Client::class], true) ? $concern->subject_id : null,
+                        'staff_id' => $concern->reported_by_user_id,
+                        'created_by' => $concern->reported_by_user_id,
+                    ]);
+                    $recoveredSomething = true;
+                } catch (Throwable $e) {
+                    Log::warning('SafetySignalDeliveryRecoveryService: HsEvent recovery failed', [
+                        'concern_id' => $concern->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // 2. Reconcile ControlRoomAlert if missing
+            $existingAlert = \App\Models\ControlRoomAlert::query()
+                ->where('context->concern_id', $concern->id)
+                ->first();
+
+            if (! $existingAlert) {
+                try {
+                    $alert = $bridge->bridgeSafeguardingConcern($concern);
+                    if ($alert) {
+                        $recoveredSomething = true;
+                        if ($hsEvent) {
+                            $hsEventService->linkControlRoomAlert($hsEvent, $alert->id);
+                        }
+                    }
+                } catch (Throwable $e) {
+                    Log::warning('SafetySignalDeliveryRecoveryService: ControlRoomAlert recovery failed', [
+                        'concern_id' => $concern->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // 3. Reconcile NotifiableIncident if critical
+            if ($concern->severity === 'critical') {
+                $notifiable = \App\Domain\Governance\Models\NotifiableIncident::query()
+                    ->where('related_incident_id', $concern->id)
+                    ->where('incident_type', 'safeguarding')
+                    ->first();
+
+                if (! $notifiable) {
+                    try {
+                        \App\Domain\Governance\Models\NotifiableIncident::create([
+                            'incident_type' => 'safeguarding',
+                            'notification_authority' => 'health_nz',
+                            'title' => 'Auto-generated from safeguarding concern #' . $concern->id,
+                            'description' => $concern->description ?? 'Critical safeguarding concern requiring authority notification.',
+                            'occurred_at' => $concern->occurred_at ?? now(),
+                            'severity' => 'critical',
+                            'related_incident_id' => $concern->id,
+                            'status' => 'pending',
+                            'notification_deadline' => now()->addHours(48),
+                            'submitted_by' => $concern->reported_by_user_id ?? 1,
+                        ]);
+                        $recoveredSomething = true;
+                    } catch (Throwable $e) {
+                        Log::warning('SafetySignalDeliveryRecoveryService: NotifiableIncident recovery failed', [
+                            'concern_id' => $concern->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
+            if ($recoveredSomething) {
+                $count++;
+            }
+        }
 
         return $count;
     }

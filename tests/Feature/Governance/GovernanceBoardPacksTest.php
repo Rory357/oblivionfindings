@@ -245,8 +245,8 @@ class GovernanceBoardPacksTest extends TestCase
             [$viewerMember->id],
         );
         $hiddenMeeting = $this->createMeeting($admin, [
-            'title' => 'Executive recipient-only pack',
-            'meeting_type' => 'executive_session',
+            'title' => 'Committee recipient-only pack',
+            'meeting_type' => 'committee',
             'scheduled_at' => now()->addDay(),
             'pack_distributed_at' => now(),
         ]);

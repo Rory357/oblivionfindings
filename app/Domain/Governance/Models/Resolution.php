@@ -128,10 +128,40 @@ class Resolution extends Model
         ]);
     }
 
-    public function closeVoting(): void
+    public function closeVoting(?array $quorumSnapshot = null): void
     {
         $summary = $this->calculateVoteSummary();
-        $outcome = $this->determineOutcome($summary);
+        $isQuorumMet = $quorumSnapshot !== null ? (bool) ($quorumSnapshot['met'] ?? true) : null;
+        $outcome = $this->determineOutcome($summary, $isQuorumMet);
+
+        $votes = $this->votes()->with('boardMember')->get();
+        $conflicts = $this->conflictDeclarations()->with('boardMember')->get();
+
+        $snapshot = [
+            'closed_at' => now()->toIso8601String(),
+            'threshold' => $this->voting_threshold,
+            'quorum_required' => (bool) $this->quorum_required,
+            'quorum_met' => $isQuorumMet ?? true,
+            'quorum_details' => $quorumSnapshot,
+            'vote_summary' => $summary,
+            'outcome' => $outcome,
+            'individual_votes' => $votes->map(fn ($v) => [
+                'board_member_id' => $v->board_member_id,
+                'board_member_name' => $v->boardMember?->full_name,
+                'vote' => $v->vote,
+                'method' => $v->voting_method,
+                'voted_at' => $v->voted_at?->toIso8601String(),
+            ])->all(),
+            'conflicts' => $conflicts->map(fn ($c) => [
+                'board_member_id' => $c->board_member_id,
+                'board_member_name' => $c->boardMember?->full_name,
+                'type' => $c->declaration_type,
+                'withdrew_from_voting' => $c->withdrew_from_voting,
+                'declared_at' => $c->declared_at?->toIso8601String(),
+            ])->all(),
+        ];
+
+        $summary['decision_snapshot'] = $snapshot;
 
         $this->update([
             'status' => 'closed',
@@ -195,8 +225,12 @@ class Resolution extends Model
         ];
     }
 
-    public function determineOutcome(array $summary): string
+    public function determineOutcome(array $summary, ?bool $isQuorumMet = null): string
     {
+        if ($this->quorum_required && $isQuorumMet === false) {
+            return 'defeated';
+        }
+
         $total = $summary['for'] + $summary['against'];
         if ($total === 0) {
             return 'defeated';

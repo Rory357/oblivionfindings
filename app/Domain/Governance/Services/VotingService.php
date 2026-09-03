@@ -109,7 +109,11 @@ class VotingService
             throw new \InvalidArgumentException('Voting is not open');
         }
 
-        $resolution->closeVoting();
+        $quorum = $resolution->quorum_required
+            ? $this->calculateQuorum($resolution->governance_meeting_id, $resolution)
+            : ['met' => true, 'required' => 0, 'present' => 0, 'total_eligible' => BoardMember::active()->count(), 'percentage_present' => 100.0, 'resolution_mode' => 'not_required'];
+
+        $resolution->closeVoting($quorum);
 
         if ($notes) {
             $resolution->update(['outcome_notes' => $notes]);
@@ -117,18 +121,38 @@ class VotingService
     }
 
     /**
-     * Calculate quorum for a meeting
+     * Calculate quorum for a meeting or out-of-session resolution
      */
-    public function calculateQuorum(?int $meetingId): array
+    public function calculateQuorum(?int $meetingId, ?Resolution $resolution = null): array
     {
+        $totalActive = BoardMember::active()->count();
+
         if (!$meetingId) {
+            if ($resolution) {
+                // Out-of-session written resolution: quorum requires majority participation of active board members
+                $participatingCount = $resolution->votes()->count() 
+                    + $resolution->conflictDeclarations()->where('withdrew_from_voting', true)->count();
+                $required = ceil($totalActive * 0.5);
+
+                return [
+                    'present' => $participatingCount,
+                    'apologies' => 0,
+                    'total_eligible' => $totalActive,
+                    'required' => $required,
+                    'met' => $totalActive > 0 ? ($participatingCount >= $required) : true,
+                    'percentage_present' => $totalActive > 0 ? round(($participatingCount / $totalActive) * 100, 1) : 0,
+                    'resolution_mode' => 'out_of_session',
+                ];
+            }
+
             return [
                 'present' => 0,
                 'apologies' => 0,
-                'total_eligible' => BoardMember::active()->count(),
+                'total_eligible' => $totalActive,
                 'required' => 0,
                 'met' => true,
                 'percentage_present' => 0,
+                'resolution_mode' => 'out_of_session',
             ];
         }
 
@@ -138,8 +162,8 @@ class VotingService
         $present = $attendances->where('status', 'present')->count();
         $apologies = $attendances->where('status', 'apology')->count();
         
-        $totalActive = BoardMember::active()->count();
-        $required = ceil($totalActive * ($meeting->quorum_required / 100));
+        $quorumPct = $meeting->quorum_required ?? 50;
+        $required = ceil($totalActive * ($quorumPct / 100));
         
         return [
             'present' => $present,
@@ -148,6 +172,7 @@ class VotingService
             'required' => $required,
             'met' => $present >= $required,
             'percentage_present' => $totalActive > 0 ? round(($present / $totalActive) * 100, 1) : 0,
+            'resolution_mode' => 'meeting',
         ];
     }
 
@@ -160,7 +185,7 @@ class VotingService
             return true;
         }
 
-        $quorum = $this->calculateQuorum($resolution->governance_meeting_id);
+        $quorum = $this->calculateQuorum($resolution->governance_meeting_id, $resolution);
         return $quorum['met'];
     }
 
