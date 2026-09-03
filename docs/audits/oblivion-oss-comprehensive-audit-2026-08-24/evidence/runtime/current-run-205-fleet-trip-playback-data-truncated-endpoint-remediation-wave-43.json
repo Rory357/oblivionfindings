@@ -1,0 +1,241 @@
+{
+  "schema_version": "run-205-fleet-trip-playback-data-truncated-endpoint-remediation-wave-43-v1",
+  "run_id": "RUN-205-FLEET-TRIP-PLAYBACK-DATA-TRUNCATED-ENDPOINT-01-REMEDIATION-WAVE-43",
+  "status": "CURRENT_FLEET_PLAYBACK_TRUNCATION_DEFECT_REPRODUCED_REMEDIATED_LOCALLY_INTEGRATED_BOUNDED_VERIFIED_NOT_PUBLISHED_REPORTING_NOT_YET_AUTHORIZED_ZERO_STATIC_OWNERSHIP_FINAL_FINDING_OR_COMPLETION_CREDIT",
+  "generated_by": "generators/materialize-run-205-fleet-trip-playback-data-truncated-endpoint-remediation-wave-43.py",
+  "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+  "finding": {
+    "finding_id": "FLEET-TRIP-PLAYBACK-DATA-TRUNCATED-ENDPOINT-01",
+    "priority": "P1",
+    "record_status_authorized_after_independent_review": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
+    "historical_risk": "The endpoint returned the first 2,000 eligible chronological points without disclosing that later points existed, while the playback UI treated the final returned point as the trip endpoint.",
+    "remediated_contract": [
+      "Apply existing eligibility predicates before deterministic occurred_at,id ordering.",
+      "Inspect at most 2,001 eligible rows and return the first 2,000 with an always-present strict truncated boolean.",
+      "When truncated is true, show an incomplete-route warning and hide endpoint markers; preserve endpoint markers when false."
+    ],
+    "exact_changed_paths": [
+      {
+        "status": "M",
+        "path": "app/Http/Controllers/Fleet/FleetTripController.php",
+        "blob": "873b2364933b60d0d00d65a7cb6ef457d9d9f4dc"
+      },
+      {
+        "status": "A",
+        "path": "resources/js/pages/fleet-assets/trips/playback.test.tsx",
+        "blob": "6034c38c57f61de6aed6f1651b8d91372bfd18a6"
+      },
+      {
+        "status": "M",
+        "path": "resources/js/pages/fleet-assets/trips/playback.tsx",
+        "blob": "61fd4c4cbeae1ba95b0812299e268a9d02b4f7b9"
+      },
+      {
+        "status": "M",
+        "path": "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php",
+        "blob": "f4eda653154cfd26c9a853b72268fad1ede1b111"
+      }
+    ]
+  },
+  "lineage": {
+    "baseline": {
+      "commit": "5e3612e9307d22f609af70b262abd7c1d4fa2376",
+      "tree": "8ac706605916464597abe593720dd6fca48b002b"
+    },
+    "advanced_main_before_merge": {
+      "commit": "f7f6a248695b1554637c1f152b2ffa783ce6fd71",
+      "tree": "98bab0538cc17560782d354665a5873117d99ad6"
+    },
+    "sealed_fix": {
+      "commit": "48c7dca4dee5fc07a98eca6eab7ddf6b0ddda06b",
+      "tree": "fb688fc46b8454196e0ac112bc51d7e54eec986c",
+      "subject": "fix(fleet): disclose truncated playback routes",
+      "stable_patch_id": "f87bf0b95c3289d2d800e5915226cc8440a3720e"
+    },
+    "local_merge": {
+      "commit": "dc41000a49d04a21f1dc24791f994cb400297f40",
+      "tree": "569a0037b5fa6c614cf2868e72942ed5c261ccd0",
+      "parents": [
+        "f7f6a248695b1554637c1f152b2ffa783ce6fd71",
+        "48c7dca4dee5fc07a98eca6eab7ddf6b0ddda06b"
+      ],
+      "subject": "merge: disclose truncated Fleet playback routes"
+    },
+    "origin_main_observed": "c39b076547056b1e158c604957a04bd8b75b0f29",
+    "published": false
+  },
+  "reproduction": {
+    "backend": {
+      "failed": 1,
+      "assertions": 3,
+      "exit_code": 1
+    },
+    "frontend_vitest": {
+      "failed_test_files": 1,
+      "failed_tests": 2,
+      "exit_code": 1
+    },
+    "credit": false
+  },
+  "isolated_verification": {
+    "frontend_vitest": {
+      "passed_test_files": 1,
+      "passed_tests": 2,
+      "exit_code": 0
+    },
+    "backend_combined": {
+      "test_files": [
+        "tests/Feature/FleetAssets/FleetTripPlaybackSitePrivacyTest.php",
+        "tests/Feature/Fleet/FleetManagementTest.php"
+      ],
+      "passed": 28,
+      "assertions": 226,
+      "duration_seconds": 181.65,
+      "exit_code": 0
+    },
+    "static_and_build": {
+      "php_syntax": "PASS",
+      "pint": "PASS",
+      "eslint_max_warnings_zero": "PASS",
+      "prettier": "PASS",
+      "typescript": "PASS",
+      "production_build": "PASS_3M25S",
+      "diff_check": "PASS"
+    },
+    "aggregate_credit": false
+  },
+  "isolated_signed_in_application_browser": {
+    "classification": "APPLICATION_BROWSER_NOT_AUDIT_DASHBOARD_BROWSER",
+    "states": [
+      "complete",
+      "truncated"
+    ],
+    "viewports": [
+      "1440x900",
+      "1280x800",
+      "1024x768",
+      "390x844"
+    ],
+    "state_viewport_checks_passed": 8,
+    "state_viewport_checks_total": 8,
+    "complete_contract": {
+      "truncated": false,
+      "endpoint_markers": 2
+    },
+    "truncated_contract": {
+      "points": 2000,
+      "truncated": true,
+      "warning_visible": true,
+      "endpoint_markers": 0
+    },
+    "console_errors": 0,
+    "page_errors": 0,
+    "horizontal_overflow_failures": 0,
+    "visual_inspection": "GO_DESKTOP_AND_MOBILE",
+    "aggregate_credit": false
+  },
+  "independent_source_reviews": {
+    "reviewers": 3,
+    "verdict": "GO",
+    "blocking_findings": 0,
+    "stale_fetch_candidate": {
+      "id": "FLEET-TRIP-PLAYBACK-FETCH-STALE-RESPONSE-01",
+      "status": "SEPARATE_PROVISIONAL_CANDIDATE_NOT_ADJUDICATED",
+      "finding_credit": false,
+      "remediation_credit": false,
+      "runtime_credit": false
+    }
+  },
+  "post_merge_verification": {
+    "backend_combined": {
+      "passed": 28,
+      "assertions": 226,
+      "duration_seconds": 184.47,
+      "exit_code": 0
+    },
+    "frontend_vitest": {
+      "passed_test_files": 1,
+      "passed_tests": 2,
+      "duration_seconds": 2.25,
+      "exit_code": 0
+    },
+    "invalid_preliminary_frontend_attempts": {
+      "count": 3,
+      "reason": "primary ignored dependency-tree resolution stopped before tests",
+      "credit": false
+    },
+    "temporary_lockfile_identical_dependency_junctions_removed": true
+  },
+  "bounded_aggregate_credit": {
+    "credited_tests": 1,
+    "credited_assertions": 13,
+    "basis": "Only the net-new post-merge PHP component counts once: one new deterministic equal-time ID-order test plus thirteen new assertions across that test and the existing cap/eligibility cases. Red runs, isolated replay, the prior 27/213 PHP component, frontend Vitest, application-browser proof, build, and duplicate post-merge totals remain separate and uncredited."
+  },
+  "cleanup": {
+    "main_status_clean_after_merge": true,
+    "php_pest_processes": 0,
+    "owned_browser_test_node_processes": 0,
+    "loopback_port_8765_free": true,
+    "numeric_pid_suffixed_test_schemas": 0,
+    "browser_test_schema_present": false,
+    "isolated_worktree_removed": true,
+    "recovery_branch_retained": true
+  },
+  "credit_boundaries": {
+    "static_route_or_page_ownership": false,
+    "controller_action_bridge": false,
+    "queue_advance": false,
+    "feature_identity_assignment": false,
+    "telemetry_lifecycle_or_range": false,
+    "cache_control": false,
+    "stale_fetch_lifecycle": false,
+    "audit_logging": false,
+    "benchmark": false,
+    "publication_or_release": false,
+    "final_finding": false,
+    "module_or_audit_completion": false
+  },
+  "prior_dashboard_pin": {
+    "receipt": {
+      "path": "evidence/browser/current-audit-dashboard-verification-run-204-wave-42.json",
+      "sha256": "93e295a8eaaf2ed09d5950ab6079a1f028fea894fb607f98d6329c4dbe001bc7",
+      "bytes": 31366,
+      "lines": 810
+    },
+    "receipt_self_seal_sha256": "f1d19715698e7a901471be2f2e18e5f51a3dd2c592f381d78a2e5168d7e10a4c",
+    "dashboard_sha256": "4017139aba80c74c16a7e7c0ce8c8fa6f765e85ca9f761a90cfaf2b99bf18682"
+  },
+  "completion_gates": {
+    "routes_classified": false,
+    "inertia_pages_classified": false,
+    "features_in_canonical_register": false,
+    "routes_and_pages_mapped_to_feature_id": false,
+    "features_with_verified_benchmark_or_final_ncm": false,
+    "human_features_with_task_script_and_ten_scores": false,
+    "common_and_safety_journeys_cross_reviewed": false,
+    "hero_banner_instances_classified": false,
+    "overlay_implementations_and_triggers_classified": false,
+    "safe_routes_observed_at_desktop": false,
+    "selected_families_and_journeys_all_viewports": false,
+    "required_visual_states_classified": false,
+    "material_visual_finding_families_resampled": false,
+    "models_classified": false,
+    "policies_classified": false,
+    "service_domain_entries_classified": false,
+    "critical_async_owners_classified": false,
+    "modules_with_all_eight_passes": false,
+    "prompt_benchmark_projects_formally_triaged": false,
+    "p0_p1_complete_finding_fields": false,
+    "redesigns_neutral_native_no_copy": false,
+    "ease_4_5_claims_independently_reviewed": false,
+    "browser_claims_labeled": false,
+    "visual_inconsistencies_complete_context": false,
+    "official_source_inference_specialist_split": false,
+    "all_agents_returned_reconciled_represented_none_live": false
+  },
+  "next_gate": {
+    "run": "RUN-205R",
+    "purpose": "Independent exact-artifact review before live reporting"
+  },
+  "receipt_self_seal_sha256": "671f33f5e0b1e3a8ee89d2ba17e89c3ec5ac7cdd0742e8d94a5ada7b4530fa81"
+}
