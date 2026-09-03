@@ -113,6 +113,11 @@ final class HrWebhookDestinationPolicy
     /** @return non-empty-list<string> */
     private function publicAddresses(string $host): array
     {
+        $normalizedHost = strtolower(trim($host, '[]'));
+        if ($normalizedHost === 'localhost' || str_ends_with($normalizedHost, '.localhost') || str_ends_with($normalizedHost, '.local') || str_ends_with($normalizedHost, '.internal')) {
+            throw new UnsafeWebhookDestination('Webhook destination is not approved.');
+        }
+
         try {
             $answers = filter_var($host, FILTER_VALIDATE_IP) !== false
                 ? [$host]

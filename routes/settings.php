@@ -211,6 +211,9 @@ Route::middleware('auth')->group(function () {
     Route::post('settings/api/webhooks', [ApiSettingsController::class, 'storeWebhook'])
         ->middleware('permission:integrations.manage_secrets')
         ->name('settings.api.webhooks.store');
+    Route::post('settings/api/webhooks/test', [ApiSettingsController::class, 'testWebhook'])
+        ->middleware('permission:integrations.manage_secrets')
+        ->name('settings.api.webhooks.test.ping');
     Route::post('settings/api/webhooks/{webhookId}/test', [ApiSettingsController::class, 'testWebhook'])
         ->middleware('permission:integrations.manage_secrets')
         ->name('settings.api.webhooks.test');

@@ -6,7 +6,6 @@ use App\Domain\Hr\Exceptions\UnsafeWebhookDestination;
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use App\Services\Integration\GovernedWebhookProbeService;
-use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -144,21 +143,13 @@ class ApiSettingsController extends Controller
             'events.*' => ['string', 'in:'.implode(',', self::AVAILABLE_EVENTS)],
         ]);
 
-        if (! $this->isSameApplicationUrl($validated['url'], $request)) {
-            try {
-                $validated['url'] = $this->webhookProbe->canonicalize($validated['url']);
-            } catch (UnsafeWebhookDestination) {
-                throw ValidationException::withMessages([
-                    'url' => 'Webhook destination is not approved.',
-                ]);
-            }
-        }
+        $canonicalUrl = $this->validateWebhookDestination($validated['url']);
 
         $plainSecret = $this->generateToken('whsec_', 24);
         $webhooks = $this->loadStoredArray(self::WEBHOOKS_KEY);
         $record = [
             'id' => (string) Str::uuid(),
-            'url' => $validated['url'],
+            'url' => $canonicalUrl,
             'events' => array_values($validated['events']),
             'status' => 'active',
             'last_delivery' => null,
@@ -191,9 +182,44 @@ class ApiSettingsController extends Controller
         ]);
     }
 
-    public function testWebhook(Request $request, string $webhookId): JsonResponse
+    public function testWebhook(Request $request, ?string $webhookId = null): JsonResponse
     {
         $this->authorizeManage($request);
+
+        if ($request->has('url') || $webhookId === 'test' || $webhookId === 'ping' || $webhookId === null) {
+            $validated = $request->validate([
+                'url' => ['required', 'url', 'max:1000'],
+            ]);
+
+            $url = $this->validateWebhookDestination($validated['url']);
+            $payload = [
+                'event' => 'webhook.test',
+                'sent_at' => now()->toIso8601String(),
+            ];
+
+            try {
+                $status = $this->webhookProbe->probe($url, $payload);
+            } catch (UnsafeWebhookDestination) {
+                throw ValidationException::withMessages([
+                    'url' => 'Webhook destination is not approved.',
+                ]);
+            } catch (Throwable) {
+                $status = null;
+            }
+
+            if (! $this->responseLooksSuccessful($status ?? 0)) {
+                return response()->json([
+                    'message' => 'Webhook test failed.',
+                    'errors' => [
+                        'url' => ['Webhook destination test failed.'],
+                    ],
+                ], 422);
+            }
+
+            return response()->json([
+                'message' => 'Webhook test succeeded.',
+            ]);
+        }
 
         $webhooks = $this->loadStoredArray(self::WEBHOOKS_KEY);
         $index = collect($webhooks)->search(fn (array $record) => ($record['id'] ?? null) === $webhookId);
@@ -206,10 +232,19 @@ class ApiSettingsController extends Controller
             'sent_at' => now()->toIso8601String(),
         ];
         $url = (string) ($record['url'] ?? '');
+
+        // Validate destination before executing test webhook ping
+        $this->validateWebhookDestination($url);
+
         try {
-            $status = $this->isSameApplicationUrl($url, $request)
-                ? $this->probeInternalWebhook($url, $payload)
-                : $this->webhookProbe->probe($url, $payload);
+            $status = $this->webhookProbe->probe($url, $payload);
+        } catch (UnsafeWebhookDestination) {
+            return response()->json([
+                'message' => 'Webhook test failed.',
+                'errors' => [
+                    'url' => ['Webhook destination is not approved.'],
+                ],
+            ], 422);
         } catch (Throwable) {
             $status = null;
         }
@@ -217,6 +252,9 @@ class ApiSettingsController extends Controller
         if (! $this->responseLooksSuccessful($status ?? 0)) {
             return response()->json([
                 'message' => 'Webhook test failed.',
+                'errors' => [
+                    'url' => ['Webhook destination test failed.'],
+                ],
             ], 422);
         }
 
@@ -228,6 +266,52 @@ class ApiSettingsController extends Controller
             'message' => 'Webhook test succeeded.',
             'webhook' => $this->mapWebhook($record),
         ]);
+    }
+
+    private function validateWebhookDestination(string $url): string
+    {
+        $parts = parse_url($url);
+        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
+            throw ValidationException::withMessages([
+                'url' => 'Webhook destination is not approved.',
+            ]);
+        }
+
+        $scheme = strtolower((string) $parts['scheme']);
+        if ($scheme !== 'https') {
+            throw ValidationException::withMessages([
+                'url' => 'Webhook destination is not approved.',
+            ]);
+        }
+
+        if (isset($parts['user']) || isset($parts['pass'])) {
+            throw ValidationException::withMessages([
+                'url' => 'Webhook destination is not approved.',
+            ]);
+        }
+
+        $host = strtolower(trim((string) $parts['host'], '[]'));
+        if ($host === '' || $host === 'localhost' || str_ends_with($host, '.localhost') || str_ends_with($host, '.local') || str_ends_with($host, '.internal') || str_ends_with($host, '.lan')) {
+            throw ValidationException::withMessages([
+                'url' => 'Webhook destination is not approved.',
+            ]);
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                throw ValidationException::withMessages([
+                    'url' => 'Webhook destination is not approved.',
+                ]);
+            }
+        }
+
+        try {
+            return $this->webhookProbe->canonicalize($url);
+        } catch (UnsafeWebhookDestination) {
+            throw ValidationException::withMessages([
+                'url' => 'Webhook destination is not approved.',
+            ]);
+        }
     }
 
     private function authorizeView(Request $request): void
@@ -335,91 +419,5 @@ class ApiSettingsController extends Controller
     private function responseLooksSuccessful(int $status): bool
     {
         return $status >= 200 && $status < 400;
-    }
-
-    private function probeInternalWebhook(string $url, array $payload): ?int
-    {
-        foreach (['POST', 'HEAD', 'GET'] as $method) {
-            $status = $this->attemptInternalWebhookRequest($method, $url, $payload);
-
-            if ($this->responseLooksSuccessful($status ?? 0)) {
-                return $status;
-            }
-        }
-
-        return null;
-    }
-
-    private function attemptInternalWebhookRequest(string $method, string $url, array $payload): ?int
-    {
-        $path = parse_url($url, PHP_URL_PATH) ?: '/';
-        $query = parse_url($url, PHP_URL_QUERY);
-        $host = parse_url($url, PHP_URL_HOST);
-        $port = parse_url($url, PHP_URL_PORT);
-        $scheme = parse_url($url, PHP_URL_SCHEME) ?: 'http';
-
-        if ($query) {
-            $path .= '?'.$query;
-        }
-
-        $server = [
-            'HTTP_ACCEPT' => 'application/json',
-            'HTTP_HOST' => $port ? sprintf('%s:%d', $host, $port) : $host,
-            'SERVER_PORT' => $port ?: ($scheme === 'https' ? 443 : 80),
-            'REQUEST_SCHEME' => $scheme,
-            'HTTPS' => $scheme === 'https' ? 'on' : 'off',
-        ];
-
-        if ($method === 'POST') {
-            $server['CONTENT_TYPE'] = 'application/json';
-        }
-
-        $internalRequest = Request::create(
-            $path,
-            $method,
-            [],
-            [],
-            [],
-            $server,
-            $method === 'POST' ? json_encode($payload) : null,
-        );
-
-        $kernel = app(Kernel::class);
-
-        try {
-            $response = $kernel->handle($internalRequest);
-
-            return $response->getStatusCode();
-        } catch (Throwable) {
-            return null;
-        } finally {
-            if (isset($response)) {
-                $kernel->terminate($internalRequest, $response);
-            }
-        }
-    }
-
-    private function isSameApplicationUrl(string $url, Request $request): bool
-    {
-        $targetParts = parse_url($url);
-        $appParts = parse_url((string) config('app.url'));
-        $requestParts = parse_url($request->root());
-        $referenceParts = is_array($appParts) && isset($appParts['host']) ? $appParts : $requestParts;
-
-        if (! is_array($targetParts) || ! is_array($referenceParts)) {
-            return false;
-        }
-
-        $targetScheme = strtolower((string) ($targetParts['scheme'] ?? 'http'));
-        $referenceScheme = strtolower((string) ($referenceParts['scheme'] ?? 'http'));
-        $targetHost = strtolower((string) ($targetParts['host'] ?? ''));
-        $referenceHost = strtolower((string) ($referenceParts['host'] ?? ''));
-        $targetPort = (int) ($targetParts['port'] ?? ($targetScheme === 'https' ? 443 : 80));
-        $referencePort = (int) ($referenceParts['port'] ?? ($referenceScheme === 'https' ? 443 : 80));
-
-        return $targetHost !== ''
-            && $targetHost === $referenceHost
-            && $targetScheme === $referenceScheme
-            && $targetPort === $referencePort;
     }
 }

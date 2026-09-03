@@ -49,7 +49,10 @@ it('rejects non-https and special-use IPv4 and IPv6 literals', function (string 
 })->with([
     'unencrypted public URL' => 'http://93.184.216.34/webhook',
     'unspecified IPv4' => 'https://0.0.0.0/webhook',
-    'private IPv4' => 'https://10.1.2.3/webhook',
+    'localhost' => 'https://localhost/webhook',
+    'private IPv4 10.x' => 'https://10.1.2.3/webhook',
+    'private IPv4 172.16.x' => 'https://172.16.0.1/webhook',
+    'private IPv4 192.168.x' => 'https://192.168.1.1/webhook',
     'loopback IPv4' => 'https://127.0.0.1/webhook',
     'link-local IPv4' => 'https://169.254.169.254/webhook',
     'multicast IPv4' => 'https://224.0.0.1/webhook',

@@ -97,8 +97,12 @@ it('rejects unsafe external destinations before persisting them', function (stri
     Http::assertNothingSent();
 })->with([
     'loopback' => 'https://127.0.0.1/webhook',
+    'localhost' => 'https://localhost/webhook',
     'cloud metadata' => 'https://169.254.169.254/latest/meta-data',
-    'private network' => 'https://10.20.30.40/webhook',
+    'private network 10.x' => 'https://10.20.30.40/webhook',
+    'private network 172.16.x' => 'https://172.16.0.1/webhook',
+    'private network 192.168.x' => 'https://192.168.1.1/webhook',
+    'loopback IPv6' => 'https://[::1]/webhook',
     'unencrypted transport' => 'http://93.184.216.34/webhook',
     'credential-bearing URL' => 'https://user:secret@93.184.216.34/webhook',
 ]);
@@ -132,7 +136,8 @@ it('re-authorizes a stored destination before sending a test request', function 
     $this->actingAs(apiSettingsWebhookAdmin())
         ->postJson(route('settings.api.webhooks.test', $id))
         ->assertUnprocessable()
-        ->assertJsonPath('message', 'Webhook test failed.');
+        ->assertJsonPath('message', 'Webhook test failed.')
+        ->assertJsonValidationErrors('url');
 
     $records = AppSetting::query()->where('key', 'settings.api.webhooks')->value('value');
     expect($records[0]['last_delivery'])->toBeNull()
@@ -185,23 +190,19 @@ it('fails closed before following a cross-host redirect', function () {
     expect($resolver->calls)->toBe(['hooks.example.test' => 1]);
 });
 
-it('preserves the intentional same-application internal probe', function () {
+it('rejects loopback localhost even if it matches app.url', function () {
     config()->set('app.url', 'http://localhost');
     config()->set('inertia.ssr.enabled', false);
     Http::fake();
 
-    $storeResponse = $this->actingAs(apiSettingsWebhookAdmin())
+    $this->actingAs(apiSettingsWebhookAdmin())
         ->postJson(route('settings.api.webhooks.store'), [
             'url' => 'http://localhost/',
             'events' => ['shift.completed'],
         ])
-        ->assertOk();
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('url');
 
-    $id = $storeResponse->json('webhook.id');
-
-    $this->postJson(route('settings.api.webhooks.test', $id))
-        ->assertOk()
-        ->assertJsonPath('message', 'Webhook test succeeded.');
-
+    expect(AppSetting::query()->where('key', 'settings.api.webhooks')->exists())->toBeFalse();
     Http::assertNothingSent();
 });
