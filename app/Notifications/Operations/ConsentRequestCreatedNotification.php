@@ -4,6 +4,7 @@ namespace App\Notifications\Operations;
 
 use App\Models\ConsentRequest;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
  * Sent to the family-portal recipient when staff creates a new consent
  * request. Mail + in-portal database notification.
  */
-class ConsentRequestCreatedNotification extends Notification
+class ConsentRequestCreatedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 

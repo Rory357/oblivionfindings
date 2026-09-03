@@ -4,6 +4,7 @@ namespace App\Notifications\Operations;
 
 use App\Models\ConsentRequest;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
  * Friendly reminder to the family-portal recipient that their pending
  * consent review is approaching the expires_at deadline. Mail + database.
  */
-class ConsentRequestReminderNotification extends Notification
+class ConsentRequestReminderNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 

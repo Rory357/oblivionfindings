@@ -13,6 +13,7 @@ use App\Services\Operations\OpsNotificationService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ServiceAgreementController extends Controller
 {
@@ -362,41 +363,44 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
-
         $data = $request->validate([
             'status' => ['required', 'in:draft,pending_approval,active,under_review,renewed,expired,terminated,suspended'],
             'reason' => ['nullable', 'string', 'max:2000'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $fromStatus = $agreement->status;
+        $agreement = DB::transaction(function () use ($auth, $data, $serviceAgreement) {
+            $agreement = $this->accessibleAgreements($auth)->lockForUpdate()->findOrFail($serviceAgreement);
+            $fromStatus = $agreement->status;
 
-        // Record status change
-        ServiceAgreementStatusChange::create([
-            'service_agreement_id' => $agreement->id,
-            'from_status' => $fromStatus,
-            'to_status' => $data['status'],
-            'changed_by' => $auth->id,
-            'reason' => $data['reason'] ?? null,
-            'notes' => $data['notes'] ?? null,
-        ]);
+            // Record status change
+            ServiceAgreementStatusChange::create([
+                'service_agreement_id' => $agreement->id,
+                'from_status' => $fromStatus,
+                'to_status' => $data['status'],
+                'changed_by' => $auth->id,
+                'reason' => $data['reason'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
 
-        // Update agreement
-        $updates = ['status' => $data['status']];
-        if ($data['status'] === 'terminated') {
-            $updates['terminated_at'] = now();
-            $updates['terminated_reason'] = $data['reason'] ?? null;
-        }
-        if ($data['status'] === 'suspended') {
-            $updates['suspended_at'] = now();
-            $updates['suspended_reason'] = $data['reason'] ?? null;
-        }
-        if ($data['status'] === 'active' && $fromStatus === 'suspended') {
-            $updates['resumed_at'] = now();
-        }
+            // Update agreement
+            $updates = ['status' => $data['status']];
+            if ($data['status'] === 'terminated') {
+                $updates['terminated_at'] = now();
+                $updates['terminated_reason'] = $data['reason'] ?? null;
+            }
+            if ($data['status'] === 'suspended') {
+                $updates['suspended_at'] = now();
+                $updates['suspended_reason'] = $data['reason'] ?? null;
+            }
+            if ($data['status'] === 'active' && $fromStatus === 'suspended') {
+                $updates['resumed_at'] = now();
+            }
 
-        $agreement->update($updates);
+            $agreement->update($updates);
+
+            return $agreement;
+        });
 
         app(OpsNotificationService::class)->notifyCrud($auth, $data['status'], 'service agreement', $agreement);
 
@@ -408,26 +412,27 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
+        DB::transaction(function () use ($auth, $serviceAgreement) {
+            $agreement = $this->accessibleAgreements($auth)->lockForUpdate()->findOrFail($serviceAgreement);
+            abort_unless($agreement->status === 'draft', 422, 'Only draft agreements can be submitted for approval.');
 
-        abort_unless($agreement->status === 'draft', 422, 'Only draft agreements can be submitted for approval.');
+            $fromStatus = $agreement->status;
 
-        $fromStatus = $agreement->status;
+            ServiceAgreementStatusChange::create([
+                'service_agreement_id' => $agreement->id,
+                'from_status' => $fromStatus,
+                'to_status' => 'pending_approval',
+                'changed_by' => $auth->id,
+                'reason' => 'Submitted for approval',
+                'notes' => null,
+            ]);
 
-        ServiceAgreementStatusChange::create([
-            'service_agreement_id' => $agreement->id,
-            'from_status' => $fromStatus,
-            'to_status' => 'pending_approval',
-            'changed_by' => $auth->id,
-            'reason' => 'Submitted for approval',
-            'notes' => null,
-        ]);
-
-        $agreement->update([
-            'status' => 'pending_approval',
-            'submitted_for_approval_at' => now(),
-            'submitted_for_approval_by' => $auth->id,
-        ]);
+            $agreement->update([
+                'status' => 'pending_approval',
+                'submitted_for_approval_at' => now(),
+                'submitted_for_approval_by' => $auth->id,
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Agreement submitted for approval.');
     }
@@ -437,26 +442,29 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
+        $agreement = DB::transaction(function () use ($auth, $request, $serviceAgreement) {
+            $agreement = $this->accessibleAgreements($auth)->lockForUpdate()->findOrFail($serviceAgreement);
+            abort_unless($agreement->status === 'pending_approval', 422, 'Only agreements pending approval can be approved.');
 
-        abort_unless($agreement->status === 'pending_approval', 422, 'Only agreements pending approval can be approved.');
+            $fromStatus = $agreement->status;
 
-        $fromStatus = $agreement->status;
+            ServiceAgreementStatusChange::create([
+                'service_agreement_id' => $agreement->id,
+                'from_status' => $fromStatus,
+                'to_status' => 'active',
+                'changed_by' => $auth->id,
+                'reason' => 'Approved',
+                'notes' => $request->input('notes'),
+            ]);
 
-        ServiceAgreementStatusChange::create([
-            'service_agreement_id' => $agreement->id,
-            'from_status' => $fromStatus,
-            'to_status' => 'active',
-            'changed_by' => $auth->id,
-            'reason' => 'Approved',
-            'notes' => $request->input('notes'),
-        ]);
+            $agreement->update([
+                'status' => 'active',
+                'approved_at' => now(),
+                'approved_by' => $auth->id,
+            ]);
 
-        $agreement->update([
-            'status' => 'active',
-            'approved_at' => now(),
-            'approved_by' => $auth->id,
-        ]);
+            return $agreement;
+        });
 
         app(OpsNotificationService::class)->notifyCrud($auth, 'approved', 'service agreement', $agreement);
 

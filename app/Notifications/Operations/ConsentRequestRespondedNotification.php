@@ -4,6 +4,7 @@ namespace App\Notifications\Operations;
 
 use App\Models\ConsentRequest;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
  * Sent to the requesting staff member when the recipient responds to a
  * consent request (approved or declined).
  */
-class ConsentRequestRespondedNotification extends Notification
+class ConsentRequestRespondedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 

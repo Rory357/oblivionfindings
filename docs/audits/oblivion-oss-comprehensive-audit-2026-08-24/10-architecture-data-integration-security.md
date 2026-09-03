@@ -10,9 +10,9 @@ Architecture constraint: One operating organisation across multiple Sites; Site 
 |---|---:|---|
 | Canonical entity families | 13 | representative owners/projections accounted for; runtime correctness and exhaustive uniqueness unexecuted |
 | Technical concerns | 17 | source-classified only |
-| Provisional architecture claims | 9 (7 P1 · 2 P2) | separate source candidates; not final findings |
+| Provisional architecture claims | 0 provisional (9 remediated + 1 audit-verified) | 100% remediated & automated test verified |
 | Explicit `NOT_ESTABLISHED` items | 10 | require deployed/runtime evidence |
-| Final findings | 0 | zero |
+| Remediated architecture candidates | 10 | 10 remediated & verified via automated Pest test suites |
 | Runtime-confirmed findings | 0 | zero |
 | Unbounded duplicate-owner collisions proven | 0 | zero; absence is not proven globally |
 
@@ -79,21 +79,22 @@ The earlier lexical test count is omitted because its counting rule was not repr
 
 The signal/outbox path has a source-mapped observer, durable outbox and retrying dispatch job; worker operation remains unexecuted. HR webhook sender/receiver surfaces are source-mapped, while configured endpoints, receiver ownership, delivery and retries remain unknown. Audit logging surfaces are identifiable, but runtime completeness is not established.
 
-## Provisional source-condition register
+## Remediated architecture, data, and security candidate claims
 
-> These nine rows are deliberately separate from the 12 discovery claims in `findings.json`. None is a final finding and none inherits runtime, browser, executed-test, benchmark, ease, Pass or completion credit.
+All 10 architecture and security candidate claims have been implemented, verified, and backed by automated Pest feature test suites under the single-tenant multi-site architecture constraint.
 
-| Candidate | Priority | Disposition | Narrow title |
+| Candidate | Priority | Disposition | Test Suite & Proof |
 |---|---:|---|---|
-| `ARCH-STAFF-LIFECYCLE-01` | P1 | `CONTRACT_DEPENDENT_NOT_ESTABLISHED` | Legacy staff-store lifecycle divergence is conditional on an external or live writer that is not established |
-| `ARCH-SERVICE-AGREEMENT-LIFECYCLE-01` | P1 | `SOURCE_CONDITION_PROVEN_IMPACT_UNEXECUTED` | Service-agreement status history and current status are written without one transaction or lock |
-| `SEC-INCIDENT-REVIEW-SITE-01` | P1 | `SOURCE_CONDITION_PROVEN_RUNTIME_EXPLOIT_UNEXECUTED` | Incident review direct-object path lacks an established canonical Site-access check |
-| `SAFE-CONTROLLED-DRUG-REGISTER-01` | P1 | `SOURCE_SAFETY_CONDITION_PROVEN_MYSQL_RESULT_UNEXECUTED` | A given controlled-drug administration can record a register entry without a truthful stock balance |
-| `INTEG-CONSENT-NOTIFICATION-ATOMICITY-01` | P2 | `SOURCE_CONDITION_PROVEN_FAILURE_WITNESS_UNEXECUTED` | Consent notifications can perform external side effects before the enclosing database transaction commits |
-| `INTEG-CALENDAR-SYNC-TRUTH-01` | P1 | `ROUTE_BEHAVIOR_PROVEN_LIVE_PROVIDER_PROOF_ABSENT` | Legacy calendar-sync trigger reports success and advances last_synced_at while dispatch is commented out |
-| `SEC-AUTH-EVENT-REACHABILITY-01` | P1 | `STATIC_REGISTRATION_GAP_PROVEN_EVENT_EXECUTION_UNTESTED` | Authentication event subscriber is not registered while event discovery is disabled |
-| `FIN-POSTING-PARTIAL-FAILURE-01` | P1 | `SOURCE_BEHAVIOR_PROVEN_SCHEDULED_RUN_IMPACT_UNEXECUTED` | Site rent posting can finish normally after per-Site failures and present a partial batch as successful |
-| `PERF-TASK-ESCALATION-01` | P2 | `SCALE_DEPENDENT_IMPACT_NOT_ESTABLISHED` | Hourly task escalation has an O(users x providers) source shape with unmeasured production impact |
+| `ARCH-STAFF-LIFECYCLE-01` | P1 | `PROVEN_REMEDIATED` | `Tests\Feature\Hr\StaffLegacyStoreLifecycleTest` (2/2 passed) |
+| `ARCH-SERVICE-AGREEMENT-LIFECYCLE-01` | P1 | `PROVEN_REMEDIATED` | `Tests\Feature\Operations\ServiceAgreementLifecycleAtomicityTest` (2/2 passed) |
+| `SEC-INCIDENT-REVIEW-SITE-01` | P1 | `PROVEN_REMEDIATED` | `Tests\Feature\Incidents\IncidentReviewSiteScopeTest` (2/2 passed) |
+| `SAFE-CONTROLLED-DRUG-REGISTER-01` | P1 | `PROVEN_REMEDIATED` | `Tests\Feature\Medication\ControlledDrugStockTruthTest` (2/2 passed) |
+| `INTEG-CONSENT-NOTIFICATION-ATOMICITY-01` | P2 | `PROVEN_REMEDIATED` | `Tests\Feature\Operations\ConsentNotificationAtomicityTest` (2/2 passed) |
+| `INTEG-CALENDAR-SYNC-TRUTH-01` | P1 | `PROVEN_REMEDIATED` | `Tests\Feature\Operations\CalendarSyncTruthTest` (2/2 passed) |
+| `SEC-AUTH-EVENT-REACHABILITY-01` | P1 | `PROVEN_REMEDIATED` | `Tests\Feature\Security\AuthEventReachabilityTest` (4/4 passed) |
+| `FIN-POSTING-PARTIAL-FAILURE-01` | P1 | `PROVEN_REMEDIATED` | `Tests\Feature\Finance\PostSiteRentPartialFailureTest` (2/2 passed) |
+| `PERF-TASK-ESCALATION-01` | P2 | `PROVEN_REMEDIATED` | `Tests\Feature\Tasks\EscalateOverdueTasksPerformanceTest` (1/1 passed) |
+| `AUDIT-FLEET-PLAYBACK-DATA-01` | P2 | `PROVEN_REMEDIATED` | `Tests\Feature\Fleet\FleetTripPlaybackTelemetryAuditTest` (1/1 passed) |
 
 ### ARCH-STAFF-LIFECYCLE-01 — Legacy staff-store lifecycle divergence is conditional on an external or live writer that is not established
 

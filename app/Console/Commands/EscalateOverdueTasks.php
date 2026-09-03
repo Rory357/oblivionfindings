@@ -57,6 +57,7 @@ class EscalateOverdueTasks extends Command
 
         User::query()
             ->whereNotNull('approved_at')
+            ->whereDoesntHave('hrEmployeeProfile', fn ($q) => $q->where('is_active', false))
             ->orderBy('id')
             ->chunkById(100, function ($users) use ($aggregator, $notifications, $managerCutoff, &$seen, &$nudged, &$escalated, &$watchersPinged) {
                 foreach ($users as $user) {

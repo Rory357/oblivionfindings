@@ -56,6 +56,7 @@ class PostSiteRentJob implements ShouldQueue
             ->get();
 
         $posted = 0;
+        $errors = [];
 
         foreach ($sites as $site) {
             try {
@@ -95,8 +96,16 @@ class PostSiteRentJob implements ShouldQueue
 
                 $posted++;
             } catch (\Throwable $e) {
-                Log::error("PostSiteRentJob: Failed for site #{$site->id} ({$site->name}): {$e->getMessage()}");
+                $errorMsg = "Site #{$site->id} ({$site->name}): {$e->getMessage()}";
+                Log::error("PostSiteRentJob: Failed for {$errorMsg}");
+                $errors[] = $errorMsg;
             }
+        }
+
+        if ($errors !== []) {
+            $failedSummary = implode('; ', $errors);
+            Log::error("PostSiteRentJob: Completed with partial failures ({$posted} posted, " . count($errors) . " failed): {$failedSummary}");
+            throw new \RuntimeException("PostSiteRentJob encountered partial failures: {$failedSummary}");
         }
 
         Log::info("PostSiteRentJob: Posted rent for {$posted} sites for period {$periodStr}.");

@@ -5,9 +5,14 @@ namespace App\Policies;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 
 class ClientIncidentPolicy
 {
+    public function __construct(
+        private readonly ?UserSiteAccessService $siteAccess = null,
+    ) {}
+
     public function viewAny(User $user): bool
     {
         return $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
@@ -61,18 +66,24 @@ class ClientIncidentPolicy
 
     public function review(User $user, ClientIncident $incident): bool
     {
-        return $user->canDo('incidents.approve') && $incident->status === 'submitted';
+        return $user->canDo('incidents.approve')
+            && $incident->status === 'submitted'
+            && $this->canAccessIncidentSite($user, $incident);
     }
 
     public function close(User $user, ClientIncident $incident): bool
     {
-        return $user->canDo('incidents.approve') && $incident->status === 'reviewed';
+        return $user->canDo('incidents.approve')
+            && $incident->status === 'reviewed'
+            && $this->canAccessIncidentSite($user, $incident);
     }
 
     public function reopen(User $user, ClientIncident $incident): bool
     {
         // Reopening is an elevated action (audit-sensitive).
-        return $user->canDo('incidents.reopen') && $incident->status === 'closed';
+        return $user->canDo('incidents.reopen')
+            && $incident->status === 'closed'
+            && $this->canAccessIncidentSite($user, $incident);
     }
 
     public function export(User $user): bool
@@ -83,5 +94,25 @@ class ClientIncidentPolicy
     public function delete(User $user, ClientIncident $incident): bool
     {
         return false;
+    }
+
+    private function canAccessIncidentSite(User $user, ClientIncident $incident): bool
+    {
+        $siteService = $this->siteAccess ?? app(UserSiteAccessService::class);
+        if ($siteService->canBypass($user, ['sites.viewAll', 'incidents.manage'])) {
+            return true;
+        }
+
+        $siteId = $incident->site_id ?: $incident->client?->site_id;
+        if (! $siteId) {
+            return true;
+        }
+
+        $accessibleSiteIds = $siteService->accessibleSiteIds($user);
+        if ($accessibleSiteIds === []) {
+            return false;
+        }
+
+        return in_array((int) $siteId, $accessibleSiteIds, true);
     }
 }

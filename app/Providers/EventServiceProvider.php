@@ -75,6 +75,15 @@ class EventServiceProvider extends ServiceProvider
     ];
 
     /**
+     * The subscriber classes to register.
+     *
+     * @var array<int, class-string>
+     */
+    protected $subscribe = [
+        \App\Listeners\AuthEventSubscriber::class,
+    ];
+
+    /**
      * Laravel registers its core event provider through Application::configure(),
      * so the framework already installs the verification listener once. This
      * application provider must not install the same fallback a second time.

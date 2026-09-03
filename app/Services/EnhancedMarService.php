@@ -2065,7 +2065,7 @@ class EnhancedMarService
     /**
      * Record controlled drug entry
      */
-    private function recordControlledDrugEntry(
+    public function recordControlledDrugEntry(
         ClientMedication $medication,
         ClientMedicationAdministration $admin,
         int $recordedBy,
@@ -2086,6 +2086,12 @@ class EnhancedMarService
         }
 
         $before = MedicationStockQuantity::normalize($stock->on_hand);
+
+        if (MedicationStockQuantity::greaterThan($quantity, $before)) {
+            throw ValidationException::withMessages([
+                'quantity_administered' => "Insufficient controlled drug stock available. Stock on hand is {$before}, but {$quantity} was requested.",
+            ]);
+        }
 
         $after = MedicationStockQuantity::subtract($before, $quantity);
         $stock->on_hand = $after;

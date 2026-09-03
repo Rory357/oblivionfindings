@@ -93,6 +93,11 @@ class FleetTripController extends Controller
         $visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
         $trip = $this->visibleTripsQuery($visibleSiteIds)->findOrFail($trip);
 
+        AuditLogger::log('fleet.trip.playback.data', $trip, [
+            'trip_id' => $trip->id,
+            'asset_id' => $trip->asset_id,
+        ]);
+
         $query = FleetTelemetryEvent::query()
             ->where('asset_id', $trip->asset_id)
             ->where('consent_blocked', false)
