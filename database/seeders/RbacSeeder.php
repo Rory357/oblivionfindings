@@ -466,6 +466,10 @@ class RbacSeeder extends Seeder
             ['key' => 'privacy.manageLegalHolds', 'description' => 'Manage legal holds', 'group' => 'privacy', 'module' => 'Compliance'],
             ['key' => 'privacy.reportBreaches', 'description' => 'Report data breaches', 'group' => 'privacy', 'module' => 'Compliance'],
             ['key' => 'privacy.conductDPIA', 'description' => 'Conduct PIAs', 'group' => 'privacy', 'module' => 'Compliance'],
+            ['key' => 'privacy.export', 'description' => 'Export privacy compliance and request reports', 'group' => 'privacy', 'module' => 'Compliance'],
+            ['key' => 'privacy.breach.export', 'description' => 'Export data breach registers', 'group' => 'privacy', 'module' => 'Compliance'],
+            ['key' => 'privacy.retention.export', 'description' => 'Export data retention audit reports', 'group' => 'privacy', 'module' => 'Compliance'],
+            ['key' => 'privacy.legal_holds.export', 'description' => 'Export legal holds registers', 'group' => 'privacy', 'module' => 'Compliance'],
 
             // Hazards
             ['key' => 'hazards.view', 'description' => 'View hazards', 'group' => 'hazards', 'module' => 'Compliance'],
@@ -652,6 +656,7 @@ class RbacSeeder extends Seeder
             'staff.vetting.view', 'staff.vetting.manage', 'staff.induction.manage',
             'privacy.viewRequests', 'privacy.processRequests', 'privacy.manageRetention',
             'privacy.manageLegalHolds', 'privacy.reportBreaches', 'privacy.conductDPIA',
+            'privacy.export', 'privacy.breach.export', 'privacy.retention.export', 'privacy.legal_holds.export',
             'integrations.view', 'integrations.manage_secrets', 'integrations.manage_site_secrets',
             'siteHardware.view', 'siteHardware.manage', 'controlRoom.alerts.view',
             'llm.generate_client_narrative', 'llm.generate_staff_summary',

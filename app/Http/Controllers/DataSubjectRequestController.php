@@ -273,7 +273,7 @@ class DataSubjectRequestController extends Controller
      */
     public function export(Request $request, DataSubjectRequest $dsRequest)
     {
-        $this->authorizePermission($request, 'privacy.viewRequests');
+        $this->authorizePermission($request, 'privacy.export');
 
         $dsRequest->load(['client', 'user']);
 

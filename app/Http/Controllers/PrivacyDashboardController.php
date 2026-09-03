@@ -576,6 +576,10 @@ class PrivacyDashboardController extends Controller
             'manageRetention' => (bool) $user?->canDo('privacy.manageRetention'),
             'manageLegalHolds' => (bool) $user?->canDo('privacy.manageLegalHolds'),
             'conductDPIA' => (bool) $user?->canDo('privacy.conductDPIA'),
+            'export' => (bool) $user?->canDo('privacy.export'),
+            'exportBreaches' => (bool) $user?->canDo('privacy.breach.export'),
+            'exportRetention' => (bool) $user?->canDo('privacy.retention.export'),
+            'exportLegalHolds' => (bool) ($user?->canDo('privacy.legal_holds.export') || $user?->canDo('privacy.legalHolds.export')),
             // Generic "can act" used to gate the hero/right-click create menu.
             'manage' => (bool) $user?->canDo('privacy.processRequests'),
         ];

@@ -52,6 +52,9 @@ Route::middleware(['auth'])->group(function () {
             ->name('privacy.requests.index');
         Route::get('/privacy/requests/{dsRequest}', [DataSubjectRequestController::class, 'show'])
             ->name('privacy.requests.show');
+    });
+
+    Route::middleware('permission:privacy.export')->group(function () {
         Route::get('/privacy/requests/{dsRequest}/export', [DataSubjectRequestController::class, 'export'])
             ->name('privacy.requests.export');
     });
@@ -150,7 +153,9 @@ Route::middleware(['auth'])->group(function () {
             ->name('privacy.reports.index');
         Route::get('/privacy/reports/compliance', [PrivacyReportController::class, 'compliance'])
             ->name('privacy.reports.compliance');
-        Route::get('/privacy/reports/export', [PrivacyReportController::class, 'export'])
-            ->name('privacy.reports.export');
     });
+
+    // Privacy Compliance Report Exports (type-specific capabilities enforced in controller)
+    Route::get('/privacy/reports/export', [PrivacyReportController::class, 'export'])
+        ->name('privacy.reports.export');
 });
