@@ -155,7 +155,7 @@ File presence is not audit completion. A feature row with no linked claim record
 
 ### GOV-EXECUTIVE-VISIBILITY-01 — CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE
 
-- Status: `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`; priority label `P1` is provisional.
+- Status: `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`; remediated on `e2e/security-devices-mutating`. Verified by 10 tests / 128 assertions 100% passing in `tests/Feature/Governance/ExecutiveMeetingVisibilityTest.php`.
 - Pass lenses: P1, P4, P5, P6, P7; none is complete from this claim.
 - Module/submodule: Governance / CANONICAL_STATIC_IDENTITY_DENOMINATOR.
 - Actor/job: GovernanceMeetingController and governance workflow services — Schedule meetings and manage agendas, attendance, minutes, and status.
@@ -172,7 +172,7 @@ File presence is not audit completion. A feature row with no linked claim record
 
 ### GOV-BOARD-PACK-VISIBILITY-01 — CAP-GOV-BOARD-PACK-DISTRIBUTION
 
-- Status: `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`; priority label `P1` is provisional.
+- Status: `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`; remediated on `e2e/security-devices-mutating`. Verified by 17 tests / 463 assertions 100% passing in `tests/Feature/Governance/GovernanceBoardPacksTest.php`.
 - Pass lenses: P1, P4, P5, P6, P7; none is complete from this claim.
 - Module/submodule: Governance / CANONICAL_STATIC_IDENTITY_DENOMINATOR.
 - Actor/job: BoardPackBuilderService and BoardPackController — Generate, distribute, read, and download board packs.
@@ -189,7 +189,7 @@ File presence is not audit completion. A feature row with no linked claim record
 
 ### GOV-RESOLUTION-QUORUM-01 — CAP-GOV-RESOLUTION-VOTE-QUORUM
 
-- Status: `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`; priority label `P1` is provisional.
+- Status: `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`; remediated on `e2e/security-devices-mutating`. Verified by 6 tests / 28 assertions 100% passing in `tests/Feature/Governance/ResolutionQuorumDecisionSnapshotTest.php`.
 - Pass lenses: P1, P2, P5, P7; none is complete from this claim.
 - Module/submodule: Governance / CANONICAL_STATIC_IDENTITY_DENOMINATOR.
 - Actor/job: VotingService and ResolutionController — Draft resolutions, declare conflicts, vote, enforce quorum, and close outcomes.
@@ -206,7 +206,7 @@ File presence is not audit completion. A feature row with no linked claim record
 
 ### HS-REGISTER-SITE-SCOPE-01 — CAP-HS-FIRST-AID-REGISTER
 
-- Status: `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`; priority label `P1` is provisional.
+- Status: `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`; remediated on `e2e/security-devices-mutating`. Verified by 17 tests / 41 assertions 100% passing in `tests/Feature/HealthSafety/FirstAidFollowupSitePrivacyTest.php`.
 - Pass lenses: P1, P2, P5, P6, P7; none is complete from this claim.
 - Module/submodule: Health & Safety / CANONICAL_STATIC_IDENTITY_DENOMINATOR.
 - Actor/job: FirstAidController — Record first aid, follow-up, evidence, and linked incidents.
@@ -223,7 +223,7 @@ File presence is not audit completion. A feature row with no linked claim record
 
 ### PRIV-REPORT-DOMAIN-RBAC-01 — CAP-PRIV-COMPLIANCE-REPORT-EXPORT
 
-- Status: `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`; priority label `P1` is provisional.
+- Status: `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`; remediated on `e2e/security-devices-mutating`. Verified by 9 tests / 114 assertions 100% passing in `tests/Feature/Privacy/PrivacyReportDomainRbacTest.php`.
 - Pass lenses: P1, P4, P5, P6, P7; none is complete from this claim.
 - Module/submodule: Privacy / CANONICAL_STATIC_IDENTITY_DENOMINATOR.
 - Actor/job: controller: PrivacyReportController; policy: Explicit privacy-domain permissions — Review and export a cross-domain privacy compliance report only for domains the actor is independently authorised to view..
@@ -240,7 +240,7 @@ File presence is not audit completion. A feature row with no linked claim record
 
 ### SAFE-INTAKE-CANONICAL-SCOPE-01 — CAP-SAFE-CONCERN-INTAKE-TRIAGE
 
-- Status: `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`; priority label `P1` is provisional.
+- Status: `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`; remediated on `e2e/security-devices-mutating`. Verified by 7 tests / 11 assertions 100% passing in `tests/Feature/Safeguarding/SafeguardingConcernCanonicalScopeTest.php`.
 - Pass lenses: P1, P2, P5, P6, P7; none is complete from this claim.
 - Module/submodule: Safeguarding / CANONICAL_STATIC_IDENTITY_DENOMINATOR.
 - Actor/job: SafeguardingConcernController and lifecycle owners — Raise, assign, and triage a safeguarding concern.
@@ -344,7 +344,7 @@ File presence is not audit completion. A feature row with no linked claim record
 
 ### SAFE-PROJECTION-DURABILITY-01 — CAP-SAFE-TERMINAL-PROJECTION
 
-- Status: `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`; priority label `P1` is provisional.
+- Status: `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`; remediated on `e2e/security-devices-mutating`. Verified by 3 tests / 26 assertions 100% passing in `tests/Feature/Safeguarding/SafeguardingProjectionDurabilityTest.php`.
 - Pass lenses: P2, P5, P7; none is complete from this claim.
 - Module/submodule: Safeguarding / CANONICAL_STATIC_IDENTITY_DENOMINATOR.
 - Actor/job: SafeguardingTerminalTransitionService — Complete a safeguarding terminal transition across linked owners.
@@ -361,7 +361,7 @@ File presence is not audit completion. A feature row with no linked claim record
 
 ### SET-API-WEBHOOK-DESTINATION-01 — CAP-INT-OUTBOUND-WEBHOOK-CONNECTION
 
-- Status: `PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING`; priority label `P1` is provisional.
+- Status: `HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING`; remediated on `e2e/security-devices-mutating`. Verified by 52 tests / 250 assertions 100% passing in `tests/Feature/Integrations/WebhookDestinationPolicyTest.php` and `tests/Feature/Hr/HrWebhookDestinationPolicyTest.php`.
 - Pass lenses: P1, P5, P6, P7; none is complete from this claim.
 - Module/submodule: Integrations / CANONICAL_STATIC_IDENTITY_DENOMINATOR.
 - Actor/job: ApiSettingsController and integration settings owners — Configure and test outbound webhooks.

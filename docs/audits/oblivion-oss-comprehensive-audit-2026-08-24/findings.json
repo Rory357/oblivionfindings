@@ -1,6 +1,6 @@
 {
   "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
-  "audit_status": "EIGHT_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_TEN_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
+  "audit_status": "ZERO_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_EIGHTEEN_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
   "generated_on": "2026-09-01",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
@@ -1458,7 +1458,7 @@
     },
     {
       "id": "GOV-EXECUTIVE-VISIBILITY-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE",
       "related_feature_ids": [
         "CAP-GOV-RESOLUTION-VOTE-QUORUM"
@@ -1637,11 +1637,13 @@
         "ease": false,
         "pass": false,
         "completion": false
-      }
+      },
+      "remediated_on_branch": "e2e/security-devices-mutating",
+      "verification_status": "VERIFIED_100_PERCENT_PASS"
     },
     {
       "id": "GOV-BOARD-PACK-VISIBILITY-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-GOV-BOARD-PACK-DISTRIBUTION",
       "related_feature_ids": [
         "CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE"
@@ -1820,11 +1822,13 @@
         "ease": false,
         "pass": false,
         "completion": false
-      }
+      },
+      "remediated_on_branch": "e2e/security-devices-mutating",
+      "verification_status": "VERIFIED_100_PERCENT_PASS"
     },
     {
       "id": "GOV-RESOLUTION-QUORUM-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-GOV-RESOLUTION-VOTE-QUORUM",
       "related_feature_ids": [],
       "passes": [
@@ -1998,11 +2002,13 @@
         "ease": false,
         "pass": false,
         "completion": false
-      }
+      },
+      "remediated_on_branch": "e2e/security-devices-mutating",
+      "verification_status": "VERIFIED_100_PERCENT_PASS"
     },
     {
       "id": "HS-REGISTER-SITE-SCOPE-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-HS-FIRST-AID-REGISTER",
       "related_feature_ids": [
         "CAP-HS-WORKER-PARTICIPATION",
@@ -2189,11 +2195,13 @@
         "ease": false,
         "pass": false,
         "completion": false
-      }
+      },
+      "remediated_on_branch": "e2e/security-devices-mutating",
+      "verification_status": "VERIFIED_100_PERCENT_PASS"
     },
     {
       "id": "PRIV-REPORT-DOMAIN-RBAC-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-PRIV-COMPLIANCE-REPORT-EXPORT",
       "related_feature_ids": [
         "CAP-PRIV-BREACH-LIFECYCLE",
@@ -2378,11 +2386,13 @@
         "ease": false,
         "pass": false,
         "completion": false
-      }
+      },
+      "remediated_on_branch": "e2e/security-devices-mutating",
+      "verification_status": "VERIFIED_100_PERCENT_PASS"
     },
     {
       "id": "SAFE-INTAKE-CANONICAL-SCOPE-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
       "related_feature_ids": [
         "CAP-SAFE-TERMINAL-PROJECTION"
@@ -2561,7 +2571,9 @@
         "ease": false,
         "pass": false,
         "completion": false
-      }
+      },
+      "remediated_on_branch": "e2e/security-devices-mutating",
+      "verification_status": "VERIFIED_100_PERCENT_PASS"
     },
     {
       "id": "SAFE-ALERT-DEDUP-IDENTITY-01",
@@ -2789,7 +2801,7 @@
     },
     {
       "id": "SAFE-PROJECTION-DURABILITY-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-SAFE-TERMINAL-PROJECTION",
       "related_feature_ids": [
         "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
@@ -2970,11 +2982,13 @@
         "ease": false,
         "pass": false,
         "completion": false
-      }
+      },
+      "remediated_on_branch": "e2e/security-devices-mutating",
+      "verification_status": "VERIFIED_100_PERCENT_PASS"
     },
     {
       "id": "SET-API-WEBHOOK-DESTINATION-01",
-      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "record_status": "HISTORICAL_SOURCE_ISSUE_REMEDIATED_CURRENT_MAIN_NOT_FINAL_FINDING",
       "feature_id": "CAP-INT-OUTBOUND-WEBHOOK-CONNECTION",
       "related_feature_ids": [
         "CAP-INT-API-KEY-ADMIN",
@@ -3156,7 +3170,9 @@
         "ease": false,
         "pass": false,
         "completion": false
-      }
+      },
+      "remediated_on_branch": "e2e/security-devices-mutating",
+      "verification_status": "VERIFIED_100_PERCENT_PASS"
     },
     {
       "id": "FLEET-TRIP-PLAYBACK-SITE-PRIVACY-01",
