@@ -68,6 +68,17 @@ New status key? Add it to `status-colors.ts` once; it's used on 50+ pages.
 | Settings pages | `layouts/settings/layout.tsx` |
 | Marketing pages | `layouts/marketing-layout.tsx` |
 
+**The global shell chrome (approved 2026-09-05).** The top bar +
+sidebar follow `design_styles/APP_SHELL_STYLE_GUIDE.md` — the "Event
+Horizon chrome": one continuous ink surface for header and sidebar
+(dark in light mode, by design), "Oblivion Care" ring-O wordmark,
+centred command search, Report incident / Clock in / Messages / bell /
+avatar in the header (no Live chip), collapsible module groups, an
+edge-tab whole-sidebar collapse, and a neutral grey page ground with
+white lifted cards. Any request to build, restyle, or "redo" the
+sidebar/top bar/page background implements that guide. Enforcement
+points: `app-header.tsx`, `app-sidebar.tsx`, shell tokens in `app.css`.
+
 Page heroes follow the shared hero pattern — see
 `design_styles/GOVERNANCE_HERO_GUIDE.md` and `docs/hero-unification-v2-plan.md`
 before styling a new hero.
@@ -264,6 +275,14 @@ before.
   show/profile page opening with a plain heading or a one-off banner
   instead of the client-profile hero regions (identity row, action
   cluster, stat tiles, vitals grid, group-pill footer).
+- **A global "Live"/sync chip in the top bar** — removed from the
+  approved shell (2026-09-05); live/sync status belongs on the page
+  surfaces that need it, not in the global chrome.
+- **Violet-tinted or pure-white page grounds** — the light
+  `--background` is a neutral mid-light grey with white cards on top
+  (see `APP_SHELL_STYLE_GUIDE.md` §4; charcoal grounds were tried and
+  rejected as too dark). Don't reintroduce tinted near-whites behind
+  cards or hardcode a per-page ground.
 - **Non-existent colour tokens** — utilities like `bg-warning/20` or
   `text-warning-foreground` reference a `warning` token that isn't in the
   `@theme` registry, so they silently render as nothing. The real tokens
@@ -373,6 +392,7 @@ This file only works if it reflects reality. The loop:
 ## Deeper guides
 
 - `design_styles/DESIGN_TOKENS.md` — full token reference, charts, adding tokens
+- `design_styles/APP_SHELL_STYLE_GUIDE.md` — the global shell: ink header + sidebar chrome, collapse behaviour, grey page ground
 - `design_styles/POPUP_STYLE_GUIDE.md` — dialog anatomy and conventions
 - `design_styles/BUTTON_STYLE_GUIDE.md` — the soft-depth button spec (primary/outline)
 - `design_styles/NAVIGATION_STYLE_GUIDE.md` — two-tier section nav (connected tab + toned strip)
