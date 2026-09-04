@@ -3,10 +3,21 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use App\Models\SiteTypePlan;
 use App\Support\SiteRecommendedDocuments;
 
 class SiteReadinessService
 {
+    /**
+     * Per-request memo of each site's current published plan. evaluate()
+     * needs it for both the emergency and medication items, and the sites
+     * index evaluates the same site twice (row payload + saved-view
+     * counts) — without this, that was up to 4 plan queries per site.
+     *
+     * @var array<int, SiteTypePlan|null>
+     */
+    private array $planMemo = [];
+
     public function evaluate(Site $site): array
     {
         $critical = [
@@ -80,16 +91,25 @@ class SiteReadinessService
 
     private function planEmergencyReady(Site $site): bool
     {
-        $plan = app(SiteTypePlanService::class)->currentPublished($site);
+        $plan = $this->currentPlanFor($site);
 
         return $plan ? app(SiteTypePlanService::class)->hasEmergencyLayer($plan) : false;
     }
 
     private function planMedicationReady(Site $site): bool
     {
-        $plan = app(SiteTypePlanService::class)->currentPublished($site);
+        $plan = $this->currentPlanFor($site);
 
         return $plan ? app(SiteTypePlanService::class)->hasMedicationPin($plan) : false;
+    }
+
+    private function currentPlanFor(Site $site): ?SiteTypePlan
+    {
+        if (! array_key_exists($site->id, $this->planMemo)) {
+            $this->planMemo[$site->id] = app(SiteTypePlanService::class)->currentPublished($site);
+        }
+
+        return $this->planMemo[$site->id];
     }
 
     private function hazardsReviewed(Site $site): bool

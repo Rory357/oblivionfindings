@@ -25,12 +25,13 @@ use App\Services\Sites\SitePhysicalRoomService;
 use App\Services\Sites\SiteReadinessService;
 use App\Services\UserSiteAccessService;
 use App\Support\NzRegions;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class SiteController extends Controller
@@ -137,6 +138,13 @@ class SiteController extends Controller
                 'is_high_risk',
                 'is_high_needs',
                 'primary_contact_user_id',
+                // Readiness inputs: without these selected, evaluate() saw
+                // null and fell through to a per-site plan query (and marked
+                // phone/email as always missing on the index).
+                'phone',
+                'email',
+                'emergency_plan_location',
+                'medication_storage_location',
             ])
             ->with([
                 'primaryContact:id,name',
@@ -144,8 +152,20 @@ class SiteController extends Controller
             ])
             ->withCount($this->siteOperationalCounts())
             ->orderBy('name')
-            ->get()
-            ->map(fn (Site $site) => $this->siteIndexPayload($site, $readinessService))
+            ->get();
+
+        // One grouped query for every row's geofence pill instead of a
+        // query (plus schema check) per site.
+        $geofencesBySite = SchemaCache::hasTable('asset_geofences')
+            ? AssetGeofence::query()
+                ->whereIn('site_id', $sites->pluck('id'))
+                ->whereNull('asset_id')
+                ->get(['id', 'site_id', 'is_active'])
+                ->groupBy('site_id')
+            : null;
+
+        $sites = $sites
+            ->map(fn (Site $site) => $this->siteIndexPayload($site, $readinessService, $geofencesBySite))
             ->when($readiness === 'incomplete', fn ($collection) => $collection
                 ->filter(fn (array $site) => $site['readiness']['is_active_but_incomplete'])
                 ->values()
@@ -164,6 +184,12 @@ class SiteController extends Controller
                 'is_high_risk',
                 'is_high_needs',
                 'primary_contact_user_id',
+                // Same readiness inputs as the main list — savedViewCounts
+                // re-evaluates readiness on this collection.
+                'phone',
+                'email',
+                'emergency_plan_location',
+                'medication_storage_location',
             ])
             ->withCount($this->siteOperationalCounts())
             ->get();
@@ -1268,7 +1294,7 @@ class SiteController extends Controller
         ];
     }
 
-    private function siteIndexPayload(Site $site, SiteReadinessService $readinessService): array
+    private function siteIndexPayload(Site $site, SiteReadinessService $readinessService, ?Collection $geofencesBySite = null): array
     {
         $roomsTotal = (int) ($site->rooms_total ?? 0);
         $roomsOccupied = (int) ($site->rooms_occupied ?? 0);
@@ -1305,7 +1331,7 @@ class SiteController extends Controller
             'overdue_checklists_count' => (int) ($site->overdue_checklists_count ?? 0),
             'open_maintenance_count' => (int) ($site->open_maintenance_count ?? 0),
             'readiness' => $readinessService->slim($site),
-            'geofence_status' => $this->resolveGeofenceStatus($site),
+            'geofence_status' => $this->resolveGeofenceStatus($site, $geofencesBySite),
         ];
     }
 
@@ -1329,16 +1355,20 @@ class SiteController extends Controller
      *   'missing'   — type=house/facility with tracked residents but no fence.
      *   'na'        — head office or otherwise not expected to have one.
      */
-    private function resolveGeofenceStatus(Site $site): string
+    private function resolveGeofenceStatus(Site $site, ?Collection $geofencesBySite = null): string
     {
-        if (! Schema::hasTable('asset_geofences')) {
+        if (! SchemaCache::hasTable('asset_geofences')) {
             return 'na';
         }
 
-        $geofences = AssetGeofence::query()
-            ->where('site_id', $site->id)
-            ->whereNull('asset_id')
-            ->get(['id', 'is_active']);
+        // Prefer the pre-grouped batch the index builds; fall back to a
+        // per-site query for any other caller.
+        $geofences = $geofencesBySite !== null
+            ? ($geofencesBySite->get($site->id) ?? collect())
+            : AssetGeofence::query()
+                ->where('site_id', $site->id)
+                ->whereNull('asset_id')
+                ->get(['id', 'is_active']);
 
         if ($geofences->isNotEmpty()) {
             return $geofences->contains(fn ($g) => (bool) $g->is_active) ? 'active' : 'inactive';
