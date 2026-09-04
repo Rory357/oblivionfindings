@@ -116,7 +116,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaCache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -1333,7 +1333,7 @@ class ClientController extends Controller
             // First-aid treatments recorded for this client (read-only panel; gated on the
             // first_aid_records.client_id FK added by the gold-standard rebuild).
             'first_aid_records' => $sectionAccess['first_aid']
-                && Schema::hasTable('first_aid_records')
+                && SchemaCache::hasTable('first_aid_records')
                 ? FirstAidRecord::where('client_id', $client->id)
                     ->with(['site:id,name', 'firstAider:id,name'])
                     ->orderByDesc('treatment_date')
@@ -2196,7 +2196,7 @@ class ClientController extends Controller
             'clinical_protocols',
             'clinical_protocol_schedules',
         ] as $table) {
-            if (! Schema::hasTable($table)) {
+            if (! SchemaCache::hasTable($table)) {
                 return $emptySummary;
             }
         }
@@ -2212,7 +2212,7 @@ class ClientController extends Controller
 
     private function buildPendingConsentRequestCount(Client $client): int
     {
-        if (! Schema::hasTable('consent_requests')) {
+        if (! SchemaCache::hasTable('consent_requests')) {
             return 0;
         }
 
@@ -2337,7 +2337,7 @@ class ClientController extends Controller
 
     private function buildAvailableTrackers(Client $client, User $viewer)
     {
-        if (! Schema::hasTable('devices') || ! Schema::hasTable('location_hardware')) {
+        if (! SchemaCache::hasTable('devices') || ! SchemaCache::hasTable('location_hardware')) {
             return collect();
         }
 
@@ -3289,10 +3289,10 @@ class ClientController extends Controller
      */
     private function buildTransportData(Client $client): array
     {
-        $hasTransports = Schema::hasTable('fleet_resident_transports');
-        $hasOutings = Schema::hasTable('fleet_outings');
-        $hasMedLogs = Schema::hasTable('fleet_medication_transit_logs');
-        $hasIncidents = Schema::hasTable('fleet_incidents');
+        $hasTransports = SchemaCache::hasTable('fleet_resident_transports');
+        $hasOutings = SchemaCache::hasTable('fleet_outings');
+        $hasMedLogs = SchemaCache::hasTable('fleet_medication_transit_logs');
+        $hasIncidents = SchemaCache::hasTable('fleet_incidents');
 
         // Stats (30-day window)
         $thirtyDaysAgo = now()->subDays(30);
@@ -3394,7 +3394,7 @@ class ClientController extends Controller
             : collect();
 
         // Client-scoped transport bookings (Book transport workflow)
-        $bookings = Schema::hasTable('client_transport_bookings')
+        $bookings = SchemaCache::hasTable('client_transport_bookings')
             ? ClientTransportBooking::query()
                 ->where('client_id', $client->id)
                 ->whereIn('status', ['requested', 'confirmed'])
@@ -3468,7 +3468,7 @@ class ClientController extends Controller
             ];
         }
 
-        if (! Schema::hasTable('devices')) {
+        if (! SchemaCache::hasTable('devices')) {
             return [
                 'trackingRestricted' => false,
                 'canManage' => $canManageTrackers,
@@ -3600,7 +3600,7 @@ class ClientController extends Controller
         $geofences = [];
         $houseGeofence = null;
         try {
-            if (Schema::hasTable('asset_geofences') && is_numeric($client->site_id)) {
+            if (SchemaCache::hasTable('asset_geofences') && is_numeric($client->site_id)) {
                 if ($client->house_geofence_id) {
                     $houseGeofence = AssetGeofence::query()
                         ->whereKey($client->house_geofence_id)
@@ -3807,7 +3807,7 @@ class ClientController extends Controller
             $device->forceFill(['meta' => $meta])->save();
         }
 
-        if (Schema::hasTable('control_room_alerts')) {
+        if (SchemaCache::hasTable('control_room_alerts')) {
             $alerts = ControlRoomAlert::query()
                 ->where('client_id', $client->id)
                 ->whereIn('source', ['tracker', 'resident_tracker'])

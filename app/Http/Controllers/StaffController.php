@@ -17,7 +17,7 @@ use App\Services\WorkstreamService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaCache;
 use Inertia\Inertia;
 
 class StaffController extends Controller
@@ -129,10 +129,10 @@ class StaffController extends Controller
 
     private function buildFleetData(User $user): array
     {
-        $hasSessions = Schema::hasTable('fleet_driver_sessions');
-        $hasTrips = Schema::hasTable('fleet_trips');
-        $hasMetrics = Schema::hasTable('fleet_driving_metrics');
-        $hasIncidents = Schema::hasTable('fleet_incidents');
+        $hasSessions = SchemaCache::hasTable('fleet_driver_sessions');
+        $hasTrips = SchemaCache::hasTable('fleet_trips');
+        $hasMetrics = SchemaCache::hasTable('fleet_driving_metrics');
+        $hasIncidents = SchemaCache::hasTable('fleet_incidents');
 
         // Driver eligibility
         $eligibility = $user->hrDriverEligibility;
@@ -362,7 +362,7 @@ class StaffController extends Controller
 
     private function assignedClientCountMap(array $userIds): array
     {
-        if ($userIds === [] || ! Schema::hasTable('client_user')) {
+        if ($userIds === [] || ! SchemaCache::hasTable('client_user')) {
             return [];
         }
 
@@ -371,10 +371,10 @@ class StaffController extends Controller
             ->whereIn('client_user.user_id', $userIds)
             ->groupBy('client_user.user_id');
 
-        if (Schema::hasTable('clients')) {
+        if (SchemaCache::hasTable('clients')) {
             $query->join('clients', 'clients.id', '=', 'client_user.client_id');
 
-            if (Schema::hasColumn('clients', 'deleted_at')) {
+            if (SchemaCache::hasColumn('clients', 'deleted_at')) {
                 $query->whereNull('clients.deleted_at');
             }
         }
@@ -387,7 +387,7 @@ class StaffController extends Controller
 
     private function assignedClientsForUser(int $userId): array
     {
-        if (! Schema::hasTable('client_user') || ! Schema::hasTable('clients')) {
+        if (! SchemaCache::hasTable('client_user') || ! SchemaCache::hasTable('clients')) {
             return [];
         }
 
@@ -398,7 +398,7 @@ class StaffController extends Controller
             ->orderBy('clients.last_name')
             ->select('clients.id', 'clients.first_name', 'clients.last_name', 'clients.status');
 
-        if (Schema::hasColumn('clients', 'deleted_at')) {
+        if (SchemaCache::hasColumn('clients', 'deleted_at')) {
             $query->whereNull('clients.deleted_at');
         }
 
@@ -412,7 +412,7 @@ class StaffController extends Controller
 
     private function clientSummaryMap(array $clientIds): array
     {
-        if ($clientIds === [] || ! Schema::hasTable('clients')) {
+        if ($clientIds === [] || ! SchemaCache::hasTable('clients')) {
             return [];
         }
 
@@ -420,7 +420,7 @@ class StaffController extends Controller
             ->whereIn('id', $clientIds)
             ->select('id', 'first_name', 'last_name');
 
-        if (Schema::hasColumn('clients', 'deleted_at')) {
+        if (SchemaCache::hasColumn('clients', 'deleted_at')) {
             $query->whereNull('deleted_at');
         }
 
@@ -484,7 +484,7 @@ class StaffController extends Controller
 
         // Read-only compatibility for records awaiting a governed backfill into
         // HrEmployeeProfile. StaffController never writes either legacy store.
-        if ($missingUserIds !== [] && Schema::hasTable('staff') && Schema::hasColumn('staff', 'user_id')) {
+        if ($missingUserIds !== [] && SchemaCache::hasTable('staff') && SchemaCache::hasColumn('staff', 'user_id')) {
             $query = DB::table('staff')
                 ->whereIn('user_id', $missingUserIds)
                 ->select($this->availableColumns('staff', [
@@ -497,7 +497,7 @@ class StaffController extends Controller
                     'status',
                 ]));
 
-            if (Schema::hasColumn('staff', 'deleted_at')) {
+            if (SchemaCache::hasColumn('staff', 'deleted_at')) {
                 $query->whereNull('deleted_at');
             }
 
@@ -521,7 +521,7 @@ class StaffController extends Controller
         }
 
         $missingUserIds = array_values(array_diff($userIds, array_keys($profiles)));
-        if ($missingUserIds !== [] && Schema::hasTable('staff_profiles') && Schema::hasColumn('staff_profiles', 'user_id')) {
+        if ($missingUserIds !== [] && SchemaCache::hasTable('staff_profiles') && SchemaCache::hasColumn('staff_profiles', 'user_id')) {
             $profiles += DB::table('staff_profiles')
                 ->whereIn('user_id', $missingUserIds)
                 ->select($this->availableColumns('staff_profiles', [
@@ -612,7 +612,7 @@ class StaffController extends Controller
     {
         return array_values(array_filter(
             $columns,
-            fn ($column) => Schema::hasColumn($table, $column)
+            fn ($column) => SchemaCache::hasColumn($table, $column)
         ));
     }
 }

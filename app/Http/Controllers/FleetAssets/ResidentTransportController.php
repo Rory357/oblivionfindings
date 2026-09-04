@@ -20,7 +20,7 @@ use App\Services\MedicationScanVerificationService;
 use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaCache;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -64,7 +64,7 @@ class ResidentTransportController extends Controller
     {
         $formOptions = $this->formOptions($request);
 
-        if (! Schema::hasTable('fleet_resident_transports')) {
+        if (! SchemaCache::hasTable('fleet_resident_transports')) {
             return Inertia::render('fleet-assets/transports/index', [
                 'transports' => [
                     'data' => [],
@@ -245,7 +245,7 @@ class ResidentTransportController extends Controller
 
         $withMedications = 0;
         if (
-            Schema::hasTable('fleet_medication_transit_logs')
+            SchemaCache::hasTable('fleet_medication_transit_logs')
             && $this->journeyScope->canViewMedicationTransit($request->user())
         ) {
             $medications = FleetMedicationTransitLog::query()
@@ -301,7 +301,7 @@ class ResidentTransportController extends Controller
         $vehicles = $vehicleQuery->limit(200)->get(['id', 'name', 'asset_tag']);
 
         $recentResidents = collect();
-        if (Schema::hasTable('fleet_resident_transports')) {
+        if (SchemaCache::hasTable('fleet_resident_transports')) {
             $recentQuery = FleetResidentTransport::query()
                 ->select('resident_name')
                 ->distinct()
@@ -349,7 +349,7 @@ class ResidentTransportController extends Controller
 
         $clientMedications = collect();
         $medicationWitnesses = collect();
-        if ($selectedClient && $this->canManageMedicationTransit($actor) && Schema::hasTable('client_medications')) {
+        if ($selectedClient && $this->canManageMedicationTransit($actor) && SchemaCache::hasTable('client_medications')) {
             $clientMedications = ClientMedication::query()
                 ->active()
                 ->where('client_id', $selectedClient->id)
@@ -491,7 +491,7 @@ class ResidentTransportController extends Controller
 
         // Pre-check status
         $preCheckStatus = null;
-        if (Schema::hasTable('fleet_transport_pre_checks')) {
+        if (SchemaCache::hasTable('fleet_transport_pre_checks')) {
             $preCheck = DB::table('fleet_transport_pre_checks')
                 ->where('transport_id', $transport->id)
                 ->first();
@@ -505,7 +505,7 @@ class ResidentTransportController extends Controller
         if (
             $clientId
             && $canViewCareContext
-            && Schema::hasTable('client_support_plan_items')
+            && SchemaCache::hasTable('client_support_plan_items')
         ) {
             $careNeeds = DB::table('client_support_plan_items')
                 ->where('client_id', $clientId)
@@ -530,7 +530,7 @@ class ResidentTransportController extends Controller
             : null;
 
         $availableMedications = [];
-        if ($transportClient && $canManageMedicationTransit && Schema::hasTable('client_medications')) {
+        if ($transportClient && $canManageMedicationTransit && SchemaCache::hasTable('client_medications')) {
             $availableMedications = ClientMedication::query()
                 ->active()
                 ->where('client_id', $transportClient->id)
@@ -569,7 +569,7 @@ class ResidentTransportController extends Controller
 
         $transitLogs = [];
         $packingAttestationHistory = [];
-        if ($canViewMedicationTransit && Schema::hasTable('fleet_medication_transit_logs')) {
+        if ($canViewMedicationTransit && SchemaCache::hasTable('fleet_medication_transit_logs')) {
             $transitQuery = FleetMedicationTransitLog::query()
                 ->with([
                     'client:id,first_name,last_name',
@@ -627,7 +627,7 @@ class ResidentTransportController extends Controller
                 ->values()
                 ->toArray();
 
-            if (Schema::hasTable('fleet_resident_transport_events')) {
+            if (SchemaCache::hasTable('fleet_resident_transport_events')) {
                 $packingAttestationHistory = FleetResidentTransportEvent::query()
                     ->with([
                         'actor:id,name',
@@ -748,7 +748,7 @@ class ResidentTransportController extends Controller
             return $blockers;
         }
 
-        if (Schema::hasTable('fleet_medication_transit_logs')) {
+        if (SchemaCache::hasTable('fleet_medication_transit_logs')) {
             $unresolvedQuery = FleetMedicationTransitLog::query()->where('transport_id', $transport->id);
             $this->journeyScope->applyMedicationTransitScope($unresolvedQuery, $request->user());
             $unresolvedMeds = $unresolvedQuery
@@ -831,7 +831,7 @@ class ResidentTransportController extends Controller
         );
         $selectedTransport = null;
 
-        if ($request->filled('transport_id') && Schema::hasTable('fleet_resident_transports')) {
+        if ($request->filled('transport_id') && SchemaCache::hasTable('fleet_resident_transports')) {
             $selectedTransport = $this->journeyScope->transportFor(
                 $request->user(),
                 (int) $request->input('transport_id'),
@@ -839,7 +839,7 @@ class ResidentTransportController extends Controller
             $selectedTransport->load(['asset:id,name,asset_tag']);
         }
 
-        if (! Schema::hasTable('fleet_medication_transit_logs')) {
+        if (! SchemaCache::hasTable('fleet_medication_transit_logs')) {
             return Inertia::render('fleet-assets/transports/medications', [
                 'logs' => ['data' => [], 'links' => [], 'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 0]],
                 'filters' => $request->only(['date_from', 'date_to', 'client_id', 'status', 'transport_id']),
@@ -954,7 +954,7 @@ class ResidentTransportController extends Controller
             ->count();
 
         $clients = [];
-        if (Schema::hasTable('clients')) {
+        if (SchemaCache::hasTable('clients')) {
             $clientQuery = Client::query()->orderBy('first_name')->limit(200);
             $this->journeyScope->applyClientScope($clientQuery, $request->user());
             $clients = $clientQuery
@@ -1270,7 +1270,7 @@ class ResidentTransportController extends Controller
 
         // Check if pre-check already completed
         $preCheckCompleted = false;
-        if (Schema::hasTable('fleet_transport_pre_checks')) {
+        if (SchemaCache::hasTable('fleet_transport_pre_checks')) {
             $preCheckCompleted = DB::table('fleet_transport_pre_checks')
                 ->where('transport_id', $transport->id)
                 ->exists();
@@ -1289,7 +1289,7 @@ class ResidentTransportController extends Controller
             // Care needs from support plan
             if (
                 $this->journeyScope->canViewResidentCareContext($request->user())
-                && Schema::hasTable('client_support_plan_items')
+                && SchemaCache::hasTable('client_support_plan_items')
             ) {
                 $careNeeds = DB::table('client_support_plan_items')
                     ->where('client_id', $client->id)
@@ -1308,7 +1308,7 @@ class ResidentTransportController extends Controller
             // Emergency contacts
             if (
                 $this->journeyScope->canViewResidentCareContext($request->user())
-                && Schema::hasTable('client_emergency_contacts')
+                && SchemaCache::hasTable('client_emergency_contacts')
             ) {
                 $emergencyContacts = DB::table('client_emergency_contacts')
                     ->where('client_id', $client->id)
@@ -1326,7 +1326,7 @@ class ResidentTransportController extends Controller
             // Medications
             if (
                 $this->journeyScope->canViewMedicationTransit($request->user())
-                && Schema::hasTable('client_medications')
+                && SchemaCache::hasTable('client_medications')
             ) {
                 $medications = ClientMedication::query()
                     ->active()

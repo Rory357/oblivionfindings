@@ -268,9 +268,12 @@ class DashboardController extends Controller
             $incidentStart = (clone $today)->subDays(config('dashboard.incident_short_days', 14));
             $incidentStart30 = (clone $today)->subDays(config('dashboard.incident_history_days', 30));
 
+            // $assignedClients is already loaded above — reuse its ids
+            // instead of re-querying the pivot twice.
+            $assignedIds = $assignedClients->pluck('id')->values();
+
             $incidentQuery = ClientIncident::query()->whereBetween('occurred_at', [$incidentStart, $tomorrow]);
             if ($user->canDo('incidents.viewAssigned') && ! $user->canDo('incidents.viewAny')) {
-                $assignedIds = $user->assignedClients()->pluck('clients.id')->values();
                 $incidentQuery->whereIn('client_id', $assignedIds);
             }
 
@@ -285,7 +288,6 @@ class DashboardController extends Controller
 
             $incidentQuery30 = ClientIncident::query()->whereBetween('occurred_at', [$incidentStart30, $tomorrow]);
             if ($user->canDo('incidents.viewAssigned') && ! $user->canDo('incidents.viewAny')) {
-                $assignedIds = $user->assignedClients()->pluck('clients.id')->values();
                 $incidentQuery30->whereIn('client_id', $assignedIds);
             }
 
@@ -308,11 +310,18 @@ class DashboardController extends Controller
 
             // KPI-style metrics used for manager/admin cards.
             // Scoped to the incidents the current user is allowed to see.
+            // One conditional-aggregate query instead of four COUNT round-trips.
+            $kpiRow = (clone $incidentQuery30)
+                ->selectRaw('COUNT(*) as total')
+                ->selectRaw("COUNT(CASE WHEN severity = 'high' THEN 1 END) as high_count")
+                ->selectRaw('COUNT(reviewed_at) as reviewed_count')
+                ->first();
+
             $incidentKpis = [
-                'incidentsLast30' => (clone $incidentQuery30)->count(),
-                'incidentsHighLast30' => (clone $incidentQuery30)->where('severity', 'high')->count(),
-                'reviewedLast30' => (clone $incidentQuery30)->whereNotNull('reviewed_at')->count(),
-                'unreviewedLast30' => (clone $incidentQuery30)->whereNull('reviewed_at')->count(),
+                'incidentsLast30' => (int) ($kpiRow->total ?? 0),
+                'incidentsHighLast30' => (int) ($kpiRow->high_count ?? 0),
+                'reviewedLast30' => (int) ($kpiRow->reviewed_count ?? 0),
+                'unreviewedLast30' => (int) ($kpiRow->total ?? 0) - (int) ($kpiRow->reviewed_count ?? 0),
             ];
 
             // Follow-up KPIs: open + overdue (also scoped).
@@ -322,12 +331,13 @@ class DashboardController extends Controller
                 $q->whereIn('id', (clone $incidentQuery30)->select('id'));
             });
 
-            $incidentKpis['followupsOpen'] = (clone $followupQuery)->whereNull('completed_at')->count();
-            $incidentKpis['followupsOverdue'] = (clone $followupQuery)
-                ->whereNull('completed_at')
-                ->whereNotNull('due_at')
-                ->where('due_at', '<', now())
-                ->count();
+            $followupRow = (clone $followupQuery)
+                ->selectRaw('COUNT(CASE WHEN completed_at IS NULL THEN 1 END) as open_count')
+                ->selectRaw('COUNT(CASE WHEN completed_at IS NULL AND due_at IS NOT NULL AND due_at < ? THEN 1 END) as overdue_count', [now()])
+                ->first();
+
+            $incidentKpis['followupsOpen'] = (int) ($followupRow->open_count ?? 0);
+            $incidentKpis['followupsOverdue'] = (int) ($followupRow->overdue_count ?? 0);
         }
 
         // Unified workstream (My Day) for staff workflow
@@ -366,7 +376,12 @@ class DashboardController extends Controller
         // HR Admin dashboard data
         $hrAdmin = null;
         if ($mode === 'hr_admin') {
-            $headcount = HrEmployeeProfile::where('is_active', true)->count();
+            // One fetch of active profiles' dates; the 12 monthly figures are
+            // overlap tests computed in PHP instead of 12 COUNT queries.
+            $activeProfiles = HrEmployeeProfile::where('is_active', true)
+                ->get(['start_date', 'end_date']);
+
+            $headcount = $activeProfiles->count();
 
             // Headcount trend sparkline (last 12 months of start_date counts)
             $headcountTrend = [];
@@ -375,9 +390,10 @@ class DashboardController extends Controller
                 $monthStart = now()->subMonths($m)->startOfMonth();
                 $monthEnd = (clone $monthStart)->endOfMonth();
                 $monthLabel = $monthStart->format('M Y');
-                $activeAtMonth = HrEmployeeProfile::where('is_active', true)
-                    ->where('start_date', '<=', $monthEnd)
-                    ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $monthStart))
+                $activeAtMonth = $activeProfiles
+                    ->filter(fn ($p) => $p->start_date !== null
+                        && $p->start_date->lte($monthEnd)
+                        && ($p->end_date === null || $p->end_date->gte($monthStart)))
                     ->count();
                 $headcountTrend[] = $activeAtMonth;
                 $headcountSeries[] = ['month' => $monthLabel, 'count' => $activeAtMonth];
