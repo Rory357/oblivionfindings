@@ -16,7 +16,11 @@ return [
     */
 
     'ssr' => [
-        'enabled' => true,
+        // Explicitly off: no SSR bundle is built or deployed (was a silent
+        // no-op with `true`). Enabling SSR for real means building
+        // resources/js/ssr.tsx (npm run build:ssr) and running the SSR
+        // server, then flipping this back on.
+        'enabled' => false,
         'url' => 'http://127.0.0.1:13714',
         // 'bundle' => base_path('bootstrap/ssr/ssr.mjs'),
 

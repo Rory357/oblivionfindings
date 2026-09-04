@@ -6,7 +6,11 @@ import { defineConfig } from 'vite';
 
 const heavyVendorChunkGroups: Array<[string, string[]]> = [
     ['vendor-inertia', ['/@inertiajs/']],
-    ['vendor-react', ['/react/', '/react-dom/', '/scheduler/']],
+    // Anchored to /node_modules/react/ so packages that merely contain
+    // "/react/" in their path (e.g. @fullcalendar/react) don't get pulled
+    // into the always-loaded react chunk and drag their whole vendor
+    // family onto every page.
+    ['vendor-react', ['/node_modules/react/', '/node_modules/react-dom/', '/node_modules/scheduler/']],
     ['vendor-ui', ['/@radix-ui/', '/@headlessui/', '/cmdk/', '/input-otp/', '/sonner/']],
     ['vendor-utils', ['/class-variance-authority/', '/clsx/', '/tailwind-merge/']],
     ['vendor-calendar', ['/@fullcalendar/', '/preact/']],
@@ -33,12 +37,28 @@ export default defineConfig({
         cors: true,
     },
     build: {
-        modulePreload: false,
+        // NOTE: modulePreload must stay ON (the default). Disabling it made
+        // the browser discover each page's ~100-500 chunks one at a time in
+        // a serial waterfall instead of preloading them in parallel.
         rollupOptions: {
             output: {
                 manualChunks,
             },
         },
+    },
+    optimizeDeps: {
+        // Pre-bundle the core deps so a dev-server cold start doesn't hit
+        // "new dependencies optimized" full-page reloads while navigating.
+        include: [
+            'react',
+            'react-dom',
+            'react-dom/client',
+            '@inertiajs/react',
+            'lucide-react',
+            'clsx',
+            'tailwind-merge',
+            'class-variance-authority',
+        ],
     },
     plugins: [
         laravel({

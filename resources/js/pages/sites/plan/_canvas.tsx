@@ -8,7 +8,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import * as Lucide from 'lucide-react';
+import { BringToFront, Copy, MapPin, SendToBack, Trash2 } from 'lucide-react';
 import {
     useCallback,
     useEffect,
@@ -20,6 +20,7 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 import { DoorSymbol } from './_door';
+import { PLAN_ICONS } from './_icons';
 import {
     inferSwingDirection,
     openingCentreFromTopLeft,
@@ -165,13 +166,7 @@ function clamp01(value: number): number {
 }
 
 function resolveIcon(name: string): React.ComponentType<IconProps> {
-    const candidate = (
-        Lucide as unknown as Record<string, React.ComponentType<IconProps>>
-    )[name];
-    return (
-        candidate ??
-        (Lucide.MapPin as unknown as React.ComponentType<IconProps>)
-    );
+    return PLAN_ICONS[name] ?? MapPin;
 }
 
 function pinStyle(
@@ -3012,7 +3007,7 @@ export default function PlanCanvas(props: Props) {
                                         setContextMenu(null);
                                     }}
                                 >
-                                    <Lucide.BringToFront className="mr-2 h-4 w-4" />
+                                    <BringToFront className="mr-2 h-4 w-4" />
                                     Bring to front
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
@@ -3025,7 +3020,7 @@ export default function PlanCanvas(props: Props) {
                                         setContextMenu(null);
                                     }}
                                 >
-                                    <Lucide.SendToBack className="mr-2 h-4 w-4" />
+                                    <SendToBack className="mr-2 h-4 w-4" />
                                     Send to back
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
@@ -3043,7 +3038,7 @@ export default function PlanCanvas(props: Props) {
                                 setContextMenu(null);
                             }}
                         >
-                            <Lucide.Copy className="mr-2 h-4 w-4" />
+                            <Copy className="mr-2 h-4 w-4" />
                             Duplicate
                         </DropdownMenuItem>
                         <DropdownMenuItem
@@ -3058,7 +3053,7 @@ export default function PlanCanvas(props: Props) {
                                 setContextMenu(null);
                             }}
                         >
-                            <Lucide.Trash2 className="mr-2 h-4 w-4 text-status-critical" />
+                            <Trash2 className="mr-2 h-4 w-4 text-status-critical" />
                             Delete
                         </DropdownMenuItem>
                     </DropdownMenuContent>

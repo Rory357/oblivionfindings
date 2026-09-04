@@ -1,7 +1,8 @@
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import * as Lucide from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import type React from 'react';
+import { PLAN_ICONS } from './_icons';
 import { DoorSymbol } from './_door';
 import {
     resolveAttachedOpening,
@@ -53,13 +54,7 @@ const FALLBACK_PIN_STYLES: Record<string, { color: string; icon: string }> = {
 function resolveIcon(
     name: string,
 ): React.ComponentType<{ className?: string }> {
-    const candidate = (
-        Lucide as unknown as Record<
-            string,
-            React.ComponentType<{ className?: string }>
-        >
-    )[name];
-    return candidate ?? Lucide.MapPin;
+    return PLAN_ICONS[name] ?? MapPin;
 }
 
 function pinStyle(

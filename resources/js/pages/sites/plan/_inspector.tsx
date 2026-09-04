@@ -18,7 +18,6 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
-import * as Lucide from 'lucide-react';
 import {
     BringToFront,
     ChevronDown,
@@ -30,6 +29,7 @@ import {
     SendToBack,
     Trash2,
 } from 'lucide-react';
+import { PLAN_ICONS } from './_icons';
 import {
     createElement,
     useState,
@@ -59,10 +59,7 @@ import type { EditorAction, LayerKey } from './_use-plan-editor';
 type IconProps = { className?: string; style?: CSSProperties };
 
 function resolveIcon(name: string): React.ComponentType<IconProps> {
-    const candidate = (
-        Lucide as unknown as Record<string, React.ComponentType<IconProps>>
-    )[name];
-    return candidate ?? (MapPin as unknown as React.ComponentType<IconProps>);
+    return PLAN_ICONS[name] ?? MapPin;
 }
 
 /**

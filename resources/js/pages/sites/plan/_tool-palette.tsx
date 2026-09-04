@@ -6,8 +6,9 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import * as Lucide from 'lucide-react';
+import { ChevronDown, Circle, MousePointer2, Ruler } from 'lucide-react';
 import { useMemo, type CSSProperties } from 'react';
+import { PLAN_ICONS } from './_icons';
 import {
     DOOR_SUBKIND_LABELS,
     SELECT_TOOL,
@@ -61,13 +62,7 @@ type Props = {
 type IconProps = { className?: string; style?: CSSProperties };
 
 function resolveIcon(name: string): React.ComponentType<IconProps> {
-    const candidate = (
-        Lucide as unknown as Record<string, React.ComponentType<IconProps>>
-    )[name];
-    return (
-        candidate ??
-        (Lucide.Circle as unknown as React.ComponentType<IconProps>)
-    );
+    return PLAN_ICONS[name] ?? Circle;
 }
 
 export default function ToolPalette({
@@ -129,7 +124,7 @@ export default function ToolPalette({
                     title="Select and marquee (Q)"
                     data-test="site-plan-select-tool"
                 >
-                    <Lucide.MousePointer2 className="h-3.5 w-3.5" />
+                    <MousePointer2 className="h-3.5 w-3.5" />
                     <span className="text-xs">Select</span>
                     <ShortcutChip keyName={SHORTCUTS[SELECT_TOOL]} />
                 </Button>
@@ -190,7 +185,7 @@ export default function ToolPalette({
                                                             SHORTCUTS[kindKey]
                                                         }
                                                     />
-                                                    <Lucide.ChevronDown className="h-3 w-3 opacity-60" />
+                                                    <ChevronDown className="h-3 w-3 opacity-60" />
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverContent
@@ -349,7 +344,7 @@ export default function ToolPalette({
                                             <ShortcutChip
                                                 keyName={SHORTCUTS[kindKey]}
                                             />
-                                            <Lucide.ChevronDown className="h-3 w-3 opacity-60" />
+                                            <ChevronDown className="h-3 w-3 opacity-60" />
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent
@@ -423,7 +418,7 @@ export default function ToolPalette({
                                 onRequestCalibration();
                             }}
                         >
-                            <Lucide.Ruler className="h-3.5 w-3.5" />
+                            <Ruler className="h-3.5 w-3.5" />
                             <span className="text-xs">Set scale</span>
                             <ShortcutChip keyName={SHORTCUTS['__scale']} />
                         </Button>
