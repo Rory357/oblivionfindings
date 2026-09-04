@@ -76,7 +76,7 @@ import type {
 } from './lib/types';
 
 /* -------------------------------------------------------------------------- */
-/*  My Day dialogs — popup-pattern per docs/POPUP_STYLE_GUIDE.md              */
+/*  My Day dialogs — popup-pattern per design_styles/POPUP_STYLE_GUIDE.md              */
 /* -------------------------------------------------------------------------- */
 /*
  * Web-only (no Sheet fallback). All shells follow the POPUP_STYLE_GUIDE

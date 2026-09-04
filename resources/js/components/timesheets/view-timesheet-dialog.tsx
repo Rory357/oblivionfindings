@@ -2,7 +2,7 @@
  * a bespoke audit-trail timeline and hue-coded person avatars (white initials on
  * computed avatar hues, white glyphs on solid status dots — the established
  * avatar/timeline idiom). All status colours are semantic tokens, per
- * docs/DESIGN_TOKENS.md. */
+ * design_styles/DESIGN_TOKENS.md. */
 import { ReasonDialog } from '@/components/reason-dialog';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Button } from '@/components/ui/button';
@@ -243,7 +243,7 @@ export default function ViewTimesheetDialog({
                 }}
             >
                 {/* Read-only detail header — icon tile + title + status, per
-                    docs/POPUP_STYLE_GUIDE.md. */}
+                    design_styles/POPUP_STYLE_GUIDE.md. */}
                 <DialogHeader className="shrink-0 space-y-0 border-b border-border px-5 py-4">
                     <div className="flex items-start gap-3">
                         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10">

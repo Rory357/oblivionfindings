@@ -115,7 +115,7 @@ They still use `CateringTabs` (`resources/js/pages/catering/_tabs.tsx`) among th
 **Design source of truth:** `C:\Users\steph\Downloads\meal_planner_extract\design_handoff_meal_planner\`
 → `mp/recipes.jsx` (`RecipeFormDialog`, ~line 216-372) + `README.md`. It's a
 React-via-Babel prototype — recreate with the app's shadcn/ui components & tokens,
-**don't copy literally**. Follow `docs/POPUP_STYLE_GUIDE.md`.
+**don't copy literally**. Follow `design_styles/POPUP_STYLE_GUIDE.md`.
 
 > **Colour note:** the design shows the *green* Sites accent. **Keep our brand
 > `--primary`** instead — the user explicitly chose brand colour over green. Match
@@ -154,7 +154,7 @@ React-via-Babel prototype — recreate with the app's shadcn/ui components & tok
 The user wants these folded into the planner too ("merge it dont use the old stuff").
 **No design reference exists for these in the handoff** (it covers the planner:
 calendar/inventory/shopping/recipes/templates — not the global catering *library*
-admin). Build them consistent with `docs/POPUP_STYLE_GUIDE.md` and the recipe dialog.
+admin). Build them consistent with `design_styles/POPUP_STYLE_GUIDE.md` and the recipe dialog.
 
 Pattern (same as recipes): add a `wantsJson()` fetch (or enrich bootstrap) + an axios
 dialog reusing the planner's loaded data, refresh via `bootstrap()`.
@@ -212,8 +212,8 @@ routes/catering.php
   success currently follows a redirect → add `wantsJson()` branches for clean JSON.
 - **Pre-deploy checks:** `npm run types` (tsc) + `npm run build` (vite). `vite build`
   doesn't type-check, so run both.
-- **App reference docs:** `docs/MEAL_PLANNER_PLAN.md`, `docs/POPUP_STYLE_GUIDE.md`,
-  `docs/DESIGN_TOKENS.md`, `docs/GOVERNANCE_HERO_GUIDE.md`.
+- **App reference docs:** `docs/MEAL_PLANNER_PLAN.md`, `design_styles/POPUP_STYLE_GUIDE.md`,
+  `design_styles/DESIGN_TOKENS.md`, `design_styles/GOVERNANCE_HERO_GUIDE.md`.
 - **Memory:** see `memory/project_meal_planner_redesign.md`.
 
 ---

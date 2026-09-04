@@ -16,7 +16,7 @@
 The web/desktop workforce experience (My Day, Shifts, Job Board, Rostering, Calendar, Availability, Handovers, Shift Notes, Timesheets, Conflict Queue, Attendance) is **consistent and verified** as of the commits above:
 
 - Every surface hero is on `PageHero category="ops"` with the Rostering pattern (greeting, live eyebrow, truthful badges, stats; week-stepper + filters footer where week-scoped). My Day intentionally keeps its avatar hero; ~~Timesheets intentionally has no week-stepper~~ (now wired — see item 6).
-- Multi-step popups (handover, shift-note, template, create-timesheet, **and now create/edit-shift**) follow the Add Client wizard chrome via shared `resources/js/components/wizard/primitives.tsx`. Single-step popups follow `docs/POPUP_STYLE_GUIDE.md`; view-timesheet is the read-only-detail reference conversion.
+- Multi-step popups (handover, shift-note, template, create-timesheet, **and now create/edit-shift**) follow the Add Client wizard chrome via shared `resources/js/components/wizard/primitives.tsx`. Single-step popups follow `design_styles/POPUP_STYLE_GUIDE.md`; view-timesheet is the read-only-detail reference conversion.
 - Attendance is in the Workforce sidebar, has the full hero, and a manager **“On the clock now”** board (`AttendanceController@index` additive payload: `weekHours`, `onClockNow` with 16h+ `is_stale` flags) — now with a manager **End session** action.
 - **Trust the corrections in the audit doc over re-sweeping** — several plausible findings were falsified by direct inspection (`--category-ops` aliases `--primary`; the My Day timesheet dialog already conforms; suggestion accept/dismiss DO persist actor attribution; the dual handover paths share one model/service by design).
 

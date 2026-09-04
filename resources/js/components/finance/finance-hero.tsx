@@ -1,4 +1,4 @@
-// Finance hero preset. See docs/GOVERNANCE_HERO_GUIDE.md for the hero contract.
+// Finance hero preset. See design_styles/GOVERNANCE_HERO_GUIDE.md for the hero contract.
 import { PageHero, type PageHeroProps } from '@/components/page/page-hero';
 
 export type { PageHeroProps } from '@/components/page/page-hero';

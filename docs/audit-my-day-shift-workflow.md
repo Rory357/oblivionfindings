@@ -32,7 +32,7 @@ Seeded test scenario:
 10. End shift — `EndOfShiftChecklist` Dialog → `POST /attendance/clock-out` ([end-of-shift-checklist.tsx](../resources/js/components/end-of-shift-checklist.tsx))
 11. Manager approval — `/operations/timesheets/{id}` → `TimesheetApprovalService` → `BillingService::generateFromTimesheet` ([BillingService.php:34](../app/Services/Operations/BillingService.php#L34))
 
-Popup style guide: [docs/POPUP_STYLE_GUIDE.md](POPUP_STYLE_GUIDE.md). All dialogs on `/my-day` must follow it.
+Popup style guide: [design_styles/POPUP_STYLE_GUIDE.md](../design_styles/POPUP_STYLE_GUIDE.md). All dialogs on `/my-day` must follow it.
 
 ## Fixes shipped (commit `227aabc9` on main)
 
@@ -98,5 +98,5 @@ Hard rules to keep:
 - Don't seed destructively — demo accounts are shared.
 - Commit each fix on `claude/...` branch → `git push origin HEAD:main` → pull on parent → `npm run build`.
 - Use NZ context (NZD, Pacific/Auckland, residential houses).
-- One Dialog per `/my-day` popup; follow [POPUP_STYLE_GUIDE.md](POPUP_STYLE_GUIDE.md) strictly.
+- One Dialog per `/my-day` popup; follow [POPUP_STYLE_GUIDE.md](../design_styles/POPUP_STYLE_GUIDE.md) strictly.
 - Probe DB with a temp `probe.php` at the repo root; delete after use.

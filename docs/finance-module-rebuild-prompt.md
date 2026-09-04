@@ -24,8 +24,8 @@ one milestone at a time, collapsing today's ~100 finance pages into ~8 hubs of t
 > **PARALLEL WORK** section inside the block.
 
 **Companion docs it will read and keep updated:** `FINANCE_READINESS_AUDIT.md`,
-`docs/finance-operations.md`, `docs/DESIGN_TOKENS.md`, `docs/GOVERNANCE_HERO_GUIDE.md`,
-`docs/POPUP_STYLE_GUIDE.md`, `docs/hero-unification-v2-plan.md`, `docs/hero-unification-v3-handoff.md`,
+`docs/finance-operations.md`, `design_styles/DESIGN_TOKENS.md`, `design_styles/GOVERNANCE_HERO_GUIDE.md`,
+`design_styles/POPUP_STYLE_GUIDE.md`, `docs/hero-unification-v2-plan.md`, `docs/hero-unification-v3-handoff.md`,
 `docs/hr-nz-statutory-notes.md`, `docs/nz-localisation-plan.md`,
 `docs/NZ_SUPPORTED_LIVING_GAP_ANALYSIS_2026-04-01.md`, and the HR loop's
 `docs/hr-module-rebuild-prompt.md` + `docs/hr-module-rebuild-plan.md` (this prompt is the Finance
@@ -210,8 +210,8 @@ HOUSE RULES (non-negotiable)
    guard every posting path with idempotency (no double-post on retry — see audit P1-5); never invent
    a chart-of-accounts code (resolve via FinAccount/mapping — see audit P0-2).
 5. Design tokens only — NEVER hardcode hex; every colour comes from semantic tokens
-   (docs/DESIGN_TOKENS.md). Add the new finance category token set rather than inlining colours.
-6. Hero contract: docs/GOVERNANCE_HERO_GUIDE.md. Modal/popup style: docs/POPUP_STYLE_GUIDE.md.
+   (design_styles/DESIGN_TOKENS.md). Add the new finance category token set rather than inlining colours.
+6. Hero contract: design_styles/GOVERNANCE_HERO_GUIDE.md. Modal/popup style: design_styles/POPUP_STYLE_GUIDE.md.
 7. Full-width layout convention; no centered max-width caps on page bodies.
 8. NZ locale & terminology everywhere: en-NZ, NZD, GST, IRD/PAYE, KiwiSaver, ESCT, payday filing,
    Holidays Act 2003. See docs/hr-nz-statutory-notes.md + docs/nz-localisation-plan.md. Treat the

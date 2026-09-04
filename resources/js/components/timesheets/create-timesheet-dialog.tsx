@@ -2,7 +2,7 @@
  * bespoke Add-client modal surface (step header + scroll-contained body + custom
  * footer) and intentionally uses styled native controls for its shift/activity
  * tile pickers. Every colour is a semantic design token, per
- * docs/DESIGN_TOKENS.md. */
+ * design_styles/DESIGN_TOKENS.md. */
 import { Button } from '@/components/ui/button';
 import {
     Dialog,

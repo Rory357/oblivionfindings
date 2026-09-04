@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax -- the MAR time-grid uses custom-styled
    <button> dose cells (84×46 tap targets) and a bordered panel that intentionally
-   diverge from <Button>/<Card>; see docs/POPUP_STYLE_GUIDE.md and the MAR handoff. */
+   diverge from <Button>/<Card>; see design_styles/POPUP_STYLE_GUIDE.md and the MAR handoff. */
 import { cn } from '@/lib/utils';
 import type { DoseStatus, ScheduleRow } from '@/pages/meds/today/types';
 import { Pill } from 'lucide-react';

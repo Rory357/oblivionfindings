@@ -208,7 +208,7 @@ Run focused ESLint with `--max-warnings=0`.
 
 - [ ] **Step 2: Replace semantic statuses with token classes**
 
-Use the mappings in `docs/DESIGN_TOKENS.md`, for example:
+Use the mappings in `design_styles/DESIGN_TOKENS.md`, for example:
 
 ```tsx
 text-red-* / bg-red-*       -> text-status-danger / bg-status-danger-bg

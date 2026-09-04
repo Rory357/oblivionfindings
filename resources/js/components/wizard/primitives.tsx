@@ -3,7 +3,7 @@
  * the reference implementation for every multi-step popup workflow. The tile
  * pickers, chips and segmented controls are intentionally styled native
  * controls; every colour comes from semantic design tokens per
- * docs/DESIGN_TOKENS.md. Wizard chrome constants (rail width, progress-bar
+ * design_styles/DESIGN_TOKENS.md. Wizard chrome constants (rail width, progress-bar
  * height) live here so Handover/Shift Note/Template wizards stay visually
  * identical to the reference. */
 import { Label } from '@/components/ui/label';

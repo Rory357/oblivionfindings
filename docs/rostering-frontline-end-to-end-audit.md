@@ -14,7 +14,7 @@ Method: live-repo inspection (no stale-doc trust). Five parallel code sweeps + d
 - `resources/js/components/clients/add-client-dialog.tsx` (2,577 lines — shell, stepper, 8 steps, review, success pane)
 - Opened from `resources/js/pages/operations/clients/index.tsx`; also reused by `pages/sites/show.tsx`
 - Server validation: `StoreClientRequest`; submit → `POST /operations/clients` (edit: `_method:put` to `/operations/clients/{id}`)
-- Companion standard for single-step popups: `docs/POPUP_STYLE_GUIDE.md` (shell+body split, width tokens, tile pickers)
+- Companion standard for single-step popups: `design_styles/POPUP_STYLE_GUIDE.md` (shell+body split, width tokens, tile pickers)
 
 **Anatomy (the wizard contract)**
 | Element | Implementation |
@@ -39,7 +39,7 @@ Method: live-repo inspection (no stale-doc trust). Five parallel code sweeps + d
 **Files**
 - Usage: `resources/js/pages/operations/rostering/index.tsx:2195-2400`
 - Component: `resources/js/components/page/page-hero.tsx` (+ `page-hero-stats/badges/meta/actions/quick-actions/avatar-stack`)
-- Contract documented for governance in `docs/GOVERNANCE_HERO_GUIDE.md`; this audit extends the same contract to workforce pages with `category="ops"`.
+- Contract documented for governance in `design_styles/GOVERNANCE_HERO_GUIDE.md`; this audit extends the same contract to workforce pages with `category="ops"`.
 
 **Anatomy**
 - `PageHero category="ops"` → gradient banner `rounded-2xl` with three decorative orbs; **note `--category-ops` aliases `--primary`** (`resources/css/app.css:200,316`), so ops pages and default-primary pages render identically today.
@@ -93,7 +93,7 @@ Verified state per surface (hero + workflow chrome):
 **Findings (I-numbers feed §8 ranking):**
 - **I-0 — Shifts hero shows fabricated status.** `shifts-hero.tsx:189-194` renders `Auto-schedule ready` and `Week published` pills **unconditionally** — “Week published” shows on unpublished weeks. Misleading operational state on a manager surface.
 - **I-1 — Shifts hero is a forked shell.** Hand-rolled gradient/orbs/medallion/footer duplicating `PageHero` (different gradient: `linear-gradient(135deg …)` vs PageHero’s `to_bottom_right`). Only listed surface not on `PageHero`.
-- **I-2 — Timesheets hero is a forked shell with token violations.** `timesheets-hero.tsx:206-307` hardcodes `text-white`, `bg-white/10`, `bg-emerald-300` etc. instead of `primary-foreground`/`status-*` tokens (violates `docs/DESIGN_TOKENS.md`); duplicates orbs/medallion/stat tiles.
+- **I-2 — Timesheets hero is a forked shell with token violations.** `timesheets-hero.tsx:206-307` hardcodes `text-white`, `bg-white/10`, `bg-emerald-300` etc. instead of `primary-foreground`/`status-*` tokens (violates `design_styles/DESIGN_TOKENS.md`); duplicates orbs/medallion/stat tiles.
 - **I-3 — Create Shift dialog diverges from the wizard contract.** Single scrolling pane with 10+ fields incl. recurring config (`create-shift-dialog.tsx:660-1220`); `POPUP_STYLE_GUIDE.md` says >8 fields → wizard/page. Functional and well-tested; full wizardization is a broad rewrite (deferred — see plan).
 - **I-4 — Wizard chrome drift.** Handover wizard: rail 260px `bg-muted/30`, 1px progress; Add Client: 248px `bg-sidebar`, 3px. Note wizard: no explicit width token (default dialog width) vs Add Client `min(94vw,1080px)` / Handover `min(96vw,1000px)`.
 - **I-5 — (merged into I-4).**

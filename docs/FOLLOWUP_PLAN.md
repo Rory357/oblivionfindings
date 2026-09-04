@@ -10,7 +10,7 @@ scope items worth shipping.
 The app's theming + branding + notifications + landing-page stack is
 live on `main`. Semantic-token system under [resources/css/app.css](../resources/css/app.css)
 plus a `derivePalette()` util at [resources/js/lib/derive-palette.ts](../resources/js/lib/derive-palette.ts)
-drive brand changes throughout the app. See [DESIGN_TOKENS.md](DESIGN_TOKENS.md)
+drive brand changes throughout the app. See [DESIGN_TOKENS.md](../design_styles/DESIGN_TOKENS.md)
 for the token taxonomy.
 
 Hardcoded-colour count went from 2,586 → 113 (22 in intentional
@@ -82,7 +82,7 @@ that don't cleanly map onto the 5-severity-token model.
 
 - `resources/js/lib/map-markers.ts` (new, if adopting the marker palette approach)
 - `resources/css/app.css` (extend `--chart-*` if needed)
-- `docs/DESIGN_TOKENS.md` (document any new category tokens added)
+- `design_styles/DESIGN_TOKENS.md` (document any new category tokens added)
 - The individual page files that hold the residuals
 
 **Expected effort:** 2–3 hours.
@@ -554,7 +554,7 @@ Recommended priority if doing all of the above:
 - Chrome Preview tooling was flaky in the prior session — fall back to `php artisan serve --port=<free-port>` + direct curl / browser navigation if needed.
 - Admin login: `admin@demo.test` / `password`.
 - Key architectural docs:
-    - [docs/DESIGN_TOKENS.md](DESIGN_TOKENS.md) — token taxonomy + component conventions
+    - [design_styles/DESIGN_TOKENS.md](../design_styles/DESIGN_TOKENS.md) — token taxonomy + component conventions
     - [resources/js/lib/derive-palette.ts](../resources/js/lib/derive-palette.ts) — palette derivation
     - [resources/js/hooks/use-appearance.tsx](../resources/js/hooks/use-appearance.tsx) — live-apply hook
     - [config/landing_routes.php](../config/landing_routes.php) — landing page registry

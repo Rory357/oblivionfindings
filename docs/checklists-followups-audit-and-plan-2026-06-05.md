@@ -81,7 +81,7 @@ Both pages are thin wrappers that render
 - `run-modal.tsx` — `RunModal` (centre modal; loads `runDetail` via `?run=`
   partial reload; submits via Inertia `router.post`).
 - `template-builder.tsx` — `TemplateBuilderModal` (create/edit/delete; loads
-  `templateDetail` via `?template=`; built to `docs/POPUP_STYLE_GUIDE.md`).
+  `templateDetail` via `?template=`; built to `design_styles/POPUP_STYLE_GUIDE.md`).
 - `assign-checklist.tsx` — `AssignChecklistButton` (site-scoped).
 - `workspace.tsx` — `ChecklistsWorkspace` orchestrator (tab/week/search/cat/
   runId/builderTarget state; renders hero + Rostering `TabStrip` + active pane +
@@ -352,7 +352,7 @@ templates, run/complete, **damage reporting**).
   `config/checklists.php`, `routes/sites.php`, models `app/Models/SiteChecklist*.php`.
 - Reuse: `@/components/rostering/week-picker` (WeekPicker + `ymd`/`startOfWeek`/
   `addDaysWP`), `@/components/rostering/tab-strip` (TabStrip),
-  `@/components/page` (PageHero), `docs/POPUP_STYLE_GUIDE.md`.
+  `@/components/page` (PageHero), `design_styles/POPUP_STYLE_GUIDE.md`.
 - Site calendar (right-click reference only): `resources/js/pages/sites/calendar/{SiteCalendar,_parts}.tsx`.
 - Site profile: `resources/js/pages/sites/show.tsx`, `app/Http/Controllers/SiteController.php@show` (`buildSiteChecklistsSummary`).
 - House checklists (to retire): `app/Http/Controllers/Sites/HouseChecklistController.php`,

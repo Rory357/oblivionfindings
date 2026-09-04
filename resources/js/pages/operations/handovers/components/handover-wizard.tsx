@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax -- Step bodies intentionally use styled
  * native controls (selects, list-builder rows, mood/CD toggles). Every colour
- * is a semantic design token, per docs/DESIGN_TOKENS.md. */
+ * is a semantic design token, per design_styles/DESIGN_TOKENS.md. */
 /* New / Edit handover wizard — 4 steps built around the outgoing-shift →
  * new-shift chain, on the shared WizardShell chrome (the Add Client modal
  * contract): 248px stepper rail, "Step x of y" header, 3px progress strip and

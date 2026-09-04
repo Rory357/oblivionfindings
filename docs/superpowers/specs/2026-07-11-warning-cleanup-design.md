@@ -43,7 +43,7 @@ whose behaviour is covered by a focused test.
 ### UI guardrail warnings
 
 Keep `no-restricted-syntax` enabled. Replace raw colour utilities with the
-semantic tokens documented in `docs/DESIGN_TOKENS.md` when the semantic meaning
+semantic tokens documented in `design_styles/DESIGN_TOKENS.md` when the semantic meaning
 is known. Replace plain buttons and card-shaped panels with the shared UI kit
 when those primitives preserve the existing interaction and layout.
 

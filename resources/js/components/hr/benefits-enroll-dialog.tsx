@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax -- This dialog is built on the shared HR
  * wizard kit (components/hr/wizard → components/wizard/*), which intentionally
  * uses styled native controls for the rail/footer. Every colour is a semantic
- * design token (docs/DESIGN_TOKENS.md). Mirrors the offer + band wizards. */
+ * design token (design_styles/DESIGN_TOKENS.md). Mirrors the offer + band wizards. */
 import { router } from '@inertiajs/react';
 import {
     Banknote,

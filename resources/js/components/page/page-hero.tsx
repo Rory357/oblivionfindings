@@ -1,4 +1,4 @@
-// New governance pages: see docs/GOVERNANCE_HERO_GUIDE.md
+// New governance pages: see design_styles/GOVERNANCE_HERO_GUIDE.md
 // for the required hero contract (category, icon, stats, etc).
 import { Link } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';

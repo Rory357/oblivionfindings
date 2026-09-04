@@ -2,7 +2,7 @@
  * shared full-height modal surface (stepper rail + scroll-contained body + custom
  * footer) that intentionally uses styled native controls for the tile pickers,
  * chips, segmented controls and toggles. Every colour is sourced from semantic
- * design tokens (never hardcoded hex), per docs/DESIGN_TOKENS.md. */
+ * design tokens (never hardcoded hex), per design_styles/DESIGN_TOKENS.md. */
 import {
     AddressAutocomplete,
     type GeocodeResult,

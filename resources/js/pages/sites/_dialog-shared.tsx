@@ -5,7 +5,7 @@
  * `credentials/_dialogs.tsx` (and the global Vendors & Credentials page) so
  * every surface — the global directory, the site-profile tab, and the per-site
  * pages — renders the *same* tile pickers, locked-site cards, searchable site
- * picker and detail headers. Follows docs/POPUP_STYLE_GUIDE.md.
+ * picker and detail headers. Follows design_styles/POPUP_STYLE_GUIDE.md.
  */
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

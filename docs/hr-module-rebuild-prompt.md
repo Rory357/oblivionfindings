@@ -16,7 +16,7 @@ build → verify → merge** until the HR module reaches BambooHR-grade feature 
 
 **Companion docs it will read and keep updated:** `docs/hr-module-design.md`,
 `docs/hr-module-checklist.md`, `docs/hr-module-audit-fix-plan.md`, `docs/hr-nz-statutory-notes.md`,
-`docs/DESIGN_TOKENS.md`, `docs/GOVERNANCE_HERO_GUIDE.md`, `docs/POPUP_STYLE_GUIDE.md`.
+`design_styles/DESIGN_TOKENS.md`, `design_styles/GOVERNANCE_HERO_GUIDE.md`, `design_styles/POPUP_STYLE_GUIDE.md`.
 
 **Reference implementations (the bar to match — read these first):**
 `resources/js/pages/operations/rostering/index.tsx` (PageHero + TabStrip + per-tab Panes +
@@ -131,8 +131,8 @@ HOUSE RULES (non-negotiable)
 2. Timezones: store UTC; convert at the app.worker_timezone (Pacific/Auckland) boundary; call ->utc()
    before persisting tz-aware Carbons. Be careful Carbon\Carbon vs Illuminate\Support\Carbon hints.
 3. Permissions seeded not migrated (see above) — wire seeder + deploy runbook for every new key.
-4. Design tokens only — NEVER hardcode hex; every colour comes from semantic tokens (docs/DESIGN_TOKENS.md).
-5. Hero contract: docs/GOVERNANCE_HERO_GUIDE.md. Modal/popup style: docs/POPUP_STYLE_GUIDE.md.
+4. Design tokens only — NEVER hardcode hex; every colour comes from semantic tokens (design_styles/DESIGN_TOKENS.md).
+5. Hero contract: design_styles/GOVERNANCE_HERO_GUIDE.md. Modal/popup style: design_styles/POPUP_STYLE_GUIDE.md.
 6. Full-width layout convention; no centered max-width caps on page bodies.
 7. NZ locale & terminology everywhere: en-NZ, NZD, NZ statutory names (Holidays Act 2003, IRD/PAYE,
    KiwiSaver, Ngā Paerewa NZS 8134:2021, Privacy Act 2020). See docs/hr-nz-statutory-notes.md and

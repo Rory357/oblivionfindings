@@ -615,7 +615,7 @@ export default function EndOfShiftChecklist({
         );
     }
 
-    // Desktop popup — follows docs/POPUP_STYLE_GUIDE.md: shell + body split,
+    // Desktop popup — follows design_styles/POPUP_STYLE_GUIDE.md: shell + body split,
     // inline-style width token, header icon + title + description, Cancel
     // (outline) on the left + primary submit (with Loader2 while processing)
     // on the right. The body is gated by `{open && ...}` so the form's

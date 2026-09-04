@@ -154,7 +154,7 @@ Quick actions are an orchestration layer over this table. A quick action is omit
 
 ## 8. Modal and form standard
 
-All multi-step Site-owned forms use the shared wizard primitives and the dimensions, rail, progress, scroll containment, footer, keyboard handling, and validation presentation defined in `docs/POPUP_STYLE_GUIDE.md`.
+All multi-step Site-owned forms use the shared wizard primitives and the dimensions, rail, progress, scroll containment, footer, keyboard handling, and validation presentation defined in `design_styles/POPUP_STYLE_GUIDE.md`.
 
 The implementation removes the duplicate quick-create Client form from `pages/sites/clients/_dialogs.tsx`. Creating a new Client always uses the complete shared Add Client wizard. Linking an existing Client remains a separate placement operation because it has different data, authorization, and side effects.
 

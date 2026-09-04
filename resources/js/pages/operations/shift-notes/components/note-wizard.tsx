@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax -- The shift-note wizard mirrors the bespoke
  * Add-client modal surface (stepper rail + scroll-contained body + custom footer)
  * and intentionally uses styled native controls. Every colour is a semantic
- * design token, per docs/DESIGN_TOKENS.md. */
+ * design token, per design_styles/DESIGN_TOKENS.md. */
 /* Add Shift Note wizard — 5-step stepper modal modelled on the Add Client /
  * handover wizard shell. Step 1 links the note to a real client shift (so it is
  * correctly filed against the roster); the rest mirror the design prototype. */

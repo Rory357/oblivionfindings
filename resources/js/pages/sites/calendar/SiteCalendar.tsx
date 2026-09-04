@@ -2329,7 +2329,7 @@ function EventDetailDialog({
     );
 }
 
-/* ---- create dialog (follows docs/POPUP_STYLE_GUIDE.md) ------------------ */
+/* ---- create dialog (follows design_styles/POPUP_STYLE_GUIDE.md) ------------------ */
 
 function CreateEventDialog({
     open,

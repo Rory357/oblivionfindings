@@ -2,7 +2,7 @@
  * Add Client wizard chrome (stepper rail + scroll-contained body + custom footer)
  * via the shared WizardShell, and uses the shared wizard primitives for tile
  * pickers, chips and segmented controls. Every colour is a semantic design token
- * (never hardcoded hex), per docs/DESIGN_TOKENS.md. */
+ * (never hardcoded hex), per design_styles/DESIGN_TOKENS.md. */
 import {
     AddressAutocomplete,
     type GeocodeResult,

@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax -- The template wizard mirrors the bespoke
  * Add-client modal surface (stepper rail + scroll-contained body + custom footer).
- * Every colour is a semantic design token, per docs/DESIGN_TOKENS.md. */
+ * Every colour is a semantic design token, per design_styles/DESIGN_TOKENS.md. */
 import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,

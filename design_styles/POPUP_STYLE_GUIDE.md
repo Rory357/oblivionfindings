@@ -2,23 +2,82 @@
 
 Every modal popup in Oblivion Findings — create dialogs, edit dialogs, confirmation
 dialogs, detail viewers — follows the same look-and-feel so users can recognise
-them instantly. The reference implementation is
-[`resources/js/pages/sites/contacts/_dialogs.tsx`](../resources/js/pages/sites/contacts/_dialogs.tsx)
-(Site Contact dialogs) and
-[`resources/js/pages/Governance/Resolutions/_dialogs.tsx`](../resources/js/pages/Governance/Resolutions/_dialogs.tsx)
-(New Resolution dialog). When you build a new popup, follow this guide.
+them instantly. There are **two tiers** of dialog, and every popup is one of them:
 
-## When to use a popup vs. a full page
+1. **Simple dialog** — one screen of fields, or a confirmation/detail viewer.
+   Reference implementations:
+   [`resources/js/pages/sites/contacts/_dialogs.tsx`](../resources/js/pages/sites/contacts/_dialogs.tsx)
+   (Site Contact dialogs) and
+   [`resources/js/pages/Governance/Resolutions/_dialogs.tsx`](../resources/js/pages/Governance/Resolutions/_dialogs.tsx)
+   (New Resolution dialog).
+2. **Entity wizard dialog** — the `WizardShell` multi-step modal (stepper rail,
+   step header, progress strip, completeness meter, success pane). **This is the
+   default for adding and editing entity records** — sites, clients, staff,
+   assets, incidents, risk assessments, and anything else with more than one
+   section of fields. Reference implementations:
+   [`resources/js/components/clients/add-client-dialog.tsx`](../resources/js/components/clients/add-client-dialog.tsx)
+   (the original contract) and
+   [`resources/js/components/sites/add-site-dialog.tsx`](../resources/js/components/sites/add-site-dialog.tsx).
 
-| Use a popup | Use a full page |
-| --- | --- |
-| Single resource create / edit (≤ 8 fields) | Multi-step wizard or > 8 fields |
-| Quick confirmation (delete, archive) | Complex relations editor (e.g. assigning users to roles + permissions) |
-| In-context detail view (contact card, KPI drill-in) | Anything that needs its own URL for sharing |
-| Picking from a small set of options | List/index views |
+When you build a new popup, follow this guide.
 
-If the form needs to scroll more than ~600 px even on desktop, it's a page, not a
-popup.
+## When to use which
+
+| Simple dialog | Wizard dialog (WizardShell) | Full page |
+| --- | --- | --- |
+| Single-section create/edit (≤ ~8 fields) | Add/edit of an entity record (site, client, staff, asset, …) | List/index views |
+| Quick confirmation (delete, archive) | Any form with 2+ logical sections or steps | Anything that needs its own URL for sharing |
+| In-context detail view (contact card, KPI drill-in) | Structured report flows (incident, injury, inspection) | Free-form canvas/editor surfaces (plan builder, rostering board) |
+| Picking from a small set of options | Detail viewers with multiple SECTIONS (use `headerLabel`) | |
+
+Do **not** send a long or multi-step form to a full page any more — that was
+the old rule from before `WizardShell` existed. New create/edit flows for
+entity records are wizard dialogs opened from the index page. (The remaining
+full-page wizards — e.g. `pages/sites/create.tsx` / `edit.tsx` on the legacy
+`wizard-stepper` — are migration targets, not precedents.)
+
+## Entity wizard dialogs (WizardShell)
+
+The shared chrome lives in
+[`resources/js/components/wizard/shell.tsx`](../resources/js/components/wizard/shell.tsx):
+`WizardShell` plus its companions `WizardStepPane`, `WizardSuccessPane`,
+`ReviewCard`, and `ReviewRow`. Never rebuild this chrome by hand — ~90 dialogs
+already compose it.
+
+Anatomy (all provided by the shell — you supply content only):
+
+- **Stepper rail** (248px, hidden below `sm`): entity icon tile, `railTitle` /
+  `railSub` ("Add site" / "New location"), one button per step with icon,
+  label, and one-line `blurb` ("Type, name & lead"). Completed steps show a
+  green check; the active step is primary-tinted. Clickable via `onStepClick`.
+- **Completeness meter** (`pct` + `pctLabel`) pinned to the rail's bottom —
+  compute it from the fields worth filling in, not just required ones.
+- **Header**: "Step x of y · Label" (automatic) and the close button. Detail
+  dialogs whose rail entries are sections, not sequential steps, pass
+  `headerLabel` instead.
+- **Progress strip**: 3px primary bar under the header (automatic).
+- **Scrollable body**: wrap each step's content in `<WizardStepPane>` for the
+  motion-safe fade/slide transition.
+- **Footer band**: `footerStart` (Cancel / Back) and `footerEnd`
+  (Continue / submit). Same button rules as simple dialogs: primary filled
+  submit, `Loader2` while processing, sentence-case verbs.
+- **Review step**: last step before submit summarises entries with
+  `<ReviewCard>` / `<ReviewRow>`, each card's Edit link jumping back to its
+  step.
+- **Success pane**: on create, pass `success={<WizardSuccessPane …/>}` with
+  follow-up actions ("View site", "Add another") instead of closing abruptly.
+
+Wizard-specific rules:
+
+- Steps are **skippable by default** (rail navigation is free); validate
+  hard-required fields on Continue and on submit, and jump to the offending
+  step on server-side errors.
+- **Edit reuses the same wizard** as Add — same steps, prefilled, with the
+  save verb changed. Don't build a separate edit layout.
+- Guard against accidental loss: if the form is dirty, closing asks for
+  confirmation ("Discard this draft?" pattern).
+- The first step opens with the type/tile picker when the entity has a
+  categorical type (see "Type picker" below).
 
 ## File layout convention
 
@@ -234,7 +293,9 @@ an info card instead of an editable select:
 ## Submit button
 
 - Always include a `<Loader2 className="mr-2 h-4 w-4 animate-spin" />` while
-  `form.processing` is true.
+  `form.processing` is true. (Interim: once the Event Horizon ring-only
+  spinner ships — see `LOADER_STYLE_GUIDE.md` — it replaces `Loader2` as the
+  inline button spinner.)
 - Use sentence-case verbs: "Save contact", "Create resolution", "Approve
   minutes" — not "Submit", "OK", "Save".
 - The submit button is the **primary** filled button. Cancel is `variant="outline"`.
@@ -302,6 +363,10 @@ final check.
 ## What NOT to do
 
 - ❌ Don't navigate to a full create page when a popup will do.
+- ❌ Don't build multi-step chrome by hand (steppers, progress bars, success
+  screens) — compose `WizardShell` from `components/wizard/shell.tsx`.
+- ❌ Don't use the legacy `components/wizard-stepper.tsx` horizontal chip
+  stepper in new work — it survives only in the old full-page site wizard.
 - ❌ Don't render a dialog inline using `useState` toggles that re-mount the
   whole `Dialog` — use the shell pattern.
 - ❌ Don't use a `<Select>` for choice-of-category — use the tile picker.
