@@ -165,7 +165,7 @@
     --accent: var(--color-purple-100);
     --accent-foreground: oklch(0.2 0.015 277);
     --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(1 0 0);
     --border: oklch(0.92 0.01 277);
     --input: oklch(0.92 0.01 277);
     --ring: var(--color-purple-500);

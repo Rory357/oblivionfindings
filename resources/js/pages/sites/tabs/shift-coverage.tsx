@@ -674,6 +674,7 @@ export function SiteProfileShiftCoverage({
                 title="Remove coverage requirement?"
                 description={`${deleting?.name ?? 'This requirement'} will no longer contribute demand to Rostering.`}
                 confirmText="Remove requirement"
+                variant="default"
             />
         </div>
     );
