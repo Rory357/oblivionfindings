@@ -59,13 +59,21 @@ export default function AppSidebarLayout({
                 >
                     Skip to main content
                 </a>
-                <AppSidebar
-                    collapsed={collapsed}
-                    onCollapsedChange={(nextCollapsed) =>
-                        setExpanded(!nextCollapsed)
-                    }
-                />
-                <AppSidebarMobile onClose={closeMobileSidebar} />
+                {/* Mount only the sidebar for the current viewport — both
+                    build the full 200+-item nav tree, so rendering the
+                    hidden one too doubled that work on every page.
+                    (useIsMobile is a synchronous media-query read; if SSR
+                    is ever enabled, revisit for hydration safety.) */}
+                {isMobile ? (
+                    <AppSidebarMobile onClose={closeMobileSidebar} />
+                ) : (
+                    <AppSidebar
+                        collapsed={collapsed}
+                        onCollapsedChange={(nextCollapsed) =>
+                            setExpanded(!nextCollapsed)
+                        }
+                    />
+                )}
                 <main
                     id="main-content"
                     className={cn(

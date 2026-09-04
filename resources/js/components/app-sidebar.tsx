@@ -20,6 +20,7 @@ import {
 import { UserMenuContent } from '@/components/user-menu-content';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useInitials } from '@/hooks/use-initials';
+import { useStableValue } from '@/hooks/use-stable-value';
 import { cn, resolveUrl } from '@/lib/utils';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
@@ -2653,10 +2654,14 @@ export function AppSidebar({
     onCollapsedChange?: (collapsed: boolean) => void;
 }) {
     const page = usePage<PageProps & Record<string, any>>();
-    const { auth, branding, name: appName, labels } = page.props;
+    const { auth, branding, name: appName, labels: labelsProp } = page.props;
     const role = auth.user?.role ?? null;
-    const can = auth?.can;
-    const portalClients = auth?.portalClients ?? null;
+    // Inertia returns fresh object identities for shared props on every
+    // visit; stabilise the ones feeding the nav-tree memos below so the
+    // 200+-item structure is only rebuilt when the contents change.
+    const can = useStableValue(auth?.can);
+    const portalClients = useStableValue(auth?.portalClients ?? null);
+    const labels = useStableValue(labelsProp);
     const unreadMessageCount = (auth as any)?.unreadMessageCount ?? 0;
     const currentUrl = page.url;
     const getInitials = useInitials();
@@ -3099,10 +3104,12 @@ export function AppSidebar({
 
 export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
     const page = usePage<PageProps & Record<string, any>>();
-    const { auth, labels } = page.props as any;
+    const { auth, labels: labelsProp } = page.props as any;
     const role = auth.user?.role ?? null;
-    const can = auth?.can;
-    const portalClients = auth?.portalClients ?? null;
+    // Same identity-stabilisation as the desktop sidebar above.
+    const can = useStableValue(auth?.can);
+    const portalClients = useStableValue(auth?.portalClients ?? null);
+    const labels = useStableValue(labelsProp);
     const unreadMessageCount = auth?.unreadMessageCount ?? 0;
     const currentUrl = page.url;
 

@@ -15,6 +15,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import { useStableValue } from '@/hooks/use-stable-value';
 import { router, usePage } from '@inertiajs/react';
 import { Search, Ticket } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -32,10 +33,12 @@ interface TicketMatch {
 export default function GlobalNavSearch() {
     const page = usePage<any>();
     const auth = page.props?.auth;
-    const labels = page.props?.labels;
     const role = auth?.user?.role as string | null | undefined;
-    const can = auth?.can;
-    const portalClients = auth?.portalClients;
+    // Stable references so the search catalog is only rebuilt when the
+    // underlying values change, not on every Inertia visit.
+    const can = useStableValue(auth?.can);
+    const labels = useStableValue(page.props?.labels);
+    const portalClients = useStableValue(auth?.portalClients);
     const unreadMessageCount = auth?.unreadMessageCount;
 
     const [open, setOpen] = useState(false);

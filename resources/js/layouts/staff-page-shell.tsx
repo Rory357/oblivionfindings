@@ -26,6 +26,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
+import { useIsDesktopLg } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 
@@ -144,6 +145,7 @@ export default function StaffPageShell({
 }: StaffPageShellProps) {
     const defaultSidebarOpen = usePage<SharedData>().props.sidebarOpen ?? true;
     const { collapsed, setExpanded } = useAppSidebarState(defaultSidebarOpen);
+    const isDesktopLg = useIsDesktopLg();
     const [moreOpen, setMoreOpen] = useState(false);
     const showBuiltInMoreSheet = !onMore;
     const handleMore = onMore ?? (() => setMoreOpen(true));
@@ -157,7 +159,10 @@ export default function StaffPageShell({
                 Skip to main content
             </a>
 
-            {!mobileOnly ? (
+            {/* Below lg the sidebar was CSS-hidden but still mounted, so
+                frontline phones paid for the full 200+-item nav tree on
+                every page. Skip mounting it entirely there. */}
+            {!mobileOnly && isDesktopLg ? (
                 <div className="hidden lg:block">
                     <AppSidebar
                         collapsed={collapsed}
