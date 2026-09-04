@@ -44,7 +44,7 @@ import {
 import { useEffect, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
+    { title: 'Overview', href: '/dashboard' },
     { title: 'Access Control', href: '/system/access' },
     { title: 'Roles', href: '/system/access/roles' },
 ];

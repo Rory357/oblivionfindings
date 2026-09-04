@@ -30,7 +30,7 @@ import { Check, LayoutGrid, Search, Settings, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
+    { title: 'Overview', href: '/dashboard' },
     { title: 'Access Control', href: '/system/access' },
     { title: 'Permissions Matrix', href: '/system/access/matrix' },
 ];

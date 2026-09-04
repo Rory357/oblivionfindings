@@ -34,6 +34,12 @@ class LoginResponse implements LoginResponseContract
             $resolved = $this->resolveLandingUrl($user);
             if ($resolved !== null) {
                 $url = $resolved;
+            } elseif (! $user->hasRole('client', 'next_of_kin')) {
+                // No explicit landing preference — staff (including managers
+                // and admins) land on My Day. Portal users keep the
+                // fortify.home fallback, which DashboardController turns into
+                // the family-portal redirect.
+                $url = route('my-day');
             }
         }
 

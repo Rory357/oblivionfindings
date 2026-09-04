@@ -405,7 +405,7 @@ function buildIconNavItems({
                   {
                       id: 'dashboard',
                       icon: LayoutGrid,
-                      label: 'Dashboard',
+                      label: 'Overview',
                       href: '/dashboard',
                   } as IconNavItem,
                   {

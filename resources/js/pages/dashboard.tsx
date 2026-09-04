@@ -58,7 +58,7 @@ import {
 /* -------------------------------------------------------------------------- */
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: dashboard().url },
+    { title: 'Overview', href: dashboard().url },
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -1099,7 +1099,7 @@ function ClientDashboard({ props }: { props: Props }) {
 export default function Dashboard(props: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Dashboard" />
+            <Head title="Overview" />
 
             {props.mode === 'hr_admin' && <HrAdminDashboard props={props} />}
             {props.mode === 'manager' && <ManagerDashboard props={props} />}

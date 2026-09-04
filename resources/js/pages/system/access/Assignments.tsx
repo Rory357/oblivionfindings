@@ -34,7 +34,7 @@ import { Pencil, Search, User, UserCheck, Users } from 'lucide-react';
 import { useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
+    { title: 'Overview', href: '/dashboard' },
     { title: 'Access Control', href: '/system/access' },
     { title: 'User Assignments', href: '/system/access/assignments' },
 ];
