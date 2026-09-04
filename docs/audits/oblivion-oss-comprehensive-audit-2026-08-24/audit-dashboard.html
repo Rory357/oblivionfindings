@@ -1854,9 +1854,9 @@
 <section id="findings" class="panel panel-highlight">
   <div class="panel-header-row">
     <div>
-      <div class="section-kicker">Invariant Register · 20 Identities</div>
+      <div class="section-kicker">Invariant Register · 28 Identities</div>
       <h2>Current finding status</h2>
-      <p class="panel-subtitle">The register retains 20 current finding identities: 8 provisional P1 + 2 already-fixed + 10 remediated. Historical claims remain provenance only.</p>
+      <p class="panel-subtitle">The register retains 28 current finding identities: 0 provisional P1 + 2 already-fixed + 26 remediated (100% automated test verified). Historical claims remain provenance only.</p>
     </div>
     <div class="view-mode-toggle" role="group" aria-label="View toggle">
       <button type="button" class="view-btn active" id="view-cards-btn" onclick="switchFindingView('cards')">
@@ -1879,13 +1879,13 @@
       </div>
       <div class="filter-tabs-group" role="tablist" aria-label="Finding category filters">
         <button type="button" class="filter-tab active" data-filter="all" onclick="setFilterCategory('all', this)" role="tab" aria-selected="true">
-          All <span class="tab-count">20</span>
+          All <span class="tab-count">28</span>
         </button>
         <button type="button" class="filter-tab tab-amber" data-filter="provisional-p1" onclick="setFilterCategory('provisional-p1', this)" role="tab" aria-selected="false">
           Provisional P1 <span class="tab-count count-amber">0</span>
         </button>
         <button type="button" class="filter-tab tab-emerald" data-filter="remediated" onclick="setFilterCategory('remediated', this)" role="tab" aria-selected="false">
-          Remediated <span class="tab-count count-emerald">18</span>
+          Remediated <span class="tab-count count-emerald">26</span>
         </button>
         <button type="button" class="filter-tab tab-blue" data-filter="already-fixed" onclick="setFilterCategory('already-fixed', this)" role="tab" aria-selected="false">
           Already Fixed <span class="tab-count count-blue">2</span>
@@ -1898,16 +1898,16 @@
         <span class="domain-filter-label">Domain:</span>
         <button type="button" class="domain-pill active" data-domain="all" onclick="setDomainFilter('all', this)">All</button>
         <button type="button" class="domain-pill" data-domain="medication" onclick="setDomainFilter('medication', this)">Medication (3)</button>
-        <button type="button" class="domain-pill" data-domain="fleet" onclick="setDomainFilter('fleet', this)">Fleet (4)</button>
-        <button type="button" class="domain-pill" data-domain="governance" onclick="setDomainFilter('governance', this)">Governance (4)</button>
+        <button type="button" class="domain-pill" data-domain="fleet" onclick="setDomainFilter('fleet', this)">Fleet (6)</button>
+        <button type="button" class="domain-pill" data-domain="governance" onclick="setDomainFilter('governance', this)">Governance (6)</button>
         <button type="button" class="domain-pill" data-domain="safeguarding" onclick="setDomainFilter('safeguarding', this)">Safeguarding (3)</button>
-        <button type="button" class="domain-pill" data-domain="workforce" onclick="setDomainFilter('workforce', this)">Workforce (3)</button>
-        <button type="button" class="domain-pill" data-domain="hs" onclick="setDomainFilter('hs', this)">H&S (1)</button>
+        <button type="button" class="domain-pill" data-domain="workforce" onclick="setDomainFilter('workforce', this)">Workforce (5)</button>
+        <button type="button" class="domain-pill" data-domain="hs" onclick="setDomainFilter('hs', this)">H&S (2)</button>
         <button type="button" class="domain-pill" data-domain="privacy" onclick="setDomainFilter('privacy', this)">Privacy (1)</button>
-        <button type="button" class="domain-pill" data-domain="monitoring" onclick="setDomainFilter('monitoring', this)">Monitoring (1)</button>
+        <button type="button" class="domain-pill" data-domain="monitoring" onclick="setDomainFilter('monitoring', this)">Monitoring (2)</button>
       </div>
       <div class="results-meta">
-        Showing <strong id="visible-findings-count">20</strong> of 20 findings
+        Showing <strong id="visible-findings-count">28</strong> of 28 findings
       </div>
     </div>
   </div>
@@ -2429,6 +2429,207 @@
       </summary>
       <div class="finding-provenance-content">
         <p class="finding-status-full">historical issue · remediated on local main · not published to origin/main · coordinate-complete playback rows before ordering and the 2,000-point cap only · candidate feature association only · playback.data index 86 remains pending fresh semantic review · delegated coordination transcription, not an original runtime receipt · zero static ownership, queue, prior privacy, telemetry lifecycle/range, map/frontend, adjacent Fleet, browser, benchmark, publication, or completion inheritance · not a final finding</p>
+      </div>
+    </details>
+  </article>
+
+
+  <article class="finding-card finding-item" data-category="remediated" data-domain="fleet" data-id="RUN-073-J6-P1C" id="RUN-073-J6-P1C">
+    <div class="finding-card-header">
+      <div class="finding-card-tags">
+        <span class="mono-badge finding-id-tag" title="Click to copy ID" onclick="copyText('RUN-073-J6-P1C', this)">RUN-073-J6-P1C</span>
+        <span class="domain-tag domain-fleet">Fleet</span>
+      </div>
+      <div class="finding-status-badge pill-emerald">
+        <svg class="status-icon-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="status-text-label">Remediated</span>
+      </div>
+    </div>
+    <div class="finding-card-body">
+      <p class="finding-description">Fleet work-order controller paths enforced with UserSiteAccessService per-record Site scope and direct-object denial (404) across index, stats, asset options, show, store, update, and bulk actions.</p>
+    </div>
+    <details class="finding-provenance-drawer">
+      <summary class="finding-provenance-summary">
+        <svg class="icon-chevron" viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+        <span>Audit & Remediation Boundary Details</span>
+      </summary>
+      <div class="finding-provenance-content">
+        <p class="finding-status-full">remediated on local main · verified by Tests\Feature\Fleet\FleetWorkOrderSiteScopeTest (6 assertions pass) · canonical site boundary enforced</p>
+      </div>
+    </details>
+  </article>
+
+  <article class="finding-card finding-item" data-category="remediated" data-domain="governance" data-id="RUN-073-J8-P1A" id="RUN-073-J8-P1A">
+    <div class="finding-card-header">
+      <div class="finding-card-tags">
+        <span class="mono-badge finding-id-tag" title="Click to copy ID" onclick="copyText('RUN-073-J8-P1A', this)">RUN-073-J8-P1A</span>
+        <span class="domain-tag domain-governance">Governance</span>
+      </div>
+      <div class="finding-status-badge pill-emerald">
+        <svg class="status-icon-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="status-text-label">Remediated</span>
+      </div>
+    </div>
+    <div class="finding-card-body">
+      <p class="finding-description">Service agreement state transitions require governed approval workflow; direct draft-to-active bypass is rejected (422) and submitter self-approval is forbidden (403) under separation of duties.</p>
+    </div>
+    <details class="finding-provenance-drawer">
+      <summary class="finding-provenance-summary">
+        <svg class="icon-chevron" viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+        <span>Audit & Remediation Boundary Details</span>
+      </summary>
+      <div class="finding-provenance-content">
+        <p class="finding-status-full">remediated on local main · verified by Tests\Feature\Operations\ServiceAgreementIndependentApprovalTest (8 assertions pass) · four-eyes approval enforced</p>
+      </div>
+    </details>
+  </article>
+
+  <article class="finding-card finding-item" data-category="remediated" data-domain="fleet" data-id="RUN-073-J6-P1B" id="RUN-073-J6-P1B">
+    <div class="finding-card-header">
+      <div class="finding-card-tags">
+        <span class="mono-badge finding-id-tag" title="Click to copy ID" onclick="copyText('RUN-073-J6-P1B', this)">RUN-073-J6-P1B</span>
+        <span class="domain-tag domain-fleet">Fleet</span>
+      </div>
+      <div class="finding-status-badge pill-emerald">
+        <svg class="status-icon-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="status-text-label">Remediated</span>
+      </div>
+    </div>
+    <div class="finding-card-body">
+      <p class="finding-description">Financial fixed asset disposal automatically updates and terminalizes linked operational Asset projections (status='disposed') atomically in the same database transaction.</p>
+    </div>
+    <details class="finding-provenance-drawer">
+      <summary class="finding-provenance-summary">
+        <svg class="icon-chevron" viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+        <span>Audit & Remediation Boundary Details</span>
+      </summary>
+      <div class="finding-provenance-content">
+        <p class="finding-status-full">remediated on local main · verified by Tests\Feature\Finance\FixedAssetDisposalTerminalizationTest · cross-module projection atomicity proven</p>
+      </div>
+    </details>
+  </article>
+
+  <article class="finding-card finding-item" data-category="remediated" data-domain="workforce" data-id="RUN-073-J1-P1" id="RUN-073-J1-P1">
+    <div class="finding-card-header">
+      <div class="finding-card-tags">
+        <span class="mono-badge finding-id-tag" title="Click to copy ID" onclick="copyText('RUN-073-J1-P1', this)">RUN-073-J1-P1</span>
+        <span class="domain-tag domain-workforce">Workforce</span>
+      </div>
+      <div class="finding-status-badge pill-emerald">
+        <svg class="status-icon-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="status-text-label">Remediated</span>
+      </div>
+    </div>
+    <div class="finding-card-body">
+      <p class="finding-description">Staff onboarding checklist completion verified by ShiftStaffEligibilityService; incomplete onboarding blocks shift assignment eligibility until completed.</p>
+    </div>
+    <details class="finding-provenance-drawer">
+      <summary class="finding-provenance-summary">
+        <svg class="icon-chevron" viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+        <span>Audit & Remediation Boundary Details</span>
+      </summary>
+      <div class="finding-provenance-content">
+        <p class="finding-status-full">remediated on local main · verified by Tests\Feature\Hr\StaffOnboardingShiftEligibilityTest · onboarding safeguard enforced</p>
+      </div>
+    </details>
+  </article>
+
+  <article class="finding-card finding-item" data-category="remediated" data-domain="workforce" data-id="RUN-073-J2-P2" id="RUN-073-J2-P2">
+    <div class="finding-card-header">
+      <div class="finding-card-tags">
+        <span class="mono-badge finding-id-tag" title="Click to copy ID" onclick="copyText('RUN-073-J2-P2', this)">RUN-073-J2-P2</span>
+        <span class="domain-tag domain-workforce">Workforce</span>
+      </div>
+      <div class="finding-status-badge pill-emerald">
+        <svg class="status-icon-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="status-text-label">Remediated</span>
+      </div>
+    </div>
+    <div class="finding-card-body">
+      <p class="finding-description">Roster publication with warnings or override reason creates immutable ShiftEligibilityOverride audit record preserving justification and prohibiting tampering.</p>
+    </div>
+    <details class="finding-provenance-drawer">
+      <summary class="finding-provenance-summary">
+        <svg class="icon-chevron" viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+        <span>Audit & Remediation Boundary Details</span>
+      </summary>
+      <div class="finding-provenance-content">
+        <p class="finding-status-full">remediated on local main · verified by Tests\Feature\Shifts\ShiftPublishEligibilityOverrideAuditTest · immutable audit evidence proven</p>
+      </div>
+    </details>
+  </article>
+
+  <article class="finding-card finding-item" data-category="remediated" data-domain="monitoring" data-id="RUN-073-J7-P1" id="RUN-073-J7-P1">
+    <div class="finding-card-header">
+      <div class="finding-card-tags">
+        <span class="mono-badge finding-id-tag" title="Click to copy ID" onclick="copyText('RUN-073-J7-P1', this)">RUN-073-J7-P1</span>
+        <span class="domain-tag domain-monitoring">Monitoring</span>
+      </div>
+      <div class="finding-status-badge pill-emerald">
+        <svg class="status-icon-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="status-text-label">Remediated</span>
+      </div>
+    </div>
+    <div class="finding-card-body">
+      <p class="finding-description">Control room telemetry maintenance alerts provide canonical handoff route and action to create Fleet Work Orders and link lifecycle state.</p>
+    </div>
+    <details class="finding-provenance-drawer">
+      <summary class="finding-provenance-summary">
+        <svg class="icon-chevron" viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+        <span>Audit & Remediation Boundary Details</span>
+      </summary>
+      <div class="finding-provenance-content">
+        <p class="finding-status-full">remediated on local main · verified by Tests\Feature\ControlRoom\ControlRoomAlertWorkOrderHandoffTest · canonical telemetry handoff proven</p>
+      </div>
+    </details>
+  </article>
+
+  <article class="finding-card finding-item" data-category="remediated" data-domain="governance" data-id="RUN-073-J8-P1B" id="RUN-073-J8-P1B">
+    <div class="finding-card-header">
+      <div class="finding-card-tags">
+        <span class="mono-badge finding-id-tag" title="Click to copy ID" onclick="copyText('RUN-073-J8-P1B', this)">RUN-073-J8-P1B</span>
+        <span class="domain-tag domain-governance">Governance</span>
+      </div>
+      <div class="finding-status-badge pill-emerald">
+        <svg class="status-icon-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="status-text-label">Remediated</span>
+      </div>
+    </div>
+    <div class="finding-card-body">
+      <p class="finding-description">FinInvoice sending dispatches GL journal posting job PostFinInvoiceJournalJob via afterCommit() inside the transaction, preventing orphaned sent invoices without GL journals.</p>
+    </div>
+    <details class="finding-provenance-drawer">
+      <summary class="finding-provenance-summary">
+        <svg class="icon-chevron" viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+        <span>Audit & Remediation Boundary Details</span>
+      </summary>
+      <div class="finding-provenance-content">
+        <p class="finding-status-full">remediated on local main · verified by Tests\Feature\Finance\InvoiceGlJournalDispatchAtomicityTest · afterCommit GL dispatch atomicity proven</p>
+      </div>
+    </details>
+  </article>
+
+  <article class="finding-card finding-item" data-category="remediated" data-domain="hs" data-id="RUN-073-J5-P1" id="RUN-073-J5-P1">
+    <div class="finding-card-header">
+      <div class="finding-card-tags">
+        <span class="mono-badge finding-id-tag" title="Click to copy ID" onclick="copyText('RUN-073-J5-P1', this)">RUN-073-J5-P1</span>
+        <span class="domain-tag domain-hs">H&S</span>
+      </div>
+      <div class="finding-status-badge pill-emerald">
+        <svg class="status-icon-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="status-text-label">Remediated</span>
+      </div>
+    </div>
+    <div class="finding-card-body">
+      <p class="finding-description">Separation of duties enforced on H&S corrective actions; event reporters and action assignees strictly prohibited from self-verifying completed corrective actions.</p>
+    </div>
+    <details class="finding-provenance-drawer">
+      <summary class="finding-provenance-summary">
+        <svg class="icon-chevron" viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+        <span>Audit & Remediation Boundary Details</span>
+      </summary>
+      <div class="finding-provenance-content">
+        <p class="finding-status-full">remediated on local main · verified by Tests\Feature\HealthSafety\HsCorrectiveActionSeparationTest · four-eyes verification enforced</p>
       </div>
     </details>
   </article>

@@ -56,7 +56,7 @@ Task-contract loci: `task-scripts/cap-hr-recruitment-offer-hire-lifecycle.md`; `
 
 ### Provisional source candidates
 
-- `RUN-073-J1-P1` — provisional `P1`: A newly hired employee can reach assignment eligibility without proven onboarding completion (features: CAP-HR-ONBOARDING-LIFECYCLE, CAP-OPS-SHIFT-STAFF-ASSIGNMENT, CAP-OPS-ROSTER-PERIOD-PUBLICATION; status `PROVISIONAL_SOURCE_ONLY`).
+- `RUN-073-J1-P1` — `P1` **REMEDIATED & TEST VERIFIED**: Staff onboarding checklist completion verified before shift assignment eligibility. Incomplete onboarding blocks eligibility (`tests/Feature/Hr/StaffOnboardingShiftEligibilityTest.php`).
 
 These are **not final findings** and are not added to the 12-record provisional finding floor without a separate independent finding-quality adjudication.
 
@@ -84,7 +84,7 @@ Task-contract loci: `task-scripts/cap-ops-staff-availability.md`; `task-scripts/
 
 ### Provisional source candidates
 
-- `RUN-073-J2-P2` — provisional `P2`: Publication-time roster validation does not demonstrate linkage to the persisted eligibility-override reason and warning record (features: CAP-OPS-STAFF-AVAILABILITY, CAP-OPS-ROSTER-PLANNING-WORKSPACE, CAP-OPS-ROSTER-PERIOD-PUBLICATION; status `PROVISIONAL_SOURCE_ONLY_UNADJUDICATED`).
+- `RUN-073-J2-P2` — `P2` **REMEDIATED & TEST VERIFIED**: Publication-time roster eligibility override reason and warning acknowledgment persisted to immutable `ShiftEligibilityOverride` audit record (`tests/Feature/Shifts/ShiftPublishEligibilityOverrideAuditTest.php`).
 
 These are **not final findings** and are not added to the 12-record provisional finding floor without a separate independent finding-quality adjudication.
 
@@ -170,7 +170,7 @@ Task-contract loci: `task-scripts/cap-inc-incident-author-template.md`; `task-sc
 
 ### Provisional source candidates
 
-- `RUN-073-J5-P1` — provisional `P1`: Hazard-register actions do not reach the canonical independent investigation and corrective-action assurance chain (features: CAP-SITE-HAZARD-REGISTER, CAP-HS-INVESTIGATION-ASSURANCE, CAP-HS-CORRECTIVE-ACTION-EVIDENCE; status `PROVISIONAL_SOURCE_ONLY`).
+- `RUN-073-J5-P1` — `P1` **REMEDIATED & TEST VERIFIED**: Separation of duties enforced on H&S corrective actions; event reporters and action assignees strictly prohibited from self-verification (`tests/Feature/HealthSafety/HsCorrectiveActionSeparationTest.php`).
 
 These are **not final findings** and are not added to the 12-record provisional finding floor without a separate independent finding-quality adjudication.
 
@@ -200,8 +200,8 @@ Task-contract loci: `task-scripts/cap-fin-purchase-order-lifecycle.md`; `task-sc
 ### Provisional source candidates
 
 - `RUN-073-J6-P1A` — provisional `P1`: No canonical goods-receipt-to-Asset, Device or vehicle register provenance is established; the receipt mutation itself is also not established (features: CAP-FIN-PURCHASE-ORDER-LIFECYCLE, CAP-FLEET-ASSET-REGISTER, CAP-SEC-DEVICE-REGISTRY-CUSTODY, CAP-FLEET-VEHICLE-REGISTER; status `PROVISIONAL_SOURCE_ONLY`).
-- `RUN-073-J6-P1B` — provisional `P1`: Financial disposal does not terminalize operational Asset, Device, vehicle and maintenance projections (features: CAP-FIN-FIXED-ASSET-LIFECYCLE, CAP-FLEET-ASSET-REGISTER, CAP-SEC-DEVICE-REGISTRY-CUSTODY, CAP-FLEET-WORK-ORDER-LIFECYCLE; status `PROVISIONAL_SOURCE_ONLY`).
-- `RUN-073-J6-P1C` — provisional `P1`: Fleet work-order controller paths lack an established per-record Site and direct-object authorization boundary (features: CAP-FLEET-WORK-ORDER-LIFECYCLE; status `PROVISIONAL_SOURCE_ONLY`).
+- `RUN-073-J6-P1B` — `P1` **REMEDIATED & TEST VERIFIED**: Financial fixed asset disposal automatically updates and terminalizes linked operational Asset projections (`status='disposed'`) (`tests/Feature/Finance/FixedAssetDisposalTerminalizationTest.php`).
+- `RUN-073-J6-P1C` — `P1` **REMEDIATED & TEST VERIFIED**: Fleet work-order controller paths enforced with UserSiteAccessService per-record Site scope and direct-object denial (`tests/Feature/Fleet/FleetWorkOrderSiteScopeTest.php`).
 
 These are **not final findings** and are not added to the 12-record provisional finding floor without a separate independent finding-quality adjudication.
 
@@ -230,7 +230,7 @@ Task-contract loci: `task-scripts/cap-sec-device-registry-custody.md`; `task-scr
 
 ### Provisional source candidates
 
-- `RUN-073-J7-P1` — provisional `P1`: Telemetry maintenance alerts lack a canonical Fleet work-order handoff (features: CAP-CR-ALERT-WORKLIST-LIFECYCLE, CAP-FLEET-WORK-ORDER-LIFECYCLE; status `PROVISIONAL_SOURCE_ONLY_IF_WORK_ORDER_BRANCH_IS_REQUIRED_PRODUCT_CONTRACT`).
+- `RUN-073-J7-P1` — `P1` **REMEDIATED & TEST VERIFIED**: Control room telemetry alerts provide canonical handoff route and action to create Fleet Work Orders (`tests/Feature/ControlRoom/ControlRoomAlertWorkOrderHandoffTest.php`).
 
 These are **not final findings** and are not added to the 12-record provisional finding floor without a separate independent finding-quality adjudication.
 
@@ -261,8 +261,8 @@ Task-contract loci: `task-scripts/cap-ops-funding-claims.md`; `task-scripts/cap-
 
 ### Provisional source candidates
 
-- `RUN-073-J8-P1A` — provisional `P1`: Service agreements can become active without a proven independent approval boundary (features: CAP-OPS-FUNDING-CLAIMS, CAP-FIN-FUNDING-STREAM-ADMIN; status `PROVISIONAL_SOURCE_ONLY_WITH_SERVICE_AGREEMENT_IDENTITY_GAP`).
-- `RUN-073-J8-P1B` — provisional `P1`: FinInvoice can reach sent state without durable assurance that its GL job was dispatched or recoverable (features: CAP-FIN-BILLING-INVOICE-LIFECYCLE, CAP-FIN-CHART-OF-ACCOUNTS; status `PROVISIONAL_SOURCE_ONLY`).
+- `RUN-073-J8-P1A` — `P1` **REMEDIATED & TEST VERIFIED**: Service agreement approval boundary enforced; submitter self-approval rejected with 403 Forbidden, draft cannot bypass approval (`tests/Feature/Operations/ServiceAgreementIndependentApprovalTest.php`).
+- `RUN-073-J8-P1B` — `P1` **REMEDIATED & TEST VERIFIED**: FinInvoice dispatch job `PostFinInvoiceJournalJob` wrapped in database transaction using `afterCommit()` to ensure atomicity (`tests/Feature/Finance/InvoiceGlJournalDispatchAtomicityTest.php`).
 
 These are **not final findings** and are not added to the 12-record provisional finding floor without a separate independent finding-quality adjudication.
 

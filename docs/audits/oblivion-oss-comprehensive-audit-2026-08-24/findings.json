@@ -1,6 +1,6 @@
 {
   "schema_version": "oblivion_audit_findings_v2_mixed_current_status",
-  "audit_status": "ZERO_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_EIGHTEEN_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
+  "audit_status": "ZERO_PROVISIONAL_TWO_HISTORICAL_ALREADY_FIXED_TWENTYSIX_HISTORICAL_REMEDIATED_ZERO_FINAL_FINDING_CREDIT",
   "generated_on": "2026-09-01",
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",

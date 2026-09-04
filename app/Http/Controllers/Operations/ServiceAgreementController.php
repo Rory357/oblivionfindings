@@ -383,6 +383,10 @@ class ServiceAgreementController extends Controller
                 'notes' => $data['notes'] ?? null,
             ]);
 
+            if ($data['status'] === 'active' && ! in_array($fromStatus, ['pending_approval', 'suspended', 'under_review'], true)) {
+                abort(422, 'Draft service agreements must be submitted and independently approved before becoming active.');
+            }
+
             // Update agreement
             $updates = ['status' => $data['status']];
             if ($data['status'] === 'terminated') {
@@ -445,6 +449,11 @@ class ServiceAgreementController extends Controller
         $agreement = DB::transaction(function () use ($auth, $request, $serviceAgreement) {
             $agreement = $this->accessibleAgreements($auth)->lockForUpdate()->findOrFail($serviceAgreement);
             abort_unless($agreement->status === 'pending_approval', 422, 'Only agreements pending approval can be approved.');
+            abort_if(
+                $agreement->submitted_for_approval_by && (int) $agreement->submitted_for_approval_by === (int) $auth->id,
+                403,
+                'Service agreements require independent approval (cannot be approved by the submitter).'
+            );
 
             $fromStatus = $agreement->status;
 

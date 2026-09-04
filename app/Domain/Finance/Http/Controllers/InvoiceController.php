@@ -578,7 +578,7 @@ class InvoiceController extends Controller
 
         $shouldPostJournal = false;
 
-        DB::transaction(function () use ($invoice, &$shouldPostJournal) {
+        DB::transaction(function () use ($invoice) {
             $invoice->refresh();
 
             if ($invoice->status === 'draft') {
@@ -587,17 +587,15 @@ class InvoiceController extends Controller
                     'sent_at' => $invoice->sent_at ?? now(),
                 ]);
 
-                $shouldPostJournal = $invoice->journal_id === null;
+                if ($invoice->journal_id === null) {
+                    PostFinInvoiceJournalJob::dispatch($invoice)->afterCommit();
+                }
+
+                SendInvoiceEmailJob::dispatch($invoice->id)->afterCommit();
             }
         });
 
         $invoice->refresh();
-
-        if ($shouldPostJournal) {
-            PostFinInvoiceJournalJob::dispatch($invoice);
-        }
-
-        SendInvoiceEmailJob::dispatch($invoice->id);
 
         return redirect()->route('finance.invoices.show', $invoice)
             ->with('success', 'Invoice is being sent to '.$invoice->client_email);

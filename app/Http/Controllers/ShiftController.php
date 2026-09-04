@@ -1840,6 +1840,17 @@ class ShiftController extends Controller
                     'user_id' => $eligibility->blocking_reasons[0] ?? 'This assigned worker cannot be published on this shift.',
                 ]);
             }
+
+            if ($request->filled('override_reason') || $eligibility->hasWarnings()) {
+                \App\Models\ShiftEligibilityOverride::create([
+                    'shift_id' => $shift->id,
+                    'user_id' => $assignee->id,
+                    'overridden_by' => $auth->id,
+                    'override_reason' => $request->input('override_reason') ?: 'Roster publication override with acknowledged warnings',
+                    'rules_overridden' => $request->input('rules_overridden', []),
+                    'acknowledged_warnings' => $eligibility->warning_reasons ?? [],
+                ]);
+            }
         }
 
         $shift->forceFill([

@@ -7,15 +7,33 @@ use App\Models\Asset;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class WorkOrderController extends Controller
 {
+    public function __construct(
+        private readonly ?UserSiteAccessService $siteAccess = null,
+    ) {}
+
+    private function siteAccessService(): UserSiteAccessService
+    {
+        return $this->siteAccess ?? app(UserSiteAccessService::class);
+    }
+
     public function index(Request $request)
     {
+        $siteService = $this->siteAccessService();
+        $user = $request->user();
+
         $query = FleetWorkOrder::query()
-            ->with(['asset:id,name,asset_tag', 'reportedBy:id,name', 'assignedTo:id,name']);
+            ->with(['asset:id,name,asset_tag,site_id', 'reportedBy:id,name', 'assignedTo:id,name']);
+
+        if ($user && ! $siteService->canBypass($user, ['fleet.manage', 'sites.viewAll'])) {
+            $accessibleSiteIds = $siteService->accessibleSiteIds($user);
+            $query->whereHas('asset', fn ($q) => $q->whereIn('site_id', $accessibleSiteIds));
+        }
 
         // CSV export
         if ($request->input('export') === 'csv') {
@@ -65,21 +83,32 @@ class WorkOrderController extends Controller
 
         $users = User::query()->orderBy('name')->limit(20)->get(['id', 'name']);
 
-        // Hero band stats — whole-table counts (the paginated slice above is not the world)
+        // Hero band stats — whole-table counts scoped to accessible sites
+        $statsBase = FleetWorkOrder::query();
+        if ($user && ! $siteService->canBypass($user, ['fleet.manage', 'sites.viewAll'])) {
+            $accessibleSiteIds = $siteService->accessibleSiteIds($user);
+            $statsBase->whereHas('asset', fn ($q) => $q->whereIn('site_id', $accessibleSiteIds));
+        }
+
         $stats = [
-            'open' => FleetWorkOrder::where('status', 'open')->count(),
-            'overdue' => FleetWorkOrder::whereNotIn('status', ['completed', 'cancelled'])
+            'open' => (clone $statsBase)->where('status', 'open')->count(),
+            'overdue' => (clone $statsBase)->whereNotIn('status', ['completed', 'cancelled'])
                 ->whereNotNull('due_at')
                 ->where('due_at', '<', now())
                 ->count(),
-            'in_progress' => FleetWorkOrder::where('status', 'in_progress')->count(),
-            'completed_30d' => FleetWorkOrder::where('status', 'completed')
+            'in_progress' => (clone $statsBase)->where('status', 'in_progress')->count(),
+            'completed_30d' => (clone $statsBase)->where('status', 'completed')
                 ->where('completed_at', '>=', now()->subDays(30))
                 ->count(),
         ];
 
         // Create-wizard options (modal lives on this page — ?new=1 shim)
-        $assets = Asset::query()->orderBy('name')->limit(20)->get(['id', 'name', 'asset_tag', 'category']);
+        $assetsQuery = Asset::query()->orderBy('name');
+        if ($user && ! $siteService->canBypass($user, ['fleet.manage', 'sites.viewAll'])) {
+            $accessibleSiteIds = $siteService->accessibleSiteIds($user);
+            $assetsQuery->whereIn('site_id', $accessibleSiteIds);
+        }
+        $assets = $assetsQuery->limit(20)->get(['id', 'name', 'asset_tag', 'category']);
         $selectedAssetId = $request->integer('asset_id');
         if ($selectedAssetId && ! $assets->contains('id', $selectedAssetId)) {
             $selectedAsset = Asset::query()->find($selectedAssetId, ['id', 'name', 'asset_tag', 'category']);
@@ -182,7 +211,16 @@ class WorkOrderController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $asset = Asset::query()->select('id', 'category')->findOrFail($data['asset_id']);
+        $asset = Asset::query()->select('id', 'category', 'site_id')->findOrFail($data['asset_id']);
+
+        $siteService = $this->siteAccessService();
+        $user = $request->user();
+        if ($user && ! $siteService->canBypass($user, ['fleet.manage', 'sites.viewAll'])) {
+            $siteId = $asset->site_id;
+            if ($siteId && ! in_array((int) $siteId, $siteService->accessibleSiteIds($user), true)) {
+                abort(404);
+            }
+        }
 
         $data['reported_by_user_id'] = $request->user()->id;
         $data['category'] = $asset->category ?: 'maintenance';
@@ -201,6 +239,15 @@ class WorkOrderController extends Controller
 
     public function show(Request $request, FleetWorkOrder $workOrder)
     {
+        $siteService = $this->siteAccessService();
+        $user = $request->user();
+        if ($user && ! $siteService->canBypass($user, ['fleet.manage', 'sites.viewAll'])) {
+            $siteId = $workOrder->asset?->site_id;
+            if ($siteId && ! in_array((int) $siteId, $siteService->accessibleSiteIds($user), true)) {
+                abort(404);
+            }
+        }
+
         $workOrder->load([
             'asset:id,name,asset_tag,category,status',
             'reportedBy:id,name,email',
@@ -214,6 +261,15 @@ class WorkOrderController extends Controller
 
     public function update(Request $request, FleetWorkOrder $workOrder)
     {
+        $siteService = $this->siteAccessService();
+        $user = $request->user();
+        if ($user && ! $siteService->canBypass($user, ['fleet.manage', 'sites.viewAll'])) {
+            $siteId = $workOrder->asset?->site_id;
+            if ($siteId && ! in_array((int) $siteId, $siteService->accessibleSiteIds($user), true)) {
+                abort(404);
+            }
+        }
+
         $data = $request->validate([
             'status' => ['sometimes', 'string', 'in:open,in_progress,on_hold,completed,cancelled'],
             'priority' => ['sometimes', 'string', 'in:low,medium,high,critical'],
@@ -270,7 +326,14 @@ class WorkOrderController extends Controller
         }
 
         if (!empty($updateData)) {
-            FleetWorkOrder::whereIn('id', $data['ids'])->update($updateData);
+            $siteService = $this->siteAccessService();
+            $user = $request->user();
+            $idsQuery = FleetWorkOrder::whereIn('id', $data['ids']);
+            if ($user && ! $siteService->canBypass($user, ['fleet.manage', 'sites.viewAll'])) {
+                $accessibleSiteIds = $siteService->accessibleSiteIds($user);
+                $idsQuery->whereHas('asset', fn ($q) => $q->whereIn('site_id', $accessibleSiteIds));
+            }
+            $idsQuery->update($updateData);
         }
 
         AuditLogger::log('fleet.work_orders.bulk_action', null, [

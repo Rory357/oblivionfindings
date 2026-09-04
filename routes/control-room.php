@@ -111,6 +111,10 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('alert')
             ->name('control-room.alerts.create-incident');
 
+        Route::post('/control-room/alerts/{alert}/create-work-order', [ControlRoomAlertController::class, 'createWorkOrder'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.create-work-order');
+
         Route::post('/control-room/alerts/{alert}/resolve', [ControlRoomAlertController::class, 'resolve'])
             ->whereNumber('alert')
             ->name('control-room.alerts.resolve');

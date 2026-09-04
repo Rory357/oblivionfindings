@@ -506,13 +506,18 @@ class HsCorrectiveActionService
 
             $verifierId = $data['verified_by_user_id'] ?? auth()->id();
 
-            // Separation of duties: the action owner and completer must not verify.
+            // Separation of duties: the action owner, completer, action creator, and event creator must not verify.
+            $actionCreatorId = $action->created_by;
+            $eventCreatorId = $action->hsEvent?->created_by;
+
             if ($verifierId && (
                 $verifierId === $action->assigned_to_user_id
                 || $verifierId === $action->completed_by_user_id
+                || ($actionCreatorId && $verifierId === $actionCreatorId)
+                || ($eventCreatorId && $verifierId === $eventCreatorId)
             )) {
                 throw new InvalidArgumentException(
-                    'Verifier must be a different person than the action owner and completer (separation of duties).'
+                    'Verifier must be a different person than the action owner, completer, and reporter (separation of duties).'
                 );
             }
 

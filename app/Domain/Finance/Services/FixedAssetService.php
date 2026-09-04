@@ -600,6 +600,16 @@ class FixedAssetService
                 'disposal_proceeds' => $proceeds,
             ]);
 
+            // Synchronize and terminalize operational Asset projection
+            if ($asset->linked_asset_id) {
+                $linkedAsset = $asset->linkedAsset()->lockForUpdate()->first();
+                if ($linkedAsset) {
+                    $linkedAsset->update([
+                        'status' => 'disposed',
+                    ]);
+                }
+            }
+
             return $asset->refresh();
         });
     }

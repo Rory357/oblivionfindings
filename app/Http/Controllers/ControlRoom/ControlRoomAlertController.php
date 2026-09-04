@@ -14,6 +14,7 @@ use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetSignal;
+use App\Models\FleetWorkOrder;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertWorklistPresenter;
@@ -236,6 +237,76 @@ class ControlRoomAlertController extends Controller
         return back()
             ->with('success', 'Incident '.$journey->incident->reference_number.' created and handed to H&S.')
             ->with('incident_journey', $payload);
+    }
+
+    /**
+     * Create a Fleet Work Order directly from a telemetry maintenance alert.
+     */
+    public function createWorkOrder(Request $request, ControlRoomAlert $alert)
+    {
+        $user = $request->user();
+        abort_unless(
+            $user
+                && $user->canDo('controlRoom.alerts.manage')
+                && ($user->canDo('fleet.work_orders.create') || $user->canDo('fleet.manage')),
+            403,
+        );
+        $this->assertCanAccessAlert($user, $alert);
+
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'priority' => ['required', 'string', 'in:low,medium,high,critical'],
+            'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'due_at' => ['nullable', 'date'],
+            'estimated_cost' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $asset = $alert->asset;
+        abort_unless($asset !== null, 422, 'Cannot create a fleet work order for an alert with no linked asset.');
+
+        $workOrder = DB::transaction(function () use ($alert, $asset, $data, $user) {
+            $workOrder = FleetWorkOrder::create([
+                'asset_id' => $asset->id,
+                'reported_by_user_id' => $user->id,
+                'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
+                'title' => $data['title'],
+                'description' => $data['description'] ?? ($alert->notes ?: "Created from telemetry alert #{$alert->id}: {$alert->alert_type}"),
+                'priority' => $data['priority'],
+                'category' => $asset->category ?: 'vehicle',
+                'status' => 'open',
+                'due_at' => $data['due_at'] ?? null,
+                'estimated_cost' => $data['estimated_cost'] ?? null,
+            ]);
+
+            $alert->update([
+                'status' => 'triaged',
+                'notes' => trim(($alert->notes ? $alert->notes."\n" : '')."Handed off to Fleet Work Order #{$workOrder->id} ({$workOrder->reference_number})"),
+            ]);
+
+            AuditLogger::log('control_room.alert.work_order_created', $alert, [
+                'work_order_id' => $workOrder->id,
+                'reference_number' => $workOrder->reference_number,
+            ]);
+
+            return $workOrder;
+        });
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'work_order' => [
+                    'id' => $workOrder->id,
+                    'reference_number' => $workOrder->reference_number,
+                    'status' => $workOrder->status,
+                ],
+                'alert' => [
+                    'id' => $alert->id,
+                    'status' => $alert->status,
+                ],
+            ]);
+        }
+
+        return back()->with('success', "Work order {$workOrder->reference_number} created from telemetry alert.");
     }
 
     /**

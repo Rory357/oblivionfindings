@@ -72,6 +72,7 @@ class ShiftStaffEligibilityService
         $checks[] = $this->requiredDriverLicenceRule->evaluate($shift, $user);
         $checks = array_merge($checks, $this->hsTrainingRule->evaluateAll($shift, $user));
         $checks[] = $this->medicationCompetencyRule->evaluate($shift, $user);
+        $checks[] = $this->checkOnboarding($shift, $user);
 
         return EligibilityResult::fromChecks($checks);
     }
@@ -429,6 +430,31 @@ class ShiftStaffEligibilityService
         }
 
         return self::pass('overfill');
+    }
+
+    protected function checkOnboarding(Shift $shift, User $user): array
+    {
+        $profile = $user->hrEmployeeProfile;
+        if (! $profile) {
+            return self::pass('onboarding');
+        }
+
+        $hasIncompleteOnboarding = \App\Domain\Hr\Models\HrOnboardingChecklist::query()
+            ->where('employee_profile_id', $profile->id)
+            ->whereNotIn('status', ['completed', 'waived'])
+            ->exists();
+
+        if ($hasIncompleteOnboarding) {
+            return [
+                'rule' => 'onboarding',
+                'passed' => false,
+                'severity' => 'block',
+                'overrideable' => true,
+                'message' => 'Staff member has not completed required onboarding checklist.',
+            ];
+        }
+
+        return self::pass('onboarding');
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
