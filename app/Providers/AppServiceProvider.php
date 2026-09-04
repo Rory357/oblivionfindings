@@ -191,12 +191,18 @@ use App\Services\Notifications\PushProvider;
 use App\Services\Notifications\SmsProvider;
 use App\Services\Notifications\TwilioSmsProvider;
 use App\Services\Notifications\WebPushProvider;
+use App\Services\Tasks\TaskAggregator;
 use App\Services\UserSiteAccessService;
+use App\Support\SchemaCache;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Database\Events\SchemaLoaded;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use SocialiteProviders\Google\GoogleExtendSocialite;
@@ -407,6 +413,11 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(DeliveryProviderManager::class);
         $this->app->scoped(UserSiteAccessService::class);
+
+        // Request-scoped so the Inertia middleware's badge pass and the
+        // /my-day and /tasks controllers share one provider fan-out per
+        // request (see TaskAggregator::$providerPassMemo).
+        $this->app->scoped(TaskAggregator::class);
     }
 
     /**
@@ -414,6 +425,34 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // SchemaCache serves hasTable()/hasColumn() from cache on hot
+        // request paths; migrations must invalidate it.
+        Event::listen([MigrationsEnded::class, SchemaLoaded::class], fn () => SchemaCache::flush());
+
+        // Local-only page-load diagnostics: one log line per web request
+        // with the query count and total DB time, for before/after
+        // comparison while tuning performance.
+        if ($this->app->isLocal() && config('app.debug') && ! $this->app->runningInConsole()) {
+            $queryStats = ['count' => 0, 'ms' => 0.0];
+
+            DB::listen(function ($query) use (&$queryStats): void {
+                $queryStats['count']++;
+                $queryStats['ms'] += $query->time;
+            });
+
+            $this->app->terminating(function () use (&$queryStats): void {
+                if ($queryStats['count'] > 0) {
+                    Log::debug(sprintf(
+                        'perf: %s /%s queries=%d db_ms=%.1f',
+                        request()->method(),
+                        request()->path(),
+                        $queryStats['count'],
+                        $queryStats['ms'],
+                    ));
+                }
+            });
+        }
+
         Relation::morphMap([
             'client' => Client::class,
             'staff' => User::class,

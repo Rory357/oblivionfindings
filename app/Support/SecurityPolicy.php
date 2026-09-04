@@ -3,10 +3,13 @@
 namespace App\Support;
 
 use App\Models\AppSetting;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rules\Password;
 
 class SecurityPolicy
 {
+    public const CACHE_KEY = 'security-policy:v1';
+
     private const DEFAULTS = [
         'password_min_length' => 12,
         'password_require_uppercase' => true,
@@ -69,10 +72,36 @@ class SecurityPolicy
         return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 
+    /**
+     * The setting keys this policy owns (AppSetting busts the cache when
+     * one of them is written).
+     *
+     * @return string[]
+     */
+    public static function keys(): array
+    {
+        return array_keys(self::DEFAULTS);
+    }
+
+    public static function flushCache(): void
+    {
+        self::$settings = null;
+        Cache::forget(self::CACHE_KEY);
+    }
+
+    /** @var array<string, mixed>|null */
+    private static ?array $settings = null;
+
     private static function value(string $key): mixed
     {
-        $setting = AppSetting::query()->where('key', $key)->first();
+        // Two global middleware (session timeout, forced 2FA) consult this
+        // on every request — one cached read for all keys instead of one
+        // uncached query per key per request.
+        self::$settings ??= Cache::rememberForever(self::CACHE_KEY, fn (): array => AppSetting::query()
+            ->whereIn('key', self::keys())
+            ->pluck('value', 'key')
+            ->all());
 
-        return $setting?->value ?? self::DEFAULTS[$key] ?? null;
+        return self::$settings[$key] ?? self::DEFAULTS[$key] ?? null;
     }
 }
