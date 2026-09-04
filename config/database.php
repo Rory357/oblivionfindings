@@ -58,6 +58,10 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // App runs in UTC (config/app.php); without this the MySQL session
+            // uses the host's timezone, and TIMESTAMP inserts whose UTC value
+            // falls inside a local DST spring-forward gap fail with error 1292.
+            'timezone' => env('DB_TIMEZONE', '+00:00'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
                 // Opt-in client-side prepares (off by default → prod unchanged).
@@ -83,6 +87,7 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            'timezone' => env('DB_TIMEZONE', '+00:00'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
