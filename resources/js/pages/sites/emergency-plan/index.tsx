@@ -139,9 +139,11 @@ export function SiteEmergencyPlanSurface({
     can,
     embedded = false,
     BuilderDialog = SiteTypePlanBuilderDialog,
+    builderReloadProps,
 }: SiteEmergencyPlanProps & {
     embedded?: boolean;
     BuilderDialog?: typeof SiteTypePlanBuilderDialog;
+    builderReloadProps?: string[];
 }) {
     const [builderOpen, setBuilderOpen] = useState(false);
     const [builderMode, setBuilderMode] = useState<BuilderMode>('emergency');
@@ -290,7 +292,7 @@ export function SiteEmergencyPlanSurface({
                 {!embedded ? (
                     <PageHero
                         icon={Siren}
-                        backHref={`/sites/${site.id}/plan`}
+                        backHref={`/sites/${site.id}?tab=plan`}
                         backLabel="Back to site plan"
                         title="Emergency Plan"
                         description={`${site.name} - ${organisation.name}`}
@@ -499,6 +501,7 @@ export function SiteEmergencyPlanSurface({
                 }}
                 focusTool={builderFocus}
                 mode={builderMode}
+                reloadProps={builderReloadProps}
             />
         </Layout>
     );

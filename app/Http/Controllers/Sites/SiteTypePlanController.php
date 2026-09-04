@@ -7,7 +7,6 @@ use App\Models\Site;
 use App\Services\Sites\SiteTypePlanService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Inertia\Inertia;
 
 class SiteTypePlanController extends Controller
 {
@@ -19,18 +18,10 @@ class SiteTypePlanController extends Controller
     {
         $this->authorize('view', $site);
 
-        return Inertia::render('sites/plan/index', [
-            'site' => [
-                'id' => $site->id,
-                'name' => $site->name,
-                'type' => $site->type,
-                'display_type' => $site->display_type,
-            ],
-            'typePlan' => $this->plans->summaryFor($site),
-            'can' => [
-                'update' => (bool) ($request->user()?->can('update', $site)),
-            ],
-        ]);
+        // The plan builder lives inside the Site Profile (Safety > House Plan
+        // tab) so building never leaves the site view; legacy /plan deep links
+        // land there too.
+        return redirect()->route('sites.show', ['site' => $site->id, 'tab' => 'plan']);
     }
 
     public function storeDraft(Request $request, Site $site)

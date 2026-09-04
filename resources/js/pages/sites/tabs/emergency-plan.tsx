@@ -49,6 +49,12 @@ export function SiteProfileEmergencyPlan({
             {...(data as SiteEmergencyPlanProps)}
             embedded
             BuilderDialog={SiteTypePlanBuilderDialog}
+            builderReloadProps={[
+                'emergencyPlanData',
+                'planData',
+                'hero',
+                'readiness',
+            ]}
         />
     );
 }

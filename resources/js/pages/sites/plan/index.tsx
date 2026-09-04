@@ -99,9 +99,11 @@ export function SitePlanSurface({
     can,
     embedded = false,
     BuilderDialog = SiteTypePlanBuilderDialog,
+    builderReloadProps,
 }: SitePlanProps & {
     embedded?: boolean;
     BuilderDialog?: typeof SiteTypePlanBuilderDialog;
+    builderReloadProps?: string[];
 }) {
     const [builderOpen, setBuilderOpen] = useState(false);
     const activePlan = typePlan.draft ?? typePlan.published;
@@ -342,6 +344,7 @@ export function SitePlanSurface({
                 typePlan={typePlan}
                 open={builderOpen}
                 onOpenChange={setBuilderOpen}
+                reloadProps={builderReloadProps}
             />
         </SitePlanFrame>
     );

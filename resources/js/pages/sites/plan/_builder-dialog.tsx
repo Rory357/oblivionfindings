@@ -75,6 +75,11 @@ type Props = {
     onOpenChange: (open: boolean) => void;
     focusTool?: string;
     mode?: BuilderMode;
+    // Inertia props to refresh after a save/publish. The defaults match the
+    // standalone plan/emergency pages; embedded surfaces (Site Profile tabs)
+    // must pass their own tab data props or the view behind the dialog stays
+    // stale.
+    reloadProps?: string[];
 };
 
 const PLAN_RELOAD_PROPS = [
@@ -173,6 +178,7 @@ export default function SiteTypePlanBuilderDialog({
     onOpenChange,
     focusTool,
     mode = 'full',
+    reloadProps = PLAN_RELOAD_PROPS,
 }: Props) {
     const source = typePlan.draft ?? typePlan.published;
 
@@ -261,7 +267,7 @@ export default function SiteTypePlanBuilderDialog({
             dispatch({ type: 'set_validation_errors', errors: {} });
             markClean();
             setNotesDirty(false);
-            router.reload({ only: PLAN_RELOAD_PROPS });
+            router.reload({ only: reloadProps });
             return true;
         } catch (error) {
             if (error instanceof JsonRequestError && error.status === 422) {
@@ -287,6 +293,7 @@ export default function SiteTypePlanBuilderDialog({
         markClean,
         mode,
         notes,
+        reloadProps,
         site.id,
         state.pins,
     ]);
@@ -298,7 +305,7 @@ export default function SiteTypePlanBuilderDialog({
         try {
             await jsonRequest(`/sites/${site.id}/plan/publish`, 'POST');
             toast.success('Plan published.');
-            router.reload({ only: PLAN_RELOAD_PROPS });
+            router.reload({ only: reloadProps });
         } catch (error) {
             toast.error(
                 error instanceof Error
@@ -308,7 +315,7 @@ export default function SiteTypePlanBuilderDialog({
         } finally {
             setSaving(false);
         }
-    }, [saveDraft, site.id]);
+    }, [reloadProps, saveDraft, site.id]);
 
     const requestOpenChange = useCallback(
         (nextOpen: boolean) => {

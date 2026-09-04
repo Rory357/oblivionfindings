@@ -44,6 +44,7 @@ describe('site profile registry', () => {
             'first_aid',
             'ppe',
             'emergency_plan',
+            'plan',
             'calendar',
             'checklists',
             'meal_planner',
@@ -51,7 +52,6 @@ describe('site profile registry', () => {
             'fleet',
             'hardware',
             'technology',
-            'plan',
             'documents',
             'financials',
             'vendors',
@@ -63,18 +63,18 @@ describe('site profile registry', () => {
         expect(siteProfileTerminology('house')).toMatchObject({
             people: 'Residents',
             occupancy: 'Bedrooms',
-            plan: 'Plan & Rooms',
+            plan: 'House Plan',
         });
         expect(siteProfileTerminology('residential').people).toBe('Residents');
         expect(siteProfileTerminology('facility')).toMatchObject({
             people: 'Attendees',
             occupancy: 'Places',
-            plan: 'Plan & Zones',
+            plan: 'Facility Plan',
         });
         expect(siteProfileTerminology('head_office')).toMatchObject({
             people: 'Clients',
             occupancy: 'Resources',
-            plan: 'Plan & Resources',
+            plan: 'Office Plan',
         });
     });
 

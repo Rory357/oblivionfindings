@@ -51,7 +51,7 @@ export function siteProfileTerminology(
         return {
             people: 'Residents',
             occupancy: 'Bedrooms',
-            plan: 'Plan & Rooms',
+            plan: 'House Plan',
         };
     }
 
@@ -59,7 +59,7 @@ export function siteProfileTerminology(
         return {
             people: 'Attendees',
             occupancy: 'Places',
-            plan: 'Plan & Zones',
+            plan: 'Facility Plan',
         };
     }
 
@@ -67,14 +67,14 @@ export function siteProfileTerminology(
         return {
             people: 'Clients',
             occupancy: 'Resources',
-            plan: 'Plan & Resources',
+            plan: 'Office Plan',
         };
     }
 
     return {
         people: 'Clients',
         occupancy: 'Spaces',
-        plan: 'Plan & Spaces',
+        plan: 'Site Plan',
     };
 }
 
@@ -202,6 +202,13 @@ export const siteProfileTabs: SiteProfileTabDefinition[] = [
         warningSource: 'emergency_plan',
     },
     {
+        id: 'plan',
+        group: 'safety',
+        label: (siteType) => siteProfileTerminology(siteType).plan,
+        icon: FileText,
+        dataProp: 'planData',
+    },
+    {
         id: 'calendar',
         group: 'operations',
         label: literal('Calendar'),
@@ -262,13 +269,6 @@ export const siteProfileTabs: SiteProfileTabDefinition[] = [
         dataProp: 'technology',
         permission: 'viewTechnology',
         warningSource: 'technology',
-    },
-    {
-        id: 'plan',
-        group: 'operations',
-        label: (siteType) => siteProfileTerminology(siteType).plan,
-        icon: FileText,
-        dataProp: 'planData',
     },
     {
         id: 'documents',
