@@ -18,11 +18,12 @@ use App\Services\MarScheduleService;
 use App\Services\Operations\OpsMessageVisibilityService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\UserSiteAccessService;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
+use Closure;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Middleware;
@@ -37,7 +38,46 @@ class HandleInertiaRequests extends Middleware
 
     public function version(Request $request): ?string
     {
+        // parent::version() content-hashes the full Vite manifest (3.5 MB
+        // here) on every response; mtime+size roll the version on every
+        // rebuild at near-zero cost.
+        $manifest = public_path('build/manifest.json');
+
+        if (is_file($manifest)) {
+            return hash(
+                'xxh128',
+                filemtime($manifest).':'.filesize($manifest).':'.(string) config('app.asset_url'),
+            );
+        }
+
         return parent::version($request);
+    }
+
+    public function handle(Request $request, Closure $next)
+    {
+        $response = parent::handle($request, $next);
+
+        // A write by this user likely changed their own task/message
+        // badges — bust so the next page load recomputes instead of
+        // waiting out the TTL. Other users' writes surface within the TTL.
+        if (! $request->isMethodSafe() && ($user = $request->user())) {
+            self::forgetNavigationBadges((int) $user->id);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Forget the cached per-user navigation badges (tasks + unread
+     * messages). Called after the user's own writes (see handle()) and by
+     * observers on records that change a user's Site scope (e.g.
+     * HrEmployeeProfileObserver), so revocation and reassignment still
+     * land on the next request despite the cache.
+     */
+    public static function forgetNavigationBadges(int $userId): void
+    {
+        Cache::forget("user:{$userId}:task-nav:v1");
+        Cache::forget("user:{$userId}:ops-unread:v1");
     }
 
     public function share(Request $request): array
@@ -94,7 +134,7 @@ class HandleInertiaRequests extends Middleware
 
         // Pull all app-settings we need for chrome (labels / theme / branding)
         // in one query and key by setting name. Avoids 4+ round-trips per page.
-        $settings = Schema::hasTable('app_settings')
+        $settings = SchemaCache::hasTable('app_settings')
             ? AppSetting::query()
                 ->where(function ($q) {
                     $q->where('key', 'like', 'labels.%')
@@ -122,11 +162,11 @@ class HandleInertiaRequests extends Middleware
         $logoPath = $settings->get('branding.logo_path')?->value;
         $logoUrl = $logoPath ? Storage::disk('public')->url($logoPath) : null;
 
-        $hasOpsMessagingTables = Schema::hasTable('ops_messages')
-            && Schema::hasTable('ops_conversation_participants');
-        $hasNotificationsTable = Schema::hasTable('notifications');
-        $hasAnnouncementsTables = Schema::hasTable('announcements')
-            && Schema::hasTable('announcement_user_reads');
+        $hasOpsMessagingTables = SchemaCache::hasTable('ops_messages')
+            && SchemaCache::hasTable('ops_conversation_participants');
+        $hasNotificationsTable = SchemaCache::hasTable('notifications');
+        $hasAnnouncementsTables = SchemaCache::hasTable('announcements')
+            && SchemaCache::hasTable('announcement_user_reads');
 
         return [
             ...parent::share($request),
@@ -191,8 +231,15 @@ class HandleInertiaRequests extends Middleware
                         'relation' => $c->pivot->relation ?? null,
                     ])->values()->all()
                     : null,
+                // Cached briefly: the batched count is cheap but still runs
+                // on every request. Busted by the user's own writes and by
+                // profile changes (see handle() / forgetNavigationBadges).
                 'unreadMessageCount' => $user && $hasOpsMessagingTables
-                    ? app(OpsMessageVisibilityService::class)->unreadCount($user)
+                    ? (int) Cache::remember(
+                        "user:{$user->id}:ops-unread:v1",
+                        60,
+                        fn (): int => app(OpsMessageVisibilityService::class)->unreadCount($user),
+                    )
                     : 0,
             ],
 
@@ -392,22 +439,44 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Keep task-provider faults out of the global Inertia failure path. This
-     * projection is deliberately request-time: Site reassignment, revocation
-     * and permission changes must immediately remove foreign derived counts.
+     * Seconds the /tasks nav projection may be served from cache. Site
+     * reassignment / revocation staleness is bounded by this TTL — tighter
+     * than the 300s permission-map cache that gates the same sidebar.
+     */
+    private const TASK_NAV_TTL = 90;
+
+    /**
+     * Keep task-provider faults out of the global Inertia failure path.
+     * The 23-provider fan-out is far too expensive to run per request, so
+     * the projection is cached briefly per user and busted after the
+     * user's own writes (see handle()). Degraded results are never
+     * cached, so a transient provider fault cannot pin a broken badge.
      *
      * @return array{view: bool, badge: int, badgeDegraded: bool}
      */
     private function taskNavigation(User $user): array
     {
+        $key = "user:{$user->id}:task-nav:v1";
+
+        $cached = Cache::get($key);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
         $this->preparePermissionLookup($user);
         $projection = app(TaskAggregator::class)->navigationBadgeFor($user);
 
-        return [
+        $result = [
             'view' => $projection['view'],
             'badge' => $projection['view'] ? $projection['badge'] : 0,
             'badgeDegraded' => $projection['degraded'],
         ];
+
+        if (! $projection['degraded']) {
+            Cache::put($key, $result, self::TASK_NAV_TTL);
+        }
+
+        return $result;
     }
 
     /**
@@ -1173,7 +1242,7 @@ class HandleInertiaRequests extends Middleware
 
     protected function jobBoardOpenCount(User $user): int
     {
-        if (! Schema::hasTable('shift_open_positions')) {
+        if (! SchemaCache::hasTable('shift_open_positions')) {
             return 0;
         }
 
@@ -1205,7 +1274,7 @@ class HandleInertiaRequests extends Middleware
 
     protected function medsOverdueTodayCount($user): int
     {
-        if (! Schema::hasTable('client_medications')) {
+        if (! SchemaCache::hasTable('client_medications')) {
             return 0;
         }
 

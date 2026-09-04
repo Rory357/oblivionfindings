@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\AssetService;
 use App\Domain\Hr\Services\HrNotificationService;
 use App\Domain\Hr\Services\PositionService;
+use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -28,6 +29,11 @@ class HrEmployeeProfileObserver
     public function saved(HrEmployeeProfile $profile): void
     {
         $this->sync($profile->position_id);
+
+        // Profile changes (deactivation, Site reassignment) alter what the
+        // user's task/unread badges may count — drop the cached badges so
+        // revocation lands on the very next request.
+        $this->forgetBadges($profile);
 
         // A transfer changes the count of both the old and the new position.
         if ($profile->wasChanged('position_id')) {
@@ -59,11 +65,20 @@ class HrEmployeeProfileObserver
     public function deleted(HrEmployeeProfile $profile): void
     {
         $this->sync($profile->position_id);
+        $this->forgetBadges($profile);
     }
 
     public function restored(HrEmployeeProfile $profile): void
     {
         $this->sync($profile->position_id);
+        $this->forgetBadges($profile);
+    }
+
+    private function forgetBadges(HrEmployeeProfile $profile): void
+    {
+        if ($profile->user_id) {
+            HandleInertiaRequests::forgetNavigationBadges((int) $profile->user_id);
+        }
     }
 
     private function sync(int|string|null $positionId): void

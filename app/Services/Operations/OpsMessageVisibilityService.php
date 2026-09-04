@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Services\Clients\ClientFamilyCommunicationAccess;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class OpsMessageVisibilityService
 {
@@ -71,18 +73,20 @@ class OpsMessageVisibilityService
             ->count() === $participantIds->count();
     }
 
+    /**
+     * Always computed fresh — the Inertia middleware caches its own copy
+     * for the per-request badge (see HandleInertiaRequests), so direct
+     * callers (controllers, tests) never see a stale count.
+     */
     public function unreadCount(User $user): int
     {
-        $conversationIds = OpsConversation::query()
+        $conversations = OpsConversation::query()
             ->whereHas('participants', fn (Builder $participants) => $participants
                 ->where('user_id', $user->id))
             ->with('client:id,site_id')
-            ->get()
-            ->filter(fn (OpsConversation $conversation) => $this->canViewConversation(
-                $user,
-                $conversation,
-            ))
-            ->pluck('id');
+            ->get(['id', 'conversation_type', 'client_id']);
+
+        $conversationIds = $this->visibleConversationIds($user, $conversations);
 
         if ($conversationIds->isEmpty()) {
             return 0;
@@ -123,5 +127,91 @@ class OpsMessageVisibilityService
                     });
             })
             ->count();
+    }
+
+    /**
+     * Batched equivalent of filtering with canViewConversation(): the same
+     * per-conversation semantics, computed with a fixed number of queries
+     * instead of ~2 per conversation.
+     *
+     * @param  Collection<int, OpsConversation>  $conversations
+     * @return Collection<int, int>
+     */
+    private function visibleConversationIds(User $user, Collection $conversations): Collection
+    {
+        if ($conversations->isEmpty()) {
+            return new Collection;
+        }
+
+        $isCurrent = $this->currentStaff->isCurrent($user);
+        $visible = new Collection;
+
+        $staff = $conversations->filter(fn (OpsConversation $conversation) => in_array($conversation->conversation_type, ['direct', 'group'], true)
+            && $conversation->client_id === null);
+
+        if ($isCurrent && $staff->isNotEmpty()) {
+            $participantsByConversation = DB::table('ops_conversation_participants')
+                ->whereIn('conversation_id', $staff->pluck('id'))
+                ->get(['conversation_id', 'user_id'])
+                ->groupBy('conversation_id');
+
+            $allParticipantIds = $participantsByConversation
+                ->flatten(1)
+                ->pluck('user_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $visibleStaffIds = $allParticipantIds->isEmpty()
+                ? new Collection
+                : $this->visibleCurrentStaffQuery($user)
+                    ->whereIn('users.id', $allParticipantIds)
+                    ->pluck('users.id')
+                    ->map(fn ($id) => (int) $id)
+                    ->flip();
+
+            foreach ($staff as $conversation) {
+                $participantIds = ($participantsByConversation->get($conversation->id) ?? new Collection)
+                    ->pluck('user_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique();
+
+                if ($participantIds->isNotEmpty()
+                    && $participantIds->every(fn (int $id) => $visibleStaffIds->has($id))) {
+                    $visible->push($conversation->id);
+                }
+            }
+        }
+
+        $family = $conversations->filter(fn (OpsConversation $conversation) => $conversation->conversation_type === 'family');
+
+        if ($family->isNotEmpty()) {
+            $isHistorical = null; // resolved lazily, once, on the first portal-access client
+            $decisionByClient = [];
+
+            foreach ($family as $conversation) {
+                $client = $conversation->client;
+
+                if (! $client) {
+                    continue;
+                }
+
+                if (! array_key_exists($client->id, $decisionByClient)) {
+                    if ($user->canAccessClientPortal($client)) {
+                        $isHistorical ??= $this->currentStaff->historicalProfileFor($user) !== null;
+                        $decisionByClient[$client->id] = ! $isHistorical;
+                    } else {
+                        $decisionByClient[$client->id] = $isCurrent
+                            && $this->familyCommunicationAccess->canView($user, $client);
+                    }
+                }
+
+                if ($decisionByClient[$client->id]) {
+                    $visible->push($conversation->id);
+                }
+            }
+        }
+
+        return $visible;
     }
 }

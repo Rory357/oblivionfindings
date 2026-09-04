@@ -28,13 +28,26 @@ class TaskAggregator
 
     /**
      * Per-request memo of each user's watched item-key set, keyed by user id.
-     * The aggregator is resolved fresh per request (no singleton binding), so
-     * this stays request-scoped and lets the index render, badge helper and
+     * The aggregator is container-scoped (see AppServiceProvider), so this
+     * stays request-scoped and lets the index render, badge helper and
      * the `following` filter share a single task_watchers read.
      *
      * @var array<int, array<string, true>>
      */
     private array $watchedMemo = [];
+
+    /**
+     * Per-request memo of provider passes, keyed by provider class, user id
+     * and filters hash. Because the aggregator is container-scoped, the
+     * middleware badge pass and the /my-day and /tasks controllers share ONE
+     * hydration per provider per request instead of re-running the full
+     * fan-out. A throwing provider is never memoised, so
+     * navigationBadgeFor()'s degraded handling and itemsFor()'s fail-fast
+     * behaviour both keep their semantics.
+     *
+     * @var array<string, TaskItem[]>
+     */
+    private array $providerPassMemo = [];
 
     /**
      * @param  TaskProvider[]|null  $providers  Defaults to the full registry.
@@ -403,7 +416,7 @@ class TaskAggregator
                 }
 
                 $view = true;
-                foreach ($provider->authorizedTasks($user) as $item) {
+                foreach ($this->authorizedTasksMemo($provider, $user) as $item) {
                     // Match itemsFor(): retries or legacy aliases cannot
                     // inflate the shared count for one canonical record.
                     $items[$item->id] ??= $item;
@@ -454,7 +467,7 @@ class TaskAggregator
                 continue;
             }
 
-            foreach ($provider->authorizedTasks($user, $filters) as $item) {
+            foreach ($this->authorizedTasksMemo($provider, $user, $filters) as $item) {
                 // A provider retry or legacy duplicate must not create two
                 // tickets for the same canonical source record.
                 $items[$item->id] ??= $item;
@@ -464,6 +477,23 @@ class TaskAggregator
         $items = $this->filterItems(array_values($items), $user, $filters);
 
         return $this->sortItems($items);
+    }
+
+    /**
+     * One provider pass per (provider, user, filters) per request. TaskItem
+     * DTOs are read-only downstream, so sharing the arrays between the badge
+     * and feed passes is safe.
+     *
+     * @return TaskItem[]
+     */
+    private function authorizedTasksMemo(TaskProvider $provider, User $user, array $filters = []): array
+    {
+        // Keyed by instance (not class): registries and tests may hold
+        // several providers of one class. Instances live in $this->providers
+        // for the aggregator's lifetime, so the object id cannot be reused.
+        $key = spl_object_id($provider).'|'.$user->id.'|'.md5(serialize($filters));
+
+        return $this->providerPassMemo[$key] ??= $provider->authorizedTasks($user, $filters);
     }
 
     /**

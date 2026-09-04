@@ -95,12 +95,16 @@ class Announcement extends Model
         $items = $base
             ->orderByDesc('created_at')
             ->limit($limit)
-            ->with('author:id,name')
+            ->with([
+                'author:id,name',
+                // Only the current user's read row — read via pivot below
+                // instead of one query per announcement.
+                'reads' => fn ($q) => $q->where('users.id', $user->id)->select('users.id'),
+            ])
             ->get(['id', 'title', 'body', 'created_by', 'created_at'])
-            ->map(function ($a) use ($user) {
-                $readAt = $a->reads()
-                    ->whereKey($user->id)
-                    ->value('announcement_user_reads.read_at');
+            ->map(function ($a) {
+                $readAtRaw = $a->reads->first()?->pivot?->read_at;
+                $readAt = $readAtRaw ? \Illuminate\Support\Carbon::parse($readAtRaw) : null;
 
                 return [
                     'id' => $a->id,
