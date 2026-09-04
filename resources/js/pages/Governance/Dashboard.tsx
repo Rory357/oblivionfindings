@@ -51,11 +51,13 @@ export default function GovernanceDashboard({
     const [payload, setPayload] = useState<DashboardPayload | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // Manual refresh bypasses the server-side dashboard cache (fresh=1)
+    // so the button always returns just-computed numbers.
     const fetchData = async () => {
         setLoading(true);
         try {
             const response = await axios.get(dashboardData.url(), {
-                params: { period },
+                params: { period, fresh: 1 },
             });
             setPayload(response.data);
         } finally {

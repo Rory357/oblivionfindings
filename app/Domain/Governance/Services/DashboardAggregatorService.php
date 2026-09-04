@@ -24,7 +24,7 @@ use App\Services\HealthSafety\HsGovernanceService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
+use App\Support\SchemaCache;
 
 class DashboardAggregatorService
 {
@@ -34,12 +34,19 @@ class DashboardAggregatorService
         protected ?RoadmapDashboardService $roadmapDashboardService = null,
     ) {}
 
-    public function captureSnapshot(
+    /**
+     * Run every widget and assemble the dashboard payload WITHOUT persisting
+     * anything. The dashboard read path caches this result; only the board
+     * digest / board pack flows persist snapshots via captureSnapshot().
+     *
+     * @return array{data: array, freshness: array, range: array}
+     */
+    public function aggregate(
         string $periodType,
         ?Carbon $start = null,
         ?Carbon $end = null,
         ?User $viewer = null,
-    ): DashboardSnapshot {
+    ): array {
         $viewer ??= auth()->user();
         if (! $viewer instanceof User || ! $viewer->exists || $viewer->approved_at === null) {
             throw new \LogicException('Dashboard snapshots require an approved authorized viewer.');
@@ -87,15 +94,35 @@ class DashboardAggregatorService
             'captured_at' => now()->toIso8601String(),
         ];
 
+        return [
+            'data' => $data,
+            'freshness' => $this->getDataFreshness(),
+            'range' => $range,
+        ];
+    }
+
+    public function captureSnapshot(
+        string $periodType,
+        ?Carbon $start = null,
+        ?Carbon $end = null,
+        ?User $viewer = null,
+    ): DashboardSnapshot {
+        $viewer ??= auth()->user();
+        if (! $viewer instanceof User || ! $viewer->exists || $viewer->approved_at === null) {
+            throw new \LogicException('Dashboard snapshots require an approved authorized viewer.');
+        }
+
+        $result = $this->aggregate($periodType, $start, $end, $viewer);
+
         return DashboardSnapshot::create([
-            'snapshot_data' => $data,
+            'snapshot_data' => $result['data'],
             'period_type' => $periodType,
-            'period_start' => $range['start'],
-            'period_end' => $range['end'],
-            'checksum' => DashboardSnapshot::generateChecksum($data),
+            'period_start' => $result['range']['start'],
+            'period_end' => $result['range']['end'],
+            'checksum' => DashboardSnapshot::generateChecksum($result['data']),
             'captured_at' => now(),
             'captured_by' => $viewer->id,
-            'data_freshness' => $this->getDataFreshness(),
+            'data_freshness' => $result['freshness'],
         ]);
     }
 
@@ -117,6 +144,7 @@ class DashboardAggregatorService
     public function getTopRisks(int $limit = 10): array
     {
         $risks = RiskRegisterEntry::active()
+            ->with('riskOwner:id,name')
             ->orderByDesc('residual_score')
             ->limit($limit)
             ->get();
@@ -196,23 +224,23 @@ class DashboardAggregatorService
 
     public function getPrivacyMetrics(array $range): array
     {
-        $breaches = Schema::hasTable('data_breach_logs')
+        $breaches = SchemaCache::hasTable('data_breach_logs')
             ? DataBreachLog::whereBetween('discovered_at', [$range['start'], $range['end']])->count()
             : 0;
-        $openBreachCount = Schema::hasTable('data_breach_logs')
+        $openBreachCount = SchemaCache::hasTable('data_breach_logs')
             ? DataBreachLog::whereNull('resolved_at')->count()
             : 0;
 
         $openDpiAs = 0;
-        if (Schema::hasTable('privacy_impact_assessments')) {
-            $openDpiAs = Schema::hasColumn('privacy_impact_assessments', 'status')
+        if (SchemaCache::hasTable('privacy_impact_assessments')) {
+            $openDpiAs = SchemaCache::hasColumn('privacy_impact_assessments', 'status')
                 ? PrivacyImpactAssessment::where('status', '!=', 'approved')->count()
                 : PrivacyImpactAssessment::count();
         }
 
         $backlogRequests = 0;
-        if (Schema::hasTable('data_subject_requests')) {
-            $backlogRequests = Schema::hasColumn('data_subject_requests', 'status')
+        if (SchemaCache::hasTable('data_subject_requests')) {
+            $backlogRequests = SchemaCache::hasColumn('data_subject_requests', 'status')
                 ? DataSubjectRequest::where('status', '!=', 'completed')->count()
                 : DataSubjectRequest::count();
         }
@@ -295,7 +323,7 @@ class DashboardAggregatorService
         }
 
         // Pending spend approvals (waiting on board / finance committee).
-        if (Schema::hasTable('spend_approvals')) {
+        if (SchemaCache::hasTable('spend_approvals')) {
             $spendQuery = $this->spendApprovalReader->readableApprovalQuery(
                 $viewer ?? auth()->user(),
             );
@@ -312,7 +340,7 @@ class DashboardAggregatorService
         }
 
         // Sites over budget — pulled via Finance's BudgetVarianceService (source of truth).
-        if (Schema::hasTable('site_budget_lines') && Schema::hasTable('fin_cost_allocations')) {
+        if (SchemaCache::hasTable('site_budget_lines') && SchemaCache::hasTable('fin_cost_allocations')) {
             try {
                 $varianceService = app(BudgetVarianceService::class);
                 $period = now()->format('Y-m');
@@ -328,7 +356,7 @@ class DashboardAggregatorService
         }
 
         // Funding gaps from donor funds (Finance source of truth).
-        if (Schema::hasTable('fin_donor_funds')) {
+        if (SchemaCache::hasTable('fin_donor_funds')) {
             $gaps = DB::table('fin_donor_funds')
                 ->where('total_committed', '>', DB::raw('total_received'))
                 ->count();
@@ -375,6 +403,7 @@ class DashboardAggregatorService
     public function getComplianceCalendar(int $days = 90): array
     {
         $obligations = ComplianceObligation::where('due_date', '<=', now()->addDays($days))
+            ->with('owner:id,name')
             ->where('status', '!=', 'complete')
             ->orderBy('due_date')
             ->limit(10)
@@ -399,7 +428,7 @@ class DashboardAggregatorService
             ->get();
 
         $roadmap = ['count' => 0, 'overdue' => 0, 'items' => []];
-        if (Schema::hasTable('roadmap_decision_requests') && $this->roadmapDashboardService !== null) {
+        if (SchemaCache::hasTable('roadmap_decision_requests') && $this->roadmapDashboardService !== null) {
             $roadmap = $this->roadmapDashboardService->decisionsRequired(10);
         }
 
@@ -440,7 +469,7 @@ class DashboardAggregatorService
 
     public function getRoadmapMetrics(): array
     {
-        if (! Schema::hasTable('roadmap_initiatives') || $this->roadmapDashboardService === null) {
+        if (! SchemaCache::hasTable('roadmap_initiatives') || $this->roadmapDashboardService === null) {
             return [
                 'status' => 'unavailable',
                 'reason' => 'roadmap module not migrated',
@@ -525,6 +554,7 @@ class DashboardAggregatorService
     public function getVoidedRisks(array $range): array
     {
         $voided = RiskRegisterEntry::where('status', 'voided')
+            ->with('closedBy:id,name')
             ->whereBetween('closed_at', [$range['start'], $range['end']])
             ->orderByDesc('closed_at')
             ->limit(10)
@@ -546,20 +576,20 @@ class DashboardAggregatorService
 
     public function getFleetAssetMetrics(array $range): array
     {
-        if (! Schema::hasTable('assets')) {
+        if (! SchemaCache::hasTable('assets')) {
             return ['total_assets' => 0, 'overdue_inspections' => 0, 'status' => 'unknown'];
         }
 
         $totalAssets = DB::table('assets')->where('status', 'active')->count();
 
         $overdueInspections = 0;
-        if (Schema::hasColumn('assets', 'inspection_due_at')) {
+        if (SchemaCache::hasColumn('assets', 'inspection_due_at')) {
             $inspectionQuery = DB::table('assets')
                 ->where('status', 'active')
                 ->whereNotNull('inspection_due_at')
                 ->where('inspection_due_at', '<', now());
 
-            if (Schema::hasColumn('assets', 'requires_inspection')) {
+            if (SchemaCache::hasColumn('assets', 'requires_inspection')) {
                 $inspectionQuery->where('requires_inspection', true);
             }
 
@@ -567,19 +597,19 @@ class DashboardAggregatorService
         }
 
         $recentIncidents = 0;
-        if (Schema::hasTable('asset_incidents')) {
+        if (SchemaCache::hasTable('asset_incidents')) {
             $recentIncidents = DB::table('asset_incidents')
                 ->whereBetween('occurred_at', [$range['start'], $range['end']])
                 ->count();
         }
 
         $fleetCount = 0;
-        if (Schema::hasColumn('assets', 'category')) {
+        if (SchemaCache::hasColumn('assets', 'category')) {
             $fleetCount = DB::table('assets')
                 ->where('status', 'active')
                 ->where('category', 'vehicle')
                 ->count();
-        } elseif (Schema::hasTable('vehicles')) {
+        } elseif (SchemaCache::hasTable('vehicles')) {
             $fleetCount = DB::table('vehicles')->where('status', 'active')->count();
         }
 

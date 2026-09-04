@@ -8,6 +8,7 @@ use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Domain\Governance\Support\GovernancePresenter;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
@@ -38,33 +39,53 @@ class DashboardController extends Controller
         ]);
     }
 
+    /**
+     * Seconds an aggregated dashboard payload may be served from cache.
+     * The Refresh button sends ?fresh=1 to bypass and recompute.
+     */
+    private const DASHBOARD_CACHE_TTL = 300;
+
     public function data(Request $request)
     {
         $period = $request->validate(['period' => 'required|in:today,week,month,year'])['period'];
-        $workflow = $this->workflowService->dashboardWorkflow($request->user());
+        $user = $request->user();
+        $workflow = $this->workflowService->dashboardWorkflow($user);
 
         try {
-            $this->syncBudgetActuals($request);
-            $snapshot = $this->aggregator->captureSnapshot(
-                $period,
-                viewer: $request->user(),
+            // Widget visibility is permission-scoped, so the cache is per
+            // user. Board digests / board packs persist their own
+            // DashboardSnapshots; this read path no longer writes one, and
+            // budget actuals sync hourly via SyncBudgetActualsJob — an
+            // explicit Refresh (?fresh=1) re-syncs and recomputes now.
+            $cacheKey = "governance:dashboard:{$period}:{$user->id}";
+
+            if ($request->boolean('fresh')) {
+                $this->syncBudgetActuals($request);
+                Cache::forget($cacheKey);
+            }
+
+            $result = Cache::remember(
+                $cacheKey,
+                self::DASHBOARD_CACHE_TTL,
+                fn () => $this->aggregator->aggregate($period, viewer: $user),
             );
-            $periodData = $snapshot->snapshot_data['period'] ?? [
+
+            $periodData = $result['data']['period'] ?? [
                 'type' => $period,
                 'start' => now()->startOfMonth()->toDateString(),
                 'end' => now()->toDateString(),
             ];
-            $widgets = $snapshot->snapshot_data['widgets'] ?? [];
-            $freshness = $snapshot->data_freshness ?? [];
+            $widgets = $result['data']['widgets'] ?? [];
+            $freshness = $result['freshness'] ?? [];
 
             return response()->json([
-                'snapshot_id' => $snapshot->id,
+                'snapshot_id' => null,
                 'period' => $periodData,
                 'widgets' => $widgets,
                 'workflow' => $workflow,
                 'freshness' => $freshness,
-                'cockpit' => $this->presenter->dashboard($widgets, $periodData, $freshness, $workflow, $request->user()),
-                'captured_at' => $snapshot->captured_at?->toIso8601String() ?? now()->toIso8601String(),
+                'cockpit' => $this->presenter->dashboard($widgets, $periodData, $freshness, $workflow, $user),
+                'captured_at' => $result['data']['captured_at'] ?? now()->toIso8601String(),
             ]);
         } catch (\Exception $e) {
             report($e);
