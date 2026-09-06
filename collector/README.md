@@ -10,6 +10,7 @@ The collector accepts only Ed25519-signed configuration for one collector UUID a
 php bin/oblivion-collector version
 php bin/oblivion-collector doctor --config=/path/collector.json [--identity=/path/collector.identity.json]
 php bin/oblivion-collector enrol --identity=/private/collector.identity.json --collector-id=<uuid> --central-url=https://... --tls-public-key-pin=sha256//... --state-directory=/private/state
+php bin/oblivion-collector heartbeat --identity=/private/collector.identity.json
 php bin/oblivion-collector run --identity=/private/collector.identity.json --config=/private/collector.json
 php bin/oblivion-collector verify-transport --identity=/private/collector.identity.json --expect=active --samples=5
 php bin/oblivion-collector verify-transport --identity=/private/collector.identity.json --expect=revoked --samples=5
@@ -134,3 +135,14 @@ only after correcting its cause, start one manual cycle, confirm ordered upload
 and heartbeat recovery, then restart the timer. A revoked identity is never
 re-enabled; use the audited central replacement-enrolment workflow with new
 identity material.
+
+## Local Herd lab (Windows)
+
+A03 collector enrolment against Herd is documented in
+[`docs/runbooks/monitoring/lab-collector-enrolment.md`](../docs/runbooks/monitoring/lab-collector-enrolment.md).
+That runbook is lab evidence only: `verify-transport` remains a response-contract
+probe and does not by itself prove reverse-proxy mTLS.
+
+`heartbeat` reports spool health without fetching signed configuration. Use it
+for the enrolment lab sequence when the Site still has no collector work. `run`
+still requires a valid signed configuration envelope.
