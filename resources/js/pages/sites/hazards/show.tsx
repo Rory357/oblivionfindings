@@ -1,3 +1,14 @@
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+    PageLayout,
+    type PageHeaderMeterTone,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,13 +27,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowLeft,
     Calendar,
     CheckCircle2,
     Clock,
@@ -31,6 +42,7 @@ import {
     Lock,
     MapPin,
     Shield,
+    ShieldAlert,
     User,
     Zap,
 } from 'lucide-react';
@@ -112,13 +124,6 @@ const RISK_MATRIX: Record<string, Record<string, string>> = {
 const sevKeys = ['low', 'medium', 'high', 'critical'];
 const likKeys = ['rare', 'unlikely', 'possible', 'likely', 'almost_certain'];
 
-const riskBarColors: Record<string, string> = {
-    extreme: 'bg-status-critical',
-    high: 'bg-status-warning',
-    medium: 'bg-status-warning',
-    low: 'bg-status-success',
-};
-
 const severityConfig: Record<string, { bg: string; text: string }> = {
     low: { bg: 'bg-status-success-bg', text: 'text-status-success' },
     medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning' },
@@ -126,37 +131,63 @@ const severityConfig: Record<string, { bg: string; text: string }> = {
     critical: { bg: 'bg-status-critical-bg', text: 'text-status-critical' },
 };
 
-const statusConfig: Record<
-    string,
-    { bg: string; text: string; icon: typeof Clock }
-> = {
-    open: {
-        bg: 'bg-status-critical-bg',
-        text: 'text-status-critical',
-        icon: AlertTriangle,
-    },
-    in_progress: {
-        bg: 'bg-status-info-bg',
-        text: 'text-status-info',
-        icon: Clock,
-    },
-    mitigated: {
-        bg: 'bg-primary/10',
-        text: 'text-primary',
-        icon: CheckCircle2,
-    },
-    closed: {
-        bg: 'bg-status-success-bg',
-        text: 'text-status-success',
-        icon: CheckCircle2,
-    },
-};
-
 const riskConfig: Record<string, { bg: string; text: string }> = {
     low: { bg: 'bg-status-success-bg', text: 'text-status-success' },
     medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning' },
     high: { bg: 'bg-status-warning-bg', text: 'text-status-warning' },
     extreme: { bg: 'bg-status-critical-bg', text: 'text-status-critical' },
+};
+
+/** Meter-row tone for a risk rating — the fixed safety tokens, never brand. */
+const riskMeterTone: Record<string, PageHeaderMeterTone> = {
+    low: 'success',
+    medium: 'warning',
+    high: 'warning',
+    extreme: 'critical',
+};
+
+/**
+ * Workflow status → title chip variant + meter tone + the hazards-register
+ * tab it links to. Safety tones stay the fixed status tokens.
+ */
+const STATUS_META: Record<
+    Hazard['status'],
+    {
+        label: string;
+        icon: typeof Clock;
+        chip: StatusVariant;
+        tone: PageHeaderMeterTone;
+        tab: string;
+    }
+> = {
+    open: {
+        label: 'Open',
+        icon: AlertTriangle,
+        chip: 'critical',
+        tone: 'critical',
+        tab: 'open',
+    },
+    in_progress: {
+        label: 'In progress',
+        icon: Clock,
+        chip: 'warning',
+        tone: 'warning',
+        tab: 'in_progress',
+    },
+    mitigated: {
+        label: 'Mitigated',
+        icon: Shield,
+        chip: 'info',
+        tone: 'brand',
+        tab: 'closed',
+    },
+    closed: {
+        label: 'Closed',
+        icon: CheckCircle2,
+        chip: 'success',
+        tone: 'success',
+        tab: 'closed',
+    },
 };
 
 const WORKFLOW_STEPS = [
@@ -197,9 +228,8 @@ export default function HazardShow({
     });
 
     const sev = severityConfig[hazard.severity] ?? severityConfig.low;
-    const stat = statusConfig[hazard.status] ?? statusConfig.open;
     const risk = riskConfig[hazard.risk_rating] ?? riskConfig.low;
-    const StatusIcon = stat.icon;
+    const status = STATUS_META[hazard.status] ?? STATUS_META.open;
 
     const isOverdue =
         hazard.due_date &&
@@ -208,12 +238,59 @@ export default function HazardShow({
 
     const stepIndex = WORKFLOW_STEPS.findIndex((s) => s.key === hazard.status);
 
+    const hazardTypeLabel =
+        hazard.custom_hazard_type || hazard.hazard_type.replace(/_/g, ' ');
+    const hazardsHref = `/sites/${hazard.site.id}/hazards`;
+
+    const dueDate = hazard.due_date ? new Date(hazard.due_date) : null;
+    const daysToDue = dueDate
+        ? Math.round((dueDate.getTime() - Date.now()) / 86_400_000)
+        : null;
+
+    // Assignment folds into the meter row: an owned hazard links to that
+    // person's register slice; an unowned one opens the assign flow (or falls
+    // back to the register when the viewer can't assign).
+    const assignedBlock = hazard.assigned_to ? (
+        <PageHeaderMeterBlock
+            label="Assigned to"
+            href={`${hazardsHref}?assignee_id=${hazard.assigned_to.id}`}
+            ariaLabel={`View hazards assigned to ${hazard.assigned_to.name}`}
+        >
+            <span className="truncate text-[15px] leading-tight font-semibold">
+                {hazard.assigned_to.name}
+            </span>
+            <PageHeaderMeterCaption>
+                {hazard.assigned_at
+                    ? `assigned ${new Date(hazard.assigned_at).toLocaleDateString()}`
+                    : 'current owner'}
+            </PageHeaderMeterCaption>
+        </PageHeaderMeterBlock>
+    ) : (
+        <PageHeaderMeterBlock
+            label="Assigned to"
+            tone={hazard.status === 'closed' ? 'brand' : 'warning'}
+            href={canAssign ? undefined : hazardsHref}
+            onClick={canAssign ? () => setShowAssignDialog(true) : undefined}
+            ariaLabel={
+                canAssign ? 'Assign this hazard' : 'View the hazard register'
+            }
+        >
+            <span className="truncate text-[15px] leading-tight font-semibold">
+                Unassigned
+            </span>
+            <PageHeaderMeterCaption>
+                {canAssign ? 'assign an owner' : 'no owner yet'}
+            </PageHeaderMeterCaption>
+        </PageHeaderMeterBlock>
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Sites', href: '/sites' },
                 { title: hazard.site.name, href: `/sites/${hazard.site.id}` },
-                { title: 'Hazards', href: `/sites/${hazard.site.id}/hazards` },
+                { title: 'Hazards', href: hazardsHref },
                 {
                     title: hazard.reference_number,
                     href: `/hazards/${hazard.id}`,
@@ -222,415 +299,490 @@ export default function HazardShow({
         >
             <Head title={`Hazard ${hazard.reference_number}`} />
 
-            <div className="mx-auto max-w-4xl space-y-6 pb-8">
-                {/* Back button */}
-                <Link
-                    href={`/sites/${hazard.site.id}/hazards`}
-                    className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to Hazards
-                </Link>
-
-                {/* Header card */}
-                <Card className="overflow-hidden">
-                    <div
-                        className={`h-2 ${riskBarColors[hazard.risk_rating] ?? 'bg-muted'}`}
-                    />
-                    <CardContent className="pt-5">
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <div className="mb-2 flex flex-wrap items-center gap-2">
-                                    <span className="text-lg font-semibold">
-                                        {hazard.reference_number}
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                        |
-                                    </span>
-                                    <span className="text-lg capitalize">
-                                        {hazard.custom_hazard_type ||
-                                            hazard.hazard_type.replace(
-                                                /_/g,
-                                                ' ',
-                                            )}
-                                    </span>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <Badge
-                                        className={`${sev.bg} ${sev.text} border-0 text-[10px] font-medium`}
-                                    >
-                                        {hazard.severity}
-                                    </Badge>
-                                    <Badge
-                                        className={`${stat.bg} ${stat.text} border-0 text-[10px] font-medium`}
-                                    >
-                                        <StatusIcon className="mr-1 h-3 w-3" />
-                                        {hazard.status.replace(/_/g, ' ')}
-                                    </Badge>
-                                    <Badge
-                                        className={`${risk.bg} ${risk.text} border-0 text-[10px] font-medium`}
-                                    >
-                                        {hazard.risk_rating} risk
-                                    </Badge>
-                                    {isOverdue && (
-                                        <Badge className="border-0 bg-status-critical-bg text-[10px] font-medium text-status-critical">
-                                            <Clock className="mr-1 h-3 w-3" />
-                                            Overdue
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {hazard.status !== 'closed' && canAssign && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
+            <PageLayout
+                hero={
+                    <PageHeader
+                        variant="profile"
+                        backHref={hazardsHref}
+                        icon={ShieldAlert}
+                        title={hazard.reference_number}
+                        titleChip={
+                            <PageHeaderStatusChip
+                                variant={status.chip}
+                                icon={status.icon}
+                            >
+                                {status.label}
+                            </PageHeaderStatusChip>
+                        }
+                        subline={
+                            /* Two lines (profile revision): where it is, then
+                               what it is. */
+                            <>
+                                <span className="block">
+                                    {hazard.site.name}
+                                    {hazard.location
+                                        ? ` · ${hazard.location}`
+                                        : ''}
+                                </span>
+                                <span className="block">
+                                    <span className="capitalize">
+                                        {hazardTypeLabel}
+                                    </span>{' '}
+                                    · Reported by {hazard.reported_by.name} ·{' '}
+                                    {formatDateTimeLong(hazard.created_at)}
+                                </span>
+                            </>
+                        }
+                        actions={
+                            <>
+                                {hazard.status !== 'closed' && canAssign ? (
+                                    <PageHeaderGlassButton
+                                        icon={User}
                                         onClick={() =>
                                             setShowAssignDialog(true)
                                         }
                                     >
-                                        <User className="mr-1 h-4 w-4" />
                                         {hazard.assigned_to
                                             ? 'Reassign'
                                             : 'Assign'}
-                                    </Button>
-                                )}
+                                    </PageHeaderGlassButton>
+                                ) : null}
                                 {['open', 'in_progress', 'mitigated'].includes(
                                     hazard.status,
-                                ) &&
-                                    canClose && (
-                                        <Button
-                                            size="sm"
-                                            onClick={() =>
-                                                setShowCloseDialog(true)
-                                            }
-                                        >
-                                            <CheckCircle2 className="mr-1 h-4 w-4" />
-                                            Close
-                                        </Button>
-                                    )}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Status timeline */}
-                <Card>
-                    <CardContent className="pt-5">
-                        <div className="flex items-center justify-between">
-                            {WORKFLOW_STEPS.map((step, idx) => {
-                                const StepIcon = step.icon;
-                                const isReached = idx <= stepIndex;
-                                const isCurrent = idx === stepIndex;
-                                return (
-                                    <div
-                                        key={step.key}
-                                        className="flex flex-1 items-center"
+                                ) && canClose ? (
+                                    <PageHeaderPrimaryButton
+                                        icon={CheckCircle2}
+                                        onClick={() => setShowCloseDialog(true)}
                                     >
-                                        <div className="flex flex-col items-center gap-1">
-                                            <div
-                                                className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors ${
-                                                    isCurrent
-                                                        ? 'border-primary bg-primary text-primary-foreground'
-                                                        : isReached
-                                                          ? 'border-primary/30 bg-primary/10 text-primary'
-                                                          : 'border-muted bg-muted text-muted-foreground'
-                                                }`}
-                                            >
-                                                <StepIcon className="h-4 w-4" />
-                                            </div>
-                                            <span
-                                                className={`text-xs font-medium ${isCurrent ? 'text-primary' : isReached ? 'text-primary/70' : 'text-muted-foreground'}`}
-                                            >
-                                                {step.label}
-                                            </span>
-                                        </div>
-                                        {idx < WORKFLOW_STEPS.length - 1 && (
-                                            <div
-                                                className={`mx-2 h-0.5 flex-1 ${isReached && idx < stepIndex ? 'bg-primary/30' : 'bg-muted'}`}
-                                            />
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <div className="grid gap-4 lg:grid-cols-2">
-                    {/* Risk matrix visual */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-sm">
-                                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                                Risk Matrix
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-start gap-4">
-                                <div className="flex-1 overflow-x-auto">
-                                    <table className="w-full border-collapse text-[10px]">
-                                        <thead>
-                                            <tr>
-                                                <th className="p-1.5" />
-                                                {likKeys.map((l) => (
-                                                    <th
-                                                        key={l}
-                                                        className="p-1.5 text-center font-medium text-muted-foreground capitalize"
-                                                    >
-                                                        {
-                                                            l
-                                                                .replace(
-                                                                    '_',
-                                                                    ' ',
-                                                                )
-                                                                .split(' ')[0]
-                                                        }
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {[...sevKeys].reverse().map((s) => (
-                                                <tr key={s}>
-                                                    <td className="p-1.5 pr-2 text-right font-medium text-muted-foreground capitalize">
-                                                        {s}
-                                                    </td>
-                                                    {likKeys.map((l) => {
-                                                        const cellRating =
-                                                            RISK_MATRIX[s]?.[
-                                                                l
-                                                            ] ?? 'low';
-                                                        const isActive =
-                                                            s ===
-                                                                hazard.severity &&
-                                                            l ===
-                                                                hazard.likelihood;
-                                                        return (
-                                                            <td
-                                                                key={l}
-                                                                className={`rounded p-1.5 text-center ${matrixCellColor(cellRating)} ${
-                                                                    isActive
-                                                                        ? 'text-xs font-bold ring-2 ring-ring ring-offset-1'
-                                                                        : ''
-                                                                }`}
-                                                            >
-                                                                {cellRating
-                                                                    .charAt(0)
-                                                                    .toUpperCase()}
-                                                            </td>
-                                                        );
-                                                    })}
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div className="space-y-2 text-xs">
-                                    <div>
-                                        <div className="text-muted-foreground">
-                                            Severity
-                                        </div>
-                                        <Badge
-                                            className={`${sev.bg} ${sev.text} border-0 text-[10px]`}
-                                        >
+                                        Close hazard
+                                    </PageHeaderPrimaryButton>
+                                ) : null}
+                            </>
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Risk rating"
+                                    tone={
+                                        riskMeterTone[hazard.risk_rating] ??
+                                        'brand'
+                                    }
+                                    href={`${hazardsHref}?risk_rating=${hazard.risk_rating}`}
+                                    ariaLabel={`View ${hazard.risk_rating}-risk hazards at ${hazard.site.name}`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        <span className="uppercase">
+                                            {hazard.risk_rating}
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        <span className="capitalize">
                                             {hazard.severity}
-                                        </Badge>
-                                    </div>
-                                    <div>
-                                        <div className="text-muted-foreground">
-                                            Likelihood
-                                        </div>
-                                        <span className="font-medium capitalize">
+                                        </span>{' '}
+                                        severity ·{' '}
+                                        <span className="capitalize">
                                             {hazard.likelihood.replace(
                                                 /_/g,
                                                 ' ',
                                             )}
                                         </span>
-                                    </div>
-                                    <div>
-                                        <div className="text-muted-foreground">
-                                            Risk Rating
-                                        </div>
-                                        <Badge
-                                            className={`${risk.bg} ${risk.text} border-0 text-[10px] font-semibold`}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+
+                                <PageHeaderMeterBlock
+                                    label="Status"
+                                    tone={status.tone}
+                                    href={`${hazardsHref}?tab=${status.tab}`}
+                                    ariaLabel={`View ${status.label.toLowerCase()} hazards at ${hazard.site.name}`}
+                                >
+                                    <span className="truncate text-[15px] leading-tight font-semibold">
+                                        {status.label}
+                                    </span>
+                                    <PageHeaderMeterCaption>
+                                        step {stepIndex + 1} of{' '}
+                                        {WORKFLOW_STEPS.length}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+
+                                {dueDate ? (
+                                    <PageHeaderMeterBlock
+                                        label="Due"
+                                        tone={
+                                            isOverdue
+                                                ? 'critical'
+                                                : daysToDue !== null &&
+                                                    daysToDue <= 3
+                                                  ? 'warning'
+                                                  : 'brand'
+                                        }
+                                        href={
+                                            isOverdue
+                                                ? `${hazardsHref}?tab=overdue`
+                                                : hazardsHref
+                                        }
+                                        ariaLabel={
+                                            isOverdue
+                                                ? 'View overdue hazards at this site'
+                                                : 'View the hazard register'
+                                        }
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {Math.abs(daysToDue ?? 0)}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {isOverdue
+                                                ? `days overdue · was due ${dueDate.toLocaleDateString()}`
+                                                : daysToDue === 0
+                                                  ? `due today · ${dueDate.toLocaleDateString()}`
+                                                  : `days until due · ${dueDate.toLocaleDateString()}`}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+
+                                {assignedBlock}
+                            </>
+                        }
+                    />
+                }
+            >
+                <div className="mx-auto max-w-4xl space-y-6 pb-8">
+                    {/* Status timeline */}
+                    <Card>
+                        <CardContent className="pt-5">
+                            <div className="flex items-center justify-between">
+                                {WORKFLOW_STEPS.map((step, idx) => {
+                                    const StepIcon = step.icon;
+                                    const isReached = idx <= stepIndex;
+                                    const isCurrent = idx === stepIndex;
+                                    return (
+                                        <div
+                                            key={step.key}
+                                            className="flex flex-1 items-center"
                                         >
-                                            {hazard.risk_rating.toUpperCase()}
-                                        </Badge>
-                                    </div>
-                                </div>
+                                            <div className="flex flex-col items-center gap-1">
+                                                <div
+                                                    className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors ${
+                                                        isCurrent
+                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            : isReached
+                                                              ? 'border-primary/30 bg-primary/10 text-primary'
+                                                              : 'border-muted bg-muted text-muted-foreground'
+                                                    }`}
+                                                >
+                                                    <StepIcon className="h-4 w-4" />
+                                                </div>
+                                                <span
+                                                    className={`text-xs font-medium ${isCurrent ? 'text-primary' : isReached ? 'text-primary/70' : 'text-muted-foreground'}`}
+                                                >
+                                                    {step.label}
+                                                </span>
+                                            </div>
+                                            {idx <
+                                                WORKFLOW_STEPS.length - 1 && (
+                                                <div
+                                                    className={`mx-2 h-0.5 flex-1 ${isReached && idx < stepIndex ? 'bg-primary/30' : 'bg-muted'}`}
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Details */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-sm">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                Details
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <div className="mb-1 text-xs text-muted-foreground">
-                                    Description
+                    <div className="grid gap-4 lg:grid-cols-2">
+                        {/* Risk matrix visual */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-sm">
+                                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                                    Risk Matrix
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex items-start gap-4">
+                                    <div className="flex-1 overflow-x-auto">
+                                        <table className="w-full border-collapse text-[10px]">
+                                            <thead>
+                                                <tr>
+                                                    <th className="p-1.5" />
+                                                    {likKeys.map((l) => (
+                                                        <th
+                                                            key={l}
+                                                            className="p-1.5 text-center font-medium text-muted-foreground capitalize"
+                                                        >
+                                                            {
+                                                                l
+                                                                    .replace(
+                                                                        '_',
+                                                                        ' ',
+                                                                    )
+                                                                    .split(
+                                                                        ' ',
+                                                                    )[0]
+                                                            }
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {[...sevKeys]
+                                                    .reverse()
+                                                    .map((s) => (
+                                                        <tr key={s}>
+                                                            <td className="p-1.5 pr-2 text-right font-medium text-muted-foreground capitalize">
+                                                                {s}
+                                                            </td>
+                                                            {likKeys.map(
+                                                                (l) => {
+                                                                    const cellRating =
+                                                                        RISK_MATRIX[
+                                                                            s
+                                                                        ]?.[
+                                                                            l
+                                                                        ] ??
+                                                                        'low';
+                                                                    const isActive =
+                                                                        s ===
+                                                                            hazard.severity &&
+                                                                        l ===
+                                                                            hazard.likelihood;
+                                                                    return (
+                                                                        <td
+                                                                            key={
+                                                                                l
+                                                                            }
+                                                                            className={`rounded p-1.5 text-center ${matrixCellColor(cellRating)} ${
+                                                                                isActive
+                                                                                    ? 'text-xs font-bold ring-2 ring-ring ring-offset-1'
+                                                                                    : ''
+                                                                            }`}
+                                                                        >
+                                                                            {cellRating
+                                                                                .charAt(
+                                                                                    0,
+                                                                                )
+                                                                                .toUpperCase()}
+                                                                        </td>
+                                                                    );
+                                                                },
+                                                            )}
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="space-y-2 text-xs">
+                                        <div>
+                                            <div className="text-muted-foreground">
+                                                Severity
+                                            </div>
+                                            <Badge
+                                                className={`${sev.bg} ${sev.text} border-0 text-[10px]`}
+                                            >
+                                                {hazard.severity}
+                                            </Badge>
+                                        </div>
+                                        <div>
+                                            <div className="text-muted-foreground">
+                                                Likelihood
+                                            </div>
+                                            <span className="font-medium capitalize">
+                                                {hazard.likelihood.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                )}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <div className="text-muted-foreground">
+                                                Risk Rating
+                                            </div>
+                                            <Badge
+                                                className={`${risk.bg} ${risk.text} border-0 text-[10px] font-semibold`}
+                                            >
+                                                {hazard.risk_rating.toUpperCase()}
+                                            </Badge>
+                                        </div>
+                                    </div>
                                 </div>
-                                <p className="text-sm whitespace-pre-wrap">
-                                    {hazard.description}
-                                </p>
-                            </div>
-                            {hazard.location && (
+                            </CardContent>
+                        </Card>
+
+                        {/* Details */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-sm">
+                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                    Details
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div>
+                                    <div className="mb-1 text-xs text-muted-foreground">
+                                        Description
+                                    </div>
+                                    <p className="text-sm whitespace-pre-wrap">
+                                        {hazard.description}
+                                    </p>
+                                </div>
+                                {hazard.location && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                                        <span>{hazard.location}</span>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-2 text-sm">
-                                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                                    <span>{hazard.location}</span>
-                                </div>
-                            )}
-                            <div className="flex items-center gap-2 text-sm">
-                                <User className="h-4 w-4 text-muted-foreground" />
-                                <span>
-                                    Reported by {hazard.reported_by.name}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                <span>
-                                    {formatDateTimeLong(hazard.created_at)}
-                                </span>
-                            </div>
-                            {hazard.due_date && (
-                                <div
-                                    className={`flex items-center gap-2 text-sm ${isOverdue ? 'font-medium text-status-critical' : ''}`}
-                                >
-                                    <Clock className="h-4 w-4" />
+                                    <User className="h-4 w-4 text-muted-foreground" />
                                     <span>
-                                        Due{' '}
-                                        {new Date(
-                                            hazard.due_date,
-                                        ).toLocaleDateString()}
+                                        Reported by {hazard.reported_by.name}
                                     </span>
                                 </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Photos */}
-                    {hazard.photo_paths && hazard.photo_paths.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Image className="h-4 w-4 text-muted-foreground" />
-                                    Photos ({hazard.photo_paths.length})
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                    {hazard.photo_paths.map((path, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="aspect-square overflow-hidden rounded-lg bg-muted"
-                                        >
-                                            <img
-                                                src={`/storage/${path}`}
-                                                alt={`Hazard photo ${idx + 1}`}
-                                                className="h-full w-full object-cover"
-                                            />
-                                        </div>
-                                    ))}
+                                <div className="flex items-center gap-2 text-sm">
+                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    <span>
+                                        {formatDateTimeLong(hazard.created_at)}
+                                    </span>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Assignment */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-sm">
-                                <User className="h-4 w-4 text-muted-foreground" />
-                                Assignment
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="flex items-center gap-3">
-                                <div
-                                    className={`flex h-10 w-10 items-center justify-center rounded-full ${hazard.assigned_to ? 'bg-status-info-bg text-status-info' : 'bg-muted text-muted-foreground'}`}
-                                >
-                                    <User className="h-5 w-5" />
-                                </div>
-                                <div>
-                                    <div className="text-sm font-medium">
-                                        {hazard.assigned_to?.name ||
-                                            'Unassigned'}
-                                    </div>
-                                    {hazard.assigned_at && (
-                                        <div className="text-xs text-muted-foreground">
-                                            Assigned on{' '}
+                                {hazard.due_date && (
+                                    <div
+                                        className={`flex items-center gap-2 text-sm ${isOverdue ? 'font-medium text-status-critical' : ''}`}
+                                    >
+                                        <Clock className="h-4 w-4" />
+                                        <span>
+                                            Due{' '}
                                             {new Date(
-                                                hazard.assigned_at,
+                                                hazard.due_date,
                                             ).toLocaleDateString()}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            {hazard.status !== 'closed' && canAssign && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="w-full"
-                                    onClick={() => setShowAssignDialog(true)}
-                                >
-                                    {hazard.assigned_to
-                                        ? 'Reassign'
-                                        : 'Assign someone'}
-                                </Button>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Immediate Action */}
-                    {hazard.immediate_action_applied && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Zap className="h-4 w-4 text-muted-foreground" />
-                                    Immediate Action Taken
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-sm whitespace-pre-wrap">
-                                    {hazard.immediate_action_taken ||
-                                        'No details provided'}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Resolution */}
-                    {hazard.resolution_summary && (
-                        <Card className="border-status-success/30 bg-status-success-bg">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-sm text-status-success">
-                                    <CheckCircle2 className="h-4 w-4" />
-                                    Resolution
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-sm whitespace-pre-wrap">
-                                    {hazard.resolution_summary}
-                                </p>
-                                {hazard.closed_at && (
-                                    <div className="mt-3 text-xs text-muted-foreground">
-                                        Closed on{' '}
-                                        {new Date(
-                                            hazard.closed_at,
-                                        ).toLocaleDateString()}
+                                        </span>
                                     </div>
                                 )}
                             </CardContent>
                         </Card>
-                    )}
+
+                        {/* Photos */}
+                        {hazard.photo_paths &&
+                            hazard.photo_paths.length > 0 && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-sm">
+                                            <Image className="h-4 w-4 text-muted-foreground" />
+                                            Photos ({hazard.photo_paths.length})
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                            {hazard.photo_paths.map(
+                                                (path, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className="aspect-square overflow-hidden rounded-lg bg-muted"
+                                                    >
+                                                        <img
+                                                            src={`/storage/${path}`}
+                                                            alt={`Hazard photo ${idx + 1}`}
+                                                            className="h-full w-full object-cover"
+                                                        />
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                        {/* Assignment */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-sm">
+                                    <User className="h-4 w-4 text-muted-foreground" />
+                                    Assignment
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="flex items-center gap-3">
+                                    <div
+                                        className={`flex h-10 w-10 items-center justify-center rounded-full ${hazard.assigned_to ? 'bg-status-info-bg text-status-info' : 'bg-muted text-muted-foreground'}`}
+                                    >
+                                        <User className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-medium">
+                                            {hazard.assigned_to?.name ||
+                                                'Unassigned'}
+                                        </div>
+                                        {hazard.assigned_at && (
+                                            <div className="text-xs text-muted-foreground">
+                                                Assigned on{' '}
+                                                {new Date(
+                                                    hazard.assigned_at,
+                                                ).toLocaleDateString()}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                {hazard.status !== 'closed' && canAssign && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full"
+                                        onClick={() =>
+                                            setShowAssignDialog(true)
+                                        }
+                                    >
+                                        {hazard.assigned_to
+                                            ? 'Reassign'
+                                            : 'Assign someone'}
+                                    </Button>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Immediate Action */}
+                        {hazard.immediate_action_applied && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-sm">
+                                        <Zap className="h-4 w-4 text-muted-foreground" />
+                                        Immediate Action Taken
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-sm whitespace-pre-wrap">
+                                        {hazard.immediate_action_taken ||
+                                            'No details provided'}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Resolution */}
+                        {hazard.resolution_summary && (
+                            <Card className="border-status-success/30 bg-status-success-bg">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-sm text-status-success">
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        Resolution
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-sm whitespace-pre-wrap">
+                                        {hazard.resolution_summary}
+                                    </p>
+                                    {hazard.closed_at && (
+                                        <div className="mt-3 text-xs text-muted-foreground">
+                                            Closed on{' '}
+                                            {new Date(
+                                                hazard.closed_at,
+                                            ).toLocaleDateString()}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
                 </div>
-            </div>
+            </PageLayout>
 
             {/* Assign Dialog */}
             <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>

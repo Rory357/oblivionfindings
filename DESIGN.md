@@ -306,26 +306,54 @@ before.
   title + one `<StatusBadge>` chip, a one-line fact subline, the
   clickable meter-block row, and a white-primary + glass-secondary
   action cluster on the brand sky.
+- **Missing or non-Home-rooted breadcrumbs** (reinforced 2026-09-07) —
+  EVERY page on the Event Horizon header MUST pass a full trail rooted
+  at **Home (`/dashboard`)** to `AppLayout breadcrumbs` — no exceptions,
+  and it is a required step of every page migration (verify it before
+  ticking the page off). `Home → Sites`, `Home → Sites → Aurora House`,
+  `Home → Sites → Reports → Houses`. Two failure modes both count as the
+  bug: (a) no `breadcrumbs` prop at all, and (b) a trail that starts at
+  the section instead of Home. Watch the single-crumb trap: the shell
+  **hides** a one-crumb trail (it would duplicate the band title), so a
+  page below the top level that passes only `[{ Calendar }]` renders NO
+  strip — it must be `[{ Home }, { Calendar }]`. The band never renders
+  its own breadcrumbs; the strip is shell chrome
+  (PAGE_HEADER_STYLE_GUIDE.md §2).
 - **Dead or decorative meter blocks** (meter-row revision 2026-09-06) —
   a header block that doesn't navigate anywhere, or one whose trend/
   fraction data has no real backend source. Every block links to the
   view where its number lives; a block without live data is dropped,
   not faked.
-- **Numbers-only meter blocks** (corrected 2026-09-06) — a header meter
-  block rendered as a bare big number when the metric has an honest
-  visual form with a live source: capacity → bar meter, share of a
-  whole → donut, daily series → sparkline, people → avatar stack
-  (photos/initials with hover name cards). Graph-first: the visual
-  carries the block and the count moves to the head value; a plain stat
-  is the fallback only when no real visual form exists
+- **Numbers-only meter blocks** (corrected 2026-09-06; budget case
+  corrected 2026-09-07) — a header meter block rendered as a bare big
+  number when the metric has an honest visual form with a live source:
+  capacity → bar meter, share of a whole → donut, daily series →
+  sparkline, people → avatar stack (photos/initials with hover name
+  cards). **Spend against a configured budget/cap is the bar-meter form
+  too** (the guide's "funding" case): the money amount STAYS the block's
+  focal 20px number, with the budget-consumed bar rendered beneath it
+  and "$X left of $Y" in the caption (warning tone + "$X over" when
+  exceeded) — never a bare money stat while a budget exists, and never
+  the amount demoted to the small head value (reference: the Meal
+  Planner Week-cost block, corrected 2026-09-07).
+  Graph-first: the visual carries the block and the count moves to the
+  head value; a plain stat is the fallback only when no real visual form
+  exists — e.g. the same money figure with NO budget configured
   (PAGE_HEADER_STYLE_GUIDE.md §5).
-- **Sunken active-rail labels** (corrected 2026-09-06) — the Rule 1
-  connected active tab is taller than its inactive pills, so an
-  uncompensated label sits ~3px below their shared text line. The
-  active tab carries bottom padding (6px in the Event Horizon rail) so
-  every rail label sits on ONE optical line; re-solve the centreline
-  equation whenever rail geometry changes (PAGE_HEADER_STYLE_GUIDE.md
-  §7).
+- **Sunken active-rail labels** (corrected 2026-09-06, re-verified
+  2026-09-07) — the Rule 1 connected active tab is taller than its
+  inactive pills, so an uncompensated label sits ~3px below their shared
+  text line. The active tab carries bottom padding (6px in the Event
+  Horizon rail) so every rail label's centreline sits **exactly 23px
+  above the band edge** — one optical line, active and inactive alike,
+  on every page. Re-solve the centreline equation (and re-measure)
+  whenever rail geometry changes. The inverse anti-pattern is just as
+  bad: **do NOT eyeball-"fix" the active label** — the dark label on the
+  white active tab reads as slightly high next to the light labels on
+  the sky, but that is an optical impression (measured Δ = 0.00px), and a
+  per-page margin/translate nudge breaks the shared `PageHeaderRail` for
+  every page. The alignment lives ONLY in that shared component
+  (PAGE_HEADER_STYLE_GUIDE.md §7), never per page.
 - **Sub-nav strip wrapped in a card** — the tier-2 strip is a bare flex
   row on the page background: no border, card fill, shadow, or container
   padding.

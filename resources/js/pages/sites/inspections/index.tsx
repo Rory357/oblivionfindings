@@ -1,4 +1,16 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+    type PageHeaderRailItem,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,13 +29,16 @@ import { Head, useForm } from '@inertiajs/react';
 import {
     AlertCircle,
     Calendar,
+    CalendarClock,
     CheckCircle2,
     ClipboardCheck,
+    ClipboardList,
     Clock,
     Plus,
+    Repeat,
     X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Site = {
     id: number;
@@ -59,6 +74,8 @@ type Props = {
     };
 };
 
+type View = 'schedules' | 'records';
+
 const frequencyLabels: Record<string, string> = {
     weekly: 'Weekly',
     monthly: 'Monthly',
@@ -77,6 +94,11 @@ const resultColors: Record<string, string> = {
 
 export default function SiteInspections({ site, schedules, records }: Props) {
     const [showForm, setShowForm] = useState(false);
+    const [view, setView] = useState<View>('schedules');
+    const [query, setQuery] = useState('');
+    const [frequencyFilter, setFrequencyFilter] = useState('all');
+    const [dueStateFilter, setDueStateFilter] = useState('all');
+    const [resultFilter, setResultFilter] = useState('all');
 
     // Deep link from the Site Profile header's "Book Inspection" quick
     // action: ?action=add opens the schedule form once, then drops the param.
@@ -85,6 +107,7 @@ export default function SiteInspections({ site, schedules, records }: Props) {
         if (url.searchParams.get('action') !== 'add') return;
         url.searchParams.delete('action');
         window.history.replaceState(window.history.state, '', url);
+        setView('schedules');
         setShowForm(true);
     }, []);
 
@@ -108,11 +131,97 @@ export default function SiteInspections({ site, schedules, records }: Props) {
         });
     };
 
-    const isOverdue = (date: string) => new Date(date) < new Date();
+    const today = useMemo(() => new Date(), []);
+    const sevenDaysFromNow = useMemo(() => {
+        const date = new Date(today);
+        date.setDate(today.getDate() + 7);
+        return date;
+    }, [today]);
+    const isOverdue = (date: string) => new Date(date) < today;
+    const isDueSoon = (date: string) => {
+        const due = new Date(date);
+        return due >= today && due <= sevenDaysFromNow;
+    };
+
+    const q = query.trim().toLowerCase();
+
+    // Header instruments read the site's totals; the lists below reflect the
+    // active search + filter pills.
+    const overdueCount = schedules.filter((s) =>
+        isOverdue(s.next_due_date),
+    ).length;
+    const dueSoonCount = schedules.filter((s) =>
+        isDueSoon(s.next_due_date),
+    ).length;
+    const activeCount = schedules.filter((s) => s.is_active).length;
+    const passedCount = records.data.filter((r) => r.result === 'pass').length;
+
+    const filteredSchedules = useMemo(() => {
+        return schedules.filter((s) => {
+            if (frequencyFilter !== 'all' && s.frequency !== frequencyFilter)
+                return false;
+            if (dueStateFilter === 'overdue' && !isOverdue(s.next_due_date))
+                return false;
+            if (dueStateFilter === 'due_soon' && !isDueSoon(s.next_due_date))
+                return false;
+            if (
+                q &&
+                ![
+                    s.title,
+                    s.inspection_type,
+                    frequencyLabels[s.frequency],
+                    s.assigned_to?.name,
+                ]
+                    .filter(Boolean)
+                    .some((v) => v!.toLowerCase().includes(q))
+            )
+                return false;
+            return true;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        schedules,
+        frequencyFilter,
+        dueStateFilter,
+        q,
+        today,
+        sevenDaysFromNow,
+    ]);
+
+    const filteredRecords = useMemo(() => {
+        return records.data.filter((r) => {
+            if (resultFilter !== 'all' && r.result !== resultFilter)
+                return false;
+            if (
+                q &&
+                ![r.due_date, r.findings, r.result]
+                    .filter(Boolean)
+                    .some((v) => v!.toLowerCase().includes(q))
+            )
+                return false;
+            return true;
+        });
+    }, [records.data, resultFilter, q]);
+
+    const railItems: PageHeaderRailItem<View>[] = [
+        {
+            key: 'schedules',
+            label: 'Schedules',
+            icon: CalendarClock,
+            count: filteredSchedules.length,
+        },
+        {
+            key: 'records',
+            label: 'Records',
+            icon: ClipboardList,
+            count: filteredRecords.length,
+        },
+    ];
 
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Sites', href: '/sites' },
                 { title: site.name, href: `/sites/${site.id}` },
                 { title: 'Inspections', href: `/sites/${site.id}/inspections` },
@@ -122,23 +231,183 @@ export default function SiteInspections({ site, schedules, records }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
-                        icon={ClipboardCheck}
-                        title="Inspections & Maintenance"
-                        description={site.name}
+                    <PageHeader
+                        variant="profile"
                         backHref={`/sites/${site.id}`}
-                        stats={[
-                            { label: 'Schedules', value: schedules.length },
-                            {
-                                label: 'Recent records',
-                                value: records.data.length,
-                            },
-                        ]}
+                        icon={ClipboardCheck}
+                        title={site.name}
+                        titleChip={
+                            overdueCount > 0 ? (
+                                <PageHeaderStatusChip variant="critical">
+                                    {overdueCount} overdue
+                                </PageHeaderStatusChip>
+                            ) : schedules.length > 0 ? (
+                                <PageHeaderStatusChip variant="success">
+                                    On schedule
+                                </PageHeaderStatusChip>
+                            ) : (
+                                <PageHeaderStatusChip variant="neutral">
+                                    No schedules
+                                </PageHeaderStatusChip>
+                            )
+                        }
+                        subline={`Inspections & maintenance · ${schedules.length} ${schedules.length === 1 ? 'schedule' : 'schedules'} · ${records.data.length} recent records`}
                         actions={
-                            <Button size="sm" onClick={() => setShowForm(true)}>
-                                <Plus className="mr-1 h-4 w-4" />
-                                Schedule Inspection
-                            </Button>
+                            <>
+                                <PageHeaderSearch
+                                    value={query}
+                                    onChange={setQuery}
+                                    placeholder="Search inspections…"
+                                />
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
+                                    onClick={() => {
+                                        setView('schedules');
+                                        setShowForm(true);
+                                    }}
+                                >
+                                    Schedule inspection
+                                </PageHeaderPrimaryButton>
+                            </>
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Schedules"
+                                    ariaLabel="View inspection schedules"
+                                    onClick={() => {
+                                        setView('schedules');
+                                        setDueStateFilter('all');
+                                    }}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {schedules.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {activeCount} active
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Overdue"
+                                    tone={
+                                        overdueCount > 0
+                                            ? 'critical'
+                                            : 'success'
+                                    }
+                                    ariaLabel="View overdue schedules"
+                                    onClick={() => {
+                                        setView('schedules');
+                                        setDueStateFilter('overdue');
+                                    }}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {overdueCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        past due date
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Due in 7 days"
+                                    tone={
+                                        dueSoonCount > 0 ? 'warning' : 'brand'
+                                    }
+                                    ariaLabel="View schedules due soon"
+                                    onClick={() => {
+                                        setView('schedules');
+                                        setDueStateFilter('due_soon');
+                                    }}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {dueSoonCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        within the next week
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Passed records"
+                                    tone="success"
+                                    ariaLabel="View passed inspection records"
+                                    onClick={() => {
+                                        setView('records');
+                                        setResultFilter('pass');
+                                    }}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {passedCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        of {records.data.length} records
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
+                        filters={
+                            view === 'schedules' ? (
+                                <>
+                                    <PageHeaderFilterSelect
+                                        icon={Repeat}
+                                        label="Any frequency"
+                                        value={frequencyFilter}
+                                        options={[
+                                            {
+                                                value: 'all',
+                                                label: 'Any frequency',
+                                            },
+                                            ...Object.entries(
+                                                frequencyLabels,
+                                            ).map(([value, label]) => ({
+                                                value,
+                                                label,
+                                            })),
+                                        ]}
+                                        onChange={setFrequencyFilter}
+                                    />
+                                    <PageHeaderFilterSelect
+                                        icon={CalendarClock}
+                                        label="Any due date"
+                                        value={dueStateFilter}
+                                        options={[
+                                            {
+                                                value: 'all',
+                                                label: 'Any due date',
+                                            },
+                                            {
+                                                value: 'overdue',
+                                                label: 'Overdue',
+                                            },
+                                            {
+                                                value: 'due_soon',
+                                                label: 'Due soon',
+                                            },
+                                        ]}
+                                        onChange={setDueStateFilter}
+                                    />
+                                </>
+                            ) : (
+                                <PageHeaderFilterSelect
+                                    icon={CheckCircle2}
+                                    label="Any result"
+                                    value={resultFilter}
+                                    options={[
+                                        { value: 'all', label: 'Any result' },
+                                        { value: 'pass', label: 'Pass' },
+                                        { value: 'fail', label: 'Fail' },
+                                        { value: 'partial', label: 'Partial' },
+                                        { value: 'na', label: 'N/A' },
+                                    ]}
+                                    onChange={setResultFilter}
+                                />
+                            )
+                        }
+                        rail={
+                            <PageHeaderRail
+                                items={railItems}
+                                value={view}
+                                onSelect={setView}
+                                ariaLabel="Inspection views"
+                            />
                         }
                     />
                 }
@@ -287,114 +556,121 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                     </Card>
                 )}
 
-                {/* Active Schedules */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <Calendar className="h-4 w-4" />
-                            Active Schedules
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {schedules.length === 0 ? (
-                            <p className="py-4 text-center text-muted-foreground">
-                                No inspection schedules
-                            </p>
-                        ) : (
-                            <div className="space-y-2">
-                                {schedules.map((schedule) => (
-                                    <div
-                                        key={schedule.id}
-                                        className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50"
-                                    >
-                                        <div>
-                                            <div className="font-medium">
-                                                {schedule.title}
-                                            </div>
-                                            <div className="text-sm text-muted-foreground">
-                                                {schedule.inspection_type} -{' '}
-                                                {
-                                                    frequencyLabels[
-                                                        schedule.frequency
-                                                    ]
-                                                }
-                                            </div>
-                                            {schedule.assigned_to && (
-                                                <div className="text-xs text-muted-foreground">
-                                                    Assigned:{' '}
-                                                    {schedule.assigned_to.name}
+                {view === 'schedules' ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Calendar className="h-4 w-4" />
+                                Schedules ({filteredSchedules.length})
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {filteredSchedules.length === 0 ? (
+                                <p className="py-4 text-center text-muted-foreground">
+                                    No inspection schedules match your filters.
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {filteredSchedules.map((schedule) => (
+                                        <div
+                                            key={schedule.id}
+                                            className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50"
+                                        >
+                                            <div>
+                                                <div className="font-medium">
+                                                    {schedule.title}
                                                 </div>
-                                            )}
-                                        </div>
-                                        <div className="text-right">
-                                            <div
-                                                className={`flex items-center gap-1 text-sm ${isOverdue(schedule.next_due_date) ? 'text-status-critical' : 'text-muted-foreground'}`}
-                                            >
-                                                {isOverdue(
-                                                    schedule.next_due_date,
-                                                ) ? (
-                                                    <AlertCircle className="h-4 w-4" />
-                                                ) : (
-                                                    <Clock className="h-4 w-4" />
-                                                )}
-                                                Due:{' '}
-                                                {new Date(
-                                                    schedule.next_due_date,
-                                                ).toLocaleDateString()}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Recent Records */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <CheckCircle2 className="h-4 w-4" />
-                            Recent Records
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {records.data.length === 0 ? (
-                            <p className="py-4 text-center text-muted-foreground">
-                                No inspection records yet
-                            </p>
-                        ) : (
-                            <div className="space-y-2">
-                                {records.data.slice(0, 10).map((record) => (
-                                    <div
-                                        key={record.id}
-                                        className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50"
-                                    >
-                                        <div>
-                                            <div className="font-medium">
-                                                {record.due_date}
-                                            </div>
-                                            {record.findings && (
                                                 <div className="text-sm text-muted-foreground">
-                                                    {record.findings}
+                                                    {schedule.inspection_type} -{' '}
+                                                    {
+                                                        frequencyLabels[
+                                                            schedule.frequency
+                                                        ]
+                                                    }
                                                 </div>
-                                            )}
+                                                {schedule.assigned_to && (
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Assigned:{' '}
+                                                        {
+                                                            schedule.assigned_to
+                                                                .name
+                                                        }
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="text-right">
+                                                <div
+                                                    className={`flex items-center gap-1 text-sm ${isOverdue(schedule.next_due_date) ? 'text-status-critical' : 'text-muted-foreground'}`}
+                                                >
+                                                    {isOverdue(
+                                                        schedule.next_due_date,
+                                                    ) ? (
+                                                        <AlertCircle className="h-4 w-4" />
+                                                    ) : (
+                                                        <Clock className="h-4 w-4" />
+                                                    )}
+                                                    Due:{' '}
+                                                    {new Date(
+                                                        schedule.next_due_date,
+                                                    ).toLocaleDateString()}
+                                                </div>
+                                            </div>
                                         </div>
-                                        {record.result && (
-                                            <Badge
-                                                className={
-                                                    resultColors[record.result]
-                                                }
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <CheckCircle2 className="h-4 w-4" />
+                                Records ({filteredRecords.length})
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {filteredRecords.length === 0 ? (
+                                <p className="py-4 text-center text-muted-foreground">
+                                    No inspection records match your filters.
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {filteredRecords
+                                        .slice(0, 10)
+                                        .map((record) => (
+                                            <div
+                                                key={record.id}
+                                                className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50"
                                             >
-                                                {record.result.toUpperCase()}
-                                            </Badge>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                                                <div>
+                                                    <div className="font-medium">
+                                                        {record.due_date}
+                                                    </div>
+                                                    {record.findings && (
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {record.findings}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {record.result && (
+                                                    <Badge
+                                                        className={
+                                                            resultColors[
+                                                                record.result
+                                                            ]
+                                                        }
+                                                    >
+                                                        {record.result.toUpperCase()}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
             </PageLayout>
         </AppLayout>
     );

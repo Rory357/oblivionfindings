@@ -1,6 +1,7 @@
 export { PageContent } from './page-content';
 export {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterCheck,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,

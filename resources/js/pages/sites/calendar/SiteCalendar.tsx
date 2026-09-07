@@ -1,10 +1,30 @@
 /**
  * Shared Site Calendar experience — one component for both the global all-sites
  * roll-up (/calendar) and a single house (/sites/{site}/calendar + the profile
- * Calendar tab). Renders the redesigned hero, toolbar, source legend and the five
+ * Calendar tab). Page contexts open with the Event Horizon PageHeader
+ * (design_styles/PAGE_HEADER_STYLE_GUIDE.md): scoped search + New entry in the
+ * top row, the meter row of linked instrument blocks, period/site/display
+ * controls in the filter row and the five calendar views on the rail. The
+ * profile embed keeps its light toolbar. Below that: source legend and the
  * views over the unified events feed (manual events + auto-derived obligations).
  */
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderMeterSpark,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+    type PageHeaderRailItem,
+} from '@/components/page';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -79,7 +99,6 @@ import {
     Filter,
     HardHat,
     Home,
-    Layers,
     LayoutGrid,
     Leaf,
     List,
@@ -467,36 +486,51 @@ function periodLabel(view: CalView, navDate: Date): string {
 
 /**
  * Clickable period label that opens a mini-month so the user can jump straight to any
- * date instead of stepping period-by-period. `dark` styles it for the onDark hero band;
- * the light variant is used by the profile-embed toolbar.
+ * date instead of stepping period-by-period. `pill` renders it as an Event Horizon
+ * filter-row field; the light variant is used by the profile-embed toolbar.
  */
 function JumpToDate({
     view,
     navDate,
     onPick,
-    dark = false,
+    pill = false,
 }: {
     view: CalView;
     navDate: Date;
     onPick: (d: Date) => void;
-    dark?: boolean;
+    pill?: boolean;
 }) {
     const [open, setOpen] = useState(false);
-    const cls = dark
-        ? 'tnum inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/30'
-        : 'tnum inline-flex min-w-[150px] items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold transition-colors hover:bg-muted';
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
-                {/* eslint-disable-next-line no-restricted-syntax -- calendar jump trigger; not a shadcn Button. */}
-                <button type="button" aria-label="Jump to date" className={cls}>
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    {periodLabel(view, navDate)}
-                    <ChevronDown className="h-3 w-3 opacity-70" />
-                </button>
+                {pill ? (
+                    <PageHeaderFilterButton
+                        icon={CalendarDays}
+                        aria-label="Jump to date"
+                        className="tnum"
+                    >
+                        {periodLabel(view, navDate)}
+                        <ChevronDown className="size-3 opacity-70" />
+                    </PageHeaderFilterButton>
+                ) : (
+                    // eslint-disable-next-line no-restricted-syntax -- calendar jump trigger; not a shadcn Button.
+                    <button
+                        type="button"
+                        aria-label="Jump to date"
+                        className="tnum inline-flex min-w-[150px] items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold transition-colors hover:bg-muted"
+                    >
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        {periodLabel(view, navDate)}
+                        <ChevronDown className="h-3 w-3 opacity-70" />
+                    </button>
+                )}
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-auto p-0">
+            <PopoverContent
+                align={pill ? 'end' : 'start'}
+                className="w-auto p-0"
+            >
                 <MiniMonth
                     selected={navDate}
                     onSelect={(d) => {
@@ -538,12 +572,12 @@ export default function SiteCalendar({
     const [fetchError, setFetchError] = useState<
         'forbidden' | 'network' | null
     >(null);
-    // When the in-view feed last loaded — drives the hero "Live" badge (G-18).
-    const [lastSynced, setLastSynced] = useState<Date | null>(null);
     const [enabledSources, setEnabledSources] = useState<Set<string>>(
         () => new Set(sources.map((s) => s.key)),
     );
     const [houseFilter, setHouseFilter] = useState<number | 'all'>('all');
+    // Header scoped search — narrows the loaded feed by entry/site name.
+    const [q, setQ] = useState('');
     const [selected, setSelected] = useState<Decorated | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
     const [editEvent, setEditEvent] = useState<Decorated | null>(null);
@@ -617,7 +651,6 @@ export default function SiteCalendar({
             const data = await res.json();
             setEvents((data.events ?? []).map(decorate));
             setFetchError(null);
-            setLastSynced(new Date());
         } catch {
             setEvents([]);
             setFetchError('network');
@@ -668,28 +701,28 @@ export default function SiteCalendar({
         void fetchRail();
     }, [fetchEvents, fetchRail]);
 
+    const searchText = q.trim().toLowerCase();
+    const matches = useCallback(
+        (e: Decorated) =>
+            enabledSources.has(e.source) &&
+            (scope !== 'global' ||
+                houseFilter === 'all' ||
+                e.site?.id === houseFilter) &&
+            (searchText === '' ||
+                `${e.title} ${e.site?.name ?? ''}`
+                    .toLowerCase()
+                    .includes(searchText)),
+        [enabledSources, scope, houseFilter, searchText],
+    );
+
     const visibleEvents = useMemo(
-        () =>
-            events.filter(
-                (e) =>
-                    enabledSources.has(e.source) &&
-                    (scope !== 'global' ||
-                        houseFilter === 'all' ||
-                        e.site?.id === houseFilter),
-            ),
-        [events, enabledSources, scope, houseFilter],
+        () => events.filter(matches),
+        [events, matches],
     );
 
     const visibleRailEvents = useMemo(
-        () =>
-            railEvents.filter(
-                (e) =>
-                    enabledSources.has(e.source) &&
-                    (scope !== 'global' ||
-                        houseFilter === 'all' ||
-                        e.site?.id === houseFilter),
-            ),
-        [railEvents, enabledSources, scope, houseFilter],
+        () => railEvents.filter(matches),
+        [railEvents, matches],
     );
 
     const viewingToday = useMemo(() => {
@@ -705,13 +738,16 @@ export default function SiteCalendar({
         );
     }, [view, navDate]);
 
-    // Hero stats. "This month" and "Done" are inherently period stats, so they stay
-    // in-view. "Overdue" / "To approve" / "Mine" prefer the authoritative server
-    // counts (which see the whole accessible range), falling back to the in-view
-    // derivation for embeds with no props — or whenever the user narrows the view by
-    // house/source, so the stat keeps tracking what's on screen.
+    // Header meter numbers. "This month" and "Done" are inherently period
+    // stats, so they stay in-view. "Overdue" / "To approve" / "Mine" prefer the
+    // authoritative server counts (which see the whole accessible range),
+    // falling back to the in-view derivation for embeds with no props — or
+    // whenever the user narrows the view by house/source/search, so the stat
+    // keeps tracking what's on screen.
     const narrowed =
-        houseFilter !== 'all' || enabledSources.size !== sources.length;
+        houseFilter !== 'all' ||
+        enabledSources.size !== sources.length ||
+        searchText !== '';
 
     const overdueDerived = useMemo(
         () => visibleEvents.filter((e) => e.status === 'overdue').length,
@@ -724,22 +760,27 @@ export default function SiteCalendar({
 
     // Scope the headline count to the *active* view's period so it isn't a
     // month-wide number while browsing a single week/day (G-19).
-    const periodCount = useMemo(() => {
+    const periodEvents = useMemo(() => {
         if (view === 'day')
-            return visibleEvents.filter((e) => sameDay(e._start, navDate))
-                .length;
+            return visibleEvents.filter((e) => sameDay(e._start, navDate));
         if (view === 'week') {
             const ws = startOfWeek(navDate);
             const we = addDays(ws, 7);
-            return visibleEvents.filter((e) => e._start >= ws && e._start < we)
-                .length;
+            return visibleEvents.filter((e) => e._start >= ws && e._start < we);
         }
         const ms = startOfMonth(navDate);
         const me = endOfMonth(navDate);
         me.setHours(23, 59, 59, 999);
-        return visibleEvents.filter((e) => e._start >= ms && e._start <= me)
-            .length;
+        return visibleEvents.filter((e) => e._start >= ms && e._start <= me);
     }, [visibleEvents, navDate, view]);
+    const periodCount = periodEvents.length;
+    const periodDone = useMemo(
+        () =>
+            periodEvents.filter(
+                (e) => e.status === 'completed' || e.status === 'approved',
+            ).length,
+        [periodEvents],
+    );
     const periodStatLabel =
         view === 'day'
             ? 'This day'
@@ -773,13 +814,22 @@ export default function SiteCalendar({
     const mineCount =
         !narrowed && mineCountProp != null ? mineCountProp : mineDerived;
 
-    const doneCount = useMemo(
-        () =>
-            visibleEvents.filter(
-                (e) => e.status === 'completed' || e.status === 'approved',
-            ).length,
-        [visibleEvents],
-    );
+    // Per-day counts for the coming week (today-anchored rail feed) — the
+    // header's "Next 7 days" sparkline series. Real fetched entries only.
+    const next7Series = useMemo(() => {
+        const start = new Date(now);
+        start.setHours(0, 0, 0, 0);
+        return Array.from(
+            { length: 7 },
+            (_, i) =>
+                visibleRailEvents.filter(
+                    (e) =>
+                        e.status !== 'cancelled' &&
+                        sameDay(e._start, addDays(start, i)),
+                ).length,
+        );
+    }, [visibleRailEvents, now]);
+    const next7Total = next7Series.reduce((a, b) => a + b, 0);
 
     // Notifications bell — entries coming up in the next 7 days (today-anchored rail
     // feed) plus, for approvers, the pending-approval count.
@@ -1224,91 +1274,82 @@ export default function SiteCalendar({
 
     const allSourcesOn = enabledSources.size === sources.length;
 
-    // Brand/--primary onDark actions, matching the Rostering banner.
-    const heroActions = (
+    // Top row, right: scoped search + glass secondaries + exactly ONE white
+    // primary (PAGE_HEADER_STYLE_GUIDE.md §4).
+    const headerActions = (
         <>
-            {canCreate && (
-                <Button
-                    size="sm"
-                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                    onClick={() => openCreate()}
-                    disabled={!canCreateHere}
-                    title={
-                        !canCreateHere
-                            ? 'No sites are available to add an entry to.'
-                            : undefined
-                    }
-                >
-                    <Plus className="mr-1 h-4 w-4" /> New entry
-                </Button>
-            )}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        size="icon"
-                        variant="outline"
-                        aria-label={`Notifications${notifyCount ? ` (${notifyCount})` : ''}`}
-                        className="relative border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                    >
-                        <Bell className="h-4 w-4" />
-                        {notifyCount > 0 && (
-                            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-semibold text-white">
-                                {notifyCount > 9 ? '9+' : notifyCount}
-                            </span>
-                        )}
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-72">
-                    <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                    {canApprove && toApproveCount > 0 && (
-                        <DropdownMenuItem
-                            onSelect={() => setApprovalsOpen(true)}
-                        >
-                            <ClipboardCheck className="mr-2 h-4 w-4 text-status-warning" />
-                            {toApproveCount} awaiting approval
-                        </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
-                        Upcoming · next 7 days
-                    </DropdownMenuLabel>
-                    {upcoming.length === 0 ? (
-                        <div className="px-2 py-3 text-center text-[13px] text-muted-foreground">
-                            Nothing in the next 7 days.
-                        </div>
-                    ) : (
-                        upcoming.map((e) => (
+            <PageHeaderSearch
+                value={q}
+                onChange={setQ}
+                placeholder={
+                    scope === 'site'
+                        ? 'Search this calendar…'
+                        : 'Search entries, sites…'
+                }
+            />
+            <div className="relative">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <PageHeaderGlassButton
+                            icon={Bell}
+                            aria-label={`Notifications${notifyCount ? ` (${notifyCount})` : ''}`}
+                        />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-72">
+                        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                        {canApprove && toApproveCount > 0 && (
                             <DropdownMenuItem
-                                key={e.id}
-                                onSelect={() => setSelected(e)}
-                                className="flex-col items-start gap-0.5"
+                                onSelect={() => setApprovalsOpen(true)}
                             >
-                                <span className="w-full truncate text-[13px] font-medium">
-                                    {e.title}
-                                </span>
-                                <span className="text-[11px] text-muted-foreground">
-                                    {e._start.toLocaleDateString('en-NZ', {
-                                        weekday: 'short',
-                                        day: 'numeric',
-                                        month: 'short',
-                                    })}
-                                    {!e.allDay ? ` · ${fmtTime(e._start)}` : ''}
-                                </span>
+                                <ClipboardCheck className="mr-2 h-4 w-4 text-status-warning" />
+                                {toApproveCount} awaiting approval
                             </DropdownMenuItem>
-                        ))
-                    )}
-                </DropdownMenuContent>
-            </DropdownMenu>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
+                            Upcoming · next 7 days
+                        </DropdownMenuLabel>
+                        {upcoming.length === 0 ? (
+                            <div className="px-2 py-3 text-center text-[13px] text-muted-foreground">
+                                Nothing in the next 7 days.
+                            </div>
+                        ) : (
+                            upcoming.map((e) => (
+                                <DropdownMenuItem
+                                    key={e.id}
+                                    onSelect={() => setSelected(e)}
+                                    className="flex-col items-start gap-0.5"
+                                >
+                                    <span className="w-full truncate text-[13px] font-medium">
+                                        {e.title}
+                                    </span>
+                                    <span className="text-[11px] text-muted-foreground">
+                                        {e._start.toLocaleDateString('en-NZ', {
+                                            weekday: 'short',
+                                            day: 'numeric',
+                                            month: 'short',
+                                        })}
+                                        {!e.allDay
+                                            ? ` · ${fmtTime(e._start)}`
+                                            : ''}
+                                    </span>
+                                </DropdownMenuItem>
+                            ))
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                {notifyCount > 0 && (
+                    <span className="pointer-events-none absolute -top-1 -right-1 z-[1] flex h-4 min-w-4 items-center justify-center rounded-[6px] bg-status-critical-bg px-1 text-[10px] font-bold text-status-critical tabular-nums">
+                        {notifyCount > 9 ? '9+' : notifyCount}
+                    </span>
+                )}
+            </div>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button
-                        size="icon"
-                        variant="outline"
+                    <PageHeaderGlassButton
+                        icon={MoreHorizontal}
                         aria-label="More options"
-                        className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                    >
-                        <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+                    />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-60">
                     <DropdownMenuItem onSelect={() => setSubscribeOpen(true)}>
@@ -1351,24 +1392,32 @@ export default function SiteCalendar({
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
+            {canCreate && (
+                <PageHeaderPrimaryButton
+                    icon={Plus}
+                    onClick={() => openCreate()}
+                    disabled={!canCreateHere}
+                    title={
+                        !canCreateHere
+                            ? 'No sites are available to add an entry to.'
+                            : undefined
+                    }
+                    className="disabled:opacity-60"
+                >
+                    New entry
+                </PageHeaderPrimaryButton>
+            )}
         </>
     );
 
     const filterPopover = (
         <Popover>
             <PopoverTrigger asChild>
-                <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                >
-                    <Filter className="mr-1 h-3.5 w-3.5" /> Filter
-                    {!allSourcesOn && (
-                        <span className="tnum ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-foreground px-1 text-[10px] font-bold text-primary">
-                            {enabledSources.size}
-                        </span>
-                    )}
-                </Button>
+                <PageHeaderFilterButton icon={Filter} active={!allSourcesOn}>
+                    {allSourcesOn
+                        ? 'Display'
+                        : `Sources · ${enabledSources.size}/${sources.length}`}
+                </PageHeaderFilterButton>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-72">
                 <div className="space-y-3">
@@ -1472,153 +1521,151 @@ export default function SiteCalendar({
         </Popover>
     );
 
-    const heroFooter = (
-        <div className="flex flex-col items-stretch gap-2 py-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap items-center gap-1.5">
-                {/* eslint-disable-next-line no-restricted-syntax -- segmented stepper on dark hero; not a shadcn Button. */}
-                <button
-                    type="button"
-                    onClick={() => step(-1)}
-                    aria-label="Previous period"
-                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Prev</span>
-                </button>
-                <JumpToDate
-                    view={view}
-                    navDate={navDate}
-                    onPick={setNavDate}
-                    dark
+    // Filter row: period stepper + jump-to-date, the site scope pill, and the
+    // display/sources popover — every field one 23px box (§6).
+    const headerFilters = (
+        <>
+            <PageHeaderFilterButton
+                icon={ChevronLeft}
+                aria-label="Previous period"
+                onClick={() => step(-1)}
+            />
+            <JumpToDate
+                view={view}
+                navDate={navDate}
+                onPick={setNavDate}
+                pill
+            />
+            <PageHeaderFilterButton
+                icon={ChevronRight}
+                aria-label="Next period"
+                onClick={() => step(1)}
+            />
+            <PageHeaderFilterButton
+                active={viewingToday}
+                onClick={() => setNavDate(new Date())}
+            >
+                Today
+            </PageHeaderFilterButton>
+            {scope === 'global' && sites.length > 0 ? (
+                <PageHeaderFilterSelect
+                    icon={Home}
+                    label="All sites"
+                    value={houseFilter === 'all' ? 'all' : String(houseFilter)}
+                    options={[
+                        { value: 'all', label: 'All sites' },
+                        ...sites.map((s) => ({
+                            value: String(s.id),
+                            label: s.name,
+                        })),
+                    ]}
+                    onChange={(v) =>
+                        setHouseFilter(v === 'all' ? 'all' : Number(v))
+                    }
                 />
-                {/* eslint-disable-next-line no-restricted-syntax -- segmented stepper on dark hero; not a shadcn Button. */}
-                <button
-                    type="button"
-                    onClick={() => step(1)}
-                    aria-label="Next period"
-                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                >
-                    <span className="hidden sm:inline">Next</span>
-                    <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-                {/* eslint-disable-next-line no-restricted-syntax -- segmented stepper on dark hero; not a shadcn Button. */}
-                <button
-                    type="button"
-                    onClick={() => setNavDate(new Date())}
-                    className="ml-0.5 inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                >
-                    Today
-                </button>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                <div
-                    role="tablist"
-                    aria-label="Calendar view"
-                    className="flex items-center rounded-md border border-primary-foreground/20 bg-primary-foreground/10 p-0.5"
-                >
-                    {VIEWS.map((v) => (
-                        // eslint-disable-next-line no-restricted-syntax -- segmented onDark view switch; not a shadcn Button.
-                        <button
-                            key={v.key}
-                            role="tab"
-                            aria-selected={view === v.key}
-                            aria-label={v.label}
-                            tabIndex={view === v.key ? 0 : -1}
-                            onClick={() => setView(v.key)}
-                            onKeyDown={onViewTabsKey}
-                            title={v.label}
-                            className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-primary-foreground/60 focus-visible:outline-none ${view === v.key ? 'bg-primary-foreground text-primary' : 'text-primary-foreground/80 hover:bg-primary-foreground/15'}`}
-                        >
-                            <v.icon
-                                aria-hidden="true"
-                                className="h-3.5 w-3.5"
-                            />
-                            <span className="hidden lg:inline">{v.label}</span>
-                        </button>
-                    ))}
-                </div>
-                {filterPopover}
-            </div>
-        </div>
-    );
-
-    const overduePart = overdueCount ? `${overdueCount} overdue` : '';
-    const pendingPart = toApproveCount
-        ? `${toApproveCount} awaiting approval`
-        : '';
-    const attention = [overduePart, pendingPart].filter(Boolean).join(', ');
-    const heroName =
-        scope === 'global' ? 'Site Calendar' : (site?.name ?? 'Site Calendar');
-    const heroDescription = `${periodCount} dated ${periodCount === 1 ? 'entry' : 'entries'} this period across ${scope === 'global' ? 'all sites' : heroName}${attention ? ` — ${attention} need attention.` : ' — all on track.'}`;
-    const todayLabel = new Date().toLocaleDateString('en-NZ', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
-
-    // Live status badge (G-18) — reflects the real in-view fetch state instead of a
-    // hardcoded "synced just now". `now` ticks each minute so the relative age updates.
-    const syncAgoMin = lastSynced
-        ? Math.max(
-              0,
-              Math.floor((now.getTime() - lastSynced.getTime()) / 60_000),
-          )
-        : null;
-    const liveText = fetchError
-        ? 'Sync failed'
-        : loading
-          ? 'Syncing…'
-          : syncAgoMin === null
-            ? 'Live'
-            : syncAgoMin < 1
-              ? 'Live · synced just now'
-              : `Live · synced ${syncAgoMin}m ago`;
-    // Literal class strings (no interpolation) so Tailwind keeps them.
-    const liveDot = fetchError
-        ? { dot: 'bg-status-critical ring-status-critical/30', ping: '' }
-        : loading
-          ? {
-                dot: 'bg-status-warning ring-status-warning/30',
-                ping: 'bg-status-warning/70',
-            }
-          : {
-                dot: 'bg-status-success ring-status-success/30',
-                ping: 'bg-status-success/70',
-            };
-
-    const heroTitle = (
-        <span className="block">
-            <span className="mb-2 flex flex-wrap items-center gap-2.5">
-                <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
-                    <span
-                        aria-hidden="true"
-                        className="relative inline-flex h-2 w-2"
-                    >
-                        {liveDot.ping && (
-                            <span
-                                className={`absolute inset-0 inline-flex h-full w-full animate-ping rounded-full ${liveDot.ping}`}
-                            />
-                        )}
-                        <span
-                            className={`relative inline-flex h-2 w-2 rounded-full ring-2 ${liveDot.dot}`}
-                        />
-                    </span>
-                    {liveText}
-                </span>
-                <span className="tnum inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/20 px-2.5 py-1 text-[11px] font-semibold">
-                    <CalendarDays className="h-3.5 w-3.5" /> Today ·{' '}
-                    {todayLabel}
-                </span>
-            </span>
-            {sites.length > 0 ? (
+            ) : null}
+            {scope === 'site' && sites.length > 0 ? (
                 <HouseSelector scope={scope} site={site} sites={sites} />
-            ) : (
-                <span className="block">{heroName}</span>
-            )}
-        </span>
+            ) : null}
+            {filterPopover}
+        </>
     );
+
+    // The meter row — every block links to the view where its number lives
+    // (an in-page calendar view, the approvals panel, or My Calendar). All
+    // figures derive from the live feed / server counts — nothing invented.
+    const headerMeters = (
+        <>
+            <PageHeaderMeterBlock
+                label={periodStatLabel}
+                ariaLabel="View this period in the agenda"
+                onClick={() => setView('agenda')}
+            >
+                <PageHeaderMeterBig>{periodCount}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    dated entries · {enabledSources.size}{' '}
+                    {enabledSources.size === 1 ? 'source' : 'sources'}
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Next 7 days"
+                value={next7Total}
+                ariaLabel="View the coming week"
+                onClick={() => {
+                    setNavDate(new Date());
+                    setView('week');
+                }}
+            >
+                <PageHeaderMeterSpark values={next7Series} />
+                <PageHeaderMeterCaption>
+                    upcoming from today
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            {periodCount > 0 ? (
+                <PageHeaderMeterBlock
+                    label="Done / approved"
+                    ariaLabel="View completed entries in the agenda"
+                    onClick={() => setView('agenda')}
+                >
+                    <PageHeaderMeterDonut
+                        percent={(periodDone / periodCount) * 100}
+                        caption={
+                            <>
+                                {periodDone} of {periodCount}
+                                <br />
+                                this period
+                            </>
+                        }
+                    />
+                </PageHeaderMeterBlock>
+            ) : null}
+            <PageHeaderMeterBlock
+                label="Overdue"
+                tone={overdueCount > 0 ? 'critical' : 'success'}
+                ariaLabel="View overdue entries in the agenda"
+                onClick={() => setView('agenda')}
+            >
+                <PageHeaderMeterBig>{overdueCount}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    past their due date
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="To approve"
+                tone={toApproveCount > 0 ? 'warning' : 'success'}
+                ariaLabel={
+                    canApprove
+                        ? 'Review pending approvals'
+                        : 'View pending entries in the agenda'
+                }
+                onClick={() =>
+                    canApprove ? setApprovalsOpen(true) : setView('agenda')
+                }
+            >
+                <PageHeaderMeterBig>{toApproveCount}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    awaiting sign-off
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+            <PageHeaderMeterBlock
+                label="Mine"
+                href="/my-calendar"
+                ariaLabel="Open My Calendar"
+            >
+                <PageHeaderMeterBig>{mineCount}</PageHeaderMeterBig>
+                <PageHeaderMeterCaption>
+                    you own or attend
+                </PageHeaderMeterCaption>
+            </PageHeaderMeterBlock>
+        </>
+    );
+
+    // The rail — the five calendar views as the Rule 1 connected tabs.
+    const railItems: PageHeaderRailItem<CalView>[] = VIEWS.map((v) => ({
+        key: v.key,
+        label: v.label,
+        icon: v.icon,
+    }));
 
     const dialogs = (
         <>
@@ -1740,48 +1787,50 @@ export default function SiteCalendar({
         <>
             <PageLayout
                 hero={
-                    <PageHero
-                        category="ops"
+                    <PageHeader
+                        variant={scope === 'site' ? 'profile' : 'index'}
                         icon={CalendarDays}
                         backHref={
                             scope === 'site' && site
                                 ? `/sites/${site.id}`
                                 : undefined
                         }
-                        backLabel="Sites"
-                        title={heroTitle}
-                        description={heroDescription}
-                        meta={[
-                            {
-                                icon: CalendarDays,
-                                label: `${periodLabel(view, navDate)} · ${VIEWS.find((v) => v.key === view)?.label ?? ''} view`,
-                            },
-                            {
-                                icon: Layers,
-                                label: `${enabledSources.size} of ${sources.length} sources shown`,
-                            },
-                            {
-                                icon: CheckCircle2,
-                                label: `${doneCount} done / approved`,
-                            },
-                        ]}
-                        stats={[
-                            { label: periodStatLabel, value: periodCount },
-                            {
-                                label: 'Overdue',
-                                value: overdueCount,
-                                tone: overdueCount > 0 ? 'critical' : undefined,
-                            },
-                            {
-                                label: 'To approve',
-                                value: toApproveCount,
-                                tone:
-                                    toApproveCount > 0 ? 'warning' : undefined,
-                            },
-                            { label: 'Mine', value: mineCount },
-                        ]}
-                        actions={heroActions}
-                        footer={heroFooter}
+                        title={
+                            scope === 'site'
+                                ? (site?.name ?? 'Site Calendar')
+                                : 'Site Calendar'
+                        }
+                        titleChip={
+                            overdueCount > 0 ? (
+                                <PageHeaderStatusChip variant="critical">
+                                    {overdueCount} overdue
+                                </PageHeaderStatusChip>
+                            ) : toApproveCount > 0 ? (
+                                <PageHeaderStatusChip variant="warning">
+                                    {toApproveCount} to approve
+                                </PageHeaderStatusChip>
+                            ) : (
+                                <PageHeaderStatusChip variant="success">
+                                    On track
+                                </PageHeaderStatusChip>
+                            )
+                        }
+                        subline={
+                            scope === 'site'
+                                ? `Site calendar · manual events and auto-derived obligations · ${sources.length} sources`
+                                : `Manual events and auto-derived obligations · ${sources.length} sources · ${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`
+                        }
+                        actions={headerActions}
+                        meters={headerMeters}
+                        filters={headerFilters}
+                        rail={
+                            <PageHeaderRail
+                                items={railItems}
+                                value={view}
+                                onSelect={setView}
+                                ariaLabel="Calendar view"
+                            />
+                        }
                     />
                 }
             >
@@ -1792,7 +1841,7 @@ export default function SiteCalendar({
     );
 }
 
-/* ---- house / site selector (hero title) --------------------------------- */
+/* ---- house / site selector (header filter row, site scope) -------------- */
 
 function HouseSelector({
     scope,
@@ -1821,19 +1870,14 @@ function HouseSelector({
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
-                <button
-                    type="button"
-                    className="group -mx-1.5 inline-flex items-center gap-2 rounded-lg px-1.5 py-0.5 text-left transition-colors hover:bg-primary-foreground/10"
-                >
-                    <span className="whitespace-nowrap">{currentLabel}</span>
-                    <span
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary-foreground/15 transition-transform ${open ? 'rotate-180' : ''}`}
-                    >
-                        <ChevronDown className="h-4 w-4" />
+                <PageHeaderFilterButton icon={Home} aria-label="Switch site">
+                    <span className="max-w-[130px] truncate">
+                        {currentLabel}
                     </span>
-                </button>
+                    <ChevronDown className="size-3 opacity-70" />
+                </PageHeaderFilterButton>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-[320px] p-0">
+            <PopoverContent align="end" className="w-[320px] p-0">
                 <div className="border-b p-2">
                     <div className="relative">
                         <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

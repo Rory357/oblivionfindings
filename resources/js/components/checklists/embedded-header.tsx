@@ -18,14 +18,13 @@ import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { catColorVar } from './category';
 import { useChecklistConfig } from './context';
-import type { WeekInfo } from './hero-footer';
 import {
     Dropdown,
     SearchInput,
     StatusBadge,
     type DropdownOption,
 } from './primitives';
-import type { ChecklistStats, SiteRef } from './types';
+import type { ChecklistStats, SiteRef, WeekInfo } from './types';
 
 export function ChecklistsEmbeddedHeader({
     stats,

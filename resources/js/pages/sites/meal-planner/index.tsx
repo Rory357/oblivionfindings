@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { router, usePage } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import axios from 'axios';
 import {
     ArrowUpRight,
@@ -108,8 +108,6 @@ export default function MealPlannerSubTabs({
     mode = 'embedded',
     defaultSiteId,
 }: Props) {
-    const page = usePage<{ auth?: { user?: { name?: string } } }>();
-    const firstName = (page.props.auth?.user?.name ?? 'there').split(' ')[0];
     const standalone = mode === 'standalone';
 
     const initialSiteId = siteProp?.id ?? defaultSiteId ?? 0;
@@ -119,7 +117,6 @@ export default function MealPlannerSubTabs({
     const [loadError, setLoadError] = useState<{
         kind: 'access' | 'session' | 'generic';
     } | null>(null);
-    const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
     const [reloadingCalendar, setReloadingCalendar] = useState(false);
     const [staleSurfaces, setStaleSurfaces] = useState<Set<string>>(
         () => new Set(),
@@ -251,7 +248,6 @@ export default function MealPlannerSubTabs({
             setDietaryTags(res.data.dietary_tags ?? []);
             setPerms((p) => ({ ...p, ...(res.data.permissions ?? {}) }));
             setLoadError(null);
-            setLastLoadedAt(Date.now());
         } catch (e) {
             // Fail VISIBLY: a confident, all-zero planner is indistinguishable
             // from a legitimately empty house and silences the safety layer.
@@ -616,7 +612,6 @@ export default function MealPlannerSubTabs({
             {standalone ? (
                 <MealPlannerHero
                     site={site}
-                    firstName={firstName}
                     weekLabel={weekLabel}
                     rangeStart={rangeStart}
                     rangeEnd={rangeEnd}
@@ -627,8 +622,8 @@ export default function MealPlannerSubTabs({
                     sites={sites}
                     notifications={notifications}
                     weekStart={weekStart}
-                    lastLoadedAt={lastLoadedAt}
-                    reloading={reloadingCalendar}
+                    tab={tab}
+                    onTab={(t) => setTab(t as SubTab)}
                     canPlan={perms.plan}
                     canShop={perms.shopping_manage}
                     onSelectSite={selectSite}
@@ -680,7 +675,11 @@ export default function MealPlannerSubTabs({
                 />
             )}
 
-            <SubTabs tab={tab} onChange={setTab} isHouse={isHouse} />
+            {/* Standalone pages carry the sub-views on the header rail; the
+                Site-profile embed keeps this light tab strip. */}
+            {!standalone && (
+                <SubTabs tab={tab} onChange={setTab} isHouse={isHouse} />
+            )}
 
             <div
                 key={`${tab}-${site.type}`}

@@ -1,4 +1,10 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,21 +36,75 @@ export default function SiteReportsIndex({ sites }: Props) {
     const officeCount = sites.filter((s) => s.type === 'head_office').length;
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Reports', href: '/sites/reports' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Sites', href: '/sites' },
+                { title: 'Reports', href: '/sites/reports' },
+            ]}
+        >
             <Head title="Site Reports" />
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHeader
                         icon={BarChart3}
                         title="Site Reports"
-                        description="Reporting packs for Houses, Facilities, and Head Office"
-                        stats={[
-                            { label: 'Total sites', value: sites.length },
-                            { label: 'Houses', value: houseCount },
-                            { label: 'Facilities', value: facilityCount },
-                            { label: 'Head office', value: officeCount },
-                        ]}
+                        subline={`Reporting packs for Houses, Facilities and Head Office · ${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`}
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Total sites"
+                                    ariaLabel="View all sites"
+                                    href="/sites"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {sites.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        across all types
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Houses"
+                                    tone="success"
+                                    ariaLabel="View house reports"
+                                    href="/sites/reports/houses"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {houseCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        quality & occupancy pack
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Facilities"
+                                    tone="warning"
+                                    ariaLabel="View facility reports"
+                                    href="/sites/reports/facilities"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {facilityCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        equipment & safety pack
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Head office"
+                                    ariaLabel="View head office reports"
+                                    href="/sites/reports/head-office"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {officeCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        rooms & IT pack
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
                     />
                 }
             >
@@ -161,51 +221,6 @@ export default function SiteReportsIndex({ sites }: Props) {
                         </CardContent>
                     </Card>
                 </div>
-
-                {/* Quick Stats */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-sm">
-                            All Sites Overview
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 sm:grid-cols-4">
-                            <div className="text-center">
-                                <div className="text-2xl font-bold">
-                                    {sites.length}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                    Total Sites
-                                </div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-status-success">
-                                    {houseCount}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                    Houses
-                                </div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-status-warning">
-                                    {facilityCount}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                    Facilities
-                                </div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-status-info">
-                                    {officeCount}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                    Head Offices
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
             </PageLayout>
         </AppLayout>
     );

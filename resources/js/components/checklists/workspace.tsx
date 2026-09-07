@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { PageLayout, type PageHeaderRailItem } from '@/components/page';
 import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
 import {
     addDaysWP,
@@ -19,7 +20,6 @@ import {
 import { ChecklistConfigProvider, type PaneCtx } from './context';
 import { ChecklistsEmbeddedHeader } from './embedded-header';
 import { ChecklistHero } from './hero';
-import { HeroFooter, type WeekInfo } from './hero-footer';
 import { AssignmentsPane } from './panes/assignments';
 import { DueNowPane } from './panes/due-now';
 import { LibraryPane } from './panes/library';
@@ -29,7 +29,12 @@ import { RunsPane } from './panes/runs';
 import { SchedulePane } from './panes/schedule';
 import { RunModal } from './run-modal';
 import { TemplateBuilderModal } from './template-builder';
-import type { ChecklistScope, ChecklistsData, SiteOverview } from './types';
+import type {
+    ChecklistScope,
+    ChecklistsData,
+    SiteOverview,
+    WeekInfo,
+} from './types';
 
 function mondayOf(today: string, offset: number): string {
     // Local-date math only (ymd uses getFullYear/Month/Date) — never toISOString,
@@ -191,6 +196,40 @@ export function ChecklistsWorkspace({
         { id: 'reports', label: 'Reports', icon: BarChart3, tone: 'info' },
     ];
 
+    // Page contexts render the same panes as the header's connected-tab rail
+    // (counters follow the counter state-colour rule; the due count keeps the
+    // fixed critical pair).
+    const railItems: PageHeaderRailItem<string>[] = tabs.map((t) => ({
+        key: t.id,
+        label: t.label,
+        icon: t.icon,
+        count: typeof t.badge === 'number' ? t.badge : undefined,
+        alert: t.id === 'due',
+    }));
+
+    const panes = (
+        <div>
+            {tab === 'overview' ? (
+                <OverviewPane ctx={ctx} stats={data.stats} goTab={setTab} />
+            ) : null}
+            {tab === 'due' ? <DueNowPane ctx={ctx} /> : null}
+            {tab === 'runs' ? <RunsPane ctx={ctx} /> : null}
+            {tab === 'schedule' ? (
+                <SchedulePane ctx={ctx} weekStart={weekStart} />
+            ) : null}
+            {tab === 'library' ? (
+                <LibraryPane
+                    ctx={ctx}
+                    onNewTemplate={() => setBuilderTarget('new')}
+                />
+            ) : null}
+            {tab === 'assignments' ? <AssignmentsPane ctx={ctx} /> : null}
+            {tab === 'reports' ? (
+                <ReportsPane ctx={ctx} stats={data.stats} />
+            ) : null}
+        </div>
+    );
+
     return (
         <ChecklistConfigProvider
             value={{
@@ -206,8 +245,8 @@ export function ChecklistsWorkspace({
                 openBuilder: setBuilderTarget,
             }}
         >
-            <div className="space-y-5">
-                {embedded ? (
+            {embedded ? (
+                <div className="space-y-5">
                     <ChecklistsEmbeddedHeader
                         stats={data.stats}
                         site={scope.mode === 'site' ? scope.site : null}
@@ -229,65 +268,45 @@ export function ChecklistsWorkspace({
                         onStart={() => setTab('due')}
                         onNewTemplate={() => setBuilderTarget('new')}
                     />
-                ) : (
-                    <ChecklistHero
-                        stats={data.stats}
-                        siteCount={
-                            scope.mode === 'org' ? data.sitesOverview.length : 1
-                        }
-                        templateCount={data.templates.length}
-                        categoryCount={data.categories.length}
-                        onStart={() => setTab('due')}
-                        onNewTemplate={() => setBuilderTarget('new')}
-                        footer={
-                            <HeroFooter
-                                week={week}
-                                onPrevWeek={() => setWeekOffset((o) => o - 1)}
-                                onNextWeek={() => setWeekOffset((o) => o + 1)}
-                                selectedWeekStart={
-                                    new Date(`${weekStart}T00:00:00`)
-                                }
-                                today={new Date(`${data.today}T00:00:00`)}
-                                onJumpToWeek={jumpToWeek}
-                                query={query}
-                                onQuery={setQuery}
-                                cat={cat}
-                                onCat={setCat}
-                                sites={data.sitesOverview}
-                            />
-                        }
-                    />
-                )}
-
-                <TabStrip value={tab} onChange={setTab} items={tabs} />
-
-                <div>
-                    {tab === 'overview' ? (
-                        <OverviewPane
-                            ctx={ctx}
+                    <TabStrip value={tab} onChange={setTab} items={tabs} />
+                    {panes}
+                </div>
+            ) : (
+                <PageLayout
+                    hero={
+                        <ChecklistHero
                             stats={data.stats}
-                            goTab={setTab}
-                        />
-                    ) : null}
-                    {tab === 'due' ? <DueNowPane ctx={ctx} /> : null}
-                    {tab === 'runs' ? <RunsPane ctx={ctx} /> : null}
-                    {tab === 'schedule' ? (
-                        <SchedulePane ctx={ctx} weekStart={weekStart} />
-                    ) : null}
-                    {tab === 'library' ? (
-                        <LibraryPane
-                            ctx={ctx}
+                            siteCount={
+                                scope.mode === 'org'
+                                    ? data.sitesOverview.length
+                                    : 1
+                            }
+                            templateCount={data.templates.length}
+                            categoryCount={data.categories.length}
+                            tab={tab}
+                            onTab={setTab}
+                            railItems={railItems}
+                            week={week}
+                            onPrevWeek={() => setWeekOffset((o) => o - 1)}
+                            onNextWeek={() => setWeekOffset((o) => o + 1)}
+                            selectedWeekStart={
+                                new Date(`${weekStart}T00:00:00`)
+                            }
+                            today={new Date(`${data.today}T00:00:00`)}
+                            onJumpToWeek={jumpToWeek}
+                            query={query}
+                            onQuery={setQuery}
+                            cat={cat}
+                            onCat={setCat}
+                            sites={data.sitesOverview}
+                            onStart={() => setTab('due')}
                             onNewTemplate={() => setBuilderTarget('new')}
                         />
-                    ) : null}
-                    {tab === 'assignments' ? (
-                        <AssignmentsPane ctx={ctx} />
-                    ) : null}
-                    {tab === 'reports' ? (
-                        <ReportsPane ctx={ctx} stats={data.stats} />
-                    ) : null}
-                </div>
-            </div>
+                    }
+                >
+                    {panes}
+                </PageLayout>
+            )}
 
             {runId != null ? (
                 <RunModal runId={runId} onClose={() => setRunId(null)} />

@@ -1,6 +1,16 @@
-import { OpsStatCard } from '@/components/ops-stat-card';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,12 +38,10 @@ import {
 } from '@/pages/health-safety/components/hs-hero-kit';
 import { Head, router } from '@inertiajs/react';
 import {
-    AlertTriangle,
     Calendar,
     CheckCircle2,
     ChevronDown,
     ChevronUp,
-    Clock,
     FileCheck,
     Pencil,
     Plus,
@@ -154,15 +162,15 @@ function statusBorderColor(status: string): string {
     switch (status.toLowerCase()) {
         case 'current':
         case 'active':
-            return 'border-l-emerald-500';
+            return 'border-l-status-success';
         case 'expiring':
         case 'expiring_soon':
         case 'action_required':
-            return 'border-l-amber-500';
+            return 'border-l-status-warning';
         case 'expired':
-            return 'border-l-red-500';
+            return 'border-l-status-critical';
         default:
-            return 'border-l-slate-500';
+            return 'border-l-border';
     }
 }
 
@@ -242,8 +250,11 @@ export default function SiteComplianceIndex({
         checks_overdue: 0,
     };
 
-    // Filter state
+    // Filter state (driven from the header's filter row and meter blocks)
     const [certStatusFilter, setCertStatusFilter] = useState<string>('all');
+    const [checkStatusFilter, setCheckStatusFilter] = useState<string>('all');
+    // Header scoped search — narrows both columns by name/type/reference.
+    const [q, setQ] = useState('');
 
     // Dialog state
     const [showAddCert, setShowAddCert] = useState(false);
@@ -289,17 +300,44 @@ export default function SiteComplianceIndex({
         follow_up_notes: '',
     });
 
-    // Filtered certifications
-    const filteredCerts =
-        certStatusFilter === 'all'
-            ? certifications
-            : certifications.filter(
-                  (c) =>
-                      displayedCertificationStatus(
-                          c,
-                          assurance.certification_status,
-                      ).toLowerCase() === certStatusFilter.toLowerCase(),
-              );
+    // Filtered certifications + checks
+    const search = q.trim().toLowerCase();
+
+    const filteredCerts = certifications.filter((c) => {
+        const statusOk =
+            certStatusFilter === 'all' ||
+            displayedCertificationStatus(
+                c,
+                assurance.certification_status,
+            ).toLowerCase() === certStatusFilter.toLowerCase();
+        const searchOk =
+            search === '' ||
+            [
+                c.name,
+                certTypeLabel(c.certification_type),
+                c.issuing_body,
+                c.reference_number,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase()
+                .includes(search);
+        return statusOk && searchOk;
+    });
+
+    const filteredChecks = (compliance_checks ?? []).filter((c) => {
+        const statusOk =
+            checkStatusFilter === 'all' ||
+            c.status?.toLowerCase() === checkStatusFilter;
+        const searchOk =
+            search === '' ||
+            [certTypeLabel(c.check_type), c.findings, c.completed_by?.name]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase()
+                .includes(search);
+        return statusOk && searchOk;
+    });
 
     // ── Handlers ───────────────────────────────────────────────────────
 
@@ -429,9 +467,189 @@ export default function SiteComplianceIndex({
 
     const alertCount = (stats.expired ?? 0) + (stats.checks_overdue ?? 0);
 
+    const header = (
+        <PageHeader
+            variant="profile"
+            icon={ShieldCheck}
+            backHref={`/sites/${site.id}`}
+            title={site.name ?? 'Site'}
+            titleChip={
+                alertCount > 0 ? (
+                    <PageHeaderStatusChip variant="critical">
+                        {alertCount} need action
+                    </PageHeaderStatusChip>
+                ) : (stats.expiring ?? 0) > 0 ? (
+                    <PageHeaderStatusChip variant="warning">
+                        {stats.expiring} expiring
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="success">
+                        All current
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline="Site compliance \u00b7 certifications, checks and regulatory requirements"
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={q}
+                        onChange={setQ}
+                        placeholder="Search certifications, checks\u2026"
+                    />
+                    {can.manage_compliance ? (
+                        <>
+                            <PageHeaderGlassButton
+                                icon={Calendar}
+                                onClick={() => setShowScheduleCheck(true)}
+                            >
+                                Schedule check
+                            </PageHeaderGlassButton>
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
+                                onClick={() => openCertificationDialog()}
+                            >
+                                Add certification
+                            </PageHeaderPrimaryButton>
+                        </>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Certifications"
+                        ariaLabel="View all certifications"
+                        onClick={() => setCertStatusFilter('all')}
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.total_certs ?? 0}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            held by this site
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Current"
+                        ariaLabel="View current certifications"
+                        onClick={() => setCertStatusFilter('current')}
+                    >
+                        {(stats.total_certs ?? 0) > 0 ? (
+                            <PageHeaderMeterDonut
+                                percent={
+                                    ((stats.current ?? 0) / stats.total_certs) *
+                                    100
+                                }
+                                caption={
+                                    <>
+                                        {stats.current ?? 0} of{' '}
+                                        {stats.total_certs}
+                                        <br />
+                                        certifications
+                                    </>
+                                }
+                            />
+                        ) : (
+                            <>
+                                <PageHeaderMeterBig>0</PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    none held yet
+                                </PageHeaderMeterCaption>
+                            </>
+                        )}
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Expiring"
+                        tone={(stats.expiring ?? 0) > 0 ? 'warning' : 'success'}
+                        ariaLabel="View expiring certifications"
+                        onClick={() => setCertStatusFilter('expiring')}
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.expiring ?? 0}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            renewal due soon
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Expired"
+                        tone={(stats.expired ?? 0) > 0 ? 'critical' : 'success'}
+                        ariaLabel="View expired certifications"
+                        onClick={() => setCertStatusFilter('expired')}
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.expired ?? 0}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            need replacing
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Checks scheduled"
+                        ariaLabel="View scheduled compliance checks"
+                        onClick={() => setCheckStatusFilter('scheduled')}
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.checks_scheduled ?? 0}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            upcoming checks
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Checks overdue"
+                        tone={
+                            (stats.checks_overdue ?? 0) > 0
+                                ? 'critical'
+                                : 'success'
+                        }
+                        ariaLabel="View overdue compliance checks"
+                        onClick={() => setCheckStatusFilter('overdue')}
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.checks_overdue ?? 0}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            past their date
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        icon={Shield}
+                        label="All statuses"
+                        value={certStatusFilter}
+                        options={[
+                            { value: 'all', label: 'All statuses' },
+                            { value: 'current', label: 'Current' },
+                            { value: 'expiring', label: 'Expiring' },
+                            { value: 'expired', label: 'Expired' },
+                            { value: 'pending', label: 'Pending' },
+                        ]}
+                        onChange={setCertStatusFilter}
+                    />
+                    <PageHeaderFilterSelect
+                        icon={FileCheck}
+                        label="All checks"
+                        value={checkStatusFilter}
+                        options={[
+                            { value: 'all', label: 'All checks' },
+                            { value: 'scheduled', label: 'Scheduled' },
+                            { value: 'overdue', label: 'Overdue' },
+                            { value: 'completed', label: 'Completed' },
+                        ]}
+                        onChange={setCheckStatusFilter}
+                    />
+                </>
+            }
+        />
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Sites', href: '/sites' },
                 { title: site.name ?? 'Site', href: `/sites/${site.id}` },
                 { title: 'Compliance', href: `/sites/${site.id}/compliance` },
@@ -439,157 +657,17 @@ export default function SiteComplianceIndex({
         >
             <Head title={`${site.name ?? 'Site'} \u2014 Compliance`} />
 
-            <PageShell>
-                {/* Header */}
-                <PageHero
-                    icon={ShieldCheck}
-                    title={`${site.name ?? 'Site'} \u2014 Compliance`}
-                    description="Track certifications, compliance checks, and regulatory requirements"
-                    backHref={`/sites/${site.id}`}
-                    backLabel="Back to site"
-                    stats={[
-                        {
-                            label: 'Certifications',
-                            value: stats.total_certs ?? 0,
-                        },
-                        { label: 'Current', value: stats.current ?? 0 },
-                        { label: 'Expiring', value: stats.expiring ?? 0 },
-                        {
-                            label: 'Overdue checks',
-                            value: stats.checks_overdue ?? 0,
-                        },
-                    ]}
-                />
-
-                {/* Stats Row */}
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                    <OpsStatCard
-                        label="Total Certifications"
-                        value={stats.total_certs ?? 0}
-                        icon={Shield}
-                        color="indigo"
-                    />
-                    <OpsStatCard
-                        label="Current"
-                        value={stats.current ?? 0}
-                        icon={CheckCircle2}
-                        color="emerald"
-                    />
-                    <OpsStatCard
-                        label="Expiring Soon"
-                        value={stats.expiring ?? 0}
-                        icon={stats.expiring > 0 ? AlertTriangle : Clock}
-                        color="amber"
-                        subtitle={
-                            stats.expiring > 0 ? 'Needs attention' : undefined
-                        }
-                    />
-                    <OpsStatCard
-                        label="Expired"
-                        value={stats.expired ?? 0}
-                        icon={stats.expired > 0 ? AlertTriangle : Clock}
-                        color="red"
-                        subtitle={
-                            stats.expired > 0 ? 'Immediate action' : undefined
-                        }
-                    />
-                    <OpsStatCard
-                        label="Checks Scheduled"
-                        value={stats.checks_scheduled ?? 0}
-                        icon={Calendar}
-                        color="blue"
-                    />
-                    <OpsStatCard
-                        label="Checks Overdue"
-                        value={stats.checks_overdue ?? 0}
-                        icon={
-                            stats.checks_overdue > 0 ? AlertTriangle : FileCheck
-                        }
-                        color="red"
-                        subtitle={
-                            stats.checks_overdue > 0 ? 'Overdue' : undefined
-                        }
-                    />
-                </div>
-
-                {/* Alert Banner */}
-                {alertCount > 0 && (
-                    <div className="flex items-center gap-3 rounded-lg border border-status-critical/30 bg-status-critical px-4 py-3">
-                        <AlertTriangle className="h-5 w-5 shrink-0 text-status-critical" />
-                        <p className="text-sm font-medium text-status-critical">
-                            {stats.expired > 0 && (
-                                <span>
-                                    {stats.expired} certification
-                                    {stats.expired !== 1 ? 's' : ''} expired
-                                </span>
-                            )}
-                            {stats.expired > 0 &&
-                                stats.checks_overdue > 0 &&
-                                ', '}
-                            {stats.checks_overdue > 0 && (
-                                <span>
-                                    {stats.checks_overdue} compliance check
-                                    {stats.checks_overdue !== 1 ? 's' : ''}{' '}
-                                    overdue
-                                </span>
-                            )}
-                            {' \u2014 immediate attention required'}
-                        </p>
-                    </div>
-                )}
-
+            <PageLayout hero={header}>
                 {/* Two-column layout */}
-                <div className="grid gap-6 lg:grid-cols-5">
+                <div className="grid gap-5 lg:grid-cols-5">
                     {/* Left: Certifications (60%) */}
                     <div className="lg:col-span-3">
                         <Card>
                             <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Shield className="h-5 w-5 text-primary" />
-                                        Certifications & Accreditations
-                                    </CardTitle>
-                                    {can.manage_compliance && (
-                                        <Button
-                                            size="sm"
-                                            className="bg-primary hover:bg-primary"
-                                            onClick={() =>
-                                                openCertificationDialog()
-                                            }
-                                        >
-                                            <Plus className="mr-1 h-4 w-4" />
-                                            Add Certification
-                                        </Button>
-                                    )}
-                                </div>
-                                {/* Status filter */}
-                                <div className="mt-3">
-                                    <Select
-                                        value={certStatusFilter}
-                                        onValueChange={setCertStatusFilter}
-                                    >
-                                        <SelectTrigger className="w-[160px]">
-                                            <SelectValue placeholder="All Statuses" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All Statuses
-                                            </SelectItem>
-                                            <SelectItem value="current">
-                                                Current
-                                            </SelectItem>
-                                            <SelectItem value="expiring">
-                                                Expiring
-                                            </SelectItem>
-                                            <SelectItem value="expired">
-                                                Expired
-                                            </SelectItem>
-                                            <SelectItem value="pending">
-                                                Pending
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Shield className="h-5 w-5 text-primary" />
+                                    Certifications & Accreditations
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 {filteredCerts.length === 0 ? (
@@ -778,32 +856,18 @@ export default function SiteComplianceIndex({
                     <div className="lg:col-span-2">
                         <Card>
                             <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="flex items-center gap-2">
-                                        <FileCheck className="h-5 w-5 text-primary" />
-                                        Compliance Checks
-                                    </CardTitle>
-                                    {can.manage_compliance && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                setShowScheduleCheck(true)
-                                            }
-                                        >
-                                            <Plus className="mr-1 h-4 w-4" />
-                                            Schedule Check
-                                        </Button>
-                                    )}
-                                </div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <FileCheck className="h-5 w-5 text-primary" />
+                                    Compliance Checks
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                {(compliance_checks ?? []).length === 0 ? (
+                                {filteredChecks.length === 0 ? (
                                     <p className="py-8 text-center text-sm text-muted-foreground">
                                         No compliance checks found.
                                     </p>
                                 ) : (
-                                    (compliance_checks ?? []).map((check) => {
+                                    filteredChecks.map((check) => {
                                         const isExpanded = expandedChecks.has(
                                             check.id,
                                         );
@@ -1355,7 +1419,7 @@ export default function SiteComplianceIndex({
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

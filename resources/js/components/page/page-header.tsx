@@ -35,6 +35,7 @@ import {
     type ButtonHTMLAttributes,
     type ComponentType,
     type ReactNode,
+    type Ref,
     useEffect,
     useRef,
     useState,
@@ -711,21 +712,41 @@ export function PageHeaderMeterDonut({
 const FILTER_FIELD =
     'box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70';
 
-/** A filter popover trigger with the same geometry as the dropdown chips. */
+/**
+ * Generic 23px glass filter-row button for page-specific controls that
+ * aren't a select/check/toggle — a period stepper, a "Today" jump, a
+ * popover trigger. Icon-only when no children; `active` inverts to the
+ * white fill like the other filter fields. Accepts a `ref` (React 19
+ * ref-as-prop) so it can anchor popovers/pickers.
+ */
 export function PageHeaderFilterButton({
+    icon: Icon,
+    active = false,
     className,
-    ...props
-}: ButtonHTMLAttributes<HTMLButtonElement>) {
+    children,
+    ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+    icon?: IconType;
+    active?: boolean;
+    ref?: Ref<HTMLButtonElement>;
+}) {
     return (
         <button
             type="button"
-            {...props}
+            {...rest}
             className={cn(
+                'inline-flex items-center gap-1 px-2',
                 FILTER_FIELD,
-                'inline-flex items-center gap-1 border-primary-foreground/20 bg-primary-foreground/10 px-2 text-primary-foreground hover:bg-primary-foreground/20',
+                children == null && 'w-[23px] justify-center px-0',
+                active
+                    ? 'border-primary-foreground bg-primary-foreground text-primary'
+                    : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
                 className,
             )}
-        />
+        >
+            {Icon ? <Icon className="size-3 shrink-0" /> : null}
+            {children}
+        </button>
     );
 }
 

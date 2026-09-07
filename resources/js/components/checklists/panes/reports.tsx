@@ -1,11 +1,11 @@
-import { TriangleAlert } from 'lucide-react';
+﻿import { TriangleAlert } from 'lucide-react';
 
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { catColorVar } from '../category';
 import { Donut } from '../charts';
 import { useChecklistConfig, type PaneCtx } from '../context';
-import type { HeroStats } from '../hero';
 import { CategoryDot, StatusBadge } from '../primitives';
+import type { ChecklistStats } from '../types';
 
 function legend(color: string, label: string) {
     return (
@@ -38,7 +38,7 @@ export function ReportsPane({
     stats,
 }: {
     ctx: PaneCtx;
-    stats: HeroStats;
+    stats: ChecklistStats;
 }) {
     const { categoryMap } = useChecklistConfig();
     const r = ctx.reports;
@@ -55,8 +55,8 @@ export function ReportsPane({
         <div className="space-y-4">
             {!hasActivity ? (
                 <div className="rounded-xl border border-dashed border-border bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
-                    No completed or overdue runs yet — these reports fill in as
-                    checklists are run. Until then the figures below show the
+                    No completed or overdue runs yet â€” these reports fill in
+                    as checklists are run. Until then the figures below show the
                     baseline (100% on-track, nothing outstanding).
                 </div>
             ) : null}
@@ -136,12 +136,16 @@ export function ReportsPane({
                             label="on track"
                         />
                         <div className="mt-4 grid w-full grid-cols-2 gap-2 text-center">
-                            {miniStat(completedWk, 'Completed · wk', 'success')}
+                            {miniStat(
+                                completedWk,
+                                'Completed Â· wk',
+                                'success',
+                            )}
                             {miniStat(stats.overdue, 'Overdue', 'critical')}
                             {miniStat(stats.dueToday, 'Due today', 'warning')}
                             {miniStat(
                                 hazardsRaised,
-                                'Failures → hazards',
+                                'Failures â†’ hazards',
                                 'info',
                             )}
                         </div>
@@ -213,7 +217,7 @@ export function ReportsPane({
                                         {f.item}
                                     </span>
                                     <span className="rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground tabular-nums">
-                                        {f.count}×
+                                        {f.count}Ã—
                                     </span>
                                     {f.hazards ? (
                                         <StatusBadge

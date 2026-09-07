@@ -130,7 +130,7 @@ Auth pages (`auth/*`) never appear because they aren't rendered via
 
 ### catering (1)
 
-- [ ] `catering/meal-planner` — custom
+- [x] `catering/meal-planner` — custom (standalone `MealPlannerHero` rebuilt on PageHeader in `sites/meal-planner/_hero.tsx`; the Site-profile embed keeps its compact `MealPlannerToolbar` untouched)
 
 ### checklists (1)
 
@@ -689,33 +689,33 @@ Auth pages (`auth/*`) never appear because they aren't rendered via
 
 ### sites (28)
 
-- [ ] `sites/calendar/index` — custom
-- [ ] `sites/checklists/index` — custom
-- [ ] `sites/compliance/Index` — PageHero
-- [ ] `sites/create` — PageHero
-- [ ] `sites/credentials/audit` — PageHero
-- [ ] `sites/damages/index` — PageHero
-- [ ] `sites/documents` — PageHero
-- [ ] `sites/edit` — PageHero
-- [ ] `sites/emergency-plan/index` — PageHero
-- [ ] `sites/feedback/Index` — PageHero
-- [ ] `sites/hardware/index` — PageHero
-- [ ] `sites/hazards/index` — custom
-- [ ] `sites/hazards/show` — custom
-- [ ] `sites/inspections/global` — PageHero
-- [ ] `sites/inspections/index` — PageHero
-- [ ] `sites/ledger/index` — PageHero
-- [ ] `sites/reports/asset-condition` — PageHero
-- [ ] `sites/reports/checklist-trends` — PageHero
-- [ ] `sites/reports/facilities` — PageHero
-- [ ] `sites/reports/head-office` — PageHero
-- [ ] `sites/reports/houses` — PageHero
-- [ ] `sites/reports/index` — PageHero
-- [ ] `sites/reports/overdue-actions` — PageHero
-- [ ] `sites/reports/site-detail` — PageHero
+- [x] `sites/calendar/index` — custom (shared `SiteCalendar` header migrated — the same band now also renders on `calendar/global`, still listed below for its own breadcrumb/verification pass)
+- [x] `sites/checklists/index` — custom (shared `ChecklistHero` rebuilt on PageHeader — the same band now also renders on `checklists/index`, still listed below for its own breadcrumb/verification pass; site-profile embed header untouched)
+- [x] `sites/compliance/Index` — PageHero
+- ~~`sites/create` — PageHero~~ — skipped 2026-09-07: legacy full-page wizard, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- ~~`sites/credentials/audit` — PageHero~~ — skipped 2026-09-07 at user request: do not migrate
+- ~~`sites/damages/index` — PageHero~~ — skipped 2026-09-07 at user request: do not migrate
+- ~~`sites/documents` — PageHero~~ — skipped 2026-09-07 at user request: do not migrate
+- ~~`sites/edit` — PageHero~~ — skipped 2026-09-07: legacy full-page wizard, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- ~~`sites/emergency-plan/index` — PageHero~~ — skipped 2026-09-07 at user request: tabbed page that already has the hero section; do not migrate
+- ~~`sites/feedback/Index` — PageHero~~ — skipped 2026-09-07 at user request: do not migrate
+- ~~`sites/hardware/index` — PageHero~~ — skipped 2026-09-07 at user request: do not migrate
+- ~~`sites/hazards/index` — custom~~ — skipped 2026-09-07 at user request: do not migrate
+- [x] `sites/hazards/show` — custom
+- [x] `sites/inspections/global` — PageHero
+- [x] `sites/inspections/index` — PageHero
+- ~~`sites/ledger/index` — PageHero~~ — skipped 2026-09-07 at user request: do not migrate
+- ~~`sites/reports/asset-condition` — PageHero~~ — skipped 2026-09-07 at user request: only the main `sites/reports/index` gets migrated; sub-reports stay on PageHero
+- ~~`sites/reports/checklist-trends` — PageHero~~ — skipped 2026-09-07 at user request: only the main `sites/reports/index` gets migrated; sub-reports stay on PageHero
+- [x] `sites/reports/facilities` — PageHero
+- [x] `sites/reports/head-office` — PageHero
+- [x] `sites/reports/houses` — PageHero
+- [x] `sites/reports/index` — PageHero
+- ~~`sites/reports/overdue-actions` — PageHero~~ — skipped 2026-09-07 at user request: only the main `sites/reports/index` gets migrated; sub-reports stay on PageHero
+- ~~`sites/reports/site-detail` — PageHero~~ — skipped 2026-09-07 at user request: only the main `sites/reports/index` gets migrated; sub-reports stay on PageHero
 - [ ] `sites/resources/index` — PageHero
 - [ ] `sites/rooms/index` — PageHero
-- [ ] `sites/vendors-credentials/global` — PageHero
+- [x] `sites/vendors-credentials/global` — PageHero
 - [ ] `sites/zones/index` — PageHero
 
 ### smart-monitoring (1)

@@ -35,7 +35,12 @@ export default function CalendarGlobal({
     overdueCount,
 }: Props) {
     return (
-        <AppLayout breadcrumbs={[{ title: 'Calendar', href: '/calendar' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Calendar', href: '/calendar' },
+            ]}
+        >
             <Head title="Site Calendar" />
             <SiteCalendar
                 context="page"

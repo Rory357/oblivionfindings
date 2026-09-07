@@ -73,11 +73,15 @@ blocks, filters, tabs) do.
     caption bottom — never top-clustered over dead space);
   - **10px** gap, then the filter row (**23px**), then 12px;
   - **46px rail** (padding `0 14px`) on the bottom edge.
-- **Above the band: the shell breadcrumb strip** (added 2026-09-06).
-  Every page passes a full trail to `AppLayout breadcrumbs` rooted at
-  **Home (`/dashboard`)** — e.g. Home → Sites, Home → Sites → Aurora
-  House — and the shell renders it as its slim muted-foreground strip
-  (`components/breadcrumbs.tsx`). Spacing: **10px above AND 10px
+- **Above the band: the shell breadcrumb strip** (added 2026-09-06,
+  reinforced 2026-09-07). Every page passes a full trail to `AppLayout
+  breadcrumbs` **rooted at Home (`/dashboard`)** — no exceptions. This
+  is a MANDATORY step of every page migration: add the Home-rooted trail
+  and verify it before ticking the page done (DESIGN.md anti-pattern
+  "Missing or non-Home-rooted breadcrumbs"). Trails read
+  Home → Sites, Home → Sites → Aurora House,
+  Home → Sites → Reports → Houses — and the shell renders it as its slim
+  muted-foreground strip (`components/breadcrumbs.tsx`). Spacing: **10px above AND 10px
   below the crumbs** (approved 2026-09-06, revised down from a 15px
   trial the same day — the strip's one exception to the 20px shell
   rhythm; the shell's content wrapper drops its top padding beneath
@@ -263,12 +267,23 @@ connected-tab rail** (NAVIGATION_STYLE_GUIDE.md):
   the merge with the page ground is the affordance.
 - Inactive tabs: 34px text pills (white/78), radius 9, `margin-bottom:
   6px`.
-- **One optical text line** (reinforced 2026-09-06): the active tab is
-  taller than the inactive pills, so without compensation its label
-  sits ~3px lower than theirs. The active tab carries `padding-bottom:
-  6px` so every rail label's centreline sits 23px above the band edge —
-  inactive: 34/2 + 6px margin; active: (40 − 6)/2 + 6px padding. Any
-  future rail geometry change must re-solve this equation.
+- **One optical text line — a permanent invariant** (reinforced
+  2026-09-06, re-verified 2026-09-07): every rail label's centreline
+  sits **exactly 23px above the band's bottom edge**, active and
+  inactive alike — one horizontal line through all of them, on every
+  page, always. The active tab is taller than the inactive pills, so
+  without compensation its label would sit ~3px lower; the active tab
+  carries `padding-bottom: 6px` so the centrelines coincide — inactive:
+  34/2 + 6px margin = 23; active: (40 − 6)/2 + 6px padding = 23. This is
+  measured, not eyeballed (repro on 2026-09-07 read both labels at 23.00px,
+  Δ = 0.00px). **Do NOT "correct" the active label by eye**: on the white
+  active tab a dark label reads as sitting slightly high next to the light
+  labels on the sky — that is an optical impression, not a real offset, and
+  nudging it with an ad-hoc margin/translate BREAKS the equation and the
+  shared rail everywhere. The alignment lives ONLY in the shared
+  `PageHeaderRail` (`components/page/page-header.tsx`) — never per page;
+  any change to rail heights, margins, or padding must re-solve the
+  centreline equation to keep both sides at 23px, and be re-measured.
 - Counters follow the **counter state-colour rule** (radius 6): active
   tab → brand-tint pair; inactive → white/15 on white; alert counts →
   the fixed critical pair. A counter must never disappear when its tab

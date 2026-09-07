@@ -234,3 +234,11 @@ export interface ChecklistsData {
 export type ChecklistScope =
     | { mode: 'org' }
     | { mode: 'site'; site: SiteRef; backHref: string };
+
+/** Week-stepper display info shared by the workspace headers. */
+export interface WeekInfo {
+    label: string;
+    range: string;
+    prevLabel: string;
+    nextLabel: string;
+}

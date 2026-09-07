@@ -14,6 +14,7 @@ export default function CateringMealPlanner({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Sites & Locations', href: '/sites' },
                 { title: 'Meal Planner', href: '/catering' },
             ]}

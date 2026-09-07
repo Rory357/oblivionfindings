@@ -1,4 +1,19 @@
-import { PageHero } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderFilterCheck,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,10 +23,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     Building2,
     CheckCircle2,
@@ -30,7 +44,6 @@ import {
     Phone,
     Plus,
     RefreshCcw,
-    Search,
     Settings,
     ShieldCheck,
     Star,
@@ -44,11 +57,8 @@ import {
     type CredentialPickerOption,
     credentialTypeIcon,
     credentialTypeLabel,
-    type FilterOption,
-    FilterSelect,
     RotationBadge,
     rotationStatus,
-    SITE_TYPE_META,
     type SiteOption,
     SiteTypeBadge,
 } from '../_dialog-shared';
@@ -152,11 +162,6 @@ function downloadCsv(
     }
 }
 
-function firstNameFromPage(name?: string | null) {
-    if (!name) return 'there';
-    return name.trim().split(/\s+/)[0] || 'there';
-}
-
 export default function GlobalVendorsCredentials({
     vendors,
     credentials,
@@ -167,9 +172,6 @@ export default function GlobalVendorsCredentials({
     filters,
     can,
 }: Props) {
-    const page = usePage<{ auth?: { user?: { name?: string } } }>();
-    const firstName = firstNameFromPage(page.props.auth?.user?.name);
-
     const [tab, setTab] = useState<'vendors' | 'credentials'>(() => {
         // Deep-links (e.g. the Site Calendar credential/vendor reminders) can
         // request a starting tab via ?tab=; honour it only when the viewer can
@@ -346,17 +348,6 @@ export default function GlobalVendorsCredentials({
         rotFilter !== 'all' ||
         search.trim() !== '';
 
-    const clearFilters = () => {
-        setSearch('');
-        setSiteFilter('all');
-        setServiceTypeFilter('all');
-        setVendorStatusFilter('all');
-        setPreferredFilter('all');
-        setCredentialTypeFilter('all');
-        setReauthFilter('all');
-        setRotFilter('all');
-    };
-
     const siteById = (id?: number | null) => sites.find((s) => s.id === id);
     const lockedSiteFor = (row: {
         site_id: number;
@@ -367,42 +358,6 @@ export default function GlobalVendorsCredentials({
         name: row.site_name ?? siteById(row.site_id)?.name ?? 'This site',
         type: row.site_type ?? siteById(row.site_id)?.type ?? '',
     });
-
-    // ── filter option sets ─────────────────────────────────────────────────
-    const siteOptions: FilterOption[] = [
-        { value: 'all', label: 'All sites', icon: Globe },
-        ...sites.map((s) => ({
-            value: String(s.id),
-            label: s.name,
-            icon: SITE_TYPE_META[s.type]?.icon ?? Building2,
-        })),
-    ];
-    const serviceOptions: FilterOption[] = [
-        { value: 'all', label: 'All services' },
-        ...serviceTypes.map((s) => ({ value: s, label: s })),
-    ];
-    const statusOptions: FilterOption[] = [
-        { value: 'all', label: 'Any status' },
-        { value: 'active', label: 'Active', icon: CheckCircle2 },
-        { value: 'inactive', label: 'Inactive' },
-    ];
-    const preferredOptions: FilterOption[] = [
-        { value: 'all', label: 'Any vendor' },
-        { value: 'yes', label: 'Preferred only', icon: Star },
-    ];
-    const credTypeOptions: FilterOption[] = [
-        { value: 'all', label: 'Any type' },
-        ...credentialTypes.map((t) => ({
-            value: t,
-            label: credentialTypeLabel(t),
-            icon: credentialTypeIcon(t),
-        })),
-    ];
-    const reauthOptions: FilterOption[] = [
-        { value: 'all', label: 'Any reveal rule' },
-        { value: 'yes', label: 'Re-auth required', icon: ShieldCheck },
-        { value: 'no', label: 'No re-auth', icon: Lock },
-    ];
 
     // ── quick actions (context menu) ───────────────────────────────────────
     const copyText = (text: string, label: string) => {
@@ -741,399 +696,475 @@ export default function GlobalVendorsCredentials({
         toast.success('Credentials exported to CSV');
     };
 
-    // ── hero scope + narrative ─────────────────────────────────────────────
-    const scopeLabel =
-        siteFilter === 'all'
-            ? `${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`
-            : (siteById(Number(siteFilter))?.name ?? '1 site');
-
-    const heroBadges = [
-        ...(can.vendors
-            ? [
-                  {
-                      icon: Star,
-                      label: `${counts.preferredVendors} preferred`,
-                      tone: 'default' as const,
-                  },
-              ]
-            : []),
-        ...(can.credentials && counts.reauth > 0
-            ? [
-                  {
-                      icon: ShieldCheck,
-                      label: `${counts.reauth} re-auth`,
-                      tone: 'warning' as const,
-                  },
-              ]
-            : []),
-        ...(can.credentials && counts.rotationDue > 0
-            ? [
-                  {
-                      icon: Clock,
-                      label: `${counts.rotationDue} rotation due`,
-                      tone: 'warning' as const,
-                  },
-              ]
-            : []),
-    ];
-
-    const heroStats = [
-        ...(can.vendors ? [{ label: 'Vendors', value: counts.vendors }] : []),
-        ...(can.credentials
-            ? [{ label: 'Credentials', value: counts.credentials }]
-            : []),
-        ...(can.credentials
-            ? [
-                  {
-                      label: 'Re-auth',
-                      value: counts.reauth,
-                      tone:
-                          counts.reauth > 0 ? ('warning' as const) : undefined,
-                  },
-              ]
-            : []),
-    ];
+    // ── header derivations ────────────────────────────────────────────────
     const hasMoreActions =
         can.vendorsManage ||
         can.credentialsManage ||
         can.credentialsReveal ||
         can.manageCredentialTypes;
 
+    const healthTotal = credHealth.ok + credHealth.due + credHealth.overdue;
+    const healthPercent =
+        healthTotal > 0 ? Math.round((credHealth.ok / healthTotal) * 100) : 100;
+
+    const sublineParts = [
+        'Vendor directory & access vault',
+        `${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`,
+        can.vendors
+            ? `${counts.vendors} ${counts.vendors === 1 ? 'provider' : 'providers'}`
+            : null,
+        can.credentials
+            ? `${counts.credentials} ${counts.credentials === 1 ? 'credential' : 'credentials'}`
+            : null,
+        'encrypted at rest · every reveal audited',
+    ].filter((part): part is string => part !== null);
+
+    const railItems: PageHeaderRailItem<'vendors' | 'credentials'>[] = [
+        ...(can.vendors
+            ? [
+                  {
+                      key: 'vendors' as const,
+                      label: 'Vendors',
+                      icon: Truck,
+                      count: filteredVendors.length,
+                  },
+              ]
+            : []),
+        ...(can.credentials
+            ? [
+                  {
+                      key: 'credentials' as const,
+                      label: 'Credentials',
+                      icon: Lock,
+                      count: filteredCredentials.length,
+                  },
+              ]
+            : []),
+    ];
+
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Sites', href: '/sites' },
                 { title: 'Vendors & Credentials', href: '/vendors' },
             ]}
         >
             <Head title="Vendors & Credentials" />
 
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
-                    icon={Package}
-                    title={
-                        <span className="block space-y-1.5">
-                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
-                                <span className="relative flex h-2 w-2">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-foreground/70 opacity-75" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-foreground" />
-                                </span>
-                                Live · vendor directory &amp; access vault
-                            </span>
-                            <span className="block">
-                                Kia ora {firstName}, here's who keeps the lights
-                                on across{' '}
-                                <span className="underline decoration-primary-foreground/40 underline-offset-4">
-                                    {scopeLabel}
-                                </span>
-                            </span>
-                        </span>
-                    }
-                    description={
-                        <>
-                            {can.vendors && (
-                                <>
-                                    <strong className="font-semibold text-primary-foreground">
-                                        {counts.vendors}
-                                    </strong>{' '}
-                                    service{' '}
-                                    {counts.vendors === 1
-                                        ? 'provider'
-                                        : 'providers'}
-                                </>
-                            )}
-                            {can.vendors && can.credentials ? ' and ' : ''}
-                            {can.credentials && (
-                                <>
-                                    <strong className="font-semibold text-primary-foreground">
-                                        {counts.credentials}
-                                    </strong>{' '}
-                                    stored{' '}
-                                    {counts.credentials === 1
-                                        ? 'credential'
-                                        : 'credentials'}
-                                </>
-                            )}{' '}
-                            in view.
-                            {can.credentials && counts.reauth > 0 ? (
-                                <>
-                                    {' '}
-                                    {counts.reauth}{' '}
-                                    {counts.reauth === 1
-                                        ? 'credential needs'
-                                        : 'credentials need'}{' '}
-                                    re-auth to reveal.
-                                </>
-                            ) : null}
-                            {can.vendors ? (
-                                <>
-                                    {' '}
-                                    <strong className="font-semibold text-primary-foreground">
-                                        {counts.preferredVendors}
-                                    </strong>{' '}
-                                    preferred{' '}
-                                    {counts.preferredVendors === 1
-                                        ? 'vendor'
-                                        : 'vendors'}{' '}
-                                    on call.
-                                </>
-                            ) : null}
-                        </>
-                    }
-                    meta={[
-                        {
-                            icon: Building2,
-                            label: `${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`,
-                        },
-                        ...(can.vendors
-                            ? [
-                                  {
-                                      icon: Truck,
-                                      label: `${counts.activeVendors} active vendors`,
-                                  },
-                              ]
-                            : []),
-                        {
-                            icon: ShieldCheck,
-                            label: 'Encrypted at rest · every reveal audited',
-                        },
-                    ]}
-                    badges={heroBadges}
-                    stats={heroStats}
-                    actions={
-                        <>
-                            {can.credentialsManage && (
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        setCredentialDialog({
-                                            mode: 'add',
-                                            target: null,
-                                        })
-                                    }
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add credential
-                                </Button>
-                            )}
-                            {can.vendorsManage && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                        setVendorDialog({
-                                            mode: 'add',
-                                            target: null,
-                                        })
-                                    }
-                                >
-                                    <Truck className="mr-1.5 h-4 w-4" />
-                                    Add vendor
-                                </Button>
-                            )}
-                            {hasMoreActions && (
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        {/* Explicit on-dark styling: as a Radix trigger this Button
-                                            loses its data-slot, so PageHeroActions can't reach it. */}
-                                        <Button
-                                            size="icon"
-                                            variant="outline"
-                                            aria-label="More actions"
-                                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground shadow-none hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                        >
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="w-56"
-                                    >
-                                        {can.vendorsManage && (
-                                            <DropdownMenuItem
-                                                onClick={exportVendors}
-                                            >
-                                                <Truck className="mr-2 h-4 w-4" />
-                                                Export vendors (CSV)
-                                            </DropdownMenuItem>
-                                        )}
-                                        {can.credentialsManage && (
-                                            <DropdownMenuItem
-                                                onClick={exportCredentials}
-                                            >
-                                                <Lock className="mr-2 h-4 w-4" />
-                                                Export credentials (CSV)
-                                            </DropdownMenuItem>
-                                        )}
-                                        {can.credentialsReveal && (
-                                            <>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    onClick={() =>
-                                                        setAuditOpen({
-                                                            focusLabel: '',
-                                                        })
-                                                    }
-                                                >
-                                                    <History className="mr-2 h-4 w-4" />
-                                                    View reveal &amp; audit log
-                                                </DropdownMenuItem>
-                                            </>
-                                        )}
-                                        {can.manageCredentialTypes && (
-                                            <>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    onClick={() =>
-                                                        setTypesOpen(true)
-                                                    }
-                                                >
-                                                    <Settings className="mr-2 h-4 w-4" />
-                                                    Manage credential types
-                                                </DropdownMenuItem>
-                                            </>
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            )}
-                        </>
-                    }
-                    footer={
-                        <div className="flex flex-wrap items-center gap-2 py-3">
-                            <div className="relative min-w-[220px] flex-1">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-primary-foreground/60" />
-                                <Input
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Search company, credential, type, or site…"
-                                    aria-label="Search vendors and credentials"
-                                    className="border-primary-foreground/20 bg-primary-foreground/15 pl-9 text-primary-foreground placeholder:text-primary-foreground/70 focus-visible:ring-primary-foreground/30"
-                                />
-                            </div>
-                            <FilterSelect
-                                value={siteFilter}
-                                onChange={setSiteFilter}
-                                options={siteOptions}
-                                variant="dark"
-                                aria-label="Filter by site"
-                            />
-                            {tab === 'vendors' ? (
-                                <>
-                                    <FilterSelect
-                                        value={serviceTypeFilter}
-                                        onChange={setServiceTypeFilter}
-                                        options={serviceOptions}
-                                        variant="dark"
-                                        widthClass="w-40"
-                                        aria-label="Filter by service"
-                                    />
-                                    <FilterSelect
-                                        value={vendorStatusFilter}
-                                        onChange={setVendorStatusFilter}
-                                        options={statusOptions}
-                                        variant="dark"
-                                        widthClass="w-36"
-                                        aria-label="Filter by status"
-                                    />
-                                    <FilterSelect
-                                        value={preferredFilter}
-                                        onChange={setPreferredFilter}
-                                        options={preferredOptions}
-                                        variant="dark"
-                                        widthClass="w-40"
-                                        aria-label="Filter by preferred"
-                                    />
-                                </>
+            <PageLayout
+                hero={
+                    <PageHeader
+                        icon={Package}
+                        title="Vendors & Credentials"
+                        titleChip={
+                            can.credentials ? (
+                                credHealth.overdue > 0 ? (
+                                    <PageHeaderStatusChip variant="critical">
+                                        {credHealth.overdue} overdue
+                                    </PageHeaderStatusChip>
+                                ) : credHealth.due > 0 ? (
+                                    <PageHeaderStatusChip variant="warning">
+                                        {credHealth.due} rotation due
+                                    </PageHeaderStatusChip>
+                                ) : (
+                                    <PageHeaderStatusChip variant="success">
+                                        Vault healthy
+                                    </PageHeaderStatusChip>
+                                )
                             ) : (
-                                <>
-                                    <FilterSelect
-                                        value={credentialTypeFilter}
-                                        onChange={setCredentialTypeFilter}
-                                        options={credTypeOptions}
-                                        variant="dark"
-                                        widthClass="w-40"
-                                        aria-label="Filter by credential type"
-                                    />
-                                    <FilterSelect
-                                        value={reauthFilter}
-                                        onChange={setReauthFilter}
-                                        options={reauthOptions}
-                                        variant="dark"
-                                        widthClass="w-44"
-                                        aria-label="Filter by reveal rule"
-                                    />
-                                </>
-                            )}
-                            {hasFilters && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={clearFilters}
-                                    className="gap-1.5 text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
-                                >
-                                    <X className="h-3.5 w-3.5" />
-                                    Clear
-                                </Button>
-                            )}
-                        </div>
-                    }
-                />
-
-                <HealthStrip
-                    can={can}
-                    credHealth={credHealth}
-                    credentials={counts.credentials}
-                    reauth={counts.reauth}
-                    activeVendors={counts.activeVendors}
-                    preferredVendors={counts.preferredVendors}
-                    onCredFilter={(key) => {
-                        // Land on exactly the intended subset — clear sibling credential filters.
-                        setTab('credentials');
-                        setCredentialTypeFilter('all');
-                        setReauthFilter('all');
-                        setRotFilter(key);
-                    }}
-                    onReauth={() => {
-                        setTab('credentials');
-                        setCredentialTypeFilter('all');
-                        setRotFilter('all');
-                        setReauthFilter('yes');
-                    }}
-                    onVendorFilter={(which) => {
-                        setTab('vendors');
-                        setServiceTypeFilter('all');
-                        setVendorStatusFilter(
-                            which === 'active' ? 'active' : 'all',
-                        );
-                        setPreferredFilter(
-                            which === 'preferred' ? 'yes' : 'all',
-                        );
-                    }}
-                />
-
-                {/* Segmented pill tabs */}
-                {/* eslint-disable-next-line no-restricted-syntax -- segmented tab-bar container, not a Card */}
-                <div className="inline-flex self-start rounded-xl border border-border bg-card p-1">
-                    {can.vendors && (
-                        <TabPill
-                            active={tab === 'vendors'}
-                            onClick={() => setTab('vendors')}
-                            icon={Truck}
-                            label="Vendors"
-                            count={filteredVendors.length}
-                        />
-                    )}
-                    {can.credentials && (
-                        <TabPill
-                            active={tab === 'credentials'}
-                            onClick={() => setTab('credentials')}
-                            icon={Lock}
-                            label="Credentials"
-                            count={filteredCredentials.length}
-                        />
-                    )}
-                </div>
-
+                                <PageHeaderStatusChip variant="success">
+                                    {counts.activeVendors} active
+                                </PageHeaderStatusChip>
+                            )
+                        }
+                        subline={sublineParts.join(' · ')}
+                        actions={
+                            <>
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder="Search company, credential, type, or site…"
+                                />
+                                {can.vendorsManage ? (
+                                    can.credentialsManage ? (
+                                        <PageHeaderGlassButton
+                                            icon={Truck}
+                                            onClick={() =>
+                                                setVendorDialog({
+                                                    mode: 'add',
+                                                    target: null,
+                                                })
+                                            }
+                                        >
+                                            Add vendor
+                                        </PageHeaderGlassButton>
+                                    ) : (
+                                        <PageHeaderPrimaryButton
+                                            icon={Truck}
+                                            onClick={() =>
+                                                setVendorDialog({
+                                                    mode: 'add',
+                                                    target: null,
+                                                })
+                                            }
+                                        >
+                                            Add vendor
+                                        </PageHeaderPrimaryButton>
+                                    )
+                                ) : null}
+                                {hasMoreActions && (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <PageHeaderGlassButton
+                                                icon={MoreHorizontal}
+                                                aria-label="More actions"
+                                            />
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            align="end"
+                                            className="w-56"
+                                        >
+                                            {can.vendorsManage && (
+                                                <DropdownMenuItem
+                                                    onClick={exportVendors}
+                                                >
+                                                    <Truck className="mr-2 h-4 w-4" />
+                                                    Export vendors (CSV)
+                                                </DropdownMenuItem>
+                                            )}
+                                            {can.credentialsManage && (
+                                                <DropdownMenuItem
+                                                    onClick={exportCredentials}
+                                                >
+                                                    <Lock className="mr-2 h-4 w-4" />
+                                                    Export credentials (CSV)
+                                                </DropdownMenuItem>
+                                            )}
+                                            {can.credentialsReveal && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                        onClick={() =>
+                                                            setAuditOpen({
+                                                                focusLabel: '',
+                                                            })
+                                                        }
+                                                    >
+                                                        <History className="mr-2 h-4 w-4" />
+                                                        View reveal &amp; audit
+                                                        log
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                            {can.manageCredentialTypes && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                        onClick={() =>
+                                                            setTypesOpen(true)
+                                                        }
+                                                    >
+                                                        <Settings className="mr-2 h-4 w-4" />
+                                                        Manage credential types
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                )}
+                                {can.credentialsManage && (
+                                    <PageHeaderPrimaryButton
+                                        icon={Plus}
+                                        onClick={() =>
+                                            setCredentialDialog({
+                                                mode: 'add',
+                                                target: null,
+                                            })
+                                        }
+                                    >
+                                        Add credential
+                                    </PageHeaderPrimaryButton>
+                                )}
+                            </>
+                        }
+                        meters={
+                            <>
+                                {can.vendors ? (
+                                    <PageHeaderMeterBlock
+                                        label="Vendors"
+                                        ariaLabel="View all vendors"
+                                        onClick={() => {
+                                            setTab('vendors');
+                                            setVendorStatusFilter('all');
+                                            setPreferredFilter('all');
+                                        }}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {counts.vendors}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {counts.activeVendors} active
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                                {can.vendors ? (
+                                    <PageHeaderMeterBlock
+                                        label="Preferred"
+                                        ariaLabel="View preferred vendors"
+                                        onClick={() => {
+                                            setTab('vendors');
+                                            setVendorStatusFilter('all');
+                                            setPreferredFilter('yes');
+                                        }}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {counts.preferredVendors}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            vendors on call
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                                {can.credentials ? (
+                                    <PageHeaderMeterBlock
+                                        label="Vault health"
+                                        value={counts.credentials}
+                                        ariaLabel="View the access vault"
+                                        onClick={() => {
+                                            setTab('credentials');
+                                            setCredentialTypeFilter('all');
+                                            setReauthFilter('all');
+                                            setRotFilter('all');
+                                        }}
+                                    >
+                                        <PageHeaderMeterDonut
+                                            percent={healthPercent}
+                                            caption={
+                                                <>
+                                                    {credHealth.ok} of{' '}
+                                                    {healthTotal}
+                                                    <br />
+                                                    rotated on time
+                                                </>
+                                            }
+                                        />
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                                {can.credentials ? (
+                                    <PageHeaderMeterBlock
+                                        label="Rotation due"
+                                        tone={
+                                            credHealth.due > 0
+                                                ? 'warning'
+                                                : 'brand'
+                                        }
+                                        ariaLabel="View credentials due for rotation"
+                                        onClick={() => {
+                                            setTab('credentials');
+                                            setCredentialTypeFilter('all');
+                                            setReauthFilter('all');
+                                            setRotFilter('due');
+                                        }}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {credHealth.due}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            need rotating soon
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                                {can.credentials ? (
+                                    <PageHeaderMeterBlock
+                                        label="Overdue"
+                                        tone={
+                                            credHealth.overdue > 0
+                                                ? 'critical'
+                                                : 'success'
+                                        }
+                                        ariaLabel="View overdue credentials"
+                                        onClick={() => {
+                                            setTab('credentials');
+                                            setCredentialTypeFilter('all');
+                                            setReauthFilter('all');
+                                            setRotFilter('overdue');
+                                        }}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {credHealth.overdue}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            incl. never rotated
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                                {can.credentials ? (
+                                    <PageHeaderMeterBlock
+                                        label="Re-auth"
+                                        tone={
+                                            counts.reauth > 0
+                                                ? 'warning'
+                                                : 'brand'
+                                        }
+                                        ariaLabel="View credentials requiring re-authentication"
+                                        onClick={() => {
+                                            setTab('credentials');
+                                            setCredentialTypeFilter('all');
+                                            setRotFilter('all');
+                                            setReauthFilter('yes');
+                                        }}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {counts.reauth}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            required to reveal
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                            </>
+                        }
+                        filters={
+                            <>
+                                <PageHeaderFilterSelect
+                                    icon={Building2}
+                                    label="All sites"
+                                    value={siteFilter}
+                                    options={[
+                                        { value: 'all', label: 'All sites' },
+                                        ...sites.map((s) => ({
+                                            value: String(s.id),
+                                            label: s.name,
+                                        })),
+                                    ]}
+                                    onChange={setSiteFilter}
+                                />
+                                {tab === 'vendors' ? (
+                                    <>
+                                        <PageHeaderFilterSelect
+                                            label="All services"
+                                            value={serviceTypeFilter}
+                                            options={[
+                                                {
+                                                    value: 'all',
+                                                    label: 'All services',
+                                                },
+                                                ...serviceTypes.map((s) => ({
+                                                    value: s,
+                                                    label: s,
+                                                })),
+                                            ]}
+                                            onChange={setServiceTypeFilter}
+                                        />
+                                        <PageHeaderFilterSelect
+                                            label="Any status"
+                                            value={vendorStatusFilter}
+                                            options={[
+                                                {
+                                                    value: 'all',
+                                                    label: 'Any status',
+                                                },
+                                                {
+                                                    value: 'active',
+                                                    label: 'Active',
+                                                },
+                                                {
+                                                    value: 'inactive',
+                                                    label: 'Inactive',
+                                                },
+                                            ]}
+                                            onChange={setVendorStatusFilter}
+                                        />
+                                        <PageHeaderFilterCheck
+                                            label="Preferred"
+                                            checked={preferredFilter === 'yes'}
+                                            onChange={(checked) =>
+                                                setPreferredFilter(
+                                                    checked ? 'yes' : 'all',
+                                                )
+                                            }
+                                        />
+                                    </>
+                                ) : (
+                                    <>
+                                        <PageHeaderFilterSelect
+                                            icon={KeyRound}
+                                            label="Any type"
+                                            value={credentialTypeFilter}
+                                            options={[
+                                                {
+                                                    value: 'all',
+                                                    label: 'Any type',
+                                                },
+                                                ...credentialTypes.map((t) => ({
+                                                    value: t,
+                                                    label: credentialTypeLabel(
+                                                        t,
+                                                    ),
+                                                })),
+                                            ]}
+                                            onChange={setCredentialTypeFilter}
+                                        />
+                                        <PageHeaderFilterSelect
+                                            icon={ShieldCheck}
+                                            label="Any reveal rule"
+                                            value={reauthFilter}
+                                            options={[
+                                                {
+                                                    value: 'all',
+                                                    label: 'Any reveal rule',
+                                                },
+                                                {
+                                                    value: 'yes',
+                                                    label: 'Re-auth required',
+                                                },
+                                                {
+                                                    value: 'no',
+                                                    label: 'No re-auth',
+                                                },
+                                            ]}
+                                            onChange={setReauthFilter}
+                                        />
+                                        <PageHeaderFilterSelect
+                                            icon={RefreshCcw}
+                                            label="Any health"
+                                            value={rotFilter}
+                                            options={[
+                                                {
+                                                    value: 'all',
+                                                    label: 'Any health',
+                                                },
+                                                {
+                                                    value: 'ok',
+                                                    label: 'Healthy',
+                                                },
+                                                {
+                                                    value: 'due',
+                                                    label: 'Rotation due',
+                                                },
+                                                {
+                                                    value: 'overdue',
+                                                    label: 'Overdue',
+                                                },
+                                            ]}
+                                            onChange={setRotFilter}
+                                        />
+                                    </>
+                                )}
+                            </>
+                        }
+                        rail={
+                            <PageHeaderRail
+                                items={railItems}
+                                value={tab}
+                                onSelect={setTab}
+                                ariaLabel="Vendor and credential views"
+                            />
+                        }
+                    />
+                }
+            >
                 {tab === 'vendors' && can.vendors ? (
                     <VendorTable
                         rows={filteredVendors}
@@ -1157,7 +1188,7 @@ export default function GlobalVendorsCredentials({
                         canReveal={can.credentialsReveal}
                     />
                 ) : null}
-            </div>
+            </PageLayout>
 
             {/* ── Dialogs ──────────────────────────────────────────────── */}
             <AddVendorDialog
@@ -1286,228 +1317,6 @@ export default function GlobalVendorsCredentials({
 
             <RowContextMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />
         </AppLayout>
-    );
-}
-
-// ── Tab pill ────────────────────────────────────────────────────────────────
-
-function TabPill({
-    active,
-    onClick,
-    icon: Icon,
-    label,
-    count,
-}: {
-    active: boolean;
-    onClick: () => void;
-    icon: typeof Truck;
-    label: string;
-    count: number;
-}) {
-    return (
-        // eslint-disable-next-line no-restricted-syntax -- segmented tab control, not a standard Button
-        <button
-            type="button"
-            onClick={onClick}
-            className={cn(
-                'inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors',
-                active
-                    ? 'bg-accent text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-            )}
-        >
-            <Icon className="h-4 w-4" />
-            {label}
-            <span
-                className={cn(
-                    'rounded-full px-1.5 py-0.5 text-xs tabular-nums',
-                    active
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground',
-                )}
-            >
-                {count}
-            </span>
-        </button>
-    );
-}
-
-// ── Health strip ─────────────────────────────────────────────────────────────
-
-function HealthStrip({
-    can,
-    credHealth,
-    credentials,
-    reauth,
-    activeVendors,
-    preferredVendors,
-    onCredFilter,
-    onReauth,
-    onVendorFilter,
-}: {
-    can: Props['can'];
-    credHealth: { ok: number; due: number; overdue: number };
-    credentials: number;
-    reauth: number;
-    activeVendors: number;
-    preferredVendors: number;
-    onCredFilter: (key: string) => void;
-    onReauth: () => void;
-    onVendorFilter: (which: 'active' | 'preferred') => void;
-}) {
-    const total = Math.max(
-        1,
-        credHealth.ok + credHealth.due + credHealth.overdue,
-    );
-    const pct = (n: number) => `${(n / total) * 100}%`;
-
-    return (
-        // eslint-disable-next-line no-restricted-syntax -- two-zone health panel with custom layout, not a Card
-        <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 lg:flex-row lg:items-stretch">
-            {can.credentials && (
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                        <Lock className="h-4 w-4 text-muted-foreground" />
-                        Credential health
-                        <span className="text-xs font-normal text-muted-foreground">
-                            · {credentials} stored
-                        </span>
-                    </div>
-                    <div
-                        className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted"
-                        role="img"
-                        aria-label={`Rotation health: ${credHealth.ok} healthy, ${credHealth.due} due, ${credHealth.overdue} overdue`}
-                    >
-                        {credHealth.ok > 0 && (
-                            <div
-                                className="bg-status-success"
-                                style={{ width: pct(credHealth.ok) }}
-                            />
-                        )}
-                        {credHealth.due > 0 && (
-                            <div
-                                className="bg-status-warning"
-                                style={{ width: pct(credHealth.due) }}
-                            />
-                        )}
-                        {credHealth.overdue > 0 && (
-                            <div
-                                className="bg-status-critical"
-                                style={{ width: pct(credHealth.overdue) }}
-                            />
-                        )}
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                        <HealthChip
-                            label="Healthy"
-                            n={credHealth.ok}
-                            dotClass="bg-status-success"
-                            onClick={() => onCredFilter('ok')}
-                        />
-                        <HealthChip
-                            label="Rotation due"
-                            n={credHealth.due}
-                            dotClass="bg-status-warning"
-                            attn={credHealth.due > 0}
-                            onClick={() => onCredFilter('due')}
-                        />
-                        <HealthChip
-                            label="Overdue"
-                            n={credHealth.overdue}
-                            dotClass="bg-status-critical"
-                            attn={credHealth.overdue > 0}
-                            crit
-                            onClick={() => onCredFilter('overdue')}
-                        />
-                        <HealthChip
-                            label="Re-auth"
-                            n={reauth}
-                            dotClass="bg-status-info"
-                            attn={reauth > 0}
-                            onClick={onReauth}
-                        />
-                    </div>
-                </div>
-            )}
-
-            {can.credentials && can.vendors && (
-                <div className="hidden w-px bg-border lg:block" />
-            )}
-
-            {can.vendors && (
-                <div className="lg:w-64">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                        <Truck className="h-4 w-4 text-muted-foreground" />
-                        Vendor coverage
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                        {/* eslint-disable-next-line no-restricted-syntax -- clickable stat tile (filters the table) */}
-                        <button
-                            type="button"
-                            onClick={() => onVendorFilter('active')}
-                            className="rounded-xl border border-border bg-background/40 p-3 text-left transition-colors hover:border-primary/50"
-                        >
-                            <div className="text-xl font-bold tabular-nums">
-                                {activeVendors}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                Active
-                            </div>
-                        </button>
-                        {/* eslint-disable-next-line no-restricted-syntax -- clickable stat tile (filters the table) */}
-                        <button
-                            type="button"
-                            onClick={() => onVendorFilter('preferred')}
-                            className="rounded-xl border border-border bg-background/40 p-3 text-left transition-colors hover:border-primary/50"
-                        >
-                            <div className="flex items-center gap-1 text-xl font-bold tabular-nums">
-                                {preferredVendors}
-                                <Star className="h-4 w-4 fill-status-warning text-status-warning" />
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                Preferred
-                            </div>
-                        </button>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-function HealthChip({
-    label,
-    n,
-    dotClass,
-    attn,
-    crit,
-    onClick,
-}: {
-    label: string;
-    n: number;
-    dotClass: string;
-    attn?: boolean;
-    crit?: boolean;
-    onClick: () => void;
-}) {
-    return (
-        // eslint-disable-next-line no-restricted-syntax -- filter chip, not a standard Button
-        <button
-            type="button"
-            onClick={onClick}
-            className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors hover:bg-muted',
-                attn
-                    ? crit
-                        ? 'border-status-critical/40 bg-status-critical-bg'
-                        : 'border-status-warning/40 bg-status-warning-bg'
-                    : 'border-border',
-            )}
-        >
-            <span className={cn('h-1.5 w-1.5 rounded-full', dotClass)} />
-            {label}
-            <span className="font-semibold tabular-nums">{n}</span>
-        </button>
     );
 }
 

@@ -1,4 +1,4 @@
-import {
+﻿import {
     AlertTriangle,
     ArrowDown,
     ArrowRight,
@@ -17,8 +17,8 @@ import { Card as GuardrailCard } from '@/components/ui/card';
 import { catColorVar, relDay } from '../category';
 import { Donut, LegendDot, MiniRing, SegmentDonut, Sparkline } from '../charts';
 import { useChecklistConfig, type GoTab, type PaneCtx } from '../context';
-import type { HeroStats } from '../hero';
 import { Empty, StatusBadge } from '../primitives';
+import type { ChecklistStats } from '../types';
 
 function miniKpi(value: number, label: string, tone: string) {
     return (
@@ -42,7 +42,7 @@ export function OverviewPane({
     goTab,
 }: {
     ctx: PaneCtx;
-    stats: HeroStats;
+    stats: ChecklistStats;
     goTab: GoTab;
 }) {
     const { categoryMap, scope } = useChecklistConfig();
@@ -145,7 +145,7 @@ export function OverviewPane({
                     <div className="mt-4 grid w-full grid-cols-2 gap-2">
                         {miniKpi(
                             categoriesHealthy,
-                            'categories ≥95%',
+                            'categories â‰¥95%',
                             'success',
                         )}
                         {miniKpi(
@@ -206,7 +206,7 @@ export function OverviewPane({
                                 Completion trend
                             </h3>
                             <p className="text-xs text-muted-foreground">
-                                Runs completed · last 8 weeks
+                                Runs completed Â· last 8 weeks
                             </p>
                         </div>
                         <div className="text-right">
@@ -495,7 +495,7 @@ export function OverviewPane({
                                                     {r.template?.name}
                                                 </div>
                                                 <div className="truncate text-[11px] text-muted-foreground">
-                                                    {r.site?.name} ·{' '}
+                                                    {r.site?.name} Â·{' '}
                                                     {relDay(
                                                         r.scheduled_date,
                                                         today,

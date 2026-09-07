@@ -16,18 +16,17 @@ export default function SiteChecklistsIndex(props: Props) {
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Sites', href: '/sites' },
                 { title: site.name, href: `/sites/${site.id}` },
                 { title: 'Checklists', href: `/sites/${site.id}/checklists` },
             ]}
         >
             <Head title={`${site.name} — Checklists`} />
-            <div className="p-4">
-                <ChecklistsWorkspace
-                    scope={{ mode: 'site', site, backHref }}
-                    data={data as ChecklistsData}
-                />
-            </div>
+            <ChecklistsWorkspace
+                scope={{ mode: 'site', site, backHref }}
+                data={data as ChecklistsData}
+            />
         </AppLayout>
     );
 }

@@ -37,6 +37,7 @@ export default function SiteCalendarPage({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Sites', href: '/sites' },
                 { title: site.name, href: `/sites/${site.id}` },
                 { title: 'Calendar', href: `/sites/${site.id}/calendar` },

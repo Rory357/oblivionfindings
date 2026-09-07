@@ -1,3 +1,16 @@
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderStatusChip,
+    type PageHeaderRailItem,
+} from '@/components/page';
 import { WeekPicker } from '@/components/rostering/week-picker';
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
@@ -5,16 +18,18 @@ import { cn } from '@/lib/utils';
 import {
     Bell,
     Building2,
+    CalendarDays,
     CalendarRange,
     Check,
     ChefHat,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     ChevronsUpDown,
     CircleCheck,
     Home,
+    LayoutTemplate,
     Loader2,
-    MapPin,
     Package,
     Plus,
     Search,
@@ -23,10 +38,9 @@ import {
     ShoppingCart,
     Soup,
     TriangleAlert,
-    Users,
     type LucideIcon,
 } from 'lucide-react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -63,176 +77,6 @@ export type HeroNotification = {
     sub?: string;
     tab: string;
 };
-
-// Brand-derived hero base — matches the shared PageHero (e.g. Rostering's
-// category="ops", which resolves to --primary). Follows Settings → Branding.
-const HERO_GRADIENT_STYLE: CSSProperties = {
-    ['--hero-base' as string]: 'var(--primary)',
-};
-const HERO_GRADIENT_CLASS =
-    'bg-[linear-gradient(to_bottom_right,color-mix(in_oklch,var(--hero-base)_90%,transparent),var(--hero-base),color-mix(in_oklch,var(--hero-base)_80%,transparent))]';
-
-function HeroStat({
-    label,
-    value,
-    sub,
-    emphasis,
-    onClick,
-    warning,
-}: {
-    label: string;
-    value: ReactNode;
-    sub?: string;
-    emphasis?: boolean;
-    onClick?: () => void;
-    warning?: boolean;
-}) {
-    const cls = cn(
-        'rounded-xl px-4 py-2.5 text-center backdrop-blur-sm transition-colors',
-        warning
-            ? 'bg-amber-300/25 ring-1 ring-amber-200/40'
-            : emphasis
-              ? 'bg-primary-foreground/20 ring-1 ring-primary-foreground/25'
-              : 'bg-primary-foreground/10',
-        onClick &&
-            'cursor-pointer hover:bg-primary-foreground/25 focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1 focus-visible:outline-none',
-    );
-    const inner = (
-        <>
-            <div className="text-[22px] leading-none font-bold text-primary-foreground tabular-nums">
-                {value}
-            </div>
-            <div className="mt-1 text-[11px] font-medium tracking-wide text-primary-foreground/70 uppercase">
-                {label}
-            </div>
-            {sub && (
-                <div
-                    className={cn(
-                        'mt-0.5 text-[10.5px]',
-                        warning
-                            ? 'text-primary-foreground/90'
-                            : 'text-primary-foreground/55',
-                    )}
-                >
-                    {sub}
-                </div>
-            )}
-        </>
-    );
-    if (onClick) {
-        return (
-            <GuardrailButton
-                unstyled
-                type="button"
-                onClick={onClick}
-                className={cn(cls, 'w-full')}
-            >
-                {inner}
-            </GuardrailButton>
-        );
-    }
-    return (
-        <div role="status" className={cls}>
-            {inner}
-        </div>
-    );
-}
-
-function HeroBadge({
-    tone,
-    icon: Icon,
-    children,
-    onClick,
-}: {
-    tone: 'success' | 'warning' | 'critical' | 'info';
-    icon?: LucideIcon;
-    children: ReactNode;
-    onClick?: () => void;
-}) {
-    const tones: Record<string, string> = {
-        success:
-            'bg-primary-foreground/15 text-primary-foreground ring-1 ring-primary-foreground/20',
-        warning: 'bg-amber-300/25 text-amber-50 ring-1 ring-amber-200/30',
-        critical: 'bg-red-400/25 text-red-50 ring-1 ring-red-200/30',
-        info: 'bg-primary-foreground/15 text-primary-foreground ring-1 ring-primary-foreground/20',
-    };
-    const cls = cn(
-        'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold',
-        tones[tone],
-        onClick &&
-            'cursor-pointer transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1 focus-visible:outline-none',
-    );
-    const inner = (
-        <>
-            {Icon && (
-                <Icon
-                    className="h-3.5 w-3.5"
-                    strokeWidth={2.4}
-                    aria-hidden="true"
-                />
-            )}
-            {children}
-        </>
-    );
-    if (onClick) {
-        return (
-            <GuardrailButton
-                unstyled
-                type="button"
-                onClick={onClick}
-                className={cls}
-            >
-                {inner}
-            </GuardrailButton>
-        );
-    }
-    return <span className={cls}>{inner}</span>;
-}
-
-/** Honest relative freshness, e.g. "updated 3 min ago" — never the old hardcoded "just now". */
-function relativeUpdated(ts: number | null): string | null {
-    if (!ts) return null;
-    const mins = Math.floor((Date.now() - ts) / 60000);
-    if (mins < 1) return 'updated just now';
-    if (mins === 1) return 'updated 1 min ago';
-    if (mins < 60) return `updated ${mins} min ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs === 1) return 'updated 1 hr ago';
-    if (hrs < 24) return `updated ${hrs} hr ago`;
-    return 'updated earlier';
-}
-
-function HeroFreshness({
-    lastLoadedAt,
-    reloading,
-}: {
-    lastLoadedAt: number | null;
-    reloading: boolean;
-}) {
-    const [, setTick] = useState(0);
-    useEffect(() => {
-        const id = setInterval(() => setTick((t) => t + 1), 30000);
-        return () => clearInterval(id);
-    }, []);
-    // Suppress freshness while a reload is in flight; show a truthful "refreshing…" cue instead.
-    const phrase = reloading ? 'refreshing…' : relativeUpdated(lastLoadedAt);
-    return phrase ? <> · {phrase}</> : null;
-}
-
-function HeroMeta({
-    icon: Icon,
-    children,
-}: {
-    icon: LucideIcon;
-    children: ReactNode;
-}) {
-    return (
-        <span className="inline-flex items-center gap-1.5 text-[12.5px] text-primary-foreground/75">
-            <Icon className="h-3.5 w-3.5 text-primary-foreground/60" />
-            {children}
-        </span>
-    );
-}
 
 function HeroBell({
     notifications,
@@ -329,7 +173,7 @@ function HeroBell({
                         aria-hidden="true"
                         className={cn(
                             'absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-bold text-white ring-2',
-                            light ? 'ring-card' : 'ring-[var(--hero-base)]',
+                            light ? 'ring-card' : 'ring-primary',
                         )}
                     >
                         {count}
@@ -651,7 +495,6 @@ function SiteSearch({
 
 export type MealPlannerHeroProps = {
     site: SiteInfo;
-    firstName: string;
     weekLabel: string;
     rangeStart: string;
     rangeEnd: string;
@@ -661,13 +504,11 @@ export type MealPlannerHeroProps = {
     stats: HeroStats;
     sites: SiteSearchItem[];
     notifications: HeroNotification[];
-    backHref?: string;
     /** Monday-start Date of the displayed week — drives the calendar week-picker. */
     weekStart: Date;
-    /** Epoch ms of the last successful bootstrap — drives the honest "updated …" eyebrow. */
-    lastLoadedAt: number | null;
-    /** True while a per-week reload is in flight — suppresses the freshness phrase. */
-    reloading: boolean;
+    /** Active sub-view — rendered as the header rail. */
+    tab: string;
+    onTab: (tab: string) => void;
     canPlan: boolean;
     canShop: boolean;
     onSelectSite: (id: number) => void;
@@ -685,10 +526,17 @@ export type MealPlannerHeroProps = {
     onReviewConflicts: () => void;
 };
 
+/**
+ * The standalone /catering header — the Event Horizon band
+ * (design_styles/PAGE_HEADER_STYLE_GUIDE.md): site identity + kitchen facts
+ * in the top row, the linked meter row (plan-fill bar, week cost, allergen
+ * conflicts, stock), week nav in the filter row and the planner sub-views on
+ * the rail. The Site-profile embed keeps the compact MealPlannerToolbar
+ * below instead.
+ */
 export default function MealPlannerHero(props: MealPlannerHeroProps) {
     const {
         site,
-        firstName,
         weekLabel,
         rangeStart,
         rangeEnd,
@@ -703,382 +551,285 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
     const overBudget =
         site.weekly_food_budget_cents != null &&
         stats.weekCostCents > site.weekly_food_budget_cents;
+    const budget = site.weekly_food_budget_cents;
+    const budgetSpentPct =
+        budget != null && budget > 0
+            ? Math.round((stats.weekCostCents / budget) * 100)
+            : null;
 
-    const badges: {
-        tone: 'success' | 'warning' | 'critical' | 'info';
-        icon?: LucideIcon;
-        label: string;
-        onClick?: () => void;
-    }[] = [];
-    if (isHouse && stats.overrides > 0)
-        badges.push({
-            tone: 'warning',
-            icon: ShieldAlert,
-            label: `${stats.overrides} override${stats.overrides === 1 ? '' : 's'} logged`,
-            onClick: props.onOpenOverrides,
-        });
-    if (stats.lowStock > 0)
-        badges.push({
-            tone: 'warning',
-            icon: Package,
-            label: `${stats.lowStock} item${stats.lowStock === 1 ? '' : 's'} below par`,
-        });
-    // Honest served badge (P2-3): no green "0 meals served".
-    if (isHouse) {
-        if (stats.served > 0)
-            badges.push({
-                tone: 'success',
-                icon: CircleCheck,
-                label: `${stats.served}/${stats.mealsPlanned} served`,
-            });
-        else if (stats.mealsPlanned > 0)
-            badges.push({
-                tone: 'info',
-                icon: CircleCheck,
-                label: `0/${stats.mealsPlanned} served`,
-            });
-    } else {
-        badges.push({
-            tone: 'success',
-            icon: CircleCheck,
-            label: 'Kitchen stocked',
-        });
-    }
-    // Texture / soft-conflict overview (P2-9) — kept below the dominant allergen banner.
-    if (isHouse && stats.textureEntries > 0)
-        badges.push({
-            tone: 'warning',
-            icon: Soup,
-            label: `${stats.textureEntries} texture check${stats.textureEntries === 1 ? '' : 's'}`,
-        });
-    if (isHouse && stats.softWarnings > 0)
-        badges.push({
-            tone: 'warning',
-            icon: TriangleAlert,
-            label: `${stats.softWarnings} soft warning${stats.softWarnings === 1 ? '' : 's'}`,
-        });
-    if (isHouse && stats.textureModified > 0)
-        badges.push({
-            tone: 'info',
-            icon: Soup,
-            label: `${stats.textureModified} on texture-modified diet`,
-        });
+    // Week cost is spend against the site's weekly food budget — when a
+    // budget is configured the block renders the §5 bar meter (the funding /
+    // capacity form) with what's left in the caption; without one there is
+    // no honest fraction, so it stays a plain money stat (no-fake-data rule).
+    const weekCostBlock = (
+        <PageHeaderMeterBlock
+            label="Week cost"
+            tone={overBudget ? 'warning' : 'brand'}
+            ariaLabel="Open the spend report"
+            onClick={props.onOpenSpend}
+        >
+            {/* The spend amount stays the block's focal number; the bar
+                beneath it tracks the weekly budget. */}
+            <PageHeaderMeterBig>
+                {formatMoneyFromCents(stats.weekCostCents)}
+            </PageHeaderMeterBig>
+            {budget != null && budgetSpentPct !== null ? (
+                <>
+                    <PageHeaderMeterBar percent={budgetSpentPct} />
+                    <PageHeaderMeterCaption>
+                        {overBudget
+                            ? `${formatMoneyFromCents(stats.weekCostCents - budget)} over the ${formatMoneyFromCents(budget)} budget`
+                            : `${formatMoneyFromCents(budget - stats.weekCostCents)} left of ${formatMoneyFromCents(budget)}`}
+                    </PageHeaderMeterCaption>
+                </>
+            ) : (
+                <PageHeaderMeterCaption>
+                    {isHouse ? 'planned this week' : 'on hand'}
+                </PageHeaderMeterCaption>
+            )}
+        </PageHeaderMeterBlock>
+    );
+
+    const railItems: PageHeaderRailItem<string>[] = isHouse
+        ? [
+              { key: 'calendar', label: 'Calendar', icon: CalendarDays },
+              { key: 'inventory', label: 'Inventory', icon: Package },
+              { key: 'shopping', label: 'Shopping', icon: ShoppingCart },
+              { key: 'recipes', label: 'Recipes', icon: ChefHat },
+              { key: 'templates', label: 'Templates', icon: LayoutTemplate },
+          ]
+        : [
+              { key: 'inventory', label: 'Inventory', icon: Package },
+              { key: 'shopping', label: 'Shopping', icon: ShoppingCart },
+              { key: 'recipes', label: 'Recipes', icon: ChefHat },
+          ];
+
+    const sublineParts = [
+        'Meal planner',
+        isHouse ? 'Resident meals' : 'Kitchen supplies',
+        isHouse
+            ? `${residentCount} ${residentCount === 1 ? 'resident' : 'residents'}`
+            : `${stats.itemsTracked} items tracked`,
+        site.suburb,
+    ].filter(Boolean);
 
     return (
-        <div
-            style={HERO_GRADIENT_STYLE}
-            className={cn(
-                'relative overflow-hidden rounded-2xl text-primary-foreground shadow-hero',
-                HERO_GRADIENT_CLASS,
-            )}
-        >
-            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-                <div className="absolute -top-24 -right-20 h-72 w-72 rounded-full bg-primary-foreground/[0.07]" />
-                <div className="absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-primary-foreground/[0.06]" />
-                <div className="absolute top-1/3 right-1/3 h-28 w-28 rounded-full bg-primary-foreground/[0.05]" />
-            </div>
-
-            <div className="relative p-5 sm:p-7">
-                <div className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.14em] text-primary-foreground/80 uppercase">
-                    <span className="relative inline-flex h-2 w-2">
-                        <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-status-success opacity-75" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                    </span>
-                    Meal Planner ·{' '}
-                    {isHouse ? 'Resident meals' : 'Kitchen supplies'}
-                    <HeroFreshness
-                        lastLoadedAt={props.lastLoadedAt}
-                        reloading={props.reloading}
-                    />
-                </div>
-
-                <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-                    <div className="hidden h-24 w-24 shrink-0 items-center justify-center rounded-3xl border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl sm:flex">
-                        <ChefHat className="h-12 w-12 text-primary-foreground" />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                        <h1 className="text-[26px] leading-tight font-bold tracking-tight sm:text-[30px]">
-                            <span className="font-normal text-primary-foreground/80">
-                                Kia ora {firstName},{' '}
-                            </span>
-                            {isHouse
-                                ? "the week's kitchen at "
-                                : 'the kitchen at '}
-                            {site.name}
-                        </h1>
-
-                        <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-primary-foreground/75">
-                            {isHouse ? (
-                                <>
-                                    <span className="font-semibold text-primary-foreground">
-                                        {stats.mealsPlanned} meals
-                                    </span>{' '}
-                                    planned for{' '}
-                                    <span className="font-semibold text-primary-foreground">
-                                        {residentCount} residents
-                                    </span>
-                                    {stats.overrides > 0 && (
-                                        <>
-                                            {' '}
-                                            ·{' '}
-                                            <span className="font-semibold text-primary-foreground/90">
-                                                {stats.overrides} allergen
-                                                override
-                                                {stats.overrides === 1
-                                                    ? ''
-                                                    : 's'}
-                                            </span>{' '}
-                                            on file
-                                        </>
-                                    )}{' '}
-                                    ·{' '}
-                                    <span className="border-b-2 border-primary-foreground/40 pb-px">
-                                        {rangeStart} → {rangeEnd}
-                                    </span>
-                                </>
-                            ) : (
-                                <>
-                                    <span className="font-semibold text-primary-foreground">
-                                        {stats.itemsTracked} items
-                                    </span>{' '}
-                                    tracked across the staff kitchen
-                                    {stats.lowStock > 0 && (
-                                        <>
-                                            {' '}
-                                            ·{' '}
-                                            <span className="font-semibold text-primary-foreground/90">
-                                                {stats.lowStock} below par
-                                            </span>
-                                        </>
-                                    )}{' '}
-                                    ·{' '}
-                                    <span className="border-b-2 border-primary-foreground/40 pb-px">
-                                        {rangeStart} → {rangeEnd}
-                                    </span>
-                                </>
-                            )}
-                        </p>
-
-                        <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-2">
-                            <HeroMeta icon={CalendarRange}>
-                                {weekLabel} · Mon–Sun
-                            </HeroMeta>
-                            {site.suburb && (
-                                <HeroMeta icon={MapPin}>{site.suburb}</HeroMeta>
-                            )}
-                            {isHouse ? (
-                                <HeroMeta icon={Users}>
-                                    {residentCount} residents
-                                </HeroMeta>
-                            ) : (
-                                <HeroMeta icon={Package}>
-                                    {stats.itemsTracked} items tracked
-                                </HeroMeta>
-                            )}
-                        </div>
-
-                        {badges.length > 0 && (
-                            <div className="mt-3.5 flex flex-wrap gap-2">
-                                {badges.map((b, i) => (
-                                    <HeroBadge
-                                        key={i}
-                                        tone={b.tone}
-                                        icon={b.icon}
-                                        onClick={b.onClick}
-                                    >
-                                        {b.label}
-                                    </HeroBadge>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex w-full shrink-0 flex-col items-stretch gap-3.5 lg:w-auto lg:items-end">
-                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                            {props.canPlan && (
-                                <GuardrailButton
-                                    unstyled
-                                    type="button"
-                                    onClick={props.onPlan}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary-foreground px-4 text-sm font-semibold text-sites-deep shadow-sm transition hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1 focus-visible:outline-none"
-                                >
-                                    <Plus
-                                        className="h-4 w-4"
-                                        strokeWidth={2.5}
-                                    />
-                                    {isHouse ? 'Plan a meal' : 'Add a meal'}
-                                </GuardrailButton>
-                            )}
-                            {props.canShop && (
-                                <GuardrailButton
-                                    unstyled
-                                    type="button"
-                                    onClick={props.onBuildList}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-primary-foreground/30 bg-primary-foreground/10 px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1 focus-visible:outline-none"
-                                >
-                                    <ShoppingCart className="h-4 w-4" />
-                                    Build list
-                                </GuardrailButton>
-                            )}
-                            <HeroBell
-                                notifications={props.notifications}
-                                onClick={props.onNotificationClick}
-                            />
-                            {props.canShop && (
-                                <GuardrailButton
-                                    unstyled
-                                    type="button"
-                                    onClick={props.onOpenSettings}
-                                    aria-label="Meal planner settings"
-                                    className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground transition hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1 focus-visible:outline-none"
-                                >
-                                    <Settings className="h-[17px] w-[17px]" />
-                                </GuardrailButton>
-                            )}
-                        </div>
-
-                        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 lg:w-auto">
-                            <HeroStat
-                                label={isHouse ? 'Meals' : 'Items'}
-                                value={
-                                    isHouse
-                                        ? stats.mealsPlanned
-                                        : stats.itemsTracked
-                                }
-                                sub={
-                                    isHouse
-                                        ? `${stats.served}/${stats.mealsPlanned} served`
-                                        : 'tracked'
-                                }
-                                emphasis
-                            />
-                            <HeroStat
-                                label="Week cost"
-                                value={formatMoneyFromCents(
-                                    stats.weekCostCents,
-                                )}
-                                sub={
-                                    overBudget
-                                        ? 'over budget'
-                                        : isHouse
-                                          ? 'planned'
-                                          : 'on hand'
-                                }
-                                warning={overBudget}
-                                onClick={props.onOpenSpend}
-                            />
-                            <HeroStat
-                                label="Low stock"
-                                value={stats.lowStock}
-                                sub={`${stats.outOfStock} out`}
-                            />
-                            <HeroStat
-                                label={isHouse ? 'Plan filled' : 'At par'}
-                                value={`${stats.fillPct}%`}
-                                sub={isHouse ? 'of slots' : 'of items'}
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {isHouse && stats.unresolved > 0 && (
-                <div className="relative flex px-5 pb-3 sm:px-7 md:justify-end">
-                    {/* Solid critical token (not brand-opacity) so contrast holds for any brand hue; announced to AT. */}
-                    <div
-                        role="alert"
-                        aria-live="assertive"
-                        className="flex w-full items-center gap-2.5 rounded-lg bg-status-critical px-3 py-1.5 text-white ring-1 ring-white/25 md:w-auto"
-                    >
-                        <ShieldAlert
-                            className="h-[15px] w-[15px] shrink-0"
-                            aria-hidden="true"
+        <PageHeader
+            icon={ChefHat}
+            title={site.name}
+            titleChip={
+                isHouse && stats.unresolved > 0 ? (
+                    <PageHeaderStatusChip variant="critical" icon={ShieldAlert}>
+                        {stats.unresolved} allergen conflict
+                        {stats.unresolved === 1 ? '' : 's'}
+                    </PageHeaderStatusChip>
+                ) : isHouse ? (
+                    stats.mealsPlanned > 0 ? (
+                        <PageHeaderStatusChip variant="success">
+                            {stats.served}/{stats.mealsPlanned} served
+                        </PageHeaderStatusChip>
+                    ) : (
+                        <PageHeaderStatusChip variant="neutral">
+                            No meals planned
+                        </PageHeaderStatusChip>
+                    )
+                ) : (
+                    <PageHeaderStatusChip variant="success">
+                        Kitchen stocked
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={sublineParts.join(' · ')}
+            actions={
+                <>
+                    {sites.length > 1 ? (
+                        <SiteSearch
+                            sites={sites}
+                            currentSiteId={site.id}
+                            onSelect={props.onSelectSite}
                         />
-                        <span className="flex-1 text-[12.5px] font-medium">
-                            {stats.unresolved} planned meal
-                            {stats.unresolved === 1 ? '' : 's'} contain
-                            {stats.unresolved === 1 ? 's' : ''} allergens for
-                            current residents
-                        </span>
-                        <GuardrailButton
-                            unstyled
-                            type="button"
+                    ) : null}
+                    <HeroBell
+                        compact
+                        notifications={props.notifications}
+                        onClick={props.onNotificationClick}
+                    />
+                    {props.canShop ? (
+                        <PageHeaderGlassButton
+                            icon={Settings}
+                            aria-label="Meal planner settings"
+                            onClick={props.onOpenSettings}
+                        />
+                    ) : null}
+                    {props.canShop ? (
+                        <PageHeaderGlassButton
+                            icon={ShoppingCart}
+                            onClick={props.onBuildList}
+                        >
+                            Build list
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {props.canPlan ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={props.onPlan}
+                        >
+                            {isHouse ? 'Plan a meal' : 'Add a meal'}
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                isHouse ? (
+                    <>
+                        <PageHeaderMeterBlock
+                            label="Plan filled"
+                            value={`${stats.mealsPlanned} meals`}
+                            ariaLabel="View the week's calendar"
+                            onClick={() => props.onTab('calendar')}
+                        >
+                            <PageHeaderMeterBar percent={stats.fillPct} />
+                            <PageHeaderMeterCaption>
+                                {stats.fillPct}% of slots · {stats.served}{' '}
+                                served
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        {weekCostBlock}
+                        <PageHeaderMeterBlock
+                            label="Allergen conflicts"
+                            tone={stats.unresolved > 0 ? 'critical' : 'success'}
+                            ariaLabel="Review allergen conflicts on the calendar"
                             onClick={props.onReviewConflicts}
-                            aria-label={`Review ${stats.unresolved} allergen conflict${stats.unresolved === 1 ? '' : 's'} on the calendar`}
-                            className="shrink-0 rounded-md bg-white px-2.5 py-1 text-[12px] font-semibold text-status-critical transition hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-status-critical focus-visible:outline-none"
                         >
-                            Review
-                        </GuardrailButton>
-                    </div>
-                </div>
-            )}
-
-            <div className="relative border-t border-primary-foreground/15 px-5 py-3 sm:px-7">
-                <div className="flex flex-col items-stretch gap-2.5 md:flex-row md:items-center md:justify-between">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                        <GuardrailButton
-                            unstyled
-                            type="button"
-                            onClick={props.onPrevWeek}
-                            aria-label="Previous week"
-                            className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-[12px] font-semibold text-primary-foreground transition hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1 focus-visible:outline-none"
+                            <PageHeaderMeterBig>
+                                {stats.unresolved}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {stats.unresolved > 0
+                                    ? 'review before serving'
+                                    : 'all clear'}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Low stock"
+                            tone={
+                                stats.outOfStock > 0
+                                    ? 'critical'
+                                    : stats.lowStock > 0
+                                      ? 'warning'
+                                      : 'success'
+                            }
+                            ariaLabel="View inventory"
+                            onClick={() => props.onTab('inventory')}
                         >
-                            <ChevronLeft className="h-3.5 w-3.5" /> Prev
-                        </GuardrailButton>
-                        <GuardrailButton
-                            unstyled
-                            ref={weekBtnRef}
-                            type="button"
-                            onClick={() => setWeekPickerOpen((v) => !v)}
-                            aria-haspopup="dialog"
-                            aria-expanded={weekPickerOpen}
-                            className={cn(
-                                'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-semibold text-primary-foreground transition focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1 focus-visible:outline-none',
-                                isThisWeek
-                                    ? 'border-primary-foreground/40 bg-primary-foreground/25'
-                                    : 'border-primary-foreground/25 bg-primary-foreground/15 hover:bg-primary-foreground/25',
-                            )}
+                            <PageHeaderMeterBig>
+                                {stats.lowStock}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {stats.outOfStock} out of stock
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        <PageHeaderMeterBlock
+                            label="Overrides"
+                            tone={stats.overrides > 0 ? 'warning' : 'brand'}
+                            ariaLabel="Open the allergen overrides log"
+                            onClick={props.onOpenOverrides}
                         >
-                            <CalendarRange className="h-3.5 w-3.5" />{' '}
-                            {weekLabel} · {rangeStart} → {rangeEnd}
-                            <ChevronsUpDown className="ml-0.5 h-3 w-3 opacity-70" />
-                        </GuardrailButton>
-                        {weekPickerOpen && (
-                            <WeekPicker
-                                selectedWeekStart={props.weekStart}
-                                anchorRef={weekBtnRef}
-                                onSelect={(d) => props.onSelectWeek(d)}
-                                onClose={() => setWeekPickerOpen(false)}
-                                showContextMenu={false}
-                            />
-                        )}
-                        <GuardrailButton
-                            unstyled
-                            type="button"
-                            onClick={props.onNextWeek}
-                            aria-label="Next week"
-                            className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-[12px] font-semibold text-primary-foreground transition hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-1 focus-visible:outline-none"
+                            <PageHeaderMeterBig>
+                                {stats.overrides}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                allergen overrides logged
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    </>
+                ) : (
+                    <>
+                        <PageHeaderMeterBlock
+                            label="Stock at par"
+                            value={`${stats.itemsTracked} items`}
+                            ariaLabel="View inventory"
+                            onClick={() => props.onTab('inventory')}
                         >
-                            Next <ChevronRight className="h-3.5 w-3.5" />
-                        </GuardrailButton>
-                    </div>
-
-                    {sites.length > 1 && (
-                        <div className="flex items-center gap-2 md:justify-end">
-                            <span className="hidden shrink-0 text-[11px] font-medium tracking-wide text-primary-foreground/55 uppercase lg:inline">
-                                Site
-                            </span>
-                            <SiteSearch
-                                sites={sites}
-                                currentSiteId={site.id}
-                                onSelect={props.onSelectSite}
-                            />
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
+                            <PageHeaderMeterBar percent={stats.fillPct} />
+                            <PageHeaderMeterCaption>
+                                {stats.fillPct}% at or above par
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                        {weekCostBlock}
+                        <PageHeaderMeterBlock
+                            label="Low stock"
+                            tone={
+                                stats.outOfStock > 0
+                                    ? 'critical'
+                                    : stats.lowStock > 0
+                                      ? 'warning'
+                                      : 'success'
+                            }
+                            ariaLabel="View inventory"
+                            onClick={() => props.onTab('inventory')}
+                        >
+                            <PageHeaderMeterBig>
+                                {stats.lowStock}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {stats.outOfStock} out of stock
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    </>
+                )
+            }
+            filters={
+                <>
+                    <PageHeaderFilterButton
+                        icon={ChevronLeft}
+                        aria-label="Previous week"
+                        onClick={props.onPrevWeek}
+                    />
+                    <PageHeaderFilterButton
+                        ref={weekBtnRef}
+                        icon={CalendarRange}
+                        aria-haspopup="dialog"
+                        aria-expanded={weekPickerOpen}
+                        onClick={() => setWeekPickerOpen((v) => !v)}
+                        className="tnum"
+                    >
+                        {weekLabel} · {rangeStart} → {rangeEnd}
+                        <ChevronDown className="size-3 opacity-70" />
+                    </PageHeaderFilterButton>
+                    <PageHeaderFilterButton
+                        icon={ChevronRight}
+                        aria-label="Next week"
+                        onClick={props.onNextWeek}
+                    />
+                    {!isThisWeek ? (
+                        <PageHeaderFilterButton onClick={props.onThisWeek}>
+                            Today
+                        </PageHeaderFilterButton>
+                    ) : null}
+                    {weekPickerOpen ? (
+                        <WeekPicker
+                            selectedWeekStart={props.weekStart}
+                            anchorRef={weekBtnRef}
+                            showContextMenu={false}
+                            onSelect={(d) => {
+                                props.onSelectWeek(d);
+                                setWeekPickerOpen(false);
+                            }}
+                            onClose={() => setWeekPickerOpen(false)}
+                        />
+                    ) : null}
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={props.tab}
+                    onSelect={props.onTab}
+                    ariaLabel="Meal planner sections"
+                />
+            }
+        />
     );
 }
 
