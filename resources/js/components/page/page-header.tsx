@@ -544,9 +544,9 @@ export function PageHeaderMeterAvatars({
                 <Tooltip key={person.id}>
                     <TooltipTrigger asChild>
                         {/* span trigger — the whole meter block is already a
-                          * link/button, so no nested interactive element. A
-                          * face click stops there and deep-links to the
-                          * person's profile instead of the block's view. */}
+                         * link/button, so no nested interactive element. A
+                         * face click stops there and deep-links to the
+                         * person's profile instead of the block's view. */}
                         <span
                             onClick={
                                 person.href
@@ -710,6 +710,24 @@ export function PageHeaderMeterDonut({
 
 const FILTER_FIELD =
     'box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70';
+
+/** A filter popover trigger with the same geometry as the dropdown chips. */
+export function PageHeaderFilterButton({
+    className,
+    ...props
+}: ButtonHTMLAttributes<HTMLButtonElement>) {
+    return (
+        <button
+            type="button"
+            {...props}
+            className={cn(
+                FILTER_FIELD,
+                'inline-flex items-center gap-1 border-primary-foreground/20 bg-primary-foreground/10 px-2 text-primary-foreground hover:bg-primary-foreground/20',
+                className,
+            )}
+        />
+    );
+}
 
 /** Glass dropdown filter chip (label + chevron; ✕ clears when active). */
 export function PageHeaderFilterSelect({
@@ -912,6 +930,8 @@ export function PageHeaderRail<K extends string>({
     onSelect,
     onFind,
     ariaLabel = 'Views',
+    onItemContextMenu,
+    decorations,
 }: {
     items: PageHeaderRailItem<K>[];
     value: K;
@@ -920,6 +940,8 @@ export function PageHeaderRail<K extends string>({
      *  page's section palette (profile pages; `/` is its shortcut). */
     onFind?: () => void;
     ariaLabel?: string;
+    onItemContextMenu?: (key: K, event: React.MouseEvent) => void;
+    decorations?: Partial<Record<K, ReactNode>>;
 }) {
     return (
         <div
@@ -937,6 +959,11 @@ export function PageHeaderRail<K extends string>({
                         role="tab"
                         aria-selected={on}
                         onClick={() => onSelect(it.key)}
+                        onContextMenu={
+                            onItemContextMenu
+                                ? (event) => onItemContextMenu(it.key, event)
+                                : undefined
+                        }
                         className={cn(
                             'inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80',
                             on
@@ -951,6 +978,7 @@ export function PageHeaderRail<K extends string>({
                     >
                         {Icon ? <Icon className="size-[15px]" /> : null}
                         <span>{it.label}</span>
+                        {decorations?.[it.key]}
                         {it.count != null ? (
                             <span
                                 className={cn(

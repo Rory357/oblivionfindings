@@ -3,6 +3,26 @@ import { describe, expect, it } from 'vitest';
 import { buildNavSearchCatalog, isIconActive } from './app-sidebar';
 
 describe('app sidebar workforce navigation', () => {
+    it('keeps IT destinations in the app sidebar without duplicating tabs or device navigation', () => {
+        const catalog = buildNavSearchCatalog({
+            can: { it: { view: true, request: true, manage: true } },
+        }).filter((item) => item.section === 'IT & Support');
+        expect(catalog.map((item) => item.href)).toEqual([
+            '/it',
+            '/it/problems',
+            '/it/changes',
+            '/it/major-incidents',
+            '/it/setup',
+        ]);
+    });
+
+    it('keeps requester navigation out of technician workspaces', () => {
+        const catalog = buildNavSearchCatalog({
+            can: { it: { request: true } },
+        }).filter((item) => item.section === 'IT & Support');
+        expect(catalog.map((item) => item.href)).toEqual(['/it']);
+    });
+
     it('uses the grouped Security & Devices contract in application search', () => {
         const catalog = buildNavSearchCatalog({
             can: {

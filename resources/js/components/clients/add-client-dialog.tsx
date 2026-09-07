@@ -945,7 +945,7 @@ function AddClientBody({
     return (
         <div className="flex h-[min(92vh,860px)] min-h-0 overflow-hidden">
             {/* ── Stepper rail ── */}
-            <aside className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 sm:flex">
+            <aside className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex">
                 <div className="mb-3 flex items-center gap-2.5">
                     <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
                         {isEditMode ? (

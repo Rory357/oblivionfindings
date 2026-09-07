@@ -1,8 +1,13 @@
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 /* eslint-disable no-restricted-syntax -- The IT & Support hub mirrors the
  * gold-standard HR hubs: bespoke table rows, hero stat chips and context-menu
  * triggers built from styled native elements. Every colour is a semantic
  * design token. */
-import { HrTabs, useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
+import { useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
 import { useLeaveContextMenu } from '@/components/hr/leave-context-menu';
 import { CsatRater } from '@/components/it/csat';
 import { ItHero } from '@/components/it/it-hero';
@@ -52,6 +57,13 @@ import {
     waitingStatusLabel,
 } from '@/components/it/ticket-waiting-dialog';
 import { WorkflowTemplateDestination } from '@/components/it/workflow-template-destination';
+import {
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+} from '@/components/page/page-header';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -109,7 +121,6 @@ import {
     Play,
     Plus,
     RotateCcw,
-    Search,
     Send,
     Server,
     Star,
@@ -118,7 +129,6 @@ import {
     Ticket,
     Timer,
     UserCog,
-    X,
     XCircle,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -268,7 +278,10 @@ interface ProvisioningWorkflowRow {
     progress: { total: number; completed: number; failed: number };
 }
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'IT & Support', href: '/it' }];
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'IT & Support', href: '/it' },
+];
 
 /** Sentinel — Radix <SelectItem value=""> crashes at runtime. */
 const ALL = 'all';
@@ -1525,23 +1538,290 @@ export default function ItIndex({
             </Dialog>
 
             <ItModuleShell>
-                <div className="flex flex-col gap-5 p-4 sm:p-6">
+                <div className="flex flex-col gap-5">
                     <ItHero
                         summary={summary}
                         can={can}
                         onRaise={() => setModal({ type: 'raise' })}
                         onLog={() => setModal({ type: 'ticket' })}
-                    />
+                        actions={
+                            can.view &&
+                            tab === 'tickets' &&
+                            can.edit_sla &&
+                            slaPolicies ? (
+                                <PageHeaderGlassButton
+                                    onClick={() => setModal({ type: 'sla' })}
+                                >
+                                    SLA policies
+                                </PageHeaderGlassButton>
+                            ) : undefined
+                        }
+                        search={
+                            can.view && tab === 'tickets' ? (
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder="Search reference, title, requester…"
+                                />
+                            ) : !can.view &&
+                              can.request &&
+                              tab === 'knowledge' ? (
+                                <PageHeaderSearch
+                                    value={kbSearch}
+                                    onChange={setKbSearch}
+                                    placeholder="Search the knowledge base…"
+                                />
+                            ) : undefined
+                        }
+                        filters={
+                            can.view && tab === 'tickets' ? (
+                                <>
+                                    <PageHeaderFilterSelect
+                                        label="Queue"
+                                        value={filters?.view ?? ALL}
+                                        allValue={ALL}
+                                        options={TICKET_VIEWS.map((v) => ({
+                                            value: v.key,
+                                            label:
+                                                v.label +
+                                                ' (' +
+                                                (summary.tickets?.views[
+                                                    v.key
+                                                ] ?? 0) +
+                                                ')',
+                                        }))}
+                                        onChange={(v) =>
+                                            v === ALL
+                                                ? clearTicketFilters()
+                                                : applyView(v)
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Status"
+                                        value={filters?.ticket_status ?? ALL}
+                                        allValue={ALL}
+                                        options={TICKET_STATUSES.map((v) => ({
+                                            value: v,
+                                            label: label(v),
+                                        }))}
+                                        onChange={(v) =>
+                                            applyFilter('ticket_status', v)
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Priority"
+                                        value={filters?.ticket_priority ?? ALL}
+                                        allValue={ALL}
+                                        options={TICKET_PRIORITIES.map((v) => ({
+                                            value: v,
+                                            label: label(v),
+                                        }))}
+                                        onChange={(v) =>
+                                            applyFilter('ticket_priority', v)
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Category"
+                                        value={filters?.ticket_category ?? ALL}
+                                        allValue={ALL}
+                                        options={TICKET_CATEGORIES.map((v) => ({
+                                            value: v,
+                                            label: label(v),
+                                        }))}
+                                        onChange={(v) =>
+                                            applyFilter('ticket_category', v)
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="SLA"
+                                        value={filters?.sla ?? ALL}
+                                        allValue={ALL}
+                                        options={SLA_STATES.map((v) => ({
+                                            value: v,
+                                            label: label(v),
+                                        }))}
+                                        onChange={(v) => applyFilter('sla', v)}
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Site"
+                                        value={
+                                            filters?.site_id != null
+                                                ? String(filters.site_id)
+                                                : ALL
+                                        }
+                                        allValue={ALL}
+                                        options={siteOptions.map((v) => ({
+                                            value: String(v.id),
+                                            label: v.name,
+                                        }))}
+                                        onChange={(v) =>
+                                            applyFilter('site_id', v)
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Assignee"
+                                        value={
+                                            filters?.assignee != null
+                                                ? String(filters.assignee)
+                                                : ALL
+                                        }
+                                        allValue={ALL}
+                                        options={assignees.map((v) => ({
+                                            value: String(v.id),
+                                            label: v.name,
+                                        }))}
+                                        onChange={(v) =>
+                                            applyFilter('assignee', v)
+                                        }
+                                    />
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <PageHeaderFilterButton>
+                                                More filters
+                                            </PageHeaderFilterButton>
+                                        </PopoverTrigger>
+                                        <PopoverContent
+                                            align="end"
+                                            className="w-[min(92vw,480px)] space-y-3"
+                                        >
+                                            <DateRange
+                                                from={filters?.from ?? ''}
+                                                to={filters?.to ?? ''}
+                                                onChange={(k, val) =>
+                                                    applyFilter(k, val)
+                                                }
+                                            />
+                                            <TicketAdvancedFilters
+                                                values={{
+                                                    source:
+                                                        filters?.source ?? null,
+                                                    workType:
+                                                        filters?.work_type ??
+                                                        null,
+                                                    service:
+                                                        filters?.service ??
+                                                        null,
+                                                    age: filters?.age ?? null,
+                                                    missing:
+                                                        filters?.missing ??
+                                                        null,
+                                                    reopened:
+                                                        filters?.reopened ??
+                                                        false,
+                                                    firstContact:
+                                                        filters?.first_contact ??
+                                                        false,
+                                                    openOnly:
+                                                        filters?.open_only ??
+                                                        false,
+                                                    deviceLinked:
+                                                        filters?.device_linked ??
+                                                        false,
+                                                    resolvedFrom:
+                                                        filters?.resolved_from ??
+                                                        null,
+                                                    resolvedTo:
+                                                        filters?.resolved_to ??
+                                                        null,
+                                                }}
+                                                services={serviceOptions}
+                                                onChange={(key, value) =>
+                                                    navigate({ [key]: value })
+                                                }
+                                                onClear={
+                                                    clearAdvancedTicketFilters
+                                                }
+                                            />
 
-                    <HrTabs
-                        value={tab}
-                        onChange={setTab}
-                        items={tabItems}
-                        ariaLabel="IT views"
-                        onItemContextMenu={tabMenu}
-                        decorations={tabDecorations}
+                                            <TicketSavedFilters
+                                                filters={savedTicketFilters}
+                                                activeId={
+                                                    activeSavedTicketFilterId
+                                                }
+                                                currentFilters={
+                                                    currentTicketFilters
+                                                }
+                                                canSave={ticketFiltersActive}
+                                                onApply={applySavedTicketFilter}
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                </>
+                            ) : can.view && tab === 'provisioning' ? (
+                                <>
+                                    <PageHeaderFilterSelect
+                                        label="Status"
+                                        value={filters?.status ?? ALL}
+                                        allValue={ALL}
+                                        options={REQUEST_STATUSES.map((v) => ({
+                                            value: v,
+                                            label: label(v),
+                                        }))}
+                                        onChange={(v) =>
+                                            applyFilter('status', v)
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Type"
+                                        value={filters?.type ?? ALL}
+                                        allValue={ALL}
+                                        options={REQUEST_TYPES.map((v) => ({
+                                            value: v,
+                                            label: label(v),
+                                        }))}
+                                        onChange={(v) => applyFilter('type', v)}
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Assignee"
+                                        value={
+                                            filters?.assignee != null
+                                                ? String(filters.assignee)
+                                                : ALL
+                                        }
+                                        allValue={ALL}
+                                        options={assignees.map((v) => ({
+                                            value: String(v.id),
+                                            label: v.name,
+                                        }))}
+                                        onChange={(v) =>
+                                            applyFilter('assignee', v)
+                                        }
+                                    />
+                                </>
+                            ) : !can.view &&
+                              can.request &&
+                              tab === 'knowledge' ? (
+                                <PageHeaderFilterSelect
+                                    label="Category"
+                                    value={kbCategory}
+                                    allValue={ALL}
+                                    options={TICKET_CATEGORIES.map((v) => ({
+                                        value: v,
+                                        label: label(v),
+                                    }))}
+                                    onChange={setKbCategory}
+                                />
+                            ) : undefined
+                        }
+                        rail={
+                            <PageHeaderRail
+                                value={tab}
+                                onSelect={setTab}
+                                items={tabItems.map((item) => ({
+                                    key: item.id,
+                                    label: item.label,
+                                    icon: item.icon,
+                                    count:
+                                        typeof item.badge === 'number'
+                                            ? item.badge
+                                            : undefined,
+                                }))}
+                                ariaLabel="IT views"
+                                onItemContextMenu={tabMenu}
+                                decorations={tabDecorations}
+                            />
+                        }
                     />
-
                     {/* ── Overview (agents) ── */}
                     {can.view &&
                         tab === 'overview' &&
@@ -1729,29 +2009,6 @@ export default function ItIndex({
                                 </p>
                             </section>
                             <div className="flex flex-wrap items-center gap-2">
-                                <FilterSelect
-                                    ariaLabel="Filter by status"
-                                    value={filters?.status ?? ALL}
-                                    onChange={(v) => applyFilter('status', v)}
-                                    allLabel="All statuses"
-                                    options={REQUEST_STATUSES}
-                                />
-                                <FilterSelect
-                                    ariaLabel="Filter by type"
-                                    value={filters?.type ?? ALL}
-                                    onChange={(v) => applyFilter('type', v)}
-                                    allLabel="All types"
-                                    options={REQUEST_TYPES}
-                                />
-                                <AssigneeFilter
-                                    value={
-                                        filters?.assignee != null
-                                            ? String(filters.assignee)
-                                            : ALL
-                                    }
-                                    onChange={(v) => applyFilter('assignee', v)}
-                                    assignees={assignees}
-                                />
                                 <div className="ml-auto flex items-center gap-2">
                                     <Button asChild size="sm" variant="outline">
                                         <a
@@ -2092,184 +2349,6 @@ export default function ItIndex({
                     {/* ── Ticket queue (agents) ── */}
                     {can.view && tab === 'tickets' && (
                         <>
-                            {/* Canonical queue views — counts from the all-time summary. */}
-                            <div
-                                className="flex flex-wrap items-center gap-1.5"
-                                aria-label="Predefined ticket views"
-                            >
-                                {TICKET_VIEWS.map((v) => {
-                                    const activeView = filters?.view === v.key;
-                                    const count =
-                                        summary.tickets?.views[v.key] ?? 0;
-                                    return (
-                                        <button
-                                            key={v.key}
-                                            type="button"
-                                            aria-pressed={activeView}
-                                            onClick={() => applyView(v.key)}
-                                            className={
-                                                activeView
-                                                    ? 'inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary px-3 py-1 text-[12px] font-semibold text-primary-foreground'
-                                                    : 'inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground'
-                                            }
-                                        >
-                                            {v.label}
-                                            <span
-                                                className={
-                                                    activeView
-                                                        ? 'rounded-full bg-white/20 px-1.5 text-[11px] font-bold tabular-nums'
-                                                        : 'rounded-full bg-muted px-1.5 text-[11px] font-bold text-muted-foreground tabular-nums'
-                                                }
-                                            >
-                                                {count}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            <TicketSavedFilters
-                                filters={savedTicketFilters}
-                                activeId={activeSavedTicketFilterId}
-                                currentFilters={currentTicketFilters}
-                                canSave={ticketFiltersActive}
-                                onApply={applySavedTicketFilter}
-                            />
-
-                            {/* Toolbar — search + filters */}
-                            <div className="flex flex-wrap items-center gap-2">
-                                <div className="relative">
-                                    <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                                    <input
-                                        type="search"
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        placeholder="Search reference, title, requester…"
-                                        aria-label="Search tickets"
-                                        className="h-8 w-[248px] rounded-md border border-border bg-card pr-7 pl-8 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    />
-                                    {search ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => setSearch('')}
-                                            aria-label="Clear search"
-                                            className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    ) : null}
-                                </div>
-                                <FilterSelect
-                                    ariaLabel="Filter by ticket status"
-                                    value={filters?.ticket_status ?? ALL}
-                                    onChange={(v) =>
-                                        applyFilter('ticket_status', v)
-                                    }
-                                    allLabel="All statuses"
-                                    options={TICKET_STATUSES}
-                                />
-                                <FilterSelect
-                                    ariaLabel="Filter by priority"
-                                    value={filters?.ticket_priority ?? ALL}
-                                    onChange={(v) =>
-                                        applyFilter('ticket_priority', v)
-                                    }
-                                    allLabel="All priorities"
-                                    options={TICKET_PRIORITIES}
-                                />
-                                <FilterSelect
-                                    ariaLabel="Filter by category"
-                                    value={filters?.ticket_category ?? ALL}
-                                    onChange={(v) =>
-                                        applyFilter('ticket_category', v)
-                                    }
-                                    allLabel="All categories"
-                                    options={TICKET_CATEGORIES}
-                                />
-                                <FilterSelect
-                                    ariaLabel="Filter by SLA state"
-                                    value={filters?.sla ?? ALL}
-                                    onChange={(v) => applyFilter('sla', v)}
-                                    allLabel="Any SLA state"
-                                    options={SLA_STATES}
-                                />
-                                <SiteFilter
-                                    value={
-                                        filters?.site_id != null
-                                            ? String(filters.site_id)
-                                            : ALL
-                                    }
-                                    onChange={(v) => applyFilter('site_id', v)}
-                                    sites={siteOptions}
-                                />
-                                <AssigneeFilter
-                                    value={
-                                        filters?.assignee != null
-                                            ? String(filters.assignee)
-                                            : ALL
-                                    }
-                                    onChange={(v) => applyFilter('assignee', v)}
-                                    assignees={assignees}
-                                />
-                                <DateRange
-                                    from={filters?.from ?? ''}
-                                    to={filters?.to ?? ''}
-                                    onChange={(k, val) => applyFilter(k, val)}
-                                />
-                                <TicketAdvancedFilters
-                                    values={{
-                                        source: filters?.source ?? null,
-                                        workType: filters?.work_type ?? null,
-                                        service: filters?.service ?? null,
-                                        age: filters?.age ?? null,
-                                        missing: filters?.missing ?? null,
-                                        reopened: filters?.reopened ?? false,
-                                        firstContact:
-                                            filters?.first_contact ?? false,
-                                        openOnly: filters?.open_only ?? false,
-                                        deviceLinked:
-                                            filters?.device_linked ?? false,
-                                        resolvedFrom:
-                                            filters?.resolved_from ?? null,
-                                        resolvedTo:
-                                            filters?.resolved_to ?? null,
-                                    }}
-                                    services={serviceOptions}
-                                    onChange={(key, value) =>
-                                        navigate({ [key]: value })
-                                    }
-                                    onClear={clearAdvancedTicketFilters}
-                                />
-                                <div className="ml-auto flex items-center gap-2">
-                                    {can.manage ? (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                setModal({ type: 'ticket' })
-                                            }
-                                        >
-                                            <Plus className="h-3.5 w-3.5" /> Log
-                                            ticket
-                                        </Button>
-                                    ) : null}
-                                    {can.edit_sla && slaPolicies ? (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                setModal({ type: 'sla' })
-                                            }
-                                        >
-                                            <Timer className="h-3.5 w-3.5" />{' '}
-                                            SLA targets
-                                        </Button>
-                                    ) : null}
-                                </div>
-                            </div>
-
                             {/* Bulk action bar — appears when rows are selected */}
                             {can.manage && ticketSel.selected.size > 0 ? (
                                 <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 shadow-sm">
@@ -2832,29 +2911,6 @@ export default function ItIndex({
                     {/* ── Knowledge browse (requesters) ── */}
                     {!can.view && can.request && tab === 'knowledge' && (
                         <>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <div className="relative">
-                                    <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                                    <input
-                                        type="search"
-                                        value={kbSearch}
-                                        onChange={(e) =>
-                                            setKbSearch(e.target.value)
-                                        }
-                                        placeholder="Search the knowledge base…"
-                                        aria-label="Search articles"
-                                        className="h-8 w-[260px] rounded-md border border-border bg-card pr-3 pl-8 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    />
-                                </div>
-                                <FilterSelect
-                                    ariaLabel="Filter by category"
-                                    value={kbCategory}
-                                    onChange={setKbCategory}
-                                    allLabel="All categories"
-                                    options={TICKET_CATEGORIES}
-                                />
-                            </div>
-
                             {filteredKb.length === 0 ? (
                                 <div className="overflow-hidden rounded-2xl border border-border bg-card">
                                     <EmptyState
@@ -2960,94 +3016,6 @@ function useRowSelection(pageIds: number[]) {
             pageIds.length > 0 && pageIds.every((id) => selected.has(id)),
         someOnPage: pageIds.some((id) => selected.has(id)),
     };
-}
-
-function FilterSelect({
-    ariaLabel,
-    value,
-    onChange,
-    allLabel,
-    options,
-}: {
-    ariaLabel: string;
-    value: string;
-    onChange: (v: string) => void;
-    allLabel: string;
-    options: string[];
-}) {
-    return (
-        <Select value={value} onValueChange={onChange}>
-            <SelectTrigger className="h-8 w-[160px]" aria-label={ariaLabel}>
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value={ALL}>{allLabel}</SelectItem>
-                {options.map((o) => (
-                    <SelectItem key={o} value={o}>
-                        {label(o)}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-    );
-}
-
-function AssigneeFilter({
-    value,
-    onChange,
-    assignees,
-}: {
-    value: string;
-    onChange: (v: string) => void;
-    assignees: AssigneeOption[];
-}) {
-    return (
-        <Select value={value} onValueChange={onChange}>
-            <SelectTrigger
-                className="h-8 w-[180px]"
-                aria-label="Filter by assignee"
-            >
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value={ALL}>All assignees</SelectItem>
-                {assignees.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>
-                        {a.name}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-    );
-}
-
-function SiteFilter({
-    value,
-    onChange,
-    sites,
-}: {
-    value: string;
-    onChange: (v: string) => void;
-    sites: SiteOption[];
-}) {
-    return (
-        <Select value={value} onValueChange={onChange}>
-            <SelectTrigger
-                className="h-8 w-[180px]"
-                aria-label="Filter by Site"
-            >
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value={ALL}>All accessible Sites</SelectItem>
-                {sites.map((site) => (
-                    <SelectItem key={site.id} value={String(site.id)}>
-                        {site.name}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-    );
 }
 
 /** Created-date range — two native pickers feeding the `from`/`to` params. */

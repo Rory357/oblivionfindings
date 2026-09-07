@@ -136,7 +136,9 @@ function readStoredGroupIds(): string[] {
         const raw = window.localStorage.getItem(SIDEBAR_GROUPS_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
         return Array.isArray(parsed)
-            ? parsed.filter((value): value is string => typeof value === 'string')
+            ? parsed.filter(
+                  (value): value is string => typeof value === 'string',
+              )
             : [];
     } catch {
         return [];
@@ -305,6 +307,10 @@ export function isIconActive(
 }
 
 function isSubItemActive(currentUrl: string, href: NavItem['href']): boolean {
+    if (resolveUrl(href) === '/it') {
+        const path = normalizePath(resolveUrl(currentUrl));
+        return path === '/it' || path.startsWith('/it/tickets/');
+    }
     return matchScore(currentUrl, href) > 0;
 }
 
@@ -649,7 +655,7 @@ function buildIconNavItems({
             id: 'it-provisioning',
             icon: Server,
             label: 'IT & Support',
-            href: '/it',
+            subPanel: true,
         });
     }
 
@@ -778,6 +784,40 @@ function buildIconNavItems({
 }
 
 // ── Build sub-panel groups for each section ──────────────────────────────
+
+function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    if (!can?.it?.view && !can?.it?.request) return [];
+    return [
+        {
+            label: 'IT & Support',
+            items: [
+                { title: 'Service desk', href: '/it', icon: Server },
+                ...(can?.it?.view
+                    ? [
+                          {
+                              title: 'Problems',
+                              href: '/it/problems',
+                              icon: Server,
+                          },
+                          {
+                              title: 'Changes',
+                              href: '/it/changes',
+                              icon: Server,
+                          },
+                          {
+                              title: 'Major incidents',
+                              href: '/it/major-incidents',
+                              icon: Server,
+                          },
+                      ]
+                    : []),
+                ...(can?.it?.manage
+                    ? [{ title: 'Setup', href: '/it/setup', icon: Settings }]
+                    : []),
+            ],
+        },
+    ];
+}
 
 function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const items: NavItem[] = [
@@ -2681,9 +2721,7 @@ function InlineSubPanelGroups({
                                         <span className="min-w-0 flex-1 truncate">
                                             {subItem.title}
                                         </span>
-                                        <CountPill
-                                            count={subItem.badge ?? 0}
-                                        />
+                                        <CountPill count={subItem.badge ?? 0} />
                                     </Link>
                                 );
                             })}
@@ -2734,6 +2772,7 @@ export function AppSidebar({
 
     const subPanelMap = useMemo(
         () => ({
+            'it-provisioning': buildItSubPanelGroups({ can }),
             sites: buildSitesSubPanelGroups({ can }),
             operations: buildOperationsSubPanelGroups({
                 can,
@@ -3134,6 +3173,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
 
     const mobileSubPanelMap = useMemo(
         () => ({
+            'it-provisioning': buildItSubPanelGroups({ can }),
             sites: buildSitesSubPanelGroups({ can }),
             operations: buildOperationsSubPanelGroups({
                 can,
@@ -3334,6 +3374,7 @@ export function buildNavSearchCatalog(ctx: {
     });
 
     const subPanelMap: Record<string, SubPanelGroup[]> = {
+        'it-provisioning': buildItSubPanelGroups({ can }),
         sites: buildSitesSubPanelGroups({ can }),
         operations: buildOperationsSubPanelGroups({
             can,
