@@ -14,7 +14,13 @@ interface PageLayoutProps {
     children?: ReactNode;
     /** Content container width. */
     width?: 'full' | 'narrow' | 'wide';
-    /** Outer padding around the layout. Default: 'p-6'. */
+    /**
+     * Outer padding around the layout. Default: 'none' — inside the app
+     * shell, the shell already owns the single 20px chrome-to-content
+     * gutter (approved 2026-09-05; see APP_SHELL_STYLE_GUIDE.md §4), so
+     * PageLayout must not stack its own outer padding on top. Only pass a
+     * value on surfaces outside the shell (e.g. marketing/careers pages).
+     */
     padding?: 'none' | 'sm' | 'md' | 'lg';
     className?: string;
 }
@@ -37,13 +43,16 @@ export function PageLayout({
     tabs,
     children,
     width = 'full',
-    padding = 'md',
+    padding = 'none',
     className,
 }: PageLayoutProps) {
     return (
         <div
             className={cn(
-                'flex w-full flex-col gap-6',
+                // 20px rhythm between sections (hero → tabs → content) — the
+                // approved shell spacing (APP_SHELL_STYLE_GUIDE.md §4): 20px
+                // everywhere between chrome, sections, and cards.
+                'flex w-full flex-col gap-5',
                 PADDING[padding],
                 className,
             )}

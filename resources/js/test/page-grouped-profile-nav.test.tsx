@@ -158,37 +158,19 @@ describe('grouped profile navigation', () => {
         expect(onTab).toHaveBeenCalledWith('inspections');
     });
 
-    it('pins and unpins tabs without changing the active tab', () => {
-        const onTab = vi.fn();
-        const onPinnedTabsChange = vi.fn();
-        const { rerender } = render(
+    it('never renders pin affordances on the sub-tab strip', () => {
+        render(
             <TierTwoTabs
                 tabs={groups[1].tabs}
                 activeTab="hazards"
-                onTab={onTab}
+                onTab={vi.fn()}
                 renderLink={() => null}
                 testIdPrefix="site-profile"
-                pinnedTabs={[]}
-                onPinnedTabsChange={onPinnedTabsChange}
             />,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Pin Hazards' }));
-        expect(onPinnedTabsChange).toHaveBeenCalledWith(['hazards']);
-        expect(onTab).not.toHaveBeenCalled();
-
-        rerender(
-            <TierTwoTabs
-                tabs={groups[1].tabs}
-                activeTab="hazards"
-                onTab={onTab}
-                renderLink={() => null}
-                testIdPrefix="site-profile"
-                pinnedTabs={['hazards']}
-                onPinnedTabsChange={onPinnedTabsChange}
-            />,
-        );
-        fireEvent.click(screen.getByRole('button', { name: 'Unpin Hazards' }));
-        expect(onPinnedTabsChange).toHaveBeenLastCalledWith([]);
+        expect(
+            screen.queryByRole('button', { name: /pin/i }),
+        ).not.toBeInTheDocument();
     });
 });

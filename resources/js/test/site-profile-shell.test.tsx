@@ -8,11 +8,12 @@ const source = readFileSync(showPage, 'utf8');
 describe('site profile shell ownership', () => {
     it('is a slim dedicated Site Profile orchestrator', () => {
         expect(statSync(showPage).size).toBeLessThan(60_000);
-        expect(source).toContain('SiteProfileHero');
-        expect(source).toContain('SiteProfileAlertRibbon');
+        expect(source).toContain('<PageHeader');
+        expect(source).toContain('variant="profile"');
         expect(source).toContain('SiteProfileDialogHost');
         expect(source).toContain('testIdPrefix="site-profile"');
         expect(source).not.toContain('import { PageHero');
+        expect(source).not.toContain('SiteProfileAlertRibbon');
     });
 
     it('loads one optional tab prop without scroll-driven navigation', () => {

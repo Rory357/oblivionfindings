@@ -213,7 +213,7 @@ routes/catering.php
 - **Pre-deploy checks:** `npm run types` (tsc) + `npm run build` (vite). `vite build`
   doesn't type-check, so run both.
 - **App reference docs:** `docs/MEAL_PLANNER_PLAN.md`, `design_styles/POPUP_STYLE_GUIDE.md`,
-  `design_styles/DESIGN_TOKENS.md`, `design_styles/GOVERNANCE_HERO_GUIDE.md`.
+  `design_styles/DESIGN_TOKENS.md`, `design_styles/PAGE_HEADER_STYLE_GUIDE.md`.
 - **Memory:** see `memory/project_meal_planner_redesign.md`.
 
 ---

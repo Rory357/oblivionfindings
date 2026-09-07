@@ -2,9 +2,12 @@
 
 namespace App\Services\Sites;
 
+use App\Enums\ServiceType;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Site;
+use App\Models\SiteChecklistRun;
+use App\Models\SiteHazard;
 use App\Models\User;
 use App\Models\UserUiPreference;
 use App\Services\Sites\Profile\SiteProfileAdminPresenter;
@@ -157,19 +160,119 @@ class SiteProfileData
         array $attention,
         array $occupancy,
     ): array {
-        $avatars = $this->canViewClients($user) && $site->type !== 'head_office'
-            ? $site->clients()
+        // The kind of support delivered here, from the ACTIVE service
+        // contexts' types rolled up to their ServiceType categories
+        // ("Respite", "Residential", …) for the identity subline.
+        // pluck('type') honours the model's enum cast, so rows arrive as
+        // ServiceType instances (legacy/unknown values arrive as strings).
+        $supportTypes = $site->serviceContexts()
+            ->where('is_active', true)
+            ->pluck('type')
+            ->map(fn ($type) => $type instanceof ServiceType
+                ? $type->category()
+                : ServiceType::tryFrom((string) $type)?->category())
+            ->filter()
+            ->unique()
+            ->values();
+
+        // Header meter blocks only render numbers with a real source the
+        // viewer may open — null drops the block instead of faking it
+        // (PAGE_HEADER_STYLE_GUIDE.md §5).
+        $people = null;
+        if ($this->canViewClients($user) && $site->type !== 'head_office') {
+            $roomNames = in_array($site->type, ['house', 'residential'], true)
+                ? $site->houseRooms()
+                    ->active()
+                    ->whereNotNull('assigned_client_id')
+                    ->pluck('name', 'assigned_client_id')
+                : collect();
+            $residents = $site->clients()
                 ->whereIn('status', ['active', 'onboarding'])
                 ->orderBy('first_name')
-                ->limit(5)
-                ->get(['id', 'first_name', 'last_name', 'preferred_name', 'profile_photo_path'])
-                ->map(fn (Client $client) => [
+                ->get(['id', 'first_name', 'last_name', 'preferred_name', 'profile_photo_path', 'status']);
+
+            $people = [
+                'count' => $residents->count(),
+                'avatars' => $residents->take(12)->map(fn (Client $client) => [
                     'id' => $client->id,
                     'name' => $client->full_name,
-                    'profile_photo_url' => $client->profile_photo_url,
-                ])->values()
-            : collect();
+                    'photo_url' => $client->profile_photo_url,
+                    'detail' => collect([
+                        ucfirst((string) $client->status),
+                        $roomNames[$client->id] ?? null,
+                    ])->filter()->implode(' · '),
+                    'href' => route('clients.show', $client),
+                ])->values()->all(),
+            ];
+        }
 
+        // Hazards: the open register count plus hazards REPORTED per day over
+        // the last 7 days for the sparkline (same instrumentation as the
+        // sites index header).
+        $openHazards = null;
+        if ($user->canDo('hazards.view')) {
+            $trendStart = now()->subDays(6)->startOfDay();
+            $reportedByDay = SiteHazard::query()
+                ->where('site_id', $site->id)
+                ->where('created_at', '>=', $trendStart)
+                ->selectRaw('DATE(created_at) as day, COUNT(*) as reported')
+                ->groupBy('day')
+                ->pluck('reported', 'day');
+            $trend = [];
+            for ($daysAgo = 6; $daysAgo >= 0; $daysAgo--) {
+                $trend[] = (int) ($reportedByDay[now()->subDays($daysAgo)->toDateString()] ?? 0);
+            }
+
+            $openHazards = [
+                'open' => SiteHazard::query()
+                    ->where('site_id', $site->id)
+                    ->whereIn('status', ['open', 'in_progress', 'reopened'])
+                    ->count(),
+                'trend' => $trend,
+            ];
+        }
+
+        // Checklists: overdue runs plus on-time completion over the last
+        // 90 days for the donut (mirrors the index header's fraction).
+        $checks = null;
+        if ($user->canDo('checklists.view')) {
+            $checksWindow = [now()->subDays(90)->toDateString(), now()->toDateString()];
+            $checksTotal = SiteChecklistRun::query()
+                ->where('site_id', $site->id)
+                ->whereBetween('scheduled_date', $checksWindow)
+                ->count();
+            $checksOnTime = $checksTotal > 0
+                ? SiteChecklistRun::query()
+                    ->where('site_id', $site->id)
+                    ->whereBetween('scheduled_date', $checksWindow)
+                    ->where('status', 'completed')
+                    ->whereRaw('DATE(completed_at) <= scheduled_date')
+                    ->count()
+                : 0;
+
+            $checks = [
+                'overdue' => SiteChecklistRun::query()
+                    ->where('site_id', $site->id)
+                    ->whereDate('scheduled_date', '<', now()->toDateString())
+                    ->whereIn('status', ['scheduled', 'in_progress', 'overdue'])
+                    ->count(),
+                'on_time' => $checksOnTime,
+                'total' => $checksTotal,
+                'percent' => $checksTotal > 0
+                    ? (int) round(($checksOnTime / $checksTotal) * 100)
+                    : null,
+            ];
+        }
+
+        $peopleNoun = match ($site->type) {
+            'house', 'residential' => 'Resident',
+            'facility' => 'Attendee',
+            default => 'Client',
+        };
+
+        // Every quick action must land somewhere that WORKS for this viewer:
+        // each is gated on the permission its destination enforces, and the
+        // deep-linked ones (?action=…) auto-open their dialog on arrival.
         $quickActions = collect($site->archived ? [] : [
             $permissions['site.update'] ? [
                 'id' => 'edit_site',
@@ -178,9 +281,16 @@ class SiteProfileData
             ] : null,
             $permissions['clients.create'] && $site->type !== 'head_office' ? [
                 'id' => 'add_client',
-                'label' => 'Add Client',
+                'label' => "Add {$peopleNoun}",
                 'href' => route('clients.create', ['site_id' => $site->id]),
             ] : null,
+            ($permissions['clients.viewAny'] || $permissions['clients.viewAssigned'])
+                && $permissions['clients.assignments.update']
+                && $site->type !== 'head_office' ? [
+                    'id' => 'link_resident',
+                    'label' => "Link {$peopleNoun}",
+                    'href' => route('sites.show', [$site, 'tab' => 'clients', 'action' => 'link']),
+                ] : null,
             $permissions['calendar.create'] ? [
                 'id' => 'add_calendar_event',
                 'label' => 'Add Event',
@@ -191,12 +301,28 @@ class SiteProfileData
                 'label' => 'Report Hazard',
                 'href' => route('sites.hazards.create', $site),
             ] : null,
+            $user->canDo('checklists.run') ? [
+                'id' => 'start_checklist',
+                'label' => 'Start Checklist',
+                'href' => route('sites.checklists.index', $site),
+            ] : null,
+            $user->canDo('checklists.schedule') ? [
+                'id' => 'book_inspection',
+                'label' => 'Book Inspection',
+                'href' => route('sites.inspections.index', [$site, 'action' => 'add']),
+            ] : null,
+            $permissions['site.update'] ? [
+                'id' => 'add_document',
+                'label' => 'Add Document',
+                'href' => route('sites.show', [$site, 'tab' => 'documents', 'action' => 'upload']),
+            ] : null,
         ])->filter()->values();
 
         return [
             'eyebrow' => $site->display_type,
             'title' => $site->name,
             'description' => $site->address ?: 'Address not yet recorded',
+            'support_types' => $supportTypes->all(),
             'brand_colour' => $site->brand_colour,
             'status' => $site->archived ? 'archived' : ($site->is_active ? 'active' : 'inactive'),
             'readiness' => [
@@ -205,7 +331,9 @@ class SiteProfileData
             ],
             'attention' => $attention['summary'],
             'occupancy' => $occupancy,
-            'avatars' => $avatars,
+            'people' => $people,
+            'open_hazards' => $openHazards,
+            'checks' => $checks,
             'quick_actions' => $quickActions,
         ];
     }

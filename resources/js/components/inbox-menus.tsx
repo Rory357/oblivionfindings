@@ -14,6 +14,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 import { Link, router, usePage } from '@inertiajs/react';
 import { ArrowRight, Bell, BellOff, Megaphone } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -44,10 +45,28 @@ type InboxPayload = {
     };
 };
 
-function UnreadBadge({ count }: { count: number }) {
+/**
+ * Badge semantics (APP_SHELL_STYLE_GUIDE.md §2 — never swap them):
+ * red = alerts needing attention (the bell); violet/primary = content
+ * waiting to be read (announcements, messages).
+ */
+function UnreadBadge({
+    count,
+    variant = 'critical',
+}: {
+    count: number;
+    variant?: 'critical' | 'primary';
+}) {
     if (!count) return null;
     return (
-        <span className="absolute -top-1 -right-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-[18px] font-bold text-white shadow-sm">
+        <span
+            className={cn(
+                'absolute -top-1 -right-1 inline-flex min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] leading-[18px] font-bold shadow-sm',
+                variant === 'primary'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-status-critical text-white',
+            )}
+        >
             {count > 99 ? '99+' : count}
         </span>
     );
@@ -122,8 +141,21 @@ function isToday(dateStr: string | null): boolean {
     );
 }
 
-export default function InboxMenus() {
+export default function InboxMenus({
+    tone = 'default',
+}: {
+    /**
+     * 'ink' restyles the trigger buttons for the dark Event Horizon chrome
+     * (sidebar tokens); 'default' keeps the light-surface styling for other
+     * shells (e.g. the staff header).
+     */
+    tone?: 'default' | 'ink';
+}) {
     const inbox = (usePage().props as any).inbox as InboxPayload | null;
+    const triggerClassName =
+        tone === 'ink'
+            ? 'relative h-9 w-9 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring'
+            : 'relative h-9 w-9';
 
     const [openNotifId, setOpenNotifId] = useState<string | null>(null);
     const [openAnnouncementId, setOpenAnnouncementId] = useState<number | null>(
@@ -193,7 +225,7 @@ export default function InboxMenus() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="relative h-9 w-9"
+                        className={triggerClassName}
                         aria-label="Notifications"
                     >
                         <Bell className="h-5 w-5" />
@@ -336,11 +368,14 @@ export default function InboxMenus() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="relative h-9 w-9"
+                        className={triggerClassName}
                         aria-label="Announcements"
                     >
                         <Megaphone className="h-5 w-5" />
-                        <UnreadBadge count={unreadAnnouncements} />
+                        <UnreadBadge
+                            count={unreadAnnouncements}
+                            variant="primary"
+                        />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-96">

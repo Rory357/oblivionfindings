@@ -1,9 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { LoadingState } from '@/components/ui/loading-state';
 import { Link } from '@inertiajs/react';
 import {
     AlertTriangle,
-    LoaderCircle,
     LockKeyhole,
     PackageOpen,
     type LucideIcon,
@@ -12,9 +12,8 @@ import {
 export function SiteProfileLoadingState({ label }: { label: string }) {
     return (
         <Card aria-busy="true" aria-live="polite">
-            <CardContent className="flex min-h-48 items-center justify-center gap-3 text-sm text-muted-foreground">
-                <LoaderCircle className="h-5 w-5 animate-spin" />
-                Loading {label.toLowerCase()}…
+            <CardContent className="flex min-h-48 items-center justify-center">
+                <LoadingState message={`Loading ${label.toLowerCase()}…`} />
             </CardContent>
         </Card>
     );

@@ -792,7 +792,7 @@ export default function MyDay() {
     );
 
     return (
-        <AppLayout header={header} contentClassName="w-full px-7 py-5">
+        <AppLayout header={header} contentClassName="w-full p-5">
             <Head title="My Day" />
 
             <MyDayHero

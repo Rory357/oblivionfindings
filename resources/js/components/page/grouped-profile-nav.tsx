@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax -- Shared two-tier navigation uses native
  * controls for accessible tab, group, search, and pin interactions. */
 import { cn } from '@/lib/utils';
-import { Pin, PinOff, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import {
     Fragment,
     useEffect,
@@ -42,16 +42,16 @@ export type TierTwoTabAccessibilityProps = {
     'data-test': string;
 };
 
-function CountPill({ n, active }: { n?: number; active?: boolean }) {
+/** Count badge — follows its tab's state colour (DESIGN.md counter rule):
+ *  neutral at rest; the active tab passes its tone pair via `className`. */
+function CountPill({ n, className }: { n?: number; className?: string }) {
     if (!n) return null;
 
     return (
         <span
             className={cn(
-                'rounded-full px-1.5 py-0.5 text-[10px] leading-none font-bold',
-                active
-                    ? 'bg-primary/15 text-primary'
-                    : 'bg-muted text-muted-foreground',
+                'rounded-full px-1.5 py-0.5 text-[10px] leading-none font-bold tabular-nums',
+                className ?? 'bg-muted text-muted-foreground',
             )}
         >
             {n}
@@ -59,26 +59,15 @@ function CountPill({ n, active }: { n?: number; active?: boolean }) {
     );
 }
 
-function WarningPill({
-    n,
-    label,
-    onHero = false,
-}: {
-    n?: number;
-    label: string;
-    onHero?: boolean;
-}) {
+/** Warning badge — a fixed verified-contrast status pair, readable on the
+ *  hero gradient, the active page-coloured tab, and the page ground alike. */
+function WarningPill({ n, label }: { n?: number; label: string }) {
     if (!n) return null;
 
     return (
         <span
             aria-label={`${label} has ${n} ${n === 1 ? 'item' : 'items'} needing attention`}
-            className={cn(
-                'rounded-full px-1.5 py-0.5 text-[10px] leading-none font-bold',
-                onHero
-                    ? 'bg-warning/20 text-primary-foreground'
-                    : 'bg-warning/15 text-warning-foreground',
-            )}
+            className="rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] leading-none font-bold text-status-warning tabular-nums"
         >
             {n}
         </span>
@@ -152,13 +141,10 @@ export function GroupPillRail({
         <div
             role="toolbar"
             aria-label={ariaLabel}
-            className="scrollbar-none flex items-center gap-1.5 overflow-x-auto py-2.5"
+            className="scrollbar-none flex items-end gap-1.5 overflow-x-auto pt-2"
         >
             {groups.map((group, index) => {
                 const isOpen = group.key === openGroup;
-                const hasActive = group.tabs.some(
-                    (tab) => tab.key === activeTab,
-                );
                 const warningCount = group.tabs.reduce(
                     (total, tab) => total + (tab.warningCount ?? 0),
                     0,
@@ -204,12 +190,16 @@ export function GroupPillRail({
                         aria-pressed={isOpen}
                         data-test={`${testIdPrefix}-group-${group.key}`}
                         className={cn(
-                            'inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-primary focus-visible:outline-none',
+                            'inline-flex shrink-0 items-center gap-[7px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80',
                             isOpen
-                                ? 'bg-primary-foreground text-primary shadow-sm'
-                                : hasActive
-                                  ? 'bg-primary-foreground/20 text-primary-foreground'
-                                  : 'text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground',
+                                ? // Rule 1 connected tab: the page --background
+                                  // fill merges with the content below the hero.
+                                  // pb-3 keeps the label on the inactive pills'
+                                  // optical line — their centre sits 42/2 + 8px
+                                  // margin = 29px above the hero edge;
+                                  // (46 − 12)/2 + 12 = 29px here.
+                                  'min-h-[46px] rounded-t-xl bg-background px-[18px] pb-3 font-semibold text-primary'
+                                : 'mb-2 min-h-[42px] rounded-full px-[15px] font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground',
                         )}
                     >
                         <Icon className="h-[15px] w-[15px]" />
@@ -217,7 +207,6 @@ export function GroupPillRail({
                         <WarningPill
                             n={warningCount}
                             label={`${group.label} group`}
-                            onHero
                         />
                     </button>
                 );
@@ -228,7 +217,7 @@ export function GroupPillRail({
                 title="Find a section (/)"
                 aria-label="Find a section"
                 data-test={`${testIdPrefix}-search`}
-                className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:outline-none"
+                className="mb-2 ml-auto inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80 focus-visible:outline-none"
             >
                 <Search className="h-[15px] w-[15px]" />
                 <span className="hidden sm:inline">Find</span>
@@ -240,7 +229,48 @@ export function GroupPillRail({
     );
 }
 
-/** Tier-2 underline tabs for the open group. */
+/** Tier-2 tone cycle (NAVIGATION_STYLE_GUIDE.md Rule 2): tones are assigned
+ *  by position (`index % 5`), never hand-picked, and appear only on the
+ *  active tab — inactive tabs stay fully neutral. Solid icon chips use the
+ *  `--tone-chip-*` fills, which stay deep in both themes so the white glyph
+ *  keeps contrast (the violet chip pairs `bg-primary` with
+ *  `text-primary-foreground`, which branding keeps readable). */
+const TONE_CYCLE = [
+    {
+        active: 'bg-primary/12 text-primary',
+        chip: 'bg-primary text-primary-foreground',
+        badge: 'bg-primary/18 text-primary',
+        bar: 'bg-primary',
+    },
+    {
+        active: 'bg-tone-teal/12 text-tone-teal',
+        chip: 'bg-tone-chip-teal text-white',
+        badge: 'bg-tone-teal/18 text-tone-teal',
+        bar: 'bg-tone-teal',
+    },
+    {
+        active: 'bg-status-success/12 text-status-success',
+        chip: 'bg-tone-chip-success text-white',
+        badge: 'bg-status-success/18 text-status-success',
+        bar: 'bg-status-success',
+    },
+    {
+        active: 'bg-status-warning/12 text-status-warning',
+        chip: 'bg-tone-chip-warning text-white',
+        badge: 'bg-status-warning/18 text-status-warning',
+        bar: 'bg-status-warning',
+    },
+    {
+        active: 'bg-status-critical/12 text-status-critical',
+        chip: 'bg-tone-chip-critical text-white',
+        badge: 'bg-status-critical/18 text-status-critical',
+        bar: 'bg-status-critical',
+    },
+] as const;
+
+/** Tier-2 toned sub-tab strip for the open group (Rule 2): a bare flex row
+ *  on the page background — no card, border, or sticky chrome, and NO pin
+ *  affordances (removed 2026-09-06 — sub-tabs are never pinnable). */
 export function TierTwoTabs({
     tabs,
     activeTab,
@@ -249,8 +279,6 @@ export function TierTwoTabs({
     testIdPrefix = 'client',
     ariaLabel = 'Profile sections',
     panelId,
-    pinnedTabs = [],
-    onPinnedTabsChange,
 }: {
     tabs: GroupedProfileNavTab[];
     activeTab: string;
@@ -264,8 +292,6 @@ export function TierTwoTabs({
     testIdPrefix?: string;
     ariaLabel?: string;
     panelId?: string;
-    pinnedTabs?: string[];
-    onPinnedTabsChange?: (tabs: string[]) => void;
 }) {
     const moveTab = (event: ReactKeyboardEvent<HTMLElement>, index: number) => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
@@ -295,88 +321,76 @@ export function TierTwoTabs({
     };
 
     return (
-        <div className="sticky top-0 z-20 -mx-4 border-b border-border bg-background/85 px-4 backdrop-blur md:-mx-6 md:px-6">
-            <div
-                role="tablist"
-                aria-label={ariaLabel}
-                className="scrollbar-none flex items-center gap-0.5 overflow-x-auto"
-            >
-                {tabs.map((tab, index) => {
-                    const isActive = tab.key === activeTab;
-                    const isPinned = pinnedTabs.includes(tab.key);
-                    const Icon = tab.icon;
-                    const className = cn(
-                        'inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                        isActive
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted-foreground hover:text-foreground',
-                        tab.disabled && 'cursor-not-allowed opacity-50',
-                    );
-                    const inner = (
-                        <>
-                            <Icon className="h-[15px] w-[15px]" />
-                            {tab.label}
-                            <CountPill n={tab.count} active={isActive} />
-                            <WarningPill
-                                n={tab.warningCount}
-                                label={tab.label}
-                            />
-                        </>
-                    );
-                    const accessibilityProps: TierTwoTabAccessibilityProps = {
-                        id: `${testIdPrefix}-tab-${tab.key}`,
-                        role: 'tab',
-                        'aria-selected': isActive,
-                        ...(panelId ? { 'aria-controls': panelId } : {}),
-                        tabIndex: isActive ? 0 : -1,
-                        onKeyDown: (event) => moveTab(event, index),
-                        'data-test': `${testIdPrefix}-tab-${tab.key}`,
-                    };
-                    const tabControl = tab.href ? (
-                        renderLink(tab, className, inner, accessibilityProps)
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => onTab(tab.key)}
-                            {...accessibilityProps}
-                            disabled={tab.disabled}
-                            className={className}
+        <div
+            role="tablist"
+            aria-label={ariaLabel}
+            className="flex flex-wrap items-center gap-1"
+        >
+            {tabs.map((tab, index) => {
+                const isActive = tab.key === activeTab;
+                const tone = TONE_CYCLE[index % TONE_CYCLE.length];
+                const Icon = tab.icon;
+                const className = cn(
+                    'relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none',
+                    isActive
+                        ? tone.active
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                    tab.disabled && 'cursor-not-allowed opacity-50',
+                );
+                const inner = (
+                    <>
+                        <span
+                            className={cn(
+                                'inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md',
+                                isActive
+                                    ? tone.chip
+                                    : 'bg-muted text-muted-foreground',
+                            )}
                         >
-                            {inner}
-                        </button>
-                    );
-
-                    if (!onPinnedTabsChange) {
-                        return <Fragment key={tab.key}>{tabControl}</Fragment>;
-                    }
-
-                    return (
-                        <div key={tab.key} className="flex items-center">
-                            {tabControl}
-                            <button
-                                type="button"
-                                aria-label={`${isPinned ? 'Unpin' : 'Pin'} ${tab.label}`}
-                                onClick={() =>
-                                    onPinnedTabsChange(
-                                        isPinned
-                                            ? pinnedTabs.filter(
-                                                  (key) => key !== tab.key,
-                                              )
-                                            : [...pinnedTabs, tab.key],
-                                    )
-                                }
-                                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                            >
-                                {isPinned ? (
-                                    <PinOff className="h-3.5 w-3.5" />
-                                ) : (
-                                    <Pin className="h-3.5 w-3.5" />
+                            <Icon className="h-3.5 w-3.5" />
+                        </span>
+                        {tab.label}
+                        <CountPill
+                            n={tab.count}
+                            className={isActive ? tone.badge : undefined}
+                        />
+                        <WarningPill n={tab.warningCount} label={tab.label} />
+                        {isActive ? (
+                            <span
+                                className={cn(
+                                    'absolute inset-x-3.5 bottom-0 h-0.5 rounded',
+                                    tone.bar,
                                 )}
-                            </button>
-                        </div>
-                    );
-                })}
-            </div>
+                                aria-hidden="true"
+                            />
+                        ) : null}
+                    </>
+                );
+                const accessibilityProps: TierTwoTabAccessibilityProps = {
+                    id: `${testIdPrefix}-tab-${tab.key}`,
+                    role: 'tab',
+                    'aria-selected': isActive,
+                    ...(panelId ? { 'aria-controls': panelId } : {}),
+                    tabIndex: isActive ? 0 : -1,
+                    onKeyDown: (event) => moveTab(event, index),
+                    'data-test': `${testIdPrefix}-tab-${tab.key}`,
+                };
+                const tabControl = tab.href ? (
+                    renderLink(tab, className, inner, accessibilityProps)
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => onTab(tab.key)}
+                        {...accessibilityProps}
+                        disabled={tab.disabled}
+                        className={className}
+                    >
+                        {inner}
+                    </button>
+                );
+
+                return <Fragment key={tab.key}>{tabControl}</Fragment>;
+            })}
         </div>
     );
 }

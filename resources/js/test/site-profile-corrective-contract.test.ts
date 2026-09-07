@@ -6,14 +6,21 @@ const root = process.cwd();
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8');
 
 describe('corrective Site Profile contract', () => {
-    it('uses the dedicated Client-family hero, ribbon, and typed dialog host', () => {
+    it('opens with the Event Horizon profile header and typed dialog host', () => {
         const source = read('resources/js/pages/sites/show.tsx');
 
-        expect(source).toContain('SiteProfileHero');
-        expect(source).toContain('SiteProfileAlertRibbon');
+        expect(source).toContain('<PageHeader');
+        expect(source).toContain('variant="profile"');
+        expect(source).toContain('PageHeaderRail');
         expect(source).toContain('SiteProfileDialogHost');
+        // Superseded page-top patterns must not come back: the legacy
+        // PageHero, the bespoke site hero, and the alert ribbon (alert
+        // counts live in the header meter row now).
         expect(source).not.toContain('import { PageHero');
-        expect(source.indexOf('SiteProfileAlertRibbon')).toBeLessThan(
+        expect(source).not.toContain("from '@/components/sites/profile/hero'");
+        expect(source).not.toContain('SiteProfileAlertRibbon');
+        // Band first, then the tier-2 sub-nav strip on the page ground.
+        expect(source.indexOf('<PageHeader')).toBeLessThan(
             source.indexOf('<TierTwoTabs'),
         );
     });

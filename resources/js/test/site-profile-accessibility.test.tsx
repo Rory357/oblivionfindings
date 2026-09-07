@@ -64,10 +64,11 @@ function PaletteHarness() {
 }
 
 describe('site profile accessibility and responsive contract', () => {
-    it('uses visible focus and a 44px pin target', () => {
+    it('uses visible focus and keeps the sub-tab strip pin-free', () => {
         expect(navSource).toContain('role="tablist"');
         expect(navSource).toContain('focus-visible:ring-2');
-        expect(navSource).toContain('h-11 w-11');
+        // Sub-tabs are never pinnable (removed 2026-09-06).
+        expect(navSource).not.toMatch(/\bPin\b|\bPinOff\b|pinnedTabs/);
     });
 
     it('supports arrow-key navigation for groups and tabs', () => {
