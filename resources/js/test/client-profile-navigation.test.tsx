@@ -64,46 +64,6 @@ vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock('@/components/page-shell', () => ({
-    default: ({ children }: { children: React.ReactNode }) => children,
-}));
-
-vi.mock('@/components/clients/profile/hero', () => ({
-    AlertRibbon: () => null,
-    ClientProfileHero: ({
-        footer,
-        noteCapabilities,
-        onChat,
-        onEdit,
-    }: {
-        footer?: React.ReactNode;
-        noteCapabilities: {
-            dailyNote: boolean;
-            quickNote: boolean;
-            communicationNote: boolean;
-        };
-        onChat?: () => void;
-        onEdit?: () => void;
-    }) => (
-        <div data-testid="client-profile-hero">
-            {noteCapabilities.dailyNote ? <span>Daily capture</span> : null}
-            {noteCapabilities.quickNote ? <span>Quick capture</span> : null}
-            {noteCapabilities.communicationNote ? (
-                <span>Communication capture</span>
-            ) : null}
-            {onChat ? (
-                // eslint-disable-next-line no-restricted-syntax -- raw test-harness control exposes whether the optional callback was supplied
-                <button onClick={onChat}>Family chat action</button>
-            ) : null}
-            {onEdit ? (
-                // eslint-disable-next-line no-restricted-syntax -- raw test-harness control exposes whether the optional callback was supplied
-                <button onClick={onEdit}>Edit profile action</button>
-            ) : null}
-            {footer}
-        </div>
-    ),
-}));
-
 vi.mock('@/components/clients/profile/dialog-host', () => ({
     ProfileDialogs: ({ dialog }: { dialog?: { key?: string } | null }) =>
         dialog?.key ? (
@@ -152,8 +112,8 @@ vi.mock(
 
 import {
     GroupPillRail,
-    type ProfileNavGroup,
-} from '@/components/clients/profile/nav';
+    type GroupedProfileNavGroup as ProfileNavGroup,
+} from '@/components/page/grouped-profile-nav';
 
 import ClientShow from '@/pages/operations/clients/show';
 import * as profileNavigation from '@/pages/operations/clients/tabs/_groups';
@@ -514,23 +474,25 @@ describe('client profile navigation registry', () => {
         );
         const { container } = render(<ClientShow {...clientShowProps()} />);
 
-        expect(
-            screen.getByRole('button', { name: 'Snapshot' }),
-        ).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('tab', { name: 'Snapshot' })).toHaveAttribute(
+            'aria-selected',
+            'true',
+        );
         expect(
             container.querySelector(
                 '[data-test="client-personal-details-tab"]',
             ),
         ).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Daily care' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Daily care' }));
 
         await waitFor(() => {
             expect(window.location.search).toBe('?tab=progress_notes');
         });
-        expect(
-            screen.getByRole('button', { name: 'Daily care' }),
-        ).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('tab', { name: 'Daily care' })).toHaveAttribute(
+            'aria-selected',
+            'true',
+        );
         expect(
             container.querySelector('[data-test="client-daily-notes-tab"]'),
         ).toBeInTheDocument();
@@ -548,7 +510,7 @@ describe('client profile navigation registry', () => {
             ).toBeVisible();
         });
 
-        fireEvent.click(screen.getByRole('button', { name: 'Snapshot' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Snapshot' }));
 
         await waitFor(() => {
             expect(window.location.search).toBe('?tab=personal_details');
@@ -712,7 +674,7 @@ describe('client profile navigation registry', () => {
         );
     });
 
-    it('fails restored dialogs closed and exposes only exact hero capture actions', async () => {
+    it('fails restored dialogs closed and exposes only exact header capture actions', async () => {
         window.history.replaceState(
             {},
             '',
@@ -722,14 +684,27 @@ describe('client profile navigation registry', () => {
         const first = render(<ClientShow {...restricted} />);
 
         expect(screen.queryByTestId('profile-dialog')).toBeNull();
-        expect(screen.queryByText('Daily capture')).toBeNull();
-        expect(screen.queryByText('Quick capture')).toBeNull();
-        expect(screen.queryByText('Communication capture')).toBeNull();
         expect(
-            screen.queryByRole('button', { name: 'Family chat action' }),
+            screen.queryByRole('button', { name: 'Family chat' }),
         ).toBeNull();
         expect(
-            screen.queryByRole('button', { name: 'Edit profile action' }),
+            screen.queryByRole('button', { name: 'Edit profile' }),
+        ).toBeNull();
+
+        fireEvent.pointerDown(
+            screen.getByRole('button', { name: 'Add / log' }),
+        );
+        expect(
+            await screen.findByRole('menuitem', { name: 'Log incident' }),
+        ).toBeVisible();
+        expect(
+            screen.queryByRole('menuitem', { name: 'Daily note' }),
+        ).toBeNull();
+        expect(
+            screen.queryByRole('menuitem', { name: 'Quick note' }),
+        ).toBeNull();
+        expect(
+            screen.queryByRole('menuitem', { name: 'Communication note' }),
         ).toBeNull();
 
         first.unmount();
@@ -747,15 +722,25 @@ describe('client profile navigation registry', () => {
         expect(await screen.findByTestId('profile-dialog')).toHaveTextContent(
             'family_chat',
         );
-        expect(screen.getByText('Daily capture')).toBeVisible();
-        expect(screen.queryByText('Quick capture')).toBeNull();
-        expect(screen.getByText('Communication capture')).toBeVisible();
         expect(
-            screen.getByRole('button', { name: 'Family chat action' }),
+            screen.getByRole('button', { name: 'Family chat' }),
         ).toBeVisible();
         expect(
-            screen.queryByRole('button', { name: 'Edit profile action' }),
+            screen.queryByRole('button', { name: 'Edit profile' }),
         ).toBeNull();
+
+        fireEvent.pointerDown(
+            screen.getByRole('button', { name: 'Add / log' }),
+        );
+        expect(
+            await screen.findByRole('menuitem', { name: 'Daily note' }),
+        ).toBeVisible();
+        expect(
+            screen.queryByRole('menuitem', { name: 'Quick note' }),
+        ).toBeNull();
+        expect(
+            screen.getByRole('menuitem', { name: 'Communication note' }),
+        ).toBeVisible();
     });
 
     it('opens N and Shift+N capture dialogs only with their matching capabilities', async () => {

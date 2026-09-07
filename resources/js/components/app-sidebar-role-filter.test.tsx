@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { AppSidebar, filterVisibleSidebarGroups } from './app-sidebar';
+import { AppHeader } from './app-header';
+import { filterVisibleSidebarGroups } from './app-sidebar';
 
 vi.mock('@inertiajs/react', async () => {
     const React = await import('react');
@@ -61,11 +62,10 @@ describe('role-filtered app sidebar', () => {
         ]);
     });
 
-    it.each([
-        ['expanded', false],
-        ['collapsed', true],
-    ])('opens the user menu while the sidebar is %s', async (_, collapsed) => {
-        render(<AppSidebar collapsed={collapsed} />);
+    // The user's identity lives in the header avatar, not the sidebar footer
+    // (Event Horizon shell — APP_SHELL_STYLE_GUIDE.md §2/§3).
+    it('opens the user menu from the header avatar', async () => {
+        render(<AppHeader />);
 
         const trigger = screen.getByRole('button', {
             name: 'Open user menu for Novice Worker',

@@ -1,10 +1,18 @@
 
 # Hero Banner & Page Layout Unification — v3 Handoff
 
+> **SUPERSEDED (2026-09-05).** The `PageHero` system this document
+> migrated pages onto is no longer the page-top contract — see
+> `design_styles/PAGE_HEADER_STYLE_GUIDE.md` (the Event Horizon
+> header). This file is retained only as a historical record and as a
+> referenced security-remediation source in
+> `docs/runbooks/it-security-release-packaging.md`. Do not follow its
+> hero conventions for new work.
+
 **Status:** Phase 4 complete · platform-wide sweep done · only cleanup + intentional skips remain
 **Reference plans:**
 - v1: `C:\Users\steph\.claude\plans\you-are-acting-as-sharded-whistle.md`
-- v2: `docs/hero-unification-v2-plan.md` (executed across commits 8abbdbd0..f550974f)
+- v2: `docs/hero-unification-v2-plan.md` (deleted 2026-09-05, superseded; was executed across commits 8abbdbd0..f550974f)
 
 ---
 

@@ -36,7 +36,13 @@ import {
     Trash2,
     Upload,
 } from 'lucide-react';
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import {
+    Fragment,
+    useEffect,
+    useMemo,
+    useState,
+    type ReactNode,
+} from 'react';
 import { ConfirmAction } from './_confirm-action';
 import {
     SITE_DOCUMENT_CATEGORIES,
@@ -257,6 +263,18 @@ export function SiteDocumentsSurface({
         uploadForm.setData('folder', folder ?? '');
         setShowUpload(true);
     };
+
+    // Deep link from the header's "Add Document" quick action:
+    // ?action=upload opens the upload dialog once (routed page and embedded
+    // profile tab alike), then drops the param.
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('action') !== 'upload') return;
+        url.searchParams.delete('action');
+        window.history.replaceState(window.history.state, '', url);
+        if (can_edit) setShowUpload(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot mount deep link
+    }, []);
 
     const openSuggestedUpload = (document: RecommendedDocument) => {
         uploadForm.setData('folder', currentFolder ?? '');

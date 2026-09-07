@@ -39,7 +39,7 @@ Method: live-repo inspection (no stale-doc trust). Five parallel code sweeps + d
 **Files**
 - Usage: `resources/js/pages/operations/rostering/index.tsx:2195-2400`
 - Component: `resources/js/components/page/page-hero.tsx` (+ `page-hero-stats/badges/meta/actions/quick-actions/avatar-stack`)
-- Contract documented for governance in `design_styles/GOVERNANCE_HERO_GUIDE.md`; this audit extends the same contract to workforce pages with `category="ops"`.
+- Contract superseded 2026-09-05: page tops now follow `design_styles/PAGE_HEADER_STYLE_GUIDE.md`; the `PageHero` anatomy audited below is historical.
 
 **Anatomy**
 - `PageHero category="ops"` → gradient banner `rounded-2xl` with three decorative orbs; **note `--category-ops` aliases `--primary`** (`resources/css/app.css:200,316`), so ops pages and default-primary pages render identically today.

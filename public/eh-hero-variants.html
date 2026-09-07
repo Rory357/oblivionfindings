@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EH hero — the meters direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   Tokens — mirrors of resources/css/app.css (light theme).
+   Implementation stays tokens-only; these are mockup refs.
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+    --primary: oklch(0.558 0.288 302.32);          /* --color-purple-600 */
+    --primary-foreground: #fff;
+    --bg: oklch(0.905 0.003 277);
+    --status-success: oklch(45% 0.15 150);
+    --status-success-bg: oklch(94% 0.05 150);
+    --status-success-fg: oklch(28% 0.1 150);
+    --status-warning: oklch(42% 0.13 85);
+    --status-warning-bg: oklch(95% 0.06 85);
+    --status-warning-fg: oklch(30% 0.11 85);
+    --status-critical: oklch(45% 0.22 25);
+    --status-critical-bg: oklch(94% 0.06 25);
+    --status-critical-fg: oklch(30% 0.15 25);
+
+    /* on-sky lightened accents (same recipe as .eh-stat-pill) */
+    --brand-l: color-mix(in oklch, var(--primary) 75%, white);
+    --crit-l:  color-mix(in oklch, var(--status-critical) 55%, white);
+    --warn-l:  color-mix(in oklch, var(--status-warning) 60%, white);
+    --succ-l:  color-mix(in oklch, var(--status-success) 55%, white);
+
+    --eh-ink: oklch(from var(--primary) 0.3 calc(c * 0.6) h);
+    --eh-sky-mid: oklch(from var(--primary) 0.42 calc(c * 0.8) h);
+}
+* { box-sizing: border-box; margin: 0; }
+body {
+    background: var(--bg);
+    color: oklch(0.24 0.01 277);
+    font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+    padding: 40px 32px 120px;
+}
+main { width: 1560px; max-width: 100%; margin: 0 auto; }
+
+.intro h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+.intro p  { margin-top: 6px; font-size: 13.5px; color: oklch(0.45 0.01 277); max-width: 880px; line-height: 1.55; }
+.rules { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.rules span {
+    font-size: 11.5px; font-weight: 600; border-radius: 8px; padding: 4px 10px;
+    background: #fff; border: 1px solid oklch(0.85 0.005 277); color: oklch(0.38 0.02 277);
+}
+
+.vhead { margin: 52px 0 14px; }
+.vhead .k { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.vnum {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--primary); background: color-mix(in oklch, var(--primary) 12%, white);
+    border-radius: 6px; padding: 3px 8px;
+}
+.vhead h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.vhead p { margin-top: 6px; font-size: 13px; color: oklch(0.45 0.01 277); max-width: 900px; line-height: 1.5; }
+
+/* ══════════════════════════════════════════════════════════════════
+   The band — replica of .eh-header (app.css)
+   ══════════════════════════════════════════════════════════════════ */
+.band {
+    position: relative; border-radius: 16px; overflow: hidden; color: #fff;
+    background:
+        radial-gradient(56% 78% at 80% 108%,
+            color-mix(in oklch, var(--brand-l) 92%, transparent) 0%, transparent 72%),
+        radial-gradient(48% 64% at 16% 112%,
+            color-mix(in oklch, var(--primary) 55%, transparent) 0%, transparent 68%),
+        linear-gradient(to bottom, var(--eh-ink) 0%, var(--eh-sky-mid) 55%, var(--primary) 100%);
+}
+.band::before, .band::after { content: ''; position: absolute; border-radius: 50%; pointer-events: none; }
+.band::before { width: 560px; height: 560px; left: -120px; bottom: -430px;
+    border: 1px solid color-mix(in oklch, var(--brand-l) 20%, transparent); }
+.band::after  { width: 680px; height: 680px; right: -220px; top: -540px;
+    border: 1px solid color-mix(in oklch, var(--brand-l) 14%, transparent); }
+
+.body { position: relative; z-index: 1; display: flex; flex-direction: column; padding: 18px 22px 0; }
+.toprow { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.railwrap { position: relative; z-index: 1; display: flex; align-items: flex-end; min-height: 46px; padding: 0 14px; }
+
+/* identity */
+.ident { display: flex; align-items: flex-start; gap: 13px; min-width: 0; }
+.mark {
+    display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 50%;
+    border: 3px solid var(--brand-l);
+    box-shadow: 0 0 18px color-mix(in oklch, var(--primary) 50%, transparent),
+                inset 0 0 12px color-mix(in oklch, var(--primary) 35%, transparent);
+}
+.mark .i { width: 20px; height: 20px; }
+.stack { display: flex; flex-direction: column; min-width: 0; }
+.trow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.trow h3 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.sub { margin-top: 3px; font-size: 13px; color: rgba(255,255,255,.65); }
+
+/* chips */
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 3px 8px; font-size: 12px; font-weight: 500; }
+.chip .i { width: 12px; height: 12px; }
+.chip-succ { background: var(--status-success-bg); color: var(--status-success-fg); font-weight: 600; }
+
+/* actions */
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.search {
+    display: flex; align-items: center; gap: 8px; height: 36px; width: 250px; padding: 0 10px 0 12px;
+    border-radius: 10px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+    font-size: 13px; color: rgba(255,255,255,.6);
+}
+.search .i { width: 15px; height: 15px; flex: none; }
+.search .ph { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search .kbd { margin-left: auto; border: 1px solid rgba(255,255,255,.25); border-radius: 5px; padding: 1px 6px; font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,.55); }
+.btn { height: 36px; border-radius: 10px; padding: 0 14px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 0; font-family: inherit; cursor: default; }
+.btn .i { width: 15px; height: 15px; }
+.btn-glass { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #fff; }
+.btn-primary { background: #fff; color: var(--primary); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+
+/* ══════════════════════════════════════════════════════════════════
+   THE METER ROW — full-width, holds any number of blocks.
+   Block anatomy is always: head (label + headline value) →
+   visual (bar / donut / sparkline / nothing) → caption.
+   ══════════════════════════════════════════════════════════════════ */
+.meters { display: flex; align-items: stretch; gap: 8px; margin-top: 13px; min-height: 80px; }
+.meter {
+    position: relative; flex: 1 1 0; min-width: 0; display: grid; gap: 7px; align-content: space-between;
+    padding: 8px 12px 9px; border-radius: 10px;
+    background: color-mix(in oklch, var(--eh-ink) 45%, transparent);
+    border: 1px solid rgba(255,255,255,.16);
+    cursor: pointer; text-decoration: none; color: inherit;
+    transition: transform .15s ease, background-color .15s ease, border-color .15s ease;
+}
+/* every block is a link to its view — hover lifts it and reveals the corner arrow */
+.meter:hover { transform: translateY(-1px); background: color-mix(in oklch, var(--eh-ink) 62%, transparent); border-color: rgba(255,255,255,.34); }
+.meter.crit:hover { border-color: color-mix(in oklch, var(--crit-l) 75%, transparent); }
+.meter.warn:hover { border-color: color-mix(in oklch, var(--warn-l) 75%, transparent); }
+.meter.succ:hover { border-color: color-mix(in oklch, var(--succ-l) 75%, transparent); }
+.meter .go { position: absolute; top: 7px; right: 8px; width: 11px; height: 11px; color: rgba(255,255,255,.75); opacity: 0; transition: opacity .15s ease; }
+.meter:hover .go { opacity: 1; }
+.meter.crit .go { color: var(--crit-l); } .meter.warn .go { color: var(--warn-l); }
+/* keep the headline value clear of the corner arrow */
+.meter .head { padding-right: 10px; }
+.meter .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.meter .l { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.62); white-space: nowrap; }
+.meter .v { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.meter .s { font-size: 10.5px; color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meter.crit { border-color: color-mix(in oklch, var(--crit-l) 45%, transparent); }
+.meter.crit .l, .meter.crit .v { color: var(--crit-l); }
+.meter.warn { border-color: color-mix(in oklch, var(--warn-l) 45%, transparent); }
+.meter.warn .l, .meter.warn .v { color: var(--warn-l); }
+.meter.succ { border-color: color-mix(in oklch, var(--succ-l) 45%, transparent); }
+.meter.succ .l, .meter.succ .v { color: var(--succ-l); }
+
+/* visual: bar */
+.mbar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.16); overflow: hidden; align-self: center; }
+.mbar i { display: block; height: 100%; border-radius: 3px; background: var(--brand-l); }
+.meter.warn .mbar i { background: var(--warn-l); }
+.meter.succ .mbar i { background: var(--succ-l); }
+
+/* visual: sparkline */
+.spark { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
+.spark i { width: 4px; border-radius: 1.5px; background: currentColor; opacity: .85; }
+.meter.crit .spark { color: var(--crit-l); }
+.meter.warn .spark { color: var(--warn-l); }
+.meter .spark { color: var(--brand-l); }
+
+/* visual: donut (head has no value; donut + caption share a row) */
+.donutwrap { display: flex; align-items: center; gap: 10px; }
+.donut { position: relative; width: 34px; height: 34px; flex: none; }
+.donut svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.donut .dv { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: var(--succ-l); }
+.donut.warn .dv { color: var(--warn-l); }
+.donutwrap .s { white-space: normal; line-height: 1.35; }
+
+/* plain stat block: bigger number, no visual */
+.meter .big { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+.d { font-size: 10.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 2px; }
+.d .i { width: 10px; height: 10px; }
+.d-bad { color: var(--crit-l); } .d-good { color: var(--succ-l); } .d-mut { color: rgba(255,255,255,.5); }
+
+/* filters */
+.filters { display: flex; align-items: center; gap: 6px; justify-content: flex-end; margin: 10px 0 12px; }
+.f { height: 23px; border-radius: 8px; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #fff; }
+.f .i { width: 10px; height: 10px; opacity: .75; }
+.f .box { width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(255,255,255,.6); flex: none; }
+.f-seg { padding: 2px; gap: 2px; }
+.f-seg .seg { height: 100%; border-radius: 6px; padding: 0 8px; display: inline-flex; align-items: center; gap: 4px; color: rgba(255,255,255,.8); }
+.f-seg .seg .i { width: 10px; height: 10px; }
+.f-seg .seg.on { background: #fff; color: var(--primary); }
+
+/* the rail */
+.rail { display: flex; align-items: flex-end; gap: 4px; width: 100%; }
+.tab { display: inline-flex; align-items: center; gap: 7px; border: 0; background: none; font-family: inherit; cursor: default; color: rgba(255,255,255,.8); }
+.tab .i { width: 15px; height: 15px; }
+.tab.on { height: 40px; border-radius: 12px 12px 0 0; background: var(--bg); color: var(--primary); padding: 0 17px; font-size: 13.5px; font-weight: 600; }
+.tab:not(.on) { height: 34px; margin-bottom: 6px; border-radius: 9px; padding: 0 13px; font-size: 13px; font-weight: 500; }
+.cnt { min-width: 22px; border-radius: 6px; padding: 2px 6px; font-size: 11px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.tab.on .cnt { background: color-mix(in oklch, var(--primary) 15%, transparent); color: var(--primary); }
+.tab:not(.on) .cnt { background: rgba(255,255,255,.15); color: #fff; }
+.cnt.alert { background: var(--status-critical-bg); color: var(--status-critical); }
+
+.i { display: inline-block; flex: none; }
+
+/* block library strip */
+.libband { position: relative; border-radius: 16px; overflow: hidden; padding: 16px 22px 18px;
+    background: linear-gradient(to bottom, var(--eh-ink) 0%, var(--eh-sky-mid) 100%); color: #fff; }
+.libband .lk { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.6); margin-bottom: 10px; }
+.libband .meters { margin-top: 0; }
+.libband .note { margin-top: 12px; font-size: 11.5px; color: rgba(255,255,255,.6); }
+</style>
+</head>
+<body>
+
+<!-- lucide-style icon sprite -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-building" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-chevd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M12 3v18"/></symbol>
+    <symbol id="i-tri" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-tup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></symbol>
+    <symbol id="i-tdown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17l-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></symbol>
+  </defs>
+</svg>
+
+<main>
+  <header class="intro">
+    <h1>Event Horizon hero — the meters direction</h1>
+    <p>Chosen direction (from the variant round): <strong>meters</strong> — small instruments instead of flat stat pills.
+       Revision: the blocks now live on <strong>their own full-width row</strong> under the identity/actions row, so every
+       page can dock as many blocks as it needs — and <strong>every block is clickable</strong>, taking you straight to its
+       view (Hazards → the open-hazards view, Occupancy → beds, Checks → audits…). Hover any block below to see the
+       affordance. Filters stay in the band; the connected-tab rail stays on the bottom edge.</p>
+    <div class="rules">
+      <span>✓ Filters in the band — always</span>
+      <span>✓ Connected-tab rail — always</span>
+      <span>✓ Meter row = full width, any number of blocks</span>
+      <span>✓ Safety colours never retint</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════ SITES INDEX ═══════════════════ -->
+  <section>
+    <div class="vhead">
+      <div class="k"><span class="vnum">Example A</span><h2>Sites index — six blocks</h2></div>
+      <p>Identity slims to one line (facts fold into the subline); the meter row runs the full band width:
+         two plain stats, a bar meter, a donut, and two sparkline stats. Blocks flex to share the row evenly.</p>
+    </div>
+    <div class="band">
+      <div class="body">
+        <div class="toprow">
+          <div class="ident">
+            <span class="mark"><svg class="i"><use href="#i-building"/></svg></span>
+            <div class="stack">
+              <div class="trow"><h3>Sites</h3><span class="chip chip-succ">13 active</span></div>
+              <p class="sub">Occupancy, leads and safety · 3 regions · 28 clients supported</p>
+            </div>
+          </div>
+          <div class="row">
+            <span class="search"><svg class="i"><use href="#i-search"/></svg><span class="ph">Search sites, regions, leads…</span><span class="kbd">/</span></span>
+            <button class="btn btn-glass"><svg class="i"><use href="#i-check"/></svg>Select</button>
+            <button class="btn btn-primary"><svg class="i"><use href="#i-plus"/></svg>Add site</button>
+          </div>
+        </div>
+        <div class="meters">
+          <a class="meter" href="#all-sites" title="View all sites">
+            <svg class="i go"><use href="#i-arrow"/></svg>
+            <div class="head"><span class="l">Total sites</span></div>
+            <span class="big">13</span>
+            <span class="s">across 3 regions</span>
+          </a>
+          <a class="meter" href="#beds" title="View beds &amp; occupancy">
+            <svg class="i go"><use href="#i-arrow"/></svg>
+            <div class="head"><span class="l">Occupancy</span><span class="v">0/41 beds</span></div>
+            <div class="mbar"><i style="width:2%"></i></div>
+            <span class="s">0% occupied · 41 available</span>
+          </a>
+          <a class="meter" href="#checks" title="View audits &amp; checks">
+            <svg class="i go"><use href="#i-arrow"/></svg>
+            <div class="head"><span class="l">Checks on time</span></div>
+            <div class="donutwrap">
+              <span class="donut">
+                <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="4"/><circle cx="20" cy="20" r="16" fill="none" stroke="oklch(70% 0.12 150)" stroke-width="4" stroke-linecap="round" stroke-dasharray="68.4 100.5"/></svg>
+                <span class="dv">68%</span>
+              </span>
+              <span class="s">212 of 310<br>done on time</span>
+            </div>
+          </a>
+          <a class="meter crit" href="#hazards" title="View open hazards">
+            <svg class="i go"><use href="#i-arrow"/></svg>
+            <div class="head"><span class="l">Hazards</span><span class="v">28</span></div>
+            <div class="spark"><i style="height:6px"></i><i style="height:7px"></i><i style="height:9px"></i><i style="height:8px"></i><i style="height:11px"></i><i style="height:13px"></i><i style="height:16px"></i></div>
+            <span class="d d-bad"><svg class="i"><use href="#i-tup"/></svg>4 this week</span>
+          </a>
+          <a class="meter warn" href="#overdue" title="View overdue checks">
+            <svg class="i go"><use href="#i-arrow"/></svg>
+            <div class="head"><span class="l">Overdue</span><span class="v">31</span></div>
+            <div class="spark"><i style="height:16px"></i><i style="height:14px"></i><i style="height:13px"></i><i style="height:13px"></i><i style="height:11px"></i><i style="height:10px"></i><i style="height:9px"></i></div>
+            <span class="d d-good"><svg class="i"><use href="#i-tdown"/></svg>2 this week</span>
+          </a>
+          <a class="meter" href="#incomplete" title="View incomplete profiles">
+            <svg class="i go"><use href="#i-arrow"/></svg>
+            <div class="head"><span class="l">Incomplete</span></div>
+            <span class="big">12</span>
+            <span class="s">profiles to finish</span>
+          </a>
+        </div>
+        <div class="filters">
+          <span class="f"><svg class="i"><use href="#i-building"/></svg>All types<svg class="i"><use href="#i-chevd"/></svg></span>
+          <span class="f"><svg class="i"><use href="#i-map"/></svg>All regions<svg class="i"><use href="#i-chevd"/></svg></span>
+          <span class="f">Status<svg class="i"><use href="#i-chevd"/></svg></span>
+          <span class="f"><span class="box"></span>Archived</span>
+          <span class="f f-seg"><span class="seg on"><svg class="i"><use href="#i-grid"/></svg>Cards</span><span class="seg"><svg class="i"><use href="#i-table"/></svg>Table</span></span>
+        </div>
+      </div>
+      <div class="railwrap">
+        <div class="rail">
+          <button class="tab on"><svg class="i"><use href="#i-grid"/></svg>All sites <span class="cnt">13</span></button>
+          <button class="tab"><svg class="i"><use href="#i-tri"/></svg>At risk <span class="cnt">0</span></button>
+          <button class="tab"><svg class="i"><use href="#i-check"/></svg>Audit overdue <span class="cnt">0</span></button>
+          <button class="tab"><svg class="i"><use href="#i-shield"/></svg>Open hazards <span class="cnt alert">11</span></button>
+          <button class="tab"><svg class="i"><use href="#i-info"/></svg>Active incomplete <span class="cnt">12</span></button>
+          <button class="tab"><svg class="i"><use href="#i-x"/></svg>Inactive <span class="cnt">0</span></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ CLIENTS INDEX ═══════════════════ -->
+  <section>
+    <div class="vhead">
+      <div class="k"><span class="vnum">Example B</span><h2>Clients index — five different blocks, same row</h2></div>
+      <p>The same band with a different block mix, showing the row adapts per page: a plain stat with a delta,
+         a reviews donut, an incidents sparkline, a warning stat, and a funding bar meter.</p>
+    </div>
+    <div class="band">
+      <div class="body">
+        <div class="toprow">
+          <div class="ident">
+            <span class="mark"><svg class="i"><use href="#i-users"/></svg></span>
+            <div class="stack">
+              <div class="trow"><h3>Clients</h3><span class="chip chip-succ">28 active</span></div>
+              <p class="sub">Support, funding and wellbeing for everyone in your care · 13 sites</p>
+            </div>
+          </div>
+          <div class="row">
+            <span class="search"><svg class="i"><use href="#i-search"/></svg><span class="ph">Search clients, NDIS refs…</span><span class="kbd">/</span></span>
+            <button class="btn btn-glass"><svg class="i"><use href="#i-check"/></svg>Select</button>
+            <button class="btn btn-primary"><svg class="i"><use href="#i-plus"/></svg>Add client</button>
+          </div>
+        </div>
+        <div class="meters">
+          <a class="meter" href="#clients" title="View all clients">
+            <svg class="i go"><use href="#i-arrow"/></svg>
+            <div class="head"><span class="l">Active clients</span></div>
+            <span class="big">28</span>
+            <span class="d d-good"><svg class="i"><use href="#i-tup"/></svg>2 this month</span>
+          </a>
+          <a class="meter" href="#reviews" title="View reviews">
+            <svg class="i go"><use href="#i-arrow"/></svg>
+            <div class="head"><span class="l">Reviews on time</span></div>
+            <div class="donutwrap">
+              <span class="donut">
+                <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="4"/><circle cx="20" cy="20" r="16" fill="none" stroke="oklch(70% 0.12 150)" stroke-width="4" stroke-linecap="round" stroke-dasharray="82.4 100.5"/></svg>
+                <span class="dv">82%</span>
+              </span>
+              <span class="s">23 of 28<br>reviewed on time</span>
+            </div>
+          </a>
+          <a class="meter crit" href="#incidents" title="View incidents">
+            <svg class="i go"><use href="#i-arrow"/></svg>
+            <div class="head"><span class="l">Incidents</span><span class="v">5</span></div>
+            <div class="spark"><i style="height:12px"></i><i style="height:10px"></i><i style="height:11px"></i><i style="height:8px"></i><i style="height:9px"></i><i style="height:7px"></i><i style="height:6px"></i></div>
+            <span class="d d-good"><svg class="i"><use href="#i-tdown"/></svg>1 this week</span>
+          </a>
+          <a class="meter warn" href="#plans" title="View expiring plans">
+            <svg class="i go"><use href="#i-arrow"/></svg>
+            <div class="head"><span class="l">Plans expiring</span></div>
+            <span class="big">4</span>
+            <span class="s">in the next 30 days</span>
+          </a>
+          <a class="meter" href="#funding" title="View funding">
+            <svg class="i go"><use href="#i-arrow"/></svg>
+            <div class="head"><span class="l">Funding utilised</span><span class="v">74%</span></div>
+            <div class="mbar"><i style="width:74%"></i></div>
+            <span class="s">this plan period · 3 plans over 90%</span>
+          </a>
+        </div>
+        <div class="filters">
+          <span class="f"><svg class="i"><use href="#i-building"/></svg>All sites<svg class="i"><use href="#i-chevd"/></svg></span>
+          <span class="f"><svg class="i"><use href="#i-heart"/></svg>Support level<svg class="i"><use href="#i-chevd"/></svg></span>
+          <span class="f">Status<svg class="i"><use href="#i-chevd"/></svg></span>
+          <span class="f"><span class="box"></span>Archived</span>
+          <span class="f f-seg"><span class="seg on"><svg class="i"><use href="#i-grid"/></svg>Cards</span><span class="seg"><svg class="i"><use href="#i-table"/></svg>Table</span></span>
+        </div>
+      </div>
+      <div class="railwrap">
+        <div class="rail">
+          <button class="tab on"><svg class="i"><use href="#i-users"/></svg>All clients <span class="cnt">28</span></button>
+          <button class="tab"><svg class="i"><use href="#i-heart"/></svg>High support <span class="cnt">6</span></button>
+          <button class="tab"><svg class="i"><use href="#i-clock"/></svg>Reviews due <span class="cnt">4</span></button>
+          <button class="tab"><svg class="i"><use href="#i-tri"/></svg>Incidents <span class="cnt alert">5</span></button>
+          <button class="tab"><svg class="i"><use href="#i-x"/></svg>Inactive <span class="cnt">3</span></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ BLOCK LIBRARY ═══════════════════ -->
+  <section>
+    <div class="vhead">
+      <div class="k"><span class="vnum">Block library</span><h2>The five block types every page composes from</h2></div>
+      <p>One shared anatomy — head (label + headline value), visual, caption — in five flavours. A page picks
+         its blocks and their tones; the row lays them out. Every block is a <strong>link to its view</strong>
+         (hover: lift + brighter border + corner ↗). Safety tones (critical/warning) are the fixed status
+         colours; neutral blocks take the brand tint.</p>
+    </div>
+    <div class="libband">
+      <div class="lk">Block types</div>
+      <div class="meters">
+        <div class="meter">
+          <div class="head"><span class="l">Stat</span></div>
+          <span class="big">13</span>
+          <span class="s">plain count + caption</span>
+        </div>
+        <div class="meter">
+          <div class="head"><span class="l">Delta stat</span></div>
+          <span class="big">28</span>
+          <span class="d d-good"><svg class="i"><use href="#i-tup"/></svg>2 this month</span>
+        </div>
+        <div class="meter">
+          <div class="head"><span class="l">Bar meter</span><span class="v">74%</span></div>
+          <div class="mbar"><i style="width:74%"></i></div>
+          <span class="s">progress toward a capacity</span>
+        </div>
+        <div class="meter">
+          <div class="head"><span class="l">Donut</span></div>
+          <div class="donutwrap">
+            <span class="donut">
+              <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="4"/><circle cx="20" cy="20" r="16" fill="none" stroke="oklch(70% 0.12 150)" stroke-width="4" stroke-linecap="round" stroke-dasharray="68.4 100.5"/></svg>
+              <span class="dv">68%</span>
+            </span>
+            <span class="s">share of a whole<br>with the fraction</span>
+          </div>
+        </div>
+        <div class="meter crit">
+          <div class="head"><span class="l">Sparkline</span><span class="v">28</span></div>
+          <div class="spark"><i style="height:6px"></i><i style="height:7px"></i><i style="height:9px"></i><i style="height:8px"></i><i style="height:11px"></i><i style="height:13px"></i><i style="height:16px"></i></div>
+          <span class="d d-bad"><svg class="i"><use href="#i-tup"/></svg>7-day trend + delta</span>
+        </div>
+      </div>
+      <p class="note">Tones: neutral (brand border, white value) · critical · warning · success — safety tones never retint with branding.
+         Recommended 4–6 blocks on desktop; the row scrolls or wraps below that width.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

@@ -20,7 +20,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { usePage } from '@inertiajs/react';
-import { Search } from 'lucide-react';
+import { Search, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -34,7 +34,15 @@ function csrfToken(): string | null {
     );
 }
 
-export default function GlobalQueryBar() {
+export default function GlobalQueryBar({
+    variant = 'default',
+}: {
+    /**
+     * 'icon' renders a compact ink icon trigger for the Event Horizon app
+     * header; 'default' keeps the wide outline trigger for other shells.
+     */
+    variant?: 'default' | 'icon';
+}) {
     const page = usePage<any>();
     const auth = page.props?.auth;
     const can = auth?.can;
@@ -163,18 +171,33 @@ export default function GlobalQueryBar() {
             }}
         >
             <DialogTrigger asChild>
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                        'hidden h-9 w-[320px] justify-start gap-2 px-3 text-sm text-muted-foreground lg:flex',
-                        !canAsk && 'opacity-60',
-                    )}
-                    disabled={!canAsk}
-                >
-                    <Search className="h-4 w-4 opacity-70" />
-                    Ask about a client…
-                </Button>
+                {variant === 'icon' ? (
+                    <button
+                        type="button"
+                        aria-label="Ask about a client"
+                        title="Ask about a client"
+                        className={cn(
+                            'flex size-9 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                            !canAsk && 'pointer-events-none opacity-50',
+                        )}
+                        disabled={!canAsk}
+                    >
+                        <Sparkles className="size-5" />
+                    </button>
+                ) : (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                            'hidden h-9 w-[320px] justify-start gap-2 px-3 text-sm text-muted-foreground lg:flex',
+                            !canAsk && 'opacity-60',
+                        )}
+                        disabled={!canAsk}
+                    >
+                        <Search className="h-4 w-4 opacity-70" />
+                        Ask about a client…
+                    </Button>
+                )}
             </DialogTrigger>
 
             {/* Mobile trigger */}

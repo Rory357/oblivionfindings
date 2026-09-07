@@ -5,11 +5,16 @@ and the page ground they frame. This replaces the old light sidebar +
 light header starter-kit shell. Design canvas reference (mockup, page
 "Shell"): https://claude.ai/code/artifact/5ef121f5-b552-4a1e-ba58-17048c0a23d7
 
-**Status:** designed and approved, NOT yet implemented. Target files:
-`resources/js/components/app-header.tsx`,
-`resources/js/components/app-sidebar.tsx`, tokens in
-`resources/css/app.css`. Until implemented, the code carries the old
-shell — this guide is the contract, not a description of current code.
+**Status:** IMPLEMENTED (2026-09-05). Enforcement points:
+`resources/js/components/app-header.tsx` (the command header),
+`resources/js/components/app-sidebar.tsx` (the ink rail),
+`resources/js/components/event-horizon-wordmark.tsx` + `.eh-ring` in
+`resources/css/app.css` (the ring-O wordmark), shell tokens in
+`resources/css/app.css` (`--sidebar*`, `--background`, `--border`), and
+`resources/js/layouts/app/app-sidebar-layout.tsx` (header-on-top shell
+structure). Known deliberate gap: the workspace/site switcher chip is
+not built — the app has no "current site" concept in shared props yet;
+add the backend concept before adding the chip.
 
 All hex values below are mockup reference values. Implementation is
 **tokens-only** (DESIGN.md non-negotiable #1): each hex maps to a token
@@ -38,8 +43,17 @@ Left → right:
 - **Wordmark**: the Event Horizon ring stands in for the O
   (ring ref: 21px circle, 3.5px border `#7b7ef0`, soft glow — same
   family as LOADER_STYLE_GUIDE.md), then "blivion" (white, 650) and
-  "Care" (muted `#8f91b3`, 450). The product wordmark is
-  **"Oblivion Care"** — not "Findings".
+  "Care" (muted `#8f91b3`, 450). Words are **19px** (enlarged from
+  15px, approved 2026-09-06); the ring stays 21px. The product
+  wordmark is **"Oblivion Care"** — not "Findings".
+- **Day & date** (approved 2026-09-06): e.g. "**Sunday** 6 September
+  2026" between the wordmark and the search, absolutely positioned
+  with its left edge flush on the sidebar seam — `left-[256px]`, the
+  sidebar's shipped `w-64` (no gutter; stays put when the sidebar
+  collapses). Day 600 in `--sidebar-accent-foreground`, date in
+  `--sidebar-foreground`, 14px. The centred search **never yields**:
+  full date ≥1320px viewport, short form "Sun 6 Sep" 1140–1320px,
+  hidden below 1140px.
 - **Workspace/site switcher chip**: dark chip (`#23232f`, border
   `#2e2e3f`), building icon + current site + chevron.
 - **Command search, truly centred** (`grid-template-columns: 1fr auto
@@ -91,6 +105,34 @@ the control an invisible ≥44px hit area and keyboard focus
 
 ## 4. Page ground and cards
 
+### The 20px spacing rule (approved 2026-09-05)
+
+**20px everywhere**: one 20px gutter between the ink chrome (sidebar +
+top bar) and page content, 20px between sections, 20px between cards.
+Chosen from the "Shell Content Gutter" canvas after the original shell
+shipped a 56px-left/64px-top stack (layout `px-8 py-10` + PageLayout
+`p-6`); 10px was tried first and revised up to 20px the same day.
+
+- **Chrome gutter** — the one source:
+  `DEFAULT_CONTENT_CLASS = 'w-full p-5'` in
+  `layouts/app/app-sidebar-layout.tsx`. One approved exception
+  (2026-09-06): the breadcrumb strip is `px-5` with **10px above and
+  below the crumbs** (`py-2.5`), and the content wrapper drops its
+  top padding beneath it — the crumbs-to-band gap is 10px, not 20px.
+- Nothing stacks on it: `PageLayout` defaults to `padding="none"`;
+  pages don't add outer padding to their root wrapper; a
+  `contentClassName` override must keep `p-5` (it exists for things
+  like `overflow-x-hidden`, not for re-padding).
+- **Section rhythm** — `PageLayout`'s `gap-5` spaces hero → tabs →
+  content; page-level section stacks use the same `gap-5`, never
+  `gap-6`/`space-y-6`.
+- **Card grids/lists** — `gap-5` between cards. Spacing INSIDE a
+  card (padding, micro-layout) is not governed by this rule.
+- Surfaces outside this shell (marketing, staff, auth layouts) manage
+  their own gutters and may pass `PageLayout` an explicit `padding`.
+- Migration of pre-rule pages is tracked as DESIGN.md conformance
+  probe 17.
+
 - Light-mode `--background` is a **neutral mid-light grey** — ref
   `#dcdde0`, i.e. chroma ~0 (drop the violet tint). Chosen after
   iterating: `#f7f8fd` (old, too white/tinted) → `#eff0f2` → `#e8e9eb`
@@ -98,8 +140,9 @@ the control an invisible ≥44px hit area and keyboard focus
   Do not creep back toward tinted white, and do not go dark.
 - `--card` stays white. Cards on the grey ground: hairline border (ref
   `#cfd0d5`) + soft shadow (`0 1px 3px rgba(16,17,26,.06)`).
-- Page context (page title + date, e.g. "Today · Saturday, 5 September
-  2026") lives **in the page**, not the header. Muted text sitting
+- Page context: the page **title** lives in the page. The **day +
+  date** moved into the header at the sidebar seam (2026-09-06 — see
+  §2); pages must not duplicate the full date line. Muted text sitting
   directly on the grey ground needs the darker muted step (ref
   `#55566a`) to hold ≥4.5:1 — re-check `--muted-foreground` usage on
   ground-level surfaces during implementation.

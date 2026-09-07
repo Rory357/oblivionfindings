@@ -1,7 +1,6 @@
-import { Breadcrumbs } from '@/components/breadcrumbs';
+import { EventHorizonWordmark, resolveWordmarkName } from '@/components/event-horizon-wordmark';
 import GlobalNavSearch from '@/components/global-nav-search';
 import GlobalQueryBar from '@/components/global-query-bar';
-import { Icon } from '@/components/icon';
 import InboxMenus from '@/components/inbox-menus';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -10,251 +9,216 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    NavigationMenu,
-    NavigationMenuItem,
-    NavigationMenuList,
-    navigationMenuTriggerStyle,
-} from '@/components/ui/navigation-menu';
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from '@/components/ui/sheet';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { SheetTrigger } from '@/components/ui/sheet';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { useInitials } from '@/hooks/use-initials';
-import { cn, isSameUrl, resolveUrl } from '@/lib/utils';
-import { dashboard } from '@/routes';
-import { type BreadcrumbItem, type NavItem, type SharedData } from '@/types';
-import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Menu } from 'lucide-react';
-import AppLogo from './app-logo';
-import AppLogoIcon from './app-logo-icon';
+import { cn } from '@/lib/utils';
+import { type SharedData } from '@/types';
+import { Link, router, usePage } from '@inertiajs/react';
+import { AlertTriangle, Clock, Menu, MessageSquareText, ShieldAlert } from 'lucide-react';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Overview',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
+/**
+ * The Event Horizon command header (APP_SHELL_STYLE_GUIDE.md §2).
+ *
+ * Painted with the sidebar tokens so header + sidebar read as one continuous
+ * ink chrome (dark in light mode by design). Anatomy, left → right: ring-O
+ * wordmark, day + date pinned to the sidebar seam (left-[256px] = w-64),
+ * truly-centred command search (grid 1fr/auto/1fr — flex spacers drift
+ * off-centre), then Report incident / Clock in-out / Ask / Messages /
+ * inbox bells / user avatar. No "Live"/sync chip — removed by design.
+ * The centred search never yields to the date: full date ≥1320px, short
+ * form 1140–1320px, hidden below 1140px.
+ *
+ * Badge semantics (never swap them): violet count = conversations waiting;
+ * red count/dot = alerts needing attention.
+ */
 
-const rightNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
-];
+const INK_ICON_BUTTON =
+    'relative flex size-9 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring';
 
-const activeItemStyles = 'text-foreground dark:bg-muted dark:text-foreground';
-
-interface AppHeaderProps {
-    breadcrumbs?: BreadcrumbItem[];
-}
-
-export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
+export function AppHeader({
+    showMobileMenuTrigger = false,
+}: {
+    showMobileMenuTrigger?: boolean;
+}) {
     const page = usePage<SharedData>();
     const { auth } = page.props;
+    const can = (auth as any)?.can;
+    const branding = (page.props as any)?.branding as
+        | { name?: string; logoUrl?: string | null }
+        | undefined;
+    const unreadMessages = Number((auth as any)?.unreadMessageCount ?? 0);
     const getInitials = useInitials();
+
+    const canReportIncident = !!can?.incidents?.create;
+    const canClock = !!(
+        can?.timesheets?.viewAny ||
+        can?.timesheets?.viewAssigned ||
+        can?.shifts?.viewAssigned ||
+        can?.shifts?.manageAny
+    );
+    const canMessages = !!(can?.messages?.viewAny || can?.shifts?.viewAny);
+
+    const handleStopImpersonating = () => {
+        router.post('/system/users/stop-impersonating');
+    };
+
+    const today = new Date();
+    const longDay = today.toLocaleDateString('en-GB', { weekday: 'long' });
+    const longDate = today.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    });
+    const shortDay = today.toLocaleDateString('en-GB', { weekday: 'short' });
+    const shortDate = today.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+    });
+
     return (
         <>
-            <div className="border-b border-sidebar-border/80">
-                <div className="mx-auto flex h-16 items-center px-4 md:max-w-7xl">
-                    {/* Mobile Menu */}
-                    <div className="lg:hidden">
-                        <Sheet>
-                            <SheetTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="mr-2 h-[34px] w-[34px]"
-                                >
-                                    <Menu className="h-5 w-5" />
-                                </Button>
-                            </SheetTrigger>
-                            <SheetContent
-                                side="left"
-                                className="flex h-full w-64 flex-col items-stretch justify-between bg-sidebar"
-                            >
-                                <SheetTitle className="sr-only">
-                                    Navigation Menu
-                                </SheetTitle>
-                                <SheetHeader className="flex justify-start text-left">
-                                    <AppLogoIcon className="h-6 w-6 fill-current text-black dark:text-white" />
-                                </SheetHeader>
-                                <div className="flex h-full flex-1 flex-col space-y-4 p-4">
-                                    <div className="flex h-full flex-col justify-between text-sm">
-                                        <div className="flex flex-col space-y-4">
-                                            {mainNavItems.map((item) => (
-                                                <Link
-                                                    key={item.title}
-                                                    href={item.href}
-                                                    className="flex items-center space-x-2 font-medium"
-                                                >
-                                                    {item.icon && (
-                                                        <Icon
-                                                            iconNode={item.icon}
-                                                            className="h-5 w-5"
-                                                        />
-                                                    )}
-                                                    <span>{item.title}</span>
-                                                </Link>
-                                            ))}
-                                        </div>
-
-                                        <div className="flex flex-col space-y-4">
-                                            {rightNavItems.map((item) => (
-                                                <a
-                                                    key={item.title}
-                                                    href={resolveUrl(item.href)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="flex items-center space-x-2 font-medium"
-                                                >
-                                                    {item.icon && (
-                                                        <Icon
-                                                            iconNode={item.icon}
-                                                            className="h-5 w-5"
-                                                        />
-                                                    )}
-                                                    <span>{item.title}</span>
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </SheetContent>
-                        </Sheet>
+            {auth.impersonating && (
+                <div className="flex items-center justify-between gap-2 bg-primary px-6 py-2 text-sm font-medium text-primary-foreground md:px-4">
+                    <div className="flex items-center gap-2">
+                        <ShieldAlert className="h-4 w-4 shrink-0" />
+                        <span>
+                            You are impersonating{' '}
+                            <strong>{auth.user.name}</strong>
+                            {auth.impersonator && (
+                                <> (logged in as {auth.impersonator.name})</>
+                            )}
+                        </span>
                     </div>
-
-                    <Link
-                        href={dashboard()}
-                        prefetch
-                        className="flex items-center space-x-2"
+                    <Button
+                        size="sm"
+                        className="shrink-0 border border-primary-foreground/30 bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                        onClick={handleStopImpersonating}
                     >
-                        <AppLogo />
+                        Stop Impersonating
+                    </Button>
+                </div>
+            )}
+
+            <header className="sticky top-0 z-50 grid h-[58px] w-full grid-cols-[1fr_auto_1fr] items-center gap-2 bg-sidebar px-3 text-sidebar-foreground md:px-4">
+                {/* Day + date, flush to the sidebar seam. Stays put when the
+                    sidebar collapses; the centred search always wins the
+                    space fight (tiers documented in the file docblock). */}
+                <div className="pointer-events-none absolute top-1/2 left-[256px] hidden -translate-y-1/2 items-baseline gap-1.5 text-sm whitespace-nowrap min-[1140px]:flex">
+                    <span className="font-semibold text-sidebar-accent-foreground">
+                        <span className="min-[1320px]:hidden">{shortDay}</span>
+                        <span className="hidden min-[1320px]:inline">
+                            {longDay}
+                        </span>
+                    </span>
+                    <span>
+                        <span className="min-[1320px]:hidden">{shortDate}</span>
+                        <span className="hidden min-[1320px]:inline">
+                            {longDate}
+                        </span>
+                    </span>
+                </div>
+
+                {/* Left — mobile menu + wordmark */}
+                <div className="flex min-w-0 items-center gap-1">
+                    {showMobileMenuTrigger && (
+                        <SheetTrigger asChild>
+                            <button
+                                type="button"
+                                className={cn(INK_ICON_BUTTON, 'md:hidden')}
+                            >
+                                <Menu className="size-5" />
+                                <span className="sr-only">Toggle menu</span>
+                            </button>
+                        </SheetTrigger>
+                    )}
+                    <Link
+                        href="/dashboard"
+                        prefetch
+                        aria-label={`${resolveWordmarkName(branding?.name)} — home`}
+                        className="flex min-w-0 items-center rounded-lg px-1.5 py-1.5 outline-none transition-colors hover:bg-sidebar-accent/50 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                    >
+                        <EventHorizonWordmark
+                            name={branding?.name}
+                            logoUrl={branding?.logoUrl}
+                        />
                     </Link>
+                </div>
 
-                    {/* Desktop Navigation */}
-                    <div className="ml-6 hidden h-full items-center space-x-6 lg:flex">
-                        <NavigationMenu className="flex h-full items-stretch">
-                            <NavigationMenuList className="flex h-full items-stretch space-x-2">
-                                {mainNavItems.map((item) => (
-                                    <NavigationMenuItem
-                                        key={item.title}
-                                        className="relative flex h-full items-center"
-                                    >
-                                        <Link
-                                            href={item.href}
-                                            className={cn(
-                                                navigationMenuTriggerStyle(),
-                                                isSameUrl(
-                                                    page.url,
-                                                    item.href,
-                                                ) && activeItemStyles,
-                                                'h-9 cursor-pointer px-3',
-                                            )}
-                                        >
-                                            {item.icon && (
-                                                <Icon
-                                                    iconNode={item.icon}
-                                                    className="mr-2 h-4 w-4"
-                                                />
-                                            )}
-                                            {item.title}
-                                        </Link>
-                                        {isSameUrl(page.url, item.href) && (
-                                            <div className="absolute bottom-0 left-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"></div>
-                                        )}
-                                    </NavigationMenuItem>
-                                ))}
-                            </NavigationMenuList>
-                        </NavigationMenu>
-                    </div>
+                {/* Centre — command search (truly centred by the grid) */}
+                <div className="flex min-w-0 justify-center">
+                    <GlobalNavSearch variant="header" />
+                </div>
 
-                    <div className="ml-auto flex items-center space-x-2">
-                        <div className="relative flex items-center space-x-1">
-                            <GlobalNavSearch />
-                            <GlobalQueryBar />
-                            <InboxMenus />
-                            <div className="hidden lg:flex">
-                                {rightNavItems.map((item) => (
-                                    <TooltipProvider
-                                        key={item.title}
-                                        delayDuration={0}
-                                    >
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <a
-                                                    href={resolveUrl(item.href)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="group ml-1 inline-flex h-9 w-9 items-center justify-center rounded-md bg-transparent p-0 text-sm font-medium text-accent-foreground ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-                                                >
-                                                    <span className="sr-only">
-                                                        {item.title}
-                                                    </span>
-                                                    {item.icon && (
-                                                        <Icon
-                                                            iconNode={item.icon}
-                                                            className="size-5 opacity-80 group-hover:opacity-100"
-                                                        />
-                                                    )}
-                                                </a>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>{item.title}</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                ))}
-                            </div>
-                        </div>
+                {/* Right cluster */}
+                <div className="flex items-center justify-end gap-1.5">
+                    {canReportIncident && (
+                        <Button asChild size="sm" className="hidden lg:inline-flex">
+                            <Link href="/incidents/create" prefetch>
+                                <AlertTriangle className="size-4" />
+                                Report incident
+                            </Link>
+                        </Button>
+                    )}
+                    {canClock && (
+                        <Link
+                            href="/attendance"
+                            prefetch
+                            className="hidden h-9 items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-3 text-sm font-medium text-sidebar-accent-foreground transition-colors outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring lg:flex"
+                        >
+                            <Clock className="size-4" />
+                            Clock in/out
+                        </Link>
+                    )}
+                    <GlobalQueryBar variant="icon" />
+                    {canMessages && (
+                        <Link
+                            href="/operations/messages"
+                            prefetch
+                            aria-label={
+                                unreadMessages > 0
+                                    ? `Messages — ${unreadMessages} unread`
+                                    : 'Messages'
+                            }
+                            className={INK_ICON_BUTTON}
+                        >
+                            <MessageSquareText className="size-5" />
+                            {unreadMessages > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-none font-bold text-primary-foreground shadow-sm">
+                                    {unreadMessages > 99
+                                        ? '99+'
+                                        : unreadMessages}
+                                </span>
+                            )}
+                        </Link>
+                    )}
+                    <InboxMenus tone="ink" />
+                    {auth.user && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    className="size-10 rounded-full p-1"
+                                <button
+                                    type="button"
+                                    aria-label={`Open user menu for ${auth.user.name}`}
+                                    className="ml-0.5 flex size-9 shrink-0 items-center justify-center rounded-full outline-none transition-shadow hover:ring-2 hover:ring-sidebar-border focus-visible:ring-2 focus-visible:ring-sidebar-ring"
                                 >
                                     <Avatar className="size-8 overflow-hidden rounded-full">
                                         <AvatarImage
                                             src={auth.user.avatar}
                                             alt={auth.user.name}
                                         />
-                                        <AvatarFallback className="rounded-lg bg-muted text-black dark:bg-muted dark:text-white">
+                                        <AvatarFallback className="rounded-full bg-sidebar-accent text-xs text-sidebar-accent-foreground">
                                             {getInitials(auth.user.name)}
                                         </AvatarFallback>
                                     </Avatar>
-                                </Button>
+                                </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-56" align="end">
                                 <UserMenuContent user={auth.user} />
                             </DropdownMenuContent>
                         </DropdownMenu>
-                    </div>
+                    )}
                 </div>
-            </div>
-            {breadcrumbs.length > 1 && (
-                <div className="flex w-full border-b border-sidebar-border/70">
-                    <div className="mx-auto flex h-12 w-full items-center justify-start px-4 text-muted-foreground md:max-w-7xl">
-                        <Breadcrumbs breadcrumbs={breadcrumbs} />
-                    </div>
-                </div>
-            )}
+            </header>
         </>
     );
 }

@@ -100,6 +100,11 @@
     --color-status-neutral-bg: var(--status-neutral-bg);
     --color-live: var(--live);
     --color-live-bg: var(--live-bg);
+    --color-tone-teal: var(--tone-teal);
+    --color-tone-chip-teal: var(--tone-chip-teal);
+    --color-tone-chip-success: var(--tone-chip-success);
+    --color-tone-chip-warning: var(--tone-chip-warning);
+    --color-tone-chip-critical: var(--tone-chip-critical);
 
     --color-category-ops: var(--category-ops);
     --color-category-ops-bg: var(--category-ops-bg);
@@ -150,7 +155,11 @@
     --color-purple-700: oklch(45% 0.225 277);
     --color-purple-800: oklch(39.8% 0.195 277);
     --color-purple-900: oklch(32% 0.16 277);
-    --background: oklch(0.98 0.006 277);
+    /* Event Horizon shell ground (APP_SHELL_STYLE_GUIDE.md §4) — a neutral
+       mid-light grey (ref #dcdde0, chroma ≈ 0) so white cards read as lifted
+       surfaces. Iterated f7f8fd → eff0f2 → e8e9eb → charcoal 313237 (rejected:
+       too dark) → this. Don't creep back toward tinted white, don't go dark. */
+    --background: oklch(0.905 0.003 277);
     --foreground: oklch(0.15 0.015 277);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.15 0.015 277);
@@ -166,8 +175,10 @@
     --accent-foreground: oklch(0.2 0.015 277);
     --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(1 0 0);
-    --border: oklch(0.92 0.01 277);
-    --input: oklch(0.92 0.01 277);
+    /* Hairline visible on both the grey ground and white cards (shell guide
+       card border ref #cfd0d5). */
+    --border: oklch(0.87 0.006 277);
+    --input: oklch(0.87 0.006 277);
     --ring: var(--color-purple-500);
     --chart-1: var(--color-purple-500);
     --chart-2: oklch(0.65 0.18 150);
@@ -175,13 +186,17 @@
     --chart-4: oklch(0.75 0.15 85);
     --chart-5: var(--color-purple-300);
     --radius: 0.75rem;
-    --sidebar: oklch(0.97 0.005 277);
-    --sidebar-foreground: oklch(0.32 0.02 277);
-    --sidebar-primary: var(--color-purple-500);
+    /* Event Horizon chrome (APP_SHELL_STYLE_GUIDE.md §1–3): the app header and
+       sidebar share this near-black ink surface — dark in light mode BY DESIGN.
+       The header is painted with the sidebar tokens so the chrome reads as one
+       continuous L-shaped frame and retints as a family. Ink ref #15151f. */
+    --sidebar: oklch(0.155 0.015 277);
+    --sidebar-foreground: oklch(0.74 0.02 277);
+    --sidebar-primary: var(--color-purple-400);
     --sidebar-primary-foreground: oklch(1 0 0);
-    --sidebar-accent: oklch(0.93 0.015 277);
-    --sidebar-accent-foreground: oklch(0.25 0.015 277);
-    --sidebar-border: oklch(0.92 0.01 277);
+    --sidebar-accent: oklch(0.23 0.02 277);
+    --sidebar-accent-foreground: oklch(0.93 0.005 277);
+    --sidebar-border: oklch(0.28 0.02 277);
     --sidebar-ring: var(--color-purple-400);
 
     /* Status tokens — semantic meaning, not brand-tied. Foreground L values
@@ -207,6 +222,20 @@
        (--status-info aliases --primary, so it can't do this job.) */
     --live: oklch(52% 0.11 200);
     --live-bg: oklch(95% 0.035 200);
+
+    /* Tier-2 sub-tab tone cycle (NAVIGATION_STYLE_GUIDE.md Rule 2). Positions
+       0/2/3/4 reuse --primary / status tokens; teal is the cycle's own hue —
+       a different job from --live, which marks in-progress states. */
+    --tone-teal: oklch(45% 0.1 200);
+    /* Solid icon-chip fills for the toned strip stay DEEP in both themes: the
+       dark-theme tone tokens go light, which would sink the white glyph below
+       AA contrast. Values mirror the light-theme tones — keep in sync. (The
+       violet chip is bg-primary + text-primary-foreground, which branding
+       keeps paired on its own.) */
+    --tone-chip-teal: oklch(45% 0.1 200);
+    --tone-chip-success: oklch(45% 0.15 150);
+    --tone-chip-warning: oklch(42% 0.13 85);
+    --tone-chip-critical: oklch(45% 0.22 25);
 
     /* Category tokens — derived from --primary hue; rotate using oklch(from …) */
     --category-ops: var(--primary);
@@ -322,11 +351,13 @@
        --brand-tint-deep for the "now" rule borders, and --text-faint for
        caps-uppercase microcopy (e.g. tip text below the rail). The L value is
        tuned so this faint microcopy clears WCAG 2.1 AA (4.5:1) against
-       --background (#f7f8fd) at small sizes; 0.58 measured 4.03 and failed.
-       Verified via axe-core in tests/e2e/my-day-a11y.spec.ts. */
+       --background at small sizes; retuned 0.54 → 0.46 when the ground moved
+       from #f7f8fd to the Event Horizon grey #dcdde0 (0.54 measured ~3.7 on
+       the darker ground). Verified via axe-core in
+       tests/e2e/my-day-a11y.spec.ts. */
     --brand-deep: oklch(from var(--primary) calc(l - 0.09) c h);
     --brand-tint-deep: oklch(from var(--primary) 0.88 0.07 h);
-    --text-faint: oklch(from var(--foreground) 0.54 c h);
+    --text-faint: oklch(from var(--foreground) 0.46 c h);
 
     /* Map tokens — themable. Status colours (online/offline/idle/moving) stay
        semantic and remain hardcoded inside leaflet-map.tsx. */
@@ -392,6 +423,10 @@
     /* "Live" (in-progress) teal pair — dark variants */
     --live: oklch(72% 0.1 200);
     --live-bg: oklch(28% 0.05 200);
+
+    /* Tier-2 tone cycle — dark variant. Only the theme-aware tone flips;
+       the --tone-chip-* fills intentionally keep their :root (deep) values. */
+    --tone-teal: oklch(72% 0.12 200);
 
     /* Category tokens — dark variants (same derivation pattern, different opacity) */
     --category-ops: var(--primary);
@@ -504,6 +539,291 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 
 .text-caption {
     @apply text-xs text-muted-foreground;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Event Horizon ring — the O of the shell wordmark
+ * (APP_SHELL_STYLE_GUIDE.md §2). The STATIC sibling of the loader's
+ * accretion ring: same conic gradient sweeping --primary to a bright tip
+ * with a blurred glow duplicate behind it (LOADER_STYLE_GUIDE.md), just not
+ * spinning — so it needs no reduced-motion handling. Tokens-only so it
+ * retints with branding.
+ * ────────────────────────────────────────────────────────────────────────── */
+.eh-ring {
+    position: relative;
+    flex: none;
+    width: 21px;
+    height: 21px;
+}
+.eh-ring::before,
+.eh-ring::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        var(--primary) 200deg,
+        color-mix(in oklch, var(--primary) 45%, white) 290deg,
+        transparent 340deg
+    );
+    mask: radial-gradient(
+        closest-side,
+        transparent calc(100% - 3.5px),
+        #000 calc(100% - 3px)
+    );
+}
+.eh-ring::after {
+    /* glow */
+    inset: -4px;
+    filter: blur(6px);
+    opacity: 0.7;
+    mask: radial-gradient(closest-side, transparent calc(100% - 9px), #000);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Event Horizon page header (PAGE_HEADER_STYLE_GUIDE.md) — the fixed sky
+ * band that opens every page. The sky is ALWAYS the brand colour's own
+ * ramp (approved 2026-09-06, replacing a neutral-ink base): a dark shade
+ * of --primary at the top flowing down into the actual --primary at the
+ * bottom, capped by the horizon glow. Tokens-only: the dark shades keep
+ * the brand hue via relative-colour oklch, so whatever colour branding
+ * sets, the band is that colour's own dark-to-true gradient.
+ * No shadow, ever: the connected-tab rail's active tab must merge with the
+ * page ground (NAVIGATION_STYLE_GUIDE.md "Merge seam").
+ * ────────────────────────────────────────────────────────────────────────── */
+.eh-header {
+    /* Brand-dark base — the top-of-sky shade and the meter blocks' glass.
+     * Lightened 2026-09-07 (user request): L 0.22→0.30 top, 0.34→0.42 mid,
+     * with a little more chroma so the brand hue stays visible in the
+     * lighter dark shades. White header text stays comfortably AA. */
+    --eh-ink: oklch(from var(--primary) 0.3 calc(c * 0.6) h);
+    --eh-sky-mid: oklch(from var(--primary) 0.42 calc(c * 0.8) h);
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    background:
+        radial-gradient(
+            56% 78% at 80% 108%,
+            color-mix(
+                    in oklch,
+                    color-mix(in oklch, var(--primary) 75%, white) 92%,
+                    transparent
+                )
+                0%,
+            transparent 72%
+        ),
+        radial-gradient(
+            48% 64% at 16% 112%,
+            color-mix(in oklch, var(--primary) 55%, transparent) 0%,
+            transparent 68%
+        ),
+        linear-gradient(
+            to bottom,
+            var(--eh-ink) 0%,
+            var(--eh-sky-mid) 55%,
+            var(--primary) 100%
+        );
+}
+/* Decorative orbit arcs — two giant hairline circles clipped by the band. */
+.eh-header::before,
+.eh-header::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
+.eh-header::before {
+    width: 560px;
+    height: 560px;
+    left: -120px;
+    bottom: -430px;
+    border: 1px solid
+        color-mix(
+            in oklch,
+            color-mix(in oklch, var(--primary) 55%, white) 20%,
+            transparent
+        );
+}
+.eh-header::after {
+    width: 680px;
+    height: 680px;
+    right: -220px;
+    top: -540px;
+    border: 1px solid
+        color-mix(
+            in oklch,
+            color-mix(in oklch, var(--primary) 55%, white) 14%,
+            transparent
+        );
+}
+
+/* The 48px circular identity mark ring — the static loader-family ring
+ * (LOADER_STYLE_GUIDE.md) scaled up for the header's module icon/avatar. */
+.eh-mark-ring {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 3px solid color-mix(in oklch, var(--primary) 75%, white);
+    color: var(--primary-foreground);
+    box-shadow:
+        0 0 18px color-mix(in oklch, var(--primary) 50%, transparent),
+        inset 0 0 12px color-mix(in oklch, var(--primary) 35%, transparent);
+}
+.eh-mark-ring > img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Header meter blocks — the full-width instrument row
+ * (PAGE_HEADER_STYLE_GUIDE.md §5, meter-row revision 2026-09-06). Dark
+ * glass on the sky; neutral blocks keep a quiet glass border, toned blocks
+ * take the fixed status tone (lightened for AA on the dark sky — safety
+ * hues never derive from brand) on border, label AND headline value. No
+ * glow — the toned border alone carries the accent. Every block is a LINK
+ * to its view: hover lifts it, brightens the border and reveals the
+ * corner ↗ arrow. */
+.eh-meter {
+    --eh-meter-accent: color-mix(in oklch, var(--primary) 75%, white);
+    position: relative;
+    flex: 1 1 0;
+    min-width: 140px;
+    display: grid;
+    gap: 7px;
+    /* Rows spread to fill the block height: head top, visual middle,
+     * caption bottom — no dead space under short content. */
+    align-content: space-between;
+    justify-items: start;
+    text-align: left;
+    padding: 8px 12px 9px;
+    border-radius: 10px;
+    background: color-mix(
+        in oklch,
+        var(--eh-ink, oklch(0.17 0.01 277)) 45%,
+        transparent
+    );
+    border: 1px solid
+        color-mix(in oklch, var(--primary-foreground) 16%, transparent);
+    transition:
+        transform 0.15s ease,
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+}
+.eh-meter:hover {
+    transform: translateY(-1px);
+    background: color-mix(
+        in oklch,
+        var(--eh-ink, oklch(0.17 0.01 277)) 62%,
+        transparent
+    );
+    border-color: color-mix(
+        in oklch,
+        var(--primary-foreground) 34%,
+        transparent
+    );
+}
+@media (prefers-reduced-motion: reduce) {
+    .eh-meter,
+    .eh-meter:hover {
+        transform: none;
+        transition: none;
+    }
+}
+.eh-meter--critical {
+    --eh-meter-accent: color-mix(in oklch, var(--status-critical) 55%, white);
+}
+.eh-meter--warning {
+    --eh-meter-accent: color-mix(in oklch, var(--status-warning) 60%, white);
+}
+.eh-meter--success {
+    --eh-meter-accent: color-mix(in oklch, var(--status-success) 55%, white);
+}
+.eh-meter--critical,
+.eh-meter--warning,
+.eh-meter--success {
+    border-color: color-mix(in oklch, var(--eh-meter-accent) 45%, transparent);
+}
+.eh-meter--critical:hover,
+.eh-meter--warning:hover,
+.eh-meter--success:hover {
+    border-color: color-mix(in oklch, var(--eh-meter-accent) 75%, transparent);
+}
+.eh-meter .eh-meter-label {
+    color: color-mix(in oklch, var(--primary-foreground) 62%, transparent);
+}
+.eh-meter .eh-meter-value,
+.eh-meter .eh-meter-big {
+    color: var(--primary-foreground);
+}
+.eh-meter--critical .eh-meter-label,
+.eh-meter--critical .eh-meter-value,
+.eh-meter--critical .eh-meter-big,
+.eh-meter--warning .eh-meter-label,
+.eh-meter--warning .eh-meter-value,
+.eh-meter--warning .eh-meter-big,
+.eh-meter--success .eh-meter-label,
+.eh-meter--success .eh-meter-value,
+.eh-meter--success .eh-meter-big {
+    color: var(--eh-meter-accent);
+}
+.eh-meter-go {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    width: 11px;
+    height: 11px;
+    color: var(--eh-meter-accent);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.eh-meter:hover .eh-meter-go,
+.eh-meter:focus-visible .eh-meter-go {
+    opacity: 1;
+}
+.eh-meter-bar {
+    display: block;
+    width: 100%;
+    height: 5px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: color-mix(in oklch, var(--primary-foreground) 16%, transparent);
+}
+.eh-meter-bar > i {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--eh-meter-accent);
+}
+.eh-meter-spark {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 16px;
+    color: var(--eh-meter-accent);
+}
+.eh-meter-spark > i {
+    width: 4px;
+    border-radius: 1.5px;
+    background: currentColor;
+    opacity: 0.85;
+}
+.eh-meter-delta--good {
+    color: color-mix(in oklch, var(--status-success) 55%, white);
+}
+.eh-meter-delta--bad {
+    color: color-mix(in oklch, var(--status-critical) 55%, white);
+}
+.eh-meter-donut-arc {
+    stroke: color-mix(in oklch, var(--status-success) 55%, white);
+}
+.eh-meter-donut-v {
+    color: color-mix(in oklch, var(--status-success) 55%, white);
 }
 
 /* Hide scrollbars on icon sidebar */

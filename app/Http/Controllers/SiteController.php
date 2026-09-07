@@ -9,7 +9,9 @@ use App\Models\AssetGeofence;
 use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
+use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
+use App\Models\SiteHazard;
 use App\Models\SiteCoverageRequirement;
 use App\Models\SiteDocument;
 use App\Models\SiteDocumentFolder;
@@ -223,13 +225,61 @@ class SiteController extends Controller
         $bedsTotal = (int) $liveSites->sum(fn (Site $site) => (int) ($site->rooms_total ?? 0));
         $bedsOccupied = (int) $liveSites->sum(fn (Site $site) => (int) ($site->rooms_occupied ?? 0));
 
+        // Header meter-row instrumentation (PAGE_HEADER_STYLE_GUIDE.md §5 —
+        // blocks never fake data): hazards REPORTED per day over the last
+        // 7 days (+ the week before, for the movement arrow) and on-time
+        // checklist completion over the last 90 days. All scoped to the
+        // visible live roster; three bounded indexed queries.
+        $liveSiteIds = $liveSites->pluck('id');
+        $trendStart = now()->subDays(6)->startOfDay();
+        $reportedByDay = SiteHazard::query()
+            ->whereIn('site_id', $liveSiteIds)
+            ->where('created_at', '>=', $trendStart)
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as reported')
+            ->groupBy('day')
+            ->pluck('reported', 'day');
+        $hazardsTrend = [];
+        for ($daysAgo = 6; $daysAgo >= 0; $daysAgo--) {
+            $hazardsTrend[] = (int) ($reportedByDay[now()->subDays($daysAgo)->toDateString()] ?? 0);
+        }
+        $hazardsWeek = array_sum($hazardsTrend);
+        $hazardsPrevWeek = SiteHazard::query()
+            ->whereIn('site_id', $liveSiteIds)
+            ->where('created_at', '>=', now()->subDays(13)->startOfDay())
+            ->where('created_at', '<', $trendStart)
+            ->count();
+
+        $checksWindow = [now()->subDays(90)->toDateString(), now()->toDateString()];
+        $checksTotal = SiteChecklistRun::query()
+            ->whereIn('site_id', $liveSiteIds)
+            ->whereBetween('scheduled_date', $checksWindow)
+            ->count();
+        $checksOnTime = $checksTotal > 0
+            ? SiteChecklistRun::query()
+                ->whereIn('site_id', $liveSiteIds)
+                ->whereBetween('scheduled_date', $checksWindow)
+                ->where('status', 'completed')
+                ->whereRaw('DATE(completed_at) <= scheduled_date')
+                ->count()
+            : 0;
+
         $summary = [
             'total' => $liveSites->count(),
             'active' => $liveSites->where('is_active', true)->count(),
             'inactive' => $liveSites->where('is_active', false)->count(),
             'incomplete' => $savedViewCounts['active_incomplete'],
             'hazards' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->open_hazards_count ?? 0)),
+            'hazards_trend' => $hazardsTrend,
+            'hazards_week' => $hazardsWeek,
+            'hazards_week_delta' => $hazardsWeek - $hazardsPrevWeek,
             'overdue' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->overdue_checklists_count ?? 0) + (int) ($site->open_maintenance_count ?? 0)),
+            'overdue_checks' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->overdue_checklists_count ?? 0)),
+            'overdue_maintenance' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->open_maintenance_count ?? 0)),
+            'checks_on_time' => [
+                'on_time' => $checksOnTime,
+                'total' => $checksTotal,
+                'percent' => $checksTotal > 0 ? (int) round(($checksOnTime / $checksTotal) * 100) : null,
+            ],
             'regions' => $liveSites->map(fn (Site $site) => $site->resolved_region)->filter()->unique()->count(),
             'beds_total' => $bedsTotal,
             'beds_occupied' => $bedsOccupied,

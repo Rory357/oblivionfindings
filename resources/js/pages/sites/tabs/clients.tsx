@@ -15,7 +15,7 @@ import {
     ShieldAlert,
     UserRound,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     LinkClientDialog,
     type ClientPlacementOptions,
@@ -78,6 +78,20 @@ export function SiteProfileClients({
     const [createOpen, setCreateOpen] = useState(false);
     const [placementOpen, setPlacementOpen] = useState(false);
     const [unlinkClient, setUnlinkClient] = useState<ClientItem | null>(null);
+
+    // Deep link from the header's "Link …" quick action:
+    // /sites/{id}?tab=clients&action=link opens the placement dialog once,
+    // then drops the param so a refresh doesn't reopen it.
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('action') !== 'link') return;
+        url.searchParams.delete('action');
+        window.history.replaceState(window.history.state, '', url);
+        if (data.can_place_existing && data.placement_options) {
+            setPlacementOpen(true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot mount deep link
+    }, []);
 
     if (data.locked) return <SiteProfileLockedState label="Clients" />;
 

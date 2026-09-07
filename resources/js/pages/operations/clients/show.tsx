@@ -10,21 +10,6 @@ import {
     type ProfileDialogState,
 } from '@/components/clients/profile/dialog-host';
 import {
-    AlertRibbon,
-    ClientProfileHero,
-    type HeroAlert,
-    type HeroBadge,
-    type HeroNextShift,
-    type HeroVital,
-    type MoreMenuItem,
-} from '@/components/clients/profile/hero';
-import {
-    GroupPillRail,
-    TabSearchPalette,
-    TierTwoTabs,
-    type ProfileNavGroup,
-} from '@/components/clients/profile/nav';
-import {
     buildAboutTiles,
     OverviewDesignGrid,
 } from '@/components/clients/profile/overview-grid';
@@ -35,12 +20,41 @@ import type {
     RaPickers,
     RaRow,
 } from '@/components/health-safety/risk-assessments/types';
-import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterContacts,
+    PageHeaderMeterDonut,
+    PageHeaderMeterSpark,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearchTrigger,
+    PageHeaderStatusChip,
+    PageLayout,
+    type PageHeaderRailItem,
+} from '@/components/page';
+import {
+    TabSearchPalette,
+    TierTwoTabs,
+    type GroupedProfileNavGroup,
+} from '@/components/page/grouped-profile-nav';
 import { ClientPrivacyPanel } from '@/components/privacy/client-privacy-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -102,11 +116,11 @@ import {
     Camera,
     Check,
     CheckCircle2,
+    ChevronDown,
     ClipboardList,
     Clock,
     DollarSign,
     FileText,
-    Flag,
     FolderOpen,
     Globe,
     GraduationCap,
@@ -114,10 +128,13 @@ import {
     HeartPulse,
     Home,
     ListTodo,
+    MessageCircle,
     MonitorCog,
+    MoreHorizontal,
     MessageSquare as MsgIcon,
     Navigation,
     Package,
+    Pencil,
     Phone,
     Pill,
     Plus,
@@ -130,6 +147,7 @@ import {
     User,
     Users,
     Utensils,
+    Zap,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuditHistoryTab } from './tabs/audit-history';
@@ -1615,7 +1633,7 @@ export default function ClientShow({
     ]);
 
     // ── Grouped nav registry: 6 groups × first-class tabs ──
-    const visibleGroups = useMemo<ProfileNavGroup[]>(() => {
+    const visibleGroups = useMemo<GroupedProfileNavGroup[]>(() => {
         const groupIcons: Record<
             ClientTabGroupKey,
             React.ComponentType<{ className?: string }>
@@ -1647,6 +1665,365 @@ export default function ClientShow({
 
     const activeGroup =
         visibleGroups.find((g) => g.key === openGroup) ?? visibleGroups[0];
+
+    // ── Event Horizon header data (PAGE_HEADER_STYLE_GUIDE.md, profile
+    //    variant): identity sublines, the meter-row numbers — every block
+    //    links to the view its number lives in — and the group rail. ──
+    const visibleTabKeys = useMemo(
+        () => new Set(tabs.filter((t) => t.show).map((t) => String(t.key))),
+        [tabs],
+    );
+
+    const statusVariant =
+        client.status === 'active'
+            ? 'success'
+            : client.status === 'onboarding'
+              ? 'warning'
+              : 'neutral';
+    const statusLabel = client.status
+        ? client.status.charAt(0).toUpperCase() + client.status.slice(1)
+        : 'Unknown';
+
+    const clientAge = client.date_of_birth
+        ? Math.floor(
+              (Date.now() - new Date(client.date_of_birth).getTime()) /
+                  31557600000,
+          )
+        : null;
+    const identityLine = [
+        client.preferred_name && client.preferred_name !== name
+            ? `“${client.preferred_name}”`
+            : null,
+        client.preferred_pronouns,
+        clientAge != null ? `${clientAge} years` : null,
+        client.ethnicity,
+        client.nhi_number ? `NHI ${client.nhi_number}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+    const serviceLine = [
+        client.site
+            ? client.room?.name
+                ? `${client.site.name} · ${client.room.name}`
+                : client.site.name
+            : null,
+        client.service_context?.name,
+        client.funding_type,
+        client.key_worker?.name ? `Key worker ${client.key_worker.name}` : null,
+        client.service_start_date
+            ? `Since ${new Date(client.service_start_date).toLocaleDateString(
+                  'en-NZ',
+                  { month: 'short', year: 'numeric' },
+              )}`
+            : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+    // Meter-row numbers — live backend sources only (DESIGN.md "dead or
+    // decorative meter blocks"); a block whose source is hidden is dropped.
+    const flaggedNotesCount = progressNotesCan.review
+        ? (dailyNotesSummary.flagged_open ?? 0)
+        : 0;
+    const openActionsCount = actionsReviewsSummary.open ?? 0;
+    const medAlertsCount = emarSummary?.pending_alerts_count ?? 0;
+    const attentionTotal =
+        flaggedNotesCount +
+        openActionsCount +
+        medAlertsCount +
+        pendingVisitCount;
+    const attentionTone =
+        (actionsReviewsSummary.critical ?? 0) > 0
+            ? 'critical'
+            : attentionTotal > 0
+              ? 'warning'
+              : 'success';
+    const attentionCaption = [
+        flaggedNotesCount
+            ? `${flaggedNotesCount} note${flaggedNotesCount > 1 ? 's' : ''}`
+            : null,
+        openActionsCount
+            ? `${openActionsCount} action${openActionsCount > 1 ? 's' : ''}`
+            : null,
+        medAlertsCount
+            ? `${medAlertsCount} med alert${medAlertsCount > 1 ? 's' : ''}`
+            : null,
+        pendingVisitCount
+            ? `${pendingVisitCount} visit request${pendingVisitCount > 1 ? 's' : ''}`
+            : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+    const safetyAlertCount =
+        (client.safeguarding_flag ? 1 : 0) +
+        (safety?.allergies?.length ?? 0) +
+        (safety?.critical_risks?.length ?? 0) +
+        (safety?.care_flags?.length ?? 0);
+    const safetyTone =
+        safetyAlertCount > 0 ||
+        client.risk_level === 'high' ||
+        client.risk_level === 'critical'
+            ? 'critical'
+            : 'success';
+    const safetyCaption = [
+        client.risk_level ? `${client.risk_level} risk` : null,
+        ...(client.safeguarding_flag ? ['Safeguarding'] : []),
+        ...(safety?.allergies ?? []).map((a) => `Allergy: ${a.label}`),
+        ...(safety?.critical_risks ?? []).map((r) => r.label),
+        ...(safety?.care_flags ?? []).map((f) => f.label),
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+    const activePlan = carePlansSummary?.active_plan ?? null;
+    const activePlanGoals: Array<{ status?: string | null }> =
+        activePlan?.goals ?? [];
+    const activePlanGoalsDone = activePlanGoals.filter(
+        (goal) => goal.status === 'completed',
+    ).length;
+    const goalsTabKey = visibleTabKeys.has('goals_path')
+        ? 'goals_path'
+        : visibleTabKeys.has('care_plans')
+          ? 'care_plans'
+          : null;
+
+    const notesWeekSeries = useMemo(() => {
+        const series = Array.from({ length: 7 }, () => 0);
+        const dayMs = 86400000;
+        const endOfToday = new Date();
+        endOfToday.setHours(24, 0, 0, 0);
+        for (const note of clientDailyNotes as Array<{
+            occurred_at?: string | null;
+            created_at?: string | null;
+        }>) {
+            const raw = note.occurred_at ?? note.created_at;
+            if (!raw) continue;
+            const daysAgo = Math.floor(
+                (endOfToday.getTime() - new Date(raw).getTime()) / dayMs,
+            );
+            if (daysAgo >= 0 && daysAgo < 7) series[6 - daysAgo] += 1;
+        }
+        return series;
+    }, [clientDailyNotes]);
+    const notesThisWeek = notesWeekSeries.reduce((sum, day) => sum + day, 0);
+
+    // Daily-living vitals — the same live sources the old vitals strip read.
+    const mealSummary = (pageProps as any).meal_logs?.summary ?? null;
+    const mealsEaten =
+        mealSummary?.eaten_today != null
+            ? Number(mealSummary.eaten_today)
+            : null;
+    const mealsExpected = Number(mealSummary?.expected_today ?? 3);
+
+    const moodWeek = useMemo(() => {
+        const sums = Array.from({ length: 7 }, () => 0);
+        const counts = Array.from({ length: 7 }, () => 0);
+        const dayMs = 86400000;
+        const endOfToday = new Date();
+        endOfToday.setHours(24, 0, 0, 0);
+        for (const note of clientDailyNotes as Array<{
+            mood_rating?: number | string | null;
+            occurred_at?: string | null;
+        }>) {
+            if (note.mood_rating == null || !note.occurred_at) continue;
+            const daysAgo = Math.floor(
+                (endOfToday.getTime() - new Date(note.occurred_at).getTime()) /
+                    dayMs,
+            );
+            if (daysAgo < 0 || daysAgo >= 7) continue;
+            sums[6 - daysAgo] += Number(note.mood_rating);
+            counts[6 - daysAgo] += 1;
+        }
+        const total = counts.reduce((a, b) => a + b, 0);
+        return {
+            series: sums.map((sum, i) => (counts[i] ? sum / counts[i] : 0)),
+            count: total,
+            average: total ? sums.reduce((a, b) => a + b, 0) / total : null,
+        };
+    }, [clientDailyNotes]);
+
+    const sleepSummary = (healthMonitoring as any)?.sleep_summary ?? {};
+    const sleepAverage =
+        sleepSummary.average_7_nights != null
+            ? Number(sleepSummary.average_7_nights)
+            : null;
+    const sleepTarget = Number(
+        sleepSummary.target_hours ?? (client as any).sleep_target_hours ?? 7,
+    );
+
+    const activeMedsCount = emarSummary?.active_medications_count ?? 0;
+
+    const nextShiftStarts = nextShiftSummary?.starts_at
+        ? new Date(nextShiftSummary.starts_at)
+        : null;
+    const nextShiftEnds = nextShiftSummary?.ends_at
+        ? new Date(nextShiftSummary.ends_at)
+        : null;
+    const nextShiftHoursAway = nextShiftStarts
+        ? (nextShiftStarts.getTime() - Date.now()) / 3600000
+        : null;
+    const nextShiftCountdown =
+        nextShiftHoursAway == null
+            ? null
+            : nextShiftHoursAway > 0
+              ? nextShiftHoursAway < 1
+                  ? 'soon'
+                  : nextShiftHoursAway < 24
+                    ? `in ${Math.round(nextShiftHoursAway)}h`
+                    : null
+              : nextShiftHoursAway > -12
+                ? 'now'
+                : null;
+    const nextShiftWhen = nextShiftStarts
+        ? `${nextShiftStarts.toLocaleDateString('en-NZ', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'short',
+          })} ${nextShiftStarts.toLocaleTimeString('en-NZ', {
+              hour: 'numeric',
+              minute: '2-digit',
+          })}${
+              nextShiftEnds
+                  ? ` – ${nextShiftEnds.toLocaleTimeString('en-NZ', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                    })}`
+                  : ''
+          }`
+        : nextShiftSummary
+          ? 'Scheduled'
+          : null;
+    const nextShiftTasksTotal = nextShiftSummary?.task_count ?? 0;
+    const nextShiftTasksDone = Math.max(
+        0,
+        nextShiftTasksTotal - (nextShiftSummary?.incomplete_task_count ?? 0),
+    );
+
+    // ── Header overflow menu ──
+    const moreItems: Array<{
+        key: string;
+        label: string;
+        icon: typeof User;
+        detail?: string;
+        onSelect: () => void;
+    }> = [];
+    if (client.phone)
+        moreItems.push({
+            key: 'call',
+            label: 'Call',
+            icon: Phone,
+            detail: client.phone,
+            onSelect: () => {
+                window.location.href = `tel:${client.phone}`;
+            },
+        });
+    if (can.navigate_family_portal)
+        moreItems.push({
+            key: 'visits',
+            label: 'Visit requests',
+            icon: Users,
+            detail: pendingVisitCount
+                ? `${pendingVisitCount} pending`
+                : undefined,
+            onSelect: () =>
+                router.visit(`/operations/clients/${client.id}/visit-requests`),
+        });
+    if (can.navigate_medical) {
+        moreItems.push({
+            key: 'mar',
+            label: 'Full MAR chart',
+            icon: Pill,
+            detail: medAlertsCount
+                ? `${medAlertsCount} alert${medAlertsCount > 1 ? 's' : ''}`
+                : activeMedsCount
+                  ? `${activeMedsCount} active`
+                  : undefined,
+            onSelect: () =>
+                router.visit(`/operations/clients/${client.id}/mar`),
+        });
+        moreItems.push({
+            key: 'medical',
+            label: 'Medical record',
+            icon: Heart,
+            detail: (medical?.conditions ?? []).length
+                ? `${medical.conditions.length} condition${medical.conditions.length > 1 ? 's' : ''}`
+                : undefined,
+            onSelect: () =>
+                router.visit(`/operations/clients/${client.id}/medical`),
+        });
+    }
+    if (can.assign_workers)
+        moreItems.push({
+            key: 'workers',
+            label: 'Manage workers',
+            icon: Users,
+            detail: client.support_workers.length
+                ? `${client.support_workers.length} assigned`
+                : undefined,
+            onSelect: () => handleTabChange('assignments'),
+        });
+    if (can.create_shift)
+        moreItems.push({
+            key: 'create_shift',
+            label: 'Create shift',
+            icon: Clock,
+            detail: client.site?.name ?? undefined,
+            onSelect: () => {
+                void createShiftLauncher.openWith({
+                    client_id: client.id,
+                    site_id: client.site?.id ?? undefined,
+                });
+            },
+        });
+    const clientSite = client.site;
+    if (clientSite && can.navigate_site)
+        moreItems.push({
+            key: 'site',
+            label: `Open ${clientSite.name}`,
+            icon: Home,
+            detail: client.room?.name ?? undefined,
+            onSelect: () => router.visit(`/sites/${clientSite.id}`),
+        });
+    moreItems.push({
+        key: 'print',
+        label: 'Print profile',
+        icon: FileText,
+        onSelect: () => window.print(),
+    });
+
+    // ── Group rail: alert counts follow the tab their number lives in ──
+    const groupAlertCounts: Partial<Record<ClientTabGroupKey, number>> = {
+        daily: flaggedNotesCount,
+        health: medAlertsCount,
+        governance: openActionsCount + pendingVisitCount,
+    };
+    const railItems: PageHeaderRailItem[] = visibleGroups.map((group) => ({
+        key: group.key,
+        label: group.label,
+        icon: group.icon,
+        count: groupAlertCounts[group.key as ClientTabGroupKey] || undefined,
+        alert: true,
+    }));
+
+    // The rail remembers which sub-tab you were on in each group, so
+    // switching groups doesn't lose your place.
+    const rememberedTabs = useRef<Record<string, string>>({});
+    useEffect(() => {
+        rememberedTabs.current[groupForTab(tab)] = tab;
+    }, [tab]);
+    const selectGroup = useCallback(
+        (groupKey: string) => {
+            const group = visibleGroups.find((item) => item.key === groupKey);
+            if (!group) return;
+            const remembered = rememberedTabs.current[groupKey];
+            const target = group.tabs.some((t) => t.key === remembered)
+                ? remembered
+                : group.tabs[0]?.key;
+            if (target) handleTabChange(target as TabKey);
+        },
+        [handleTabChange, visibleGroups],
+    );
 
     useEffect(() => {
         const resolved = resolveVisibleProfileTab(tab, visibleGroups);
@@ -1682,6 +2059,7 @@ export default function ClientShow({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 {
                     title: labels?.['client.plural'] ?? 'Clients',
                     href: '/operations/clients',
@@ -1689,664 +2067,589 @@ export default function ClientShow({
                 { title: name, href: `/operations/clients/${client.id}` },
             ]}
         >
-            <Head title={name} />
+            <Head title={`${name} — Client Profile`} />
 
-            <PageShell>
-                {/* ── Hero Header ──────────────────────────────── */}
-                {(() => {
-                    // ── Identity chips ──
-                    const heroChips: {
-                        key: string;
-                        icon?: React.ComponentType<{ className?: string }>;
-                        label: string;
-                    }[] = [];
-                    if (client.nhi_number)
-                        heroChips.push({
-                            key: 'nhi',
-                            label: `NHI ${client.nhi_number}`,
-                        });
-                    if (client.site)
-                        heroChips.push({
-                            key: 'site',
-                            icon: Home,
-                            label: client.room?.name
-                                ? `${client.site.name} · ${client.room.name}`
-                                : client.site.name,
-                        });
-                    if (client.service_start_date)
-                        heroChips.push({
-                            key: 'since',
-                            icon: Clock,
-                            label: `Since ${new Date(
-                                client.service_start_date,
-                            ).toLocaleDateString('en-NZ', {
-                                month: 'short',
-                                year: 'numeric',
-                            })}`,
-                        });
-                    if (client.key_worker?.name)
-                        heroChips.push({
-                            key: 'keyworker',
-                            icon: User,
-                            label: client.key_worker.name,
-                        });
-                    if (client.funding_type)
-                        heroChips.push({
-                            key: 'funding',
-                            label: client.funding_type,
-                        });
-                    if (client.service_context)
-                        heroChips.push({
-                            key: 'service',
-                            label: client.service_context.name,
-                        });
-
-                    // ── Status badges ──
-                    const heroBadges: HeroBadge[] = [];
-                    if (client.risk_level)
-                        heroBadges.push({
-                            key: 'risk',
-                            label: `${client.risk_level} risk`,
-                            icon: ShieldAlert,
-                            tone:
-                                client.risk_level === 'critical'
-                                    ? 'critical'
-                                    : client.risk_level === 'high'
-                                      ? 'warning'
-                                      : client.risk_level === 'medium'
-                                        ? 'info'
-                                        : 'success',
-                        });
-                    if (client.safeguarding_flag)
-                        heroBadges.push({
-                            key: 'safeguarding',
-                            label: 'Safeguarding',
-                            icon: Shield,
-                            tone: 'critical',
-                        });
-
-                    const carePlanSummary =
-                        (pageProps as any).care_plans_summary ?? {};
-                    const carePlanGoals =
-                        carePlanSummary.active_plan?.goals ?? [];
-                    const carePlanDone = carePlanGoals.filter(
-                        (g: any) => g.status === 'completed',
-                    ).length;
-                    if (carePlanSummary.active_plan)
-                        heroBadges.push({
-                            key: 'plan',
-                            label: 'Care plan active',
-                            icon: Target,
-                            tone: 'info',
-                        });
-
-                    // ── Identity line ──
-                    const age = client.date_of_birth
-                        ? Math.floor(
-                              (Date.now() -
-                                  new Date(client.date_of_birth).getTime()) /
-                                  31557600000,
-                          )
-                        : null;
-                    const identityLine = [
-                        client.preferred_name && client.preferred_name !== name
-                            ? `“${client.preferred_name}”`
-                            : null,
-                        client.preferred_pronouns,
-                        age != null ? `${age}y` : null,
-                        client.ethnicity,
-                    ]
-                        .filter(Boolean)
-                        .join(' · ');
-
-                    // ── Vitals strip (real chart data) ──
-                    const now = Date.now();
-                    const weekAgo = now - 7 * 86400000;
-                    const moodRatings = (clientDailyNotes as any[])
-                        .filter(
-                            (n) =>
-                                n.mood_rating != null &&
-                                n.occurred_at &&
-                                new Date(n.occurred_at).getTime() >= weekAgo,
-                        )
-                        .map((n) => Number(n.mood_rating));
-                    const moodAvg = moodRatings.length
-                        ? moodRatings.reduce((a, b) => a + b, 0) /
-                          moodRatings.length
-                        : null;
-                    const seizureEntries =
-                        (healthMonitoring?.seizure as any[]) ?? [];
-                    const lastSeizure = seizureEntries[0]?.occurred_at
-                        ? new Date(seizureEntries[0].occurred_at).getTime()
-                        : null;
-                    const seizureFreeDays = lastSeizure
-                        ? Math.max(
-                              0,
-                              Math.floor((now - lastSeizure) / 86400000),
-                          )
-                        : null;
-                    const fluidToday = (
-                        (healthMonitoring?.fluid as any[]) ?? []
-                    )
-                        .filter(
-                            (e) =>
-                                e.direction !== 'out' &&
-                                e.occurred_at &&
-                                new Date(e.occurred_at).toDateString() ===
-                                    new Date().toDateString(),
-                        )
-                        .reduce((sum, e) => sum + (e.volume_ml ?? 0), 0);
-                    const fluidTarget =
-                        ((client as any).fluid_intake_min_ml as
-                            | number
-                            | null) ?? null;
-                    const notesThisWeek = (clientDailyNotes as any[]).filter(
-                        (n) =>
-                            (n.occurred_at ?? n.created_at) &&
-                            new Date(n.occurred_at ?? n.created_at).getTime() >=
-                                weekAgo,
-                    ).length;
-                    const mealLogsPayload = (pageProps as any).meal_logs ?? {};
-                    const mealSummary = mealLogsPayload.summary ?? {};
-                    const mealsEaten =
-                        mealSummary.eaten_today != null
-                            ? Number(mealSummary.eaten_today)
-                            : null;
-                    const mealsExpected = Number(
-                        mealSummary.expected_today ?? 3,
-                    );
-                    const mealsOnTrack =
-                        mealsEaten != null && mealsEaten >= mealsExpected;
-                    const sleepSummary =
-                        (healthMonitoring as any)?.sleep_summary ?? {};
-                    const sleepAverage =
-                        sleepSummary.average_7_nights != null
-                            ? Number(sleepSummary.average_7_nights)
-                            : null;
-                    const sleepTarget = Number(
-                        sleepSummary.target_hours ??
-                            (client as any).sleep_target_hours ??
-                            7,
-                    );
-
-                    const heroVitals: HeroVital[] = [
-                        {
-                            key: 'meals',
-                            label: 'Meals',
-                            value:
-                                mealsEaten != null
-                                    ? `${mealsEaten}/${mealsExpected}`
-                                    : '—',
-                            trend:
-                                mealsEaten == null
-                                    ? 'flat'
-                                    : mealsOnTrack
-                                      ? 'up'
-                                      : mealsEaten > 0
-                                        ? 'flat'
-                                        : 'down',
-                            detail:
-                                mealsEaten == null
-                                    ? 'No meals logged today'
-                                    : mealsOnTrack
-                                      ? 'On track today'
-                                      : 'Meals logged today',
-                        },
-                        {
-                            key: 'sleep',
-                            label: 'Sleep',
-                            value:
-                                sleepAverage != null
-                                    ? `${sleepAverage.toFixed(1)}h`
-                                    : '—',
-                            trend:
-                                sleepAverage == null
-                                    ? 'flat'
-                                    : sleepAverage >= sleepTarget
-                                      ? 'up'
-                                      : 'down',
-                            detail: `Target ${sleepTarget}h`,
-                        },
-                        {
-                            key: 'mood',
-                            label: 'Mood',
-                            value:
-                                moodAvg != null
-                                    ? `${moodAvg.toFixed(1)}/10`
-                                    : '—',
-                            trend:
-                                moodAvg == null
-                                    ? 'flat'
-                                    : moodAvg >= 6
-                                      ? 'up'
-                                      : moodAvg >= 4
-                                        ? 'flat'
-                                        : 'down',
-                            detail: moodRatings.length
-                                ? `${moodRatings.length} rating${moodRatings.length > 1 ? 's' : ''} this week`
-                                : 'No mood ratings this week',
-                        },
-                        {
-                            key: 'seizures',
-                            label: 'Seizures',
-                            value:
-                                seizureFreeDays != null
-                                    ? `${seizureFreeDays}d`
-                                    : '—',
-                            trend:
-                                seizureFreeDays != null && seizureFreeDays >= 14
-                                    ? 'up'
-                                    : 'flat',
-                            detail:
-                                seizureFreeDays != null
-                                    ? 'days since last seizure'
-                                    : 'No seizures recorded',
-                        },
-                        {
-                            key: 'fluids',
-                            label: 'Fluids today',
-                            value: fluidToday
-                                ? `${(fluidToday / 1000).toFixed(1)}L`
-                                : '—',
-                            trend:
-                                fluidTarget && fluidToday
-                                    ? fluidToday >= fluidTarget
-                                        ? 'up'
-                                        : 'down'
-                                    : 'flat',
-                            detail: fluidTarget
-                                ? `Target ${(fluidTarget / 1000).toFixed(1)}L+`
-                                : 'No target set',
-                        },
-                        {
-                            key: 'notes',
-                            label: 'Notes',
-                            value: String(notesThisWeek),
-                            trend: notesThisWeek > 0 ? 'up' : 'flat',
-                            detail: 'daily notes this week',
-                        },
-                    ];
-
-                    // ── Next shift tile ──
-                    const ns = nextShiftSummary as any;
-                    const handoverEvents = (handover as any[]) ?? [];
-                    const handoverSnippet =
-                        handoverEvents[0]?.body ??
-                        handoverEvents[0]?.subject ??
-                        null;
-                    const heroNextShift: HeroNextShift | null = ns
-                        ? (() => {
-                              const starts = ns.starts_at
-                                  ? new Date(ns.starts_at)
-                                  : null;
-                              const ends = ns.ends_at
-                                  ? new Date(ns.ends_at)
-                                  : null;
-                              const hoursAway = starts
-                                  ? (starts.getTime() - now) / 3600000
-                                  : null;
-                              return {
-                                  when: starts
-                                      ? `${starts.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })} ${starts.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}${ends ? ` – ${ends.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}` : ''}`
-                                      : 'Scheduled',
-                                  countdown:
-                                      hoursAway != null && hoursAway > 0
-                                          ? hoursAway < 1
-                                              ? 'soon'
-                                              : hoursAway < 24
-                                                ? `in ${Math.round(hoursAway)}h`
-                                                : null
-                                          : hoursAway != null && hoursAway > -12
-                                            ? 'now'
-                                            : null,
-                                  staffName: ns.staff?.name ?? null,
-                                  typeLabel: nextShiftTypeLabel,
-                                  tasksTotal: ns.task_count ?? 0,
-                                  tasksDone: Math.max(
-                                      0,
-                                      (ns.task_count ?? 0) -
-                                          (ns.incomplete_task_count ?? 0),
-                                  ),
-                                  location:
-                                      ns.location ?? client.site?.name ?? null,
-                                  breakLabel: ns.expected_break_minutes
-                                      ? `${ns.expected_break_minutes} min expected`
-                                      : null,
-                                  medsLabel:
-                                      (emarSummary?.active_medications_count ??
-                                          0) > 0
-                                          ? `${emarSummary.active_medications_count} active med${emarSummary.active_medications_count > 1 ? 's' : ''}`
-                                          : null,
-                                  handoverSnippet,
-                              };
-                          })()
-                        : null;
-
-                    // ── Safety strip (allergies + critical risks + care flags) ──
-                    const heroSafety = {
-                        allergies: (safety?.allergies ?? []).map(
-                            (a) => a.label,
-                        ),
-                        alerts: [
-                            ...(safety?.critical_risks ?? []).map(
-                                (r) => r.label,
-                            ),
-                            ...(safety?.care_flags ?? []).map((f) => f.label),
-                        ],
-                    };
-
-                    // ── "Needs attention" ribbon ──
-                    const heroAlerts: HeroAlert[] = [];
-                    if (
-                        progressNotesCan.review &&
-                        (dailyNotesSummary.flagged_open ?? 0) > 0
-                    )
-                        heroAlerts.push({
-                            key: 'flagged-notes',
-                            tone: 'warning',
-                            icon: Flag,
-                            label: `${dailyNotesSummary.flagged_open} note${dailyNotesSummary.flagged_open > 1 ? 's' : ''} need review`,
-                            onClick: () => openDailyNotes('flagged'),
-                        });
-                    if ((actionsReviewsSummary.open ?? 0) > 0)
-                        heroAlerts.push({
-                            key: 'open-actions',
-                            tone:
-                                (actionsReviewsSummary.critical ?? 0) > 0
-                                    ? 'critical'
-                                    : 'warning',
-                            icon: ListTodo,
-                            label: `${actionsReviewsSummary.open}${actionsReviewsSummary.has_more ? '+' : ''} open action${actionsReviewsSummary.open > 1 ? 's' : ''}`,
-                            detail:
-                                (actionsReviewsSummary.critical ?? 0) > 0
-                                    ? `${actionsReviewsSummary.critical} critical${actionsReviewsSummary.has_more ? ' shown' : ''}`
-                                    : undefined,
-                            onClick: () => handleTabChange('actions_reviews'),
-                        });
-                    if ((emarSummary?.pending_alerts_count ?? 0) > 0)
-                        heroAlerts.push({
-                            key: 'med-alerts',
-                            tone: 'warning',
-                            icon: Pill,
-                            label: `${emarSummary.pending_alerts_count} medication alert${emarSummary.pending_alerts_count > 1 ? 's' : ''}`,
-                            onClick: () => handleTabChange('mar'),
-                        });
-                    if (pendingVisitCount > 0)
-                        heroAlerts.push({
-                            key: 'visits',
-                            tone: 'warning',
-                            icon: Users,
-                            label: `${pendingVisitCount} visit request${pendingVisitCount > 1 ? 's' : ''} pending`,
-                            onClick: () =>
-                                router.visit(
-                                    `/operations/clients/${client.id}/visit-requests`,
-                                ),
-                        });
-
-                    // ── More menu ──
-                    const moreItems: MoreMenuItem[] = [];
-                    if (client.phone)
-                        moreItems.push({
-                            key: 'call',
-                            label: 'Call',
-                            icon: Phone,
-                            detail: client.phone,
-                            onSelect: () => {
-                                window.location.href = `tel:${client.phone}`;
-                            },
-                        });
-                    if (can.navigate_family_portal)
-                        moreItems.push({
-                            key: 'visits',
-                            label: 'Visit requests',
-                            icon: Users,
-                            detail: pendingVisitCount
-                                ? `${pendingVisitCount} pending`
-                                : undefined,
-                            onSelect: () =>
-                                router.visit(
-                                    `/operations/clients/${client.id}/visit-requests`,
-                                ),
-                        });
-                    if (can.navigate_medical) {
-                        moreItems.push({
-                            key: 'mar',
-                            label: 'Full MAR chart',
-                            icon: Pill,
-                            onSelect: () =>
-                                router.visit(
-                                    `/operations/clients/${client.id}/mar`,
-                                ),
-                        });
-                        moreItems.push({
-                            key: 'medical',
-                            label: 'Medical record',
-                            icon: Heart,
-                            onSelect: () =>
-                                router.visit(
-                                    `/operations/clients/${client.id}/medical`,
-                                ),
-                        });
-                    }
-                    if (can.assign_workers)
-                        moreItems.push({
-                            key: 'workers',
-                            label: 'Manage workers',
-                            icon: Users,
-                            onSelect: () => handleTabChange('assignments'),
-                        });
-                    const clientSite = client.site;
-                    if (clientSite && can.navigate_site)
-                        moreItems.push({
-                            key: 'site',
-                            label: `Open ${clientSite.name}`,
-                            icon: Home,
-                            onSelect: () =>
-                                router.visit(`/sites/${clientSite.id}`),
-                        });
-                    moreItems.push({
-                        key: 'print',
-                        label: 'Print profile',
-                        icon: FileText,
-                        onSelect: () => window.print(),
-                    });
-
-                    return (
-                        <>
-                            <ClientProfileHero
-                                clientId={client.id}
-                                name={name}
-                                photoUrl={
-                                    client.avatar ??
-                                    client.profile_photo_url ??
-                                    null
-                                }
-                                initials={getInitials(name)}
-                                statusLabel={client.status}
-                                statusTone={
-                                    client.status === 'active'
-                                        ? 'success'
-                                        : client.status === 'onboarding'
-                                          ? 'warning'
-                                          : 'neutral'
-                                }
-                                identityLine={identityLine}
-                                chips={heroChips}
-                                badges={heroBadges}
-                                vitals={heroVitals}
-                                nextShift={heroNextShift}
-                                safety={heroSafety}
-                                stats={[
-                                    {
-                                        key: 'plan',
-                                        icon: Target,
-                                        label: 'Care plan',
-                                        value: carePlanSummary.active_plan
-                                            ? 'Active'
-                                            : '—',
-                                    },
-                                    {
-                                        key: 'goals',
-                                        icon: CheckCircle2,
-                                        label: 'Goals',
-                                        value:
-                                            carePlanGoals.length > 0
-                                                ? `${carePlanDone}/${carePlanGoals.length}`
-                                                : '—',
-                                    },
-                                    {
-                                        key: 'shift',
-                                        icon: Clock,
-                                        label: 'Next shift',
-                                        value: shifts_summary?.next
-                                            ? 'Yes'
-                                            : '—',
-                                    },
-                                ]}
-                                noteCapabilities={{
-                                    dailyNote: Boolean(can.create_daily_note),
-                                    quickNote: Boolean(can.create_quick_note),
-                                    communicationNote: Boolean(
-                                        can.create_communication_note,
-                                    ),
-                                }}
-                                onAddNote={(key) => openProfileDialog(key)}
-                                onChat={
-                                    can.view_family_chat
-                                        ? () => openProfileDialog('family_chat')
-                                        : undefined
-                                }
-                                onEdit={
-                                    can.update_client
-                                        ? () =>
-                                              openProfileDialog('edit_profile')
-                                        : undefined
-                                }
-                                onOpenShift={
-                                    can.navigate_calendar
-                                        ? () => handleTabChange('calendar')
-                                        : undefined
-                                }
-                                onOpenSafety={
-                                    can.navigate_risks
-                                        ? () =>
-                                              handleTabChange('risk_management')
-                                        : undefined
-                                }
-                                moreItems={moreItems}
-                                backLabel={
-                                    labels?.['client.plural'] ?? 'Clients'
-                                }
-                                footer={
-                                    <GroupPillRail
-                                        groups={visibleGroups}
-                                        openGroup={openGroup}
-                                        activeTab={tab}
-                                        onOpenGroup={(_key, targetTab) =>
-                                            handleTabChange(targetTab as TabKey)
+            <PageLayout
+                width="wide"
+                hero={
+                    <PageHeader
+                        variant="profile"
+                        backHref="/operations/clients"
+                        mark={
+                            <span className="eh-mark-ring text-[17px] font-bold tracking-tight">
+                                {client.avatar || client.profile_photo_url ? (
+                                    <img
+                                        src={
+                                            (client.avatar ??
+                                                client.profile_photo_url)!
                                         }
-                                        onSearch={() => setPaletteOpen(true)}
+                                        alt=""
                                     />
-                                }
+                                ) : (
+                                    getInitials(name)
+                                )}
+                            </span>
+                        }
+                        title={name}
+                        titleChip={
+                            <PageHeaderStatusChip variant={statusVariant}>
+                                {statusLabel}
+                            </PageHeaderStatusChip>
+                        }
+                        subline={
+                            /* Two stacked fact lines (profile revision
+                               2026-09-06): who this person is, then how
+                               they are supported. */
+                            <>
+                                {identityLine ? (
+                                    <span className="block">
+                                        {identityLine}
+                                    </span>
+                                ) : null}
+                                {serviceLine ? (
+                                    <span className="block">{serviceLine}</span>
+                                ) : null}
+                            </>
+                        }
+                        actions={
+                            <>
+                                <PageHeaderSearchTrigger
+                                    placeholder="Search this profile…"
+                                    onOpen={() => setPaletteOpen(true)}
+                                />
+                                {can.view_family_chat ? (
+                                    <PageHeaderGlassButton
+                                        icon={MessageCircle}
+                                        aria-label="Family chat"
+                                        title="Chat with whānau"
+                                        onClick={() =>
+                                            openProfileDialog('family_chat')
+                                        }
+                                        data-test="client-profile-chat"
+                                    />
+                                ) : null}
+                                {can.update_client ? (
+                                    <PageHeaderGlassButton
+                                        icon={Pencil}
+                                        aria-label="Edit profile"
+                                        title="Edit profile"
+                                        onClick={() =>
+                                            openProfileDialog('edit_profile')
+                                        }
+                                        data-test="client-profile-edit"
+                                    />
+                                ) : null}
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <PageHeaderGlassButton
+                                            icon={MoreHorizontal}
+                                            aria-label="More actions"
+                                            title="More actions"
+                                        />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        className="w-60"
+                                    >
+                                        <DropdownMenuLabel>
+                                            More actions
+                                        </DropdownMenuLabel>
+                                        {moreItems.map((item) => {
+                                            const Icon = item.icon;
+                                            return (
+                                                <DropdownMenuItem
+                                                    key={item.key}
+                                                    onSelect={item.onSelect}
+                                                >
+                                                    <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                    {item.label}
+                                                    {item.detail ? (
+                                                        <span className="ml-auto text-xs text-muted-foreground">
+                                                            {item.detail}
+                                                        </span>
+                                                    ) : null}
+                                                </DropdownMenuItem>
+                                            );
+                                        })}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <PageHeaderPrimaryButton
+                                            icon={Plus}
+                                            data-test="client-profile-add-note"
+                                        >
+                                            Add / log
+                                            <ChevronDown className="size-3.5 opacity-70" />
+                                        </PageHeaderPrimaryButton>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        className="w-60"
+                                    >
+                                        {can.create_daily_note ? (
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openProfileDialog(
+                                                        'daily_note',
+                                                    )
+                                                }
+                                            >
+                                                <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                Daily note
+                                            </DropdownMenuItem>
+                                        ) : null}
+                                        {can.create_quick_note ? (
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openProfileDialog(
+                                                        'quick_note',
+                                                    )
+                                                }
+                                            >
+                                                <Zap className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                Quick note
+                                            </DropdownMenuItem>
+                                        ) : null}
+                                        {can.create_communication_note ? (
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openProfileDialog(
+                                                        'comm_note',
+                                                    )
+                                                }
+                                            >
+                                                <MsgIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                Communication note
+                                            </DropdownMenuItem>
+                                        ) : null}
+                                        {can.create_daily_note ||
+                                        can.create_quick_note ||
+                                        can.create_communication_note ? (
+                                            <DropdownMenuSeparator />
+                                        ) : null}
+                                        <DropdownMenuItem
+                                            onSelect={() =>
+                                                openProfileDialog(
+                                                    'log_incident',
+                                                )
+                                            }
+                                        >
+                                            <AlertTriangle className="mr-2 h-4 w-4 text-status-critical" />
+                                            Log incident
+                                        </DropdownMenuItem>
+                                        {can.record_medication_administration ? (
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openProfileDialog('emar')
+                                                }
+                                            >
+                                                <Pill className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                Record medication dose
+                                            </DropdownMenuItem>
+                                        ) : null}
+                                        {can.record_observation ? (
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openProfileDialog(
+                                                        'record_obs',
+                                                    )
+                                                }
+                                            >
+                                                <Stethoscope className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                Record observation
+                                            </DropdownMenuItem>
+                                        ) : null}
+                                        {canCreateAppointment ||
+                                        can.create_risks ||
+                                        can.manage_care_plan_goals ||
+                                        visibleTabKeys.has('documents') ? (
+                                            <DropdownMenuSeparator />
+                                        ) : null}
+                                        {canCreateAppointment ? (
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openProfileDialog(
+                                                        'appointment',
+                                                    )
+                                                }
+                                            >
+                                                <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                Schedule appointment
+                                            </DropdownMenuItem>
+                                        ) : null}
+                                        {can.create_risks ? (
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openProfileDialog(
+                                                        'add_risk',
+                                                    )
+                                                }
+                                            >
+                                                <ShieldAlert className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                Add risk
+                                            </DropdownMenuItem>
+                                        ) : null}
+                                        {can.manage_care_plan_goals ? (
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openProfileDialog('goal')
+                                                }
+                                            >
+                                                <Target className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                Add goal
+                                            </DropdownMenuItem>
+                                        ) : null}
+                                        {visibleTabKeys.has('documents') ? (
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    openProfileDialog(
+                                                        'upload_doc',
+                                                    )
+                                                }
+                                            >
+                                                <FolderOpen className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                Upload document
+                                            </DropdownMenuItem>
+                                        ) : null}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </>
+                        }
+                        meters={
+                            /* Two full-width instrument rows (client profile
+                               revision 2026-09-07): next shift first, then
+                               care & clinical state on row 1; daily living +
+                               meds on row 2 — the band grows to fit. */
+                            <>
+                                <div className="flex min-h-[80px] w-full flex-wrap items-stretch gap-2 empty:hidden">
+                                    {visibleTabKeys.has('calendar') ? (
+                                        <PageHeaderMeterBlock
+                                            label="Next shift"
+                                            value={
+                                                nextShiftCountdown ?? undefined
+                                            }
+                                            ariaLabel="View appointments and shifts"
+                                            onClick={() =>
+                                                handleTabChange('calendar')
+                                            }
+                                        >
+                                            {nextShiftSummary ? (
+                                                <PageHeaderMeterContacts
+                                                    contacts={[
+                                                        {
+                                                            label: 'When',
+                                                            name: nextShiftWhen,
+                                                        },
+                                                        {
+                                                            label: 'Staff',
+                                                            name:
+                                                                nextShiftSummary
+                                                                    .staff
+                                                                    ?.name ??
+                                                                null,
+                                                        },
+                                                        nextShiftTasksTotal > 0
+                                                            ? {
+                                                                  label: 'Tasks',
+                                                                  name: `${nextShiftTasksDone}/${nextShiftTasksTotal} done`,
+                                                              }
+                                                            : {
+                                                                  label: 'Type',
+                                                                  name: nextShiftTypeLabel,
+                                                              },
+                                                    ]}
+                                                />
+                                            ) : (
+                                                <>
+                                                    <PageHeaderMeterBig>
+                                                        —
+                                                    </PageHeaderMeterBig>
+                                                    <PageHeaderMeterCaption>
+                                                        nothing rostered
+                                                    </PageHeaderMeterCaption>
+                                                </>
+                                            )}
+                                        </PageHeaderMeterBlock>
+                                    ) : null}
+                                    <PageHeaderMeterBlock
+                                        label="Needs attention"
+                                        tone={attentionTone}
+                                        ariaLabel="View items needing attention"
+                                        onClick={() =>
+                                            handleTabChange('profile')
+                                        }
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {attentionTotal}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            {attentionTotal > 0
+                                                ? attentionCaption
+                                                : 'nothing outstanding'}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                    {visibleTabKeys.has('risk_management') ? (
+                                        <PageHeaderMeterBlock
+                                            label="Safety"
+                                            tone={safetyTone}
+                                            ariaLabel="View risk management"
+                                            onClick={() =>
+                                                handleTabChange(
+                                                    'risk_management',
+                                                )
+                                            }
+                                        >
+                                            <PageHeaderMeterBig>
+                                                {safetyAlertCount}
+                                            </PageHeaderMeterBig>
+                                            <PageHeaderMeterCaption>
+                                                {safetyCaption ||
+                                                    'no allergies or active alerts recorded'}
+                                            </PageHeaderMeterCaption>
+                                        </PageHeaderMeterBlock>
+                                    ) : null}
+                                    {goalsTabKey ? (
+                                        <PageHeaderMeterBlock
+                                            label="Care plan goals"
+                                            value={
+                                                activePlanGoals.length > 0
+                                                    ? `${activePlanGoalsDone}/${activePlanGoals.length}`
+                                                    : undefined
+                                            }
+                                            ariaLabel="View care plan goals"
+                                            onClick={() =>
+                                                handleTabChange(
+                                                    goalsTabKey as TabKey,
+                                                )
+                                            }
+                                        >
+                                            {activePlanGoals.length > 0 ? (
+                                                <PageHeaderMeterDonut
+                                                    percent={
+                                                        (activePlanGoalsDone /
+                                                            activePlanGoals.length) *
+                                                        100
+                                                    }
+                                                    caption={
+                                                        <>
+                                                            {
+                                                                activePlanGoalsDone
+                                                            }{' '}
+                                                            of{' '}
+                                                            {
+                                                                activePlanGoals.length
+                                                            }
+                                                            <br />
+                                                            goals completed
+                                                        </>
+                                                    }
+                                                />
+                                            ) : (
+                                                <>
+                                                    <PageHeaderMeterBig>
+                                                        {activePlan ? 0 : '—'}
+                                                    </PageHeaderMeterBig>
+                                                    <PageHeaderMeterCaption>
+                                                        {activePlan
+                                                            ? 'no goals on the active plan'
+                                                            : 'no active care plan'}
+                                                    </PageHeaderMeterCaption>
+                                                </>
+                                            )}
+                                        </PageHeaderMeterBlock>
+                                    ) : null}
+                                    {visibleTabKeys.has('progress_notes') ? (
+                                        <PageHeaderMeterBlock
+                                            label="Daily notes"
+                                            value={notesThisWeek}
+                                            tone={
+                                                flaggedNotesCount > 0
+                                                    ? 'warning'
+                                                    : 'brand'
+                                            }
+                                            ariaLabel="View daily notes"
+                                            onClick={() =>
+                                                openDailyNotes(
+                                                    flaggedNotesCount > 0
+                                                        ? 'flagged'
+                                                        : 'all',
+                                                )
+                                            }
+                                        >
+                                            <PageHeaderMeterSpark
+                                                values={notesWeekSeries}
+                                            />
+                                            <PageHeaderMeterCaption>
+                                                {flaggedNotesCount > 0
+                                                    ? `${flaggedNotesCount} flagged for review`
+                                                    : 'written this past week'}
+                                            </PageHeaderMeterCaption>
+                                        </PageHeaderMeterBlock>
+                                    ) : null}
+                                </div>
+                                <div className="flex min-h-[80px] w-full flex-wrap items-stretch gap-2 empty:hidden">
+                                    {visibleTabKeys.has('meal_prefs') ? (
+                                        <PageHeaderMeterBlock
+                                            label="Meals today"
+                                            value={
+                                                mealsEaten != null
+                                                    ? `${mealsEaten}/${mealsExpected}`
+                                                    : undefined
+                                            }
+                                            ariaLabel="View food and meal planning"
+                                            onClick={() =>
+                                                handleTabChange('meal_prefs')
+                                            }
+                                        >
+                                            {mealsEaten != null ? (
+                                                <>
+                                                    <PageHeaderMeterBar
+                                                        percent={
+                                                            mealsExpected > 0
+                                                                ? (mealsEaten /
+                                                                      mealsExpected) *
+                                                                  100
+                                                                : 0
+                                                        }
+                                                    />
+                                                    <PageHeaderMeterCaption>
+                                                        {mealsEaten >=
+                                                        mealsExpected
+                                                            ? 'on track today'
+                                                            : mealsEaten > 0
+                                                              ? 'meals logged today'
+                                                              : 'none logged yet today'}
+                                                    </PageHeaderMeterCaption>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <PageHeaderMeterBig>
+                                                        —
+                                                    </PageHeaderMeterBig>
+                                                    <PageHeaderMeterCaption>
+                                                        no meals logged today
+                                                    </PageHeaderMeterCaption>
+                                                </>
+                                            )}
+                                        </PageHeaderMeterBlock>
+                                    ) : null}
+                                    {visibleTabKeys.has('progress_notes') ? (
+                                        <PageHeaderMeterBlock
+                                            label="Mood"
+                                            value={
+                                                moodWeek.average != null
+                                                    ? `${moodWeek.average.toFixed(1)}/10`
+                                                    : undefined
+                                            }
+                                            ariaLabel="View daily notes and mood ratings"
+                                            onClick={() =>
+                                                openDailyNotes('all')
+                                            }
+                                        >
+                                            {moodWeek.count > 0 ? (
+                                                <PageHeaderMeterSpark
+                                                    values={moodWeek.series}
+                                                />
+                                            ) : (
+                                                <PageHeaderMeterBig>
+                                                    —
+                                                </PageHeaderMeterBig>
+                                            )}
+                                            <PageHeaderMeterCaption>
+                                                {moodWeek.count > 0
+                                                    ? `${moodWeek.count} rating${moodWeek.count > 1 ? 's' : ''} this week`
+                                                    : 'no mood ratings this week'}
+                                            </PageHeaderMeterCaption>
+                                        </PageHeaderMeterBlock>
+                                    ) : null}
+                                    {visibleTabKeys.has('health_monitoring') ? (
+                                        <PageHeaderMeterBlock
+                                            label="Sleep"
+                                            value={
+                                                sleepAverage != null
+                                                    ? `${sleepAverage.toFixed(1)}h`
+                                                    : undefined
+                                            }
+                                            ariaLabel="View health monitoring"
+                                            onClick={() =>
+                                                handleTabChange(
+                                                    'health_monitoring',
+                                                )
+                                            }
+                                        >
+                                            {sleepAverage != null ? (
+                                                <>
+                                                    <PageHeaderMeterBar
+                                                        percent={
+                                                            sleepTarget > 0
+                                                                ? (sleepAverage /
+                                                                      sleepTarget) *
+                                                                  100
+                                                                : 0
+                                                        }
+                                                    />
+                                                    <PageHeaderMeterCaption>
+                                                        {`target ${sleepTarget}h · 7-night average`}
+                                                    </PageHeaderMeterCaption>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <PageHeaderMeterBig>
+                                                        —
+                                                    </PageHeaderMeterBig>
+                                                    <PageHeaderMeterCaption>
+                                                        no sleep logged this
+                                                        week
+                                                    </PageHeaderMeterCaption>
+                                                </>
+                                            )}
+                                        </PageHeaderMeterBlock>
+                                    ) : null}
+                                    {emarSummary &&
+                                    visibleTabKeys.has('mar') ? (
+                                        <PageHeaderMeterBlock
+                                            label="Medications"
+                                            tone={
+                                                medAlertsCount > 0
+                                                    ? 'warning'
+                                                    : 'brand'
+                                            }
+                                            ariaLabel="View the MAR"
+                                            onClick={() =>
+                                                handleTabChange('mar')
+                                            }
+                                        >
+                                            <PageHeaderMeterBig>
+                                                {activeMedsCount}
+                                            </PageHeaderMeterBig>
+                                            <PageHeaderMeterCaption>
+                                                {medAlertsCount > 0
+                                                    ? `active meds · ${medAlertsCount} alert${medAlertsCount > 1 ? 's' : ''} pending`
+                                                    : 'active meds · no pending alerts'}
+                                            </PageHeaderMeterCaption>
+                                        </PageHeaderMeterBlock>
+                                    ) : null}
+                                </div>
+                            </>
+                        }
+                        rail={
+                            <PageHeaderRail
+                                items={railItems}
+                                value={activeGroup?.key ?? ''}
+                                onSelect={selectGroup}
+                                onFind={() => setPaletteOpen(true)}
+                                ariaLabel="Client Profile groups"
                             />
-                            <AlertRibbon alerts={heroAlerts} />
-
-                            {/* Hidden photo upload form */}
-                            {can.update_client && (
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        if (!photoForm.data.photo) return;
-                                        photoForm.post(
-                                            `/operations/clients/${client.id}/photo`,
-                                            {
-                                                forceFormData: true,
-                                                preserveScroll: true,
-                                            },
-                                        );
-                                    }}
-                                    className="hidden"
-                                >
-                                    <Input
-                                        type="file"
-                                        accept="image/*"
-                                        id="client-photo"
-                                        onChange={(e) =>
-                                            photoForm.setData(
-                                                'photo',
-                                                e.target.files?.[0] ?? null,
-                                            )
-                                        }
-                                    />
-                                </form>
-                            )}
-                        </>
-                    );
-                })()}
-
-                <QuickNoteDialog
-                    clientId={client.id}
-                    open={quickNoteOpen}
-                    onOpenChange={(open) => {
-                        if (!open && profileDialog?.key === 'quick_note') {
-                            closeProfileDialog();
                         }
-                    }}
-                    onSubmitted={() => openDailyNotes('all')}
-                />
-                <DailyNoteWizard
-                    clientId={client.id}
-                    open={dailyNoteOpen}
-                    onOpenChange={(open) => {
-                        if (!open && profileDialog?.key === 'daily_note') {
-                            closeProfileDialog();
-                        }
-                    }}
-                    shiftOptions={dailyNoteShiftOptions}
-                    goalOptions={dailyNoteGoalOptions}
-                    onSubmitted={() => openDailyNotes('all')}
-                    note={
-                        (authorizedProfileDialog?.ctx?.note as
-                            | ClientDailyNote
-                            | undefined) ?? null
-                    }
-                />
-                <DailyNoteWizard
-                    clientId={client.id}
-                    open={communicationNoteOpen}
-                    onOpenChange={(open) => {
-                        if (!open && profileDialog?.key === 'comm_note') {
-                            closeProfileDialog();
-                        }
-                    }}
-                    mode="communication"
-                    shiftOptions={dailyNoteShiftOptions}
-                    goalOptions={dailyNoteGoalOptions}
-                    onSubmitted={() => {
-                        setTab('communication_notes');
-                        updateProfileQuery({ tab: 'communication_notes' });
-                    }}
-                    note={
-                        (authorizedProfileDialog?.ctx?.note as
-                            | ClientDailyNote
-                            | undefined) ?? null
-                    }
-                />
-
-                <div className="mt-3">
-                    <RecentClientsStrip
-                        currentClient={{
-                            id: client.id,
-                            name,
-                            photo: client.profile_photo_url ?? null,
-                            house: client.site?.name ?? null,
-                        }}
-                        currentTab={tab}
                     />
-                </div>
-
-                {/* Tier-2 tabs for the open group (group pills live in the hero footer) */}
-                <div className="mt-3">
+                }
+            >
+                {/* 20px rhythm between the page's section stack (DESIGN.md
+                    spacing rule) — the tier-2 strip, recent-clients strip and
+                    tab panel are siblings on the page ground. Alert counts
+                    live in the header's meter row (PAGE_HEADER_STYLE_GUIDE.md). */}
+                <div className="flex flex-col gap-5">
                     <TierTwoTabs
                         tabs={activeGroup?.tabs ?? []}
                         activeTab={tab}
@@ -2361,633 +2664,363 @@ export default function ClientShow({
                                 {inner}
                             </Link>
                         )}
+                        ariaLabel="Client Profile sections"
+                        panelId="client-profile-tab-panel"
                     />
-                </div>
+                    <RecentClientsStrip
+                        currentClient={{
+                            id: client.id,
+                            name,
+                            photo: client.profile_photo_url ?? null,
+                            house: client.site?.name ?? null,
+                        }}
+                        currentTab={tab}
+                    />
+                    <div
+                        id="client-profile-tab-panel"
+                        role="tabpanel"
+                        aria-labelledby={`client-tab-${tab}`}
+                        tabIndex={0}
+                        className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                        {tab === 'profile' &&
+                            (() => {
+                                const summary =
+                                    pageProps.care_plans_summary ?? {};
+                                const activePlan = summary.active_plan;
+                                const risks = pageProps.client_risks ?? [];
 
-                <TabSearchPalette
-                    open={paletteOpen}
-                    onClose={() => setPaletteOpen(false)}
-                    groups={visibleGroups}
-                    onTab={(key) => {
-                        const target = visibleGroups
-                            .flatMap((g) => g.tabs)
-                            .find((t) => t.key === key);
-                        if (target?.href) {
-                            router.visit(target.href);
-                        } else {
-                            handleTabChange(key as TabKey);
-                        }
-                    }}
-                />
+                                // Parse about me from care plan content (feeds the
+                                // design Overview's About tiles).
+                                const planContent = activePlan?.content
+                                    ? typeof activePlan.content === 'string'
+                                        ? JSON.parse(activePlan.content || '{}')
+                                        : activePlan.content
+                                    : {};
+                                const aboutMe = planContent.about_me ?? {};
 
-                <ProfileDialogs
-                    dialog={authorizedProfileDialog}
-                    onClose={() => {
-                        if (profileDialog?.key === 'abc') {
-                            setAbcRefreshToken((t) => t + 1);
-                            router.reload({
-                                only: ['behaviour_patterns'],
-                                preserveScroll: true,
-                                preserveState: true,
-                            });
-                        }
-                        closeProfileDialog();
-                    }}
-                    flowContext={flowContext}
-                    medications={(medical?.medications ?? []) as any[]}
-                    canRecord={Boolean(can.record_medication_administration)}
-                    canRecordControlled={Boolean(
-                        can.record_controlled_medication,
-                    )}
-                />
+                                const goals = activePlan?.goals ?? [];
 
-                {tab === 'profile' &&
-                    (() => {
-                        const summary = pageProps.care_plans_summary ?? {};
-                        const activePlan = summary.active_plan;
-                        const risks = pageProps.client_risks ?? [];
+                                // Review countdown
+                                const reviewDays = activePlan?.next_review_at
+                                    ? Math.ceil(
+                                          (new Date(
+                                              activePlan.next_review_at,
+                                          ).getTime() -
+                                              Date.now()) /
+                                              86400000,
+                                      )
+                                    : null;
 
-                        // Parse about me from care plan content (feeds the
-                        // design Overview's About tiles).
-                        const planContent = activePlan?.content
-                            ? typeof activePlan.content === 'string'
-                                ? JSON.parse(activePlan.content || '{}')
-                                : activePlan.content
-                            : {};
-                        const aboutMe = planContent.about_me ?? {};
+                                return (
+                                    <>
+                                        {/* Safeguarding Alert */}
+                                        {client.safeguarding_flag && (
+                                            <div className="mb-4 flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
+                                                <ShieldAlert className="h-6 w-6 text-status-critical" />
+                                                <div>
+                                                    <p className="text-sm font-bold text-status-critical">
+                                                        Safeguarding Alert
+                                                    </p>
+                                                    <p className="text-xs text-status-critical">
+                                                        Active safeguarding
+                                                        concern. Follow
+                                                        protocols.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
 
-                        const goals = activePlan?.goals ?? [];
-
-                        // Review countdown
-                        const reviewDays = activePlan?.next_review_at
-                            ? Math.ceil(
-                                  (new Date(
-                                      activePlan.next_review_at,
-                                  ).getTime() -
-                                      Date.now()) /
-                                      86400000,
-                              )
-                            : null;
-
-                        return (
-                            <>
-                                {/* Safeguarding Alert */}
-                                {client.safeguarding_flag && (
-                                    <div className="mb-4 flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
-                                        <ShieldAlert className="h-6 w-6 text-status-critical" />
-                                        <div>
-                                            <p className="text-sm font-bold text-status-critical">
-                                                Safeguarding Alert
-                                            </p>
-                                            <p className="text-xs text-status-critical">
-                                                Active safeguarding concern.
-                                                Follow protocols.
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Overview board — design composition (tabs-core OverviewTab).
+                                        {/* Overview board — design composition (tabs-core OverviewTab).
                                     Legacy depth widgets (house coverage, health summary, …)
                                     continue below so nothing is lost. */}
-                                <OverviewDesignGrid
-                                    preferredName={preferredName}
-                                    aboutTiles={buildAboutTiles(
-                                        aboutMe ?? {},
-                                        client as any,
-                                    )}
-                                    notes={clientDailyNotes as any[]}
-                                    goals={goals as any[]}
-                                    risks={risks as any[]}
-                                    activePlan={activePlan ?? null}
-                                    reviewDays={reviewDays}
-                                    emarSummary={emarSummary}
-                                    events={
-                                        ((pageProps as any).calendar_events ??
-                                            []) as any[]
-                                    }
-                                    team={
-                                        ((client as any).support_workers ??
-                                            []) as any[]
-                                    }
-                                    keyWorkerId={
-                                        (client as any).key_worker?.id ?? null
-                                    }
-                                    keyWorkerName={
-                                        (client as any).key_worker?.name ?? null
-                                    }
-                                    navigationCapabilities={{
-                                        dailyNotes: Boolean(
-                                            can.navigate_daily_notes,
-                                        ),
-                                        goals: Boolean(can.navigate_care_plans),
-                                        risks: Boolean(can.navigate_risks),
-                                        mar: Boolean(can.navigate_medical),
-                                        calendar: Boolean(
-                                            can.navigate_calendar,
-                                        ),
-                                    }}
-                                    onTab={(key) =>
-                                        handleTabChange(key as TabKey)
-                                    }
-                                    onEditAbout={
-                                        can.update_client
-                                            ? () =>
-                                                  openProfileDialog(
-                                                      'edit_profile',
-                                                  )
-                                            : undefined
-                                    }
-                                    onRecordDose={
-                                        can.record_medication_administration
-                                            ? () => openProfileDialog('emar')
-                                            : undefined
-                                    }
-                                    onManageWorkers={
-                                        can.assign_workers
-                                            ? () =>
-                                                  handleTabChange('assignments')
-                                            : undefined
-                                    }
-                                    riskLevelControl={
-                                        can.update_risk_level ? (
-                                            <Select
-                                                value={client.risk_level ?? ''}
-                                                onValueChange={(v) =>
-                                                    router.patch(
-                                                        `/operations/clients/${client.id}/quick-update`,
-                                                        { risk_level: v },
-                                                        {
-                                                            preserveScroll: true,
-                                                        },
-                                                    )
-                                                }
-                                            >
-                                                <SelectTrigger
-                                                    className={`h-8 w-full border-0 text-sm font-bold shadow-none ${
-                                                        client.risk_level ===
-                                                        'critical'
-                                                            ? 'bg-status-critical-bg text-status-critical'
-                                                            : client.risk_level ===
-                                                                'high'
-                                                              ? 'bg-status-critical-bg text-status-critical'
-                                                              : client.risk_level ===
-                                                                  'medium'
-                                                                ? 'bg-status-warning-bg text-status-warning'
-                                                                : client.risk_level ===
-                                                                    'low'
-                                                                  ? 'bg-status-success-bg text-status-success'
-                                                                  : 'bg-muted text-muted-foreground'
-                                                    } rounded-full px-3`}
-                                                >
-                                                    <SelectValue placeholder="Set level..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="low">
-                                                        Low
-                                                    </SelectItem>
-                                                    <SelectItem value="medium">
-                                                        Medium
-                                                    </SelectItem>
-                                                    <SelectItem value="high">
-                                                        High
-                                                    </SelectItem>
-                                                    <SelectItem value="critical">
-                                                        Critical
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        ) : undefined
-                                    }
-                                />
-                            </>
-                        );
-                    })()}
-
-                {tab === 'onboarding' && (
-                    <div className="space-y-4">
-                        {/* Workflow Progress Header */}
-                        {onboarding?.workflow ? (
-                            <Card>
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-base">
-                                            Onboarding Workflow
-                                        </CardTitle>
-                                        <div className="flex items-center gap-2">
-                                            {can.manage_onboarding_workflow &&
-                                            onboarding.workflow.status !==
-                                                'completed' ? (
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        openProfileDialog(
-                                                            'add_onboarding_step',
-                                                        )
-                                                    }
-                                                    data-test="onboarding-add-step"
-                                                >
-                                                    <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                                    Add step
-                                                </Button>
-                                            ) : null}
-                                            <Badge
-                                                variant={
-                                                    onboarding.workflow
-                                                        .status === 'completed'
-                                                        ? 'secondary'
-                                                        : 'default'
-                                                }
-                                                className="capitalize"
-                                            >
-                                                {onboarding.workflow.status?.replace(
-                                                    '_',
-                                                    ' ',
-                                                )}
-                                            </Badge>
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                        {onboarding.workflow.assigned_to && (
-                                            <span>
-                                                Coordinator:{' '}
-                                                <strong>
-                                                    {
-                                                        onboarding.workflow
-                                                            .assigned_to.name
-                                                    }
-                                                </strong>
-                                            </span>
-                                        )}
-                                        {onboarding.workflow.started_at && (
-                                            <span>
-                                                Started:{' '}
-                                                {new Date(
-                                                    onboarding.workflow
-                                                        .started_at,
-                                                ).toLocaleDateString('en-NZ', {
-                                                    day: 'numeric',
-                                                    month: 'short',
-                                                    year: 'numeric',
-                                                })}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {/* Progress bar */}
-                                    {(() => {
-                                        const steps =
-                                            onboarding.workflow.steps ?? [];
-                                        const done = steps.filter(
-                                            (s: any) =>
-                                                s.status === 'completed' ||
-                                                s.status === 'skipped',
-                                        ).length;
-                                        const pct =
-                                            steps.length > 0
-                                                ? Math.round(
-                                                      (done / steps.length) *
-                                                          100,
-                                                  )
-                                                : 0;
-                                        const remaining = steps.length - done;
-                                        return (
-                                            <div className="mt-3 flex flex-wrap items-center gap-5">
-                                                {/* Completeness ring (design tabs-daily OnboardingTab) */}
-                                                <Ring pct={pct} size={96} />
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="text-sm font-semibold">
-                                                        {pct === 100
-                                                            ? 'Onboarding complete'
-                                                            : remaining <= 2
-                                                              ? 'Almost there'
-                                                              : 'In progress'}
-                                                    </div>
-                                                    <p className="mt-0.5 text-xs text-muted-foreground">
-                                                        {done}/{steps.length}{' '}
-                                                        steps complete
-                                                        {remaining > 0
-                                                            ? ` · ${remaining} remaining`
-                                                            : ''}
-                                                    </p>
-                                                    <div className="mt-2 h-2 rounded-full bg-muted">
-                                                        <div
-                                                            className="h-2 rounded-full bg-primary transition-all"
-                                                            style={{
-                                                                width: `${pct}%`,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <Card>
-                                <CardContent className="flex flex-col items-center justify-center py-8">
-                                    <p className="text-sm text-muted-foreground">
-                                        No onboarding workflow found.
-                                    </p>
-                                    {can.create_onboarding_workflow && (
-                                        <Button
-                                            size="sm"
-                                            className="mt-3"
-                                            onClick={() => {
-                                                router.post(
-                                                    `/operations/clients/${client.id}/onboarding-workflow`,
-                                                    {},
-                                                    { preserveScroll: true },
-                                                );
+                                        <OverviewDesignGrid
+                                            preferredName={preferredName}
+                                            aboutTiles={buildAboutTiles(
+                                                aboutMe ?? {},
+                                                client as any,
+                                            )}
+                                            notes={clientDailyNotes as any[]}
+                                            goals={goals as any[]}
+                                            risks={risks as any[]}
+                                            activePlan={activePlan ?? null}
+                                            reviewDays={reviewDays}
+                                            emarSummary={emarSummary}
+                                            events={
+                                                ((pageProps as any)
+                                                    .calendar_events ??
+                                                    []) as any[]
+                                            }
+                                            team={
+                                                ((client as any)
+                                                    .support_workers ??
+                                                    []) as any[]
+                                            }
+                                            keyWorkerId={
+                                                (client as any).key_worker
+                                                    ?.id ?? null
+                                            }
+                                            keyWorkerName={
+                                                (client as any).key_worker
+                                                    ?.name ?? null
+                                            }
+                                            navigationCapabilities={{
+                                                dailyNotes: Boolean(
+                                                    can.navigate_daily_notes,
+                                                ),
+                                                goals: Boolean(
+                                                    can.navigate_care_plans,
+                                                ),
+                                                risks: Boolean(
+                                                    can.navigate_risks,
+                                                ),
+                                                mar: Boolean(
+                                                    can.navigate_medical,
+                                                ),
+                                                calendar: Boolean(
+                                                    can.navigate_calendar,
+                                                ),
                                             }}
-                                        >
-                                            Start Onboarding Workflow
-                                        </Button>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Data Checklist */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">
-                                    Data Checklist
-                                </CardTitle>
-                                <p className="text-xs text-muted-foreground">
-                                    Auto-detected from{' '}
-                                    {(
-                                        labels?.['client.singular'] ?? 'client'
-                                    ).toLowerCase()}{' '}
-                                    profile data
-                                </p>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {(
-                                    onboarding?.checklist?.items ??
-                                    onboarding?.items ??
-                                    []
-                                ).map((item: any) => (
-                                    <div
-                                        key={item.key}
-                                        className="flex items-center justify-between rounded-md border p-2"
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <div
-                                                className={`h-2 w-2 rounded-full ${item.complete ? 'bg-status-success' : 'bg-muted'}`}
-                                            />
-                                            <div>
-                                                <div className="text-sm font-medium">
-                                                    {item.label}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">
-                                                    {item.complete
-                                                        ? item.has_data
-                                                            ? 'Added'
-                                                            : 'Not applicable'
-                                                        : 'Not completed'}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {!item.has_data &&
-                                            can.manage_onboarding_checklist && (
-                                                <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                                                    <Checkbox
-                                                        checked={item.override}
-                                                        onCheckedChange={(
-                                                            v,
-                                                        ) => {
-                                                            router.post(
-                                                                `/operations/clients/${client.id}/onboarding/${item.key}`,
+                                            onTab={(key) =>
+                                                handleTabChange(key as TabKey)
+                                            }
+                                            onEditAbout={
+                                                can.update_client
+                                                    ? () =>
+                                                          openProfileDialog(
+                                                              'edit_profile',
+                                                          )
+                                                    : undefined
+                                            }
+                                            onRecordDose={
+                                                can.record_medication_administration
+                                                    ? () =>
+                                                          openProfileDialog(
+                                                              'emar',
+                                                          )
+                                                    : undefined
+                                            }
+                                            onManageWorkers={
+                                                can.assign_workers
+                                                    ? () =>
+                                                          handleTabChange(
+                                                              'assignments',
+                                                          )
+                                                    : undefined
+                                            }
+                                            riskLevelControl={
+                                                can.update_risk_level ? (
+                                                    <Select
+                                                        value={
+                                                            client.risk_level ??
+                                                            ''
+                                                        }
+                                                        onValueChange={(v) =>
+                                                            router.patch(
+                                                                `/operations/clients/${client.id}/quick-update`,
                                                                 {
-                                                                    checked:
-                                                                        !!v,
+                                                                    risk_level:
+                                                                        v,
                                                                 },
                                                                 {
                                                                     preserveScroll: true,
                                                                 },
-                                                            );
-                                                        }}
-                                                    />
-                                                    Doesn't have this
-                                                </label>
-                                            )}
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-
-                        {/* Workflow Steps */}
-                        {onboarding?.workflow?.steps && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Workflow Steps
-                                    </CardTitle>
-                                    <p className="text-xs text-muted-foreground">
-                                        Manual steps tracked by staff
-                                    </p>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                    {onboarding.workflow.steps.map(
-                                        (step: any) => {
-                                            const stepCategory =
-                                                /DBS|Health Screening|Privacy Act 2020|Safeguarding/i.test(
-                                                    step.step_name ?? '',
-                                                )
-                                                    ? {
-                                                          label: 'Compliance',
-                                                          color: 'bg-primary/10 text-primary',
-                                                      }
-                                                    : /Referral|Assessment|Care Plan|Agreement|Staff|Introduction/i.test(
-                                                            step.step_name ??
-                                                                '',
-                                                        )
-                                                      ? {
-                                                            label: 'Service',
-                                                            color: 'bg-status-info-bg text-status-info',
+                                                            )
                                                         }
-                                                      : {
-                                                            label: 'Admin',
-                                                            color: 'bg-muted text-muted-foreground',
-                                                        };
-                                            return (
-                                                <div
-                                                    key={step.id}
-                                                    className={`flex items-center justify-between rounded-md border p-3 ${step.status === 'completed' ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30' : step.due_date && new Date(step.due_date) < new Date() && step.status === 'pending' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30' : ''}`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                                                            {step.step_order}
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-2 text-sm font-medium">
-                                                                <span
-                                                                    className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${stepCategory.color}`}
-                                                                >
-                                                                    {
-                                                                        stepCategory.label
-                                                                    }
-                                                                </span>
-                                                                {step.step_name}
-                                                            </div>
-                                                            {step.description && (
-                                                                <div className="mt-0.5 text-xs text-muted-foreground">
-                                                                    {
-                                                                        step.description
-                                                                    }
-                                                                </div>
-                                                            )}
-                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                {step.status ===
-                                                                    'completed' &&
-                                                                    step.completed_by && (
-                                                                        <span>
-                                                                            Completed
-                                                                            by{' '}
-                                                                            {
-                                                                                step
-                                                                                    .completed_by
-                                                                                    .name
-                                                                            }
-                                                                        </span>
-                                                                    )}
-                                                                {step.completed_at && (
-                                                                    <span>
-                                                                        {new Date(
-                                                                            step.completed_at,
-                                                                        ).toLocaleDateString(
-                                                                            'en-NZ',
-                                                                            {
-                                                                                day: 'numeric',
-                                                                                month: 'short',
-                                                                            },
-                                                                        )}
-                                                                    </span>
-                                                                )}
-                                                                {step.due_date &&
-                                                                    step.status ===
-                                                                        'pending' && (
-                                                                        <span
-                                                                            className={
-                                                                                new Date(
-                                                                                    step.due_date,
-                                                                                ) <
-                                                                                new Date()
-                                                                                    ? 'font-medium text-status-critical'
-                                                                                    : ''
-                                                                            }
-                                                                        >
-                                                                            Due:{' '}
-                                                                            {new Date(
-                                                                                step.due_date,
-                                                                            ).toLocaleDateString(
-                                                                                'en-NZ',
-                                                                                {
-                                                                                    day: 'numeric',
-                                                                                    month: 'short',
-                                                                                },
-                                                                            )}
-                                                                        </span>
-                                                                    )}
-                                                                {step.notes && (
-                                                                    <span className="italic">
-                                                                        "
-                                                                        {
-                                                                            step.notes
-                                                                        }
-                                                                        "
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge
-                                                            variant={
-                                                                step.status ===
-                                                                'completed'
-                                                                    ? 'secondary'
-                                                                    : step.status ===
-                                                                        'skipped'
-                                                                      ? 'outline'
-                                                                      : 'default'
-                                                            }
-                                                            className="h-5 text-[10px] capitalize"
+                                                    >
+                                                        <SelectTrigger
+                                                            className={`h-8 w-full border-0 text-sm font-bold shadow-none ${
+                                                                client.risk_level ===
+                                                                'critical'
+                                                                    ? 'bg-status-critical-bg text-status-critical'
+                                                                    : client.risk_level ===
+                                                                        'high'
+                                                                      ? 'bg-status-critical-bg text-status-critical'
+                                                                      : client.risk_level ===
+                                                                          'medium'
+                                                                        ? 'bg-status-warning-bg text-status-warning'
+                                                                        : client.risk_level ===
+                                                                            'low'
+                                                                          ? 'bg-status-success-bg text-status-success'
+                                                                          : 'bg-muted text-muted-foreground'
+                                                            } rounded-full px-3`}
                                                         >
-                                                            {step.status}
-                                                        </Badge>
-                                                        {step.status ===
-                                                            'pending' &&
-                                                            can.manage_onboarding_workflow && (
-                                                                <div className="flex gap-1">
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        className="h-7 text-xs"
-                                                                        onClick={() => {
-                                                                            router.patch(
-                                                                                `/operations/onboarding/${onboarding.workflow.id}/steps/${step.id}`,
-                                                                                {
-                                                                                    status: 'completed',
-                                                                                },
-                                                                                {
-                                                                                    preserveScroll: true,
-                                                                                },
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        Complete
-                                                                    </Button>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        className="h-7 text-xs text-muted-foreground"
-                                                                        onClick={() => {
-                                                                            router.patch(
-                                                                                `/operations/onboarding/${onboarding.workflow.id}/steps/${step.id}`,
-                                                                                {
-                                                                                    status: 'skipped',
-                                                                                },
-                                                                                {
-                                                                                    preserveScroll: true,
-                                                                                },
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        Skip
-                                                                    </Button>
-                                                                </div>
-                                                            )}
-                                                    </div>
+                                                            <SelectValue placeholder="Set level..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="low">
+                                                                Low
+                                                            </SelectItem>
+                                                            <SelectItem value="medium">
+                                                                Medium
+                                                            </SelectItem>
+                                                            <SelectItem value="high">
+                                                                High
+                                                            </SelectItem>
+                                                            <SelectItem value="critical">
+                                                                Critical
+                                                            </SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                ) : undefined
+                                            }
+                                        />
+                                    </>
+                                );
+                            })()}
+
+                        {tab === 'onboarding' && (
+                            <div className="space-y-4">
+                                {/* Workflow Progress Header */}
+                                {onboarding?.workflow ? (
+                                    <Card>
+                                        <CardHeader>
+                                            <div className="flex items-center justify-between">
+                                                <CardTitle className="text-base">
+                                                    Onboarding Workflow
+                                                </CardTitle>
+                                                <div className="flex items-center gap-2">
+                                                    {can.manage_onboarding_workflow &&
+                                                    onboarding.workflow
+                                                        .status !==
+                                                        'completed' ? (
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                openProfileDialog(
+                                                                    'add_onboarding_step',
+                                                                )
+                                                            }
+                                                            data-test="onboarding-add-step"
+                                                        >
+                                                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                                            Add step
+                                                        </Button>
+                                                    ) : null}
+                                                    <Badge
+                                                        variant={
+                                                            onboarding.workflow
+                                                                .status ===
+                                                            'completed'
+                                                                ? 'secondary'
+                                                                : 'default'
+                                                        }
+                                                        className="capitalize"
+                                                    >
+                                                        {onboarding.workflow.status?.replace(
+                                                            '_',
+                                                            ' ',
+                                                        )}
+                                                    </Badge>
                                                 </div>
-                                            );
-                                        },
-                                    )}
-                                </CardContent>
-                                {/* Complete Onboarding Button */}
-                                {onboarding.workflow.status === 'in_progress' &&
-                                    can.manage_onboarding_workflow &&
-                                    (() => {
-                                        const requiredSteps =
-                                            onboarding.workflow.steps.filter(
-                                                (s: any) => s.is_required,
-                                            );
-                                        const allRequiredDone =
-                                            requiredSteps.every(
-                                                (s: any) =>
-                                                    s.status === 'completed' ||
-                                                    s.status === 'skipped',
-                                            );
-                                        return allRequiredDone ? (
-                                            <div className="border-t p-4">
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                                {onboarding.workflow
+                                                    .assigned_to && (
+                                                    <span>
+                                                        Coordinator:{' '}
+                                                        <strong>
+                                                            {
+                                                                onboarding
+                                                                    .workflow
+                                                                    .assigned_to
+                                                                    .name
+                                                            }
+                                                        </strong>
+                                                    </span>
+                                                )}
+                                                {onboarding.workflow
+                                                    .started_at && (
+                                                    <span>
+                                                        Started:{' '}
+                                                        {new Date(
+                                                            onboarding.workflow
+                                                                .started_at,
+                                                        ).toLocaleDateString(
+                                                            'en-NZ',
+                                                            {
+                                                                day: 'numeric',
+                                                                month: 'short',
+                                                                year: 'numeric',
+                                                            },
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {/* Progress bar */}
+                                            {(() => {
+                                                const steps =
+                                                    onboarding.workflow.steps ??
+                                                    [];
+                                                const done = steps.filter(
+                                                    (s: any) =>
+                                                        s.status ===
+                                                            'completed' ||
+                                                        s.status === 'skipped',
+                                                ).length;
+                                                const pct =
+                                                    steps.length > 0
+                                                        ? Math.round(
+                                                              (done /
+                                                                  steps.length) *
+                                                                  100,
+                                                          )
+                                                        : 0;
+                                                const remaining =
+                                                    steps.length - done;
+                                                return (
+                                                    <div className="mt-3 flex flex-wrap items-center gap-5">
+                                                        {/* Completeness ring (design tabs-daily OnboardingTab) */}
+                                                        <Ring
+                                                            pct={pct}
+                                                            size={96}
+                                                        />
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="text-sm font-semibold">
+                                                                {pct === 100
+                                                                    ? 'Onboarding complete'
+                                                                    : remaining <=
+                                                                        2
+                                                                      ? 'Almost there'
+                                                                      : 'In progress'}
+                                                            </div>
+                                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                                {done}/
+                                                                {steps.length}{' '}
+                                                                steps complete
+                                                                {remaining > 0
+                                                                    ? ` · ${remaining} remaining`
+                                                                    : ''}
+                                                            </p>
+                                                            <div className="mt-2 h-2 rounded-full bg-muted">
+                                                                <div
+                                                                    className="h-2 rounded-full bg-primary transition-all"
+                                                                    style={{
+                                                                        width: `${pct}%`,
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    <Card>
+                                        <CardContent className="flex flex-col items-center justify-center py-8">
+                                            <p className="text-sm text-muted-foreground">
+                                                No onboarding workflow found.
+                                            </p>
+                                            {can.create_onboarding_workflow && (
                                                 <Button
-                                                    className="w-full"
+                                                    size="sm"
+                                                    className="mt-3"
                                                     onClick={() => {
                                                         router.post(
-                                                            `/operations/onboarding/${onboarding.workflow.id}/complete`,
+                                                            `/operations/clients/${client.id}/onboarding-workflow`,
                                                             {},
                                                             {
                                                                 preserveScroll: true,
@@ -2995,3235 +3028,3857 @@ export default function ClientShow({
                                                         );
                                                     }}
                                                 >
-                                                    Complete Onboarding — Set
-                                                    Status to Active
+                                                    Start Onboarding Workflow
                                                 </Button>
-                                            </div>
-                                        ) : null;
-                                    })()}
-                            </Card>
-                        )}
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                )}
 
-                        <Card className="mt-4">
-                            <CardHeader>
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div className="flex items-start gap-3">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-status-info-bg text-status-info">
-                                            <GraduationCap className="h-5 w-5" />
-                                        </div>
-                                        <div>
-                                            <CardTitle className="text-base">
-                                                Staff preparation
-                                            </CardTitle>
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                Canonical HR onboarding and
-                                                induction readiness for support
-                                                workers assigned to this client.
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {can.view_hr_onboarding ? (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            asChild
-                                        >
-                                            <Link href="/hr/onboarding">
-                                                Open HR onboarding
-                                            </Link>
-                                        </Button>
-                                    ) : null}
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                {!can.view_hr_onboarding ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        HR onboarding readiness is available to
-                                        authorised HR viewers. Client onboarding
-                                        remains available above.
-                                    </p>
-                                ) : !staffPreparation ||
-                                  staffPreparation.summary.assigned === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No support workers are assigned, so
-                                        there is no staff-preparation cohort
-                                        yet.
-                                    </p>
-                                ) : (
-                                    <div className="space-y-3">
-                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                            {[
-                                                [
-                                                    'Assigned',
-                                                    staffPreparation.summary
-                                                        .assigned,
-                                                ],
-                                                [
-                                                    'Prepared',
-                                                    staffPreparation.summary
-                                                        .prepared,
-                                                ],
-                                                [
-                                                    'In progress',
-                                                    staffPreparation.summary
-                                                        .in_progress,
-                                                ],
-                                                [
-                                                    'Attention',
-                                                    staffPreparation.summary
-                                                        .needs_attention,
-                                                ],
-                                            ].map(([label, value]) => (
-                                                <div
-                                                    key={String(label)}
-                                                    className="rounded-lg border p-3"
-                                                >
-                                                    <div className="text-lg font-semibold">
-                                                        {value}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {label}
+                                {/* Data Checklist */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base">
+                                            Data Checklist
+                                        </CardTitle>
+                                        <p className="text-xs text-muted-foreground">
+                                            Auto-detected from{' '}
+                                            {(
+                                                labels?.['client.singular'] ??
+                                                'client'
+                                            ).toLowerCase()}{' '}
+                                            profile data
+                                        </p>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
+                                        {(
+                                            onboarding?.checklist?.items ??
+                                            onboarding?.items ??
+                                            []
+                                        ).map((item: any) => (
+                                            <div
+                                                key={item.key}
+                                                className="flex items-center justify-between rounded-md border p-2"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div
+                                                        className={`h-2 w-2 rounded-full ${item.complete ? 'bg-status-success' : 'bg-muted'}`}
+                                                    />
+                                                    <div>
+                                                        <div className="text-sm font-medium">
+                                                            {item.label}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {item.complete
+                                                                ? item.has_data
+                                                                    ? 'Added'
+                                                                    : 'Not applicable'
+                                                                : 'Not completed'}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                        <div className="divide-y rounded-lg border">
-                                            {staffPreparation.workers.map(
-                                                (worker) => {
-                                                    const statusLabel =
-                                                        worker.status ===
-                                                        'completed'
-                                                            ? 'Prepared'
-                                                            : worker.status ===
-                                                                'in_progress'
-                                                              ? 'In progress'
-                                                              : worker.status ===
-                                                                  'pending'
-                                                                ? 'Pending'
-                                                                : worker.status ===
-                                                                    'not_linked'
-                                                                  ? 'No HR profile'
-                                                                  : worker.status ===
-                                                                      'not_started'
-                                                                    ? 'No checklist'
-                                                                    : worker.status.replace(
-                                                                          '_',
-                                                                          ' ',
-                                                                      );
+                                                {!item.has_data &&
+                                                    can.manage_onboarding_checklist && (
+                                                        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                                                            <Checkbox
+                                                                checked={
+                                                                    item.override
+                                                                }
+                                                                onCheckedChange={(
+                                                                    v,
+                                                                ) => {
+                                                                    router.post(
+                                                                        `/operations/clients/${client.id}/onboarding/${item.key}`,
+                                                                        {
+                                                                            checked:
+                                                                                !!v,
+                                                                        },
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                        },
+                                                                    );
+                                                                }}
+                                                            />
+                                                            Doesn't have this
+                                                        </label>
+                                                    )}
+                                            </div>
+                                        ))}
+                                    </CardContent>
+                                </Card>
+
+                                {/* Workflow Steps */}
+                                {onboarding?.workflow?.steps && (
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="text-base">
+                                                Workflow Steps
+                                            </CardTitle>
+                                            <p className="text-xs text-muted-foreground">
+                                                Manual steps tracked by staff
+                                            </p>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2">
+                                            {onboarding.workflow.steps.map(
+                                                (step: any) => {
+                                                    const stepCategory =
+                                                        /DBS|Health Screening|Privacy Act 2020|Safeguarding/i.test(
+                                                            step.step_name ??
+                                                                '',
+                                                        )
+                                                            ? {
+                                                                  label: 'Compliance',
+                                                                  color: 'bg-primary/10 text-primary',
+                                                              }
+                                                            : /Referral|Assessment|Care Plan|Agreement|Staff|Introduction/i.test(
+                                                                    step.step_name ??
+                                                                        '',
+                                                                )
+                                                              ? {
+                                                                    label: 'Service',
+                                                                    color: 'bg-status-info-bg text-status-info',
+                                                                }
+                                                              : {
+                                                                    label: 'Admin',
+                                                                    color: 'bg-muted text-muted-foreground',
+                                                                };
                                                     return (
                                                         <div
-                                                            key={worker.user_id}
-                                                            className="flex flex-wrap items-center justify-between gap-3 p-3"
+                                                            key={step.id}
+                                                            className={`flex items-center justify-between rounded-md border p-3 ${step.status === 'completed' ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30' : step.due_date && new Date(step.due_date) < new Date() && step.status === 'pending' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30' : ''}`}
                                                         >
-                                                            <div className="min-w-0">
-                                                                <p className="truncate text-sm font-medium">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
                                                                     {
-                                                                        worker.name
+                                                                        step.step_order
                                                                     }
-                                                                </p>
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {worker.role ??
-                                                                        'Assigned support worker'}
-                                                                    {worker.tasks_total >
-                                                                    0
-                                                                        ? ` · ${worker.tasks_completed}/${worker.tasks_total} tasks`
-                                                                        : ''}
-                                                                    {worker.is_overdue
-                                                                        ? ' · Overdue'
-                                                                        : ''}
-                                                                </p>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex items-center gap-2 text-sm font-medium">
+                                                                        <span
+                                                                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${stepCategory.color}`}
+                                                                        >
+                                                                            {
+                                                                                stepCategory.label
+                                                                            }
+                                                                        </span>
+                                                                        {
+                                                                            step.step_name
+                                                                        }
+                                                                    </div>
+                                                                    {step.description && (
+                                                                        <div className="mt-0.5 text-xs text-muted-foreground">
+                                                                            {
+                                                                                step.description
+                                                                            }
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                        {step.status ===
+                                                                            'completed' &&
+                                                                            step.completed_by && (
+                                                                                <span>
+                                                                                    Completed
+                                                                                    by{' '}
+                                                                                    {
+                                                                                        step
+                                                                                            .completed_by
+                                                                                            .name
+                                                                                    }
+                                                                                </span>
+                                                                            )}
+                                                                        {step.completed_at && (
+                                                                            <span>
+                                                                                {new Date(
+                                                                                    step.completed_at,
+                                                                                ).toLocaleDateString(
+                                                                                    'en-NZ',
+                                                                                    {
+                                                                                        day: 'numeric',
+                                                                                        month: 'short',
+                                                                                    },
+                                                                                )}
+                                                                            </span>
+                                                                        )}
+                                                                        {step.due_date &&
+                                                                            step.status ===
+                                                                                'pending' && (
+                                                                                <span
+                                                                                    className={
+                                                                                        new Date(
+                                                                                            step.due_date,
+                                                                                        ) <
+                                                                                        new Date()
+                                                                                            ? 'font-medium text-status-critical'
+                                                                                            : ''
+                                                                                    }
+                                                                                >
+                                                                                    Due:{' '}
+                                                                                    {new Date(
+                                                                                        step.due_date,
+                                                                                    ).toLocaleDateString(
+                                                                                        'en-NZ',
+                                                                                        {
+                                                                                            day: 'numeric',
+                                                                                            month: 'short',
+                                                                                        },
+                                                                                    )}
+                                                                                </span>
+                                                                            )}
+                                                                        {step.notes && (
+                                                                            <span className="italic">
+                                                                                "
+                                                                                {
+                                                                                    step.notes
+                                                                                }
+
+                                                                                "
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                             <div className="flex items-center gap-2">
                                                                 <Badge
                                                                     variant={
-                                                                        worker.status ===
+                                                                        step.status ===
                                                                         'completed'
                                                                             ? 'secondary'
-                                                                            : worker.is_overdue
-                                                                              ? 'destructive'
-                                                                              : 'outline'
+                                                                            : step.status ===
+                                                                                'skipped'
+                                                                              ? 'outline'
+                                                                              : 'default'
                                                                     }
-                                                                    className="capitalize"
+                                                                    className="h-5 text-[10px] capitalize"
                                                                 >
                                                                     {
-                                                                        statusLabel
+                                                                        step.status
                                                                     }
                                                                 </Badge>
-                                                                {worker.checklist_id ? (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        asChild
-                                                                    >
-                                                                        <Link
-                                                                            href={`/hr/onboarding/${worker.checklist_id}`}
-                                                                        >
-                                                                            View
-                                                                        </Link>
-                                                                    </Button>
-                                                                ) : null}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                },
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-
-                {tab === 'medical' && (
-                    <div className="space-y-4">
-                        {/* Allergy Alert */}
-                        {medical.profile?.allergies &&
-                            medical.profile.allergies !== '-' && (
-                                <div className="flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
-                                    <ShieldAlert className="h-6 w-6 shrink-0 text-status-critical" />
-                                    <div>
-                                        <p className="text-sm font-bold text-status-critical">
-                                            Allergies
-                                        </p>
-                                        <p className="text-sm text-status-critical">
-                                            {medical.profile.allergies}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
-                        {/* Quick Stats */}
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            <div className="rounded-xl border bg-primary/10 p-3 text-center">
-                                <div className="text-xl font-bold text-primary">
-                                    {medical.medications?.length ?? 0}
-                                </div>
-                                <div className="text-[10px] tracking-wider text-primary uppercase">
-                                    Medications
-                                </div>
-                            </div>
-                            <div className="rounded-xl border bg-status-warning-bg p-3 text-center">
-                                <div className="text-xl font-bold text-status-warning">
-                                    {medical.conditions?.length ?? 0}
-                                </div>
-                                <div className="text-[10px] tracking-wider text-status-warning uppercase">
-                                    Conditions
-                                </div>
-                            </div>
-                            <div className="rounded-xl border bg-status-info-bg p-3 text-center">
-                                <div className="text-xl font-bold text-status-info">
-                                    {medical.emergency_contacts?.length ?? 0}
-                                </div>
-                                <div className="text-[10px] tracking-wider text-status-info uppercase">
-                                    Emergency Contacts
-                                </div>
-                            </div>
-                            <div className="rounded-xl border bg-status-info-bg p-3 text-center">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-1.5 text-xs"
-                                    asChild
-                                >
-                                    <Link href="/emar">
-                                        <Pill className="h-3.5 w-3.5" /> Open
-                                        eMAR
-                                    </Link>
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Main Grid */}
-                        <div className="grid gap-4 lg:grid-cols-3">
-                            {/* Left Column — Profile + Medications */}
-                            <div className="space-y-4 lg:col-span-2">
-                                {/* GP Card */}
-                                {(medical.profile?.gp_name ||
-                                    medical.profile?.gp_practice) && (
-                                    <Card className="border-status-success/30 bg-status-success-bg">
-                                        <CardContent className="p-4">
-                                            <div className="mb-2 flex items-center gap-2">
-                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-success-bg text-status-success">
-                                                    <Heart className="h-4 w-4" />
-                                                </div>
-                                                <span className="text-sm font-semibold">
-                                                    GP / Primary Care
-                                                </span>
-                                            </div>
-                                            <div className="grid gap-2 text-sm sm:grid-cols-3">
-                                                {medical.profile.gp_name && (
-                                                    <div>
-                                                        <p className="text-[10px] text-muted-foreground uppercase">
-                                                            Doctor
-                                                        </p>
-                                                        <p className="font-medium">
-                                                            {
-                                                                medical.profile
-                                                                    .gp_name
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                )}
-                                                {medical.profile
-                                                    .gp_practice && (
-                                                    <div>
-                                                        <p className="text-[10px] text-muted-foreground uppercase">
-                                                            Practice
-                                                        </p>
-                                                        <p className="font-medium">
-                                                            {
-                                                                medical.profile
-                                                                    .gp_practice
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                )}
-                                                {medical.profile.gp_phone && (
-                                                    <div>
-                                                        <p className="text-[10px] text-muted-foreground uppercase">
-                                                            Phone
-                                                        </p>
-                                                        <p className="font-medium">
-                                                            {
-                                                                medical.profile
-                                                                    .gp_phone
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-
-                                {/* Medical Profile */}
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center justify-between text-base">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-critical-bg text-status-critical">
-                                                    <FileText className="h-4 w-4" />
-                                                </div>
-                                                Medical Profile
-                                            </div>
-                                            {can.edit && (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={`/operations/clients/${client.id}/medical`}
-                                                    >
-                                                        Edit
-                                                    </Link>
-                                                </Button>
-                                            )}
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="grid gap-4 sm:grid-cols-2">
-                                            {[
-                                                {
-                                                    label: 'Medical History',
-                                                    value: medical.profile
-                                                        ?.medical_history,
-                                                },
-                                                {
-                                                    label: 'Disabilities',
-                                                    value: medical.profile
-                                                        ?.disabilities,
-                                                },
-                                                {
-                                                    label: 'Blood Type',
-                                                    value: medical.profile
-                                                        ?.blood_type,
-                                                },
-                                                {
-                                                    label: 'Hospital Preference',
-                                                    value: medical.profile
-                                                        ?.hospital_preference,
-                                                },
-                                            ]
-                                                .filter(
-                                                    (f) =>
-                                                        f.value &&
-                                                        f.value !== '-',
-                                                )
-                                                .map((f) => (
-                                                    <div
-                                                        key={f.label}
-                                                        className="rounded-lg bg-muted p-3"
-                                                    >
-                                                        <p className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                                                            {f.label}
-                                                        </p>
-                                                        <p className="mt-1 text-sm">
-                                                            {f.value}
-                                                        </p>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                        {medical.profile?.notes &&
-                                            medical.profile.notes !== '-' && (
-                                                <div className="mt-3 rounded-lg bg-muted p-3">
-                                                    <p className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                                                        Notes
-                                                    </p>
-                                                    <p className="mt-1 text-sm whitespace-pre-wrap">
-                                                        {medical.profile.notes}
-                                                    </p>
-                                                </div>
-                                            )}
-                                    </CardContent>
-                                </Card>
-
-                                {/* Medications */}
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center justify-between text-base">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                                    <Pill className="h-4 w-4" />
-                                                </div>
-                                                Medications
-                                                <Badge
-                                                    variant="secondary"
-                                                    className="text-[10px]"
-                                                >
-                                                    {medical.medications
-                                                        ?.length ?? 0}
-                                                </Badge>
-                                            </div>
-                                            {can.edit && (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={`/operations/clients/${client.id}/medical?section=medications`}
-                                                    >
-                                                        Manage
-                                                    </Link>
-                                                </Button>
-                                            )}
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {(medical.medications ?? []).length ===
-                                        0 ? (
-                                            <p className="py-4 text-center text-sm text-muted-foreground">
-                                                No medications listed.
-                                            </p>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {medical.medications.map(
-                                                    (m: any) => (
-                                                        // eslint-disable-next-line no-restricted-syntax -- Medication rows use status strip styling inside the clinical Card.
-                                                        <div
-                                                            key={m.id}
-                                                            className="flex items-start gap-3 rounded-xl border-l-4 border-l-violet-400 bg-card p-3 shadow-sm"
-                                                        >
-                                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                                                                <Pill className="h-4 w-4 text-primary" />
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-sm font-semibold">
-                                                                        {m.name}
-                                                                    </span>
-                                                                    {m.is_controlled && (
-                                                                        <Badge className="border-0 bg-status-critical-bg text-[9px] text-status-critical">
-                                                                            Controlled
-                                                                        </Badge>
-                                                                    )}
-                                                                    {m.is_prn && (
-                                                                        <Badge className="border-0 bg-status-warning-bg text-[9px] text-status-warning">
-                                                                            PRN
-                                                                        </Badge>
-                                                                    )}
-                                                                </div>
-                                                                <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                                                                    {m.dosage && (
-                                                                        <span>
-                                                                            {
-                                                                                m.dosage
-                                                                            }
-                                                                        </span>
-                                                                    )}
-                                                                    {m.frequency && (
-                                                                        <span>
-                                                                            {
-                                                                                m.frequency
-                                                                            }
-                                                                        </span>
-                                                                    )}
-                                                                    {m.route && (
-                                                                        <span>
-                                                                            {
-                                                                                m.route
-                                                                            }
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                {m.instructions && (
-                                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                                        {
-                                                                            m.instructions
-                                                                        }
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ),
-                                                )}
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </div>
-
-                            {/* Right Column — Conditions + Emergency Contacts */}
-                            <div className="space-y-4">
-                                {/* Conditions */}
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="flex items-center justify-between text-sm font-semibold">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-status-warning-bg text-status-warning">
-                                                    <ShieldAlert className="h-3.5 w-3.5" />
-                                                </div>
-                                                Conditions
-                                            </div>
-                                            {can.edit && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-6 text-xs"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={`/operations/clients/${client.id}/medical?section=conditions`}
-                                                    >
-                                                        Manage
-                                                    </Link>
-                                                </Button>
-                                            )}
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {(medical.conditions ?? []).length ===
-                                        0 ? (
-                                            <p className="py-4 text-center text-xs text-muted-foreground">
-                                                No conditions listed.
-                                            </p>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {medical.conditions.map(
-                                                    (c: any) => (
-                                                        <div
-                                                            key={c.id}
-                                                            className="rounded-lg border p-2.5"
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="text-xs font-medium">
-                                                                    {c.label}
-                                                                </span>
-                                                                {c.severity && (
-                                                                    <Badge
-                                                                        className={`border-0 text-[9px] ${
-                                                                            c.severity ===
-                                                                            'severe'
-                                                                                ? 'bg-status-critical-bg text-status-critical'
-                                                                                : c.severity ===
-                                                                                    'moderate'
-                                                                                  ? 'bg-status-warning-bg text-status-warning'
-                                                                                  : 'bg-status-success-bg text-status-success'
-                                                                        }`}
-                                                                    >
-                                                                        {
-                                                                            c.severity
-                                                                        }
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                            {c.notes && (
-                                                                <p className="mt-1 text-[11px] text-muted-foreground">
-                                                                    {c.notes}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    ),
-                                                )}
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-
-                                {/* Emergency Contacts */}
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="flex items-center justify-between text-sm font-semibold">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-status-info-bg text-status-info">
-                                                    <Heart className="h-3.5 w-3.5" />
-                                                </div>
-                                                Emergency Contacts
-                                            </div>
-                                            {can.edit && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-6 text-xs"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={`/operations/clients/${client.id}/medical?section=emergency_contacts`}
-                                                    >
-                                                        Manage
-                                                    </Link>
-                                                </Button>
-                                            )}
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {(medical.emergency_contacts ?? [])
-                                            .length === 0 ? (
-                                            <p className="py-4 text-center text-xs text-muted-foreground">
-                                                No emergency contacts listed.
-                                            </p>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {medical.emergency_contacts.map(
-                                                    (e: any) => (
-                                                        <div
-                                                            key={e.id}
-                                                            className="flex items-start gap-2.5 rounded-lg border p-2.5"
-                                                        >
-                                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status-info-bg text-xs font-bold text-status-info">
-                                                                {(
-                                                                    e.name ??
-                                                                    '?'
-                                                                ).charAt(0)}
-                                                            </div>
-                                                            <div className="flex-1 text-xs">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="font-medium">
-                                                                        {e.name}
-                                                                    </span>
-                                                                    {e.relationship && (
-                                                                        <Badge
-                                                                            variant="outline"
-                                                                            className="h-4 px-1 text-[9px]"
-                                                                        >
-                                                                            {
-                                                                                e.relationship
-                                                                            }
-                                                                        </Badge>
-                                                                    )}
-                                                                </div>
-                                                                {e.phone && (
-                                                                    <p className="mt-0.5 text-muted-foreground">
-                                                                        {
-                                                                            e.phone
-                                                                        }
-                                                                    </p>
-                                                                )}
-                                                                {e.email && (
-                                                                    <p className="text-muted-foreground">
-                                                                        {
-                                                                            e.email
-                                                                        }
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ),
-                                                )}
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {tab === 'mar' && (
-                    <MarTab
-                        clientId={client.id}
-                        clientFirstName={client.first_name}
-                        siteName={client.site?.name ?? null}
-                        medications={(medical?.medications ?? []) as any[]}
-                        allergies={
-                            Array.isArray(medical?.profile?.allergies)
-                                ? (medical.profile.allergies as string[])
-                                : []
-                        }
-                        emarSummary={emarSummary}
-                        canRecord={Boolean(
-                            can.record_medication_administration,
-                        )}
-                        canRecordControlled={Boolean(
-                            can.record_controlled_medication,
-                        )}
-                        canViewControlled={Boolean(
-                            auth?.can?.medications?.controlledView,
-                        )}
-                        onRecordDose={(medicationId) =>
-                            openProfileDialog(
-                                'emar',
-                                medicationId ? { medicationId } : undefined,
-                            )
-                        }
-                    />
-                )}
-
-                {tab === 'meal_prefs' && (
-                    <FoodMealTab
-                        clientId={client.id}
-                        canEdit={!!can?.edit}
-                        mealLogs={(pageProps as any).meal_logs}
-                        onAddPreference={() => openProfileDialog('meal_pref')}
-                    />
-                )}
-
-                {tab === 'observations' && (
-                    <BehaviourAbcTab
-                        clientId={client.id}
-                        patterns={(pageProps as any).behaviour_patterns as any}
-                        canRecord={Boolean(can.record_event)}
-                        onNewEntry={() => openProfileDialog('abc')}
-                        onOpenEntry={(entry: AbcEntryRow) =>
-                            openProfileDialog('abc', { entry })
-                        }
-                        refreshToken={abcRefreshToken}
-                    />
-                )}
-
-                {tab === 'care_plans' && (
-                    <CareSupportPlanTab
-                        client={client as any}
-                        summary={carePlansSummary}
-                        agreements={clientAgreements}
-                        canEdit={Boolean(can.care_plans_update)}
-                        canCreate={Boolean(can.care_plans_create)}
-                        onCreatePlan={() =>
-                            openProfileDialog('care_plan', {
-                                serviceAgreementOptions,
-                            })
-                        }
-                        onEditPlan={(plan) =>
-                            openProfileDialog('care_plan', {
-                                plan,
-                                serviceAgreementOptions,
-                            })
-                        }
-                        onGoToGoals={() => handleTabChange('goals_path')}
-                    />
-                )}
-
-                {tab === 'calendar' && (
-                    <div className="space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
-                                    <Calendar className="h-[19px] w-[19px]" />
-                                </span>
-                                <div>
-                                    <h2 className="text-lg leading-tight font-semibold">
-                                        Appointments
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        Appointments, shifts & reminders
-                                    </p>
-                                </div>
-                            </div>
-                            {canCreateAppointment ? (
-                                <Button
-                                    onClick={() =>
-                                        openProfileDialog('appointment')
-                                    }
-                                    data-test="calendar-new-appointment"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New appointment
-                                </Button>
-                            ) : null}
-                        </div>
-                        <ClientCalendarTab
-                            clientId={client.id}
-                            clientFirstName={client.first_name}
-                            initialEvents={
-                                (pageProps as any).calendar_events ?? []
-                            }
-                            canCreate={canCreateAppointment}
-                        />
-                    </div>
-                )}
-
-                {tab === 'progress_notes' && (
-                    <DailyNotesTab
-                        clientId={client.id}
-                        notes={clientDailyNotes}
-                        summary={dailyNotesSummary}
-                        canReview={Boolean(progressNotesCan.review)}
-                        canUpdate={Boolean(progressNotesCan.update)}
-                        currentUserId={auth?.user?.id}
-                        onCreateDaily={
-                            can.create_daily_note
-                                ? () => openProfileDialog('daily_note')
-                                : undefined
-                        }
-                        onCreateQuick={
-                            can.create_quick_note
-                                ? () => openProfileDialog('quick_note')
-                                : undefined
-                        }
-                        onEditNote={(note) =>
-                            openProfileDialog('daily_note', { note })
-                        }
-                        filterPreset={dailyNotesFilter}
-                        onFilterChange={setDailyNotesFilter}
-                        onShowReviewQueue={() => openDailyNotes('flagged')}
-                        isLoading={!hasClientDailyNotesProp}
-                    />
-                )}
-
-                {tab === 'communication_notes' && (
-                    <CommunicationNotesTab
-                        notes={communicationNotes}
-                        familyNotes={familyNotes}
-                        familyNotesOpenCount={familyNotesOpenCount}
-                        coverage={{
-                            total: dailyNotesSummary.communication,
-                            loaded: dailyNotesSummary.communication_loaded,
-                            has_more: dailyNotesSummary.communication_has_more,
-                        }}
-                        onCreate={
-                            can.create_communication_note
-                                ? () => openProfileDialog('comm_note')
-                                : undefined
-                        }
-                        canReview={Boolean(progressNotesCan.review)}
-                        canUpdate={Boolean(progressNotesCan.update)}
-                        onMarkReviewed={(noteId) =>
-                            router.post(
-                                `/operations/clients/${client.id}/daily-notes/${noteId}/review`,
-                                {},
-                                { preserveScroll: true },
-                            )
-                        }
-                        onClearFlag={(noteId) =>
-                            router.post(
-                                `/operations/clients/${client.id}/daily-notes/${noteId}/flag`,
-                                { is_flagged: false },
-                                { preserveScroll: true },
-                            )
-                        }
-                        onEditNote={(note) =>
-                            openProfileDialog('comm_note', { note })
-                        }
-                        isLoading={!hasCommunicationNotesProp}
-                    />
-                )}
-
-                {tab === 'health_monitoring' && (
-                    <div className="space-y-4">
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => openProfileDialog('record_obs')}
-                                data-test="health-record-observation"
-                            >
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Record observation
-                            </Button>
-                        </div>
-                        <ClientClinicalRecordLaunchers client={client} />
-                        <HealthMonitoringTab
-                            clientId={client.id}
-                            data={healthMonitoring}
-                            isLoading={!hasHealthMonitoringProp}
-                        />
-                    </div>
-                )}
-
-                {tab === 'healthcare_devices' && (
-                    <ClientHealthcareDevicesTab
-                        data={healthcareDevices}
-                        isLoading={
-                            healthcareDevicesLoading ||
-                            (!hasHealthcareDevicesProp &&
-                                !healthcareDevicesLoadFailed)
-                        }
-                        loadFailed={healthcareDevicesLoadFailed}
-                    />
-                )}
-
-                {tab === 'rhythms_routines' && (
-                    <div className="space-y-4">
-                        {can.edit ? (
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                <Button
-                                    onClick={() =>
-                                        openProfileDialog('edit_rhythms')
-                                    }
-                                    data-test="rhythms-update-guidance"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Update guidance
-                                </Button>
-                            </div>
-                        ) : null}
-                        <RhythmsRoutinesTab
-                            clientId={client.id}
-                            routines={clientRoutines}
-                            canEdit={can.edit}
-                            isLoading={!hasClientRoutinesProp}
-                        />
-                    </div>
-                )}
-
-                {tab === 'actions_reviews' && (
-                    <div className="space-y-4">
-                        {can.create_note ? (
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                <Button
-                                    onClick={() =>
-                                        openProfileDialog('add_action')
-                                    }
-                                    data-test="actions-add"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add action
-                                </Button>
-                            </div>
-                        ) : null}
-                        <ActionsReviewsTab
-                            items={actionsReviews}
-                            summary={actionsReviewsSummary}
-                            isLoading={!hasActionsReviewsProp}
-                        />
-                    </div>
-                )}
-
-                {tab === 'personal_details' && (
-                    <PersonalDetailsTab
-                        client={client as any}
-                        supportWorkers={(client as any).support_workers ?? []}
-                        emergencyContacts={
-                            ((pageProps as any).medical?.emergency_contacts ??
-                                []) as any
-                        }
-                        nextOfKins={
-                            ((pageProps as any).next_of_kins ?? []) as any
-                        }
-                        onEdit={
-                            can.edit
-                                ? () => openProfileDialog('edit_profile')
-                                : undefined
-                        }
-                    />
-                )}
-
-                {tab === 'goals_path' && (
-                    <GoalsPathTab
-                        clientId={client.id}
-                        clientName={name}
-                        activePlanId={workingCarePlan?.id ?? null}
-                        goals={workingCarePlan?.goals ?? []}
-                        lifeStory={(client as any).life_story}
-                        strengthsAbilities={(client as any).strengths_abilities}
-                        interestsHobbies={(client as any).interests_hobbies}
-                        pathPlan={(pageProps as any).path_plan ?? null}
-                        canManageGoals={Boolean(can.manage_care_plan_goals)}
-                        canEditPath={Boolean(can.edit_path_plan)}
-                        onAddGoal={() => openProfileDialog('goal')}
-                        onManageGoal={(goal) =>
-                            openProfileDialog('goal', { goal })
-                        }
-                        onEditPlan={() => {
-                            const pp = ((pageProps as any).path_plan ??
-                                {}) as Record<string, unknown>;
-                            const toLines = (a: unknown) =>
-                                Array.isArray(a) ? a.join('\n') : '';
-                            const day = (v: unknown) =>
-                                typeof v === 'string' ? v.slice(0, 10) : '';
-                            openProfileDialog('edit_path_plan', {
-                                values: {
-                                    dream: pp.dream ?? '',
-                                    north_star: pp.north_star ?? '',
-                                    strengths: toLines(pp.strengths),
-                                    trusted_people: toLines(pp.trusted_people),
-                                    independence_goals: toLines(
-                                        pp.independence_goals,
-                                    ),
-                                    community: pp.community ?? '',
-                                    action_steps: toLines(pp.action_steps),
-                                    meaningful_outcomes:
-                                        pp.meaningful_outcomes ?? '',
-                                    life_story:
-                                        (client as any).life_story ?? '',
-                                    strengths_abilities:
-                                        (client as any).strengths_abilities ??
-                                        '',
-                                    interests_hobbies:
-                                        (client as any).interests_hobbies ?? '',
-                                    plan_date: day(pp.plan_date),
-                                    next_review_at: day(pp.next_review_at),
-                                },
-                            });
-                        }}
-                    />
-                )}
-
-                {tab === 'risk_management' && (
-                    <>
-                        <RiskManagementTab
-                            clientId={client.id}
-                            risks={(pageProps.client_risks ?? []) as any}
-                            canCreate={Boolean((can as any).create_risks)}
-                            canUpdate={Boolean((can as any).update_risks)}
-                            canDelete={Boolean((can as any).delete_risks)}
-                            onAddRisk={() => openProfileDialog('add_risk')}
-                            onEditRisk={(risk) =>
-                                openProfileDialog('edit_risk', { risk })
-                            }
-                            homeHazards={(pageProps.homeHazards ?? []) as any}
-                            homeHazardDetail={
-                                (pageProps.homeHazardDetail ?? null) as any
-                            }
-                            homeName={(pageProps.homeName ?? null) as any}
-                            homeSiteId={(pageProps.homeSiteId ?? null) as any}
-                            homeProcedures={
-                                (pageProps.homeProcedures ?? []) as any
-                            }
-                        />
-
-                        {Boolean((can as any).view_hs_risk_assessments) && (
-                            <div className="mt-8 border-t border-border pt-6">
-                                <div className="mb-4 flex items-center gap-2">
-                                    <ShieldAlert className="h-5 w-5 text-muted-foreground" />
-                                    <div>
-                                        <h3 className="text-base font-semibold">
-                                            Formal H&amp;S risk assessments
-                                        </h3>
-                                        <p className="text-xs text-muted-foreground">
-                                            ISO 31000 / SafePlus 5×5 assessments
-                                            attached to this client — separate
-                                            from the care-risk list above.
-                                        </p>
-                                    </div>
-                                </div>
-                                <RaRegisterSection
-                                    assessments={
-                                        (pageProps.hs_risk_assessments ??
-                                            []) as RaRow[]
-                                    }
-                                    pickers={
-                                        (pageProps.ra_pickers ?? {
-                                            sites: [],
-                                            clients: [],
-                                            events: [],
-                                        }) as RaPickers
-                                    }
-                                    canManage={Boolean(
-                                        (can as any).manage_hs_risk_assessments,
-                                    )}
-                                    lockedAssessable={{
-                                        type: 'client',
-                                        id: client.id,
-                                        name: `${client.first_name} ${client.last_name}`.trim(),
-                                    }}
-                                />
-                            </div>
-                        )}
-                    </>
-                )}
-
-                {tab === 'incidents_accidents' && (
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
-                                <AlertTriangle className="h-[19px] w-[19px]" />
-                            </span>
-                            <div>
-                                <h2 className="text-lg leading-tight font-semibold">
-                                    Incidents & accidents
-                                </h2>
-                                <p className="text-sm text-muted-foreground">
-                                    {(pageProps.client_incidents ?? []).length}{' '}
-                                    recent incident
-                                    {(pageProps.client_incidents ?? [])
-                                        .length === 1
-                                        ? ''
-                                        : 's'}
-                                </p>
-                            </div>
-                        </div>
-                        <Button
-                            onClick={() => openProfileDialog('log_incident')}
-                            data-test="incidents-log-incident"
-                        >
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            Log incident
-                        </Button>
-                    </div>
-                )}
-                {tab === 'incidents_accidents' && (
-                    <IncidentsTab
-                        incidents={(pageProps.client_incidents ?? []) as any[]}
-                    />
-                )}
-
-                {tab === 'first_aid' && (
-                    <FirstAidTab
-                        records={(pageProps.first_aid_records ?? []) as any[]}
-                    />
-                )}
-
-                {tab === 'family_tree' && (
-                    <div className="space-y-4">
-                        {can.edit ? (
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={() =>
-                                        openProfileDialog('portal_invite')
-                                    }
-                                >
-                                    <Globe className="mr-1.5 h-4 w-4" />
-                                    Invite to portal
-                                </Button>
-                                <Button
-                                    onClick={() =>
-                                        openProfileDialog('add_relationship')
-                                    }
-                                    data-test="family-add-relationship"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add relationship
-                                </Button>
-                            </div>
-                        ) : null}
-                        <FamilyTreeTab
-                            clientName={name}
-                            nextOfKins={
-                                ((pageProps as any).next_of_kins ?? []) as any
-                            }
-                            portalUsers={(portal_users ?? []) as any}
-                            emergencyContacts={
-                                (medical?.emergency_contacts ?? []) as any
-                            }
-                        />
-                    </div>
-                )}
-
-                {tab === 'audit_history' && (
-                    <AuditHistoryTab
-                        entries={
-                            ((pageProps as any).audit_history ?? []) as any
-                        }
-                        canView={Boolean(
-                            ((pageProps as any).audit_history ?? []).length >
-                                0 || progressNotesCan.update,
-                        )}
-                    />
-                )}
-
-                {tab === 'finance' && (
-                    <div className="space-y-4">
-                        {flowContext.fundOptions.length > 0 ? (
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                <Button
-                                    onClick={() =>
-                                        openProfileDialog('transaction')
-                                    }
-                                    data-test="finance-new-transaction"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New transaction
-                                </Button>
-                            </div>
-                        ) : null}
-                        <FinanceTab
-                            clientId={client.id}
-                            finance={(pageProps as any).client_finance ?? {}}
-                        />
-                    </div>
-                )}
-
-                {tab === 'leave_excursions' && (
-                    <LeaveExcursionsTab
-                        clientId={client.id}
-                        leave={
-                            ((pageProps as any).leave_excursions?.leave ??
-                                []) as any
-                        }
-                        excursions={
-                            ((pageProps as any).leave_excursions?.excursions ??
-                                []) as any
-                        }
-                        canManage={Boolean(can.edit)}
-                        onRequestLeave={() =>
-                            openProfileDialog('request_leave')
-                        }
-                        onPlanExcursion={() =>
-                            openProfileDialog('plan_excursion')
-                        }
-                    />
-                )}
-
-                {tab === 'service_agreements' &&
-                    (() => {
-                        const agreements = clientAgreements;
-                        const activeAgs = agreements.filter(
-                            (a: any) => a.status === 'active',
-                        );
-                        const totalBudget = agreements.reduce(
-                            (s: number, a: any) => s + (a.total_budget ?? 0),
-                            0,
-                        );
-                        const totalUsed = agreements.reduce(
-                            (s: number, a: any) => s + (a.budget_used ?? 0),
-                            0,
-                        );
-                        const overallPct =
-                            totalBudget > 0
-                                ? Math.round((totalUsed / totalBudget) * 100)
-                                : 0;
-                        const expiringSoon = agreements.filter(
-                            (a: any) =>
-                                a.ends_at &&
-                                new Date(a.ends_at).getTime() - Date.now() <
-                                    30 * 86400000 &&
-                                new Date(a.ends_at) > new Date(),
-                        ).length;
-
-                        return (
-                            <div className="space-y-4">
-                                {/* Stats */}
-                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
-                                        <div className="text-xl font-bold text-primary">
-                                            {agreements.length}
-                                        </div>
-                                        <div className="text-[10px] tracking-wider text-primary uppercase">
-                                            Total
-                                        </div>
-                                    </div>
-                                    <div className="rounded-xl border bg-status-success-bg p-3 text-center">
-                                        <div className="text-xl font-bold text-status-success">
-                                            {activeAgs.length}
-                                        </div>
-                                        <div className="text-[10px] tracking-wider text-status-success uppercase">
-                                            Active
-                                        </div>
-                                    </div>
-                                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
-                                        <div
-                                            className={`text-xl font-bold ${overallPct > 90 ? 'text-status-critical' : overallPct > 70 ? 'text-status-warning' : 'text-primary'}`}
-                                        >
-                                            {overallPct}%
-                                        </div>
-                                        <div className="text-[10px] tracking-wider text-primary uppercase">
-                                            Budget Used
-                                        </div>
-                                    </div>
-                                    <div className="rounded-xl border p-3 text-center">
-                                        <div
-                                            className={`text-xl font-bold ${expiringSoon > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
-                                        >
-                                            {expiringSoon}
-                                        </div>
-                                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                                            Expiring Soon
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Overall Budget Bar */}
-                                {totalBudget > 0 && (
-                                    <Card className="border-primary bg-primary/10">
-                                        <CardContent className="p-4">
-                                            <div className="mb-2 flex items-center justify-between">
-                                                <span className="text-sm font-semibold">
-                                                    Total Funding Overview
-                                                </span>
-                                                <span className="text-sm font-bold text-primary">
-                                                    $
-                                                    {new Intl.NumberFormat(
-                                                        'en-NZ',
-                                                    ).format(totalUsed)}{' '}
-                                                    / $
-                                                    {new Intl.NumberFormat(
-                                                        'en-NZ',
-                                                    ).format(totalBudget)}{' '}
-                                                    NZD
-                                                </span>
-                                            </div>
-                                            <div className="h-4 w-full overflow-hidden rounded-full bg-primary/20">
-                                                <div
-                                                    className={`h-full rounded-full transition-all ${overallPct > 90 ? 'bg-status-critical' : overallPct > 70 ? 'bg-status-warning' : 'bg-primary'}`}
-                                                    style={{
-                                                        width: `${Math.min(overallPct, 100)}%`,
-                                                    }}
-                                                />
-                                            </div>
-                                            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
-                                                <span>
-                                                    Remaining: $
-                                                    {new Intl.NumberFormat(
-                                                        'en-NZ',
-                                                    ).format(
-                                                        totalBudget - totalUsed,
-                                                    )}
-                                                </span>
-                                                <span>
-                                                    {overallPct}% utilised
-                                                </span>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-
-                                {/* Header */}
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">
-                                        Agreements ({agreements.length})
-                                    </span>
-                                    {serviceAgreementsCan.create && (
-                                        <Button
-                                            size="sm"
-                                            className="gap-1.5 bg-primary hover:bg-primary"
-                                            asChild
-                                        >
-                                            <Link
-                                                href={`/operations/service-agreements/create?client_id=${client.id}`}
-                                            >
-                                                New Agreement
-                                            </Link>
-                                        </Button>
-                                    )}
-                                </div>
-
-                                {/* Agreement Cards */}
-                                {agreements.length === 0 ? (
-                                    <Card className="border-dashed">
-                                        <CardContent className="flex flex-col items-center justify-center py-12">
-                                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                                                <DollarSign className="h-7 w-7 text-primary" />
-                                            </div>
-                                            <p className="font-medium">
-                                                No Service Agreements
-                                            </p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                {serviceAgreementsCan.create
-                                                    ? `Create a funding agreement for ${client.first_name}.`
-                                                    : 'No agreements are available to view.'}
-                                            </p>
-                                        </CardContent>
-                                    </Card>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {agreements.map((ag: any) => {
-                                            const budgetPct =
-                                                ag.total_budget > 0
-                                                    ? Math.round(
-                                                          ((ag.budget_used ??
-                                                              0) /
-                                                              ag.total_budget) *
-                                                              100,
-                                                      )
-                                                    : 0;
-                                            const budgetColor =
-                                                budgetPct > 90
-                                                    ? 'bg-status-critical'
-                                                    : budgetPct > 70
-                                                      ? 'bg-status-warning'
-                                                      : 'bg-status-success';
-                                            const isExpiring =
-                                                ag.ends_at &&
-                                                new Date(ag.ends_at).getTime() -
-                                                    Date.now() <
-                                                    30 * 86400000 &&
-                                                new Date(ag.ends_at) >
-                                                    new Date();
-                                            const isExpired =
-                                                ag.ends_at &&
-                                                new Date(ag.ends_at) <
-                                                    new Date();
-                                            return (
-                                                <Card
-                                                    key={ag.id}
-                                                    className={`overflow-hidden border-l-4 transition-all hover:shadow-sm ${ag.status === 'active' ? 'border-l-emerald-500' : 'border-l-slate-300'}`}
-                                                >
-                                                    <CardContent className="p-4">
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div className="flex items-start gap-3">
-                                                                <div
-                                                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ag.status === 'active' ? 'bg-status-success-bg text-status-success' : 'bg-muted text-muted-foreground'}`}
-                                                                >
-                                                                    <DollarSign className="h-5 w-5" />
-                                                                </div>
-                                                                <div>
-                                                                    <div className="flex flex-wrap items-center gap-2">
-                                                                        <span className="text-sm font-semibold">
-                                                                            {
-                                                                                ag.title
-                                                                            }
-                                                                        </span>
-                                                                        <Badge
-                                                                            className={`border-0 text-[9px] capitalize ${ag.status === 'active' ? 'bg-status-success-bg text-status-success' : ag.status === 'draft' ? 'bg-muted text-muted-foreground' : 'bg-status-warning-bg text-status-warning'}`}
-                                                                        >
-                                                                            {
-                                                                                ag.status
-                                                                            }
-                                                                        </Badge>
-                                                                        {ag.funding_body && (
-                                                                            <Badge
-                                                                                variant="outline"
-                                                                                className="text-[9px]"
-                                                                            >
-                                                                                {
-                                                                                    ag.funding_body
-                                                                                }
-                                                                            </Badge>
-                                                                        )}
-                                                                        {isExpiring && (
-                                                                            <Badge className="animate-pulse border-0 bg-status-warning-bg text-[9px] text-status-warning">
-                                                                                Expiring
-                                                                                Soon
-                                                                            </Badge>
-                                                                        )}
-                                                                        {isExpired && (
-                                                                            <Badge className="border-0 bg-status-critical-bg text-[9px] text-status-critical">
-                                                                                Expired
-                                                                            </Badge>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="mt-0.5 flex gap-3 text-xs text-muted-foreground">
-                                                                        {ag.reference_number && (
-                                                                            <span>
-                                                                                Ref:{' '}
-                                                                                {
-                                                                                    ag.reference_number
-                                                                                }
-                                                                            </span>
-                                                                        )}
-                                                                        {ag.starts_at && (
-                                                                            <span>
-                                                                                {new Date(
-                                                                                    ag.starts_at,
-                                                                                ).toLocaleDateString(
-                                                                                    'en-NZ',
-                                                                                )}{' '}
-                                                                                —{' '}
-                                                                                {ag.ends_at
-                                                                                    ? new Date(
-                                                                                          ag.ends_at,
-                                                                                      ).toLocaleDateString(
-                                                                                          'en-NZ',
-                                                                                      )
-                                                                                    : 'Ongoing'}
-                                                                            </span>
-                                                                        )}
-                                                                        {ag.hourly_rate && (
-                                                                            <span>
-                                                                                $
-                                                                                {
-                                                                                    ag.hourly_rate
-                                                                                }
-                                                                                /hr
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="shrink-0 text-xs"
-                                                                asChild
-                                                            >
-                                                                <Link
-                                                                    href={`/operations/service-agreements/${ag.id}`}
-                                                                >
-                                                                    View
-                                                                </Link>
-                                                            </Button>
-                                                        </div>
-                                                        {ag.total_budget >
-                                                            0 && (
-                                                            <div className="mt-3">
-                                                                <div className="mb-1 flex items-center justify-between text-xs">
-                                                                    <span className="text-muted-foreground">
-                                                                        Budget
-                                                                        Utilisation
-                                                                    </span>
-                                                                    <span className="font-semibold">
-                                                                        $
-                                                                        {new Intl.NumberFormat(
-                                                                            'en-NZ',
-                                                                        ).format(
-                                                                            ag.budget_used ??
-                                                                                0,
-                                                                        )}{' '}
-                                                                        / $
-                                                                        {new Intl.NumberFormat(
-                                                                            'en-NZ',
-                                                                        ).format(
-                                                                            ag.total_budget,
-                                                                        )}{' '}
-                                                                        (
-                                                                        {
-                                                                            budgetPct
-                                                                        }
-                                                                        %)
-                                                                    </span>
-                                                                </div>
-                                                                <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                                                                    <div
-                                                                        className={`h-full rounded-full ${budgetColor} transition-all`}
-                                                                        style={{
-                                                                            width: `${Math.min(budgetPct, 100)}%`,
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </CardContent>
-                                                </Card>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })()}
-
-                {/* Support Plan merged into Care Plans tab */}
-
-                {tab === 'assessments' && (
-                    <div className="space-y-4">
-                        {can.edit ? (
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                <Button
-                                    onClick={() =>
-                                        openProfileDialog('add_assessment')
-                                    }
-                                    data-test="assessments-add"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add assessment
-                                </Button>
-                            </div>
-                        ) : null}
-                        <AssessmentsTab
-                            clientId={client.id}
-                            assessments={assessments}
-                            canEdit={can.edit}
-                        />
-                    </div>
-                )}
-
-                {tab === 'timeline' && (
-                    <div className="space-y-4">
-                        {can.create_note ? (
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                <Button
-                                    onClick={() =>
-                                        openProfileDialog('add_note', {
-                                            title: 'Add timeline note',
-                                        })
-                                    }
-                                    data-test="timeline-add-note"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add note
-                                </Button>
-                            </div>
-                        ) : null}
-                        <ClientTimelineTab
-                            clientId={client.id}
-                            events={events}
-                            handover={handover}
-                            summary={timelineSummary}
-                            canCreateNote={Boolean(can.create_note)}
-                            canPinHandover={Boolean(can.pin_handover)}
-                            auth={auth}
-                        />
-                    </div>
-                )}
-
-                {tab === 'documents' && (
-                    <div className="space-y-4">
-                        {can.edit ? (
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                <Button
-                                    onClick={() =>
-                                        openProfileDialog('upload_doc', {
-                                            title: 'Upload document',
-                                        })
-                                    }
-                                    data-test="documents-upload"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Upload document
-                                </Button>
-                            </div>
-                        ) : null}
-                        <DocumentsTab
-                            clientId={client.id}
-                            clientName={client.first_name ?? name}
-                            documents={(documents ?? []) as any}
-                        />
-                    </div>
-                )}
-
-                {tab === 'photos' && (
-                    <PhotoGalleryTab
-                        clientId={client.id}
-                        photos={photos}
-                        canEdit={can.edit}
-                    />
-                )}
-
-                {tab === 'family_notes' &&
-                    (() => {
-                        const openNotes = familyNotes.filter((n: any) =>
-                            ['open', 'in_progress'].includes(n.status),
-                        );
-                        const urgentCount = openNotes.filter(
-                            (n: any) => n.priority === 'urgent',
-                        ).length;
-                        const overdueCount = openNotes.filter(
-                            (n: any) => n.is_overdue,
-                        ).length;
-                        const completedThisWeek = familyNotes.filter(
-                            (n: any) =>
-                                n.status === 'completed' &&
-                                n.completed_at &&
-                                new Date(n.completed_at) >=
-                                    new Date(Date.now() - 7 * 86400000),
-                        ).length;
-                        const upcomingShifts = shifts_summary?.next
-                            ? [shifts_summary.next]
-                            : [];
-
-                        const NOTE_TYPES: Record<
-                            string,
-                            { emoji: string; label: string; color: string }
-                        > = {
-                            note: {
-                                emoji: '📝',
-                                label: 'Note',
-                                color: 'bg-status-info-bg text-status-info',
-                            },
-                            todo: {
-                                emoji: '✅',
-                                label: 'To-Do',
-                                color: 'bg-status-success-bg text-status-success',
-                            },
-                            request: {
-                                emoji: '🙏',
-                                label: 'Request',
-                                color: 'bg-status-warning-bg text-status-warning',
-                            },
-                            reminder: {
-                                emoji: '⏰',
-                                label: 'Reminder',
-                                color: 'bg-primary/10 text-primary',
-                            },
-                        };
-                        const PRIORITY_COLORS: Record<string, string> = {
-                            low: 'bg-muted text-muted-foreground',
-                            normal: 'bg-status-info-bg text-status-info',
-                            high: 'bg-status-warning-bg text-status-warning',
-                            urgent: 'bg-status-critical-bg text-status-critical',
-                        };
-                        const STATUS_COLORS: Record<string, string> = {
-                            open: 'bg-status-info-bg text-status-info',
-                            in_progress:
-                                'bg-status-warning-bg text-status-warning',
-                            completed:
-                                'bg-status-success-bg text-status-success',
-                            cancelled: 'bg-muted text-muted-foreground',
-                        };
-
-                        return (
-                            <div className="space-y-4">
-                                {/* Stats */}
-                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                    <div className="rounded-xl border bg-status-info-bg p-3 text-center">
-                                        <div className="text-xl font-bold text-status-info">
-                                            {openNotes.length}
-                                        </div>
-                                        <div className="text-[10px] tracking-wider text-status-info uppercase">
-                                            Open
-                                        </div>
-                                    </div>
-                                    <div
-                                        className={`rounded-xl border p-3 text-center ${urgentCount > 0 ? 'bg-status-critical-bg' : ''}`}
-                                    >
-                                        <div
-                                            className={`text-xl font-bold ${urgentCount > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
-                                        >
-                                            {urgentCount}
-                                        </div>
-                                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                                            Urgent
-                                        </div>
-                                    </div>
-                                    <div
-                                        className={`rounded-xl border p-3 text-center ${overdueCount > 0 ? 'bg-status-warning-bg' : ''}`}
-                                    >
-                                        <div
-                                            className={`text-xl font-bold ${overdueCount > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
-                                        >
-                                            {overdueCount}
-                                        </div>
-                                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                                            Overdue
-                                        </div>
-                                    </div>
-                                    <div className="rounded-xl border bg-status-success-bg p-3 text-center">
-                                        <div className="text-xl font-bold text-status-success">
-                                            {completedThisWeek}
-                                        </div>
-                                        <div className="text-[10px] tracking-wider text-status-success uppercase">
-                                            Done This Week
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Notes list */}
-                                {familyNotes.length === 0 ? (
-                                    <Card className="border-dashed">
-                                        <CardContent className="flex flex-col items-center justify-center py-12">
-                                            <span className="mb-3 text-4xl">
-                                                📝
-                                            </span>
-                                            <p className="font-medium">
-                                                No family notes yet
-                                            </p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                Notes and to-dos from family
-                                                members will appear here.
-                                            </p>
-                                        </CardContent>
-                                    </Card>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {familyNotes.map((note: any) => {
-                                            const typeInfo = (NOTE_TYPES[
-                                                note.note_type
-                                            ] ?? NOTE_TYPES.note)!;
-                                            return (
-                                                <Card
-                                                    key={note.id}
-                                                    className={`overflow-hidden transition-all hover:shadow-sm ${note.is_overdue ? 'border-status-critical/30 bg-status-critical-bg' : note.status === 'completed' ? 'opacity-60' : ''}`}
-                                                >
-                                                    <CardContent className="p-4">
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                    <span className="text-sm font-semibold">
-                                                                        {
-                                                                            note.title
-                                                                        }
-                                                                    </span>
-                                                                    <span
-                                                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${typeInfo.color}`}
-                                                                    >
-                                                                        {
-                                                                            typeInfo.emoji
-                                                                        }{' '}
-                                                                        {
-                                                                            typeInfo.label
-                                                                        }
-                                                                    </span>
-                                                                    {note.priority !==
-                                                                        'normal' && (
-                                                                        <Badge
-                                                                            className={`border-0 text-[9px] ${PRIORITY_COLORS[note.priority]}`}
-                                                                        >
-                                                                            {
-                                                                                note.priority
-                                                                            }
-                                                                        </Badge>
-                                                                    )}
-                                                                    <Badge
-                                                                        className={`border-0 text-[9px] capitalize ${STATUS_COLORS[note.status]}`}
-                                                                    >
-                                                                        {note.status.replace(
-                                                                            '_',
-                                                                            ' ',
-                                                                        )}
-                                                                    </Badge>
-                                                                    {note.is_overdue && (
-                                                                        <Badge className="gap-0.5 border-0 bg-status-critical-bg text-[9px] text-status-critical">
-                                                                            <AlertTriangle className="h-2.5 w-2.5" />
-                                                                            Overdue
-                                                                        </Badge>
-                                                                    )}
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className="border-status-warning/30 bg-status-warning-bg text-[9px] text-status-warning"
-                                                                    >
-                                                                        Family
-                                                                    </Badge>
-                                                                </div>
-                                                                {note.due_date && (
-                                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                                        <Calendar className="mr-1 inline h-3 w-3" />
-                                                                        Due:{' '}
-                                                                        {new Date(
-                                                                            note.due_date +
-                                                                                'T00:00:00',
-                                                                        ).toLocaleDateString(
-                                                                            'en-NZ',
-                                                                            {
-                                                                                weekday:
-                                                                                    'short',
-                                                                                day: 'numeric',
-                                                                                month: 'short',
-                                                                            },
-                                                                        )}
-                                                                        {note.due_time
-                                                                            ? ` at ${note.due_time}`
-                                                                            : ''}
-                                                                    </p>
-                                                                )}
-                                                                {note.description && (
-                                                                    <p className="mt-1.5 text-sm text-muted-foreground">
-                                                                        {note
-                                                                            .description
-                                                                            .length >
-                                                                        200
-                                                                            ? note.description.slice(
-                                                                                  0,
-                                                                                  200,
-                                                                              ) +
-                                                                              '...'
-                                                                            : note.description}
-                                                                    </p>
-                                                                )}
-                                                                {note.assigned_shift && (
-                                                                    <div className="mt-1 rounded-md border border-primary bg-primary/10 px-2 py-1 text-xs text-primary">
-                                                                        <p className="font-medium">
-                                                                            📋
-                                                                            Assigned
-                                                                            to{' '}
-                                                                            {String(
-                                                                                note
-                                                                                    .assigned_shift
-                                                                                    .shift_type ??
-                                                                                    'standard',
-                                                                            ).replace(
-                                                                                /_/g,
-                                                                                ' ',
-                                                                            )}{' '}
-                                                                            shift
-                                                                        </p>
-                                                                        <p className="text-primary">
-                                                                            {note
-                                                                                .assigned_shift
-                                                                                .staff_name ??
-                                                                                'Unassigned'}
-                                                                            {note
-                                                                                .assigned_shift
-                                                                                .service_context
-                                                                                ? ` · ${note.assigned_shift.service_context}`
-                                                                                : ''}
-                                                                            {note
-                                                                                .assigned_shift
-                                                                                .location
-                                                                                ? ` · ${note.assigned_shift.location}`
-                                                                                : ''}
-                                                                        </p>
-                                                                    </div>
-                                                                )}
-                                                                {!note.assigned_shift &&
-                                                                    note.assigned_shift_date && (
-                                                                        <p className="mt-1 text-xs text-primary">
-                                                                            📋
-                                                                            Assigned
-                                                                            to
-                                                                            shift
-                                                                            on{' '}
-                                                                            {
-                                                                                note.assigned_shift_date
-                                                                            }
-                                                                        </p>
-                                                                    )}
-                                                                {note.staff_response && (
-                                                                    <div className="mt-2 rounded-lg border-l-2 border-l-blue-400 bg-status-info-bg p-2">
-                                                                        <p className="text-xs">
-                                                                            <span className="font-medium">
-                                                                                {
-                                                                                    note.staff_responded_by_name
-                                                                                }
-                                                                            </span>{' '}
-                                                                            <Badge
-                                                                                variant="outline"
-                                                                                className="ml-1 border-status-info/30 bg-status-info-bg text-[9px] text-status-info"
-                                                                            >
-                                                                                Staff
-                                                                            </Badge>
-                                                                        </p>
-                                                                        <p className="mt-0.5 text-sm">
-                                                                            {
-                                                                                note.staff_response
-                                                                            }
-                                                                        </p>
-                                                                    </div>
-                                                                )}
-                                                                {note.status ===
-                                                                    'completed' &&
-                                                                    note.completed_by_name && (
-                                                                        <p className="mt-1 text-xs text-status-success">
-                                                                            <CheckCircle2 className="mr-1 inline h-3 w-3" />
-                                                                            Completed
-                                                                            by{' '}
-                                                                            {
-                                                                                note.completed_by_name
-                                                                            }
-                                                                        </p>
-                                                                    )}
-                                                                <p className="mt-1 text-[10px] text-muted-foreground">
-                                                                    By{' '}
-                                                                    {
-                                                                        note.creator_name
-                                                                    }{' '}
-                                                                    ·{' '}
-                                                                    {new Date(
-                                                                        note.created_at,
-                                                                    ).toLocaleDateString(
-                                                                        'en-NZ',
-                                                                    )}
-                                                                </p>
-                                                            </div>
-
-                                                            {/* Staff actions */}
-                                                            {can.manage_family_notes &&
-                                                                [
-                                                                    'open',
-                                                                    'in_progress',
-                                                                ].includes(
-                                                                    note.status,
-                                                                ) && (
-                                                                    <div className="flex shrink-0 flex-col gap-1">
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            className="h-7 gap-1 text-[10px] text-status-success"
-                                                                            onClick={() =>
-                                                                                router.post(
-                                                                                    `/clients/${client.id}/family-notes/${note.id}/status`,
-                                                                                    {
-                                                                                        status: 'completed',
-                                                                                    },
-                                                                                    {
-                                                                                        preserveScroll: true,
-                                                                                    },
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            <Check className="h-3 w-3" />
-                                                                            Done
-                                                                        </Button>
-                                                                        {note.status ===
-                                                                            'open' && (
+                                                                {step.status ===
+                                                                    'pending' &&
+                                                                    can.manage_onboarding_workflow && (
+                                                                        <div className="flex gap-1">
                                                                             <Button
                                                                                 size="sm"
                                                                                 variant="outline"
-                                                                                className="h-7 gap-1 text-[10px] text-status-warning"
-                                                                                onClick={() =>
-                                                                                    router.post(
-                                                                                        `/clients/${client.id}/family-notes/${note.id}/status`,
+                                                                                className="h-7 text-xs"
+                                                                                onClick={() => {
+                                                                                    router.patch(
+                                                                                        `/operations/onboarding/${onboarding.workflow.id}/steps/${step.id}`,
                                                                                         {
-                                                                                            status: 'in_progress',
+                                                                                            status: 'completed',
                                                                                         },
                                                                                         {
                                                                                             preserveScroll: true,
                                                                                         },
-                                                                                    )
-                                                                                }
+                                                                                    );
+                                                                                }}
                                                                             >
-                                                                                <Clock className="h-3 w-3" />
-                                                                                Start
+                                                                                Complete
                                                                             </Button>
-                                                                        )}
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            className="h-7 gap-1 text-[10px]"
-                                                                            onClick={() => {
-                                                                                setRespondingId(
-                                                                                    respondingId ===
-                                                                                        note.id
-                                                                                        ? null
-                                                                                        : note.id,
-                                                                                );
-                                                                                setResponseText(
-                                                                                    '',
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            <MsgIcon className="h-3 w-3" />
-                                                                            Reply
-                                                                        </Button>
-                                                                        {!note.assigned_to_shift_id && (
                                                                             <Button
                                                                                 size="sm"
-                                                                                variant="outline"
-                                                                                className="h-7 gap-1 text-[10px] text-primary"
-                                                                                onClick={() =>
-                                                                                    setAssigningId(
-                                                                                        assigningId ===
-                                                                                            note.id
-                                                                                            ? null
-                                                                                            : note.id,
-                                                                                    )
-                                                                                }
+                                                                                variant="ghost"
+                                                                                className="h-7 text-xs text-muted-foreground"
+                                                                                onClick={() => {
+                                                                                    router.patch(
+                                                                                        `/operations/onboarding/${onboarding.workflow.id}/steps/${step.id}`,
+                                                                                        {
+                                                                                            status: 'skipped',
+                                                                                        },
+                                                                                        {
+                                                                                            preserveScroll: true,
+                                                                                        },
+                                                                                    );
+                                                                                }}
                                                                             >
-                                                                                <ListTodo className="h-3 w-3" />
-                                                                                Shift
+                                                                                Skip
                                                                             </Button>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                        </div>
-
-                                                        {/* Response form */}
-                                                        {can.manage_family_notes &&
-                                                            respondingId ===
-                                                                note.id && (
-                                                                <div className="mt-3 flex gap-2">
-                                                                    <Input
-                                                                        className="h-8 text-xs"
-                                                                        placeholder="Write a response..."
-                                                                        value={
-                                                                            responseText
-                                                                        }
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) =>
-                                                                            setResponseText(
-                                                                                e
-                                                                                    .target
-                                                                                    .value,
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                    <Button
-                                                                        size="sm"
-                                                                        className="h-8"
-                                                                        disabled={
-                                                                            !responseText.trim()
-                                                                        }
-                                                                        onClick={() => {
-                                                                            router.post(
-                                                                                `/clients/${client.id}/family-notes/${note.id}/respond`,
-                                                                                {
-                                                                                    staff_response:
-                                                                                        responseText,
-                                                                                },
-                                                                                {
-                                                                                    preserveScroll: true,
-                                                                                },
-                                                                            );
-                                                                            setRespondingId(
-                                                                                null,
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        Send
-                                                                    </Button>
-                                                                </div>
-                                                            )}
-
-                                                        {/* Assign to shift */}
-                                                        {can.manage_family_notes &&
-                                                            assigningId ===
-                                                                note.id && (
-                                                                <div className="mt-3 text-xs text-muted-foreground">
-                                                                    <p className="mb-1 font-medium">
-                                                                        Assign
-                                                                        to
-                                                                        upcoming
-                                                                        shift:
-                                                                    </p>
-                                                                    {(() => {
-                                                                        const clientShifts =
-                                                                            (
-                                                                                events ??
-                                                                                []
-                                                                            )
-                                                                                .filter(
-                                                                                    (
-                                                                                        e: any,
-                                                                                    ) =>
-                                                                                        e.type ===
-                                                                                            'shift' &&
-                                                                                        new Date(
-                                                                                            e.occurred_at,
-                                                                                        ) >
-                                                                                            new Date(),
-                                                                                )
-                                                                                .slice(
-                                                                                    0,
-                                                                                    5,
-                                                                                );
-                                                                        return clientShifts.length >
-                                                                            0 ? (
-                                                                            <div className="flex flex-wrap gap-1">
-                                                                                {clientShifts.map(
-                                                                                    (
-                                                                                        s: any,
-                                                                                    ) => (
-                                                                                        <Button
-                                                                                            key={
-                                                                                                s.id
-                                                                                            }
-                                                                                            size="sm"
-                                                                                            variant="outline"
-                                                                                            className="h-7 text-[10px]"
-                                                                                            onClick={() => {
-                                                                                                router.post(
-                                                                                                    `/clients/${client.id}/family-notes/${note.id}/assign-shift`,
-                                                                                                    {
-                                                                                                        shift_id:
-                                                                                                            s.shift_id ||
-                                                                                                            s.id,
-                                                                                                    },
-                                                                                                    {
-                                                                                                        preserveScroll: true,
-                                                                                                    },
-                                                                                                );
-                                                                                                setAssigningId(
-                                                                                                    null,
-                                                                                                );
-                                                                                            }}
-                                                                                        >
-                                                                                            {new Date(
-                                                                                                s.occurred_at,
-                                                                                            ).toLocaleDateString(
-                                                                                                'en-NZ',
-                                                                                                {
-                                                                                                    weekday:
-                                                                                                        'short',
-                                                                                                    day: 'numeric',
-                                                                                                    month: 'short',
-                                                                                                },
-                                                                                            )}
-                                                                                        </Button>
-                                                                                    ),
-                                                                                )}
-                                                                            </div>
-                                                                        ) : (
-                                                                            <p>
-                                                                                No
-                                                                                upcoming
-                                                                                shifts
-                                                                                found.
-                                                                            </p>
-                                                                        );
-                                                                    })()}
-                                                                </div>
-                                                            )}
-                                                    </CardContent>
-                                                </Card>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })()}
-
-                {tab === 'respite' && (
-                    <RespiteTab
-                        clientId={client.id}
-                        canCreate={Boolean(respiteCan?.create)}
-                        bookings={respiteBookings}
-                        requests={respiteRequests}
-                        allocation={respite?.allocation ?? null}
-                        onNewBooking={() =>
-                            openProfileDialog('respite_booking')
-                        }
-                    />
-                )}
-
-                {tab === 'location' && location && (
-                    <ClientLocationTab
-                        clientId={client.id}
-                        clientName={name}
-                        clientHouse={client.site?.name ?? ''}
-                        clientPhoto={client.profile_photo_url ?? null}
-                        location={location}
-                    />
-                )}
-
-                {tab === 'consents' &&
-                    (() => {
-                        const activeCount = consents.filter(
-                            (c: any) => c.is_consumable,
-                        ).length;
-                        const expiredCount = consents.filter(
-                            (c: any) => c.is_expired,
-                        ).length;
-                        const expiringCount = consents.filter(
-                            (c: any) => c.is_consumable && c.is_expiring_soon,
-                        ).length;
-
-                        const STATUS_COLORS: Record<string, string> = {
-                            given: 'bg-status-success-bg text-status-success',
-                            refused:
-                                'bg-status-critical-bg text-status-critical',
-                            withdrawn: 'bg-muted text-muted-foreground',
-                            expired: 'bg-status-warning-bg text-status-warning',
-                            governance_review_required:
-                                'bg-status-warning-bg text-status-warning',
-                            informational_acknowledgement:
-                                'bg-status-info-bg text-status-info',
-                        };
-
-                        return (
-                            <div className="space-y-4">
-                                {/* Stats */}
-                                <div className="grid grid-cols-4 gap-3">
-                                    <div className="rounded-lg border p-3 text-center">
-                                        <div className="text-lg font-bold text-primary">
-                                            {consents.length}
-                                        </div>
-                                        <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                                            Total
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg border p-3 text-center">
-                                        <div className="text-lg font-bold text-status-success">
-                                            {activeCount}
-                                        </div>
-                                        <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                                            Active
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg border p-3 text-center">
-                                        <div
-                                            className={`text-lg font-bold ${expiringCount > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
-                                        >
-                                            {expiringCount}
-                                        </div>
-                                        <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                                            Expiring
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg border p-3 text-center">
-                                        <div
-                                            className={`text-lg font-bold ${expiredCount > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
-                                        >
-                                            {expiredCount}
-                                        </div>
-                                        <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                                            Expired
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Consent List */}
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center justify-between text-base">
-                                            <span>Consent Records</span>
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={`/operations/clients/${client.id}/consents`}
-                                                    >
-                                                        Manage Consents
-                                                    </Link>
-                                                </Button>
-                                                {can.edit ? (
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            openProfileDialog(
-                                                                'consent_record',
-                                                            )
-                                                        }
-                                                        data-test="consents-record"
-                                                    >
-                                                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                                        Record consent
-                                                    </Button>
-                                                ) : null}
-                                            </div>
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {consents.length === 0 ? (
-                                            <p className="py-8 text-center text-sm text-muted-foreground">
-                                                No consent records. Record the
-                                                first consent for{' '}
-                                                {client.first_name}.
-                                            </p>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {consents.map((c: any) => {
-                                                    const displayStatus =
-                                                        c.decision_state ===
-                                                            'governance_review_required' ||
-                                                        c.decision_state ===
-                                                            'informational_acknowledgement'
-                                                            ? c.decision_state
-                                                            : c.is_expired
-                                                              ? 'expired'
-                                                              : c.status;
-                                                    return (
-                                                        <div
-                                                            key={c.id}
-                                                            className="flex items-center justify-between rounded-lg border p-3"
-                                                        >
-                                                            <div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-sm font-medium">
-                                                                        {
-                                                                            c.consent_type
-                                                                        }
-                                                                    </span>
-                                                                    <span
-                                                                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${STATUS_COLORS[displayStatus] ?? 'bg-muted text-muted-foreground'}`}
-                                                                    >
-                                                                        {displayStatus.replace(
-                                                                            /_/g,
-                                                                            ' ',
-                                                                        )}
-                                                                    </span>
-                                                                    {c.capacity_assessed && (
-                                                                        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
-                                                                            Capacity
-                                                                            Assessed
-                                                                        </span>
+                                                                        </div>
                                                                     )}
-                                                                </div>
-                                                                <div className="mt-0.5 flex gap-3 text-xs text-muted-foreground">
-                                                                    {c.given_at && (
-                                                                        <span>
-                                                                            Given:{' '}
-                                                                            {new Date(
-                                                                                c.given_at,
-                                                                            ).toLocaleDateString(
-                                                                                'en-NZ',
-                                                                            )}
-                                                                        </span>
-                                                                    )}
-                                                                    {c.expires_at && (
-                                                                        <span
-                                                                            className={
-                                                                                c.is_expired
-                                                                                    ? 'font-medium text-status-critical'
-                                                                                    : c.is_expiring_soon
-                                                                                      ? 'font-medium text-status-warning'
-                                                                                      : ''
-                                                                            }
-                                                                        >
-                                                                            Expires:{' '}
-                                                                            {new Date(
-                                                                                c.expires_at,
-                                                                            ).toLocaleDateString(
-                                                                                'en-NZ',
-                                                                            )}
-                                                                        </span>
-                                                                    )}
-                                                                    {c.given_method && (
-                                                                        <span>
-                                                                            Method:{' '}
-                                                                            {
-                                                                                c.given_method
-                                                                            }
-                                                                        </span>
-                                                                    )}
-                                                                </div>
                                                             </div>
                                                         </div>
                                                     );
-                                                })}
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        );
-                    })()}
+                                                },
+                                            )}
+                                        </CardContent>
+                                        {/* Complete Onboarding Button */}
+                                        {onboarding.workflow.status ===
+                                            'in_progress' &&
+                                            can.manage_onboarding_workflow &&
+                                            (() => {
+                                                const requiredSteps =
+                                                    onboarding.workflow.steps.filter(
+                                                        (s: any) =>
+                                                            s.is_required,
+                                                    );
+                                                const allRequiredDone =
+                                                    requiredSteps.every(
+                                                        (s: any) =>
+                                                            s.status ===
+                                                                'completed' ||
+                                                            s.status ===
+                                                                'skipped',
+                                                    );
+                                                return allRequiredDone ? (
+                                                    <div className="border-t p-4">
+                                                        <Button
+                                                            className="w-full"
+                                                            onClick={() => {
+                                                                router.post(
+                                                                    `/operations/onboarding/${onboarding.workflow.id}/complete`,
+                                                                    {},
+                                                                    {
+                                                                        preserveScroll: true,
+                                                                    },
+                                                                );
+                                                            }}
+                                                        >
+                                                            Complete Onboarding
+                                                            — Set Status to
+                                                            Active
+                                                        </Button>
+                                                    </div>
+                                                ) : null;
+                                            })()}
+                                    </Card>
+                                )}
 
-                {tab === 'consent-requests' &&
-                    (() => {
-                        const requests = ((pageProps as any)
-                            .consent_request_list ?? []) as any[];
-                        const pending = requests.filter(
-                            (r) => r.status === 'pending',
-                        ).length;
-                        const approved = requests.filter(
-                            (r) => r.status === 'approved',
-                        ).length;
-                        const declined = requests.filter(
-                            (r) => r.status === 'declined',
-                        ).length;
-                        const REQ_TONES: Record<string, string> = {
-                            pending: 'bg-status-warning-bg text-status-warning',
-                            approved:
-                                'bg-status-success-bg text-status-success',
-                            declined:
-                                'bg-status-critical-bg text-status-critical',
-                            cancelled: 'bg-muted text-muted-foreground',
-                            expired: 'bg-muted text-muted-foreground',
-                        };
-                        return (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-4 gap-3">
-                                    {[
-                                        ['Total', requests.length, ''],
-                                        [
-                                            'Pending',
-                                            pending,
-                                            'text-status-warning',
-                                        ],
-                                        [
-                                            'Approved',
-                                            approved,
-                                            'text-status-success',
-                                        ],
-                                        [
-                                            'Declined',
-                                            declined,
-                                            'text-status-critical',
-                                        ],
-                                    ].map(([label, value, tone]) => (
-                                        <div
-                                            key={String(label)}
-                                            className="rounded-lg border p-3 text-center"
-                                        >
-                                            <div
-                                                className={`text-lg font-bold ${tone || 'text-primary'}`}
-                                            >
-                                                {value}
-                                            </div>
-                                            <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                                                {label}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <Card>
+                                <Card className="mt-4">
                                     <CardHeader>
-                                        <CardTitle className="flex items-center justify-between text-base">
-                                            <span>
-                                                Consent requests sent to whānau
-                                            </span>
-                                            {(auth?.can?.consents?.request ??
-                                                false) && (
-                                                <Button size="sm" asChild>
-                                                    <Link
-                                                        href={`/operations/clients/${client.id}/consent-requests/create`}
-                                                    >
-                                                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                                        New request
+                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-status-info-bg text-status-info">
+                                                    <GraduationCap className="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <CardTitle className="text-base">
+                                                        Staff preparation
+                                                    </CardTitle>
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        Canonical HR onboarding
+                                                        and induction readiness
+                                                        for support workers
+                                                        assigned to this client.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {can.view_hr_onboarding ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    asChild
+                                                >
+                                                    <Link href="/hr/onboarding">
+                                                        Open HR onboarding
                                                     </Link>
                                                 </Button>
-                                            )}
-                                        </CardTitle>
+                                            ) : null}
+                                        </div>
                                     </CardHeader>
                                     <CardContent>
-                                        {requests.length === 0 ? (
-                                            <p className="py-8 text-center text-sm text-muted-foreground">
-                                                No consent requests yet — send
-                                                one to whānau for a decision on
-                                                the portal.
+                                        {!can.view_hr_onboarding ? (
+                                            <p className="text-sm text-muted-foreground">
+                                                HR onboarding readiness is
+                                                available to authorised HR
+                                                viewers. Client onboarding
+                                                remains available above.
+                                            </p>
+                                        ) : !staffPreparation ||
+                                          staffPreparation.summary.assigned ===
+                                              0 ? (
+                                            <p className="text-sm text-muted-foreground">
+                                                No support workers are assigned,
+                                                so there is no staff-preparation
+                                                cohort yet.
                                             </p>
                                         ) : (
-                                            <div className="space-y-2">
-                                                {requests.map((r) => (
-                                                    <Link
-                                                        key={r.id}
-                                                        href={`/operations/clients/${client.id}/consent-requests/${r.id}`}
-                                                        className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/40"
-                                                    >
-                                                        <div className="min-w-0">
-                                                            <div className="truncate text-sm font-semibold">
-                                                                {r.consent_type}
+                                            <div className="space-y-3">
+                                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                                    {[
+                                                        [
+                                                            'Assigned',
+                                                            staffPreparation
+                                                                .summary
+                                                                .assigned,
+                                                        ],
+                                                        [
+                                                            'Prepared',
+                                                            staffPreparation
+                                                                .summary
+                                                                .prepared,
+                                                        ],
+                                                        [
+                                                            'In progress',
+                                                            staffPreparation
+                                                                .summary
+                                                                .in_progress,
+                                                        ],
+                                                        [
+                                                            'Attention',
+                                                            staffPreparation
+                                                                .summary
+                                                                .needs_attention,
+                                                        ],
+                                                    ].map(([label, value]) => (
+                                                        <div
+                                                            key={String(label)}
+                                                            className="rounded-lg border p-3"
+                                                        >
+                                                            <div className="text-lg font-semibold">
+                                                                {value}
                                                             </div>
-                                                            <div className="mt-0.5 text-xs text-muted-foreground">
-                                                                To{' '}
-                                                                {r.recipient ??
-                                                                    '—'}
-                                                                {r.recipient_relationship
-                                                                    ? ` (${r.recipient_relationship})`
-                                                                    : ''}
-                                                                {r.created_at
-                                                                    ? ` · sent ${new Date(r.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`
-                                                                    : ''}
-                                                                {r.status ===
-                                                                    'pending' &&
-                                                                r.expires_at
-                                                                    ? ` · expires ${new Date(r.expires_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`
-                                                                    : ''}
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {label}
                                                             </div>
                                                         </div>
-                                                        <span
-                                                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${REQ_TONES[r.status] ?? 'bg-muted text-muted-foreground'}`}
-                                                        >
-                                                            {r.status}
-                                                        </span>
-                                                    </Link>
-                                                ))}
+                                                    ))}
+                                                </div>
+                                                <div className="divide-y rounded-lg border">
+                                                    {staffPreparation.workers.map(
+                                                        (worker) => {
+                                                            const statusLabel =
+                                                                worker.status ===
+                                                                'completed'
+                                                                    ? 'Prepared'
+                                                                    : worker.status ===
+                                                                        'in_progress'
+                                                                      ? 'In progress'
+                                                                      : worker.status ===
+                                                                          'pending'
+                                                                        ? 'Pending'
+                                                                        : worker.status ===
+                                                                            'not_linked'
+                                                                          ? 'No HR profile'
+                                                                          : worker.status ===
+                                                                              'not_started'
+                                                                            ? 'No checklist'
+                                                                            : worker.status.replace(
+                                                                                  '_',
+                                                                                  ' ',
+                                                                              );
+                                                            return (
+                                                                <div
+                                                                    key={
+                                                                        worker.user_id
+                                                                    }
+                                                                    className="flex flex-wrap items-center justify-between gap-3 p-3"
+                                                                >
+                                                                    <div className="min-w-0">
+                                                                        <p className="truncate text-sm font-medium">
+                                                                            {
+                                                                                worker.name
+                                                                            }
+                                                                        </p>
+                                                                        <p className="text-xs text-muted-foreground">
+                                                                            {worker.role ??
+                                                                                'Assigned support worker'}
+                                                                            {worker.tasks_total >
+                                                                            0
+                                                                                ? ` · ${worker.tasks_completed}/${worker.tasks_total} tasks`
+                                                                                : ''}
+                                                                            {worker.is_overdue
+                                                                                ? ' · Overdue'
+                                                                                : ''}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Badge
+                                                                            variant={
+                                                                                worker.status ===
+                                                                                'completed'
+                                                                                    ? 'secondary'
+                                                                                    : worker.is_overdue
+                                                                                      ? 'destructive'
+                                                                                      : 'outline'
+                                                                            }
+                                                                            className="capitalize"
+                                                                        >
+                                                                            {
+                                                                                statusLabel
+                                                                            }
+                                                                        </Badge>
+                                                                        {worker.checklist_id ? (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="ghost"
+                                                                                asChild
+                                                                            >
+                                                                                <Link
+                                                                                    href={`/hr/onboarding/${worker.checklist_id}`}
+                                                                                >
+                                                                                    View
+                                                                                </Link>
+                                                                            </Button>
+                                                                        ) : null}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        },
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </CardContent>
                                 </Card>
                             </div>
-                        );
-                    })()}
+                        )}
 
-                {tab === 'portal' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-between text-base">
-                                <div className="flex items-center gap-2">
-                                    <span>
-                                        Portal access (
-                                        {labels?.['client.singular'] ??
-                                            'Client'}{' '}
-                                        / Next of Kin)
-                                    </span>
-                                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                        {portal_users.length}
-                                    </span>
-                                </div>
-                                {can.edit && (
-                                    <div className="flex items-center gap-2">
+                        {tab === 'medical' && (
+                            <div className="space-y-4">
+                                {/* Allergy Alert */}
+                                {medical.profile?.allergies &&
+                                    medical.profile.allergies !== '-' && (
+                                        <div className="flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
+                                            <ShieldAlert className="h-6 w-6 shrink-0 text-status-critical" />
+                                            <div>
+                                                <p className="text-sm font-bold text-status-critical">
+                                                    Allergies
+                                                </p>
+                                                <p className="text-sm text-status-critical">
+                                                    {medical.profile.allergies}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                {/* Quick Stats */}
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
+                                        <div className="text-xl font-bold text-primary">
+                                            {medical.medications?.length ?? 0}
+                                        </div>
+                                        <div className="text-[10px] tracking-wider text-primary uppercase">
+                                            Medications
+                                        </div>
+                                    </div>
+                                    <div className="rounded-xl border bg-status-warning-bg p-3 text-center">
+                                        <div className="text-xl font-bold text-status-warning">
+                                            {medical.conditions?.length ?? 0}
+                                        </div>
+                                        <div className="text-[10px] tracking-wider text-status-warning uppercase">
+                                            Conditions
+                                        </div>
+                                    </div>
+                                    <div className="rounded-xl border bg-status-info-bg p-3 text-center">
+                                        <div className="text-xl font-bold text-status-info">
+                                            {medical.emergency_contacts
+                                                ?.length ?? 0}
+                                        </div>
+                                        <div className="text-[10px] tracking-wider text-status-info uppercase">
+                                            Emergency Contacts
+                                        </div>
+                                    </div>
+                                    <div className="rounded-xl border bg-status-info-bg p-3 text-center">
                                         <Button
-                                            size="sm"
                                             variant="outline"
+                                            size="sm"
+                                            className="gap-1.5 text-xs"
                                             asChild
                                         >
-                                            <Link
-                                                href={`/operations/clients/${client.id}/portal-users`}
-                                            >
-                                                Manage access
+                                            <Link href="/emar">
+                                                <Pill className="h-3.5 w-3.5" />{' '}
+                                                Open eMAR
                                             </Link>
                                         </Button>
+                                    </div>
+                                </div>
+
+                                {/* Main Grid */}
+                                <div className="grid gap-4 lg:grid-cols-3">
+                                    {/* Left Column — Profile + Medications */}
+                                    <div className="space-y-4 lg:col-span-2">
+                                        {/* GP Card */}
+                                        {(medical.profile?.gp_name ||
+                                            medical.profile?.gp_practice) && (
+                                            <Card className="border-status-success/30 bg-status-success-bg">
+                                                <CardContent className="p-4">
+                                                    <div className="mb-2 flex items-center gap-2">
+                                                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-success-bg text-status-success">
+                                                            <Heart className="h-4 w-4" />
+                                                        </div>
+                                                        <span className="text-sm font-semibold">
+                                                            GP / Primary Care
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid gap-2 text-sm sm:grid-cols-3">
+                                                        {medical.profile
+                                                            .gp_name && (
+                                                            <div>
+                                                                <p className="text-[10px] text-muted-foreground uppercase">
+                                                                    Doctor
+                                                                </p>
+                                                                <p className="font-medium">
+                                                                    {
+                                                                        medical
+                                                                            .profile
+                                                                            .gp_name
+                                                                    }
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        {medical.profile
+                                                            .gp_practice && (
+                                                            <div>
+                                                                <p className="text-[10px] text-muted-foreground uppercase">
+                                                                    Practice
+                                                                </p>
+                                                                <p className="font-medium">
+                                                                    {
+                                                                        medical
+                                                                            .profile
+                                                                            .gp_practice
+                                                                    }
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        {medical.profile
+                                                            .gp_phone && (
+                                                            <div>
+                                                                <p className="text-[10px] text-muted-foreground uppercase">
+                                                                    Phone
+                                                                </p>
+                                                                <p className="font-medium">
+                                                                    {
+                                                                        medical
+                                                                            .profile
+                                                                            .gp_phone
+                                                                    }
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+
+                                        {/* Medical Profile */}
+                                        <Card>
+                                            <CardHeader>
+                                                <CardTitle className="flex items-center justify-between text-base">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-critical-bg text-status-critical">
+                                                            <FileText className="h-4 w-4" />
+                                                        </div>
+                                                        Medical Profile
+                                                    </div>
+                                                    {can.edit && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/operations/clients/${client.id}/medical`}
+                                                            >
+                                                                Edit
+                                                            </Link>
+                                                        </Button>
+                                                    )}
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="grid gap-4 sm:grid-cols-2">
+                                                    {[
+                                                        {
+                                                            label: 'Medical History',
+                                                            value: medical
+                                                                .profile
+                                                                ?.medical_history,
+                                                        },
+                                                        {
+                                                            label: 'Disabilities',
+                                                            value: medical
+                                                                .profile
+                                                                ?.disabilities,
+                                                        },
+                                                        {
+                                                            label: 'Blood Type',
+                                                            value: medical
+                                                                .profile
+                                                                ?.blood_type,
+                                                        },
+                                                        {
+                                                            label: 'Hospital Preference',
+                                                            value: medical
+                                                                .profile
+                                                                ?.hospital_preference,
+                                                        },
+                                                    ]
+                                                        .filter(
+                                                            (f) =>
+                                                                f.value &&
+                                                                f.value !== '-',
+                                                        )
+                                                        .map((f) => (
+                                                            <div
+                                                                key={f.label}
+                                                                className="rounded-lg bg-muted p-3"
+                                                            >
+                                                                <p className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                                    {f.label}
+                                                                </p>
+                                                                <p className="mt-1 text-sm">
+                                                                    {f.value}
+                                                                </p>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                                {medical.profile?.notes &&
+                                                    medical.profile.notes !==
+                                                        '-' && (
+                                                        <div className="mt-3 rounded-lg bg-muted p-3">
+                                                            <p className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                                Notes
+                                                            </p>
+                                                            <p className="mt-1 text-sm whitespace-pre-wrap">
+                                                                {
+                                                                    medical
+                                                                        .profile
+                                                                        .notes
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                            </CardContent>
+                                        </Card>
+
+                                        {/* Medications */}
+                                        <Card>
+                                            <CardHeader>
+                                                <CardTitle className="flex items-center justify-between text-base">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                                            <Pill className="h-4 w-4" />
+                                                        </div>
+                                                        Medications
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className="text-[10px]"
+                                                        >
+                                                            {medical.medications
+                                                                ?.length ?? 0}
+                                                        </Badge>
+                                                    </div>
+                                                    {can.edit && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/operations/clients/${client.id}/medical?section=medications`}
+                                                            >
+                                                                Manage
+                                                            </Link>
+                                                        </Button>
+                                                    )}
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {(medical.medications ?? [])
+                                                    .length === 0 ? (
+                                                    <p className="py-4 text-center text-sm text-muted-foreground">
+                                                        No medications listed.
+                                                    </p>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {medical.medications.map(
+                                                            (m: any) => (
+                                                                // eslint-disable-next-line no-restricted-syntax -- Medication rows use status strip styling inside the clinical Card.
+                                                                <div
+                                                                    key={m.id}
+                                                                    className="flex items-start gap-3 rounded-xl border-l-4 border-l-violet-400 bg-card p-3 shadow-sm"
+                                                                >
+                                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                                                        <Pill className="h-4 w-4 text-primary" />
+                                                                    </div>
+                                                                    <div className="flex-1">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="text-sm font-semibold">
+                                                                                {
+                                                                                    m.name
+                                                                                }
+                                                                            </span>
+                                                                            {m.is_controlled && (
+                                                                                <Badge className="border-0 bg-status-critical-bg text-[9px] text-status-critical">
+                                                                                    Controlled
+                                                                                </Badge>
+                                                                            )}
+                                                                            {m.is_prn && (
+                                                                                <Badge className="border-0 bg-status-warning-bg text-[9px] text-status-warning">
+                                                                                    PRN
+                                                                                </Badge>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                                                                            {m.dosage && (
+                                                                                <span>
+                                                                                    {
+                                                                                        m.dosage
+                                                                                    }
+                                                                                </span>
+                                                                            )}
+                                                                            {m.frequency && (
+                                                                                <span>
+                                                                                    {
+                                                                                        m.frequency
+                                                                                    }
+                                                                                </span>
+                                                                            )}
+                                                                            {m.route && (
+                                                                                <span>
+                                                                                    {
+                                                                                        m.route
+                                                                                    }
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        {m.instructions && (
+                                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                                {
+                                                                                    m.instructions
+                                                                                }
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+
+                                    {/* Right Column — Conditions + Emergency Contacts */}
+                                    <div className="space-y-4">
+                                        {/* Conditions */}
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="flex items-center justify-between text-sm font-semibold">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-status-warning-bg text-status-warning">
+                                                            <ShieldAlert className="h-3.5 w-3.5" />
+                                                        </div>
+                                                        Conditions
+                                                    </div>
+                                                    {can.edit && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-6 text-xs"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/operations/clients/${client.id}/medical?section=conditions`}
+                                                            >
+                                                                Manage
+                                                            </Link>
+                                                        </Button>
+                                                    )}
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {(medical.conditions ?? [])
+                                                    .length === 0 ? (
+                                                    <p className="py-4 text-center text-xs text-muted-foreground">
+                                                        No conditions listed.
+                                                    </p>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {medical.conditions.map(
+                                                            (c: any) => (
+                                                                <div
+                                                                    key={c.id}
+                                                                    className="rounded-lg border p-2.5"
+                                                                >
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span className="text-xs font-medium">
+                                                                            {
+                                                                                c.label
+                                                                            }
+                                                                        </span>
+                                                                        {c.severity && (
+                                                                            <Badge
+                                                                                className={`border-0 text-[9px] ${
+                                                                                    c.severity ===
+                                                                                    'severe'
+                                                                                        ? 'bg-status-critical-bg text-status-critical'
+                                                                                        : c.severity ===
+                                                                                            'moderate'
+                                                                                          ? 'bg-status-warning-bg text-status-warning'
+                                                                                          : 'bg-status-success-bg text-status-success'
+                                                                                }`}
+                                                                            >
+                                                                                {
+                                                                                    c.severity
+                                                                                }
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                    {c.notes && (
+                                                                        <p className="mt-1 text-[11px] text-muted-foreground">
+                                                                            {
+                                                                                c.notes
+                                                                            }
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+
+                                        {/* Emergency Contacts */}
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="flex items-center justify-between text-sm font-semibold">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-status-info-bg text-status-info">
+                                                            <Heart className="h-3.5 w-3.5" />
+                                                        </div>
+                                                        Emergency Contacts
+                                                    </div>
+                                                    {can.edit && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-6 text-xs"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/operations/clients/${client.id}/medical?section=emergency_contacts`}
+                                                            >
+                                                                Manage
+                                                            </Link>
+                                                        </Button>
+                                                    )}
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {(
+                                                    medical.emergency_contacts ??
+                                                    []
+                                                ).length === 0 ? (
+                                                    <p className="py-4 text-center text-xs text-muted-foreground">
+                                                        No emergency contacts
+                                                        listed.
+                                                    </p>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {medical.emergency_contacts.map(
+                                                            (e: any) => (
+                                                                <div
+                                                                    key={e.id}
+                                                                    className="flex items-start gap-2.5 rounded-lg border p-2.5"
+                                                                >
+                                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status-info-bg text-xs font-bold text-status-info">
+                                                                        {(
+                                                                            e.name ??
+                                                                            '?'
+                                                                        ).charAt(
+                                                                            0,
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex-1 text-xs">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="font-medium">
+                                                                                {
+                                                                                    e.name
+                                                                                }
+                                                                            </span>
+                                                                            {e.relationship && (
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="h-4 px-1 text-[9px]"
+                                                                                >
+                                                                                    {
+                                                                                        e.relationship
+                                                                                    }
+                                                                                </Badge>
+                                                                            )}
+                                                                        </div>
+                                                                        {e.phone && (
+                                                                            <p className="mt-0.5 text-muted-foreground">
+                                                                                {
+                                                                                    e.phone
+                                                                                }
+                                                                            </p>
+                                                                        )}
+                                                                        {e.email && (
+                                                                            <p className="text-muted-foreground">
+                                                                                {
+                                                                                    e.email
+                                                                                }
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {tab === 'mar' && (
+                            <MarTab
+                                clientId={client.id}
+                                clientFirstName={client.first_name}
+                                siteName={client.site?.name ?? null}
+                                medications={
+                                    (medical?.medications ?? []) as any[]
+                                }
+                                allergies={
+                                    Array.isArray(medical?.profile?.allergies)
+                                        ? (medical.profile
+                                              .allergies as string[])
+                                        : []
+                                }
+                                emarSummary={emarSummary}
+                                canRecord={Boolean(
+                                    can.record_medication_administration,
+                                )}
+                                canRecordControlled={Boolean(
+                                    can.record_controlled_medication,
+                                )}
+                                canViewControlled={Boolean(
+                                    auth?.can?.medications?.controlledView,
+                                )}
+                                onRecordDose={(medicationId) =>
+                                    openProfileDialog(
+                                        'emar',
+                                        medicationId
+                                            ? { medicationId }
+                                            : undefined,
+                                    )
+                                }
+                            />
+                        )}
+
+                        {tab === 'meal_prefs' && (
+                            <FoodMealTab
+                                clientId={client.id}
+                                canEdit={!!can?.edit}
+                                mealLogs={(pageProps as any).meal_logs}
+                                onAddPreference={() =>
+                                    openProfileDialog('meal_pref')
+                                }
+                            />
+                        )}
+
+                        {tab === 'observations' && (
+                            <BehaviourAbcTab
+                                clientId={client.id}
+                                patterns={
+                                    (pageProps as any).behaviour_patterns as any
+                                }
+                                canRecord={Boolean(can.record_event)}
+                                onNewEntry={() => openProfileDialog('abc')}
+                                onOpenEntry={(entry: AbcEntryRow) =>
+                                    openProfileDialog('abc', { entry })
+                                }
+                                refreshToken={abcRefreshToken}
+                            />
+                        )}
+
+                        {tab === 'care_plans' && (
+                            <CareSupportPlanTab
+                                client={client as any}
+                                summary={carePlansSummary}
+                                agreements={clientAgreements}
+                                canEdit={Boolean(can.care_plans_update)}
+                                canCreate={Boolean(can.care_plans_create)}
+                                onCreatePlan={() =>
+                                    openProfileDialog('care_plan', {
+                                        serviceAgreementOptions,
+                                    })
+                                }
+                                onEditPlan={(plan) =>
+                                    openProfileDialog('care_plan', {
+                                        plan,
+                                        serviceAgreementOptions,
+                                    })
+                                }
+                                onGoToGoals={() =>
+                                    handleTabChange('goals_path')
+                                }
+                            />
+                        )}
+
+                        {tab === 'calendar' && (
+                            <div className="space-y-4">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                            <Calendar className="h-[19px] w-[19px]" />
+                                        </span>
+                                        <div>
+                                            <h2 className="text-lg leading-tight font-semibold">
+                                                Appointments
+                                            </h2>
+                                            <p className="text-sm text-muted-foreground">
+                                                Appointments, shifts & reminders
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {canCreateAppointment ? (
                                         <Button
-                                            size="sm"
+                                            onClick={() =>
+                                                openProfileDialog('appointment')
+                                            }
+                                            data-test="calendar-new-appointment"
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            New appointment
+                                        </Button>
+                                    ) : null}
+                                </div>
+                                <ClientCalendarTab
+                                    clientId={client.id}
+                                    clientFirstName={client.first_name}
+                                    initialEvents={
+                                        (pageProps as any).calendar_events ?? []
+                                    }
+                                    canCreate={canCreateAppointment}
+                                />
+                            </div>
+                        )}
+
+                        {tab === 'progress_notes' && (
+                            <DailyNotesTab
+                                clientId={client.id}
+                                notes={clientDailyNotes}
+                                summary={dailyNotesSummary}
+                                canReview={Boolean(progressNotesCan.review)}
+                                canUpdate={Boolean(progressNotesCan.update)}
+                                currentUserId={auth?.user?.id}
+                                onCreateDaily={
+                                    can.create_daily_note
+                                        ? () => openProfileDialog('daily_note')
+                                        : undefined
+                                }
+                                onCreateQuick={
+                                    can.create_quick_note
+                                        ? () => openProfileDialog('quick_note')
+                                        : undefined
+                                }
+                                onEditNote={(note) =>
+                                    openProfileDialog('daily_note', { note })
+                                }
+                                filterPreset={dailyNotesFilter}
+                                onFilterChange={setDailyNotesFilter}
+                                onShowReviewQueue={() =>
+                                    openDailyNotes('flagged')
+                                }
+                                isLoading={!hasClientDailyNotesProp}
+                            />
+                        )}
+
+                        {tab === 'communication_notes' && (
+                            <CommunicationNotesTab
+                                notes={communicationNotes}
+                                familyNotes={familyNotes}
+                                familyNotesOpenCount={familyNotesOpenCount}
+                                coverage={{
+                                    total: dailyNotesSummary.communication,
+                                    loaded: dailyNotesSummary.communication_loaded,
+                                    has_more:
+                                        dailyNotesSummary.communication_has_more,
+                                }}
+                                onCreate={
+                                    can.create_communication_note
+                                        ? () => openProfileDialog('comm_note')
+                                        : undefined
+                                }
+                                canReview={Boolean(progressNotesCan.review)}
+                                canUpdate={Boolean(progressNotesCan.update)}
+                                onMarkReviewed={(noteId) =>
+                                    router.post(
+                                        `/operations/clients/${client.id}/daily-notes/${noteId}/review`,
+                                        {},
+                                        { preserveScroll: true },
+                                    )
+                                }
+                                onClearFlag={(noteId) =>
+                                    router.post(
+                                        `/operations/clients/${client.id}/daily-notes/${noteId}/flag`,
+                                        { is_flagged: false },
+                                        { preserveScroll: true },
+                                    )
+                                }
+                                onEditNote={(note) =>
+                                    openProfileDialog('comm_note', { note })
+                                }
+                                isLoading={!hasCommunicationNotesProp}
+                            />
+                        )}
+
+                        {tab === 'health_monitoring' && (
+                            <div className="space-y-4">
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                            openProfileDialog('record_obs')
+                                        }
+                                        data-test="health-record-observation"
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Record observation
+                                    </Button>
+                                </div>
+                                <ClientClinicalRecordLaunchers
+                                    client={client}
+                                />
+                                <HealthMonitoringTab
+                                    clientId={client.id}
+                                    data={healthMonitoring}
+                                    isLoading={!hasHealthMonitoringProp}
+                                />
+                            </div>
+                        )}
+
+                        {tab === 'healthcare_devices' && (
+                            <ClientHealthcareDevicesTab
+                                data={healthcareDevices}
+                                isLoading={
+                                    healthcareDevicesLoading ||
+                                    (!hasHealthcareDevicesProp &&
+                                        !healthcareDevicesLoadFailed)
+                                }
+                                loadFailed={healthcareDevicesLoadFailed}
+                            />
+                        )}
+
+                        {tab === 'rhythms_routines' && (
+                            <div className="space-y-4">
+                                {can.edit ? (
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <Button
+                                            onClick={() =>
+                                                openProfileDialog(
+                                                    'edit_rhythms',
+                                                )
+                                            }
+                                            data-test="rhythms-update-guidance"
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Update guidance
+                                        </Button>
+                                    </div>
+                                ) : null}
+                                <RhythmsRoutinesTab
+                                    clientId={client.id}
+                                    routines={clientRoutines}
+                                    canEdit={can.edit}
+                                    isLoading={!hasClientRoutinesProp}
+                                />
+                            </div>
+                        )}
+
+                        {tab === 'actions_reviews' && (
+                            <div className="space-y-4">
+                                {can.create_note ? (
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <Button
+                                            onClick={() =>
+                                                openProfileDialog('add_action')
+                                            }
+                                            data-test="actions-add"
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Add action
+                                        </Button>
+                                    </div>
+                                ) : null}
+                                <ActionsReviewsTab
+                                    items={actionsReviews}
+                                    summary={actionsReviewsSummary}
+                                    isLoading={!hasActionsReviewsProp}
+                                />
+                            </div>
+                        )}
+
+                        {tab === 'personal_details' && (
+                            <PersonalDetailsTab
+                                client={client as any}
+                                supportWorkers={
+                                    (client as any).support_workers ?? []
+                                }
+                                emergencyContacts={
+                                    ((pageProps as any).medical
+                                        ?.emergency_contacts ?? []) as any
+                                }
+                                nextOfKins={
+                                    ((pageProps as any).next_of_kins ??
+                                        []) as any
+                                }
+                                onEdit={
+                                    can.edit
+                                        ? () =>
+                                              openProfileDialog('edit_profile')
+                                        : undefined
+                                }
+                            />
+                        )}
+
+                        {tab === 'goals_path' && (
+                            <GoalsPathTab
+                                clientId={client.id}
+                                clientName={name}
+                                activePlanId={workingCarePlan?.id ?? null}
+                                goals={workingCarePlan?.goals ?? []}
+                                lifeStory={(client as any).life_story}
+                                strengthsAbilities={
+                                    (client as any).strengths_abilities
+                                }
+                                interestsHobbies={
+                                    (client as any).interests_hobbies
+                                }
+                                pathPlan={(pageProps as any).path_plan ?? null}
+                                canManageGoals={Boolean(
+                                    can.manage_care_plan_goals,
+                                )}
+                                canEditPath={Boolean(can.edit_path_plan)}
+                                onAddGoal={() => openProfileDialog('goal')}
+                                onManageGoal={(goal) =>
+                                    openProfileDialog('goal', { goal })
+                                }
+                                onEditPlan={() => {
+                                    const pp = ((pageProps as any).path_plan ??
+                                        {}) as Record<string, unknown>;
+                                    const toLines = (a: unknown) =>
+                                        Array.isArray(a) ? a.join('\n') : '';
+                                    const day = (v: unknown) =>
+                                        typeof v === 'string'
+                                            ? v.slice(0, 10)
+                                            : '';
+                                    openProfileDialog('edit_path_plan', {
+                                        values: {
+                                            dream: pp.dream ?? '',
+                                            north_star: pp.north_star ?? '',
+                                            strengths: toLines(pp.strengths),
+                                            trusted_people: toLines(
+                                                pp.trusted_people,
+                                            ),
+                                            independence_goals: toLines(
+                                                pp.independence_goals,
+                                            ),
+                                            community: pp.community ?? '',
+                                            action_steps: toLines(
+                                                pp.action_steps,
+                                            ),
+                                            meaningful_outcomes:
+                                                pp.meaningful_outcomes ?? '',
+                                            life_story:
+                                                (client as any).life_story ??
+                                                '',
+                                            strengths_abilities:
+                                                (client as any)
+                                                    .strengths_abilities ?? '',
+                                            interests_hobbies:
+                                                (client as any)
+                                                    .interests_hobbies ?? '',
+                                            plan_date: day(pp.plan_date),
+                                            next_review_at: day(
+                                                pp.next_review_at,
+                                            ),
+                                        },
+                                    });
+                                }}
+                            />
+                        )}
+
+                        {tab === 'risk_management' && (
+                            <>
+                                <RiskManagementTab
+                                    clientId={client.id}
+                                    risks={
+                                        (pageProps.client_risks ?? []) as any
+                                    }
+                                    canCreate={Boolean(
+                                        (can as any).create_risks,
+                                    )}
+                                    canUpdate={Boolean(
+                                        (can as any).update_risks,
+                                    )}
+                                    canDelete={Boolean(
+                                        (can as any).delete_risks,
+                                    )}
+                                    onAddRisk={() =>
+                                        openProfileDialog('add_risk')
+                                    }
+                                    onEditRisk={(risk) =>
+                                        openProfileDialog('edit_risk', { risk })
+                                    }
+                                    homeHazards={
+                                        (pageProps.homeHazards ?? []) as any
+                                    }
+                                    homeHazardDetail={
+                                        (pageProps.homeHazardDetail ??
+                                            null) as any
+                                    }
+                                    homeName={
+                                        (pageProps.homeName ?? null) as any
+                                    }
+                                    homeSiteId={
+                                        (pageProps.homeSiteId ?? null) as any
+                                    }
+                                    homeProcedures={
+                                        (pageProps.homeProcedures ?? []) as any
+                                    }
+                                />
+
+                                {Boolean(
+                                    (can as any).view_hs_risk_assessments,
+                                ) && (
+                                    <div className="mt-8 border-t border-border pt-6">
+                                        <div className="mb-4 flex items-center gap-2">
+                                            <ShieldAlert className="h-5 w-5 text-muted-foreground" />
+                                            <div>
+                                                <h3 className="text-base font-semibold">
+                                                    Formal H&amp;S risk
+                                                    assessments
+                                                </h3>
+                                                <p className="text-xs text-muted-foreground">
+                                                    ISO 31000 / SafePlus 5×5
+                                                    assessments attached to this
+                                                    client — separate from the
+                                                    care-risk list above.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <RaRegisterSection
+                                            assessments={
+                                                (pageProps.hs_risk_assessments ??
+                                                    []) as RaRow[]
+                                            }
+                                            pickers={
+                                                (pageProps.ra_pickers ?? {
+                                                    sites: [],
+                                                    clients: [],
+                                                    events: [],
+                                                }) as RaPickers
+                                            }
+                                            canManage={Boolean(
+                                                (can as any)
+                                                    .manage_hs_risk_assessments,
+                                            )}
+                                            lockedAssessable={{
+                                                type: 'client',
+                                                id: client.id,
+                                                name: `${client.first_name} ${client.last_name}`.trim(),
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {tab === 'incidents_accidents' && (
+                            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                        <AlertTriangle className="h-[19px] w-[19px]" />
+                                    </span>
+                                    <div>
+                                        <h2 className="text-lg leading-tight font-semibold">
+                                            Incidents & accidents
+                                        </h2>
+                                        <p className="text-sm text-muted-foreground">
+                                            {
+                                                (
+                                                    pageProps.client_incidents ??
+                                                    []
+                                                ).length
+                                            }{' '}
+                                            recent incident
+                                            {(pageProps.client_incidents ?? [])
+                                                .length === 1
+                                                ? ''
+                                                : 's'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button
+                                    onClick={() =>
+                                        openProfileDialog('log_incident')
+                                    }
+                                    data-test="incidents-log-incident"
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Log incident
+                                </Button>
+                            </div>
+                        )}
+                        {tab === 'incidents_accidents' && (
+                            <IncidentsTab
+                                incidents={
+                                    (pageProps.client_incidents ?? []) as any[]
+                                }
+                            />
+                        )}
+
+                        {tab === 'first_aid' && (
+                            <FirstAidTab
+                                records={
+                                    (pageProps.first_aid_records ?? []) as any[]
+                                }
+                            />
+                        )}
+
+                        {tab === 'family_tree' && (
+                            <div className="space-y-4">
+                                {can.edit ? (
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <Button
+                                            variant="outline"
                                             onClick={() =>
                                                 openProfileDialog(
                                                     'portal_invite',
                                                 )
                                             }
-                                            data-test="portal-invite"
                                         >
-                                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                            Invite
+                                            <Globe className="mr-1.5 h-4 w-4" />
+                                            Invite to portal
                                         </Button>
-                                    </div>
-                                )}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <div className="text-sm text-muted-foreground">
-                                Portal users can view this{' '}
-                                {(
-                                    labels?.['client.singular'] ?? 'Client'
-                                ).toLowerCase()}
-                                {"'s"} medical, documents, and timeline, and can
-                                query the RAG assistant.
-                            </div>
-                            <Separator />
-                            <div className="space-y-2">
-                                {portal_users.map((u) => (
-                                    <div
-                                        key={u.id}
-                                        className="flex items-center justify-between rounded-md border p-3"
-                                    >
-                                        <div>
-                                            <div className="flex items-center gap-2 text-sm font-medium">
-                                                {u.name}
-                                                {u.is_legal_guardian && (
-                                                    <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning">
-                                                        Legal Guardian
-                                                    </span>
-                                                )}
-                                                {u.is_emergency_contact && (
-                                                    <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical">
-                                                        Emergency
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                {u.email}
-                                            </div>
-                                            {u.relation && (
-                                                <div className="mt-0.5 text-xs text-muted-foreground">
-                                                    Relation: {u.relation}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {u.status === 'active' ||
-                                            u.is_active !== false ? (
-                                                <span className="rounded-full bg-status-success-bg px-2 py-0.5 text-[10px] font-medium text-status-success">
-                                                    Active
-                                                </span>
-                                            ) : (
-                                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                                    Inactive
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                                {!portal_users.length && (
-                                    <div className="py-8 text-center text-sm text-muted-foreground">
-                                        No portal users linked. Add a next of
-                                        kin or family member to get started.
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {tab === 'personal_assets' && (
-                    <div className="space-y-4">
-                        {can.edit ? (
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                <Button
-                                    onClick={() =>
-                                        openProfileDialog('add_asset')
-                                    }
-                                    data-test="assets-add-item"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add item
-                                </Button>
-                            </div>
-                        ) : null}
-                        <PersonalAssetsTab
-                            clientId={client.id}
-                            assets={personal_assets}
-                            canEdit={can.edit}
-                            firstName={client.first_name}
-                            locations={(pageProps as any).asset_locations ?? []}
-                            clientSiteId={client.site?.id ?? null}
-                            availableTrackers={
-                                (pageProps as any).available_trackers ?? []
-                            }
-                        />
-                    </div>
-                )}
-
-                {tab === 'transport' &&
-                    (() => {
-                        const ts = transport?.stats ?? {
-                            transports_30d: 0,
-                            outings_30d: 0,
-                            incidents_30d: 0,
-                        };
-                        const upcoming = transport?.upcoming_outings ?? [];
-                        const history = transport?.transport_history ?? [];
-                        const medLogs = transport?.medication_logs ?? [];
-                        const bookings = ((transport as any)?.bookings ??
-                            []) as any[];
-
-                        return (
-                            <div className="space-y-6">
-                                {/* Header + book-transport workflow */}
-                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                    <div className="flex items-center gap-3">
-                                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
-                                            <Truck className="h-[19px] w-[19px]" />
-                                        </span>
-                                        <div>
-                                            <h2 className="text-lg leading-tight font-semibold">
-                                                Transport
-                                            </h2>
-                                            <p className="text-sm text-muted-foreground">
-                                                Bookings, outings & trip log
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {can.edit ? (
                                         <Button
                                             onClick={() =>
                                                 openProfileDialog(
-                                                    'transport_booking',
+                                                    'add_relationship',
                                                 )
                                             }
-                                            data-test="transport-book"
+                                            data-test="family-add-relationship"
                                         >
                                             <Plus className="mr-1.5 h-4 w-4" />
-                                            Book transport
+                                            Add relationship
                                         </Button>
-                                    ) : null}
-                                </div>
+                                    </div>
+                                ) : null}
+                                <FamilyTreeTab
+                                    clientName={name}
+                                    nextOfKins={
+                                        ((pageProps as any).next_of_kins ??
+                                            []) as any
+                                    }
+                                    portalUsers={(portal_users ?? []) as any}
+                                    emergencyContacts={
+                                        (medical?.emergency_contacts ??
+                                            []) as any
+                                    }
+                                />
+                            </div>
+                        )}
 
-                                {/* Scheduled bookings (Book transport workflow) */}
-                                {bookings.length > 0 && (
-                                    <Card>
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="flex items-center gap-2 text-base">
-                                                <Truck className="h-4 w-4" />{' '}
-                                                Scheduled transport
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-2">
-                                                {bookings.map((b: any) => (
-                                                    <div
-                                                        key={b.id}
-                                                        className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+                        {tab === 'audit_history' && (
+                            <AuditHistoryTab
+                                entries={
+                                    ((pageProps as any).audit_history ??
+                                        []) as any
+                                }
+                                canView={Boolean(
+                                    ((pageProps as any).audit_history ?? [])
+                                        .length > 0 || progressNotesCan.update,
+                                )}
+                            />
+                        )}
+
+                        {tab === 'finance' && (
+                            <div className="space-y-4">
+                                {flowContext.fundOptions.length > 0 ? (
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <Button
+                                            onClick={() =>
+                                                openProfileDialog('transaction')
+                                            }
+                                            data-test="finance-new-transaction"
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            New transaction
+                                        </Button>
+                                    </div>
+                                ) : null}
+                                <FinanceTab
+                                    clientId={client.id}
+                                    finance={
+                                        (pageProps as any).client_finance ?? {}
+                                    }
+                                />
+                            </div>
+                        )}
+
+                        {tab === 'leave_excursions' && (
+                            <LeaveExcursionsTab
+                                clientId={client.id}
+                                leave={
+                                    ((pageProps as any).leave_excursions
+                                        ?.leave ?? []) as any
+                                }
+                                excursions={
+                                    ((pageProps as any).leave_excursions
+                                        ?.excursions ?? []) as any
+                                }
+                                canManage={Boolean(can.edit)}
+                                onRequestLeave={() =>
+                                    openProfileDialog('request_leave')
+                                }
+                                onPlanExcursion={() =>
+                                    openProfileDialog('plan_excursion')
+                                }
+                            />
+                        )}
+
+                        {tab === 'service_agreements' &&
+                            (() => {
+                                const agreements = clientAgreements;
+                                const activeAgs = agreements.filter(
+                                    (a: any) => a.status === 'active',
+                                );
+                                const totalBudget = agreements.reduce(
+                                    (s: number, a: any) =>
+                                        s + (a.total_budget ?? 0),
+                                    0,
+                                );
+                                const totalUsed = agreements.reduce(
+                                    (s: number, a: any) =>
+                                        s + (a.budget_used ?? 0),
+                                    0,
+                                );
+                                const overallPct =
+                                    totalBudget > 0
+                                        ? Math.round(
+                                              (totalUsed / totalBudget) * 100,
+                                          )
+                                        : 0;
+                                const expiringSoon = agreements.filter(
+                                    (a: any) =>
+                                        a.ends_at &&
+                                        new Date(a.ends_at).getTime() -
+                                            Date.now() <
+                                            30 * 86400000 &&
+                                        new Date(a.ends_at) > new Date(),
+                                ).length;
+
+                                return (
+                                    <div className="space-y-4">
+                                        {/* Stats */}
+                                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                            <div className="rounded-xl border bg-primary/10 p-3 text-center">
+                                                <div className="text-xl font-bold text-primary">
+                                                    {agreements.length}
+                                                </div>
+                                                <div className="text-[10px] tracking-wider text-primary uppercase">
+                                                    Total
+                                                </div>
+                                            </div>
+                                            <div className="rounded-xl border bg-status-success-bg p-3 text-center">
+                                                <div className="text-xl font-bold text-status-success">
+                                                    {activeAgs.length}
+                                                </div>
+                                                <div className="text-[10px] tracking-wider text-status-success uppercase">
+                                                    Active
+                                                </div>
+                                            </div>
+                                            <div className="rounded-xl border bg-primary/10 p-3 text-center">
+                                                <div
+                                                    className={`text-xl font-bold ${overallPct > 90 ? 'text-status-critical' : overallPct > 70 ? 'text-status-warning' : 'text-primary'}`}
+                                                >
+                                                    {overallPct}%
+                                                </div>
+                                                <div className="text-[10px] tracking-wider text-primary uppercase">
+                                                    Budget Used
+                                                </div>
+                                            </div>
+                                            <div className="rounded-xl border p-3 text-center">
+                                                <div
+                                                    className={`text-xl font-bold ${expiringSoon > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
+                                                >
+                                                    {expiringSoon}
+                                                </div>
+                                                <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                                                    Expiring Soon
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Overall Budget Bar */}
+                                        {totalBudget > 0 && (
+                                            <Card className="border-primary bg-primary/10">
+                                                <CardContent className="p-4">
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <span className="text-sm font-semibold">
+                                                            Total Funding
+                                                            Overview
+                                                        </span>
+                                                        <span className="text-sm font-bold text-primary">
+                                                            $
+                                                            {new Intl.NumberFormat(
+                                                                'en-NZ',
+                                                            ).format(
+                                                                totalUsed,
+                                                            )}{' '}
+                                                            / $
+                                                            {new Intl.NumberFormat(
+                                                                'en-NZ',
+                                                            ).format(
+                                                                totalBudget,
+                                                            )}{' '}
+                                                            NZD
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-4 w-full overflow-hidden rounded-full bg-primary/20">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all ${overallPct > 90 ? 'bg-status-critical' : overallPct > 70 ? 'bg-status-warning' : 'bg-primary'}`}
+                                                            style={{
+                                                                width: `${Math.min(overallPct, 100)}%`,
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                                                        <span>
+                                                            Remaining: $
+                                                            {new Intl.NumberFormat(
+                                                                'en-NZ',
+                                                            ).format(
+                                                                totalBudget -
+                                                                    totalUsed,
+                                                            )}
+                                                        </span>
+                                                        <span>
+                                                            {overallPct}%
+                                                            utilised
+                                                        </span>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-medium">
+                                                Agreements ({agreements.length})
+                                            </span>
+                                            {serviceAgreementsCan.create && (
+                                                <Button
+                                                    size="sm"
+                                                    className="gap-1.5 bg-primary hover:bg-primary"
+                                                    asChild
+                                                >
+                                                    <Link
+                                                        href={`/operations/service-agreements/create?client_id=${client.id}`}
                                                     >
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex flex-wrap items-center gap-2">
-                                                                <span className="truncate font-semibold">
-                                                                    {b.purpose}
-                                                                </span>
-                                                                <Badge
-                                                                    variant={
-                                                                        b.status ===
-                                                                        'confirmed'
-                                                                            ? 'default'
-                                                                            : 'outline'
-                                                                    }
-                                                                    className="shrink-0 text-[10px] capitalize"
-                                                                >
-                                                                    {b.status}
-                                                                </Badge>
-                                                                {b.escort_required ? (
-                                                                    <Badge
+                                                        New Agreement
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        {/* Agreement Cards */}
+                                        {agreements.length === 0 ? (
+                                            <Card className="border-dashed">
+                                                <CardContent className="flex flex-col items-center justify-center py-12">
+                                                    <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                                                        <DollarSign className="h-7 w-7 text-primary" />
+                                                    </div>
+                                                    <p className="font-medium">
+                                                        No Service Agreements
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        {serviceAgreementsCan.create
+                                                            ? `Create a funding agreement for ${client.first_name}.`
+                                                            : 'No agreements are available to view.'}
+                                                    </p>
+                                                </CardContent>
+                                            </Card>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {agreements.map((ag: any) => {
+                                                    const budgetPct =
+                                                        ag.total_budget > 0
+                                                            ? Math.round(
+                                                                  ((ag.budget_used ??
+                                                                      0) /
+                                                                      ag.total_budget) *
+                                                                      100,
+                                                              )
+                                                            : 0;
+                                                    const budgetColor =
+                                                        budgetPct > 90
+                                                            ? 'bg-status-critical'
+                                                            : budgetPct > 70
+                                                              ? 'bg-status-warning'
+                                                              : 'bg-status-success';
+                                                    const isExpiring =
+                                                        ag.ends_at &&
+                                                        new Date(
+                                                            ag.ends_at,
+                                                        ).getTime() -
+                                                            Date.now() <
+                                                            30 * 86400000 &&
+                                                        new Date(ag.ends_at) >
+                                                            new Date();
+                                                    const isExpired =
+                                                        ag.ends_at &&
+                                                        new Date(ag.ends_at) <
+                                                            new Date();
+                                                    return (
+                                                        <Card
+                                                            key={ag.id}
+                                                            className={`overflow-hidden border-l-4 transition-all hover:shadow-sm ${ag.status === 'active' ? 'border-l-emerald-500' : 'border-l-slate-300'}`}
+                                                        >
+                                                            <CardContent className="p-4">
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    <div className="flex items-start gap-3">
+                                                                        <div
+                                                                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ag.status === 'active' ? 'bg-status-success-bg text-status-success' : 'bg-muted text-muted-foreground'}`}
+                                                                        >
+                                                                            <DollarSign className="h-5 w-5" />
+                                                                        </div>
+                                                                        <div>
+                                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                                <span className="text-sm font-semibold">
+                                                                                    {
+                                                                                        ag.title
+                                                                                    }
+                                                                                </span>
+                                                                                <Badge
+                                                                                    className={`border-0 text-[9px] capitalize ${ag.status === 'active' ? 'bg-status-success-bg text-status-success' : ag.status === 'draft' ? 'bg-muted text-muted-foreground' : 'bg-status-warning-bg text-status-warning'}`}
+                                                                                >
+                                                                                    {
+                                                                                        ag.status
+                                                                                    }
+                                                                                </Badge>
+                                                                                {ag.funding_body && (
+                                                                                    <Badge
+                                                                                        variant="outline"
+                                                                                        className="text-[9px]"
+                                                                                    >
+                                                                                        {
+                                                                                            ag.funding_body
+                                                                                        }
+                                                                                    </Badge>
+                                                                                )}
+                                                                                {isExpiring && (
+                                                                                    <Badge className="animate-pulse border-0 bg-status-warning-bg text-[9px] text-status-warning">
+                                                                                        Expiring
+                                                                                        Soon
+                                                                                    </Badge>
+                                                                                )}
+                                                                                {isExpired && (
+                                                                                    <Badge className="border-0 bg-status-critical-bg text-[9px] text-status-critical">
+                                                                                        Expired
+                                                                                    </Badge>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="mt-0.5 flex gap-3 text-xs text-muted-foreground">
+                                                                                {ag.reference_number && (
+                                                                                    <span>
+                                                                                        Ref:{' '}
+                                                                                        {
+                                                                                            ag.reference_number
+                                                                                        }
+                                                                                    </span>
+                                                                                )}
+                                                                                {ag.starts_at && (
+                                                                                    <span>
+                                                                                        {new Date(
+                                                                                            ag.starts_at,
+                                                                                        ).toLocaleDateString(
+                                                                                            'en-NZ',
+                                                                                        )}{' '}
+                                                                                        —{' '}
+                                                                                        {ag.ends_at
+                                                                                            ? new Date(
+                                                                                                  ag.ends_at,
+                                                                                              ).toLocaleDateString(
+                                                                                                  'en-NZ',
+                                                                                              )
+                                                                                            : 'Ongoing'}
+                                                                                    </span>
+                                                                                )}
+                                                                                {ag.hourly_rate && (
+                                                                                    <span>
+                                                                                        $
+                                                                                        {
+                                                                                            ag.hourly_rate
+                                                                                        }
+                                                                                        /hr
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <Button
                                                                         variant="outline"
-                                                                        className="shrink-0 text-[10px]"
+                                                                        size="sm"
+                                                                        className="shrink-0 text-xs"
+                                                                        asChild
                                                                     >
-                                                                        Escort
-                                                                    </Badge>
-                                                                ) : null}
-                                                                {b.return_trip ? (
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className="shrink-0 text-[10px]"
-                                                                    >
-                                                                        Return
-                                                                    </Badge>
-                                                                ) : null}
-                                                            </div>
-                                                            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                                                                {b.scheduled_at ? (
-                                                                    <span>
-                                                                        {formatDateTimeLong(
-                                                                            b.scheduled_at,
+                                                                        <Link
+                                                                            href={`/operations/service-agreements/${ag.id}`}
+                                                                        >
+                                                                            View
+                                                                        </Link>
+                                                                    </Button>
+                                                                </div>
+                                                                {ag.total_budget >
+                                                                    0 && (
+                                                                    <div className="mt-3">
+                                                                        <div className="mb-1 flex items-center justify-between text-xs">
+                                                                            <span className="text-muted-foreground">
+                                                                                Budget
+                                                                                Utilisation
+                                                                            </span>
+                                                                            <span className="font-semibold">
+                                                                                $
+                                                                                {new Intl.NumberFormat(
+                                                                                    'en-NZ',
+                                                                                ).format(
+                                                                                    ag.budget_used ??
+                                                                                        0,
+                                                                                )}{' '}
+                                                                                /
+                                                                                $
+                                                                                {new Intl.NumberFormat(
+                                                                                    'en-NZ',
+                                                                                ).format(
+                                                                                    ag.total_budget,
+                                                                                )}{' '}
+                                                                                (
+                                                                                {
+                                                                                    budgetPct
+                                                                                }
+                                                                                %)
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                                                                            <div
+                                                                                className={`h-full rounded-full ${budgetColor} transition-all`}
+                                                                                style={{
+                                                                                    width: `${Math.min(budgetPct, 100)}%`,
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </CardContent>
+                                                        </Card>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+
+                        {/* Support Plan merged into Care Plans tab */}
+
+                        {tab === 'assessments' && (
+                            <div className="space-y-4">
+                                {can.edit ? (
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <Button
+                                            onClick={() =>
+                                                openProfileDialog(
+                                                    'add_assessment',
+                                                )
+                                            }
+                                            data-test="assessments-add"
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Add assessment
+                                        </Button>
+                                    </div>
+                                ) : null}
+                                <AssessmentsTab
+                                    clientId={client.id}
+                                    assessments={assessments}
+                                    canEdit={can.edit}
+                                />
+                            </div>
+                        )}
+
+                        {tab === 'timeline' && (
+                            <div className="space-y-4">
+                                {can.create_note ? (
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <Button
+                                            onClick={() =>
+                                                openProfileDialog('add_note', {
+                                                    title: 'Add timeline note',
+                                                })
+                                            }
+                                            data-test="timeline-add-note"
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Add note
+                                        </Button>
+                                    </div>
+                                ) : null}
+                                <ClientTimelineTab
+                                    clientId={client.id}
+                                    events={events}
+                                    handover={handover}
+                                    summary={timelineSummary}
+                                    canCreateNote={Boolean(can.create_note)}
+                                    canPinHandover={Boolean(can.pin_handover)}
+                                    auth={auth}
+                                />
+                            </div>
+                        )}
+
+                        {tab === 'documents' && (
+                            <div className="space-y-4">
+                                {can.edit ? (
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <Button
+                                            onClick={() =>
+                                                openProfileDialog(
+                                                    'upload_doc',
+                                                    {
+                                                        title: 'Upload document',
+                                                    },
+                                                )
+                                            }
+                                            data-test="documents-upload"
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Upload document
+                                        </Button>
+                                    </div>
+                                ) : null}
+                                <DocumentsTab
+                                    clientId={client.id}
+                                    clientName={client.first_name ?? name}
+                                    documents={(documents ?? []) as any}
+                                />
+                            </div>
+                        )}
+
+                        {tab === 'photos' && (
+                            <PhotoGalleryTab
+                                clientId={client.id}
+                                photos={photos}
+                                canEdit={can.edit}
+                            />
+                        )}
+
+                        {tab === 'family_notes' &&
+                            (() => {
+                                const openNotes = familyNotes.filter((n: any) =>
+                                    ['open', 'in_progress'].includes(n.status),
+                                );
+                                const urgentCount = openNotes.filter(
+                                    (n: any) => n.priority === 'urgent',
+                                ).length;
+                                const overdueCount = openNotes.filter(
+                                    (n: any) => n.is_overdue,
+                                ).length;
+                                const completedThisWeek = familyNotes.filter(
+                                    (n: any) =>
+                                        n.status === 'completed' &&
+                                        n.completed_at &&
+                                        new Date(n.completed_at) >=
+                                            new Date(Date.now() - 7 * 86400000),
+                                ).length;
+                                const upcomingShifts = shifts_summary?.next
+                                    ? [shifts_summary.next]
+                                    : [];
+
+                                const NOTE_TYPES: Record<
+                                    string,
+                                    {
+                                        emoji: string;
+                                        label: string;
+                                        color: string;
+                                    }
+                                > = {
+                                    note: {
+                                        emoji: '📝',
+                                        label: 'Note',
+                                        color: 'bg-status-info-bg text-status-info',
+                                    },
+                                    todo: {
+                                        emoji: '✅',
+                                        label: 'To-Do',
+                                        color: 'bg-status-success-bg text-status-success',
+                                    },
+                                    request: {
+                                        emoji: '🙏',
+                                        label: 'Request',
+                                        color: 'bg-status-warning-bg text-status-warning',
+                                    },
+                                    reminder: {
+                                        emoji: '⏰',
+                                        label: 'Reminder',
+                                        color: 'bg-primary/10 text-primary',
+                                    },
+                                };
+                                const PRIORITY_COLORS: Record<string, string> =
+                                    {
+                                        low: 'bg-muted text-muted-foreground',
+                                        normal: 'bg-status-info-bg text-status-info',
+                                        high: 'bg-status-warning-bg text-status-warning',
+                                        urgent: 'bg-status-critical-bg text-status-critical',
+                                    };
+                                const STATUS_COLORS: Record<string, string> = {
+                                    open: 'bg-status-info-bg text-status-info',
+                                    in_progress:
+                                        'bg-status-warning-bg text-status-warning',
+                                    completed:
+                                        'bg-status-success-bg text-status-success',
+                                    cancelled: 'bg-muted text-muted-foreground',
+                                };
+
+                                return (
+                                    <div className="space-y-4">
+                                        {/* Stats */}
+                                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                            <div className="rounded-xl border bg-status-info-bg p-3 text-center">
+                                                <div className="text-xl font-bold text-status-info">
+                                                    {openNotes.length}
+                                                </div>
+                                                <div className="text-[10px] tracking-wider text-status-info uppercase">
+                                                    Open
+                                                </div>
+                                            </div>
+                                            <div
+                                                className={`rounded-xl border p-3 text-center ${urgentCount > 0 ? 'bg-status-critical-bg' : ''}`}
+                                            >
+                                                <div
+                                                    className={`text-xl font-bold ${urgentCount > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
+                                                >
+                                                    {urgentCount}
+                                                </div>
+                                                <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                                                    Urgent
+                                                </div>
+                                            </div>
+                                            <div
+                                                className={`rounded-xl border p-3 text-center ${overdueCount > 0 ? 'bg-status-warning-bg' : ''}`}
+                                            >
+                                                <div
+                                                    className={`text-xl font-bold ${overdueCount > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
+                                                >
+                                                    {overdueCount}
+                                                </div>
+                                                <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                                                    Overdue
+                                                </div>
+                                            </div>
+                                            <div className="rounded-xl border bg-status-success-bg p-3 text-center">
+                                                <div className="text-xl font-bold text-status-success">
+                                                    {completedThisWeek}
+                                                </div>
+                                                <div className="text-[10px] tracking-wider text-status-success uppercase">
+                                                    Done This Week
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Notes list */}
+                                        {familyNotes.length === 0 ? (
+                                            <Card className="border-dashed">
+                                                <CardContent className="flex flex-col items-center justify-center py-12">
+                                                    <span className="mb-3 text-4xl">
+                                                        📝
+                                                    </span>
+                                                    <p className="font-medium">
+                                                        No family notes yet
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        Notes and to-dos from
+                                                        family members will
+                                                        appear here.
+                                                    </p>
+                                                </CardContent>
+                                            </Card>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {familyNotes.map(
+                                                    (note: any) => {
+                                                        const typeInfo =
+                                                            (NOTE_TYPES[
+                                                                note.note_type
+                                                            ] ??
+                                                                NOTE_TYPES.note)!;
+                                                        return (
+                                                            <Card
+                                                                key={note.id}
+                                                                className={`overflow-hidden transition-all hover:shadow-sm ${note.is_overdue ? 'border-status-critical/30 bg-status-critical-bg' : note.status === 'completed' ? 'opacity-60' : ''}`}
+                                                            >
+                                                                <CardContent className="p-4">
+                                                                    <div className="flex items-start justify-between gap-3">
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                                <span className="text-sm font-semibold">
+                                                                                    {
+                                                                                        note.title
+                                                                                    }
+                                                                                </span>
+                                                                                <span
+                                                                                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${typeInfo.color}`}
+                                                                                >
+                                                                                    {
+                                                                                        typeInfo.emoji
+                                                                                    }{' '}
+                                                                                    {
+                                                                                        typeInfo.label
+                                                                                    }
+                                                                                </span>
+                                                                                {note.priority !==
+                                                                                    'normal' && (
+                                                                                    <Badge
+                                                                                        className={`border-0 text-[9px] ${PRIORITY_COLORS[note.priority]}`}
+                                                                                    >
+                                                                                        {
+                                                                                            note.priority
+                                                                                        }
+                                                                                    </Badge>
+                                                                                )}
+                                                                                <Badge
+                                                                                    className={`border-0 text-[9px] capitalize ${STATUS_COLORS[note.status]}`}
+                                                                                >
+                                                                                    {note.status.replace(
+                                                                                        '_',
+                                                                                        ' ',
+                                                                                    )}
+                                                                                </Badge>
+                                                                                {note.is_overdue && (
+                                                                                    <Badge className="gap-0.5 border-0 bg-status-critical-bg text-[9px] text-status-critical">
+                                                                                        <AlertTriangle className="h-2.5 w-2.5" />
+                                                                                        Overdue
+                                                                                    </Badge>
+                                                                                )}
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="border-status-warning/30 bg-status-warning-bg text-[9px] text-status-warning"
+                                                                                >
+                                                                                    Family
+                                                                                </Badge>
+                                                                            </div>
+                                                                            {note.due_date && (
+                                                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                                                    <Calendar className="mr-1 inline h-3 w-3" />
+                                                                                    Due:{' '}
+                                                                                    {new Date(
+                                                                                        note.due_date +
+                                                                                            'T00:00:00',
+                                                                                    ).toLocaleDateString(
+                                                                                        'en-NZ',
+                                                                                        {
+                                                                                            weekday:
+                                                                                                'short',
+                                                                                            day: 'numeric',
+                                                                                            month: 'short',
+                                                                                        },
+                                                                                    )}
+                                                                                    {note.due_time
+                                                                                        ? ` at ${note.due_time}`
+                                                                                        : ''}
+                                                                                </p>
+                                                                            )}
+                                                                            {note.description && (
+                                                                                <p className="mt-1.5 text-sm text-muted-foreground">
+                                                                                    {note
+                                                                                        .description
+                                                                                        .length >
+                                                                                    200
+                                                                                        ? note.description.slice(
+                                                                                              0,
+                                                                                              200,
+                                                                                          ) +
+                                                                                          '...'
+                                                                                        : note.description}
+                                                                                </p>
+                                                                            )}
+                                                                            {note.assigned_shift && (
+                                                                                <div className="mt-1 rounded-md border border-primary bg-primary/10 px-2 py-1 text-xs text-primary">
+                                                                                    <p className="font-medium">
+                                                                                        📋
+                                                                                        Assigned
+                                                                                        to{' '}
+                                                                                        {String(
+                                                                                            note
+                                                                                                .assigned_shift
+                                                                                                .shift_type ??
+                                                                                                'standard',
+                                                                                        ).replace(
+                                                                                            /_/g,
+                                                                                            ' ',
+                                                                                        )}{' '}
+                                                                                        shift
+                                                                                    </p>
+                                                                                    <p className="text-primary">
+                                                                                        {note
+                                                                                            .assigned_shift
+                                                                                            .staff_name ??
+                                                                                            'Unassigned'}
+                                                                                        {note
+                                                                                            .assigned_shift
+                                                                                            .service_context
+                                                                                            ? ` · ${note.assigned_shift.service_context}`
+                                                                                            : ''}
+                                                                                        {note
+                                                                                            .assigned_shift
+                                                                                            .location
+                                                                                            ? ` · ${note.assigned_shift.location}`
+                                                                                            : ''}
+                                                                                    </p>
+                                                                                </div>
+                                                                            )}
+                                                                            {!note.assigned_shift &&
+                                                                                note.assigned_shift_date && (
+                                                                                    <p className="mt-1 text-xs text-primary">
+                                                                                        📋
+                                                                                        Assigned
+                                                                                        to
+                                                                                        shift
+                                                                                        on{' '}
+                                                                                        {
+                                                                                            note.assigned_shift_date
+                                                                                        }
+                                                                                    </p>
+                                                                                )}
+                                                                            {note.staff_response && (
+                                                                                <div className="mt-2 rounded-lg border-l-2 border-l-blue-400 bg-status-info-bg p-2">
+                                                                                    <p className="text-xs">
+                                                                                        <span className="font-medium">
+                                                                                            {
+                                                                                                note.staff_responded_by_name
+                                                                                            }
+                                                                                        </span>{' '}
+                                                                                        <Badge
+                                                                                            variant="outline"
+                                                                                            className="ml-1 border-status-info/30 bg-status-info-bg text-[9px] text-status-info"
+                                                                                        >
+                                                                                            Staff
+                                                                                        </Badge>
+                                                                                    </p>
+                                                                                    <p className="mt-0.5 text-sm">
+                                                                                        {
+                                                                                            note.staff_response
+                                                                                        }
+                                                                                    </p>
+                                                                                </div>
+                                                                            )}
+                                                                            {note.status ===
+                                                                                'completed' &&
+                                                                                note.completed_by_name && (
+                                                                                    <p className="mt-1 text-xs text-status-success">
+                                                                                        <CheckCircle2 className="mr-1 inline h-3 w-3" />
+                                                                                        Completed
+                                                                                        by{' '}
+                                                                                        {
+                                                                                            note.completed_by_name
+                                                                                        }
+                                                                                    </p>
+                                                                                )}
+                                                                            <p className="mt-1 text-[10px] text-muted-foreground">
+                                                                                By{' '}
+                                                                                {
+                                                                                    note.creator_name
+                                                                                }{' '}
+                                                                                ·{' '}
+                                                                                {new Date(
+                                                                                    note.created_at,
+                                                                                ).toLocaleDateString(
+                                                                                    'en-NZ',
+                                                                                )}
+                                                                            </p>
+                                                                        </div>
+
+                                                                        {/* Staff actions */}
+                                                                        {can.manage_family_notes &&
+                                                                            [
+                                                                                'open',
+                                                                                'in_progress',
+                                                                            ].includes(
+                                                                                note.status,
+                                                                            ) && (
+                                                                                <div className="flex shrink-0 flex-col gap-1">
+                                                                                    <Button
+                                                                                        size="sm"
+                                                                                        variant="outline"
+                                                                                        className="h-7 gap-1 text-[10px] text-status-success"
+                                                                                        onClick={() =>
+                                                                                            router.post(
+                                                                                                `/clients/${client.id}/family-notes/${note.id}/status`,
+                                                                                                {
+                                                                                                    status: 'completed',
+                                                                                                },
+                                                                                                {
+                                                                                                    preserveScroll: true,
+                                                                                                },
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        <Check className="h-3 w-3" />
+                                                                                        Done
+                                                                                    </Button>
+                                                                                    {note.status ===
+                                                                                        'open' && (
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            className="h-7 gap-1 text-[10px] text-status-warning"
+                                                                                            onClick={() =>
+                                                                                                router.post(
+                                                                                                    `/clients/${client.id}/family-notes/${note.id}/status`,
+                                                                                                    {
+                                                                                                        status: 'in_progress',
+                                                                                                    },
+                                                                                                    {
+                                                                                                        preserveScroll: true,
+                                                                                                    },
+                                                                                                )
+                                                                                            }
+                                                                                        >
+                                                                                            <Clock className="h-3 w-3" />
+                                                                                            Start
+                                                                                        </Button>
+                                                                                    )}
+                                                                                    <Button
+                                                                                        size="sm"
+                                                                                        variant="outline"
+                                                                                        className="h-7 gap-1 text-[10px]"
+                                                                                        onClick={() => {
+                                                                                            setRespondingId(
+                                                                                                respondingId ===
+                                                                                                    note.id
+                                                                                                    ? null
+                                                                                                    : note.id,
+                                                                                            );
+                                                                                            setResponseText(
+                                                                                                '',
+                                                                                            );
+                                                                                        }}
+                                                                                    >
+                                                                                        <MsgIcon className="h-3 w-3" />
+                                                                                        Reply
+                                                                                    </Button>
+                                                                                    {!note.assigned_to_shift_id && (
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            className="h-7 gap-1 text-[10px] text-primary"
+                                                                                            onClick={() =>
+                                                                                                setAssigningId(
+                                                                                                    assigningId ===
+                                                                                                        note.id
+                                                                                                        ? null
+                                                                                                        : note.id,
+                                                                                                )
+                                                                                            }
+                                                                                        >
+                                                                                            <ListTodo className="h-3 w-3" />
+                                                                                            Shift
+                                                                                        </Button>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                    </div>
+
+                                                                    {/* Response form */}
+                                                                    {can.manage_family_notes &&
+                                                                        respondingId ===
+                                                                            note.id && (
+                                                                            <div className="mt-3 flex gap-2">
+                                                                                <Input
+                                                                                    className="h-8 text-xs"
+                                                                                    placeholder="Write a response..."
+                                                                                    value={
+                                                                                        responseText
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        e,
+                                                                                    ) =>
+                                                                                        setResponseText(
+                                                                                            e
+                                                                                                .target
+                                                                                                .value,
+                                                                                        )
+                                                                                    }
+                                                                                />
+                                                                                <Button
+                                                                                    size="sm"
+                                                                                    className="h-8"
+                                                                                    disabled={
+                                                                                        !responseText.trim()
+                                                                                    }
+                                                                                    onClick={() => {
+                                                                                        router.post(
+                                                                                            `/clients/${client.id}/family-notes/${note.id}/respond`,
+                                                                                            {
+                                                                                                staff_response:
+                                                                                                    responseText,
+                                                                                            },
+                                                                                            {
+                                                                                                preserveScroll: true,
+                                                                                            },
+                                                                                        );
+                                                                                        setRespondingId(
+                                                                                            null,
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    Send
+                                                                                </Button>
+                                                                            </div>
                                                                         )}
-                                                                    </span>
-                                                                ) : null}
-                                                                {b.destination ? (
-                                                                    <span>
-                                                                        ·{' '}
-                                                                        {
-                                                                            b.destination
-                                                                        }
-                                                                    </span>
-                                                                ) : null}
-                                                                {b.vehicle ? (
-                                                                    <span>
-                                                                        ·{' '}
-                                                                        {
-                                                                            b.vehicle
-                                                                        }
-                                                                    </span>
-                                                                ) : null}
-                                                                {b.driver
-                                                                    ?.name ? (
-                                                                    <span>
-                                                                        ·{' '}
-                                                                        {
-                                                                            b
-                                                                                .driver
-                                                                                .name
-                                                                        }
-                                                                    </span>
-                                                                ) : null}
-                                                            </div>
-                                                        </div>
+
+                                                                    {/* Assign to shift */}
+                                                                    {can.manage_family_notes &&
+                                                                        assigningId ===
+                                                                            note.id && (
+                                                                            <div className="mt-3 text-xs text-muted-foreground">
+                                                                                <p className="mb-1 font-medium">
+                                                                                    Assign
+                                                                                    to
+                                                                                    upcoming
+                                                                                    shift:
+                                                                                </p>
+                                                                                {(() => {
+                                                                                    const clientShifts =
+                                                                                        (
+                                                                                            events ??
+                                                                                            []
+                                                                                        )
+                                                                                            .filter(
+                                                                                                (
+                                                                                                    e: any,
+                                                                                                ) =>
+                                                                                                    e.type ===
+                                                                                                        'shift' &&
+                                                                                                    new Date(
+                                                                                                        e.occurred_at,
+                                                                                                    ) >
+                                                                                                        new Date(),
+                                                                                            )
+                                                                                            .slice(
+                                                                                                0,
+                                                                                                5,
+                                                                                            );
+                                                                                    return clientShifts.length >
+                                                                                        0 ? (
+                                                                                        <div className="flex flex-wrap gap-1">
+                                                                                            {clientShifts.map(
+                                                                                                (
+                                                                                                    s: any,
+                                                                                                ) => (
+                                                                                                    <Button
+                                                                                                        key={
+                                                                                                            s.id
+                                                                                                        }
+                                                                                                        size="sm"
+                                                                                                        variant="outline"
+                                                                                                        className="h-7 text-[10px]"
+                                                                                                        onClick={() => {
+                                                                                                            router.post(
+                                                                                                                `/clients/${client.id}/family-notes/${note.id}/assign-shift`,
+                                                                                                                {
+                                                                                                                    shift_id:
+                                                                                                                        s.shift_id ||
+                                                                                                                        s.id,
+                                                                                                                },
+                                                                                                                {
+                                                                                                                    preserveScroll: true,
+                                                                                                                },
+                                                                                                            );
+                                                                                                            setAssigningId(
+                                                                                                                null,
+                                                                                                            );
+                                                                                                        }}
+                                                                                                    >
+                                                                                                        {new Date(
+                                                                                                            s.occurred_at,
+                                                                                                        ).toLocaleDateString(
+                                                                                                            'en-NZ',
+                                                                                                            {
+                                                                                                                weekday:
+                                                                                                                    'short',
+                                                                                                                day: 'numeric',
+                                                                                                                month: 'short',
+                                                                                                            },
+                                                                                                        )}
+                                                                                                    </Button>
+                                                                                                ),
+                                                                                            )}
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <p>
+                                                                                            No
+                                                                                            upcoming
+                                                                                            shifts
+                                                                                            found.
+                                                                                        </p>
+                                                                                    );
+                                                                                })()}
+                                                                            </div>
+                                                                        )}
+                                                                </CardContent>
+                                                            </Card>
+                                                        );
+                                                    },
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+
+                        {tab === 'respite' && (
+                            <RespiteTab
+                                clientId={client.id}
+                                canCreate={Boolean(respiteCan?.create)}
+                                bookings={respiteBookings}
+                                requests={respiteRequests}
+                                allocation={respite?.allocation ?? null}
+                                onNewBooking={() =>
+                                    openProfileDialog('respite_booking')
+                                }
+                            />
+                        )}
+
+                        {tab === 'location' && location && (
+                            <ClientLocationTab
+                                clientId={client.id}
+                                clientName={name}
+                                clientHouse={client.site?.name ?? ''}
+                                clientPhoto={client.profile_photo_url ?? null}
+                                location={location}
+                            />
+                        )}
+
+                        {tab === 'consents' &&
+                            (() => {
+                                const activeCount = consents.filter(
+                                    (c: any) => c.is_consumable,
+                                ).length;
+                                const expiredCount = consents.filter(
+                                    (c: any) => c.is_expired,
+                                ).length;
+                                const expiringCount = consents.filter(
+                                    (c: any) =>
+                                        c.is_consumable && c.is_expiring_soon,
+                                ).length;
+
+                                const STATUS_COLORS: Record<string, string> = {
+                                    given: 'bg-status-success-bg text-status-success',
+                                    refused:
+                                        'bg-status-critical-bg text-status-critical',
+                                    withdrawn: 'bg-muted text-muted-foreground',
+                                    expired:
+                                        'bg-status-warning-bg text-status-warning',
+                                    governance_review_required:
+                                        'bg-status-warning-bg text-status-warning',
+                                    informational_acknowledgement:
+                                        'bg-status-info-bg text-status-info',
+                                };
+
+                                return (
+                                    <div className="space-y-4">
+                                        {/* Stats */}
+                                        <div className="grid grid-cols-4 gap-3">
+                                            <div className="rounded-lg border p-3 text-center">
+                                                <div className="text-lg font-bold text-primary">
+                                                    {consents.length}
+                                                </div>
+                                                <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                                                    Total
+                                                </div>
+                                            </div>
+                                            <div className="rounded-lg border p-3 text-center">
+                                                <div className="text-lg font-bold text-status-success">
+                                                    {activeCount}
+                                                </div>
+                                                <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                                                    Active
+                                                </div>
+                                            </div>
+                                            <div className="rounded-lg border p-3 text-center">
+                                                <div
+                                                    className={`text-lg font-bold ${expiringCount > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
+                                                >
+                                                    {expiringCount}
+                                                </div>
+                                                <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                                                    Expiring
+                                                </div>
+                                            </div>
+                                            <div className="rounded-lg border p-3 text-center">
+                                                <div
+                                                    className={`text-lg font-bold ${expiredCount > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
+                                                >
+                                                    {expiredCount}
+                                                </div>
+                                                <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                                                    Expired
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Consent List */}
+                                        <Card>
+                                            <CardHeader>
+                                                <CardTitle className="flex items-center justify-between text-base">
+                                                    <span>Consent Records</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/operations/clients/${client.id}/consents`}
+                                                            >
+                                                                Manage Consents
+                                                            </Link>
+                                                        </Button>
                                                         {can.edit ? (
                                                             <Button
                                                                 size="sm"
-                                                                variant="ghost"
-                                                                className="shrink-0 text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
                                                                 onClick={() =>
-                                                                    router.delete(
-                                                                        `/operations/clients/${client.id}/transport-bookings/${b.id}`,
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                            onSuccess:
-                                                                                () =>
-                                                                                    router.reload(
-                                                                                        {
-                                                                                            only: [
-                                                                                                'transport',
-                                                                                            ],
-                                                                                        },
-                                                                                    ),
-                                                                        },
+                                                                    openProfileDialog(
+                                                                        'consent_record',
                                                                     )
                                                                 }
+                                                                data-test="consents-record"
                                                             >
-                                                                Cancel
+                                                                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                                                Record consent
                                                             </Button>
                                                         ) : null}
                                                     </div>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-
-                                {/* Stats */}
-                                <div className="grid gap-3 sm:grid-cols-3">
-                                    <Card className="border bg-status-info-bg">
-                                        <CardContent className="p-4">
-                                            <div className="text-2xl font-bold text-status-info dark:text-status-info">
-                                                {ts.transports_30d}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                Transports (30d)
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                    <Card className="border bg-primary/10 dark:bg-primary/20">
-                                        <CardContent className="p-4">
-                                            <div className="text-2xl font-bold text-primary dark:text-primary">
-                                                {ts.outings_30d}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                Outings (30d)
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                    <Card
-                                        className={`border ${ts.incidents_30d > 0 ? 'bg-status-critical-bg' : 'bg-muted/30'}`}
-                                    >
-                                        <CardContent className="p-4">
-                                            <div
-                                                className={`text-2xl font-bold ${ts.incidents_30d > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
-                                            >
-                                                {ts.incidents_30d}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                Incidents (30d)
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </div>
-
-                                {/* Upcoming Outings */}
-                                {upcoming.length > 0 && (
-                                    <Card>
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="flex items-center gap-2 text-base">
-                                                <Calendar className="h-4 w-4" />{' '}
-                                                Upcoming Outings
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-2">
-                                                {upcoming.map((o) => (
-                                                    <Link
-                                                        key={o.id}
-                                                        href={`/fleet-assets/outings/${o.id}`}
-                                                        className="flex items-center justify-between rounded-lg border p-3 text-sm transition-colors hover:bg-muted/50"
-                                                    >
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="truncate font-semibold">
-                                                                    {o.title}
-                                                                </span>
-                                                                <Badge
-                                                                    variant={
-                                                                        o.status ===
-                                                                        'active'
-                                                                            ? 'default'
-                                                                            : 'outline'
-                                                                    }
-                                                                    className="shrink-0 text-[10px]"
-                                                                >
-                                                                    {o.status}
-                                                                </Badge>
-                                                            </div>
-                                                            <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                                                                <span>
-                                                                    {
-                                                                        o.destination
-                                                                    }
-                                                                </span>
-                                                                {o.vehicle && (
-                                                                    <>
-                                                                        <span>
-                                                                            ·
-                                                                        </span>
-                                                                        <span>
-                                                                            {
-                                                                                o
-                                                                                    .vehicle
-                                                                                    .name
-                                                                            }
-                                                                        </span>
-                                                                    </>
-                                                                )}
-                                                                {o.residents_count >
-                                                                    1 && (
-                                                                    <>
-                                                                        <span>
-                                                                            ·
-                                                                        </span>
-                                                                        <span>
-                                                                            {
-                                                                                o.residents_count
-                                                                            }{' '}
-                                                                            residents
-                                                                        </span>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        {o.planned_departure && (
-                                                            <div className="shrink-0 text-right text-xs text-muted-foreground">
-                                                                <div>
-                                                                    {new Date(
-                                                                        o.planned_departure,
-                                                                    ).toLocaleDateString(
-                                                                        'en-NZ',
-                                                                        {
-                                                                            day: 'numeric',
-                                                                            month: 'short',
-                                                                        },
-                                                                    )}
-                                                                </div>
-                                                                <div>
-                                                                    {new Date(
-                                                                        o.planned_departure,
-                                                                    ).toLocaleTimeString(
-                                                                        'en-NZ',
-                                                                        {
-                                                                            hour: '2-digit',
-                                                                            minute: '2-digit',
-                                                                        },
-                                                                    )}
-                                                                </div>
-                                                            </div>
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {consents.length === 0 ? (
+                                                    <p className="py-8 text-center text-sm text-muted-foreground">
+                                                        No consent records.
+                                                        Record the first consent
+                                                        for {client.first_name}.
+                                                    </p>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {consents.map(
+                                                            (c: any) => {
+                                                                const displayStatus =
+                                                                    c.decision_state ===
+                                                                        'governance_review_required' ||
+                                                                    c.decision_state ===
+                                                                        'informational_acknowledgement'
+                                                                        ? c.decision_state
+                                                                        : c.is_expired
+                                                                          ? 'expired'
+                                                                          : c.status;
+                                                                return (
+                                                                    <div
+                                                                        key={
+                                                                            c.id
+                                                                        }
+                                                                        className="flex items-center justify-between rounded-lg border p-3"
+                                                                    >
+                                                                        <div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-sm font-medium">
+                                                                                    {
+                                                                                        c.consent_type
+                                                                                    }
+                                                                                </span>
+                                                                                <span
+                                                                                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${STATUS_COLORS[displayStatus] ?? 'bg-muted text-muted-foreground'}`}
+                                                                                >
+                                                                                    {displayStatus.replace(
+                                                                                        /_/g,
+                                                                                        ' ',
+                                                                                    )}
+                                                                                </span>
+                                                                                {c.capacity_assessed && (
+                                                                                    <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                                                                                        Capacity
+                                                                                        Assessed
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="mt-0.5 flex gap-3 text-xs text-muted-foreground">
+                                                                                {c.given_at && (
+                                                                                    <span>
+                                                                                        Given:{' '}
+                                                                                        {new Date(
+                                                                                            c.given_at,
+                                                                                        ).toLocaleDateString(
+                                                                                            'en-NZ',
+                                                                                        )}
+                                                                                    </span>
+                                                                                )}
+                                                                                {c.expires_at && (
+                                                                                    <span
+                                                                                        className={
+                                                                                            c.is_expired
+                                                                                                ? 'font-medium text-status-critical'
+                                                                                                : c.is_expiring_soon
+                                                                                                  ? 'font-medium text-status-warning'
+                                                                                                  : ''
+                                                                                        }
+                                                                                    >
+                                                                                        Expires:{' '}
+                                                                                        {new Date(
+                                                                                            c.expires_at,
+                                                                                        ).toLocaleDateString(
+                                                                                            'en-NZ',
+                                                                                        )}
+                                                                                    </span>
+                                                                                )}
+                                                                                {c.given_method && (
+                                                                                    <span>
+                                                                                        Method:{' '}
+                                                                                        {
+                                                                                            c.given_method
+                                                                                        }
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            },
                                                         )}
-                                                    </Link>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                );
+                            })()}
 
-                                {/* Transport History */}
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <Truck className="h-4 w-4" />{' '}
-                                            Transport History
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {history.length > 0 ? (
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-xs">
-                                                    <thead>
-                                                        <tr className="border-b text-left text-muted-foreground">
-                                                            <th className="pr-3 pb-2 font-medium">
-                                                                Type
-                                                            </th>
-                                                            <th className="pr-3 pb-2 font-medium">
-                                                                From / To
-                                                            </th>
-                                                            <th className="pr-3 pb-2 font-medium">
-                                                                Vehicle
-                                                            </th>
-                                                            <th className="pr-3 pb-2 font-medium">
-                                                                Driver
-                                                            </th>
-                                                            <th className="pr-3 pb-2 font-medium">
-                                                                Date
-                                                            </th>
-                                                            <th className="pr-3 pb-2 font-medium">
-                                                                Duration
-                                                            </th>
-                                                            <th className="pb-2 font-medium">
-                                                                Status
-                                                            </th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {history.map((t) => (
-                                                            <tr
-                                                                key={t.id}
-                                                                className="border-b border-border/50 last:border-0"
+                        {tab === 'consent-requests' &&
+                            (() => {
+                                const requests = ((pageProps as any)
+                                    .consent_request_list ?? []) as any[];
+                                const pending = requests.filter(
+                                    (r) => r.status === 'pending',
+                                ).length;
+                                const approved = requests.filter(
+                                    (r) => r.status === 'approved',
+                                ).length;
+                                const declined = requests.filter(
+                                    (r) => r.status === 'declined',
+                                ).length;
+                                const REQ_TONES: Record<string, string> = {
+                                    pending:
+                                        'bg-status-warning-bg text-status-warning',
+                                    approved:
+                                        'bg-status-success-bg text-status-success',
+                                    declined:
+                                        'bg-status-critical-bg text-status-critical',
+                                    cancelled: 'bg-muted text-muted-foreground',
+                                    expired: 'bg-muted text-muted-foreground',
+                                };
+                                return (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-4 gap-3">
+                                            {[
+                                                ['Total', requests.length, ''],
+                                                [
+                                                    'Pending',
+                                                    pending,
+                                                    'text-status-warning',
+                                                ],
+                                                [
+                                                    'Approved',
+                                                    approved,
+                                                    'text-status-success',
+                                                ],
+                                                [
+                                                    'Declined',
+                                                    declined,
+                                                    'text-status-critical',
+                                                ],
+                                            ].map(([label, value, tone]) => (
+                                                <div
+                                                    key={String(label)}
+                                                    className="rounded-lg border p-3 text-center"
+                                                >
+                                                    <div
+                                                        className={`text-lg font-bold ${tone || 'text-primary'}`}
+                                                    >
+                                                        {value}
+                                                    </div>
+                                                    <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                                                        {label}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <Card>
+                                            <CardHeader>
+                                                <CardTitle className="flex items-center justify-between text-base">
+                                                    <span>
+                                                        Consent requests sent to
+                                                        whānau
+                                                    </span>
+                                                    {(auth?.can?.consents
+                                                        ?.request ??
+                                                        false) && (
+                                                        <Button
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/operations/clients/${client.id}/consent-requests/create`}
                                                             >
-                                                                <td className="py-2 pr-3">
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className="text-[10px] capitalize"
-                                                                    >
-                                                                        {(
-                                                                            t.transport_type ??
-                                                                            ''
-                                                                        ).replace(
-                                                                            /_/g,
-                                                                            ' ',
-                                                                        )}
-                                                                    </Badge>
-                                                                </td>
-                                                                <td className="py-2 pr-3">
-                                                                    <div className="max-w-[140px] truncate">
-                                                                        {t.pickup_location ??
-                                                                            '—'}
-                                                                    </div>
-                                                                    <div className="max-w-[140px] truncate text-muted-foreground">
-                                                                        →{' '}
-                                                                        {t.dropoff_location ??
-                                                                            '—'}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="py-2 pr-3">
-                                                                    {t.vehicle
-                                                                        ?.name ??
-                                                                        '—'}
-                                                                </td>
-                                                                <td className="py-2 pr-3">
-                                                                    {t.driver
-                                                                        ?.name ??
-                                                                        '—'}
-                                                                </td>
-                                                                <td className="py-2 pr-3 whitespace-nowrap">
-                                                                    {t.departed_at
-                                                                        ? formatDT(
-                                                                              t.departed_at,
-                                                                          )
-                                                                        : '—'}
-                                                                </td>
-                                                                <td className="py-2 pr-3 whitespace-nowrap">
-                                                                    {t.duration_minutes !=
-                                                                    null
-                                                                        ? `${Math.round(t.duration_minutes)}m`
-                                                                        : '—'}
-                                                                </td>
-                                                                <td className="py-2">
-                                                                    <Badge
-                                                                        variant={
-                                                                            t.status ===
-                                                                            'completed'
-                                                                                ? 'default'
-                                                                                : t.status ===
-                                                                                    'in_progress'
-                                                                                  ? 'secondary'
-                                                                                  : 'outline'
-                                                                        }
-                                                                        className="text-[10px]"
-                                                                    >
+                                                                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                                                New request
+                                                            </Link>
+                                                        </Button>
+                                                    )}
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {requests.length === 0 ? (
+                                                    <p className="py-8 text-center text-sm text-muted-foreground">
+                                                        No consent requests yet
+                                                        — send one to whānau for
+                                                        a decision on the
+                                                        portal.
+                                                    </p>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {requests.map((r) => (
+                                                            <Link
+                                                                key={r.id}
+                                                                href={`/operations/clients/${client.id}/consent-requests/${r.id}`}
+                                                                className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/40"
+                                                            >
+                                                                <div className="min-w-0">
+                                                                    <div className="truncate text-sm font-semibold">
                                                                         {
-                                                                            t.status
+                                                                            r.consent_type
                                                                         }
-                                                                    </Badge>
-                                                                </td>
-                                                            </tr>
+                                                                    </div>
+                                                                    <div className="mt-0.5 text-xs text-muted-foreground">
+                                                                        To{' '}
+                                                                        {r.recipient ??
+                                                                            '—'}
+                                                                        {r.recipient_relationship
+                                                                            ? ` (${r.recipient_relationship})`
+                                                                            : ''}
+                                                                        {r.created_at
+                                                                            ? ` · sent ${new Date(r.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`
+                                                                            : ''}
+                                                                        {r.status ===
+                                                                            'pending' &&
+                                                                        r.expires_at
+                                                                            ? ` · expires ${new Date(r.expires_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`
+                                                                            : ''}
+                                                                    </div>
+                                                                </div>
+                                                                <span
+                                                                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${REQ_TONES[r.status] ?? 'bg-muted text-muted-foreground'}`}
+                                                                >
+                                                                    {r.status}
+                                                                </span>
+                                                            </Link>
                                                         ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                                                <Truck className="mb-2 h-8 w-8 opacity-40" />
-                                                <p className="text-sm font-medium">
-                                                    No transport history
-                                                </p>
-                                                <p className="text-xs">
-                                                    Transport records will
-                                                    appear here when this
-                                                    resident is transported.
-                                                </p>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                );
+                            })()}
+
+                        {tab === 'portal' && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-between text-base">
+                                        <div className="flex items-center gap-2">
+                                            <span>
+                                                Portal access (
+                                                {labels?.['client.singular'] ??
+                                                    'Client'}{' '}
+                                                / Next of Kin)
+                                            </span>
+                                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                {portal_users.length}
+                                            </span>
+                                        </div>
+                                        {can.edit && (
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    asChild
+                                                >
+                                                    <Link
+                                                        href={`/operations/clients/${client.id}/portal-users`}
+                                                    >
+                                                        Manage access
+                                                    </Link>
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        openProfileDialog(
+                                                            'portal_invite',
+                                                        )
+                                                    }
+                                                    data-test="portal-invite"
+                                                >
+                                                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                                    Invite
+                                                </Button>
                                             </div>
                                         )}
-                                    </CardContent>
-                                </Card>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    <div className="text-sm text-muted-foreground">
+                                        Portal users can view this{' '}
+                                        {(
+                                            labels?.['client.singular'] ??
+                                            'Client'
+                                        ).toLowerCase()}
+                                        {"'s"} medical, documents, and timeline,
+                                        and can query the RAG assistant.
+                                    </div>
+                                    <Separator />
+                                    <div className="space-y-2">
+                                        {portal_users.map((u) => (
+                                            <div
+                                                key={u.id}
+                                                className="flex items-center justify-between rounded-md border p-3"
+                                            >
+                                                <div>
+                                                    <div className="flex items-center gap-2 text-sm font-medium">
+                                                        {u.name}
+                                                        {u.is_legal_guardian && (
+                                                            <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning">
+                                                                Legal Guardian
+                                                            </span>
+                                                        )}
+                                                        {u.is_emergency_contact && (
+                                                            <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical">
+                                                                Emergency
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {u.email}
+                                                    </div>
+                                                    {u.relation && (
+                                                        <div className="mt-0.5 text-xs text-muted-foreground">
+                                                            Relation:{' '}
+                                                            {u.relation}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {u.status === 'active' ||
+                                                    u.is_active !== false ? (
+                                                        <span className="rounded-full bg-status-success-bg px-2 py-0.5 text-[10px] font-medium text-status-success">
+                                                            Active
+                                                        </span>
+                                                    ) : (
+                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                            Inactive
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {!portal_users.length && (
+                                            <div className="py-8 text-center text-sm text-muted-foreground">
+                                                No portal users linked. Add a
+                                                next of kin or family member to
+                                                get started.
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
-                                {/* Medication Transit Logs */}
-                                {medLogs.length > 0 && (
-                                    <Card>
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="flex items-center gap-2 text-base">
-                                                <Pill className="h-4 w-4" />{' '}
-                                                Medication Transit Log
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-xs">
-                                                    <thead>
-                                                        <tr className="border-b text-left text-muted-foreground">
-                                                            <th className="pr-3 pb-2 font-medium">
-                                                                Medication
-                                                            </th>
-                                                            <th className="pr-3 pb-2 font-medium">
-                                                                Packed
-                                                            </th>
-                                                            <th className="pr-3 pb-2 font-medium">
-                                                                Administered
-                                                            </th>
-                                                            <th className="pr-3 pb-2 font-medium">
-                                                                Returned
-                                                            </th>
-                                                            <th className="pb-2 font-medium">
-                                                                Status
-                                                            </th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {medLogs.map((m) => (
-                                                            <tr
-                                                                key={m.id}
-                                                                className="border-b border-border/50 last:border-0"
+                        {tab === 'personal_assets' && (
+                            <div className="space-y-4">
+                                {can.edit ? (
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <Button
+                                            onClick={() =>
+                                                openProfileDialog('add_asset')
+                                            }
+                                            data-test="assets-add-item"
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Add item
+                                        </Button>
+                                    </div>
+                                ) : null}
+                                <PersonalAssetsTab
+                                    clientId={client.id}
+                                    assets={personal_assets}
+                                    canEdit={can.edit}
+                                    firstName={client.first_name}
+                                    locations={
+                                        (pageProps as any).asset_locations ?? []
+                                    }
+                                    clientSiteId={client.site?.id ?? null}
+                                    availableTrackers={
+                                        (pageProps as any).available_trackers ??
+                                        []
+                                    }
+                                />
+                            </div>
+                        )}
+
+                        {tab === 'transport' &&
+                            (() => {
+                                const ts = transport?.stats ?? {
+                                    transports_30d: 0,
+                                    outings_30d: 0,
+                                    incidents_30d: 0,
+                                };
+                                const upcoming =
+                                    transport?.upcoming_outings ?? [];
+                                const history =
+                                    transport?.transport_history ?? [];
+                                const medLogs =
+                                    transport?.medication_logs ?? [];
+                                const bookings = ((transport as any)
+                                    ?.bookings ?? []) as any[];
+
+                                return (
+                                    <div className="space-y-6">
+                                        {/* Header + book-transport workflow */}
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div className="flex items-center gap-3">
+                                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                                    <Truck className="h-[19px] w-[19px]" />
+                                                </span>
+                                                <div>
+                                                    <h2 className="text-lg leading-tight font-semibold">
+                                                        Transport
+                                                    </h2>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Bookings, outings & trip
+                                                        log
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {can.edit ? (
+                                                <Button
+                                                    onClick={() =>
+                                                        openProfileDialog(
+                                                            'transport_booking',
+                                                        )
+                                                    }
+                                                    data-test="transport-book"
+                                                >
+                                                    <Plus className="mr-1.5 h-4 w-4" />
+                                                    Book transport
+                                                </Button>
+                                            ) : null}
+                                        </div>
+
+                                        {/* Scheduled bookings (Book transport workflow) */}
+                                        {bookings.length > 0 && (
+                                            <Card>
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="flex items-center gap-2 text-base">
+                                                        <Truck className="h-4 w-4" />{' '}
+                                                        Scheduled transport
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="space-y-2">
+                                                        {bookings.map(
+                                                            (b: any) => (
+                                                                <div
+                                                                    key={b.id}
+                                                                    className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+                                                                >
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="flex flex-wrap items-center gap-2">
+                                                                            <span className="truncate font-semibold">
+                                                                                {
+                                                                                    b.purpose
+                                                                                }
+                                                                            </span>
+                                                                            <Badge
+                                                                                variant={
+                                                                                    b.status ===
+                                                                                    'confirmed'
+                                                                                        ? 'default'
+                                                                                        : 'outline'
+                                                                                }
+                                                                                className="shrink-0 text-[10px] capitalize"
+                                                                            >
+                                                                                {
+                                                                                    b.status
+                                                                                }
+                                                                            </Badge>
+                                                                            {b.escort_required ? (
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="shrink-0 text-[10px]"
+                                                                                >
+                                                                                    Escort
+                                                                                </Badge>
+                                                                            ) : null}
+                                                                            {b.return_trip ? (
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="shrink-0 text-[10px]"
+                                                                                >
+                                                                                    Return
+                                                                                </Badge>
+                                                                            ) : null}
+                                                                        </div>
+                                                                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                                                                            {b.scheduled_at ? (
+                                                                                <span>
+                                                                                    {formatDateTimeLong(
+                                                                                        b.scheduled_at,
+                                                                                    )}
+                                                                                </span>
+                                                                            ) : null}
+                                                                            {b.destination ? (
+                                                                                <span>
+                                                                                    ·{' '}
+                                                                                    {
+                                                                                        b.destination
+                                                                                    }
+                                                                                </span>
+                                                                            ) : null}
+                                                                            {b.vehicle ? (
+                                                                                <span>
+                                                                                    ·{' '}
+                                                                                    {
+                                                                                        b.vehicle
+                                                                                    }
+                                                                                </span>
+                                                                            ) : null}
+                                                                            {b
+                                                                                .driver
+                                                                                ?.name ? (
+                                                                                <span>
+                                                                                    ·{' '}
+                                                                                    {
+                                                                                        b
+                                                                                            .driver
+                                                                                            .name
+                                                                                    }
+                                                                                </span>
+                                                                            ) : null}
+                                                                        </div>
+                                                                    </div>
+                                                                    {can.edit ? (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="ghost"
+                                                                            className="shrink-0 text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
+                                                                            onClick={() =>
+                                                                                router.delete(
+                                                                                    `/operations/clients/${client.id}/transport-bookings/${b.id}`,
+                                                                                    {
+                                                                                        preserveScroll: true,
+                                                                                        onSuccess:
+                                                                                            () =>
+                                                                                                router.reload(
+                                                                                                    {
+                                                                                                        only: [
+                                                                                                            'transport',
+                                                                                                        ],
+                                                                                                    },
+                                                                                                ),
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            Cancel
+                                                                        </Button>
+                                                                    ) : null}
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+
+                                        {/* Stats */}
+                                        <div className="grid gap-3 sm:grid-cols-3">
+                                            <Card className="border bg-status-info-bg">
+                                                <CardContent className="p-4">
+                                                    <div className="text-2xl font-bold text-status-info dark:text-status-info">
+                                                        {ts.transports_30d}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Transports (30d)
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                            <Card className="border bg-primary/10 dark:bg-primary/20">
+                                                <CardContent className="p-4">
+                                                    <div className="text-2xl font-bold text-primary dark:text-primary">
+                                                        {ts.outings_30d}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Outings (30d)
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                            <Card
+                                                className={`border ${ts.incidents_30d > 0 ? 'bg-status-critical-bg' : 'bg-muted/30'}`}
+                                            >
+                                                <CardContent className="p-4">
+                                                    <div
+                                                        className={`text-2xl font-bold ${ts.incidents_30d > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
+                                                    >
+                                                        {ts.incidents_30d}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Incidents (30d)
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+
+                                        {/* Upcoming Outings */}
+                                        {upcoming.length > 0 && (
+                                            <Card>
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="flex items-center gap-2 text-base">
+                                                        <Calendar className="h-4 w-4" />{' '}
+                                                        Upcoming Outings
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="space-y-2">
+                                                        {upcoming.map((o) => (
+                                                            <Link
+                                                                key={o.id}
+                                                                href={`/fleet-assets/outings/${o.id}`}
+                                                                className="flex items-center justify-between rounded-lg border p-3 text-sm transition-colors hover:bg-muted/50"
                                                             >
-                                                                <td className="py-2 pr-3">
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="font-medium">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="truncate font-semibold">
                                                                             {
-                                                                                m.medication_name
+                                                                                o.title
                                                                             }
                                                                         </span>
-                                                                        {m.is_controlled_drug && (
-                                                                            <Badge
-                                                                                variant="destructive"
-                                                                                className="px-1 text-[8px]"
-                                                                            >
-                                                                                CD
-                                                                            </Badge>
+                                                                        <Badge
+                                                                            variant={
+                                                                                o.status ===
+                                                                                'active'
+                                                                                    ? 'default'
+                                                                                    : 'outline'
+                                                                            }
+                                                                            className="shrink-0 text-[10px]"
+                                                                        >
+                                                                            {
+                                                                                o.status
+                                                                            }
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                                                                        <span>
+                                                                            {
+                                                                                o.destination
+                                                                            }
+                                                                        </span>
+                                                                        {o.vehicle && (
+                                                                            <>
+                                                                                <span>
+                                                                                    ·
+                                                                                </span>
+                                                                                <span>
+                                                                                    {
+                                                                                        o
+                                                                                            .vehicle
+                                                                                            .name
+                                                                                    }
+                                                                                </span>
+                                                                            </>
+                                                                        )}
+                                                                        {o.residents_count >
+                                                                            1 && (
+                                                                            <>
+                                                                                <span>
+                                                                                    ·
+                                                                                </span>
+                                                                                <span>
+                                                                                    {
+                                                                                        o.residents_count
+                                                                                    }{' '}
+                                                                                    residents
+                                                                                </span>
+                                                                            </>
                                                                         )}
                                                                     </div>
-                                                                </td>
-                                                                <td className="py-2 pr-3">
-                                                                    {m.packed_at ? (
+                                                                </div>
+                                                                {o.planned_departure && (
+                                                                    <div className="shrink-0 text-right text-xs text-muted-foreground">
                                                                         <div>
-                                                                            <div>
-                                                                                {formatDT(
-                                                                                    m.packed_at,
-                                                                                )}
-                                                                            </div>
-                                                                            {m.packed_by && (
-                                                                                <div className="text-muted-foreground">
-                                                                                    by{' '}
-                                                                                    {
-                                                                                        m.packed_by
-                                                                                    }
-                                                                                </div>
+                                                                            {new Date(
+                                                                                o.planned_departure,
+                                                                            ).toLocaleDateString(
+                                                                                'en-NZ',
+                                                                                {
+                                                                                    day: 'numeric',
+                                                                                    month: 'short',
+                                                                                },
                                                                             )}
                                                                         </div>
-                                                                    ) : (
-                                                                        '—'
-                                                                    )}
-                                                                </td>
-                                                                <td className="py-2 pr-3">
-                                                                    {m.administered_at ? (
                                                                         <div>
-                                                                            <div>
-                                                                                {formatDT(
-                                                                                    m.administered_at,
-                                                                                )}
-                                                                            </div>
-                                                                            {m.administered_by && (
-                                                                                <div className="text-muted-foreground">
-                                                                                    by{' '}
-                                                                                    {
-                                                                                        m.administered_by
-                                                                                    }
-                                                                                </div>
+                                                                            {new Date(
+                                                                                o.planned_departure,
+                                                                            ).toLocaleTimeString(
+                                                                                'en-NZ',
+                                                                                {
+                                                                                    hour: '2-digit',
+                                                                                    minute: '2-digit',
+                                                                                },
                                                                             )}
-                                                                            {m.is_controlled_drug &&
-                                                                                m.witnessed_by && (
-                                                                                    <div className="text-muted-foreground">
-                                                                                        witnessed:{' '}
-                                                                                        {
-                                                                                            m.witnessed_by
-                                                                                        }
-                                                                                    </div>
-                                                                                )}
                                                                         </div>
-                                                                    ) : (
-                                                                        '—'
-                                                                    )}
-                                                                </td>
-                                                                <td className="py-2 pr-3">
-                                                                    {m.returned_to_house_at
-                                                                        ? formatDT(
-                                                                              m.returned_to_house_at,
-                                                                          )
-                                                                        : '—'}
-                                                                </td>
-                                                                <td className="py-2">
-                                                                    <Badge
-                                                                        variant={
-                                                                            m.status ===
-                                                                            'returned'
-                                                                                ? 'default'
-                                                                                : m.status ===
-                                                                                    'administered'
-                                                                                  ? 'secondary'
-                                                                                  : 'outline'
-                                                                        }
-                                                                        className="text-[10px] capitalize"
-                                                                    >
-                                                                        {
-                                                                            m.status
-                                                                        }
-                                                                    </Badge>
-                                                                </td>
-                                                            </tr>
+                                                                    </div>
+                                                                )}
+                                                            </Link>
                                                         ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-                            </div>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+
+                                        {/* Transport History */}
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="flex items-center gap-2 text-base">
+                                                    <Truck className="h-4 w-4" />{' '}
+                                                    Transport History
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {history.length > 0 ? (
+                                                    <div className="overflow-x-auto">
+                                                        <table className="w-full text-xs">
+                                                            <thead>
+                                                                <tr className="border-b text-left text-muted-foreground">
+                                                                    <th className="pr-3 pb-2 font-medium">
+                                                                        Type
+                                                                    </th>
+                                                                    <th className="pr-3 pb-2 font-medium">
+                                                                        From /
+                                                                        To
+                                                                    </th>
+                                                                    <th className="pr-3 pb-2 font-medium">
+                                                                        Vehicle
+                                                                    </th>
+                                                                    <th className="pr-3 pb-2 font-medium">
+                                                                        Driver
+                                                                    </th>
+                                                                    <th className="pr-3 pb-2 font-medium">
+                                                                        Date
+                                                                    </th>
+                                                                    <th className="pr-3 pb-2 font-medium">
+                                                                        Duration
+                                                                    </th>
+                                                                    <th className="pb-2 font-medium">
+                                                                        Status
+                                                                    </th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {history.map(
+                                                                    (t) => (
+                                                                        <tr
+                                                                            key={
+                                                                                t.id
+                                                                            }
+                                                                            className="border-b border-border/50 last:border-0"
+                                                                        >
+                                                                            <td className="py-2 pr-3">
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="text-[10px] capitalize"
+                                                                                >
+                                                                                    {(
+                                                                                        t.transport_type ??
+                                                                                        ''
+                                                                                    ).replace(
+                                                                                        /_/g,
+                                                                                        ' ',
+                                                                                    )}
+                                                                                </Badge>
+                                                                            </td>
+                                                                            <td className="py-2 pr-3">
+                                                                                <div className="max-w-[140px] truncate">
+                                                                                    {t.pickup_location ??
+                                                                                        '—'}
+                                                                                </div>
+                                                                                <div className="max-w-[140px] truncate text-muted-foreground">
+                                                                                    →{' '}
+                                                                                    {t.dropoff_location ??
+                                                                                        '—'}
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="py-2 pr-3">
+                                                                                {t
+                                                                                    .vehicle
+                                                                                    ?.name ??
+                                                                                    '—'}
+                                                                            </td>
+                                                                            <td className="py-2 pr-3">
+                                                                                {t
+                                                                                    .driver
+                                                                                    ?.name ??
+                                                                                    '—'}
+                                                                            </td>
+                                                                            <td className="py-2 pr-3 whitespace-nowrap">
+                                                                                {t.departed_at
+                                                                                    ? formatDT(
+                                                                                          t.departed_at,
+                                                                                      )
+                                                                                    : '—'}
+                                                                            </td>
+                                                                            <td className="py-2 pr-3 whitespace-nowrap">
+                                                                                {t.duration_minutes !=
+                                                                                null
+                                                                                    ? `${Math.round(t.duration_minutes)}m`
+                                                                                    : '—'}
+                                                                            </td>
+                                                                            <td className="py-2">
+                                                                                <Badge
+                                                                                    variant={
+                                                                                        t.status ===
+                                                                                        'completed'
+                                                                                            ? 'default'
+                                                                                            : t.status ===
+                                                                                                'in_progress'
+                                                                                              ? 'secondary'
+                                                                                              : 'outline'
+                                                                                    }
+                                                                                    className="text-[10px]"
+                                                                                >
+                                                                                    {
+                                                                                        t.status
+                                                                                    }
+                                                                                </Badge>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ),
+                                                                )}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                                                        <Truck className="mb-2 h-8 w-8 opacity-40" />
+                                                        <p className="text-sm font-medium">
+                                                            No transport history
+                                                        </p>
+                                                        <p className="text-xs">
+                                                            Transport records
+                                                            will appear here
+                                                            when this resident
+                                                            is transported.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+
+                                        {/* Medication Transit Logs */}
+                                        {medLogs.length > 0 && (
+                                            <Card>
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="flex items-center gap-2 text-base">
+                                                        <Pill className="h-4 w-4" />{' '}
+                                                        Medication Transit Log
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="overflow-x-auto">
+                                                        <table className="w-full text-xs">
+                                                            <thead>
+                                                                <tr className="border-b text-left text-muted-foreground">
+                                                                    <th className="pr-3 pb-2 font-medium">
+                                                                        Medication
+                                                                    </th>
+                                                                    <th className="pr-3 pb-2 font-medium">
+                                                                        Packed
+                                                                    </th>
+                                                                    <th className="pr-3 pb-2 font-medium">
+                                                                        Administered
+                                                                    </th>
+                                                                    <th className="pr-3 pb-2 font-medium">
+                                                                        Returned
+                                                                    </th>
+                                                                    <th className="pb-2 font-medium">
+                                                                        Status
+                                                                    </th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {medLogs.map(
+                                                                    (m) => (
+                                                                        <tr
+                                                                            key={
+                                                                                m.id
+                                                                            }
+                                                                            className="border-b border-border/50 last:border-0"
+                                                                        >
+                                                                            <td className="py-2 pr-3">
+                                                                                <div className="flex items-center gap-1.5">
+                                                                                    <span className="font-medium">
+                                                                                        {
+                                                                                            m.medication_name
+                                                                                        }
+                                                                                    </span>
+                                                                                    {m.is_controlled_drug && (
+                                                                                        <Badge
+                                                                                            variant="destructive"
+                                                                                            className="px-1 text-[8px]"
+                                                                                        >
+                                                                                            CD
+                                                                                        </Badge>
+                                                                                    )}
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="py-2 pr-3">
+                                                                                {m.packed_at ? (
+                                                                                    <div>
+                                                                                        <div>
+                                                                                            {formatDT(
+                                                                                                m.packed_at,
+                                                                                            )}
+                                                                                        </div>
+                                                                                        {m.packed_by && (
+                                                                                            <div className="text-muted-foreground">
+                                                                                                by{' '}
+                                                                                                {
+                                                                                                    m.packed_by
+                                                                                                }
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    '—'
+                                                                                )}
+                                                                            </td>
+                                                                            <td className="py-2 pr-3">
+                                                                                {m.administered_at ? (
+                                                                                    <div>
+                                                                                        <div>
+                                                                                            {formatDT(
+                                                                                                m.administered_at,
+                                                                                            )}
+                                                                                        </div>
+                                                                                        {m.administered_by && (
+                                                                                            <div className="text-muted-foreground">
+                                                                                                by{' '}
+                                                                                                {
+                                                                                                    m.administered_by
+                                                                                                }
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {m.is_controlled_drug &&
+                                                                                            m.witnessed_by && (
+                                                                                                <div className="text-muted-foreground">
+                                                                                                    witnessed:{' '}
+                                                                                                    {
+                                                                                                        m.witnessed_by
+                                                                                                    }
+                                                                                                </div>
+                                                                                            )}
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    '—'
+                                                                                )}
+                                                                            </td>
+                                                                            <td className="py-2 pr-3">
+                                                                                {m.returned_to_house_at
+                                                                                    ? formatDT(
+                                                                                          m.returned_to_house_at,
+                                                                                      )
+                                                                                    : '—'}
+                                                                            </td>
+                                                                            <td className="py-2">
+                                                                                <Badge
+                                                                                    variant={
+                                                                                        m.status ===
+                                                                                        'returned'
+                                                                                            ? 'default'
+                                                                                            : m.status ===
+                                                                                                'administered'
+                                                                                              ? 'secondary'
+                                                                                              : 'outline'
+                                                                                    }
+                                                                                    className="text-[10px] capitalize"
+                                                                                >
+                                                                                    {
+                                                                                        m.status
+                                                                                    }
+                                                                                </Badge>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ),
+                                                                )}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+
+                        {tab === 'assignments' && (
+                            <WorkersTab
+                                client={client}
+                                assignableWorkers={
+                                    (pageProps as any).assignable_workers ?? []
+                                }
+                                canAssign={Boolean(can.assign_workers)}
+                            />
+                        )}
+
+                        {tab === 'privacy' && (
+                            <ClientPrivacyPanel
+                                requests={dataSubjectRequests}
+                                canManage={Boolean(privacyCan?.processRequests)}
+                            />
+                        )}
+                    </div>
+                </div>
+            </PageLayout>
+
+            {/* Hidden photo upload form */}
+            {can.update_client && (
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!photoForm.data.photo) return;
+                        photoForm.post(
+                            `/operations/clients/${client.id}/photo`,
+                            {
+                                forceFormData: true,
+                                preserveScroll: true,
+                            },
                         );
-                    })()}
-
-                {tab === 'assignments' && (
-                    <WorkersTab
-                        client={client}
-                        assignableWorkers={
-                            (pageProps as any).assignable_workers ?? []
+                    }}
+                    className="hidden"
+                >
+                    <Input
+                        type="file"
+                        accept="image/*"
+                        id="client-photo"
+                        onChange={(e) =>
+                            photoForm.setData(
+                                'photo',
+                                e.target.files?.[0] ?? null,
+                            )
                         }
-                        canAssign={Boolean(can.assign_workers)}
                     />
-                )}
+                </form>
+            )}
 
-                {tab === 'privacy' && (
-                    <ClientPrivacyPanel
-                        requests={dataSubjectRequests}
-                        canManage={Boolean(privacyCan?.processRequests)}
-                    />
-                )}
-            </PageShell>
+            <QuickNoteDialog
+                clientId={client.id}
+                open={quickNoteOpen}
+                onOpenChange={(open) => {
+                    if (!open && profileDialog?.key === 'quick_note') {
+                        closeProfileDialog();
+                    }
+                }}
+                onSubmitted={() => openDailyNotes('all')}
+            />
+            <DailyNoteWizard
+                clientId={client.id}
+                open={dailyNoteOpen}
+                onOpenChange={(open) => {
+                    if (!open && profileDialog?.key === 'daily_note') {
+                        closeProfileDialog();
+                    }
+                }}
+                shiftOptions={dailyNoteShiftOptions}
+                goalOptions={dailyNoteGoalOptions}
+                onSubmitted={() => openDailyNotes('all')}
+                note={
+                    (authorizedProfileDialog?.ctx?.note as
+                        | ClientDailyNote
+                        | undefined) ?? null
+                }
+            />
+            <DailyNoteWizard
+                clientId={client.id}
+                open={communicationNoteOpen}
+                onOpenChange={(open) => {
+                    if (!open && profileDialog?.key === 'comm_note') {
+                        closeProfileDialog();
+                    }
+                }}
+                mode="communication"
+                shiftOptions={dailyNoteShiftOptions}
+                goalOptions={dailyNoteGoalOptions}
+                onSubmitted={() => {
+                    setTab('communication_notes');
+                    updateProfileQuery({ tab: 'communication_notes' });
+                }}
+                note={
+                    (authorizedProfileDialog?.ctx?.note as
+                        | ClientDailyNote
+                        | undefined) ?? null
+                }
+            />
+
+            <TabSearchPalette
+                open={paletteOpen}
+                onClose={() => setPaletteOpen(false)}
+                groups={visibleGroups}
+                onTab={(key) => {
+                    const target = visibleGroups
+                        .flatMap((g) => g.tabs)
+                        .find((t) => t.key === key);
+                    if (target?.href) {
+                        router.visit(target.href);
+                    } else {
+                        handleTabChange(key as TabKey);
+                    }
+                }}
+                searchLabel="Find a Client Profile section"
+            />
+
+            <ProfileDialogs
+                dialog={authorizedProfileDialog}
+                onClose={() => {
+                    if (profileDialog?.key === 'abc') {
+                        setAbcRefreshToken((t) => t + 1);
+                        router.reload({
+                            only: ['behaviour_patterns'],
+                            preserveScroll: true,
+                            preserveState: true,
+                        });
+                    }
+                    closeProfileDialog();
+                }}
+                flowContext={flowContext}
+                medications={(medical?.medications ?? []) as any[]}
+                canRecord={Boolean(can.record_medication_administration)}
+                canRecordControlled={Boolean(can.record_controlled_medication)}
+            />
 
             <ClientEditDialog
                 clientId={client.id}

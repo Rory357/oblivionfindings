@@ -23,7 +23,7 @@ import {
     Plus,
     X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type Site = {
     id: number;
@@ -77,6 +77,16 @@ const resultColors: Record<string, string> = {
 
 export default function SiteInspections({ site, schedules, records }: Props) {
     const [showForm, setShowForm] = useState(false);
+
+    // Deep link from the Site Profile header's "Book Inspection" quick
+    // action: ?action=add opens the schedule form once, then drops the param.
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('action') !== 'add') return;
+        url.searchParams.delete('action');
+        window.history.replaceState(window.history.state, '', url);
+        setShowForm(true);
+    }, []);
 
     const form = useForm({
         inspection_type: '',

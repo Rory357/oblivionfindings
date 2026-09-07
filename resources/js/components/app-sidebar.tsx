@@ -1,10 +1,4 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
     SheetContent,
     SheetDescription,
@@ -17,9 +11,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { UserMenuContent } from '@/components/user-menu-content';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
-import { useInitials } from '@/hooks/use-initials';
 import { useStableValue } from '@/hooks/use-stable-value';
 import { cn, resolveUrl } from '@/lib/utils';
 import { type NavItem } from '@/types';
@@ -38,6 +30,7 @@ import {
     CalendarDays,
     Car,
     CheckCircle2,
+    ChevronLeft,
     ChevronRight,
     Clipboard,
     ClipboardCheck,
@@ -64,8 +57,6 @@ import {
     MessageSquare,
     MessageSquareText,
     Package,
-    PanelLeftClose,
-    PanelLeftOpen,
     PersonStanding,
     PieChart,
     Pill,
@@ -93,17 +84,76 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import AppLogoIcon from './app-logo-icon';
 import { buildSecurityDevicesNavigationGroups } from './security-devices/security-devices-navigation';
-const dashboard = () => '/dashboard';
 
-const SIDEBAR_OPCN_CLASS = 'size-5 shrink-0';
+/* Event Horizon ink rail (APP_SHELL_STYLE_GUIDE.md §3). Sits below the
+ * 58px command header; the two share the sidebar tokens so they read as one
+ * continuous chrome. Row anatomy: 16px lucide icon + label; active rows take
+ * the white-lift accent fill with a brand-tinted icon; sub-items are
+ * indented text-only (the group header carries the icon). */
+const SHELL_HEADER_HEIGHT_CLASS = 'top-[58px] h-[calc(100svh-58px)]';
+
+const SIDEBAR_OPCN_CLASS = 'size-4 shrink-0';
 const SIDEBAR_ITEM_BASE =
-    'relative flex h-10 w-full items-center rounded-xl text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring';
+    'relative flex min-h-9 w-full items-center rounded-lg text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring';
 const SIDEBAR_ITEM_ACTIVE =
-    'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm';
+    'bg-sidebar-accent font-medium text-sidebar-accent-foreground';
 const SIDEBAR_ITEM_INACTIVE =
-    'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground';
+    'text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground';
+const SIDEBAR_ICON_ACTIVE = 'text-sidebar-primary';
+const SIDEBAR_ICON_INACTIVE = 'text-sidebar-foreground/60';
+
+function CountPill({
+    count,
+    collapsed = false,
+    testId,
+}: {
+    count: number;
+    collapsed?: boolean;
+    testId?: string;
+}) {
+    if (!count || count <= 0) return null;
+    return (
+        <span
+            data-test={testId}
+            className={cn(
+                'flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white',
+                collapsed ? 'absolute top-0.5 right-0.5' : 'ml-auto',
+            )}
+        >
+            {count > 9 ? '9+' : count}
+        </span>
+    );
+}
+
+// Per-user persistence for which module groups are unfolded (same local
+// convention as use-app-sidebar-state's whole-sidebar flag).
+const SIDEBAR_GROUPS_STORAGE_KEY = 'oblivionfindings:sidebar-groups';
+
+function readStoredGroupIds(): string[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = window.localStorage.getItem(SIDEBAR_GROUPS_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        return Array.isArray(parsed)
+            ? parsed.filter((value): value is string => typeof value === 'string')
+            : [];
+    } catch {
+        return [];
+    }
+}
+
+function persistGroupIds(ids: string[]) {
+    if (typeof window === 'undefined') return;
+    try {
+        window.localStorage.setItem(
+            SIDEBAR_GROUPS_STORAGE_KEY,
+            JSON.stringify(ids),
+        );
+    } catch {
+        // Storage unavailable (private mode) — the fold state just won't stick.
+    }
+}
 
 function SidebarItemIcon({
     icon: Icon,
@@ -2495,8 +2545,8 @@ function SubPanel({
         <div
             ref={panelRef}
             className={cn(
-                'fixed top-0 bottom-0 z-50 w-64 overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-lg transition-[left] duration-200 ease-in-out',
-                isSidebarCollapsed ? 'left-16' : 'left-64',
+                'fixed top-[58px] bottom-0 z-50 w-64 overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-lg transition-[left] duration-200 ease-in-out',
+                isSidebarCollapsed ? 'left-16' : 'left-66',
             )}
         >
             {/* Panel header */}
@@ -2538,8 +2588,8 @@ function SubPanel({
                                     className={cn(
                                         'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
                                         active
-                                            ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
-                                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                            ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                                            : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
                                     )}
                                 >
                                     {item.icon && (
@@ -2589,57 +2639,58 @@ function InlineSubPanelGroups({
         <div
             role="group"
             aria-label={`${title} navigation`}
-            className="mt-1 space-y-2 border-l border-sidebar-border/60 py-1 pl-3"
+            className="mt-0.5 mb-1 space-y-1.5 py-0.5"
         >
-            {visibleGroups.map((group) => (
-                <div key={group.label}>
-                    <div className="px-2 py-1 text-[10px] font-semibold tracking-wider text-sidebar-foreground/70 uppercase">
-                        {group.label}
-                    </div>
-                    <div className="space-y-0.5">
-                        {(group.items ?? []).map((subItem) => {
-                            const active = isSubItemActive(
-                                currentUrl,
-                                subItem.href,
-                            );
+            {visibleGroups.map((group) => {
+                // A lone group that just repeats the module name adds noise —
+                // its items read fine directly under the group header row.
+                const showLabel =
+                    visibleGroups.length > 1 || group.label !== title;
 
-                            return (
-                                <Link
-                                    key={resolveUrl(subItem.href)}
-                                    href={subItem.href}
-                                    aria-current={active ? 'page' : undefined}
-                                    prefetch
-                                    preserveScroll
-                                    className={cn(
-                                        'flex min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-                                        active
-                                            ? 'bg-sidebar-primary/10 text-sidebar-foreground'
-                                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                                    )}
-                                >
-                                    {subItem.icon ? (
-                                        <SidebarItemIcon
-                                            icon={subItem.icon}
-                                            className="size-4"
-                                        />
-                                    ) : null}
-                                    <span className="min-w-0 flex-1 truncate">
-                                        {subItem.title}
-                                    </span>
-                                    {subItem.badge != null &&
-                                    subItem.badge > 0 ? (
-                                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
-                                            {subItem.badge > 9
-                                                ? '9+'
-                                                : subItem.badge}
+                return (
+                    <div key={group.label}>
+                        {showLabel && (
+                            <div className="py-1 pr-2 pl-[38px] text-[10px] font-semibold tracking-wider text-sidebar-foreground/80 uppercase">
+                                {group.label}
+                            </div>
+                        )}
+                        <div className="space-y-px">
+                            {(group.items ?? []).map((subItem) => {
+                                const active = isSubItemActive(
+                                    currentUrl,
+                                    subItem.href,
+                                );
+
+                                return (
+                                    <Link
+                                        key={resolveUrl(subItem.href)}
+                                        href={subItem.href}
+                                        aria-current={
+                                            active ? 'page' : undefined
+                                        }
+                                        prefetch
+                                        preserveScroll
+                                        data-sidebar-item
+                                        className={cn(
+                                            'flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-[38px] text-[13px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                                            active
+                                                ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                                                : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
+                                        )}
+                                    >
+                                        <span className="min-w-0 flex-1 truncate">
+                                            {subItem.title}
                                         </span>
-                                    ) : null}
-                                </Link>
-                            );
-                        })}
+                                        <CountPill
+                                            count={subItem.badge ?? 0}
+                                        />
+                                    </Link>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
@@ -2654,7 +2705,7 @@ export function AppSidebar({
     onCollapsedChange?: (collapsed: boolean) => void;
 }) {
     const page = usePage<PageProps & Record<string, any>>();
-    const { auth, branding, name: appName, labels: labelsProp } = page.props;
+    const { auth, labels: labelsProp } = page.props;
     const role = auth.user?.role ?? null;
     // Inertia returns fresh object identities for shared props on every
     // visit; stabilise the ones feeding the nav-tree memos below so the
@@ -2664,15 +2715,16 @@ export function AppSidebar({
     const labels = useStableValue(labelsProp);
     const unreadMessageCount = (auth as any)?.unreadMessageCount ?? 0;
     const currentUrl = page.url;
-    const getInitials = useInitials();
-    const displayName: string =
-        (branding as any)?.name ?? appName ?? 'Oblivion Findings';
-    const logoUrl: string | null = (branding as any)?.logoUrl ?? null;
     const { collapsed: fallbackCollapsed, setExpanded: setFallbackExpanded } =
         useAppSidebarState((page.props as any)?.sidebarOpen ?? true);
     const isCollapsed = collapsedProp ?? fallbackCollapsed;
 
+    // Flyout panel for the collapsed icon rail (one at a time)…
     const [openPanelId, setOpenPanelId] = useState<string | null>(null);
+    // …vs the folded/unfolded module groups of the expanded rail (any number,
+    // persisted per user).
+    const [expandedGroupIds, setExpandedGroupIds] =
+        useState<string[]>(readStoredGroupIds);
 
     const iconNavItems = useMemo(
         () =>
@@ -2710,6 +2762,16 @@ export function AppSidebar({
         setOpenPanelId(null);
     }, []);
 
+    const toggleGroup = useCallback((id: string) => {
+        setExpandedGroupIds((prev) => {
+            const next = prev.includes(id)
+                ? prev.filter((groupId) => groupId !== id)
+                : [...prev, id];
+            persistGroupIds(next);
+            return next;
+        });
+    }, []);
+
     const toggleCollapsed = useCallback(() => {
         const nextCollapsed = !isCollapsed;
 
@@ -2720,8 +2782,9 @@ export function AppSidebar({
         }
     }, [isCollapsed, onCollapsedChange, setFallbackExpanded]);
 
-    // Keep the active module expanded inside the primary sidebar after
-    // navigation. This avoids rendering a second persistent left rail.
+    // Folding a group must never hide where you are: unfold the active module
+    // after navigation (other folds are left as the user set them). The
+    // collapsed rail instead drops its flyout on navigation.
     useEffect(() => {
         if (isCollapsed) {
             setOpenPanelId(null);
@@ -2736,95 +2799,36 @@ export function AppSidebar({
             return item.subPanel && isIconActive(currentUrl, item, panelGroups);
         });
 
-        setOpenPanelId(activePanel?.id ?? null);
+        if (!activePanel) return;
+
+        setExpandedGroupIds((prev) => {
+            if (prev.includes(activePanel.id)) return prev;
+            const next = [...prev, activePanel.id];
+            persistGroupIds(next);
+            return next;
+        });
     }, [currentUrl, iconNavItems, isCollapsed, subPanelMap]);
 
     return (
         <TooltipProvider delayDuration={0}>
-            <div className="relative hidden md:flex">
+            <div
+                className={cn(
+                    'sticky z-30 hidden shrink-0 md:block',
+                    SHELL_HEADER_HEIGHT_CLASS,
+                )}
+            >
                 <nav
                     id="app-sidebar-nav"
                     aria-label="Primary navigation"
                     data-state={isCollapsed ? 'collapsed' : 'expanded'}
                     className={cn(
-                        'fixed top-0 left-0 z-40 flex h-svh flex-col overflow-x-hidden overflow-y-hidden border-r border-sidebar-border bg-sidebar py-3 transition-[width] duration-200 ease-in-out',
-                        isCollapsed ? 'w-16 items-center' : 'w-64',
+                        'flex h-full flex-col overflow-x-hidden bg-sidebar pt-2 pb-2 text-sidebar-foreground transition-[width] duration-200 ease-in-out',
+                        isCollapsed ? 'w-16 items-center' : 'w-66',
                     )}
                 >
                     <div
                         className={cn(
-                            'flex w-full items-center gap-2 px-3 pb-3',
-                            isCollapsed ? 'flex-col' : 'justify-between',
-                        )}
-                    >
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Link
-                                    href={dashboard()}
-                                    aria-label={displayName}
-                                    prefetch
-                                    className={cn(
-                                        'flex min-w-0 items-center rounded-xl text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none',
-                                        isCollapsed
-                                            ? 'h-10 w-10 justify-center'
-                                            : 'h-11 flex-1 gap-3 px-2',
-                                    )}
-                                >
-                                    <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
-                                        {logoUrl ? (
-                                            <img
-                                                src={logoUrl}
-                                                alt=""
-                                                className="h-full w-full object-cover"
-                                            />
-                                        ) : (
-                                            <AppLogoIcon className="size-5 fill-current text-white dark:text-black" />
-                                        )}
-                                    </span>
-                                    {!isCollapsed && (
-                                        <span className="min-w-0 truncate text-sm font-semibold text-sidebar-foreground">
-                                            {displayName}
-                                        </span>
-                                    )}
-                                </Link>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" hidden={!isCollapsed}>
-                                {displayName}
-                            </TooltipContent>
-                        </Tooltip>
-
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-controls="app-sidebar-nav"
-                            aria-expanded={!isCollapsed}
-                            aria-label={
-                                isCollapsed
-                                    ? 'Expand sidebar'
-                                    : 'Collapse sidebar'
-                            }
-                            title={
-                                isCollapsed
-                                    ? 'Expand sidebar'
-                                    : 'Collapse sidebar'
-                            }
-                            onClick={toggleCollapsed}
-                            className="size-9 shrink-0 rounded-xl text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                        >
-                            {isCollapsed ? (
-                                <PanelLeftOpen className={SIDEBAR_OPCN_CLASS} />
-                            ) : (
-                                <PanelLeftClose
-                                    className={SIDEBAR_OPCN_CLASS}
-                                />
-                            )}
-                        </Button>
-                    </div>
-
-                    <div
-                        className={cn(
-                            'scrollbar-none flex w-full flex-1 flex-col gap-1 overflow-y-auto px-2',
+                            'scrollbar-none flex w-full flex-1 flex-col gap-0.5 overflow-y-auto px-2',
                             isCollapsed ? 'items-center' : 'items-stretch',
                         )}
                     >
@@ -2841,16 +2845,39 @@ export function AppSidebar({
                             );
                             const itemClassName = cn(
                                 SIDEBAR_ITEM_BASE,
+                                'py-2',
                                 isCollapsed
                                     ? 'justify-center px-0'
-                                    : 'justify-start gap-3 px-3',
+                                    : 'justify-start gap-2.5 px-3',
                                 active
                                     ? SIDEBAR_ITEM_ACTIVE
                                     : SIDEBAR_ITEM_INACTIVE,
                             );
+                            const iconClassName = active
+                                ? SIDEBAR_ICON_ACTIVE
+                                : SIDEBAR_ICON_INACTIVE;
 
                             if (item.subPanel) {
                                 const isPanelOpen = openPanelId === item.id;
+                                const isGroupOpen = expandedGroupIds.includes(
+                                    item.id,
+                                );
+                                const isExpanded = isCollapsed
+                                    ? isPanelOpen
+                                    : isGroupOpen;
+                                // Folding a group must never hide an alert:
+                                // roll its children's counts up onto the
+                                // header row (visible in every fold state).
+                                const groupBadge = (panelGroups ?? []).reduce(
+                                    (total, group) =>
+                                        total +
+                                        (group?.items ?? []).reduce(
+                                            (sum, sub) =>
+                                                sum + (sub.badge ?? 0),
+                                            0,
+                                        ),
+                                    0,
+                                );
 
                                 return (
                                     <div
@@ -2858,49 +2885,66 @@ export function AppSidebar({
                                         className={cn(
                                             'w-full',
                                             item.dividerAfter &&
-                                                'mb-1 border-b border-sidebar-border/30 pb-1',
+                                                'mb-1 border-b border-sidebar-border/60 pb-1',
                                         )}
                                     >
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <Button
+                                                {/* eslint-disable-next-line no-restricted-syntax -- nav row on the ink chrome; <Button>'s ghost hover fights the sidebar tokens */}
+                                                <button
                                                     type="button"
-                                                    variant="ghost"
                                                     data-sub-panel-trigger
+                                                    data-sidebar-item
                                                     aria-label={`${item.label} menu`}
                                                     aria-current={
                                                         active
                                                             ? 'page'
                                                             : undefined
                                                     }
-                                                    aria-expanded={isPanelOpen}
+                                                    aria-expanded={isExpanded}
                                                     onClick={() =>
-                                                        toggleSubPanel(item.id)
+                                                        isCollapsed
+                                                            ? toggleSubPanel(
+                                                                  item.id,
+                                                              )
+                                                            : toggleGroup(
+                                                                  item.id,
+                                                              )
                                                     }
-                                                    className={cn(
-                                                        itemClassName,
-                                                        isPanelOpen &&
-                                                            SIDEBAR_ITEM_ACTIVE,
-                                                    )}
+                                                    className={itemClassName}
                                                 >
                                                     <SidebarItemIcon
                                                         icon={item.icon}
+                                                        className={
+                                                            iconClassName
+                                                        }
                                                     />
                                                     {!isCollapsed && (
                                                         <>
-                                                            <span className="min-w-0 flex-1 truncate text-left">
+                                                            <span className="min-w-0 flex-1 truncate text-left font-medium">
                                                                 {item.label}
                                                             </span>
+                                                            <CountPill
+                                                                count={
+                                                                    groupBadge
+                                                                }
+                                                            />
                                                             <ChevronRight
                                                                 className={cn(
-                                                                    'size-4 shrink-0 opacity-70 transition-transform',
-                                                                    isPanelOpen &&
+                                                                    'size-4 shrink-0 opacity-60 transition-transform',
+                                                                    isExpanded &&
                                                                         'rotate-90',
                                                                 )}
                                                             />
                                                         </>
                                                     )}
-                                                </Button>
+                                                    {isCollapsed && (
+                                                        <CountPill
+                                                            count={groupBadge}
+                                                            collapsed
+                                                        />
+                                                    )}
+                                                </button>
                                             </TooltipTrigger>
                                             <TooltipContent
                                                 side="right"
@@ -2910,7 +2954,7 @@ export function AppSidebar({
                                             </TooltipContent>
                                         </Tooltip>
 
-                                        {!isCollapsed && isPanelOpen ? (
+                                        {!isCollapsed && isGroupOpen ? (
                                             <InlineSubPanelGroups
                                                 groups={panelGroups ?? []}
                                                 currentUrl={currentUrl}
@@ -2927,7 +2971,7 @@ export function AppSidebar({
                                     className={cn(
                                         'w-full',
                                         item.dividerAfter &&
-                                            'mb-1 border-b border-sidebar-border/30 pb-1',
+                                            'mb-1 border-b border-sidebar-border/60 pb-1',
                                     )}
                                 >
                                     <Tooltip>
@@ -2939,32 +2983,23 @@ export function AppSidebar({
                                                 }
                                                 aria-label={item.label}
                                                 prefetch
+                                                data-sidebar-item
                                                 className={itemClassName}
                                             >
                                                 <SidebarItemIcon
                                                     icon={item.icon}
+                                                    className={iconClassName}
                                                 />
                                                 {!isCollapsed && (
                                                     <span className="min-w-0 flex-1 truncate">
                                                         {item.label}
                                                     </span>
                                                 )}
-                                                {item.badge != null &&
-                                                    item.badge > 0 && (
-                                                        <span
-                                                            data-test={`sidebar-badge-${item.id}`}
-                                                            className={cn(
-                                                                'flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white',
-                                                                isCollapsed
-                                                                    ? 'absolute top-0 right-1'
-                                                                    : 'ml-auto',
-                                                            )}
-                                                        >
-                                                            {item.badge > 9
-                                                                ? '9+'
-                                                                : item.badge}
-                                                        </span>
-                                                    )}
+                                                <CountPill
+                                                    count={item.badge ?? 0}
+                                                    collapsed={isCollapsed}
+                                                    testId={`sidebar-badge-${item.id}`}
+                                                />
                                             </Link>
                                         </TooltipTrigger>
                                         <TooltipContent
@@ -2981,7 +3016,7 @@ export function AppSidebar({
 
                     <div
                         className={cn(
-                            'mt-auto flex w-full flex-col gap-1 border-t border-sidebar-border/30 px-2 pt-2',
+                            'mt-auto flex w-full flex-col gap-1 border-t border-sidebar-border px-2 pt-2',
                             isCollapsed ? 'items-center' : 'items-stretch',
                         )}
                     >
@@ -2996,11 +3031,13 @@ export function AppSidebar({
                                     }
                                     aria-label="Settings"
                                     prefetch
+                                    data-sidebar-item
                                     className={cn(
                                         SIDEBAR_ITEM_BASE,
+                                        'py-2',
                                         isCollapsed
                                             ? 'justify-center px-0'
-                                            : 'justify-start gap-3 px-3',
+                                            : 'justify-start gap-2.5 px-3',
                                         currentUrl.startsWith('/settings')
                                             ? SIDEBAR_ITEM_ACTIVE
                                             : SIDEBAR_ITEM_INACTIVE,
@@ -3008,7 +3045,12 @@ export function AppSidebar({
                                 >
                                     <Settings
                                         aria-hidden="true"
-                                        className={SIDEBAR_OPCN_CLASS}
+                                        className={cn(
+                                            SIDEBAR_OPCN_CLASS,
+                                            currentUrl.startsWith('/settings')
+                                                ? SIDEBAR_ICON_ACTIVE
+                                                : SIDEBAR_ICON_INACTIVE,
+                                        )}
                                     />
                                     {!isCollapsed && (
                                         <span className="min-w-0 flex-1 truncate">
@@ -3021,65 +3063,36 @@ export function AppSidebar({
                                 Settings
                             </TooltipContent>
                         </Tooltip>
-
-                        {auth.user && (
-                            <DropdownMenu>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <DropdownMenuTrigger asChild>
-                                            <button
-                                                type="button"
-                                                aria-label={`Open user menu for ${auth.user.name}`}
-                                                className={cn(
-                                                    SIDEBAR_ITEM_BASE,
-                                                    isCollapsed
-                                                        ? 'justify-center px-0'
-                                                        : 'justify-start gap-3 px-3',
-                                                    SIDEBAR_ITEM_INACTIVE,
-                                                )}
-                                            >
-                                                <Avatar className="size-8 shrink-0 overflow-hidden rounded-full">
-                                                    <AvatarImage
-                                                        src={auth.user.avatar}
-                                                        alt={auth.user.name}
-                                                    />
-                                                    <AvatarFallback className="rounded-full bg-muted text-xs text-black dark:bg-muted dark:text-white">
-                                                        {getInitials(
-                                                            auth.user.name,
-                                                        )}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                {!isCollapsed && (
-                                                    <span className="min-w-0 flex-1 text-left">
-                                                        <span className="block truncate text-sm font-medium text-sidebar-foreground">
-                                                            {auth.user.name}
-                                                        </span>
-                                                        <span className="block truncate text-xs text-sidebar-foreground/80">
-                                                            {auth.user.email}
-                                                        </span>
-                                                    </span>
-                                                )}
-                                            </button>
-                                        </DropdownMenuTrigger>
-                                    </TooltipTrigger>
-                                    <TooltipContent
-                                        side="right"
-                                        hidden={!isCollapsed}
-                                    >
-                                        {auth.user.name}
-                                    </TooltipContent>
-                                </Tooltip>
-                                <DropdownMenuContent
-                                    className="min-w-56 rounded-lg"
-                                    align={isCollapsed ? 'center' : 'start'}
-                                    side="right"
-                                >
-                                    <UserMenuContent user={auth.user as any} />
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        )}
                     </div>
                 </nav>
+
+                {/* Whole-sidebar collapse: the edge tab handle — a 12×56px
+                    lip flowing out of the sidebar's right edge, with an
+                    invisible ≥44px hit area around the slim visual. */}
+                {/* eslint-disable-next-line no-restricted-syntax -- custom edge-tab control; no Button variant matches the lip */}
+                <button
+                    type="button"
+                    aria-controls="app-sidebar-nav"
+                    aria-expanded={!isCollapsed}
+                    aria-label={
+                        isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+                    }
+                    title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                    onClick={toggleCollapsed}
+                    className="group absolute top-1/2 left-full z-40 -translate-y-1/2 outline-none"
+                >
+                    <span
+                        aria-hidden="true"
+                        className="absolute -inset-x-4 -inset-y-4"
+                    />
+                    <span className="flex h-14 w-3 items-center justify-center rounded-r-[7px] bg-sidebar text-sidebar-foreground/70 shadow-md transition-colors group-hover:text-sidebar-accent-foreground group-focus-visible:ring-2 group-focus-visible:ring-sidebar-ring">
+                        {isCollapsed ? (
+                            <ChevronRight className="size-3" />
+                        ) : (
+                            <ChevronLeft className="size-3" />
+                        )}
+                    </span>
+                </button>
 
                 {isCollapsed &&
                     openPanelId &&
@@ -3192,8 +3205,8 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                     className={cn(
                                         'frontline-focus min-h-11 w-full justify-start gap-3 rounded-none px-4 py-2 text-sm font-normal transition-colors',
                                         active
-                                            ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
-                                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                            ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                                            : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
                                     )}
                                 >
                                     <SidebarItemIcon icon={item.icon} />
@@ -3233,8 +3246,8 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                                             currentUrl,
                                                             sub.href,
                                                         )
-                                                            ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
-                                                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                                            ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                                                            : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
                                                     )}
                                                 >
                                                     {sub.icon && (
@@ -3275,8 +3288,8 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                 className={cn(
                                     'frontline-focus flex min-h-11 items-center gap-3 px-4 py-2 text-sm transition-colors',
                                     active
-                                        ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
-                                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                        ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                                        : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
                                 )}
                             >
                                 <SidebarItemIcon icon={item.icon} />

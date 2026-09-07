@@ -42,6 +42,20 @@ For dynamic status-based class composition (e.g. on a table row), use
 `getStatusColor()` from `@/lib/status-colors` — it returns a single
 string of semantic-token utilities, already re-brandable.
 
+## Tone tokens — tier-2 sub-tab cycle
+
+The toned sub-tab strip (`NAVIGATION_STYLE_GUIDE.md` Rule 2) cycles
+positionally through violet → teal → green → amber → rose (`index % 5`).
+Four positions reuse `--primary` / status tokens; teal has its own token:
+
+| Token | Light | Dark | Use for |
+|---|---|---|---|
+| `--tone-teal` | `oklch(45% 0.1 200)` | `oklch(72% 0.12 200)` | position-1 tint/text in the tier-2 cycle (NOT `--live`, which marks in-progress states) |
+| `--tone-chip-teal/-success/-warning/-critical` | deep tone | same (no dark flip) | solid icon-chip fills only — deep in both themes so the white glyph keeps AA contrast |
+
+Never hand-pick tones per tab; the cycle owns the assignment
+(`TONE_CYCLE` in `components/page/grouped-profile-nav.tsx`).
+
 ## Category tokens — module-level tinting
 
 Categories (ops, HR, compliance, incidents, governance, sites, fleet) are

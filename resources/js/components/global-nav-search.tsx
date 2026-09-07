@@ -30,7 +30,17 @@ interface TicketMatch {
     link: string | null;
 }
 
-export default function GlobalNavSearch() {
+export default function GlobalNavSearch({
+    variant = 'default',
+}: {
+    /**
+     * 'header' renders the Event Horizon command-bar trigger (wide, ink
+     * surface, "Search or jump to…" — APP_SHELL_STYLE_GUIDE.md §2) for the
+     * app header; 'default' keeps the compact outline trigger for other
+     * shells (e.g. the staff header).
+     */
+    variant?: 'default' | 'header';
+}) {
     const page = usePage<any>();
     const auth = page.props?.auth;
     const role = auth?.user?.role as string | null | undefined;
@@ -131,35 +141,74 @@ export default function GlobalNavSearch() {
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            {/* Desktop trigger */}
-            <DialogTrigger asChild>
-                <Button
-                    type="button"
-                    aria-label="Search modules"
-                    variant="outline"
-                    className="mr-2 hidden h-9 w-[240px] justify-start gap-2 px-3 text-sm text-muted-foreground lg:flex"
-                >
-                    <Search className="h-4 w-4 opacity-70" />
-                    <span>Search modules…</span>
-                    <kbd className="pointer-events-none ml-auto hidden items-center gap-0.5 rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-flex">
-                        <span className="text-xs">{isMac ? '⌘' : 'Ctrl'}</span>K
-                    </kbd>
-                </Button>
-            </DialogTrigger>
+            {variant === 'header' ? (
+                <>
+                    {/* Desktop trigger — the centred command bar on ink */}
+                    <DialogTrigger asChild>
+                        <button
+                            type="button"
+                            aria-label="Search or jump to a page"
+                            className="hidden h-9 w-[430px] max-w-full items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-3 text-sm text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring md:flex"
+                        >
+                            <Search className="size-4 opacity-70" />
+                            <span className="truncate">Search or jump to…</span>
+                            <kbd className="pointer-events-none ml-auto inline-flex items-center gap-0.5 rounded border border-sidebar-border bg-sidebar px-1.5 py-0.5 font-mono text-[10px] font-medium text-sidebar-foreground/80">
+                                <span className="text-xs">
+                                    {isMac ? '⌘' : 'Ctrl'}
+                                </span>
+                                K
+                            </kbd>
+                        </button>
+                    </DialogTrigger>
 
-            {/* Mobile trigger */}
-            <DialogTrigger asChild>
-                <Button
-                    type="button"
-                    aria-label="Search modules"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 lg:hidden"
-                    title="Search modules"
-                >
-                    <Search className="!size-5 opacity-80" />
-                </Button>
-            </DialogTrigger>
+                    {/* Mobile trigger */}
+                    <DialogTrigger asChild>
+                        <button
+                            type="button"
+                            aria-label="Search or jump to a page"
+                            title="Search"
+                            className="flex size-9 items-center justify-center rounded-lg text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring md:hidden"
+                        >
+                            <Search className="size-5 opacity-80" />
+                        </button>
+                    </DialogTrigger>
+                </>
+            ) : (
+                <>
+                    {/* Desktop trigger */}
+                    <DialogTrigger asChild>
+                        <Button
+                            type="button"
+                            aria-label="Search modules"
+                            variant="outline"
+                            className="mr-2 hidden h-9 w-[240px] justify-start gap-2 px-3 text-sm text-muted-foreground lg:flex"
+                        >
+                            <Search className="h-4 w-4 opacity-70" />
+                            <span>Search modules…</span>
+                            <kbd className="pointer-events-none ml-auto hidden items-center gap-0.5 rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-flex">
+                                <span className="text-xs">
+                                    {isMac ? '⌘' : 'Ctrl'}
+                                </span>
+                                K
+                            </kbd>
+                        </Button>
+                    </DialogTrigger>
+
+                    {/* Mobile trigger */}
+                    <DialogTrigger asChild>
+                        <Button
+                            type="button"
+                            aria-label="Search modules"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 lg:hidden"
+                            title="Search modules"
+                        >
+                            <Search className="!size-5 opacity-80" />
+                        </Button>
+                    </DialogTrigger>
+                </>
+            )}
 
             <DialogContent className="overflow-hidden p-0 sm:max-w-xl">
                 <DialogTitle className="sr-only">

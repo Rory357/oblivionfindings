@@ -1,32 +1,50 @@
-import { PageLayout } from '@/components/page';
 import {
-    GroupPillRail,
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterAvatars,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterContacts,
+    PageHeaderMeterDonut,
+    PageHeaderMeterSpark,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearchTrigger,
+    PageHeaderStatusChip,
+    PageLayout,
+    type PageHeaderRailItem,
+} from '@/components/page';
+import {
     TabSearchPalette,
     TierTwoTabs,
     useGroupedProfileSearchShortcut,
     type GroupedProfileNavGroup,
 } from '@/components/page/grouped-profile-nav';
-import { SiteProfileAlertRibbon } from '@/components/sites/profile/alert-ribbon';
-import {
-    SiteProfileHero,
-    type SiteHeroStat,
-} from '@/components/sites/profile/hero';
 import {
     SiteTechnologyProjectionPanel,
     type SiteTechnologyProjection,
 } from '@/components/sites/site-technology-projection';
-import { useUiPreference } from '@/hooks/use-ui-preference';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    BedDouble,
-    BellRing,
     CalendarPlus,
+    CheckSquare,
+    ChevronDown,
+    ClipboardCheck,
     ExternalLink,
-    Gauge,
+    Link2,
     Pencil,
     Plus,
     ShieldAlert,
+    Upload,
     type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -72,6 +90,7 @@ import {
     resolveSiteProfileTab,
     siteProfileGroups,
     siteProfileTabQueryValue,
+    siteProfileTerminology,
     visibleSiteProfileTabs,
 } from './tabs/registry';
 import {
@@ -148,16 +167,33 @@ export type SiteProfileRoleContact = {
 
 export type SiteProfileHeroData = {
     description: string;
+    /** ServiceType categories of the ACTIVE service contexts ("Respite", …). */
+    support_types: string[];
     brand_colour?: string | null;
     status: 'active' | 'inactive' | 'archived';
     readiness: { score: number; missing_critical: number };
     attention: { total: number; critical: number; warning: number };
     occupancy: { label: string; total: number; occupied: number };
-    avatars: Array<{
-        id: number;
-        name: string;
-        profile_photo_url?: string | null;
-    }>;
+    /** People at this Site with hover details — null when the viewer can't see them. */
+    people: {
+        count: number;
+        avatars: Array<{
+            id: number;
+            name: string;
+            photo_url?: string | null;
+            detail?: string | null;
+            href?: string | null;
+        }>;
+    } | null;
+    /** Open register count + 7-day reported trend — null without hazards.view. */
+    open_hazards: { open: number; trend: number[] } | null;
+    /** Overdue runs + 90-day on-time fraction — null without checklists.view. */
+    checks: {
+        overdue: number;
+        on_time: number;
+        total: number;
+        percent: number | null;
+    } | null;
     quick_actions: Array<{ id: string; label: string; href: string }>;
 };
 
@@ -294,9 +330,22 @@ export type SiteProfileProps = {
 const QUICK_ACTION_ICONS: Record<string, LucideIcon> = {
     edit_site: Pencil,
     add_client: Plus,
+    link_resident: Link2,
     add_calendar_event: CalendarPlus,
     report_hazard: ShieldAlert,
+    start_checklist: ClipboardCheck,
+    book_inspection: CheckSquare,
+    add_document: Upload,
 };
+
+function initials(name: string): string {
+    return name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join('');
+}
 
 function currentRequestedTab(): string | null {
     if (typeof window === 'undefined') return null;
@@ -344,15 +393,7 @@ function exceptionTargetsProp(
 }
 
 export default function SiteShow(props: SiteProfileProps) {
-    const {
-        site,
-        hero,
-        permissions,
-        attention,
-        overview,
-        readiness,
-        uiPreferences,
-    } = props;
+    const { site, hero, permissions, attention, overview } = props;
     const profilePermissions = useMemo(
         () => ({
             ...permissions,
@@ -392,10 +433,6 @@ export default function SiteShow(props: SiteProfileProps) {
     const [propErrors, setPropErrors] = useState<
         Partial<Record<SiteProfileDataProp, boolean>>
     >({});
-    const pinned = useUiPreference<string[]>({
-        key: 'sites.profile.pinned-tabs',
-        initialValue: uiPreferences.pinned_tabs,
-    });
 
     const requestProp = useCallback(
         (dataProp: SiteProfileDataProp, force = false) => {
@@ -497,38 +534,64 @@ export default function SiteShow(props: SiteProfileProps) {
     const activeGroup = active?.group ?? 'overview';
     const groupTabs =
         navGroups.find((group) => group.key === activeGroup)?.tabs ?? [];
-    const heroStats: SiteHeroStat[] = [
-        {
-            id: 'readiness',
-            label: 'Readiness',
-            value: `${hero.readiness.score}%`,
-            detail:
-                hero.readiness.missing_critical > 0
-                    ? `${hero.readiness.missing_critical} critical missing`
-                    : 'Core setup complete',
-            icon: Gauge,
+
+    // The rail remembers which tab you were on in each group, so switching
+    // groups doesn't lose your place.
+    const rememberedTabs = useRef<Record<string, string>>({});
+    useEffect(() => {
+        rememberedTabs.current[activeGroup] = activeTab;
+    }, [activeGroup, activeTab]);
+    const selectGroup = useCallback(
+        (groupKey: string) => {
+            const group = navGroups.find((item) => item.key === groupKey);
+            if (!group) return;
+            const remembered = rememberedTabs.current[groupKey];
+            const target = group.tabs.some(
+                (tab) => tab.key === remembered && !tab.disabled,
+            )
+                ? remembered
+                : group.tabs.find((tab) => !tab.disabled)?.key;
+            if (target) selectTab(target);
         },
-        {
-            id: 'attention',
-            label: 'Needs attention',
-            value: String(hero.attention.total),
-            detail:
-                hero.attention.critical > 0
-                    ? `${hero.attention.critical} critical`
-                    : 'No critical items',
-            icon: BellRing,
-        },
-        {
-            id: 'occupancy',
-            label: hero.occupancy.label,
-            value: `${hero.occupancy.occupied}/${hero.occupancy.total}`,
-            icon: BedDouble,
-        },
-    ];
+        [navGroups, selectTab],
+    );
+
+    const terminology = siteProfileTerminology(site.type);
+    const statusLabel =
+        hero.status === 'archived'
+            ? 'Archived'
+            : hero.status === 'active'
+              ? 'Active'
+              : 'Inactive';
+    // The header renders a dedicated edit chip, so drop the duplicate
+    // quick action from the Add/log menu.
+    const quickActions = hero.quick_actions.filter(
+        (action) => action.id !== 'edit_site',
+    );
+    const clientsTab = resolvedTabs.find(
+        (tab) => tab.id === 'clients' && !tab.locked,
+    );
+    // Only houses track per-room occupancy; other types only know capacity.
+    const occupancyTracked =
+        site.type === 'house' || site.type === 'residential';
+    const occupancyPercent =
+        hero.occupancy.total > 0
+            ? Math.round((hero.occupancy.occupied / hero.occupancy.total) * 100)
+            : 0;
+    const hazardsWeek =
+        hero.open_hazards?.trend.reduce((sum, day) => sum + day, 0) ?? 0;
+    const railItems: PageHeaderRailItem[] = navGroups.map((group) => ({
+        key: group.key,
+        label: group.label,
+        icon: group.icon,
+        count: attention.groups[group.key] || undefined,
+        alert: true,
+    }));
 
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Sites', href: '/sites' },
                 { title: site.name, href: `/sites/${site.id}` },
             ]}
@@ -537,102 +600,356 @@ export default function SiteShow(props: SiteProfileProps) {
             <PageLayout
                 width="wide"
                 hero={
-                    <SiteProfileHero
-                        siteId={site.id}
-                        name={site.name}
-                        description={hero.description}
-                        brandColour={site.brand_colour ?? hero.brand_colour}
-                        statusLabel={
-                            hero.status === 'archived'
-                                ? 'Archived'
-                                : hero.status === 'active'
-                                  ? 'Active'
-                                  : 'Inactive'
+                    <PageHeader
+                        variant="profile"
+                        backHref="/sites"
+                        mark={
+                            <span className="eh-mark-ring text-[17px] font-bold tracking-tight">
+                                {initials(site.name)}
+                            </span>
                         }
-                        typeLabel={site.display_type}
-                        region={site.region}
-                        avatars={hero.avatars}
-                        stats={heroStats}
-                        actions={hero.quick_actions.map((action) => ({
-                            id: action.id,
-                            label: action.label,
-                            href: action.href,
-                            icon: QUICK_ACTION_ICONS[action.id] ?? ExternalLink,
-                        }))}
-                        onEdit={
-                            permissions['site.update']
-                                ? () => router.visit(`/sites/${site.id}/edit`)
-                                : undefined
+                        title={site.name}
+                        titleChip={
+                            <PageHeaderStatusChip
+                                variant={
+                                    hero.status === 'active'
+                                        ? 'success'
+                                        : 'neutral'
+                                }
+                            >
+                                {statusLabel}
+                            </PageHeaderStatusChip>
                         }
-                        footer={
-                            <GroupPillRail
-                                groups={navGroups}
-                                openGroup={activeGroup}
-                                activeTab={activeTab}
-                                onOpenGroup={(_group, tab) => selectTab(tab)}
-                                onSearch={() => setSearchOpen(true)}
-                                testIdPrefix="site-profile"
+                        subline={
+                            /* Two lines (profile revision 2026-09-06): the
+                               address first, then what this place IS —
+                               type · support category · region. */
+                            <>
+                                <span className="block">
+                                    {hero.description}
+                                </span>
+                                <span className="block">
+                                    {[
+                                        site.display_type,
+                                        hero.support_types.join(' / '),
+                                        site.region,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                </span>
+                            </>
+                        }
+                        actions={
+                            <>
+                                <PageHeaderSearchTrigger
+                                    placeholder="Search this site…"
+                                    onOpen={() => setSearchOpen(true)}
+                                />
+                                {permissions['site.update'] ? (
+                                    <PageHeaderGlassButton
+                                        icon={Pencil}
+                                        aria-label="Edit Site"
+                                        title="Edit Site"
+                                        onClick={() =>
+                                            router.visit(
+                                                `/sites/${site.id}/edit`,
+                                            )
+                                        }
+                                    />
+                                ) : null}
+                                {quickActions.length ? (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <PageHeaderPrimaryButton
+                                                icon={Plus}
+                                            >
+                                                Add / log
+                                                <ChevronDown className="size-3.5 opacity-70" />
+                                            </PageHeaderPrimaryButton>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            align="end"
+                                            className="w-56"
+                                        >
+                                            {quickActions.map((action) => {
+                                                const Icon =
+                                                    QUICK_ACTION_ICONS[
+                                                        action.id
+                                                    ] ?? ExternalLink;
+                                                return (
+                                                    <DropdownMenuItem
+                                                        key={action.id}
+                                                        asChild
+                                                        className="min-h-11"
+                                                    >
+                                                        <Link
+                                                            href={action.href}
+                                                        >
+                                                            <Icon className="mr-2 h-4 w-4" />
+                                                            {action.label}
+                                                        </Link>
+                                                    </DropdownMenuItem>
+                                                );
+                                            })}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                ) : null}
+                            </>
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Key contacts"
+                                    ariaLabel="View the contact register"
+                                    onClick={() => selectTab('contacts')}
+                                >
+                                    <PageHeaderMeterContacts
+                                        contacts={[
+                                            {
+                                                label: 'Manager',
+                                                name: site.manager_contact
+                                                    ?.name,
+                                                phone: site.manager_contact
+                                                    ?.phone,
+                                            },
+                                            {
+                                                label: 'Site lead',
+                                                name: site.site_lead_contact
+                                                    ?.name,
+                                                phone: site.site_lead_contact
+                                                    ?.phone,
+                                            },
+                                            {
+                                                label: 'After hours',
+                                                name: site.after_hours_contact
+                                                    ?.name,
+                                                phone: site.after_hours_contact
+                                                    ?.phone,
+                                            },
+                                        ]}
+                                    />
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Needs attention"
+                                    tone={
+                                        attention.summary.critical > 0
+                                            ? 'critical'
+                                            : attention.summary.total > 0
+                                              ? 'warning'
+                                              : 'success'
+                                    }
+                                    ariaLabel="View items needing attention"
+                                    onClick={() => selectTab('overview')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {attention.summary.total}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {attention.summary.total > 0
+                                            ? `${attention.summary.critical} critical · ${attention.summary.warning} warning`
+                                            : 'nothing outstanding'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                {hero.open_hazards ? (
+                                    <PageHeaderMeterBlock
+                                        label="Open hazards"
+                                        value={hero.open_hazards.open}
+                                        tone={
+                                            hero.open_hazards.open > 0
+                                                ? 'critical'
+                                                : 'success'
+                                        }
+                                        ariaLabel="View open hazards"
+                                        onClick={() => selectTab('hazards')}
+                                    >
+                                        <PageHeaderMeterSpark
+                                            values={hero.open_hazards.trend}
+                                        />
+                                        <PageHeaderMeterCaption>
+                                            {hazardsWeek > 0
+                                                ? `${hazardsWeek} reported this week`
+                                                : 'none reported this week'}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                                {hero.checks ? (
+                                    hero.checks.percent !== null ? (
+                                        <PageHeaderMeterBlock
+                                            label="Checks on time"
+                                            value={
+                                                hero.checks.overdue > 0
+                                                    ? `${hero.checks.overdue} overdue`
+                                                    : undefined
+                                            }
+                                            tone={
+                                                hero.checks.overdue > 0
+                                                    ? 'warning'
+                                                    : 'brand'
+                                            }
+                                            ariaLabel="View checklists"
+                                            onClick={() =>
+                                                selectTab('checklists')
+                                            }
+                                        >
+                                            <PageHeaderMeterDonut
+                                                percent={hero.checks.percent}
+                                                caption={
+                                                    <>
+                                                        {hero.checks.on_time}{' '}
+                                                        of {hero.checks.total}
+                                                        <br />
+                                                        done on time
+                                                    </>
+                                                }
+                                            />
+                                        </PageHeaderMeterBlock>
+                                    ) : (
+                                        <PageHeaderMeterBlock
+                                            label="Overdue checks"
+                                            tone={
+                                                hero.checks.overdue > 0
+                                                    ? 'warning'
+                                                    : 'success'
+                                            }
+                                            ariaLabel="View overdue checklists"
+                                            onClick={() =>
+                                                selectTab('checklists')
+                                            }
+                                        >
+                                            <PageHeaderMeterBig>
+                                                {hero.checks.overdue}
+                                            </PageHeaderMeterBig>
+                                            <PageHeaderMeterCaption>
+                                                {hero.checks.overdue > 0
+                                                    ? 'checklist runs late'
+                                                    : 'all on schedule'}
+                                            </PageHeaderMeterCaption>
+                                        </PageHeaderMeterBlock>
+                                    )
+                                ) : null}
+                                {clientsTab && hero.occupancy.total > 0 ? (
+                                    occupancyTracked ? (
+                                        <PageHeaderMeterBlock
+                                            label={hero.occupancy.label}
+                                            value={`${hero.occupancy.occupied}/${hero.occupancy.total}`}
+                                            ariaLabel={`View ${terminology.people.toLowerCase()} and room placements`}
+                                            onClick={() =>
+                                                selectTab('clients')
+                                            }
+                                        >
+                                            <PageHeaderMeterBar
+                                                percent={occupancyPercent}
+                                            />
+                                            <PageHeaderMeterCaption>
+                                                {occupancyPercent}% occupied ·{' '}
+                                                {hero.occupancy.total -
+                                                    hero.occupancy
+                                                        .occupied}{' '}
+                                                available
+                                            </PageHeaderMeterCaption>
+                                        </PageHeaderMeterBlock>
+                                    ) : (
+                                        <PageHeaderMeterBlock
+                                            label={hero.occupancy.label}
+                                            ariaLabel={`View ${terminology.people.toLowerCase()}`}
+                                            onClick={() =>
+                                                selectTab('clients')
+                                            }
+                                        >
+                                            <PageHeaderMeterBig>
+                                                {hero.occupancy.total}
+                                            </PageHeaderMeterBig>
+                                            <PageHeaderMeterCaption>
+                                                capacity
+                                            </PageHeaderMeterCaption>
+                                        </PageHeaderMeterBlock>
+                                    )
+                                ) : null}
+                                {clientsTab && hero.people ? (
+                                    <PageHeaderMeterBlock
+                                        label={terminology.people}
+                                        value={
+                                            hero.people.avatars.length > 0
+                                                ? hero.people.count
+                                                : undefined
+                                        }
+                                        ariaLabel={`View ${terminology.people.toLowerCase()}`}
+                                        onClick={() => selectTab('clients')}
+                                    >
+                                        {hero.people.avatars.length > 0 ? (
+                                            <PageHeaderMeterAvatars
+                                                people={hero.people.avatars}
+                                                overflow={
+                                                    hero.people.count -
+                                                    hero.people.avatars.length
+                                                }
+                                            />
+                                        ) : (
+                                            <PageHeaderMeterBig>
+                                                {hero.people.count}
+                                            </PageHeaderMeterBig>
+                                        )}
+                                        <PageHeaderMeterCaption>
+                                            active or onboarding
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                ) : null}
+                            </>
+                        }
+                        rail={
+                            <PageHeaderRail
+                                items={railItems}
+                                value={activeGroup}
+                                onSelect={selectGroup}
+                                onFind={() => setSearchOpen(true)}
                                 ariaLabel="Site Profile groups"
                             />
                         }
                     />
                 }
             >
-                <SiteProfileAlertRibbon
-                    alerts={attention.items.slice(0, 6).map((item) => ({
-                        id: item.id,
-                        label: item.title,
-                        detail: item.detail,
-                        tone: item.severity,
-                        icon:
-                            item.severity === 'critical'
-                                ? ShieldAlert
-                                : BellRing,
-                        onSelect: () => selectTab(item.tab),
-                    }))}
-                />
-                <TierTwoTabs
-                    tabs={groupTabs}
-                    activeTab={activeTab}
-                    onTab={selectTab}
-                    renderLink={(tab, className, inner, tabProps) => (
-                        <Link
-                            key={tab.key}
-                            href={tab.href ?? '#'}
-                            className={className}
-                            {...tabProps}
-                        >
-                            {inner}
-                        </Link>
-                    )}
-                    testIdPrefix="site-profile"
-                    ariaLabel="Site Profile sections"
-                    panelId="site-profile-tab-panel"
-                    pinnedTabs={pinned.value}
-                    onPinnedTabsChange={pinned.setValue}
-                />
-                {pinned.error ? (
-                    <p role="alert" className="text-sm text-status-critical">
-                        {pinned.error}
-                    </p>
-                ) : null}
-                <div
-                    id="site-profile-tab-panel"
-                    role="tabpanel"
-                    aria-labelledby={`site-profile-tab-${activeTab}`}
-                    tabIndex={0}
-                    className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                >
-                    <SiteProfileContent
-                        active={active}
-                        props={props}
-                        loadingProps={loadingProps}
-                        propErrors={propErrors}
-                        onNavigate={selectTab}
-                        onEditLocation={() => setLocationOpen(true)}
-                        onConfigureGeofence={() => setGeofenceOpen(true)}
-                        onRetry={(dataProp) => requestProp(dataProp, true)}
+                {/* 20px rhythm between the page's section stack (DESIGN.md
+                    spacing rule) — the sub-tab strip and panel are siblings
+                    on the page ground. Alert counts live in the header's
+                    meter row; the detail list is the overview's attention
+                    panel (PAGE_HEADER_STYLE_GUIDE.md). */}
+                <div className="flex flex-col gap-5">
+                    <TierTwoTabs
+                        tabs={groupTabs}
+                        activeTab={activeTab}
+                        onTab={selectTab}
+                        renderLink={(tab, className, inner, tabProps) => (
+                            <Link
+                                key={tab.key}
+                                href={tab.href ?? '#'}
+                                className={className}
+                                {...tabProps}
+                            >
+                                {inner}
+                            </Link>
+                        )}
+                        testIdPrefix="site-profile"
+                        ariaLabel="Site Profile sections"
+                        panelId="site-profile-tab-panel"
                     />
+                    <div
+                        id="site-profile-tab-panel"
+                        role="tabpanel"
+                        aria-labelledby={`site-profile-tab-${activeTab}`}
+                        tabIndex={0}
+                        className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                        <SiteProfileContent
+                            active={active}
+                            props={props}
+                            loadingProps={loadingProps}
+                            propErrors={propErrors}
+                            onNavigate={selectTab}
+                            onEditLocation={() => setLocationOpen(true)}
+                            onConfigureGeofence={() => setGeofenceOpen(true)}
+                            onRetry={(dataProp) => requestProp(dataProp, true)}
+                        />
+                    </div>
                 </div>
             </PageLayout>
             <SiteProfileDialogHost />
@@ -749,7 +1066,6 @@ function SiteProfileContent({
         return (
             <SiteProfileOverview
                 site={props.site}
-                hero={props.hero}
                 overview={props.overview}
                 attention={props.attention}
                 onNavigate={onNavigate}

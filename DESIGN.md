@@ -75,44 +75,57 @@ Horizon chrome": one continuous ink surface for header and sidebar
 centred command search, Report incident / Clock in / Messages / bell /
 avatar in the header (no Live chip), collapsible module groups, an
 edge-tab whole-sidebar collapse, and a neutral grey page ground with
-white lifted cards. Any request to build, restyle, or "redo" the
-sidebar/top bar/page background implements that guide. Enforcement
-points: `app-header.tsx`, `app-sidebar.tsx`, shell tokens in `app.css`.
+white lifted cards. **The shell owns a single 20px gutter** (approved
+2026-09-05; 10px was tried and revised up the same day) between the
+ink chrome (sidebar + top bar) and page content — `p-5` in
+`app-sidebar-layout.tsx`'s `DEFAULT_CONTENT_CLASS`
+— and nothing re-pads it: `PageLayout` defaults to `padding="none"`,
+and pages must not add their own outer padding against the chrome.
+Any request to build, restyle, or "redo" the sidebar/top bar/page
+background implements that guide. Enforcement points: `app-header.tsx`,
+`app-sidebar.tsx`, `layouts/app/app-sidebar-layout.tsx`, shell tokens
+in `app.css`.
 
-Page heroes follow the shared hero pattern — see
-`design_styles/GOVERNANCE_HERO_GUIDE.md` and `docs/hero-unification-v2-plan.md`
-before styling a new hero.
+### Page headers — the Event Horizon header (approved 2026-09-05)
 
-### Record profile header — the client-profile contract
+**The top of every page has ONE source of truth:**
+`design_styles/PAGE_HEADER_STYLE_GUIDE.md`. Every index/list page and
+every record profile page opens with the same fixed-rhythm "Event
+Horizon" header band (meter-row revision approved 2026-09-06): a top
+row of identity (ring mark, title + status chip, one fact subline)
+left and scoped search + action cluster right; then **one full-width
+METER ROW** — instrument blocks (stat / delta stat / bar meter / donut
+/ sparkline, 4–6 per page) carrying the page's key numbers, **every
+block a link to its view** (Hazards → open hazards, Occupancy → beds,
+…); then the page-specific filter row — **all INSIDE the header**;
+the page's main view tabs on the bottom edge as the Rule 1
+connected-tab rail. Above the band, the shell renders its slim
+breadcrumb strip: every page passes a full trail rooted at **Home
+(`/dashboard`)** to `AppLayout breadcrumbs` (added 2026-09-06). Lists
+render nothing between the header and their content;
+individual/profile pages add one tier-2 sub-nav strip (ghost tabs,
+positional tones) below it. Visual reference:
+`public/eh-hero-variants.html`.
 
-Every record profile page (clicking into a client, site, staff member, …)
-opens with the gradient header modelled on the **client profile hero**
-(`components/clients/profile/hero.tsx`, used by
-`pages/operations/clients/show.tsx`). Its regions, top to bottom:
+Implemented (2026-09-06, meter-row revision included) as **one
+`PageHeader` component** — `components/page/page-header.tsx` (with the
+`PageHeaderMeterBlock` family) plus the `.eh-header` / `.eh-mark-ring`
+/ `.eh-meter` utilities in `app.css`; reference migration
+`pages/sites/index.tsx`. The sky is **always the branding colour's
+own ramp** (approved 2026-09-06): whatever colour Settings → Branding
+sets, a dark shade of `--primary` at the top fades into the actual
+`--primary` at the bottom (relative-colour oklch keeps the hue) —
+never a neutral/ink top, never a hand-picked palette.
 
-1. **Back link** to the index (left) + **record id** chip (right).
-2. **Identity row** — avatar with presence dot, record name + status
-   pill, identity sub-line (nickname · age / location), then glass chips
-   and toned badges. Right-aligned: the **action cluster** (one white
-   primary dropdown like "Add note", then glass secondary buttons — chat,
-   edit, overflow) above **stat tiles** (2–3 headline stats: label +
-   value).
-3. **Context tiles row** — module-specific full-width tiles (e.g. the
-   expandable next-shift tile, the safety-information strip).
-4. **Vitals grid** — glass metric boxes (label, value, trend, one-line
-   detail). The *set* of boxes is module-specific — fewer or different
-   boxes are fine — but every box keeps this anatomy and the glass
-   treatment (`border-primary-foreground/20 bg-primary-foreground/10`,
-   all bound to semantic tokens).
-5. **Hero footer** — the tier-1 group rail using the **connected-tab**
-   treatment (active tab merges with the page background — see
-   `design_styles/NAVIGATION_STYLE_GUIDE.md` Rule 1). Count and warning
-   pills on these navs follow the counter state-colour rule — the number
-   must stay visible when its tab activates.
-
-New profile pages compose these regions (extract shared pieces rather
-than fork); the site profile hero (`components/sites/profile/hero.tsx`)
-is the sibling implementation to keep aligned with this contract.
+This supersedes the `PageHero` banner system
+(`components/page/page-hero.tsx`), the Governance Hero Guide, the
+hero-unification plans, and the client/site profile heroes as
+references — all of those are migration targets (conformance probe
+12), not precedents. Do not consult or extend them for new work.
+Both profile heroes are now migrated and deleted (sites 2026-09-06,
+clients 2026-09-07 — `pages/operations/clients/show.tsx` is on the
+`PageHeader` profile variant with its alert ribbon folded into the
+meter row).
 
 ---
 
@@ -170,13 +183,17 @@ is the sibling implementation to keep aligned with this contract.
   `design_styles/NAVIGATION_STYLE_GUIDE.md`. Enforcement points:
   `GroupPillRail` + `TierTwoTabs` (`components/page/grouped-profile-nav.tsx`)
   and the rostering `TabStrip` (`components/rostering/tab-strip.tsx`).
-- **Index view tabs — the tinted-pill tab.** For standalone view/filter
-  tab rows on index pages (e.g. All sites / At risk / …): active =
-  rounded `bg-primary/10 text-primary` wrap with a `border-b-2
-  border-primary` underline; inactive = `text-muted-foreground` with
-  `hover:bg-accent`; icon + label + count pill. Shared implementation:
-  `components/page/page-tabs.tsx`; visual reference: `ViewTabs` in
-  `pages/sites/index.tsx`.
+- **Index view tabs — main tabs live in the hero (corrected 2026-09-05).**
+  A page's main view/filter tabs (e.g. All sites / At risk / …) render in
+  the hero footer as the Rule 1 **connected-tab** rail
+  (`design_styles/NAVIGATION_STYLE_GUIDE.md`): the active tab takes the
+  page `--background` and sits flush with the hero's bottom edge — never
+  as a tinted-pill strip below the hero. Counters follow the counter
+  state-colour rule. Reference implementation: `PageHeaderRail` in
+  `components/page/page-header.tsx` (used by `pages/sites/index.tsx`).
+  `components/page/page-tabs.tsx`'s tinted-pill
+  strip remains only for secondary in-page tab rows that have no hero
+  rail to live in.
 - **Count/warning pills on tabs and nav items follow their tab's state
   colour — never a fixed colour.** Active tab → `bg-primary/15 text-primary`
   (on an active connected tab, whose surface is the page background, the
@@ -186,13 +203,30 @@ is the sibling implementation to keep aligned with this contract.
   colour across states goes invisible when its tab activates (the hero
   "Overview 7" white-on-white bug in `grouped-profile-nav.tsx`
   `WarningPill onHero`).
-- **Filters above tables** — `components/filter-bar.tsx`.
+- **Filters** — a page's primary filters live in its header's filter
+  row (`design_styles/PAGE_HEADER_STYLE_GUIDE.md` §5), never in a bar
+  below the header; `components/filter-bar.tsx` remains only for
+  secondary tables inside cards/sections.
+- **Entity list surfaces — cards + tables (approved 2026-09-06).**
+  Every listable record (sites, clients, incidents, staff, assets, …)
+  renders through the two Event Horizon list contracts in
+  `design_styles/LIST_STYLE_GUIDE.md`: the entity card (status
+  meridian, identity row, fact chips, one optional metric slot, alert
+  chips, utility footer) and the entity table (one shell, identity
+  cell first, kebab last, columns picked from the cell library via a
+  per-entity column spec). Both keep the kebab menu AND the
+  right-click context menu on every card/row, fed by one `MenuItem[]`.
+  No readiness/onboarding displays. Implemented (2026-09-06) in
+  `components/lists/` (`EntityCard`, `EntityTable`, cell library,
+  shared `entity-menu.tsx`, `ListCaption`); reference migration
+  `pages/sites/index.tsx`.
 - **Data tables & pagination** — table markup uses the
   `components/ui/table.tsx` primitives; server-paginated lists use
   `components/ui/laravel-pagination.tsx` (the canonical paginator — 64+
   pages already do); loading state is `skeleton-table`. Wide tables scroll
   inside their own `overflow-x-auto` container — the page body never
-  scrolls horizontally.
+  scrolls horizontally. Entity list tables additionally follow the
+  table contract in `design_styles/LIST_STYLE_GUIDE.md`.
 - **Scroll surfaces** — custom scroll areas use `.scrollbar-pretty` (thin,
   themed); `.scrollbar-none` is reserved for the icon sidebar rail.
   `.nice-scroll` is a meal-planner-era duplicate of `.scrollbar-pretty` —
@@ -253,9 +287,52 @@ before.
   rails, or underline-only sub-tab strips; both are superseded by the
   connected tab (Rule 1) and toned strip (Rule 2) in
   `design_styles/NAVIGATION_STYLE_GUIDE.md`.
+- **Main view tabs below the hero** (corrected 2026-09-05) — a page's
+  primary view/filter tabs rendered as a separate tinted-pill/underline
+  strip on the page ground (the old `ViewTabs`/`PageTabs` row); they
+  belong in the hero footer as the Rule 1 connected-tab rail.
+- **Drop shadow on a connected-rail hero** (corrected 2026-09-05) — any
+  `shadow-*` on a hero that hosts the Rule 1 connected-tab rail. The
+  shadow darkens the page ground along the hero's bottom edge, so the
+  active tab's `--background` fill reads white beside it and the merge
+  breaks. Shadow-parting tricks (erasing it only under the tab) were
+  tried and rejected — the ground beside the tab stays tinted. A
+  connected-rail hero casts no shadow (see NAVIGATION_STYLE_GUIDE.md
+  "Merge seam").
+- **Conversational page headers** (corrected 2026-09-05) — greeting
+  titles ("Kia ora … your sites at a glance"), live/sync eyebrows, or
+  underlined phrases in a page header. Headers follow the Event
+  Horizon contract (`design_styles/PAGE_HEADER_STYLE_GUIDE.md`): plain
+  title + one `<StatusBadge>` chip, a one-line fact subline, the
+  clickable meter-block row, and a white-primary + glass-secondary
+  action cluster on the brand sky.
+- **Dead or decorative meter blocks** (meter-row revision 2026-09-06) —
+  a header block that doesn't navigate anywhere, or one whose trend/
+  fraction data has no real backend source. Every block links to the
+  view where its number lives; a block without live data is dropped,
+  not faked.
+- **Numbers-only meter blocks** (corrected 2026-09-06) — a header meter
+  block rendered as a bare big number when the metric has an honest
+  visual form with a live source: capacity → bar meter, share of a
+  whole → donut, daily series → sparkline, people → avatar stack
+  (photos/initials with hover name cards). Graph-first: the visual
+  carries the block and the count moves to the head value; a plain stat
+  is the fallback only when no real visual form exists
+  (PAGE_HEADER_STYLE_GUIDE.md §5).
+- **Sunken active-rail labels** (corrected 2026-09-06) — the Rule 1
+  connected active tab is taller than its inactive pills, so an
+  uncompensated label sits ~3px below their shared text line. The
+  active tab carries bottom padding (6px in the Event Horizon rail) so
+  every rail label sits on ONE optical line; re-solve the centreline
+  equation whenever rail geometry changes (PAGE_HEADER_STYLE_GUIDE.md
+  §7).
 - **Sub-nav strip wrapped in a card** — the tier-2 strip is a bare flex
   row on the page background: no border, card fill, shadow, or container
   padding.
+- **Pinned sub-tabs** (removed 2026-09-06) — pin/unpin buttons (or any
+  per-tab management affordance) on the tier-2 sub-tab strip. Sub-tabs
+  are NEVER pinnable; the strip is tabs only. `TierTwoTabs` has no pin
+  API by design — do not grow one back.
 - **Hand-picked or semantic sub-tab tones** — tier-2 tones come from the
   positional cycle (`index % 5`), never chosen per tab; and tones must
   not appear on inactive tabs (neutral at rest).
@@ -271,10 +348,20 @@ before.
   transforms on `default`/`outline` buttons (via `className` or raw
   elements) instead of the soft-depth treatment owned by
   `components/ui/button.tsx` (see `design_styles/BUTTON_STYLE_GUIDE.md`).
-- **Record profile pages without the profile header contract** — a
-  show/profile page opening with a plain heading or a one-off banner
-  instead of the client-profile hero regions (identity row, action
-  cluster, stat tiles, vitals grid, group-pill footer).
+- **Page tops that bypass the Event Horizon header** — a page opening
+  with a plain heading, a one-off banner, a legacy `PageHero`, or a
+  search/filter bar sitting BELOW the header, instead of the fixed
+  contract in `design_styles/PAGE_HEADER_STYLE_GUIDE.md` (search and
+  filters live in the header; lists get no sub-bar; individuals add
+  the tier-2 sub-nav strip).
+- **Bespoke entity cards or list tables** — hand-rolled card
+  anatomies, per-page table styling, or invented table cells instead
+  of the contracts in `design_styles/LIST_STYLE_GUIDE.md` (status
+  meridian + slot anatomy for cards; identity-first/kebab-last +
+  cell library for tables). Includes dropping either actions entry
+  point — every card/row keeps the kebab AND the right-click context
+  menu with the full existing `MenuItem` set — and reintroducing
+  readiness/onboarding displays (removed 2026-09-06).
 - **A global "Live"/sync chip in the top bar** — removed from the
   approved shell (2026-09-05); live/sync status belongs on the page
   surfaces that need it, not in the global chrome.
@@ -283,6 +370,23 @@ before.
   (see `APP_SHELL_STYLE_GUIDE.md` §4; charcoal grounds were tried and
   rejected as too dark). Don't reintroduce tinted near-whites behind
   cards or hardcode a per-page ground.
+- **Stacked chrome-to-content gutters** — the app shell owns ONE 20px
+  gutter between the ink chrome (sidebar + top bar) and page content
+  (`p-5` in `app-sidebar-layout.tsx`; approved 2026-09-05, replacing
+  a 56/64px stack of layout + PageLayout padding; 10px was tried and
+  revised up the same day). Never re-pad it: no
+  outer `p-*`/`px-*`/`py-*` on a page's root wrapper, no `padding`
+  value on `PageLayout` inside the shell (its default is `none`), no
+  `contentClassName` overrides that change the gutter. Surfaces outside
+  the shell (marketing, staff, auth) are exempt.
+- **Off-scale gaps between sections and cards** — the 20px rule
+  (approved 2026-09-05) also governs the space BETWEEN things on a
+  shell page: section-to-section stacks (hero → tabs → content —
+  `PageLayout`'s `gap-5` is the enforcement point) and gaps between
+  cards in a grid/list are `gap-5` (20px), not `gap-4`/`gap-6`/
+  `gap-[15px]`/`space-y-6`. Spacing INSIDE a card (its own
+  padding and micro-layout) is unaffected. Existing pages migrate via
+  conformance sweep probe 17.
 - **Non-existent colour tokens** — utilities like `bg-warning/20` or
   `text-warning-foreground` reference a `warning` token that isn't in the
   `@theme` registry, so they silently render as nothing. The real tokens
@@ -314,38 +418,41 @@ file. Concrete, mechanically-checkable probes:
    `style={{…}}` props and in CSS rules (known: `.icon-gradient-bg` in
    `app.css` — migrate to token-based `color-mix` or drop it).
 5. **Hand-rolled status pills** — spans styled with `status-*` tokens that
-   should be `<StatusBadge>`, and duplicated tone maps (known:
-   `BADGE_TONE` in `components/clients/profile/hero.tsx` mirrors
-   `StatusBadge`'s `VARIANT_CLASSES` — consolidate to one source).
+   should be `<StatusBadge>`, and duplicated tone maps (the known
+   `BADGE_TONE` offender left with the client profile hero, deleted
+   2026-09-07).
 6. **Ad-hoc heading sizes** — `text-2xl`/`text-xl font-semibold` composed
    inline instead of the typography helpers.
 7. **`dark:` colour pairs** on token-styled elements.
 8. **Safe-area sprinkles** — raw `env(safe-area-inset-*)` outside the
    helpers in `app.css`.
 9. **Tab strips** — (a) two-tier nav conformance per
-   `design_styles/NAVIGATION_STYLE_GUIDE.md`: restyle `GroupPillRail` to
-   the connected tab (Rule 1), `TierTwoTabs` and the rostering `TabStrip`
-   to the toned strip (Rule 2); add the `--tone-teal` token to `app.css`
-   + `@theme` first; flag hero rails still using white-pill active
-   states, carded/underline-only sub-strips, hand-picked tones, or toned
-   inactive states. (b) local copies of the index view-tab pattern
-   (`ViewTabs` in `pages/sites/index.tsx`,
-   `pages/operations/clients/index.tsx`,
-   `pages/sites/calendar/SiteCalendar.tsx`) — consolidate on
-   `components/page/page-tabs.tsx`.
+   `design_styles/NAVIGATION_STYLE_GUIDE.md`: `GroupPillRail` (Rule 1
+   connected tab) and `TierTwoTabs` (Rule 2 toned strip) were restyled and
+   `--tone-teal` added 2026-09-05; the rostering `TabStrip` still needs
+   its tones aligned to the positional cycle. Flag hero rails still using
+   white-pill active states, carded/underline-only sub-strips,
+   hand-picked tones, or toned inactive states. (b) pages whose main view tabs still render below
+   the hero as tinted-pill strips (`ViewTabs` in
+   `pages/sites/calendar/SiteCalendar.tsx`; the clients index migrated
+   2026-09-07) — migrate to the
+   connected-tab hero rail (reference: `PageHeaderRail` in
+   `components/page/page-header.tsx`).
 10. **Nav counters** — count/warning pills that don't follow their tab's
-    state colour. Known: `WarningPill onHero` in `grouped-profile-nav.tsx`
-    hardcodes `text-primary-foreground` (invisible on the active white
-    hero pill) and uses the non-existent `warning` token
-    (`bg-warning/20` → renders nothing; should be `status-warning` pairs).
+    state colour. (The known `WarningPill onHero` offender in
+    `grouped-profile-nav.tsx` — `text-primary-foreground` on the active
+    pill plus the ghost `warning` token — was fixed 2026-09-05; it now
+    uses the verified `status-warning-bg`/`status-warning` pair in all
+    states.)
 11. **Ghost tokens** — grep utility classes against the `@theme` registry
     in `app.css`; any `bg-*/text-*/border-*` naming a token that isn't
     registered renders as nothing and must be re-pointed at a real token.
-12. **Profile header coverage** — enumerate record show/profile routes
-    (clients, sites, staff, assets, …) and flag any whose header doesn't
-    follow the client-profile contract (see "Record profile header"):
-    missing regions, hand-rolled banners, group navs whose counters
-    disappear when active.
+12. **Page header coverage** — enumerate index and record show/profile
+    routes and flag any whose page top doesn't follow the Event
+    Horizon contract (`design_styles/PAGE_HEADER_STYLE_GUIDE.md`):
+    legacy `PageHero` usages, hand-rolled banners, missing header
+    slots, search/filter bars below the header, list pages with
+    sub-bars, group navs whose counters disappear when active.
 13. **Button conformance** — apply the soft-depth spec
     (`design_styles/BUTTON_STYLE_GUIDE.md`): (a) update `buttonVariants`
     `default`/`outline` in `components/ui/button.tsx` if not yet done;
@@ -370,6 +477,23 @@ file. Concrete, mechanically-checkable probes:
 16. **Icons** — non-lucide icon usages (other sets, inline SVGs
     duplicating lucide glyphs, emoji-as-icon); icon-only buttons/links
     missing `aria-label`; off-scale icon sizes in standard chrome.
+17. **20px spacing rule** (approved 2026-09-05) — on app-shell pages:
+    (a) anything re-padding the shell's single `p-5` gutter (outer
+    padding on page root wrappers, `PageLayout padding=` values inside
+    the shell, `contentClassName` gutter overrides); (b) off-scale gaps
+    between sections or between cards (`gap-4`, `gap-6`+, `gap-[Npx]`,
+    `space-y-*` on section stacks and card grids/lists — should be
+    `gap-5`). Card-internal spacing is out of scope. Migrate one
+    module at a time.
+18. **List contract coverage** (approved 2026-09-06) — enumerate
+    listable-entity index views and flag any not on the
+    `design_styles/LIST_STYLE_GUIDE.md` contracts: hand-rolled entity
+    cards, per-page table styling or invented cells, cards/rows
+    missing the kebab or right-click context menu (or with diverged
+    `MenuItem` sets between the two), dishonest empty states, and any
+    remaining readiness/onboarding displays. `pages/sites/index.tsx`
+    (2026-09-06, the reference) and
+    `pages/operations/clients/index.tsx` (2026-09-07) are migrated.
 
 Report findings grouped by pattern with file:line references; fix only when
 asked, and migrate one pattern at a time.
@@ -397,7 +521,8 @@ This file only works if it reflects reality. The loop:
 - `design_styles/BUTTON_STYLE_GUIDE.md` — the soft-depth button spec (primary/outline)
 - `design_styles/NAVIGATION_STYLE_GUIDE.md` — two-tier section nav (connected tab + toned strip)
 - `design_styles/LOADER_STYLE_GUIDE.md` — the Event Horizon brand loader (+ ring-only inline variant)
-- `design_styles/GOVERNANCE_HERO_GUIDE.md` — page hero pattern
+- `design_styles/PAGE_HEADER_STYLE_GUIDE.md` — the Event Horizon page header (index + profile variants, in-header search/filters, rail, sub nav)
+- `design_styles/LIST_STYLE_GUIDE.md` — the Event Horizon list contracts (entity card grid + entity table, cell library, kebab/context-menu rules)
 - `resources/css/app.css` — the tokens themselves (source of truth)
 - `resources/js/lib/status-colors.ts` — status → class map
 - `resources/js/lib/derive-palette.ts` — brand colour → derived palette

@@ -1,12 +1,9 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { router } from '@inertiajs/react';
 import {
-    BedDouble,
     CheckCircle2,
-    CircleAlert,
     Mail,
     MapPin,
     Pencil,
@@ -15,7 +12,6 @@ import {
     ShieldAlert,
     StickyNote,
     Trash2,
-    Users,
     type LucideIcon,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
@@ -29,7 +25,6 @@ import SiteOverviewMapCard from '../_overview-map-card';
 import { AddContactDialog } from '../contacts/_dialogs';
 import type {
     SiteProfileAttentionData,
-    SiteProfileHeroData,
     SiteProfileOverviewData,
     SiteProfileRoleContact,
     SiteProfileSite,
@@ -38,7 +33,6 @@ import { SiteAttentionPanel } from './attention-panel';
 
 export function SiteProfileOverview({
     site,
-    hero,
     overview,
     attention,
     onNavigate,
@@ -46,7 +40,6 @@ export function SiteProfileOverview({
     onConfigureGeofence,
 }: {
     site: SiteProfileSite;
-    hero: SiteProfileHeroData;
     overview: SiteProfileOverviewData;
     attention: SiteProfileAttentionData;
     onNavigate: (tab: string) => void;
@@ -60,68 +53,11 @@ export function SiteProfileOverview({
     const canManage = overview.can_manage;
 
     return (
-        <div className="space-y-6">
-            {hero.readiness.missing_critical > 0 ? (
-                <Button
-                    type="button"
-                    unstyled
-                    onClick={() => onNavigate('readiness')}
-                    className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg px-4 py-3 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                >
-                    <CircleAlert className="h-5 w-5 shrink-0 text-status-warning" />
-                    <span className="min-w-0 flex-1">
-                        <span className="block font-medium">
-                            Complete {hero.readiness.missing_critical} critical
-                            setup{' '}
-                            {hero.readiness.missing_critical === 1
-                                ? 'item'
-                                : 'items'}
-                        </span>
-                        <span className="block text-sm text-muted-foreground">
-                            This active Site has an incomplete operational
-                            profile.
-                        </span>
-                    </span>
-                    <span className="text-sm font-medium">Review</span>
-                </Button>
-            ) : null}
-
-            <div className="grid gap-4 lg:grid-cols-4">
-                <OverviewStat
-                    label={hero.occupancy.label}
-                    value={`${hero.occupancy.occupied}/${hero.occupancy.total}`}
-                    detail="occupied"
-                    icon={BedDouble}
-                />
-                <OverviewStat
-                    label="Readiness"
-                    value={`${hero.readiness.score}%`}
-                    detail={
-                        hero.readiness.missing_critical
-                            ? 'critical setup remains'
-                            : 'core setup complete'
-                    }
-                    icon={CheckCircle2}
-                />
-                <OverviewStat
-                    label="Attention"
-                    value={String(hero.attention.total)}
-                    detail={
-                        hero.attention.critical
-                            ? `${hero.attention.critical} critical`
-                            : 'no critical items'
-                    }
-                    icon={ShieldAlert}
-                />
-                <OverviewStat
-                    label="People"
-                    value={String(hero.avatars.length)}
-                    detail="shown in Site hero"
-                    icon={Users}
-                />
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-2">
+        // 20px between sections and between cards (DESIGN.md spacing rule).
+        // No stat row or readiness banner here — those numbers live in the
+        // page header's clickable meter row (PAGE_HEADER_STYLE_GUIDE.md §5).
+        <div className="flex flex-col gap-5">
+            <div className="grid gap-5 xl:grid-cols-2">
                 <OverviewCard
                     title="Site line & key contacts"
                     icon={Phone}
@@ -264,19 +200,21 @@ export function SiteProfileOverview({
                     }
                 >
                     <div className="flex flex-wrap gap-2">
-                        <Badge
-                            variant="outline"
-                            className={cn(
-                                overview.safety.is_high_risk &&
-                                    'border-status-critical/30 bg-status-critical-bg text-status-critical',
-                            )}
+                        <StatusBadge
+                            variant={
+                                overview.safety.is_high_risk
+                                    ? 'critical'
+                                    : 'neutral'
+                            }
                         >
                             {overview.safety.is_high_risk
                                 ? 'High-risk Site'
                                 : 'Standard risk'}
-                        </Badge>
+                        </StatusBadge>
                         {overview.safety.is_high_needs ? (
-                            <Badge variant="outline">High needs</Badge>
+                            <StatusBadge variant="warning">
+                                High needs
+                            </StatusBadge>
                         ) : null}
                     </div>
                     {overview.safety.risk_notes ? (
@@ -354,7 +292,7 @@ export function SiteProfileOverview({
                 </OverviewCard>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
+            <div className="grid gap-5 xl:grid-cols-[1.3fr_1fr]">
                 <SiteAttentionPanel attention={attention} />
                 <OverviewCard
                     title="Site notes"
@@ -543,39 +481,6 @@ function RoleContactLine({
             </div>
             {action}
         </div>
-    );
-}
-
-function OverviewStat({
-    label,
-    value,
-    detail,
-    icon: Icon,
-}: {
-    label: string;
-    value: string;
-    detail: string;
-    icon: LucideIcon;
-}) {
-    return (
-        <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-                <span className="rounded-lg bg-primary/10 p-2 text-primary">
-                    <Icon className="h-5 w-5" />
-                </span>
-                <span>
-                    <span className="block text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                        {label}
-                    </span>
-                    <span className="text-2xl font-bold tabular-nums">
-                        {value}
-                    </span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                        {detail}
-                    </span>
-                </span>
-            </CardContent>
-        </Card>
     );
 }
 

@@ -10,27 +10,52 @@ below.
 
 ## Rule 1 — "Connected tab" hero rail (tier 1)
 
-The hero itself is unchanged (gradient `from-primary/90 via-primary to-primary/80`,
-decorative circles, trailing "Find /" control). Only the tabs change.
+The band/hero surface itself is owned by
+`PAGE_HEADER_STYLE_GUIDE.md` (the Event Horizon sky — the branding
+colour's own dark-to-true ramp). This rule owns only the tabs. The
+canonical measurements are the implemented `PageHeaderRail`
+(`components/page/page-header.tsx`), restated here; the pre-header
+42/46px `rounded-full` metrics (2026-09-04) are superseded — the
+header bans full-capsule pills.
 
 ### Inactive tabs
 
-- Pill: `rounded-full`, min-height 42px, padding 0 15px, 14px / weight 500,
-  icon 15px, gap 7px
-- Text `--primary-foreground` at 72% opacity; hover: `primary-foreground/10`
-  background + full-opacity text
-- Rail is bottom-aligned; inactive tabs keep an 8px bottom margin
-- Warning badges (amber count chips) unchanged
+- Text pill: radius 9, height 34px, padding 0 13px, 13px / weight 500,
+  icon 15px, gap 7px, `margin-bottom: 6px`
+- Text `--primary-foreground` at ~80% opacity; hover:
+  `primary-foreground/10` background + full-opacity text
+- Rail is bottom-aligned
+- Counters follow the counter state-colour rule (radius 6; alert
+  counts keep the fixed critical pair in every state)
 
 ### Active tab — connects to the page
 
 - Background: **page background token** (`--background`) — the tab visually
   merges with the content area below the hero
-- Text: `--primary`, weight ~550, min-height 46px, padding 0 18px
-- Radius: `12px 12px 0 0` (square bottom corners, flush with the hero's
-  bottom edge — hero gets `padding-bottom: 0`, active tab margin-bottom 0)
+- Text: `--primary`, weight 600, 13.5px, height 40px, padding 0 17px
+- Radius: `12px 12px 0 0` (square bottom corners, flush with the band's
+  bottom edge — the band's rail row gets `padding-bottom: 0`, active
+  tab margin-bottom 0)
 - No shadow, no border; the merge IS the affordance
-- Focus ring: 2px hero-colour + 2px white double ring (visible on violet)
+- Focus ring: 2px `primary-foreground`-derived ring (visible on the sky)
+
+### Merge seam (added 2026-09-05)
+
+The active tab is the page `--background` token, but the merge only
+*reads* if nothing re-tints the page ground around it.
+
+- **A hero hosting a connected rail casts no drop shadow.** `shadow-lg`
+  darkens the ground along the hero's bottom edge, so the tab's
+  identical `--background` fill reads white beside the shadow-tinted
+  grey. Erasing the shadow only underneath the tab (a `--background`
+  plug below the hero edge) was tried 2026-09-05 and rejected — the
+  shadow still tints the ground *beside* the tab, so the mismatch
+  remains. The gradient-on-grey contrast is the hero's lift; no shadow.
+- Decorative glows/orbit arcs are clipped by the band's own
+  `overflow: hidden` (`.eh-header`), never allowed to spill over the
+  seam.
+- Reference implementation: `PageHeaderRail` in
+  `resources/js/components/page/page-header.tsx`.
 
 ## Rule 2 — Dynamic toned sub-tab strip (tier 2)
 
@@ -69,7 +94,8 @@ Tone → token mapping (light and dark handled by the tokens themselves):
 
 1. violet → `--primary`
 2. teal → derived teal, hue 200 (light `oklch(45% 0.10 200)`, dark
-   `oklch(72% 0.12 200)`) — **needs a named token**, suggest `--tone-teal`
+   `oklch(72% 0.12 200)`) — the named token `--tone-teal` in `app.css`
+   (implemented 2026-09-05)
 3. green → `--status-success`
 4. amber → `--status-warning`
 5. rose → `--status-critical`
@@ -105,12 +131,16 @@ with colour used only as the active accent.
    → Rule 2 (it is the anatomy donor; align its tones to the positional
    cycle).
 
-**Token prerequisite:** add `--tone-teal` to `resources/css/app.css`
-(`:root` light `oklch(45% 0.10 200)`, `.dark` `oklch(72% 0.12 200)`) and
-register `--color-tone-teal` in the `@theme` block. The other four tones
-reuse existing tokens (`--primary`, `--status-success`, `--status-warning`,
+**Token prerequisite (done 2026-09-05):** `--tone-teal` lives in
+`resources/css/app.css` (`:root` light `oklch(45% 0.10 200)`, `.dark`
+`oklch(72% 0.12 200)`), registered as `--color-tone-teal` in the `@theme`
+block, alongside the `--tone-chip-*` fills (deep in both themes, for the
+solid icon chips). The other four tones reuse existing tokens
+(`--primary`, `--status-success`, `--status-warning`,
 `--status-critical`). Note `--live` is a *different* teal pair reserved for
-in-progress states — don't reuse it here.
+in-progress states — don't reuse it here. `GroupPillRail` and `TierTwoTabs`
+were restyled to Rules 1 and 2 the same day; the rostering `TabStrip`'s
+positional-cycle alignment is still outstanding.
 
 **Counter rule interplay:** the state-colour counter rule in `DESIGN.md`
 still applies. Under Rule 1 the active connected tab is page-coloured, so
@@ -119,6 +149,11 @@ warning pills `bg-status-warning-bg text-status-warning`), never keep the
 white-text hero styling. Under Rule 2 the count badge follows the tab's
 tone when active and `bg-muted text-muted-foreground` at rest — exactly as
 specced above.
+
+**No pins (user rule, 2026-09-06):** sub-tabs are NEVER pinnable — no
+pin/unpin buttons or any other per-tab management affordance on the
+tier-2 strip. The strip is tabs only; `TierTwoTabs` deliberately has no
+pin API, and it must not grow one back.
 
 **What the conformance sweep looks for:**
 
@@ -134,6 +169,8 @@ specced above.
    the deep light-theme values so the white icon keeps contrast).
 6. `--tone-teal` missing from `app.css` / `@theme` (ghost-token risk if the
    strip ships first).
+7. Pin/unpin affordances (or other per-tab management chrome) on a
+   sub-tab strip.
 
 ## See also
 
