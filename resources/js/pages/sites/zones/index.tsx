@@ -1,4 +1,16 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+    type PageHeaderRailItem,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { LayoutGrid, Map, MapPin, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ConfirmAction } from '../_confirm-action';
 
 type Site = {
@@ -29,9 +41,14 @@ type Props = {
     zones: Zone[];
 };
 
+type View = 'active' | 'inactive';
+
 export default function SiteZones({ site, zones }: Props) {
     const [showForm, setShowForm] = useState(false);
     const [editingZone, setEditingZone] = useState<Zone | null>(null);
+    const [view, setView] = useState<View>('active');
+    const [search, setSearch] = useState('');
+    const [typeFilter, setTypeFilter] = useState('all');
 
     const form = useForm({
         name: '',
@@ -75,61 +92,157 @@ export default function SiteZones({ site, zones }: Props) {
     };
 
     const activeZones = zones.filter((z) => z.is_active);
+    const inactiveCount = zones.length - activeZones.length;
+    const zoneTypes = useMemo(
+        () => [
+            ...new Set(
+                zones
+                    .map((z) => z.zone_type)
+                    .filter((t): t is string => !!t && t.length > 0),
+            ),
+        ],
+        [zones],
+    );
+
+    const list = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return zones.filter(
+            (z) =>
+                (view === 'active' ? z.is_active : !z.is_active) &&
+                (typeFilter === 'all' || z.zone_type === typeFilter) &&
+                (q === '' ||
+                    `${z.name} ${z.zone_type ?? ''} ${z.description ?? ''}`
+                        .toLowerCase()
+                        .includes(q)),
+        );
+    }, [zones, view, typeFilter, search]);
+
+    const railItems: PageHeaderRailItem<View>[] = [
+        {
+            key: 'active',
+            label: 'Active',
+            icon: LayoutGrid,
+            count: activeZones.length,
+        },
+        {
+            key: 'inactive',
+            label: 'Inactive',
+            icon: Trash2,
+            count: inactiveCount,
+        },
+    ];
 
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Sites', href: '/sites' },
                 { title: site.name, href: `/sites/${site.id}` },
-                { title: 'Zones', href: `#` },
+                { title: 'Zones', href: `/sites/${site.id}/zones` },
             ]}
         >
             <Head title={`${site.name} - Zones`} />
 
             <PageLayout
                 hero={
-                    <PageHero
-                        icon={Map}
-                        title="Areas & Zones"
-                        description={site.name}
+                    <PageHeader
+                        variant="profile"
                         backHref={`/sites/${site.id}`}
-                        stats={[
-                            { label: 'Total', value: zones.length },
-                            { label: 'Active', value: activeZones.length },
-                        ]}
+                        icon={Map}
+                        title={site.name}
+                        titleChip={
+                            activeZones.length > 0 ? (
+                                <PageHeaderStatusChip variant="success">
+                                    {activeZones.length} active
+                                </PageHeaderStatusChip>
+                            ) : (
+                                <PageHeaderStatusChip variant="neutral">
+                                    No zones yet
+                                </PageHeaderStatusChip>
+                            )
+                        }
+                        subline={`Areas & zones · ${zones.length} ${zones.length === 1 ? 'zone' : 'zones'} · ${zoneTypes.length} ${zoneTypes.length === 1 ? 'type' : 'types'}`}
                         actions={
-                            <Button size="sm" onClick={() => setShowForm(true)}>
-                                <Plus className="mr-1 h-4 w-4" />
-                                Add Zone
-                            </Button>
+                            <>
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder="Search zones, types…"
+                                />
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
+                                    onClick={() => setShowForm(true)}
+                                >
+                                    Add zone
+                                </PageHeaderPrimaryButton>
+                            </>
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Active zones"
+                                    ariaLabel="View active zones"
+                                    onClick={() => setView('active')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {activeZones.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        in use across the site
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Zone types"
+                                    ariaLabel="View active zones by type"
+                                    onClick={() => setView('active')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {zoneTypes.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        categories in use
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Inactive"
+                                    ariaLabel="View deactivated zones"
+                                    onClick={() => setView('inactive')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {inactiveCount}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        deactivated zones
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
+                        filters={
+                            <PageHeaderFilterSelect
+                                icon={MapPin}
+                                label="All types"
+                                value={typeFilter}
+                                options={[
+                                    { value: 'all', label: 'All types' },
+                                    ...zoneTypes.map((t) => ({
+                                        value: t,
+                                        label: t,
+                                    })),
+                                ]}
+                                onChange={setTypeFilter}
+                            />
+                        }
+                        rail={
+                            <PageHeaderRail
+                                items={railItems}
+                                value={view}
+                                onSelect={setView}
+                                ariaLabel="Zone views"
+                            />
                         }
                     />
                 }
             >
-                {/* Stats */}
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">
-                                {zones.length}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                                Total Zones
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-status-success/20 bg-status-success">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-success">
-                                {activeZones.length}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                                Active
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
                 {/* Add/Edit Form */}
                 {showForm && (
                     <Card>
@@ -205,18 +318,25 @@ export default function SiteZones({ site, zones }: Props) {
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">
-                            Zones ({activeZones.length})
+                            {view === 'active' ? 'Zones' : 'Inactive zones'} (
+                            {list.length})
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {activeZones.length === 0 ? (
+                        {list.length === 0 ? (
                             <div className="py-8 text-center text-muted-foreground">
                                 <LayoutGrid className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                <p>No zones configured yet</p>
+                                <p>
+                                    {view === 'active'
+                                        ? search.trim() || typeFilter !== 'all'
+                                            ? 'No zones match your filters.'
+                                            : 'No zones configured yet'
+                                        : 'No deactivated zones.'}
+                                </p>
                             </div>
                         ) : (
                             <div className="grid gap-3 sm:grid-cols-2">
-                                {activeZones.map((zone) => (
+                                {list.map((zone) => (
                                     <Card
                                         key={zone.id}
                                         className="transition-colors hover:bg-muted/50"
@@ -242,38 +362,47 @@ export default function SiteZones({ site, zones }: Props) {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <div className="ml-2 flex gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            startEdit(zone)
-                                                        }
-                                                    >
-                                                        Edit
-                                                    </Button>
-                                                    <ConfirmAction
-                                                        title="Deactivate zone?"
-                                                        description={`Deactivate "${zone.name}" for this site?`}
-                                                        confirmLabel="Deactivate"
-                                                        onConfirm={() =>
-                                                            handleDeactivate(
-                                                                zone,
-                                                            )
-                                                        }
-                                                    >
+                                                {zone.is_active ? (
+                                                    <div className="ml-2 flex gap-1">
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            className="text-status-critical hover:bg-status-critical hover:text-status-critical"
-                                                            disabled={
-                                                                deleteForm.processing
+                                                            onClick={() =>
+                                                                startEdit(zone)
                                                             }
                                                         >
-                                                            <Trash2 className="h-4 w-4" />
+                                                            Edit
                                                         </Button>
-                                                    </ConfirmAction>
-                                                </div>
+                                                        <ConfirmAction
+                                                            title="Deactivate zone?"
+                                                            description={`Deactivate "${zone.name}" for this site?`}
+                                                            confirmLabel="Deactivate"
+                                                            onConfirm={() =>
+                                                                handleDeactivate(
+                                                                    zone,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="text-status-critical hover:bg-status-critical hover:text-status-critical"
+                                                                disabled={
+                                                                    deleteForm.processing
+                                                                }
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </ConfirmAction>
+                                                    </div>
+                                                ) : (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="ml-2 border-muted-foreground/30 text-muted-foreground"
+                                                    >
+                                                        Inactive
+                                                    </Badge>
+                                                )}
                                             </div>
                                         </CardContent>
                                     </Card>

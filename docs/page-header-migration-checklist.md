@@ -716,7 +716,7 @@ Auth pages (`auth/*`) never appear because they aren't rendered via
 - ~~`sites/resources/index` — PageHero~~ — skipped 2026-09-08 at user request: do not migrate
 - [x] `sites/rooms/index` — PageHero
 - [x] `sites/vendors-credentials/global` — PageHero
-- [ ] `sites/zones/index` — PageHero
+- [x] `sites/zones/index` — PageHero
 
 ### smart-monitoring (1)
 
