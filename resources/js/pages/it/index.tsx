@@ -13,7 +13,7 @@ import { CsatRater } from '@/components/it/csat';
 import { ItHero } from '@/components/it/it-hero';
 import { ItModuleShell } from '@/components/it/it-module-shell';
 import { ItOverview, type OverviewPayload } from '@/components/it/it-overview';
-import { ItReports } from '@/components/it/it-reports';
+import { ItReports, REPORT_RANGES } from '@/components/it/it-reports';
 import {
     ItServiceCatalogue,
     type CatalogFieldOptions,
@@ -785,6 +785,13 @@ export default function ItIndex({
     );
     const [kbSearch, setKbSearch] = useState('');
     const [kbCategory, setKbCategory] = useState<string>(ALL);
+    const [kbStatus, setKbStatus] = useState<string>(ALL);
+    // Every rail view carries its own header filter pills (PAGE_HEADER_STYLE_GUIDE.md §6).
+    const [overviewPriority, setOverviewPriority] = useState<string>(ALL);
+    const [reportDays, setReportDays] = useState(30);
+    const [catalogQuery, setCatalogQuery] = useState('');
+    const [catalogCategory, setCatalogCategory] = useState<string>(ALL);
+    const [myStatus, setMyStatus] = useState<string>(ALL);
     // The server is canonical; this local overlay keeps the open reader in
     // sync while its partial Inertia refresh returns the updated payload.
     const [submittedKbVotes, setSubmittedKbVotes] = useState<
@@ -798,6 +805,17 @@ export default function ItIndex({
         const q = kbSearch.trim().toLowerCase();
         return (
             (kbCategory === ALL || a.category === kbCategory) &&
+            (q === '' ||
+                a.title.toLowerCase().includes(q) ||
+                (a.body ?? '').toLowerCase().includes(q))
+        );
+    });
+    /** Agent knowledge list, narrowed by the header search + pills. */
+    const agentKb = kbArticles.filter((a) => {
+        const q = kbSearch.trim().toLowerCase();
+        return (
+            (kbCategory === ALL || a.category === kbCategory) &&
+            (kbStatus === ALL || a.status === kbStatus) &&
             (q === '' ||
                 a.title.toLowerCase().includes(q) ||
                 (a.body ?? '').toLowerCase().includes(q))
@@ -1563,13 +1581,17 @@ export default function ItIndex({
                                     onChange={setSearch}
                                     placeholder="Search reference, title, requester…"
                                 />
-                            ) : !can.view &&
-                              can.request &&
-                              tab === 'knowledge' ? (
+                            ) : tab === 'knowledge' ? (
                                 <PageHeaderSearch
                                     value={kbSearch}
                                     onChange={setKbSearch}
                                     placeholder="Search the knowledge base…"
+                                />
+                            ) : can.request && tab === 'catalog' ? (
+                                <PageHeaderSearch
+                                    value={catalogQuery}
+                                    onChange={setCatalogQuery}
+                                    placeholder="Search requests, systems, needs…"
                                 />
                             ) : undefined
                         }
@@ -1788,6 +1810,85 @@ export default function ItIndex({
                                         }
                                     />
                                 </>
+                            ) : can.view && tab === 'overview' ? (
+                                <PageHeaderFilterSelect
+                                    label="Priority"
+                                    value={overviewPriority}
+                                    allValue={ALL}
+                                    options={TICKET_PRIORITIES.map((v) => ({
+                                        value: v,
+                                        label: label(v),
+                                    }))}
+                                    onChange={setOverviewPriority}
+                                />
+                            ) : can.view && tab === 'knowledge' ? (
+                                <>
+                                    <PageHeaderFilterSelect
+                                        label="Category"
+                                        value={kbCategory}
+                                        allValue={ALL}
+                                        options={TICKET_CATEGORIES.map((v) => ({
+                                            value: v,
+                                            label: label(v),
+                                        }))}
+                                        onChange={setKbCategory}
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Status"
+                                        value={kbStatus}
+                                        allValue={ALL}
+                                        options={[
+                                            ...new Set(
+                                                kbArticles.map((a) => a.status),
+                                            ),
+                                        ].map((v) => ({
+                                            value: v,
+                                            label: label(v),
+                                        }))}
+                                        onChange={setKbStatus}
+                                    />
+                                </>
+                            ) : can.view && tab === 'reports' ? (
+                                <PageHeaderFilterSelect
+                                    label="30 days"
+                                    value={String(reportDays)}
+                                    allValue="30"
+                                    options={REPORT_RANGES.map((r) => ({
+                                        value: String(r.days),
+                                        label: r.label,
+                                    }))}
+                                    onChange={(v) => setReportDays(Number(v))}
+                                />
+                            ) : can.request && tab === 'catalog' ? (
+                                <PageHeaderFilterSelect
+                                    label="Category"
+                                    value={catalogCategory}
+                                    allValue={ALL}
+                                    options={[
+                                        ...new Set(
+                                            catalogItems.map((i) => i.category),
+                                        ),
+                                    ].map((v) => ({
+                                        value: v,
+                                        label: label(v),
+                                    }))}
+                                    onChange={setCatalogCategory}
+                                />
+                            ) : can.request && tab === 'my-tickets' ? (
+                                <PageHeaderFilterSelect
+                                    label="Status"
+                                    value={myStatus}
+                                    allValue={ALL}
+                                    options={[
+                                        ...new Set(
+                                            myTickets.map((t) => t.status),
+                                        ),
+                                    ].map((v) => ({
+                                        value: v,
+                                        label: label(v),
+                                    }))}
+                                    onChange={setMyStatus}
+                                />
                             ) : !can.view &&
                               can.request &&
                               tab === 'knowledge' ? (
@@ -1829,18 +1930,19 @@ export default function ItIndex({
                         summary.tickets && (
                             <ItOverview
                                 overview={overview}
-                                kpis={{
-                                    open: summary.tickets.open,
-                                    unassigned: summary.tickets.unassigned,
-                                    at_risk: summary.tickets.at_risk,
-                                    breached: summary.tickets.breached,
-                                }}
+                                priority={
+                                    overviewPriority === ALL
+                                        ? null
+                                        : overviewPriority
+                                }
                                 onOpenTicket={(id) => setPeekId(id)}
                             />
                         )}
 
                     {/* ── Reports (agents, §L) ── */}
-                    {can.view && tab === 'reports' && <ItReports />}
+                    {can.view && tab === 'reports' && (
+                        <ItReports days={reportDays} />
+                    )}
 
                     {/* ── Provisioning queue (agents) ── */}
                     {can.view && tab === 'provisioning' && (
@@ -2678,6 +2780,10 @@ export default function ItIndex({
                         <ItServiceCatalogue
                             items={catalogItems}
                             fieldOptions={catalogFieldOptions}
+                            query={catalogQuery}
+                            category={
+                                catalogCategory === ALL ? null : catalogCategory
+                            }
                         />
                     ) : null}
 
@@ -2755,7 +2861,13 @@ export default function ItIndex({
                             ) : null}
 
                             <MyTicketsList
-                                tickets={myTickets}
+                                tickets={
+                                    myStatus === ALL
+                                        ? myTickets
+                                        : myTickets.filter(
+                                              (t) => t.status === myStatus,
+                                          )
+                                }
                                 onTicketContextMenu={myTicketMenu}
                                 emptyState={
                                     <EmptyState
@@ -2798,7 +2910,7 @@ export default function ItIndex({
                                     <span>Review</span>
                                     <span />
                                 </div>
-                                {kbArticles.map((a) => (
+                                {agentKb.map((a) => (
                                     <div
                                         key={a.id}
                                         onContextMenu={

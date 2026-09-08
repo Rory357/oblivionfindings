@@ -1,9 +1,22 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderFilterCheck,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+    type PageHeaderRailItem,
+} from '@/components/page';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
     Sheet,
     SheetContent,
@@ -33,6 +46,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Head, router } from '@inertiajs/react';
 import {
     BedDouble,
+    DoorOpen,
     GripVertical,
     History,
     Home,
@@ -41,11 +55,9 @@ import {
     Pencil,
     Plus,
     Printer,
-    Search,
     Shield,
     Sparkles,
     Trash2,
-    UserCog,
     UserPlus,
     UserX,
     type LucideIcon,
@@ -252,6 +264,27 @@ export default function FullBedroomManagement({
         });
     }, [orderedRooms, search, filter, showInactive]);
 
+    const visibleRooms = useMemo(
+        () => orderedRooms.filter((r) => showInactive || r.is_active),
+        [orderedRooms, showInactive],
+    );
+    const railCounts = useMemo(
+        () => ({
+            all: visibleRooms.length,
+            bedrooms: visibleRooms.filter((r) => r.is_assignable !== false)
+                .length,
+            communal: visibleRooms.filter((r) => r.is_assignable === false)
+                .length,
+            occupied: visibleRooms.filter(
+                (r) => r.is_assignable && !!r.assigned_client,
+            ).length,
+            available: visibleRooms.filter(
+                (r) => r.is_assignable && !r.assigned_client,
+            ).length,
+        }),
+        [visibleRooms],
+    );
+
     const bedroomList = filtered.filter((r) => r.is_assignable !== false);
     const communalList = filtered.filter((r) => r.is_assignable === false);
 
@@ -314,6 +347,7 @@ export default function FullBedroomManagement({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Sites', href: '/sites' },
                 { title: site.name, href: `/sites/${site.id}` },
                 { title: 'Bedrooms', href: `/sites/${site.id}/rooms` },
@@ -327,6 +361,13 @@ export default function FullBedroomManagement({
                         site={site}
                         summary={summary}
                         alerts={alerts}
+                        counts={railCounts}
+                        filter={filter}
+                        onFilter={setFilter}
+                        search={search}
+                        onSearch={setSearch}
+                        showInactive={showInactive}
+                        onShowInactive={setShowInactive}
                         onAdd={() => setDialog({ mode: 'add', target: null })}
                         canEdit={can_edit}
                         onSeedDefaults={() =>
@@ -339,50 +380,6 @@ export default function FullBedroomManagement({
                     />
                 }
             >
-                {/* Filter bar */}
-                <div className="flex flex-col gap-3 rounded-2xl border bg-card/40 p-3 md:flex-row md:items-center md:justify-between">
-                    <div className="flex flex-1 items-center gap-2">
-                        <div className="relative w-full md:max-w-sm">
-                            <Search className="pointer-events-none absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search room or occupant…"
-                                className="pl-8"
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                        {(
-                            [
-                                ['all', 'All'],
-                                ['bedrooms', 'Bedrooms'],
-                                ['communal', 'Communal'],
-                                ['occupied', 'Occupied'],
-                                ['available', 'Available'],
-                            ] as const
-                        ).map(([key, label]) => (
-                            <Button
-                                key={key}
-                                type="button"
-                                variant={filter === key ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setFilter(key)}
-                            >
-                                {label}
-                            </Button>
-                        ))}
-                        <Button
-                            type="button"
-                            variant={showInactive ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setShowInactive((v) => !v)}
-                        >
-                            {showInactive ? 'Hide inactive' : 'Show inactive'}
-                        </Button>
-                    </div>
-                </div>
-
                 {/* Two-section split */}
                 <div className="grid gap-4 lg:grid-cols-2">
                     <DndContext
@@ -574,10 +571,20 @@ export default function FullBedroomManagement({
 
 // ── Hero ───────────────────────────────────────────────────────────────────
 
+/** Bedrooms content composed into the canonical Event Horizon header —
+ *  site-scoped section page: back chip to the Site, module icon in the
+ *  ring, title = site name (PAGE_HEADER_STYLE_GUIDE.md). */
 function BedroomsHero({
     site,
     summary,
     alerts,
+    counts,
+    filter,
+    onFilter,
+    search,
+    onSearch,
+    showInactive,
+    onShowInactive,
     onAdd,
     canEdit,
     onSeedDefaults,
@@ -585,90 +592,186 @@ function BedroomsHero({
     site: Site;
     summary: Summary;
     alerts: Alerts;
+    counts: Record<FilterKey, number>;
+    filter: FilterKey;
+    onFilter: (key: FilterKey) => void;
+    search: string;
+    onSearch: (value: string) => void;
+    showInactive: boolean;
+    onShowInactive: (value: boolean) => void;
     onAdd: () => void;
     canEdit: boolean;
     onSeedDefaults: () => void;
 }) {
-    const metaParts = [site.type?.replace('_', ' '), site.region].filter(
-        (s): s is string => typeof s === 'string' && s.length > 0,
-    );
+    const sublineParts = [
+        'Bedroom management',
+        site.type?.replace('_', ' '),
+        site.region,
+        `${summary.total} ${summary.total === 1 ? 'room' : 'rooms'}`,
+        `${summary.assets_linked} assets linked`,
+    ].filter((s): s is string => typeof s === 'string' && s.length > 0);
+
+    const railItems: PageHeaderRailItem<FilterKey>[] = [
+        { key: 'all', label: 'All rooms', icon: Layers, count: counts.all },
+        {
+            key: 'bedrooms',
+            label: 'Bedrooms',
+            icon: BedDouble,
+            count: counts.bedrooms,
+        },
+        {
+            key: 'communal',
+            label: 'Communal',
+            icon: Home,
+            count: counts.communal,
+        },
+        {
+            key: 'occupied',
+            label: 'Occupied',
+            icon: UserPlus,
+            count: counts.occupied,
+        },
+        {
+            key: 'available',
+            label: 'Available',
+            icon: DoorOpen,
+            count: counts.available,
+        },
+    ];
+
     return (
-        <PageHero
-            icon={BedDouble}
+        <PageHeader
+            variant="profile"
             backHref={`/sites/${site.id}`}
-            backLabel={`Back to ${site.name}`}
-            title="Bedroom management"
-            description="Track who lives where, attach the assets that belong in each room, surface safeguarding flags and print door cards for night shift."
-            meta={
-                metaParts.length > 0
-                    ? [
-                          {
-                              label: `${site.name} · ${metaParts.join(' · ')}`,
-                              href: `/sites/${site.id}`,
-                          },
-                      ]
-                    : [{ label: site.name, href: `/sites/${site.id}` }]
+            icon={BedDouble}
+            title={site.name}
+            titleChip={
+                alerts.safeguarding > 0 ? (
+                    <PageHeaderStatusChip variant="critical" icon={Shield}>
+                        {alerts.safeguarding} safeguarding flag
+                        {alerts.safeguarding === 1 ? '' : 's'}
+                    </PageHeaderStatusChip>
+                ) : alerts.missing_key_worker > 0 ? (
+                    <PageHeaderStatusChip variant="warning">
+                        {alerts.missing_key_worker} without a key worker
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="success">
+                        {summary.occupied}/{summary.bedrooms} occupied
+                    </PageHeaderStatusChip>
+                )
             }
-            badges={[
-                ...(alerts.empty_bedrooms > 0
-                    ? [
-                          {
-                              icon: BedDouble,
-                              label: `${alerts.empty_bedrooms} empty bedroom${alerts.empty_bedrooms === 1 ? '' : 's'}`,
-                              tone: 'default' as const,
-                          },
-                      ]
-                    : []),
-                ...(alerts.safeguarding > 0
-                    ? [
-                          {
-                              icon: Shield,
-                              label: `${alerts.safeguarding} safeguarding flag${alerts.safeguarding === 1 ? '' : 's'}`,
-                              tone: 'critical' as const,
-                          },
-                      ]
-                    : []),
-                ...(alerts.missing_key_worker > 0
-                    ? [
-                          {
-                              icon: UserCog,
-                              label: `${alerts.missing_key_worker} occupant${alerts.missing_key_worker === 1 ? '' : 's'} without a key worker`,
-                              tone: 'warning' as const,
-                          },
-                      ]
-                    : []),
-            ]}
-            stats={[
-                { label: 'Bedrooms', value: summary.bedrooms },
-                { label: 'Occupied', value: summary.occupied },
-                { label: 'Available', value: summary.available },
-                { label: 'Occupancy', value: `${summary.occupancy_percent}%` },
-                { label: 'Communal', value: summary.communal },
-                { label: 'Assets', value: summary.assets_linked },
-            ]}
+            subline={sublineParts.join(' · ')}
             actions={
                 <>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={onAdd}
-                    >
-                        <Plus className="mr-1 h-4 w-4" />
-                        Add room
-                    </Button>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={onSearch}
+                        placeholder="Search room or occupant…"
+                    />
                     {canEdit && summary.total < 3 ? (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
+                        <PageHeaderGlassButton
+                            icon={Sparkles}
                             onClick={onSeedDefaults}
                         >
-                            <Sparkles className="mr-1 h-4 w-4" />
                             Add standard rooms
-                        </Button>
+                        </PageHeaderGlassButton>
                     ) : null}
+                    <PageHeaderPrimaryButton icon={Plus} onClick={onAdd}>
+                        Add room
+                    </PageHeaderPrimaryButton>
                 </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Occupancy"
+                        value={`${summary.occupied}/${summary.bedrooms}`}
+                        ariaLabel="View occupied bedrooms"
+                        onClick={() => onFilter('occupied')}
+                    >
+                        <PageHeaderMeterBar
+                            percent={summary.occupancy_percent}
+                        />
+                        <PageHeaderMeterCaption>
+                            {summary.occupancy_percent}% occupied ·{' '}
+                            {summary.available} available
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Available"
+                        ariaLabel="View available bedrooms"
+                        onClick={() => onFilter('available')}
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.available}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            bedrooms ready to assign
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Safeguarding"
+                        tone={alerts.safeguarding > 0 ? 'critical' : 'success'}
+                        ariaLabel="View occupied rooms with safeguarding flags"
+                        onClick={() => onFilter('occupied')}
+                    >
+                        <PageHeaderMeterBig>
+                            {alerts.safeguarding}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {alerts.safeguarding > 0
+                                ? 'flags on occupants'
+                                : 'none flagged'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Key worker gaps"
+                        tone={
+                            alerts.missing_key_worker > 0
+                                ? 'warning'
+                                : 'success'
+                        }
+                        ariaLabel="View occupants missing a key worker"
+                        onClick={() => onFilter('occupied')}
+                    >
+                        <PageHeaderMeterBig>
+                            {alerts.missing_key_worker}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {alerts.missing_key_worker > 0
+                                ? 'occupants without one'
+                                : 'every occupant covered'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Communal"
+                        ariaLabel="View communal spaces"
+                        onClick={() => onFilter('communal')}
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.communal}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            shared spaces
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterCheck
+                    label="Show inactive"
+                    checked={showInactive}
+                    onChange={onShowInactive}
+                />
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={filter}
+                    onSelect={onFilter}
+                    ariaLabel="Room views"
+                />
             }
         />
     );

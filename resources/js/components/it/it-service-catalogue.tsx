@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from '@inertiajs/react';
-import { BookOpen, Search, Send } from 'lucide-react';
+import { BookOpen, Send } from 'lucide-react';
 import { type FormEvent, useMemo, useState } from 'react';
 
 type CatalogValue = string | number | boolean | string[] | null;
@@ -58,6 +58,10 @@ export type CatalogFieldOptions = Record<
 interface Props {
     items: CatalogItem[];
     fieldOptions: CatalogFieldOptions;
+    /** Scoped search + category pill — owned by the page header
+     *  (PAGE_HEADER_STYLE_GUIDE.md §4/§6), never an in-content bar. */
+    query: string;
+    category: string | null;
 }
 
 const humanize = (value: string) =>
@@ -82,8 +86,12 @@ function initialValues(item: CatalogItem): Record<string, CatalogValue> {
     );
 }
 
-export function ItServiceCatalogue({ items, fieldOptions }: Props) {
-    const [query, setQuery] = useState('');
+export function ItServiceCatalogue({
+    items,
+    fieldOptions,
+    query,
+    category,
+}: Props) {
     const [selected, setSelected] = useState<CatalogItem | null>(null);
     const form = useForm<{
         schema_version: number;
@@ -97,16 +105,22 @@ export function ItServiceCatalogue({ items, fieldOptions }: Props) {
 
     const filtered = useMemo(() => {
         const needle = query.trim().toLocaleLowerCase();
-        if (!needle) return items;
-
-        return items.filter((item) =>
-            [item.name, item.description, item.category, item.outcome_type]
-                .filter(Boolean)
-                .some((value) =>
-                    String(value).toLocaleLowerCase().includes(needle),
-                ),
+        return items.filter(
+            (item) =>
+                (category == null || item.category === category) &&
+                (!needle ||
+                    [
+                        item.name,
+                        item.description,
+                        item.category,
+                        item.outcome_type,
+                    ]
+                        .filter(Boolean)
+                        .some((value) =>
+                            String(value).toLocaleLowerCase().includes(needle),
+                        )),
         );
-    }, [items, query]);
+    }, [items, query, category]);
 
     const open = (item: CatalogItem) => {
         setSelected(item);
@@ -160,19 +174,6 @@ export function ItServiceCatalogue({ items, fieldOptions }: Props) {
                         </p>
                     </div>
                 </div>
-                <label className="relative mt-4 block max-w-xl">
-                    <span className="sr-only">Search service catalogue</span>
-                    <Search
-                        className="pointer-events-none absolute top-3.5 left-3 h-4 w-4 text-muted-foreground"
-                        aria-hidden="true"
-                    />
-                    <Input
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search requests, systems, or support needs"
-                        className="min-h-11 pl-10"
-                    />
-                </label>
             </header>
 
             {filtered.length ? (

@@ -436,7 +436,7 @@ Auth pages (`auth/*`) never appear because they aren't rendered via
 
 - [ ] `it/changes/index` — custom
 - [ ] `it/changes/show` — custom
-- [ ] `it/index` — custom
+- [x] `it/index` — custom (upstream's PageHeader adoption brought up to spec 2026-09-08: title chip, graph-first meters incl. SLA donut + provisioning block, duplicate Overview KPI grid removed)
 - [ ] `it/major-incidents/index` — custom
 - [ ] `it/major-incidents/show` — custom
 - [ ] `it/major-incidents/status` — custom
@@ -713,8 +713,8 @@ Auth pages (`auth/*`) never appear because they aren't rendered via
 - [x] `sites/reports/index` — PageHero
 - ~~`sites/reports/overdue-actions` — PageHero~~ — skipped 2026-09-07 at user request: only the main `sites/reports/index` gets migrated; sub-reports stay on PageHero
 - ~~`sites/reports/site-detail` — PageHero~~ — skipped 2026-09-07 at user request: only the main `sites/reports/index` gets migrated; sub-reports stay on PageHero
-- [ ] `sites/resources/index` — PageHero
-- [ ] `sites/rooms/index` — PageHero
+- ~~`sites/resources/index` — PageHero~~ — skipped 2026-09-08 at user request: do not migrate
+- [x] `sites/rooms/index` — PageHero
 - [x] `sites/vendors-credentials/global` — PageHero
 - [ ] `sites/zones/index` — PageHero
 

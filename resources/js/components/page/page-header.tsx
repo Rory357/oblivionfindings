@@ -43,6 +43,12 @@ import {
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
     Popover,
     PopoverContent,
     PopoverTrigger,
@@ -944,6 +950,13 @@ export interface PageHeaderRailItem<K extends string = string> {
  * page --background and sits flush with the edge — the merge with the page
  * ground is the affordance (NAVIGATION_STYLE_GUIDE.md Rule 1). Counters
  * follow the counter state-colour rule and never disappear on activation.
+ *
+ * EVERY rail ends with the ghost "⌕ Find" chip (guide §7, mandatory
+ * 2026-09-08): pages with a richer section palette pass `onFind` (record
+ * profiles — `/` opens it there); otherwise the rail opens its own
+ * built-in palette over these view items. On pages whose header carries
+ * the scoped search input, `/` stays with the search — the built-in chip
+ * opens on click and shows no kbd hint.
  */
 export function PageHeaderRail<K extends string>({
     items,
@@ -957,13 +970,14 @@ export function PageHeaderRail<K extends string>({
     items: PageHeaderRailItem<K>[];
     value: K;
     onSelect: (key: K) => void;
-    /** Renders the compact "Find /" chip at the rail's end — opens the
-     *  page's section palette (profile pages; `/` is its shortcut). */
+    /** Custom palette opener (record profiles); omitted → the rail's own
+     *  built-in views palette. */
     onFind?: () => void;
     ariaLabel?: string;
     onItemContextMenu?: (key: K, event: React.MouseEvent) => void;
     decorations?: Partial<Record<K, ReactNode>>;
 }) {
+    const [viewsFindOpen, setViewsFindOpen] = useState(false);
     return (
         <div
             role="tablist"
@@ -1017,24 +1031,118 @@ export function PageHeaderRail<K extends string>({
                     </button>
                 );
             })}
-            {onFind ? (
-                <button
-                    type="button"
-                    onClick={onFind}
-                    title="Find a section (/)"
-                    aria-label="Find a section"
-                    className="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
-                >
-                    <Search className="size-[15px]" />
-                    <span className="hidden sm:inline">Find</span>
+            <button
+                type="button"
+                onClick={onFind ?? (() => setViewsFindOpen(true))}
+                title={onFind ? 'Find a section (/)' : 'Find a view'}
+                aria-label={onFind ? 'Find a section' : 'Find a view'}
+                className="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
+            >
+                <Search className="size-[15px]" />
+                <span className="hidden sm:inline">Find</span>
+                {onFind ? (
                     <kbd
                         aria-hidden="true"
                         className="hidden rounded-[5px] border border-primary-foreground/30 px-1 text-[10px] sm:inline"
                     >
                         /
                     </kbd>
-                </button>
-            ) : null}
+                ) : null}
+            </button>
+            {onFind ? null : (
+                <RailViewsPalette
+                    items={items}
+                    open={viewsFindOpen}
+                    onOpenChange={setViewsFindOpen}
+                    ariaLabel={`Find a view — ${ariaLabel}`}
+                    onPick={(key) => {
+                        setViewsFindOpen(false);
+                        onSelect(key);
+                    }}
+                />
+            )}
         </div>
+    );
+}
+
+/**
+ * The rail's built-in fallback palette — a light dialog over its own view
+ * items, so every page gets the Find chip without building a palette.
+ * Record profiles keep their richer grouped `TabSearchPalette` via `onFind`.
+ */
+function RailViewsPalette<K extends string>({
+    items,
+    open,
+    onOpenChange,
+    onPick,
+    ariaLabel,
+}: {
+    items: PageHeaderRailItem<K>[];
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onPick: (key: K) => void;
+    ariaLabel: string;
+}) {
+    const [query, setQuery] = useState('');
+    useEffect(() => {
+        if (open) setQuery('');
+    }, [open]);
+    const list = items.filter((it) =>
+        it.label.toLowerCase().includes(query.trim().toLowerCase()),
+    );
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-sm gap-3 p-3">
+                <DialogTitle className="sr-only">{ariaLabel}</DialogTitle>
+                <DialogDescription className="sr-only">
+                    Search the views on this page and jump to one.
+                </DialogDescription>
+                <input
+                    autoFocus
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && list[0]) {
+                            e.preventDefault();
+                            onPick(list[0].key);
+                        }
+                    }}
+                    placeholder="Find a view…"
+                    aria-label={ariaLabel}
+                    className="h-9 w-full rounded-md border border-input bg-background pr-9 pl-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <div className="-mx-1 max-h-[300px] overflow-y-auto px-1">
+                    {list.length === 0 ? (
+                        <p className="px-2.5 py-4 text-center text-[13px] text-muted-foreground">
+                            No views match.
+                        </p>
+                    ) : (
+                        list.map((it) => {
+                            const Icon = it.icon;
+                            return (
+                                <button
+                                    key={it.key}
+                                    type="button"
+                                    onClick={() => onPick(it.key)}
+                                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
+                                >
+                                    {Icon ? (
+                                        <Icon className="size-4 text-muted-foreground" />
+                                    ) : null}
+                                    <span className="flex-1 truncate">
+                                        {it.label}
+                                    </span>
+                                    {it.count != null ? (
+                                        <span className="text-[11px] font-semibold text-muted-foreground tabular-nums">
+                                            {it.count}
+                                        </span>
+                                    ) : null}
+                                </button>
+                            );
+                        })
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }

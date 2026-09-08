@@ -127,7 +127,8 @@ interface ReportData {
     quality: Record<string, DrillMetric>;
 }
 
-const RANGES = [
+/** Range options — rendered as a header filter pill by the page. */
+export const REPORT_RANGES = [
     { days: 7, label: '7 days' },
     { days: 30, label: '30 days' },
     { days: 90, label: '90 days' },
@@ -172,8 +173,7 @@ const TOOLTIP_STYLE = {
     fontSize: 12,
 } as const;
 
-export function ItReports() {
-    const [days, setDays] = useState(30);
+export function ItReports({ days = 30 }: { days?: number }) {
     const [data, setData] = useState<ReportData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -285,21 +285,8 @@ export function ItReports() {
                         ? `${shortDate(data.range.from)} → ${shortDate(data.range.to)}`
                         : 'loading…'}
                 </p>
+                {/* The range lives in the header filter row (PAGE_HEADER_STYLE_GUIDE.md §6). */}
                 <div className="ml-auto flex items-center gap-2">
-                    <div className="inline-flex gap-1 rounded-lg bg-muted p-1">
-                        {RANGES.map((r) => (
-                            <Button
-                                key={r.days}
-                                size="sm"
-                                variant={days === r.days ? 'default' : 'ghost'}
-                                className="h-7"
-                                onClick={() => setDays(r.days)}
-                                aria-pressed={days === r.days}
-                            >
-                                {r.label}
-                            </Button>
-                        ))}
-                    </div>
                     {data && hasAnything ? (
                         <Button
                             asChild

@@ -427,6 +427,10 @@ describe('IT & Support grouped navigation', () => {
         const { fireEvent } = await import('@testing-library/react');
         render(
             <ItServiceCatalogue
+                // Search + category narrowing are owned by the page header
+                // (PAGE_HEADER_STYLE_GUIDE.md §4/§6) and passed down.
+                query=""
+                category={null}
                 items={[
                     {
                         id: 9,

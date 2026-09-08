@@ -340,6 +340,23 @@ before.
   head value; a plain stat is the fallback only when no real visual form
   exists — e.g. the same money figure with NO budget configured
   (PAGE_HEADER_STYLE_GUIDE.md §5).
+- **Filterless rail tabs** (corrected 2026-09-08) — a header whose
+  filter row is populated on one rail view and empty on another: the
+  band collapses a row and the rhythm jumps between tabs. EVERY rail
+  view supplies real filter pills for its own content (queue filters,
+  a report range, a catalogue category, a board priority) — and never
+  a decorative pill that filters nothing. Reference: IT & Support
+  (`pages/it/index.tsx`), all seven views
+  (PAGE_HEADER_STYLE_GUIDE.md §6).
+- **Rail without the Find chip** (corrected 2026-09-08) — every rail
+  ends with the ghost "⌕ Find" chip, exactly as the Sites profile
+  renders it. `PageHeaderRail` now renders it BY DEFAULT with a
+  built-in palette over its own views; record profiles pass `onFind`
+  for their richer grouped `TabSearchPalette` (`/` opens it there —
+  elsewhere `/` belongs to the header's scoped search). Suppressing
+  the chip is a migration gap, not a variant — only pages with no rail
+  at all (leaf record details) are exempt
+  (PAGE_HEADER_STYLE_GUIDE.md §7).
 - **Sunken active-rail labels** (corrected 2026-09-06, re-verified
   2026-09-07) — the Rule 1 connected active tab is taller than its
   inactive pills, so an uncompensated label sits ~3px below their shared

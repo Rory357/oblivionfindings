@@ -71,13 +71,6 @@ export interface OverviewPayload {
     recent_activity: ActivityRow[];
 }
 
-interface OverviewKpis {
-    open: number;
-    unassigned: number;
-    at_risk: number;
-    breached: number;
-}
-
 const priorityVariant: Record<string, StatusVariant> = {
     urgent: 'critical',
     high: 'critical',
@@ -116,39 +109,26 @@ function fmtMins(m: number | null): string {
  */
 export function ItOverview({
     overview,
-    kpis,
+    priority = null,
     onOpenTicket,
 }: {
     overview: OverviewPayload;
-    kpis: OverviewKpis;
+    /** Header filter-row pill: narrow the attention lanes to one priority. */
+    priority?: string | null;
     onOpenTicket: (id: number) => void;
 }) {
+    const byPriority = <T extends { priority: string }>(rows: T[]): T[] =>
+        priority ? rows.filter((row) => row.priority === priority) : rows;
+    const slaLane = byPriority(overview.sla_lane);
+    const awaitingLane = byPriority(overview.awaiting_lane);
+    const agingLane = byPriority(overview.aging_lane);
     return (
         <div className="flex flex-col gap-4">
-            {/* KPI row */}
+            {/* The queue KPIs (open / unassigned / breaching / breached) live
+                in the header meter row — no duplicate stat grid here
+                (DESIGN.md: fold key numbers into the meter row). Only the
+                metric without a header home stays on the board. */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                <Kpi
-                    label="Open"
-                    value={kpis.open}
-                    href="/it?tab=tickets&view=all_open"
-                />
-                <Kpi
-                    label="Unassigned"
-                    value={kpis.unassigned}
-                    href="/it?tab=tickets&view=unassigned"
-                />
-                <Kpi
-                    label="Breaching soon"
-                    value={kpis.at_risk}
-                    href="/it?tab=tickets&view=breaching"
-                    amber={kpis.at_risk > 0}
-                />
-                <Kpi
-                    label="Breached"
-                    value={kpis.breached}
-                    href="/it?tab=tickets&view=breached"
-                    critical={kpis.breached > 0}
-                />
                 <Kpi
                     label="Avg first response · 30d"
                     value={fmtMins(overview.avg_first_response_mins)}
@@ -160,10 +140,10 @@ export function ItOverview({
                 <LaneCard
                     icon={TriangleAlert}
                     title="SLA at risk / breached"
-                    tone={overview.sla_lane.length > 0 ? 'critical' : 'neutral'}
+                    tone={slaLane.length > 0 ? 'critical' : 'neutral'}
                     viewHref="/it?tab=tickets&view=breaching"
                     empty="Every open ticket is comfortably within SLA."
-                    rows={overview.sla_lane}
+                    rows={slaLane}
                     render={(t) => (
                         <LaneRow
                             key={t.id}
@@ -192,14 +172,10 @@ export function ItOverview({
                 <LaneCard
                     icon={Inbox}
                     title="Awaiting agent reply"
-                    tone={
-                        overview.awaiting_lane.length > 0
-                            ? 'warning'
-                            : 'neutral'
-                    }
+                    tone={awaitingLane.length > 0 ? 'warning' : 'neutral'}
                     viewHref="/it?tab=tickets&view=awaiting_reply"
                     empty="No tickets are waiting on a first response."
-                    rows={overview.awaiting_lane}
+                    rows={awaitingLane}
                     render={(t) => (
                         <LaneRow
                             key={t.id}
@@ -219,12 +195,10 @@ export function ItOverview({
                 <LaneCard
                     icon={Clock}
                     title="Aging · open >7 days"
-                    tone={
-                        overview.aging_lane.length > 0 ? 'warning' : 'neutral'
-                    }
+                    tone={agingLane.length > 0 ? 'warning' : 'neutral'}
                     viewHref="/it?tab=tickets&view=all_open&sort=created&dir=asc"
                     empty="Nothing has been sitting open for more than a week."
-                    rows={overview.aging_lane}
+                    rows={agingLane}
                     render={(t) => (
                         <LaneRow
                             key={t.id}

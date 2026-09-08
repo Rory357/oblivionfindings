@@ -181,8 +181,14 @@ Each row is its own `min-h-[80px]` flex line inside the `meters` slot
 grows to fit; the split is thematic, not arbitrary. Reference:
 the Client Profile (`pages/operations/clients/show.tsx`) — row 1
 "Next shift · Needs attention · Safety · Care plan goals · Daily
-notes", row 2 "Meals today · Mood · Sleep · Medications". Index pages
-stay on the single 4–6 block row.
+notes", row 2 "Meals today · Mood · Sleep · Medications". **Dense
+module hubs qualify too** (extended 2026-09-08): an index page whose
+module genuinely carries more than ~6 important instruments splits the
+same way rather than cramming one tight line — reference IT & Support
+(`pages/it/index.tsx` via `components/it/it-hero.tsx`): row 1 "Open ·
+Unassigned · Breaching soon · Breached" (queue pressure), row 2
+"Awaiting reply · Waiting · SLA met donut · Provisioning" (flow &
+delivery). Ordinary index pages with ≤6 blocks stay on the single row.
 
 **Block surface**: radius 10, dark glass (`--eh-ink` at 45% alpha),
 1px border. Neutral blocks take a brand border (brand-25%-white at
@@ -257,6 +263,16 @@ types/regions/status/archived + Cards–Table; a profile gets
 date-range/staff; a dashboard gets whatever it filters by. All fields
 in the row share the same height — no odd one out.
 
+**Every rail view carries its own pills** (reinforced 2026-09-08): on
+a page whose rail switches views, EACH tab supplies real filter pills
+for its own content — a queue gets its queue filters, a report view its
+range, a catalogue its category, a board a priority narrow. The filter
+row never sits populated on one tab and empty on the next (the band
+visibly collapses and the rhythm jumps); if a view truly has nothing
+filterable, give it its honest control (a range, a scope) rather than
+none — and never a dead pill that filters nothing. Reference: IT &
+Support, where all seven views keep the row live.
+
 ## 7. The rail — main view tabs (bottom edge)
 
 The page's primary view/filter tabs render here as the **Rule 1
@@ -288,13 +304,21 @@ connected-tab rail** (NAVIGATION_STYLE_GUIDE.md):
   tab → brand-tint pair; inactive → white/15 on white; alert counts →
   the fixed critical pair. A counter must never disappear when its tab
   activates.
-- **The Find chip** (reinforced 2026-09-06): a page whose sections open
-  a jump palette (record profiles) ends the rail with a compact ghost
-  "⌕ Find /" chip — inline with the tabs at the row's far end
-  (`margin-left: auto`), sized like an inactive pill (34px, radius 9,
-  6px bottom margin), opening the section palette; `/` stays its
-  keyboard shortcut. Quick section-finding is part of the rail, not a
-  separate bar.
+- **The Find chip — on EVERY rail** (reinforced 2026-09-06; made
+  mandatory 2026-09-08): every page that renders the rail ends it with
+  the compact ghost "⌕ Find /" chip, exactly as the Sites profile does —
+  inline with the tabs at the row's far end (`margin-left: auto`), sized
+  like an inactive pill (34px, radius 9, 6px bottom margin). It opens
+  the page's jump palette: the grouped section palette on record
+  profiles (`TabSearchPalette`, via `PageHeaderRail onFind` — `/` opens
+  it there), or the rail's own BUILT-IN views palette everywhere else
+  (rendered by `PageHeaderRail` automatically when no `onFind` is
+  passed). `/` ownership: on pages whose header carries the scoped
+  search input, `/` stays with the search — the built-in chip opens on
+  click and shows no kbd hint.
+  Quick section-finding is part of the rail, not a separate bar — and a
+  rail without the Find chip is a migration gap, not a variant. (Pages
+  with no rail at all — leaf record details — are the only exemption.)
 
 ## 8. Sub nav — individual/record pages only
 
