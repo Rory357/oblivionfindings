@@ -91,8 +91,36 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
 
             return $outbox;
         };
+        $failTicketInsert = false;
+        ItTicket::creating(function () use (&$failTicketInsert): void {
+            if ($failTicketInsert) {
+                throw new RuntimeException('Synthetic browser fixture: interrupted technical ticket insert.');
+            }
+        });
+        $failedDelivery = static function ($outbox, object $sourceJob, object $itJob) use (&$failTicketInsert): void {
+            app()->call([$sourceJob, 'handle']);
+            $before = ItTicket::query()->count();
+            $failTicketInsert = true;
+            try {
+                app()->call([$itJob, 'handle']);
+                throw new LogicException('The synthetic ticket interruption did not run.');
+            } catch (RuntimeException $exception) {
+                w06BrowserRequire($exception->getMessage() === 'Synthetic browser fixture: interrupted technical ticket insert.',
+                    'Unexpected failure while preparing the synthetic delivery.');
+            } finally {
+                $failTicketInsert = false;
+            }
+            $outbox->refresh();
+            w06BrowserRequire($outbox->status === 'sent' && $outbox->it_status === 'failed'
+                && $outbox->it_outcome_code === 'processing_failed' && $outbox->it_attempts === 1
+                && ItTicket::query()->count() === $before,
+                'Synthetic failed delivery must preserve its real source intent and roll back technical work.');
+        };
+        $retryCases = [];
+        $historyPending = [];
         $cases = [];
-        foreach (['direct', 'recovered', 'urgent', 'other_site', 'urgent_recovered'] as $case) {
+        $nativeCases = ['direct', 'recovered', 'urgent', 'other_site', 'urgent_recovered', 'retry', 'retry_stale', 'retry_access'];
+        foreach (array_merge($nativeCases, array_map(fn (int $number): string => 'history_pending_'.$number, range(1, 13))) as $case) {
             $siteId = (int) $fixtures['sites'][$case === 'other_site' ? 'c' : 'a'];
             $urgent = in_array($case, ['urgent', 'urgent_recovered'], true);
             SignalRule::query()->where('signal_type_code', 'device_offline')->update(['output_severity' => $urgent ? 'high' : 'medium']);
@@ -108,6 +136,26 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
             $failure = app(MonitoringObservationIngestor::class)->ingest($monitor,
                 new ObservationInput('w14-'.$case.'-failed', MonitorState::Failed, $time), $siteId, (int) $device->id, null)->deviceEvent;
             w06BrowserRequire($failure !== null, 'The synthetic confirmed fault has no canonical source event.');
+            if (str_starts_with($case, 'history_pending_')) {
+                // A real acknowledged source with an undispatched IT intent,
+                // bounded to13 fixtures so the authorized history spans two pages.
+                $outbox = $failure->signalOutbox()->sole();
+                app()->call([new DispatchDeviceEventSignalOutbox($outbox->id), 'handle']);
+                $outbox->refresh();
+                w06BrowserRequire($outbox->status === 'sent' && $outbox->it_status === 'pending'
+                    && $outbox->it_attempts === 0 && empty($outbox->it_ticket_ids),
+                    'Synthetic history fixture must retain an undispatched canonical IT intent.');
+                $historyPending[] = $outbox->id;
+
+                continue;
+            }
+            if (str_starts_with($case, 'retry')) {
+                $outbox = $failure->signalOutbox()->sole();
+                $failedDelivery($outbox, new DispatchDeviceEventSignalOutbox($outbox->id), new DispatchDeviceMonitoringTicket($outbox->id));
+                $retryCases[$case] = ['source' => 'device', 'outbox_id' => $outbox->id, 'device_id' => $device->id, 'site_id' => $siteId];
+
+                continue;
+            }
             $outbox = $deliver($failure);
             $ticket = ItTicket::query()->findOrFail($outbox->it_ticket_ids[0]);
             if (in_array($case, ['recovered', 'urgent_recovered'], true)) {
@@ -174,7 +222,7 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
         $anchor = CarbonImmutable::now()->startOfSecond();
         $previousTestNow = Carbon::getTestNow();
         try {
-            foreach (['fleet_direct', 'fleet_recovered', 'fleet_urgent'] as $case) {
+            foreach (['fleet_direct', 'fleet_recovered', 'fleet_urgent', 'fleet_retry'] as $case) {
                 SignalRule::query()->updateOrCreate(['name' => 'W14 synthetic Fleet availability'], [
                     'signal_type_code' => 'fleet_device_offline', 'priority' => 1, 'is_active' => true,
                     'output_severity' => $case === 'fleet_urgent' ? 'high' : 'medium',
@@ -201,6 +249,14 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
                 Carbon::setTestNow($anchor->subMinute());
                 (new DetectFleetOfflineDevices)->handle(app(FleetSignalService::class));
                 $offline = FleetSignal::query()->where('asset_id', $asset->id)->where('signal_type', 'device.offline')->sole();
+                if ($case === 'fleet_retry') {
+                    $outbox = FleetSignalOutbox::query()->where('fleet_signal_id', $offline->id)->sole();
+                    $failedDelivery($outbox, new DispatchFleetSignalOutbox($outbox->id), new DispatchFleetMonitoringTicket($outbox->id));
+                    $retryCases[$case] = ['source' => 'fleet', 'outbox_id' => $outbox->id, 'device_id' => $device->id,
+                        'asset_id' => $asset->id, 'site_id' => $siteId];
+
+                    continue;
+                }
                 $outbox = $fleetDeliver($offline);
                 if ($case === 'fleet_recovered') {
                     Carbon::setTestNow($anchor);
@@ -245,6 +301,7 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
         }
 
         return ['synthetic_only' => true, 'queue_id' => $queue->id, 'team_id' => $team->id, 'cases' => $cases,
-            'handoffs' => $handoffs, 'handoff_service_id' => $handoffService->id];
+            'handoffs' => $handoffs, 'handoff_service_id' => $handoffService->id, 'retry_cases' => $retryCases,
+            'history_pending_outbox_ids' => $historyPending];
     });
 }

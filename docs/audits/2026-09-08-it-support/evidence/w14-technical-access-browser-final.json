@@ -1,0 +1,180 @@
+{
+    "token": "b26e8827895f418d",
+    "mutations_performed": false,
+    "cases": {
+        "retry": {
+            "source": "device",
+            "outcome": {
+                "id": 8,
+                "status": "sent",
+                "it_status": "applied",
+                "it_attempts": 2,
+                "it_attempt_limit": 2,
+                "it_outcome_code": "ticket_created",
+                "it_ticket_ids": "[20]",
+                "it_completed_at": "2026-09-12 09:07:44"
+            },
+            "tickets": [
+                {
+                    "id": 20,
+                    "reference": "IT-000020",
+                    "status": "open",
+                    "site_id": 1,
+                    "queue_id": 1,
+                    "team_id": 1,
+                    "assigned_to_user_id": 3,
+                    "owner_user_id": 3
+                }
+            ],
+            "audits": [
+                {
+                    "action": "it.monitoring.delivery_retry_requested",
+                    "user_id": 3
+                },
+                {
+                    "action": "it.monitoring.delivery_completed",
+                    "user_id": null
+                }
+            ]
+        },
+        "retry_stale": {
+            "source": "device",
+            "outcome": {
+                "id": 9,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        },
+        "retry_access": {
+            "source": "device",
+            "outcome": {
+                "id": 10,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        },
+        "fleet_retry": {
+            "source": "fleet",
+            "outcome": {
+                "id": 5,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        }
+    },
+    "history_pending": [
+        {
+            "id": 11,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 12,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 13,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 14,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 15,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 16,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 17,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 18,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 19,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 20,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 21,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 22,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 23,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        }
+    ],
+    "ticket_count": 20
+}

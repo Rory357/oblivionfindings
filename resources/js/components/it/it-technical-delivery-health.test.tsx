@@ -112,6 +112,20 @@ describe('technical delivery operations', () => {
                 document.getElementById('it-device-delivery-unavailable'),
             ).toHaveFocus(),
         );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Refresh delivery access' }),
+        );
+        expect(router.get).toHaveBeenCalledWith(
+            window.location.href,
+            {},
+            {
+                preserveState: false,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+        // A refresh request alone is not evidence that permission was restored.
+        expect(screen.queryByText('Delivery 21')).not.toBeInTheDocument();
     });
 
     it('distinguishes a filtered empty history from the complete scoped health totals', () => {

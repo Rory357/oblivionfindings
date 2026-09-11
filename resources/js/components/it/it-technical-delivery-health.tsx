@@ -288,9 +288,18 @@ export function ItTechnicalDeliveryHealth({
                                     <Button
                                         variant="outline"
                                         onClick={() =>
-                                            router.reload({
-                                                preserveState: false,
-                                            })
+                                            // Inertia reload always retains component state.
+                                            // A fresh GET must reset the concealed view only
+                                            // after current permissions have been checked.
+                                            router.get(
+                                                window.location.href,
+                                                {},
+                                                {
+                                                    preserveState: false,
+                                                    preserveScroll: true,
+                                                    replace: true,
+                                                },
+                                            )
                                         }
                                     >
                                         Refresh delivery access

@@ -1,0 +1,127 @@
+{
+    "token": "33eaee60878c45e8",
+    "mutations_performed": false,
+    "cases": {
+        "retry": {
+            "source": "device",
+            "outcome": {
+                "id": 8,
+                "status": "sent",
+                "it_status": "applied",
+                "it_attempts": 2,
+                "it_attempt_limit": 2,
+                "it_outcome_code": "ticket_created",
+                "it_ticket_ids": "[20]",
+                "it_completed_at": "2026-09-12 08:44:55"
+            },
+            "tickets": [
+                {
+                    "id": 20,
+                    "reference": "IT-000020",
+                    "status": "open",
+                    "site_id": 1,
+                    "queue_id": 1,
+                    "team_id": 1,
+                    "assigned_to_user_id": 3,
+                    "owner_user_id": 3
+                }
+            ],
+            "audits": [
+                {
+                    "action": "it.monitoring.delivery_retry_requested",
+                    "user_id": 3
+                },
+                {
+                    "action": "it.monitoring.delivery_completed",
+                    "user_id": null
+                }
+            ]
+        },
+        "retry_stale": {
+            "source": "device",
+            "outcome": {
+                "id": 9,
+                "status": "sent",
+                "it_status": "applied",
+                "it_attempts": 2,
+                "it_attempt_limit": 2,
+                "it_outcome_code": "ticket_created",
+                "it_ticket_ids": "[22]",
+                "it_completed_at": "2026-09-12 08:46:59"
+            },
+            "tickets": [
+                {
+                    "id": 22,
+                    "reference": "IT-000022",
+                    "status": "open",
+                    "site_id": 1,
+                    "queue_id": 1,
+                    "team_id": 1,
+                    "assigned_to_user_id": 3,
+                    "owner_user_id": 3
+                }
+            ],
+            "audits": [
+                {
+                    "action": "it.monitoring.delivery_retry_requested",
+                    "user_id": 3
+                },
+                {
+                    "action": "it.monitoring.delivery_completed",
+                    "user_id": null
+                }
+            ]
+        },
+        "retry_access": {
+            "source": "device",
+            "outcome": {
+                "id": 10,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        },
+        "fleet_retry": {
+            "source": "fleet",
+            "outcome": {
+                "id": 5,
+                "status": "sent",
+                "it_status": "applied",
+                "it_attempts": 2,
+                "it_attempt_limit": 2,
+                "it_outcome_code": "ticket_created",
+                "it_ticket_ids": "[21]",
+                "it_completed_at": "2026-09-12 08:45:51"
+            },
+            "tickets": [
+                {
+                    "id": 21,
+                    "reference": "IT-000021",
+                    "status": "open",
+                    "site_id": 1,
+                    "queue_id": 1,
+                    "team_id": 1,
+                    "assigned_to_user_id": 3,
+                    "owner_user_id": 3
+                }
+            ],
+            "audits": [
+                {
+                    "action": "it.fleet.delivery_retry_requested",
+                    "user_id": 3
+                },
+                {
+                    "action": "it.fleet.delivery_completed",
+                    "user_id": null
+                }
+            ]
+        }
+    },
+    "ticket_count": 22
+}
