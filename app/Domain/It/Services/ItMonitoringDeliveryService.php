@@ -2,7 +2,7 @@
 
 namespace App\Domain\It\Services;
 
-use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
+use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -33,7 +33,7 @@ final class ItMonitoringDeliveryService extends ItTechnicalDeliveryService
             }
             $device = Device::query()->find($event->device_id);
             $suppressed = $signal->status === 'suppressed';
-            $eligible = ! $suppressed && $device?->domain === 'it_infrastructure' && in_array($event->event_type, ['offline', 'online'], true);
+            $eligible = ! $suppressed && $device?->domain === 'it_infrastructure' && in_array($event->event_type, MonitoringIssueEpisode::EVENT_TYPES, true);
             $outbox->forceFill([
                 'it_status' => $eligible ? 'pending' : 'ignored',
                 'it_signal_id' => $signal->id,
@@ -86,7 +86,7 @@ final class ItMonitoringDeliveryService extends ItTechnicalDeliveryService
             || (int) $event->device_id !== ($scope['device_id'] ?? null)
             || ($scope['domain'] ?? null) !== $device->domain
             || ($scope['event_identity'] ?? null) !== $this->eventIdentity($event)
-            || ! in_array($event->event_type, ['offline', 'online'], true)
+            || ! in_array($event->event_type, MonitoringIssueEpisode::EVENT_TYPES, true)
             || $signal->external_ref !== 'device_event_'.$event->id
             || $signal->signal_type_code !== 'device_'.$event->event_type
             || (int) data_get($signal->normalized_data, 'device_event_id') !== (int) $event->id
@@ -100,11 +100,13 @@ final class ItMonitoringDeliveryService extends ItTechnicalDeliveryService
         if (($scope['work_routing'] ?? null) !== data_get($signal->normalized_data, 'it_work_routing')) {
             throw new DomainException('source_scope_changed');
         }
-        if (data_get($event->payload, 'availability_episode_version') === 1
-            && ((! ($event->event_type === 'online' && data_get($event->payload, 'availability_episode') === null)
-                    && ! MonitoringAvailabilityEpisode::hasCanonicalObservations($event, (int) $signal->site_id))
-                || data_get($signal->normalized_data, 'availability_episode_version') !== 1
-                || data_get($signal->normalized_data, 'availability_episode_key') !== (MonitoringAvailabilityEpisode::fromEvent($event, (int) $signal->site_id)['key'] ?? null))) {
+        $episodeField = MonitoringIssueEpisode::field($event->event_type);
+        if (MonitoringIssueEpisode::isNative($event)
+            && ((! (in_array($event->event_type, MonitoringIssueEpisode::RECOVERY_TYPES, true) && data_get($event->payload, $episodeField) === null
+                        && data_get($event->payload, $episodeField.'_version') === 1)
+                    && ! MonitoringIssueEpisode::hasCanonicalObservations($event, (int) $signal->site_id))
+                || data_get($signal->normalized_data, $episodeField.'_version') !== 1
+                || data_get($signal->normalized_data, $episodeField.'_key') !== (MonitoringIssueEpisode::fromEvent($event, (int) $signal->site_id)['key'] ?? null))) {
             throw new DomainException('source_scope_changed');
         }
 
@@ -120,8 +122,8 @@ final class ItMonitoringDeliveryService extends ItTechnicalDeliveryService
             data_get($event->payload, 'legacy_monitoring_recovery') === true,
         ];
         // Keep pre-episode pending intents compatible with their original digest.
-        if (data_get($event->payload, 'availability_episode_version') === 1) {
-            $identity[] = ['native-availability-v1', MonitoringAvailabilityEpisode::fromEvent($event)['key'] ?? null,
+        if (MonitoringIssueEpisode::isNative($event)) {
+            $identity[] = [MonitoringIssueEpisode::field($event->event_type) === 'condition_episode' ? 'native-condition-v1' : 'native-availability-v1', MonitoringIssueEpisode::fromEvent($event)['key'] ?? null,
                 data_get($event->payload, 'monitor_id'), data_get($event->payload, 'observation_id'),
                 data_get($event->payload, 'site_id'), data_get($event->payload, 'from_state'), data_get($event->payload, 'to_state')];
         }

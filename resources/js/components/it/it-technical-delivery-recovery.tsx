@@ -25,11 +25,15 @@ export function ItTechnicalDeliveryRecovery({
     source,
     deliveryId,
     onAccessLost,
+    onRetryStarted,
+    onReviewed,
 }: {
     actorId: number;
     source: DeliverySource;
     deliveryId: number;
     onAccessLost: () => void;
+    onRetryStarted?: () => void;
+    onReviewed?: (review: DeliveryReview) => void;
 }) {
     const [review, setReview] = useState<DeliveryReview | null>(null);
     const [stage, setStage] = useState<
@@ -40,10 +44,14 @@ export function ItTechnicalDeliveryRecovery({
     const active = useRef<AbortController | null>(null);
     const epoch = useRef(0);
     const accessLost = useRef(onAccessLost);
+    const historyCallbacks = useRef({ onRetryStarted, onReviewed });
     const feedback = useRef<HTMLDivElement | null>(null);
     useLayoutEffect(() => {
         accessLost.current = onAccessLost;
     }, [onAccessLost]);
+    useLayoutEffect(() => {
+        historyCallbacks.current = { onRetryStarted, onReviewed };
+    }, [onRetryStarted, onReviewed]);
     useLayoutEffect(() => {
         if (message) feedback.current?.focus();
     }, [message]);
@@ -59,6 +67,8 @@ export function ItTechnicalDeliveryRecovery({
             setConfirmed(false);
             setMessage(null);
             setReview(null);
+            // A lost response or stopped wait can still leave a committed retry.
+            if (proposal) historyCallbacks.current.onRetryStarted?.();
             try {
                 const response = proposal
                     ? await axios.post(
@@ -83,6 +93,7 @@ export function ItTechnicalDeliveryRecovery({
                     !!proposal,
                 );
                 if (!result) throw new Error('Unconfirmed delivery response');
+                historyCallbacks.current.onReviewed?.(result);
                 setReview(result);
                 setStage('ready');
                 if (proposal)

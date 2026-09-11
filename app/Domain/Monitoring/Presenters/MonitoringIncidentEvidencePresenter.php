@@ -6,7 +6,7 @@ use App\Domain\It\Services\ItControlRoomHandoffService;
 use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
-use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
+use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -47,7 +47,8 @@ final class MonitoringIncidentEvidencePresenter
     /** @return array{observed_at: string, verification_required: bool}|null */
     public function recoveryForAlert(ControlRoomAlert $alert, User $viewer): ?array
     {
-        $episodeKey = data_get($alert->context, 'normalized_data.availability_episode_key');
+        $episodeKey = data_get($alert->context, 'normalized_data.condition_episode_key')
+            ?? data_get($alert->context, 'normalized_data.availability_episode_key');
         $deviceId = data_get($alert->context, 'normalized_data.canonical_device_id');
         if (! $viewer->canDo('controlRoom.alerts.view') || ! $viewer->canDo('securityDevices.devices.view')
             || ! $this->canViewAlert($alert, $viewer)
@@ -75,12 +76,12 @@ final class MonitoringIncidentEvidencePresenter
             return null;
         }
         $event = DeviceEvent::query()->find($recovery['device_event_id']);
-        if (! $event || $event->event_type !== 'online' || (int) $event->device_id !== $deviceId
+        if (! $event || ! in_array($event->event_type, MonitoringIssueEpisode::RECOVERY_TYPES, true) || (int) $event->device_id !== $deviceId
             || ($legacyFailure !== null
-                ? (MonitoringAvailabilityEpisode::legacyFailureForRecovery($event, (int) $alert->site_id)?->id !== $legacyFailure->id
+                ? (MonitoringIssueEpisode::legacyFailureForRecovery($event, (int) $alert->site_id)?->id !== $legacyFailure->id
                     || ($recovery['offline_device_event_id'] ?? null) !== $legacyFailure->id)
-                : (! MonitoringAvailabilityEpisode::hasCanonicalObservations($event, (int) $alert->site_id)
-                    || (MonitoringAvailabilityEpisode::fromEvent($event, (int) $alert->site_id)['key'] ?? null) !== $episodeKey))
+                : (! MonitoringIssueEpisode::hasCanonicalObservations($event, (int) $alert->site_id)
+                    || (MonitoringIssueEpisode::fromEvent($event, (int) $alert->site_id)['key'] ?? null) !== $episodeKey))
             || $event->occurred_at?->toIso8601String() !== ($recovery['observed_at'] ?? null)
             || app(ItTicketLinkService::class)->canonicalDeviceSiteId($event->device) !== (int) $alert->site_id) {
             return null;

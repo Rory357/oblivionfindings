@@ -48,12 +48,19 @@ export interface MonitoringIncidentEvidence {
     };
 }
 
-const label = (value: string | null | undefined) =>
-    value
+const label = (value: string | null | undefined) => {
+    if (value === 'monitor_failed' || value === 'device_monitor_failed') {
+        return 'Technical check failed';
+    }
+    if (value === 'monitor_recovered' || value === 'device_monitor_recovered') {
+        return 'Technical check recovered';
+    }
+    return value
         ? value
               .replace(/[_.-]/g, ' ')
               .replace(/^\w/, (character) => character.toUpperCase())
         : 'Not recorded';
+};
 
 export function MonitoringIncidentEvidenceCard({
     evidence,

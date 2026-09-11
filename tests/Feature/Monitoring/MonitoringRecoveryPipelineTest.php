@@ -1,7 +1,7 @@
 <?php
 
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
-use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
+use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -165,7 +165,7 @@ it('does not apply a delayed legacy recovery to a later fault on the same correl
         'payload' => ['monitor_correlation_key' => $key],
     ]);
 
-    expect(MonitoringAvailabilityEpisode::legacyFailureForRecovery($recovery, (int) $projection->site_id)?->id)->toBe($first->id)
+    expect(MonitoringIssueEpisode::legacyFailureForRecovery($recovery, (int) $projection->site_id)?->id)->toBe($first->id)
         ->and(ItTicket::sole()->monitoring_recovered_at)->toBeNull()
         ->and(ItTicket::sole()->status_reason)->toBe('monitoring_outage')
         ->and(ControlRoomAlert::sole()->status)->toBe(ControlRoomAlert::STATUS_OPEN)
@@ -199,9 +199,9 @@ it('rejects legacy recovery when its preceding source event is already online or
         'payload' => ['legacy_monitoring_recovery' => true],
     ]));
 
-    expect(MonitoringAvailabilityEpisode::legacyFailureForRecovery($recovery, (int) $projection->site_id)?->id)->toBe($failure->id)
-        ->and(MonitoringAvailabilityEpisode::legacyFailureForRecovery($duplicate, (int) $projection->site_id))->toBeNull()
-        ->and(MonitoringAvailabilityEpisode::legacyFailureForRecovery($recovery, (int) $projection->site_id + 1000))->toBeNull();
+    expect(MonitoringIssueEpisode::legacyFailureForRecovery($recovery, (int) $projection->site_id)?->id)->toBe($failure->id)
+        ->and(MonitoringIssueEpisode::legacyFailureForRecovery($duplicate, (int) $projection->site_id))->toBeNull()
+        ->and(MonitoringIssueEpisode::legacyFailureForRecovery($recovery, (int) $projection->site_id + 1000))->toBeNull();
 });
 
 it('processes an identity-less recovery without resolving unrelated alerts', function () {
@@ -232,15 +232,15 @@ it('processes an identity-less recovery without resolving unrelated alerts', fun
         ->and($signal->fresh()->status)->toBe('processed');
 });
 
-it('rejects non-recovery signals from the device recovery path', function () {
+it('rejects non-recovery and foreign-source signals from the device recovery path', function (string $code) {
     $source = SignalSource::where('slug', 'security_devices')->firstOrFail();
     $signal = app(SignalProcessingService::class)->ingest([
         'signal_source_id' => $source->id,
-        'signal_type_code' => 'device_offline',
+        'signal_type_code' => $code,
         'severity_hint' => 'high',
         'occurred_at' => now(),
     ]);
 
     expect(fn () => app(SignalProcessingService::class)->processDeviceRecovery($signal))
-        ->toThrow(InvalidArgumentException::class, 'Only device_online signals');
-});
+        ->toThrow(InvalidArgumentException::class, 'Only native device or monitor recovery signals');
+})->with(['device_offline', 'device_monitor_failed', 'fleet_device_online']);

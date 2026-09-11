@@ -14,12 +14,18 @@ final class MonitoringTechnicalSummary
             'device.online' => 'Fleet monitoring reported recovery. Technical verification is still required.',
             'offline' => 'Monitoring confirmed an infrastructure outage. Technical verification is required.',
             'online' => 'Monitoring reported recovery. Technical verification is still required.',
+            'monitor_failed' => 'Monitoring confirmed a failed technical check. Technical verification is required.',
+            'monitor_recovered' => 'The technical check recovered. Technical verification is still required.',
             default => 'Monitoring recorded technical evidence. Review the authorised source record.',
         };
     }
 
-    public static function activity(string $eventType): string
+    public static function activity(string $eventType, ?string $monitorEventType = null): string
     {
+        if (in_array($monitorEventType, ['monitor_failed', 'monitor_recovered'], true)) {
+            return self::observation($monitorEventType);
+        }
+
         return match ($eventType) {
             'created_from_monitoring' => self::observation('offline'),
             'monitoring_recovered' => self::observation('online'),
@@ -40,7 +46,7 @@ final class MonitoringTechnicalSummary
 
         return is_string($originalMessage) && trim($originalMessage) !== ''
             && trim($description) === trim($originalMessage)
-                ? self::observation('offline')
+                ? self::observation(data_get($creation?->payload, 'monitor_event_type') === 'monitor_failed' ? 'monitor_failed' : 'offline')
                 : $description;
     }
 }

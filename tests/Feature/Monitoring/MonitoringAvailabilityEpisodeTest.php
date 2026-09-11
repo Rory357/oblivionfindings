@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItMonitoringDeliveryService;
+use App\Domain\It\Services\ItTechnicalDeliveryOperationsPresenter;
 use App\Domain\Monitoring\Data\ObservationInput;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\Monitor;
@@ -9,7 +10,7 @@ use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
 use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Presenters\MonitoringIncidentEvidencePresenter;
-use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
+use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\Monitoring\Services\MonitoringObservationIngestor;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -20,6 +21,7 @@ use App\Jobs\DispatchDeviceMonitoringTicket;
 use App\Models\AuditLog;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalRule;
+use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
 use App\Models\ItQueue;
@@ -102,7 +104,7 @@ test('delayed recovery affects only its original episode even when the same moni
     $secondOutbox = deliverEpisodeSource($second);
     $secondTicket = ItTicket::query()->findOrFail($secondOutbox->it_ticket_ids[0]);
     expect(data_get($first->payload, 'monitor_correlation_key'))->toBe(data_get($second->payload, 'monitor_correlation_key'))
-        ->and(MonitoringAvailabilityEpisode::fromEvent($first)['key'])->not->toBe(MonitoringAvailabilityEpisode::fromEvent($second)['key'])
+        ->and(MonitoringIssueEpisode::fromEvent($first)['key'])->not->toBe(MonitoringIssueEpisode::fromEvent($second)['key'])
         ->and(ControlRoomAlert::query()->count())->toBe(2)->and(ItTicket::query()->count())->toBe(2);
 
     deliverEpisodeSource($recovery);
@@ -113,7 +115,7 @@ test('delayed recovery affects only its original episode even when the same moni
         ->and($secondTicket->linked('source_alert')->sole()->linkable->status)->toBe(ControlRoomAlert::STATUS_OPEN)
         ->and($firstTicket->linked('source_alert')->sole()->linkable->status)->toBe(ControlRoomAlert::STATUS_OPEN)
         ->and(data_get($firstTicket->linked('source_alert')->sole()->linkable->context,
-            'monitoring_recoveries.'.MonitoringAvailabilityEpisode::fromEvent($first)['key'].'.verification_required'))->toBeTrue()
+            'monitoring_recoveries.'.MonitoringIssueEpisode::fromEvent($first)['key'].'.verification_required'))->toBeTrue()
         ->and($secondTicket->linked('source_alert')->sole()->linkable->context)->not->toHaveKey('monitoring_recoveries')
         ->and(AuditLog::query()->where('action', 'control_room.monitoring.recovery_recorded')->count())->toBe(1)
         ->and($firstTicket->events()->where('type', 'monitoring_recovered')->count())->toBe(1)
@@ -198,7 +200,7 @@ test('a recovery without its own canonical observation cannot settle operational
     expect($outbox->it_status)->toBe('unroutable')
         ->and(ControlRoomAlert::query()->sole()->context)->not->toHaveKey('monitoring_recoveries')
         ->and(ItTicket::query()->sole()->monitoring_recovered_at)->toBeNull()
-        ->and(MonitoringAvailabilityEpisode::recoveryFor($failure, (int) $site->id))->toBeNull();
+        ->and(MonitoringIssueEpisode::recoveryFor($failure, (int) $site->id))->toBeNull();
 });
 
 test('a recovered episode delivered late does not create a stale Control Room alarm or falsely complete technical work', function () {
@@ -217,7 +219,7 @@ test('maintenance suppression retains the episode and a confirmed healthy observ
     [$monitor, $site] = episodeMonitor();
     $failure = episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent;
     deliverEpisodeSource($failure);
-    $originalKey = MonitoringAvailabilityEpisode::fromEvent($failure)['key'];
+    $originalKey = MonitoringIssueEpisode::fromEvent($failure)['key'];
     MonitoringMaintenanceWindow::query()->create([
         'site_id' => $site->id, 'monitor_id' => $monitor->id, 'name' => 'Isolated maintenance',
         'reason' => 'Isolated episode recovery verification',
@@ -228,7 +230,7 @@ test('maintenance suppression retains the episode and a confirmed healthy observ
     expect($suppressed->deviceEvent)->toBeNull()->and($monitor->fresh()->effective_state)->toBe(MonitorState::Suppressed);
     $recovery = episodeObservation($monitor, $site, MonitorState::Healthy, 4)->deviceEvent;
     expect($recovery?->event_type)->toBe('online')
-        ->and(MonitoringAvailabilityEpisode::fromEvent($recovery)['key'])->toBe($originalKey)
+        ->and(MonitoringIssueEpisode::fromEvent($recovery)['key'])->toBe($originalKey)
         ->and($monitor->fresh()->availability_episode)->toBeNull();
     deliverEpisodeSource($recovery);
     expect(ItTicket::query()->sole()->status_reason)->toBe('monitoring_recovered');
@@ -247,7 +249,7 @@ test('resuming a still-failed monitor after maintenance reuses its episode beyon
     episodeObservation($monitor, $site, MonitorState::Failed, 3);
     $this->travelTo(CarbonImmutable::parse('2026-09-12T03:00:02Z'));
     $resumed = episodeObservation($monitor, $site, MonitorState::Failed, 7202)->deviceEvent;
-    expect(MonitoringAvailabilityEpisode::fromEvent($resumed)['key'])->toBe(MonitoringAvailabilityEpisode::fromEvent($failure)['key']);
+    expect(MonitoringIssueEpisode::fromEvent($resumed)['key'])->toBe(MonitoringIssueEpisode::fromEvent($failure)['key']);
     deliverEpisodeSource($resumed);
     expect(ControlRoomAlert::query()->count())->toBe(1)->and(ItTicket::query()->count())->toBe(1)
         ->and(ItTicket::query()->sole()->events()->where('type', 'monitoring_evidence_added')->count())->toBe(1);
@@ -270,7 +272,7 @@ test('confirmed threshold state defines an outage even when the raw observation 
     expect($result->observation->state)->toBe(MonitorState::Healthy)
         ->and($monitor->fresh()->current_state)->toBe(MonitorState::Failed)
         ->and($result->deviceEvent?->event_type)->toBe('offline')
-        ->and(MonitoringAvailabilityEpisode::fromEvent($result->deviceEvent))->not->toBeNull();
+        ->and(MonitoringIssueEpisode::fromEvent($result->deviceEvent))->not->toBeNull();
     $recovery = episodeObservation($monitor, $site, MonitorState::Healthy, 2, value: 40);
     expect($recovery->deviceEvent?->event_type)->toBe('online');
 });
@@ -340,6 +342,215 @@ test('a legacy broad recovery cannot settle a new native episode', function () {
     deliverEpisodeSource($legacy);
     expect(ControlRoomAlert::query()->sole()->status)->toBe(ControlRoomAlert::STATUS_OPEN)
         ->and(ItTicket::query()->sole()->monitoring_recovered_at)->toBeNull();
+});
+
+function technicalEpisodeMonitor(string $kind = 'tls', string $severity = 'medium', array $profile = []): array
+{
+    [$monitor, $site] = episodeMonitor($profile);
+    $monitor->update(['kind' => $kind, 'affects_availability' => false]);
+    $source = SignalSource::query()->where('slug', 'security_devices')->sole();
+    SignalRule::query()->create([
+        'name' => 'Isolated technical-check routing '.str()->uuid(),
+        'signal_source_id' => $source->id,
+        'signal_type_id' => SignalType::query()->where('code', 'device_monitor_failed')->sole()->id,
+        'signal_type_code' => 'device_monitor_failed', 'priority' => 1,
+        'output_severity' => $severity, 'output_tier' => 2, 'is_active' => true,
+        'deduplicate' => true, 'dedup_window_minutes' => 30,
+    ]);
+
+    return [$monitor, $site];
+}
+
+test('technical checks create owned work and recovery without declaring the device offline', function (string $kind) {
+    config()->set('inertia.ssr.enabled', false);
+    [$monitor, $site] = technicalEpisodeMonitor($kind);
+    $deviceBefore = $monitor->device->only(['status', 'health_status', 'last_seen_at']);
+    $owner = episodeViewer($site);
+    $cover = episodeViewer($site);
+    $team = ItTeam::factory()->create(['manager_user_id' => $owner->id]);
+    $team->members()->attach($cover->id, ['role' => 'member']);
+    $queue = ItQueue::factory()->create(['team_id' => $team->id, 'filter_rules' => [
+        'is_default' => true, 'site_ids' => [$site->id], 'cover_user_id' => $cover->id,
+        'default_assignee_user_id' => $owner->id,
+    ]]);
+    $failure = episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent;
+    $outbox = deliverEpisodeSource($failure);
+    deliverEpisodeSource($failure);
+    $ticket = ItTicket::query()->sole();
+    $snapshot = MonitoringIncidentEvidenceSnapshot::query()->sole();
+    expect($failure->event_type)->toBe('monitor_failed')
+        ->and($failure->payload)->not->toHaveKey('availability_episode')
+        ->and($monitor->fresh()->availability_episode)->toBeNull()
+        ->and($monitor->fresh()->condition_episode['condition_kind'])->toBe($kind)
+        ->and($monitor->device->fresh()->only(['status', 'health_status', 'last_seen_at']))->toEqual($deviceBefore)
+        ->and(ControlRoomAlert::query()->count())->toBe(0)
+        ->and($ticket->title)->toStartWith('Technical check failed: ')
+        ->and($ticket->description)->toBe('Monitoring confirmed a failed technical check. Technical verification is required.')
+        ->and($ticket->status_reason)->toBe('monitoring_fault')
+        ->and($ticket->queue_id)->toBe($queue->id)->and($ticket->owner_user_id)->toBe($owner->id)
+        ->and($ticket->routing_decision['cover_user_id'])->toBe($cover->id)
+        ->and($snapshot->hasValidChecksum())->toBeTrue()
+        ->and($snapshot->snapshot['observation'])->toHaveKey('condition_episode_key')
+        ->and($outbox->it_status)->toBe('applied');
+    $this->actingAs($owner)->get('/it/tickets/'.$ticket->id)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('ticket.description', 'Monitoring confirmed a failed technical check. Technical verification is required.'));
+    $recovery = episodeObservation($monitor, $site, MonitorState::Healthy, 2)->deviceEvent;
+    expect($recovery->event_type)->toBe('monitor_recovered');
+    deliverEpisodeSource($recovery);
+    expect($ticket->fresh()->status)->toBe('open')->and($ticket->fresh()->monitoring_recovered_at)->not->toBeNull()
+        ->and($monitor->fresh()->condition_episode)->toBeNull()
+        ->and($snapshot->fresh()->checksum)->toBe($snapshot->checksum)
+        ->and(DeviceEvent::query()->whereIn('event_type', ['offline', 'online'])->count())->toBe(0);
+})->with(['tls', 'http', 'snmp']);
+
+test('technical-check monitors on the same device have distinct issue and recovery identities', function () {
+    [$first, $site] = technicalEpisodeMonitor();
+    $second = Monitor::factory()->create([
+        'device_id' => $first->device_id, 'profile_id' => $first->profile_id, 'collector_id' => null,
+        'kind' => 'http', 'affects_availability' => false,
+        'current_state' => MonitorState::Healthy, 'effective_state' => MonitorState::Healthy,
+    ]);
+    $one = episodeObservation($first, $site, MonitorState::Failed, 1)->deviceEvent;
+    $two = episodeObservation($second, $site, MonitorState::Failed, 1)->deviceEvent;
+    $oneDelivery = deliverEpisodeSource($one);
+    $twoDelivery = deliverEpisodeSource($two);
+    expect(data_get($one->payload, 'monitor_correlation_key'))->not->toBe(data_get($two->payload, 'monitor_correlation_key'))
+        ->and(ItTicket::query()->count())->toBe(2);
+    deliverEpisodeSource(episodeObservation($first, $site, MonitorState::Healthy, 2)->deviceEvent);
+    expect(ItTicket::findOrFail($oneDelivery->it_ticket_ids[0])->monitoring_recovered_at)->not->toBeNull()
+        ->and(ItTicket::findOrFail($twoDelivery->it_ticket_ids[0])->monitoring_recovered_at)->toBeNull();
+});
+
+test('late technical recovery does not recover a later episode or reopen settled work', function () {
+    [$monitor, $site] = technicalEpisodeMonitor();
+    $first = deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent);
+    $old = ItTicket::findOrFail($first->it_ticket_ids[0]);
+    $recovery = episodeObservation($monitor, $site, MonitorState::Healthy, 2)->deviceEvent;
+    $next = deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 3)->deviceEvent);
+    deliverEpisodeSource($recovery);
+    deliverEpisodeSource($recovery);
+    expect($old->fresh()->events()->where('type', 'monitoring_recovered')->count())->toBe(1)
+        ->and(ItTicket::findOrFail($next->it_ticket_ids[0])->monitoring_recovered_at)->toBeNull();
+    $old->update(['status' => 'closed', 'closed_at' => now()]);
+    deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Healthy, 4)->deviceEvent);
+    deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 5)->deviceEvent);
+    expect($old->fresh()->status)->toBe('closed')->and(ItTicket::query()->count())->toBe(3);
+});
+
+test('reordered technical-check source delivery keeps recovery evidence without a stale alarm', function () {
+    [$monitor, $site] = technicalEpisodeMonitor('tls', 'high');
+    $failure = episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent;
+    $recovery = episodeObservation($monitor, $site, MonitorState::Healthy, 2)->deviceEvent;
+    deliverEpisodeSource($recovery);
+    deliverEpisodeSource($failure);
+    expect(ControlRoomAlert::query()->count())->toBe(0)
+        ->and(ItTicket::query()->sole()->monitoring_recovered_at)->not->toBeNull()
+        ->and(ItTicket::query()->sole()->status)->toBe('open');
+});
+
+test('urgent technical checks retain operational coordination and record recovery without auto closure', function () {
+    [$monitor, $site] = technicalEpisodeMonitor('tls', 'high');
+    deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent);
+    $alert = ControlRoomAlert::query()->sole();
+    $ticket = ItTicket::query()->sole();
+    $recovery = episodeObservation($monitor, $site, MonitorState::Healthy, 2)->deviceEvent;
+    deliverEpisodeSource($recovery);
+    expect($alert->fresh()->status)->toBe(ControlRoomAlert::STATUS_OPEN)
+        ->and($ticket->fresh()->status)->toBe('open')
+        ->and($ticket->fresh()->monitoring_recovered_at)->not->toBeNull()
+        ->and(data_get($alert->fresh()->context, 'monitoring_recoveries.'.MonitoringIssueEpisode::fromEvent($recovery)['key'].'.verification_required'))->toBeTrue();
+    $viewer = episodeViewer($site, ['it.view', 'it.manage', 'securityDevices.devices.view', 'controlRoom.alerts.view']);
+    expect(app(MonitoringIncidentEvidencePresenter::class)->recoveryForAlert($alert->fresh(), $viewer))
+        ->toBe(['observed_at' => $recovery->occurred_at->toIso8601String(), 'verification_required' => true]);
+});
+
+test('technical checks retain confirmation and maintenance suppression before automatic work', function () {
+    [$monitor, $site] = technicalEpisodeMonitor('tls', 'medium', ['failure_confirmations' => 2]);
+    expect(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent)->toBeNull();
+    $failure = episodeObservation($monitor, $site, MonitorState::Failed, 2)->deviceEvent;
+    deliverEpisodeSource($failure);
+    MonitoringMaintenanceWindow::query()->create([
+        'site_id' => $site->id, 'monitor_id' => $monitor->id, 'name' => 'Isolated check maintenance',
+        'reason' => 'Confirm suppression', 'starts_at' => now()->addSeconds(3), 'ends_at' => now()->addSeconds(6),
+        'timezone' => 'UTC', 'policy' => 'suppress_notifications_and_ticketing', 'status' => 'active',
+    ]);
+    expect(episodeObservation($monitor, $site, MonitorState::Failed, 4)->deviceEvent)->toBeNull();
+    $resumed = episodeObservation($monitor, $site, MonitorState::Failed, 7)->deviceEvent;
+    expect(MonitoringIssueEpisode::fromEvent($resumed)['key'])->toBe(MonitoringIssueEpisode::fromEvent($failure)['key']);
+    deliverEpisodeSource($resumed);
+    expect(ItTicket::query()->count())->toBe(1)->and(ControlRoomAlert::query()->count())->toBe(0);
+});
+
+test('forged technical-check provenance cannot fall back to generic or availability work', function (string $change) {
+    [$monitor, $site] = technicalEpisodeMonitor();
+    $failure = episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent;
+    $payload = $failure->payload;
+    if ($change === 'missing') {
+        unset($payload['condition_episode_version']);
+    } elseif ($change === 'site') {
+        $payload['condition_episode']['site_id'] = $site->id + 1;
+    } else {
+        $monitor->update(['affects_availability' => true]);
+    }
+    $failure->update(['payload' => $payload]);
+    $outbox = deliverEpisodeSource($failure);
+    expect($outbox->status)->toBe('unroutable')->and(ControlRoomAlert::query()->count())->toBe(0)
+        ->and(ItTicket::query()->count())->toBe(0);
+})->with(['missing', 'site', 'availability']);
+
+test('technical check publication rollback can retry the same observation without lost or duplicated work', function () {
+    [$monitor, $site] = technicalEpisodeMonitor();
+    $fail = true;
+    DeviceEvent::creating(function () use (&$fail): void {
+        if ($fail) {
+            throw new RuntimeException('Isolated condition publication failure');
+        }
+    });
+    expect(fn () => episodeObservation($monitor, $site, MonitorState::Failed, 1))->toThrow(RuntimeException::class);
+    expect($monitor->fresh()->condition_episode)->toBeNull()->and($monitor->observations()->count())->toBe(0);
+    $fail = false;
+    $result = episodeObservation($monitor, $site, MonitorState::Failed, 1);
+    deliverEpisodeSource($result->deviceEvent);
+    expect(episodeObservation($monitor, $site, MonitorState::Failed, 1)->duplicate)->toBeTrue()
+        ->and(ItTicket::query()->count())->toBe(1)->and(DeviceEventSignalOutbox::query()->count())->toBe(1);
+});
+
+test('non IT devices keep their owning workflow when a nonavailability check fails', function () {
+    [$monitor, $site] = technicalEpisodeMonitor();
+    $monitor->device->update(['domain' => 'security']);
+    expect(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent)->toBeNull()
+        ->and($monitor->fresh()->condition_episode)->toBeNull()->and(DeviceEventSignalOutbox::query()->count())->toBe(0);
+});
+
+test('technical-check history and evidence enforce current source permission and approved Site', function () {
+    [$monitor, $site] = technicalEpisodeMonitor();
+    $outbox = deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent);
+    $ticket = ItTicket::query()->sole();
+    $viewer = episodeViewer($site);
+    $restricted = episodeViewer($site, ['it.view', 'it.manage']);
+    $otherSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+    $unrelated = episodeViewer($otherSite);
+    $presenter = app(MonitoringIncidentEvidencePresenter::class);
+    $operations = app(ItTechnicalDeliveryOperationsPresenter::class);
+    expect($presenter->forTicket($ticket, $viewer))->toHaveCount(1)
+        ->and($presenter->forTicket($ticket, $restricted))->toBe([])
+        ->and($presenter->forTicket($ticket, $unrelated))->toBe([])
+        ->and($operations->operations($viewer)['sources'][0]['total'])->toBe(1)
+        ->and($operations->operations($viewer)['sources'][0]['rows'][0]['id'])->toBe($outbox->id)
+        ->and($operations->operations($restricted)['sources'][0]['rows'])->toBe([])
+        ->and($operations->operations($unrelated)['sources'][0]['total'])->toBe(0);
+    $monitor->device->assignments()->whereNull('released_at')->update(['assignable_id' => $otherSite->id]);
+    expect($operations->operations($viewer)['sources'][0]['total'])->toBe(0)
+        ->and($presenter->forTicket($ticket->fresh(), $viewer))->toBe([]);
+});
+
+test('a technical-check source without an operational rule retains the existing coordination fallback', function () {
+    [$monitor, $site] = technicalEpisodeMonitor();
+    SignalRule::query()->where('signal_type_code', 'device_monitor_failed')->delete();
+    $outbox = deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent);
+    expect(ControlRoomAlert::query()->count())->toBe(1)
+        ->and($outbox->it_scope['work_routing']['destination'])->toBe('control_room')
+        ->and($outbox->it_scope['work_routing']['rule_id'])->toBeNull();
 });
 
 function episodeViewer(Site $site, array $permissions = ['it.view', 'it.manage', 'securityDevices.devices.view']): User

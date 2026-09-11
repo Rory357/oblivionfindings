@@ -1,0 +1,167 @@
+{
+  "captured_at": "2026-09-11T22:09:17.9514260Z",
+  "source": [
+    {
+      "path": "app/Domain/It/Presenters/ItTicketActivityPresenter.php",
+      "sha256": "47df3dc1e906cad3c86c4b0cd1ca59954c6de8c754f9d2e68bd29534bb85addb"
+    },
+    {
+      "path": "app/Domain/It/Services/ItMonitoringDeliveryService.php",
+      "sha256": "f5bbead4690cdb6daa3519e6b518d9d828d96e4d4c2b5d00ccd7770b81eefdcc"
+    },
+    {
+      "path": "app/Domain/It/Services/ItTechnicalDeliveryOperationsPresenter.php",
+      "sha256": "b25482b51fd5ef1ec1d23295f47a835206663c4db4a625bbfbae034ee94cd3c4"
+    },
+    {
+      "path": "app/Domain/It/Services/ItTicketLinkService.php",
+      "sha256": "7b39c08de0a16742cd4c7fad0a75b1a6299552159f7cd0ea0ea68804b4c0c565"
+    },
+    {
+      "path": "app/Domain/Monitoring/Models/Monitor.php",
+      "sha256": "7b6b8ae9d8d749971d51b082f6068fb99b1acde7f934a57c14523be5a8a8a0c1"
+    },
+    {
+      "path": "app/Domain/Monitoring/Presenters/MonitoringIncidentEvidencePresenter.php",
+      "sha256": "f16b16dc6bd4a0215cb22eb580fce9e20c5c7791e25ef4659ec06540520953de"
+    },
+    {
+      "path": "app/Domain/Monitoring/Services/MonitoringIncidentEvidenceService.php",
+      "sha256": "2c43f7386e7c1c8aa3b47a6dcb072ad8415be6dc2fd4af4618467912252ff87a"
+    },
+    {
+      "path": "app/Domain/Monitoring/Services/MonitoringIssueEpisode.php",
+      "sha256": "41a7ab0256ee97e4cb4a86c7b31f049f7183441ec73b410dead8c9b2c6f5c818"
+    },
+    {
+      "path": "app/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+      "sha256": "1976a38602a573df1a45099ea822311d250abcc2875edaf0db966e378eff25bd"
+    },
+    {
+      "path": "app/Domain/Monitoring/Services/MonitoringTechnicalSummary.php",
+      "sha256": "a1d99a78b1eccb5aaf92574c06cd8317189259f9512e3f7bb1f03b5cfbe79d59"
+    },
+    {
+      "path": "app/Domain/Monitoring/Services/MonitoringWorkRouting.php",
+      "sha256": "7d66e0d8062b6f0a568129da34b6787f89dad616ce35499ddd0b00e136a0033b"
+    },
+    {
+      "path": "app/Listeners/It/CreateOrUpdateMonitoringTicket.php",
+      "sha256": "613e86124f387f3d7fedb1b30bd7ace3bd4389dc7d0cf362f31cca79b5605e29"
+    },
+    {
+      "path": "app/Observers/DeviceEventObserver.php",
+      "sha256": "10d4c8aba5616c15e9725405a4b4b949dfbecc8b6c06928da4f7d9889464e797"
+    },
+    {
+      "path": "app/Services/ControlRoom/SignalProcessingService.php",
+      "sha256": "a06d0ec4b39a80bf09795ab1d32cc63acb62845d1f4d68b8229730f7fb3d442f"
+    },
+    {
+      "path": "database/migrations/2026_09_12_000030_add_monitor_condition_episode.php",
+      "sha256": "c4cbb627a7fb8d77187aaa786c8e8129ee822eb0451d6ca06b986cc4006395f5"
+    },
+    {
+      "path": "database/migrations/2026_09_12_000031_register_monitor_condition_signal_types.php",
+      "sha256": "d487bb4ec14ee97b29a6f95c72ded707a1b05fa12816621cb2e26ebf07d9f6e3"
+    },
+    {
+      "path": "database/seeders/SecurityDevicesSignalSeeder.php",
+      "sha256": "c297f3a5cf75ba1781c482930c09ef3f5b1fd876232f5bf5c27a940863bb7171"
+    },
+    {
+      "path": "docs/audits/2026-09-08-it-support/evidence/w14-monitoring-browser-fixture.php",
+      "sha256": "4bd266ea4e57d3c110171fc2bb81e25500e5b5e8235faebdf2ff00d53289d783"
+    },
+    {
+      "path": "docs/audits/2026-09-08-it-support/evidence/w14-technical-browser-inspect.php",
+      "sha256": "b1cfb0950aab97c1cdae31d92b1f25a419f9dd2e288580d68a007d794c29c5eb"
+    },
+    {
+      "path": "resources/js/components/it/it-technical-delivery-health.test.tsx",
+      "sha256": "035a045cfba0284ad11e2576a883cded00cfea246984b241bbb44c667e0cf715"
+    },
+    {
+      "path": "resources/js/components/it/it-technical-delivery-health.tsx",
+      "sha256": "cfef25bc25d442b09d0562673283c985456f5bad3d4a0074ad4ec82189f7e904"
+    },
+    {
+      "path": "resources/js/components/it/it-technical-delivery-recovery.tsx",
+      "sha256": "be69816368a3c2f786c4d83774add2eb930de64197c573473eee865ed269f3f7"
+    },
+    {
+      "path": "resources/js/components/monitoring/monitoring-incident-evidence-card.test.tsx",
+      "sha256": "950b943cd7d008e09809915c739a212b6f9ea8c60ff50f3c42a744ba2fea5106"
+    },
+    {
+      "path": "resources/js/components/monitoring/monitoring-incident-evidence-card.tsx",
+      "sha256": "124d4b2b6337d519762b9881a9acc368a7f558ba7a350d248cd6f01c4fb0065e"
+    },
+    {
+      "path": "tests/Concurrency/It/ItMonitoringDeliveryConcurrencyTest.php",
+      "sha256": "1d433517751970d266b6a5286e635dd8fd070c2a071c431255b52f57aa6e7493"
+    },
+    {
+      "path": "tests/Feature/Monitoring/MonitoringAvailabilityEpisodeTest.php",
+      "sha256": "a369d16e2268933555c5c245fb14af2d10946e4cd75d0165c77660217c77a056"
+    },
+    {
+      "path": "tests/Feature/Monitoring/MonitoringRecoveryPipelineTest.php",
+      "sha256": "3328ceb3da901163e11a3fda427489ddfa167514002a1bbf3370bfdd690a5068"
+    }
+  ],
+  "design": [
+    {
+      "path": "DESIGN.md",
+      "sha256": "96863e01d924e954255cd61f550396c2f2eea9778bbaab7e8570ef9d63279c22",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md",
+      "sha256": "62515485265119962773e6015fefe38be94434aae468acd017c078da61b20ab5",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md",
+      "sha256": "86259475c987d6e30001604316379eb608aea9f83e16941b6aa476a94bca6957",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/DESIGN_TOKENS.md",
+      "sha256": "c3ee6c8acaa22049084f819e3ad2a33f457e936e467492079f16c15e9a611d2b",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LIST_STYLE_GUIDE.md",
+      "sha256": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LOADER_STYLE_GUIDE.md",
+      "sha256": "cc20485e6e42e0a848b8cacc8ac6124e5e5a01206d966de6ebbbdec39dbe2a91",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md",
+      "sha256": "9295cdb1386322b8a088ae03de41bc3c75a0fbe3e8fa3331c92c704ccb15895d",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/oblivion-loader-01-demo.html",
+      "sha256": "748c94c030984d16c1a78f3b70855d1cf8f22461ab017e4ac8287ab9e8809cdf",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+      "sha256": "a528a0e863a676fdbbfcb028e532ece2799e39a7345ca3c1eca619ac4491d931",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "sha256": "aee723e21491e9be908554a6f200d73204280a63d9028ea78de6bb9049f4a477",
+      "unchanged": true
+    }
+  ],
+  "manifest_sha256": "e3e6553f6071fe1b0ed608079d23254d158ce6628949b95b43957fe152bd5373",
+  "app_asset": "app-CUgUJHwk.js"
+}

@@ -4,7 +4,7 @@ namespace App\Observers;
 
 use App\Domain\It\Services\ItMonitoringDeliveryService;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
-use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
+use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceEventSignalOutbox;
@@ -47,6 +47,8 @@ class DeviceEventObserver
         'battery_low' => 'device_battery_low',
         'offline' => 'device_offline',
         'online' => 'device_online',
+        'monitor_failed' => 'device_monitor_failed',
+        'monitor_recovered' => 'device_monitor_recovered',
         'heartbeat' => 'device_heartbeat',
         'firmware_updated' => 'device_firmware_updated',
         'maintenance_due' => 'device_maintenance_due',
@@ -149,8 +151,8 @@ class DeviceEventObserver
                 'source' => $event->source,
                 'original_event_type' => $event->event_type,
                 'monitor_correlation_key' => $this->monitorCorrelationKey($event),
-                'availability_episode_version' => data_get($event->payload, 'availability_episode_version') === 1 ? 1 : null,
-                'availability_episode_key' => MonitoringAvailabilityEpisode::fromEvent($event, $siteId)['key'] ?? null,
+                MonitoringIssueEpisode::field($event->event_type).'_version' => data_get($event->payload, MonitoringIssueEpisode::field($event->event_type).'_version') === 1 ? 1 : null,
+                MonitoringIssueEpisode::field($event->event_type).'_key' => MonitoringIssueEpisode::fromEvent($event, $siteId)['key'] ?? null,
                 'legacy_monitoring_recovery' => data_get($event->payload, 'legacy_monitoring_recovery') === true
                     ? true
                     : null,
@@ -164,7 +166,7 @@ class DeviceEventObserver
         $signal = $this->processor->ingest($payload);
         $alert = null;
 
-        if ($event->event_type === 'online') {
+        if (in_array($event->event_type, MonitoringIssueEpisode::RECOVERY_TYPES, true)) {
             $this->processor->processDeviceRecovery($signal);
         } else {
             $alert = $this->processor->process($signal);

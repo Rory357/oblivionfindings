@@ -6,8 +6,8 @@ use App\Domain\It\Services\ItMonitoringDeliveryService;
 use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\It\Services\ItTicketPriorityService;
 use App\Domain\It\Services\ItTicketRoutingService;
-use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
 use App\Domain\Monitoring\Services\MonitoringIncidentEvidenceService;
+use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Domain\Monitoring\Services\MonitoringWorkRouting;
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
@@ -49,7 +49,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
 
     public function processOutbox(int $outboxId): void
     {
-        $this->deliveries->deliver($outboxId, fn (DeviceSignalPublished $event): array => $event->originalEventType() === 'offline'
+        $this->deliveries->deliver($outboxId, fn (DeviceSignalPublished $event): array => in_array($event->originalEventType(), MonitoringIssueEpisode::FAILURE_TYPES, true)
             ? $this->handleFailure($event)
             : $this->handleRecovery($event));
     }
@@ -72,11 +72,12 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             if ($siteId === null) {
                 throw new DomainException('source_scope_changed');
             }
-            $episode = MonitoringAvailabilityEpisode::fromEvent($event->deviceEvent, $siteId);
-            if (data_get($event->deviceEvent->payload, 'availability_episode_version') === 1 && $episode === null) {
+            $episode = MonitoringIssueEpisode::fromEvent($event->deviceEvent, $siteId);
+            if (MonitoringIssueEpisode::isNative($event->deviceEvent) && $episode === null) {
                 throw new DomainException('source_scope_changed');
             }
-            $ticket = $this->ticketForAlert($event->device, $lockedAlert, $siteId, $episode['key'] ?? null, (int) $event->deviceEvent->id);
+            $ticket = $this->ticketForAlert($event->device, $lockedAlert, $siteId, $episode['key'] ?? null,
+                (int) $event->deviceEvent->id, MonitoringIssueEpisode::field($event->originalEventType()).'_key');
             if ($ticket === null && $lockedAlert !== null) {
                 $ticket = $this->links->unboundHumanMonitoringTicket($lockedAlert);
                 if ($ticket !== null) {
@@ -104,7 +105,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                 if (in_array($ticket->status, ItTicket::OPEN_STATUSES, true)
                     && ($episode === null ? $this->isLatestMonitoringFailure($ticket, $event->deviceEvent) : $ticket->monitoring_recovered_at === null)) {
                     $ticket->forceFill([
-                        'status_reason' => 'monitoring_outage',
+                        'status_reason' => $event->originalEventType() === 'monitor_failed' ? 'monitoring_fault' : 'monitoring_outage',
                         'monitoring_recovered_at' => null,
                     ])->save();
                 }
@@ -128,7 +129,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             $ticket = ItTicket::createWithReference([
                 'site_id' => $siteId,
                 'is_organisation_wide' => false,
-                'title' => Str::limit('Monitoring outage: '.$event->device->name, 255, ''),
+                'title' => Str::limit(($event->originalEventType() === 'monitor_failed' ? 'Technical check failed: ' : 'Monitoring outage: ').$event->device->name, 255, ''),
                 'description' => $this->failureDescription($event),
                 'requester_user_id' => null,
                 'category' => $this->ticketCategory($event->device),
@@ -137,7 +138,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                 'work_type' => 'incident',
                 ...$assessment,
                 'status' => 'open',
-                'status_reason' => 'monitoring_outage',
+                'status_reason' => $event->originalEventType() === 'monitor_failed' ? 'monitoring_fault' : 'monitoring_outage',
                 'requires_approval' => false,
             ]);
             $ticket->stampSlaDueDates();
@@ -172,8 +173,9 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                 throw new DomainException('source_scope_changed');
             }
             $correlationKey = $this->monitorCorrelationKey($event);
-            $nativeEpisode = data_get($event->deviceEvent->payload, 'availability_episode_version') === 1;
-            $episode = MonitoringAvailabilityEpisode::fromEvent($event->deviceEvent, $siteId);
+            $nativeEpisode = MonitoringIssueEpisode::isNative($event->deviceEvent);
+            $episodeKeyField = MonitoringIssueEpisode::field($event->originalEventType()).'_key';
+            $episode = MonitoringIssueEpisode::fromEvent($event->deviceEvent, $siteId);
             if ($nativeEpisode && $episode === null) {
                 return ['outcome' => 'recovery_unmatched', 'ticket_ids' => []];
             }
@@ -181,7 +183,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             if ($correlationKey === null && ! $legacyRecovery && ! $nativeEpisode) {
                 return ['outcome' => 'recovery_unmatched', 'ticket_ids' => []];
             }
-            $legacyFailure = $nativeEpisode ? null : MonitoringAvailabilityEpisode::legacyFailureForRecovery($event->deviceEvent, $siteId);
+            $legacyFailure = $nativeEpisode ? null : MonitoringIssueEpisode::legacyFailureForRecovery($event->deviceEvent, $siteId);
             if (! $nativeEpisode && $legacyFailure === null) {
                 return ['outcome' => 'recovery_unmatched', 'ticket_ids' => []];
             }
@@ -208,7 +210,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
 
             if ($nativeEpisode) {
                 $ticketsQuery->whereHas('events', fn ($events) => $events->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)
-                    ->where('payload->availability_episode_key', $episode['key']));
+                    ->where('payload->'.$episodeKeyField, $episode['key']));
             } elseif ($correlationKey !== null) {
                 $ticketsQuery->whereHas('events', function ($events) use ($correlationKey): void {
                     $events
@@ -247,7 +249,8 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                     'device_event_id' => $event->deviceEvent->id,
                     'signal_id' => $event->signal->id,
                     'monitor_correlation_key' => $correlationKey,
-                    'availability_episode_key' => $episode['key'] ?? null,
+                    $episodeKeyField => $episode['key'] ?? null,
+                    ...($event->originalEventType() === 'monitor_recovered' ? ['monitor_event_type' => 'monitor_recovered'] : []),
                     'offline_device_event_id' => $legacyFailure?->id,
                 ]);
             }
@@ -257,7 +260,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
         });
     }
 
-    private function ticketForAlert(Device $device, ?ControlRoomAlert $alert, int $siteId, ?string $episodeKey, int $sourceEventId): ?ItTicket
+    private function ticketForAlert(Device $device, ?ControlRoomAlert $alert, int $siteId, ?string $episodeKey, int $sourceEventId, string $episodeKeyField): ?ItTicket
     {
         return $this->links->monitoringTickets()
             ->where('work_type', 'incident')
@@ -275,7 +278,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             ->when($episodeKey === null && $alert === null, fn ($tickets) => $tickets->whereHas('events', fn ($events) => $events
                 ->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)->where('payload->device_event_id', $sourceEventId)))
             ->when($episodeKey !== null, fn ($tickets) => $tickets->whereHas('events', fn ($events) => $events
-                ->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)->where('payload->availability_episode_key', $episodeKey)))
+                ->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)->where('payload->'.$episodeKeyField, $episodeKey)))
             ->whereHas('links', function ($query) use ($device): void {
                 $query
                     ->where('relationship', 'affected_device')
@@ -304,11 +307,11 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
 
     private function applyObservedRecovery(ItTicket $ticket, DeviceSignalPublished $failure): void
     {
-        if (data_get($failure->deviceEvent->payload, 'availability_episode_version') === null
+        if (! MonitoringIssueEpisode::isNative($failure->deviceEvent)
             && ! $this->isLatestMonitoringFailure($ticket, $failure->deviceEvent)) {
             return;
         }
-        $recovery = MonitoringAvailabilityEpisode::recoveryFor($failure->deviceEvent, (int) $ticket->site_id);
+        $recovery = MonitoringIssueEpisode::recoveryFor($failure->deviceEvent, (int) $ticket->site_id);
         if ($recovery === null || $ticket->monitoring_recovered_at !== null) {
             return;
         }
@@ -317,7 +320,8 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             'device_id' => $recovery->device_id, 'device_event_id' => $recovery->id,
             'signal_id' => $recovery->signalOutbox?->it_signal_id,
             'monitor_correlation_key' => data_get($recovery->payload, 'monitor_correlation_key'),
-            'availability_episode_key' => MonitoringAvailabilityEpisode::fromEvent($recovery, (int) $ticket->site_id)['key'] ?? null,
+            MonitoringIssueEpisode::field($recovery->event_type).'_key' => MonitoringIssueEpisode::fromEvent($recovery, (int) $ticket->site_id)['key'] ?? null,
+            ...($recovery->event_type === 'monitor_recovered' ? ['monitor_event_type' => 'monitor_recovered'] : []),
         ]);
     }
 
@@ -346,7 +350,8 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             'severity' => $alert?->severity ?? data_get($event->signal->normalized_data, 'it_work_routing.severity'),
             'message' => MonitoringTechnicalSummary::observation($event->originalEventType()),
             'monitor_correlation_key' => $this->monitorCorrelationKey($event),
-            'availability_episode_key' => MonitoringAvailabilityEpisode::fromEvent($event->deviceEvent, (int) $event->signal->site_id)['key'] ?? null,
+            MonitoringIssueEpisode::field($event->originalEventType()).'_key' => MonitoringIssueEpisode::fromEvent($event->deviceEvent, (int) $event->signal->site_id)['key'] ?? null,
+            ...($event->originalEventType() === 'monitor_failed' ? ['monitor_event_type' => 'monitor_failed'] : []),
             'system_principal' => ItTicketLinkService::MONITORING_PRINCIPAL,
             'operation' => ItTicketLinkService::MONITORING_OPERATION,
         ];

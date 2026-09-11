@@ -2,6 +2,7 @@
 
 namespace App\Domain\It\Services;
 
+use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\SecurityDevices\Models\DeviceEventSignalOutbox;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\FleetSignalOutbox;
@@ -131,7 +132,7 @@ final class ItTechnicalDeliveryOperationsPresenter
             ->whereIn('it_scope->site_id', $this->work->approvedSiteIds($viewer));
         if ($source === 'device') {
             return $query->whereHas('event', fn (Builder $event) => $event
-                ->whereIn('event_type', ['offline', 'online'])
+                ->whereIn('event_type', MonitoringIssueEpisode::EVENT_TYPES)
                 ->whereIn('device_id', $deviceIds)
                 ->whereHas('device', fn (Builder $device) => $device->where('domain', 'it_infrastructure')));
         }

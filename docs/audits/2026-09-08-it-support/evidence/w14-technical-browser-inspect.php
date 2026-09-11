@@ -79,6 +79,23 @@ try {
         $pending->execute([$id]);
         $report['history_pending'][] = $pending->fetch(PDO::FETCH_ASSOC);
     }
+    $report['technical_cases'] = [];
+    foreach ($ready['monitoring_fixtures']['cases'] as $case => $fixture) {
+        if (! str_starts_with($case, 'condition_')) {
+            continue;
+        }
+        $ticket = $pdo->prepare('SELECT id,reference,status,status_reason,monitoring_recovered_at,site_id,queue_id,team_id,assigned_to_user_id,owner_user_id FROM it_tickets WHERE id = ?');
+        $ticket->execute([$fixture['ticket_id']]);
+        $monitors = $pdo->prepare('SELECT id,device_id,kind,affects_availability,current_state,effective_state,availability_episode,condition_episode FROM monitors WHERE device_id = ?');
+        $monitors->execute([$fixture['device_id']]);
+        $events = $pdo->prepare('SELECT id,event_type,source,occurred_at FROM device_events WHERE device_id = ? ORDER BY id');
+        $events->execute([$fixture['device_id']]);
+        $activity = $pdo->prepare('SELECT type,COUNT(*) AS count FROM it_ticket_events WHERE subject_type = ? AND subject_id = ? GROUP BY type');
+        $activity->execute(['it_ticket', $fixture['ticket_id']]);
+        $report['technical_cases'][$case] = ['ticket' => $ticket->fetch(PDO::FETCH_ASSOC),
+            'monitors' => $monitors->fetchAll(PDO::FETCH_ASSOC), 'source_events' => $events->fetchAll(PDO::FETCH_ASSOC),
+            'activity_counts' => $activity->fetchAll(PDO::FETCH_ASSOC)];
+    }
     $report['ticket_count'] = (int) $pdo->query('SELECT COUNT(*) FROM it_tickets')->fetchColumn();
     $pdo->rollBack();
     echo json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR).PHP_EOL;

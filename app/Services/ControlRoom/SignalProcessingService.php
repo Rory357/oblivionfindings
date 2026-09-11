@@ -2,7 +2,7 @@
 
 namespace App\Services\ControlRoom;
 
-use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
+use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\Monitoring\Services\MonitoringWorkRouting;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Enums\AlertSeverity;
@@ -179,13 +179,14 @@ class SignalProcessingService
                 return null;
             }
 
-            if ($signal->signal_type_code === 'device_offline'
-                && data_get($signal->normalized_data, 'availability_episode_version') === 1) {
-                $sourceEvent = $this->nativeAvailabilityEvent($signal);
+            if (($signal->signal_type_code === 'device_offline'
+                    && data_get($signal->normalized_data, 'availability_episode_version') === 1)
+                || $signal->signal_type_code === 'device_monitor_failed') {
+                $sourceEvent = $this->nativeIssueEvent($signal);
                 if ($sourceEvent === null) {
                     throw new SafetySignalUnroutable('Native monitoring outage has no valid episode evidence.');
                 }
-                $recovered = MonitoringAvailabilityEpisode::recoveryFor($sourceEvent, (int) $signal->site_id) !== null;
+                $recovered = MonitoringIssueEpisode::recoveryFor($sourceEvent, (int) $signal->site_id) !== null;
                 try {
                     $routing = MonitoringWorkRouting::decide($signal, $sourceEvent, $recovered);
                 } catch (\DomainException $exception) {
@@ -344,8 +345,8 @@ class SignalProcessingService
 
     public function processDeviceRecovery(Signal $signal): int
     {
-        if ($signal->signal_type_code !== 'device_online') {
-            throw new InvalidArgumentException('Only device_online signals can use device recovery processing.');
+        if (! in_array($signal->signal_type_code, ['device_online', 'device_monitor_recovered'], true)) {
+            throw new InvalidArgumentException('Only native device or monitor recovery signals can use device recovery processing.');
         }
 
         return DB::transaction(function () use ($signal): int {
@@ -362,11 +363,12 @@ class SignalProcessingService
             $canonicalDeviceId = (int) data_get($signal->normalized_data, 'canonical_device_id');
             $correlationKey = $this->monitorCorrelationKey($signal);
             $legacyRecovery = data_get($signal->normalized_data, 'legacy_monitoring_recovery') === true;
-            $nativeEpisode = data_get($signal->normalized_data, 'availability_episode_version') === 1;
-            $episodeKey = $this->nativeAvailabilityKey($signal);
-            $nativeEvent = $nativeEpisode ? $this->nativeAvailabilityEvent($signal) : null;
+            $nativeEpisode = $signal->signal_type_code === 'device_monitor_recovered'
+                || data_get($signal->normalized_data, 'availability_episode_version') === 1;
+            $episodeKey = $this->nativeIssueKey($signal);
+            $nativeEvent = $nativeEpisode ? $this->nativeIssueEvent($signal) : null;
             if ($nativeEpisode && ($episodeKey === null || $nativeEvent === null
-                || ! MonitoringAvailabilityEpisode::hasCanonicalObservations($nativeEvent, (int) $signal->site_id))) {
+                || ! MonitoringIssueEpisode::hasCanonicalObservations($nativeEvent, (int) $signal->site_id))) {
                 $signal->markProcessed(null, 'Recovery has no matching outage episode; technical verification is required.');
 
                 return 0;
@@ -382,7 +384,7 @@ class SignalProcessingService
                     && $signal->external_ref === 'device_event_'.$legacyEvent->id
                     && (int) $legacyEvent->device_id === $canonicalDeviceId
                     && $legacyEvent->occurred_at?->equalTo($signal->occurred_at)) {
-                    $legacyFailure = MonitoringAvailabilityEpisode::legacyFailureForRecovery($legacyEvent, (int) $signal->site_id);
+                    $legacyFailure = MonitoringIssueEpisode::legacyFailureForRecovery($legacyEvent, (int) $signal->site_id);
                 }
                 if ($legacyFailure === null) {
                     $signal->markProcessed(null, 'Recovery has no matching canonical fault; technical verification is required.');
@@ -423,10 +425,11 @@ class SignalProcessingService
                         $query->{$method}('context->normalized_data->canonical_device_id', $canonicalDeviceId);
                     }
                 })
-                ->whereHas('signals', fn ($query) => $query->where('signal_type_code', 'device_offline'));
+                ->whereHas('signals', fn ($query) => $query->where('signal_type_code',
+                    $signal->signal_type_code === 'device_monitor_recovered' ? 'device_monitor_failed' : 'device_offline'));
 
             if ($nativeEpisode) {
-                $alertsQuery->where('context->normalized_data->availability_episode_key', $episodeKey);
+                $alertsQuery->where('context->normalized_data->'.$this->nativeEpisodeField($signal).'_key', $episodeKey);
             } elseif ($correlationKey !== null) {
                 $alertsQuery->where('context->normalized_data->monitor_correlation_key', $correlationKey);
             } else {
@@ -1049,14 +1052,14 @@ class SignalProcessingService
         $windowMinutes = $rule->dedup_window_minutes ?? 30;
         $normalizedData = $signal->normalized_data ?? [];
         $canonicalDeviceId = $this->canonicalPositiveId($normalizedData['canonical_device_id'] ?? null);
-        $episodeKey = $this->nativeAvailabilityKey($signal);
+        $episodeKey = $this->nativeIssueKey($signal);
 
         $query = ControlRoomAlert::query()
             ->unresolved()
             ->when($episodeKey === null, fn ($alerts) => $alerts->where('triggered_at', '>=', now()->subMinutes($windowMinutes)));
 
-        if ($signal->signal_type_code === 'device_offline') {
-            $query->where('context->normalized_data->availability_episode_key', $episodeKey);
+        if (in_array($signal->signal_type_code, ['device_offline', 'device_monitor_failed'], true)) {
+            $query->where('context->normalized_data->'.$this->nativeEpisodeField($signal).'_key', $episodeKey);
         }
 
         $query->whereIn('alert_type', $this->correlationAlertTypes($signal, $rule));
@@ -1176,17 +1179,24 @@ class SignalProcessingService
             : null;
     }
 
-    private function nativeAvailabilityKey(Signal $signal): ?string
+    private function nativeIssueKey(Signal $signal): ?string
     {
-        $key = data_get($signal->normalized_data, 'availability_episode_key');
+        $field = $this->nativeEpisodeField($signal);
+        $key = data_get($signal->normalized_data, $field.'_key');
 
-        return data_get($signal->normalized_data, 'availability_episode_version') === 1
+        return data_get($signal->normalized_data, $field.'_version') === 1
             && is_string($key) && preg_match('/\A[a-f0-9]{64}\z/', $key) === 1 ? $key : null;
     }
 
-    private function nativeAvailabilityEvent(Signal $signal): ?DeviceEvent
+    private function nativeEpisodeField(Signal $signal): string
     {
-        $key = $this->nativeAvailabilityKey($signal);
+        return in_array($signal->signal_type_code, ['device_monitor_failed', 'device_monitor_recovered'], true)
+            ? 'condition_episode' : 'availability_episode';
+    }
+
+    private function nativeIssueEvent(Signal $signal): ?DeviceEvent
+    {
+        $key = $this->nativeIssueKey($signal);
         $eventId = data_get($signal->normalized_data, 'device_event_id');
         if ($key === null || ! is_int($eventId) || $signal->signalSource?->slug !== 'security_devices') {
             return null;
@@ -1195,7 +1205,7 @@ class SignalProcessingService
 
         return $event && $signal->signal_type_code === 'device_'.$event->event_type
             && (int) data_get($signal->normalized_data, 'canonical_device_id') === (int) $event->device_id
-            && (MonitoringAvailabilityEpisode::fromEvent($event, (int) $signal->site_id)['key'] ?? null) === $key
+            && (MonitoringIssueEpisode::fromEvent($event, (int) $signal->site_id)['key'] ?? null) === $key
                 ? $event : null;
     }
 

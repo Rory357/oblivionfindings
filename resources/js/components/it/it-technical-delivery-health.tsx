@@ -65,9 +65,56 @@ function DeliveryHistory({
 }) {
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const returnFocus = useRef<HTMLElement | null>(null);
+    const returnRowId = useRef<string | null>(null);
+    const needsRefresh = useRef(false);
+    const [refreshState, setRefreshState] = useState<
+        'current' | 'stale' | 'loading'
+    >('current');
+    const invalidateHistory = () => {
+        needsRefresh.current = true;
+        setRefreshState('stale');
+    };
+    const refreshHistory = () => {
+        if (refreshState === 'loading') return;
+        setRefreshState('loading');
+        let succeeded = false;
+        const rowId = returnRowId.current;
+        router.get(
+            window.location.href,
+            {},
+            {
+                preserveState: false,
+                preserveScroll: true,
+                replace: true,
+                onSuccess: () => {
+                    succeeded = true;
+                    // The refreshed search may no longer contain the completed row.
+                    requestAnimationFrame(() => {
+                        const target =
+                            (rowId
+                                ? document
+                                      .getElementById(rowId)
+                                      ?.closest<HTMLElement>('[role="row"]')
+                                : null) ??
+                            document.getElementById(
+                                `it-${health.source}-delivery-history`,
+                            ) ??
+                            document.getElementById(
+                                `it-${health.source}-delivery-unavailable`,
+                            );
+                        target?.focus();
+                    });
+                },
+                onFinish: () => {
+                    if (!succeeded) setRefreshState('stale');
+                },
+            },
+        );
+    };
     const context = useEntityContextMenu<DeliveryRow>();
     const selected = health.rows.find((row) => row.id === selectedId);
     const open = (row: DeliveryRow) => {
+        returnRowId.current = `it-${health.source}-delivery-${row.id}`;
         returnFocus.current =
             document
                 .getElementById(`it-${health.source}-delivery-${row.id}`)
@@ -85,8 +132,23 @@ function DeliveryHistory({
     return (
         <div
             id={`it-${health.source}-delivery-history`}
-            className="scroll-mt-20 space-y-5"
+            tabIndex={-1}
+            className="scroll-mt-20 space-y-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
+            {refreshState !== 'current' ? (
+                <div role="status" className="space-y-3">
+                    <p className="text-subtle">
+                        {refreshState === 'loading'
+                            ? 'Refreshing delivery history and totals…'
+                            : 'Displayed history and totals may be out of date. Close the details to refresh, or check them again below.'}
+                    </p>
+                    {!selected && refreshState === 'stale' ? (
+                        <Button variant="outline" onClick={refreshHistory}>
+                            Refresh delivery history
+                        </Button>
+                    ) : null}
+                </div>
+            ) : null}
             <ListCaption
                 title="Delivery history"
                 caption={`${health.rows.length} of ${health.history_total} shown · page ${health.page} of ${health.last_page}`}
@@ -202,6 +264,8 @@ function DeliveryHistory({
                             event.preventDefault();
                             target.focus();
                         }
+                        // Keep the result visible until the operator closes it.
+                        if (needsRefresh.current) refreshHistory();
                     }}
                 >
                     {selected ? (
@@ -219,7 +283,25 @@ function DeliveryHistory({
                                 actorId={actorId}
                                 source={health.source}
                                 deliveryId={selected.id}
-                                onAccessLost={onAccessLost}
+                                onAccessLost={() => {
+                                    needsRefresh.current = false;
+                                    onAccessLost();
+                                }}
+                                onRetryStarted={invalidateHistory}
+                                onReviewed={(review) => {
+                                    if (
+                                        (
+                                            Object.keys(
+                                                selected,
+                                            ) as (keyof DeliveryRow)[]
+                                        ).some(
+                                            (key) =>
+                                                selected[key] !== review[key],
+                                        )
+                                    ) {
+                                        invalidateHistory();
+                                    }
+                                }}
                             />
                             <DialogFooter>
                                 <Button

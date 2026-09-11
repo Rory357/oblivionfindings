@@ -62,7 +62,7 @@ final class MonitoringWorkRouting
         if ($event->device?->domain !== 'it_infrastructure') {
             return null;
         }
-        if (! MonitoringAvailabilityEpisode::hasCanonicalObservations($event, (int) $signal->site_id)) {
+        if (! MonitoringIssueEpisode::hasCanonicalObservations($event, (int) $signal->site_id)) {
             throw new DomainException('source_scope_changed');
         }
         $rule = SignalRule::findMatchingRules($signal)->first();
@@ -77,7 +77,7 @@ final class MonitoringWorkRouting
             'reason' => $recovered ? 'recovered_before_delivery' : ($nonurgent ? 'nonurgent_technical' : 'operational_coordination'),
             'severity' => $severity,
             'rule_id' => $rule?->id,
-            'episode_key' => MonitoringAvailabilityEpisode::fromEvent($event, (int) $signal->site_id)['key'],
+            'episode_key' => MonitoringIssueEpisode::fromEvent($event, (int) $signal->site_id)['key'],
         ];
     }
 
@@ -96,8 +96,8 @@ final class MonitoringWorkRouting
         }
         if (! is_array($decision) || ($decision['version'] ?? null) !== 1 || ($decision['destination'] ?? null) !== 'it'
             || ! in_array($decision['reason'] ?? null, ['nonurgent_technical', 'recovered_before_delivery'], true)
-            || ($decision['episode_key'] ?? null) !== (MonitoringAvailabilityEpisode::fromEvent($event, (int) $signal->site_id)['key'] ?? null)
-            || ! MonitoringAvailabilityEpisode::hasCanonicalObservations($event, (int) $signal->site_id)) {
+            || ($decision['episode_key'] ?? null) !== (MonitoringIssueEpisode::fromEvent($event, (int) $signal->site_id)['key'] ?? null)
+            || ! MonitoringIssueEpisode::hasCanonicalObservations($event, (int) $signal->site_id)) {
             return null;
         }
 
@@ -115,7 +115,7 @@ final class MonitoringWorkRouting
             || data_get($signal->normalized_data, 'canonical_device_id') !== (int) $event->device_id) {
             return null;
         }
-        $recovery = MonitoringAvailabilityEpisode::recoveryFor($event, (int) $signal->site_id);
+        $recovery = MonitoringIssueEpisode::recoveryFor($event, (int) $signal->site_id);
         if ($recovery === null) {
             return null;
         }
@@ -135,8 +135,8 @@ final class MonitoringWorkRouting
 
     public static function hasDirectSourceEvidence(DeviceEvent $event, int $siteId): bool
     {
-        return MonitoringAvailabilityEpisode::hasCanonicalObservations($event, $siteId)
+        return MonitoringIssueEpisode::hasCanonicalObservations($event, $siteId)
             || ($event->event_type === 'offline' && data_get($event->payload, 'availability_episode_version') === null
-                && MonitoringAvailabilityEpisode::recoveryFor($event, $siteId) !== null);
+                && MonitoringIssueEpisode::recoveryFor($event, $siteId) !== null);
     }
 }

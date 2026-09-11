@@ -2,15 +2,34 @@
 
 namespace App\Domain\Monitoring\Services;
 
+use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use Carbon\CarbonImmutable;
 use Throwable;
 
-/** Bounded provenance for one confirmed outage, carried by canonical DeviceEvents. */
-final class MonitoringAvailabilityEpisode
+/** Bounded provenance for a confirmed availability or technical-check issue. */
+final class MonitoringIssueEpisode
 {
+    public const FAILURE_TYPES = ['offline', 'monitor_failed'];
+
+    public const RECOVERY_TYPES = ['online', 'monitor_recovered'];
+
+    public const EVENT_TYPES = [...self::FAILURE_TYPES, ...self::RECOVERY_TYPES];
+
+    public static function field(string $eventType): string
+    {
+        return in_array($eventType, ['monitor_failed', 'monitor_recovered'], true)
+            ? 'condition_episode' : 'availability_episode';
+    }
+
+    public static function isNative(DeviceEvent $event): bool
+    {
+        return self::field($event->event_type) === 'condition_episode'
+            || data_get($event->payload, 'availability_episode_version') !== null;
+    }
+
     public static function begin(Monitor $monitor, MonitorObservation $observation, int $siteId): array
     {
         $episode = [
@@ -18,24 +37,32 @@ final class MonitoringAvailabilityEpisode
             'site_id' => $siteId, 'observation_id' => (int) $observation->id,
             'started_at' => $observation->observed_at->toIso8601String(),
         ];
+        if (! $monitor->affects_availability) {
+            $episode['condition_kind'] = $monitor->kind->value;
+        }
 
         return [...$episode, 'key' => self::key($episode)];
     }
 
     public static function current(Monitor $monitor, int $siteId): ?array
     {
-        return self::validate($monitor->availability_episode, (int) $monitor->device_id, $siteId, (int) $monitor->id);
+        $field = $monitor->affects_availability ? 'availability_episode' : 'condition_episode';
+
+        return self::validate($monitor->{$field}, (int) $monitor->device_id, $siteId, (int) $monitor->id,
+            $field === 'condition_episode');
     }
 
     public static function fromEvent(DeviceEvent $event, ?int $siteId = null): ?array
     {
         $payload = $event->payload ?? [];
-        if ($event->source !== 'oblivion_monitoring' || ($payload['availability_episode_version'] ?? null) !== 1
+        $field = self::field($event->event_type);
+        if (! in_array($event->event_type, self::EVENT_TYPES, true)
+            || $event->source !== 'oblivion_monitoring' || ($payload[$field.'_version'] ?? null) !== 1
             || ! is_int($payload['monitor_id'] ?? null) || ! is_int($payload['site_id'] ?? null)) {
             return null;
         }
-        $episode = self::validate($payload['availability_episode'] ?? null, (int) $event->device_id,
-            $siteId ?? $payload['site_id'], $payload['monitor_id']);
+        $episode = self::validate($payload[$field] ?? null, (int) $event->device_id,
+            $siteId ?? $payload['site_id'], $payload['monitor_id'], $field === 'condition_episode');
         if ($episode === null || $payload['site_id'] !== $episode['site_id'] || $event->occurred_at === null
             || CarbonImmutable::parse($episode['started_at'])->greaterThan($event->occurred_at)) {
             return null;
@@ -46,9 +73,12 @@ final class MonitoringAvailabilityEpisode
 
     public static function recoveryFor(DeviceEvent $failure, int $siteId): ?DeviceEvent
     {
+        if (! in_array($failure->event_type, self::FAILURE_TYPES, true)) {
+            return null;
+        }
         $episode = self::fromEvent($failure, $siteId);
         if ($episode === null) {
-            if (data_get($failure->payload, 'availability_episode_version') !== null) {
+            if (self::isNative($failure)) {
                 return null;
             }
 
@@ -58,8 +88,11 @@ final class MonitoringAvailabilityEpisode
                 ->first(fn (DeviceEvent $recovery): bool => self::legacyFailureForRecovery($recovery, $siteId)?->id === $failure->id);
         }
 
-        return DeviceEvent::query()->where('device_id', $failure->device_id)->where('event_type', 'online')
-            ->where('source', 'oblivion_monitoring')->where('payload->availability_episode->key', $episode['key'])
+        $field = self::field($failure->event_type);
+
+        return DeviceEvent::query()->where('device_id', $failure->device_id)
+            ->where('event_type', $failure->event_type === 'offline' ? 'online' : 'monitor_recovered')
+            ->where('source', 'oblivion_monitoring')->where('payload->'.$field.'->key', $episode['key'])
             ->where('occurred_at', '>=', $failure->occurred_at)->orderBy('occurred_at')->orderBy('id')
             ->lazy(100)->first(fn (DeviceEvent $event): bool => (self::fromEvent($event, $siteId)['key'] ?? null) === $episode['key']
                 && self::hasCanonicalObservations($event, $siteId));
@@ -103,12 +136,14 @@ final class MonitoringAvailabilityEpisode
         $observationId = data_get($event->payload, 'observation_id');
         if ($episode === null || ! is_int($observationId)
             || ! MonitorObservation::supportsProvenanceColumns()
-            || ! in_array($event->event_type, ['offline', 'online'], true)
-            || data_get($event->payload, 'to_state') !== ($event->event_type === 'offline' ? 'failed' : 'healthy')) {
+            || ! in_array($event->event_type, self::EVENT_TYPES, true)
+            || data_get($event->payload, 'to_state') !== (in_array($event->event_type, self::FAILURE_TYPES, true) ? 'failed' : 'healthy')) {
             return false;
         }
         $monitor = Monitor::query()->whereKey($episode['monitor_id'])->where('device_id', $event->device_id)->first();
-        if ($monitor === null || ! $monitor->affects_availability) {
+        $technical = self::field($event->event_type) === 'condition_episode';
+        if ($monitor === null || $monitor->affects_availability === $technical
+            || ($technical && ($episode['condition_kind'] ?? null) !== $monitor->kind->value)) {
             return false;
         }
         $observations = MonitorObservation::query()->where('monitor_id', $monitor->id)
@@ -122,9 +157,14 @@ final class MonitoringAvailabilityEpisode
             && $current->observed_at->equalTo($event->occurred_at);
     }
 
-    private static function validate(mixed $episode, int $deviceId, int $siteId, int $monitorId): ?array
+    private static function validate(mixed $episode, int $deviceId, int $siteId, int $monitorId, bool $technical = false): ?array
     {
         if (! is_array($episode) || ($episode['version'] ?? null) !== 1) {
+            return null;
+        }
+        if ($technical ? (! is_string($episode['condition_kind'] ?? null)
+            || MonitorKind::tryFrom($episode['condition_kind']) === null)
+            : array_key_exists('condition_kind', $episode)) {
             return null;
         }
         foreach (['device_id', 'site_id', 'monitor_id', 'observation_id'] as $key) {
@@ -147,12 +187,17 @@ final class MonitoringAvailabilityEpisode
         }
 
         return hash_equals(self::key($episode), $episode['key'])
-            ? array_intersect_key($episode, array_flip(['version', 'monitor_id', 'device_id', 'site_id', 'observation_id', 'started_at', 'key']))
+            ? array_intersect_key($episode, array_flip(['version', 'monitor_id', 'device_id', 'site_id', 'observation_id', 'started_at', 'key', 'condition_kind']))
             : null;
     }
 
     private static function key(array $episode): string
     {
+        if (isset($episode['condition_kind'])) {
+            return hash('sha256', json_encode(['native-condition-v1', $episode['monitor_id'], $episode['device_id'],
+                $episode['site_id'], $episode['observation_id'], $episode['started_at'], $episode['condition_kind']], JSON_THROW_ON_ERROR));
+        }
+
         return hash('sha256', json_encode(['native-availability-v1', $episode['monitor_id'], $episode['device_id'],
             $episode['site_id'], $episode['observation_id'], $episode['started_at']], JSON_THROW_ON_ERROR));
     }

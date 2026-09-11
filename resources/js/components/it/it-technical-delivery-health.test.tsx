@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
 import {
+    act,
     fireEvent,
     render,
     screen,
@@ -76,6 +77,8 @@ const health: TechnicalDeliveryHealth = {
 };
 
 beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.mocked(router.get).mockClear();
     vi.spyOn(axios, 'get').mockResolvedValue({
         data: {
             data: {
@@ -90,6 +93,110 @@ beforeEach(() => {
 });
 
 describe('technical delivery operations', () => {
+    it.each(['recorded', 'unconfirmed', 'stopped'] as const)(
+        'refreshes authoritative filtered history only after closing a %s retry',
+        async (outcome) => {
+            const response = {
+                data: {
+                    data: {
+                        ...health.sources[0].rows[0],
+                        viewer_user_id: 7,
+                        source: 'device',
+                        version: 'b'.repeat(64),
+                        can_retry: false,
+                        retry_requested: true,
+                        state: 'applied',
+                        outcome_code: 'ticket_created',
+                        attempts: 5,
+                    },
+                },
+            };
+            const post = vi.spyOn(axios, 'post');
+            if (outcome === 'recorded') post.mockResolvedValueOnce(response);
+            else if (outcome === 'unconfirmed')
+                post.mockRejectedValueOnce(new Error('Lost response'));
+            else post.mockImplementationOnce(() => new Promise(() => {}));
+            render(<ItTechnicalDeliveryHealth health={health} viewerId={7} />);
+            fireEvent.click(screen.getByText('Delivery 21'));
+            const dialog = await screen.findByRole('dialog');
+            fireEvent.click(
+                await within(dialog).findByRole('checkbox', {
+                    name: 'I want to request one delivery attempt.',
+                }),
+            );
+            fireEvent.click(
+                within(dialog).getByRole('button', {
+                    name: 'Request one retry',
+                }),
+            );
+            if (outcome === 'stopped')
+                fireEvent.click(
+                    await within(dialog).findByRole('button', {
+                        name: 'Stop waiting',
+                    }),
+                );
+            await within(dialog).findByText(
+                outcome === 'recorded'
+                    ? /One retry allowance was recorded/
+                    : outcome === 'stopped'
+                      ? /Stopped waiting/
+                      : /retry result could not be confirmed/,
+            );
+            expect(router.get).not.toHaveBeenCalled();
+            expect(
+                screen.getByText('26 total · 2 need attention'),
+            ).toBeInTheDocument();
+            fireEvent.click(
+                within(dialog).getByRole('button', { name: 'Close details' }),
+            );
+            await waitFor(() => expect(router.get).toHaveBeenCalledOnce());
+            expect(router.get).toHaveBeenCalledWith(
+                window.location.href,
+                {},
+                expect.objectContaining({
+                    preserveState: false,
+                    preserveScroll: true,
+                    replace: true,
+                }),
+            );
+            expect(post).toHaveBeenCalledOnce();
+        },
+    );
+
+    it('refreshes a changed live review and offers recovery if that refresh fails', async () => {
+        vi.mocked(axios.get).mockResolvedValueOnce({
+            data: {
+                data: {
+                    ...health.sources[0].rows[0],
+                    viewer_user_id: 7,
+                    source: 'device',
+                    version: 'b'.repeat(64),
+                    can_retry: false,
+                    attempts: 5,
+                },
+            },
+        });
+        render(<ItTechnicalDeliveryHealth health={health} viewerId={7} />);
+        fireEvent.click(screen.getByText('Delivery 21'));
+        const dialog = await screen.findByRole('dialog');
+        await within(dialog).findByText('5 / 5');
+        expect(router.get).not.toHaveBeenCalled();
+        fireEvent.keyDown(dialog, { key: 'Escape' });
+        await waitFor(() => expect(router.get).toHaveBeenCalledOnce());
+        const options = vi.mocked(router.get).mock.calls[0][2]!;
+        act(() =>
+            options.onFinish?.(
+                {} as Parameters<NonNullable<typeof options.onFinish>>[0],
+            ),
+        );
+        expect(
+            screen.getByText(/Displayed history and totals may be out of date/),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Refresh delivery history' }),
+        );
+        expect(router.get).toHaveBeenCalledTimes(2);
+    });
     it('conceals delivery totals and the open dialog when live review denies access', async () => {
         vi.mocked(axios.get).mockRejectedValueOnce({
             isAxiosError: true,
@@ -238,6 +345,7 @@ describe('technical delivery operations', () => {
         ).toBeInTheDocument();
         fireEvent.keyDown(dialog, { key: 'Escape' });
         await waitFor(() => expect(row).toHaveFocus());
+        expect(router.get).not.toHaveBeenCalled();
     });
 
     it('offers the same detail review in the row context menu', async () => {

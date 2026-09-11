@@ -8,7 +8,7 @@ use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
 use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitoringProfile;
-use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
+use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\Monitoring\Services\MonitoringObservationIngestor;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -17,6 +17,8 @@ use App\Jobs\DispatchDeviceEventSignalOutbox;
 use App\Jobs\DispatchDeviceMonitoringTicket;
 use App\Models\AuditLog;
 use App\Models\ControlRoom\SignalRule;
+use App\Models\ControlRoom\SignalSource;
+use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\Site;
@@ -37,6 +39,8 @@ use Tests\TestCase;
 final class ItMonitoringDeliveryConcurrencyTest extends TestCase
 {
     use VerifiesMonitoringHandoffConcurrency;
+
+    private bool $technicalCheck = false;
 
     public function createApplication()
     {
@@ -60,7 +64,15 @@ final class ItMonitoringDeliveryConcurrencyTest extends TestCase
         Notification::fake();
         Http::preventStrayRequests();
 
-        foreach (['high', 'medium'] as $severity) {
+        SignalRule::query()->create([
+            'name' => 'Isolated technical-check worker rule',
+            'signal_source_id' => SignalSource::query()->where('slug', 'security_devices')->sole()->id,
+            'signal_type_id' => SignalType::query()->where('code', 'device_monitor_failed')->sole()->id,
+            'signal_type_code' => 'device_monitor_failed', 'priority' => 1, 'output_severity' => 'high',
+            'output_tier' => 2, 'is_active' => true, 'deduplicate' => true, 'dedup_window_minutes' => 30,
+        ]);
+        foreach ([[false, 'high'], [false, 'medium'], [true, 'high'], [true, 'medium']] as [$technicalCheck, $severity]) {
+            $this->technicalCheck = $technicalCheck;
             foreach (['hold_claim', 'hold_ticket', 'hold_commit'] as $mode) {
                 $outbox = $this->pendingDelivery($severity);
                 $ticketCount = ItTicket::query()->count();
@@ -124,7 +136,7 @@ final class ItMonitoringDeliveryConcurrencyTest extends TestCase
                 $this->cleanup($workers, $barrier);
             }
             $this->assertDistinctOutboxesShareOneTicket($severity);
-            if ($severity === 'high') {
+            if ($severity === 'high' && ! $technicalCheck) {
                 $this->assertHumanHandoffRaces('device');
             }
         }
@@ -132,7 +144,7 @@ final class ItMonitoringDeliveryConcurrencyTest extends TestCase
 
     private function pendingDelivery(string $severity): DeviceEventSignalOutbox
     {
-        SignalRule::query()->where('signal_type_code', 'device_offline')->update(['output_severity' => $severity]);
+        SignalRule::query()->where('signal_type_code', $this->technicalCheck ? 'device_monitor_failed' : 'device_offline')->update(['output_severity' => $severity]);
         $site = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
         $device = Device::factory()->itInfrastructure()->create();
         DeviceAssignment::query()->create([
@@ -147,13 +159,13 @@ final class ItMonitoringDeliveryConcurrencyTest extends TestCase
         $monitor = Monitor::factory()->create([
             'device_id' => $device->id, 'profile_id' => $profile->id, 'collector_id' => null,
             'current_state' => MonitorState::Healthy, 'effective_state' => MonitorState::Healthy,
-            'affects_availability' => true,
+            'kind' => $this->technicalCheck ? 'tls' : 'icmp', 'affects_availability' => ! $this->technicalCheck,
         ]);
         $event = app(MonitoringObservationIngestor::class)->ingest($monitor,
             new ObservationInput('isolated-worker-'.$monitor->id, MonitorState::Failed, CarbonImmutable::now()),
             (int) $site->id, (int) $device->id, null)->deviceEvent;
         $this->assertNotNull($event);
-        $this->assertNotNull(MonitoringAvailabilityEpisode::fromEvent($event, (int) $site->id));
+        $this->assertNotNull(MonitoringIssueEpisode::fromEvent($event, (int) $site->id));
         $outbox = $event->signalOutbox()->sole();
         app()->call([new DispatchDeviceEventSignalOutbox($outbox->id), 'handle']);
         $this->assertSame('sent', $outbox->fresh()->status);
@@ -172,8 +184,8 @@ final class ItMonitoringDeliveryConcurrencyTest extends TestCase
         $this->assertCount(1, $outbox->it_ticket_ids);
         $ticket = ItTicket::query()->findOrFail($outbox->it_ticket_ids[0]);
         $this->assertSame(1, $ticket->events()->where('type', 'created_from_monitoring')->count());
-        $this->assertSame(MonitoringAvailabilityEpisode::fromEvent($outbox->event, (int) $ticket->site_id)['key'],
-            $ticket->events()->where('type', 'created_from_monitoring')->sole()->payload['availability_episode_key']);
+        $this->assertSame(MonitoringIssueEpisode::fromEvent($outbox->event, (int) $ticket->site_id)['key'],
+            $ticket->events()->where('type', 'created_from_monitoring')->sole()->payload[MonitoringIssueEpisode::field($outbox->event->event_type).'_key']);
         $this->assertSame(1, MonitoringIncidentEvidenceSnapshot::query()->where('it_ticket_id', $ticket->id)->count());
         $alertId = $outbox->it_scope['alert_id'] ?? $outbox->it_scope['correlated_alert_id'] ?? null;
         $this->assertSame($alertId, MonitoringIncidentEvidenceSnapshot::query()->where('it_ticket_id', $ticket->id)->sole()->control_room_alert_id);

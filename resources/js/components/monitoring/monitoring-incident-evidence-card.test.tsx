@@ -24,6 +24,21 @@ const evidence: MonitoringIncidentEvidence = {
 };
 
 describe('Monitoring incident evidence source', () => {
+    it('distinguishes a failed technical check from recorded device availability', () => {
+        render(
+            <MonitoringIncidentEvidenceCard
+                evidence={{
+                    ...evidence,
+                    device: { ...evidence.device, status: 'active', health_status: 'healthy' },
+                    observation: { ...evidence.observation, event_type: 'monitor_failed' },
+                }}
+            />,
+        );
+        expect(screen.getByText(/^Technical check failed ·/)).toBeInTheDocument();
+        expect(screen.getByText(/Recorded health: Healthy/)).toBeInTheDocument();
+        expect(screen.queryByText('Offline')).not.toBeInTheDocument();
+    });
+
     it('presents direct technical evidence without inventing an alert or severity', () => {
         render(<MonitoringIncidentEvidenceCard evidence={evidence} />);
         expect(screen.getByText('Direct to IT')).toBeInTheDocument();

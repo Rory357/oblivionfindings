@@ -1,0 +1,383 @@
+{
+    "token": "a86d0861d5714fcd",
+    "mutations_performed": false,
+    "cases": {
+        "retry": {
+            "source": "device",
+            "outcome": {
+                "id": 8,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        },
+        "retry_stale": {
+            "source": "device",
+            "outcome": {
+                "id": 9,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        },
+        "retry_access": {
+            "source": "device",
+            "outcome": {
+                "id": 10,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        },
+        "condition_retry": {
+            "source": "device",
+            "outcome": {
+                "id": 15,
+                "status": "sent",
+                "it_status": "applied",
+                "it_attempts": 2,
+                "it_attempt_limit": 2,
+                "it_outcome_code": "ticket_created",
+                "it_ticket_ids": "[24]",
+                "it_completed_at": "2026-09-12 09:51:23"
+            },
+            "tickets": [
+                {
+                    "id": 24,
+                    "reference": "IT-000024",
+                    "status": "open",
+                    "site_id": 1,
+                    "queue_id": 1,
+                    "team_id": 1,
+                    "assigned_to_user_id": 3,
+                    "owner_user_id": 3
+                }
+            ],
+            "audits": [
+                {
+                    "action": "it.monitoring.delivery_retry_requested",
+                    "user_id": 3
+                },
+                {
+                    "action": "it.monitoring.delivery_completed",
+                    "user_id": null
+                }
+            ]
+        },
+        "fleet_retry": {
+            "source": "fleet",
+            "outcome": {
+                "id": 5,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        }
+    },
+    "history_pending": [
+        {
+            "id": 17,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 18,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 19,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 20,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 21,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 22,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 23,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 24,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 25,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 26,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 27,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 28,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        },
+        {
+            "id": 29,
+            "status": "sent",
+            "it_status": "pending",
+            "it_attempts": 0,
+            "it_ticket_ids": null
+        }
+    ],
+    "technical_cases": {
+        "condition_direct": {
+            "ticket": {
+                "id": 13,
+                "reference": "IT-000013",
+                "status": "open",
+                "status_reason": "monitoring_fault",
+                "monitoring_recovered_at": null,
+                "site_id": 1,
+                "queue_id": 1,
+                "team_id": 1,
+                "assigned_to_user_id": 3,
+                "owner_user_id": 3
+            },
+            "monitors": [
+                {
+                    "id": 9,
+                    "device_id": 9,
+                    "kind": "tls",
+                    "affects_availability": 0,
+                    "current_state": "failed",
+                    "effective_state": "failed",
+                    "availability_episode": null,
+                    "condition_episode": "{\"key\": \"0661b000c58c3be1682dfcd135359edaacd79198fc7bfec00f20b6637edf4c13\", \"site_id\": 1, \"version\": 1, \"device_id\": 9, \"monitor_id\": 9, \"started_at\": \"2026-09-11T21:47:23+00:00\", \"condition_kind\": \"tls\", \"observation_id\": 11}"
+                }
+            ],
+            "source_events": [
+                {
+                    "id": 11,
+                    "event_type": "monitor_failed",
+                    "source": "oblivion_monitoring",
+                    "occurred_at": "2026-09-12 09:47:23"
+                }
+            ],
+            "activity_counts": [
+                {
+                    "type": "created_from_monitoring",
+                    "count": 1
+                },
+                {
+                    "type": "routing_applied",
+                    "count": 1
+                }
+            ]
+        },
+        "condition_recovered": {
+            "ticket": {
+                "id": 14,
+                "reference": "IT-000014",
+                "status": "open",
+                "status_reason": "monitoring_recovered",
+                "monitoring_recovered_at": "2026-09-12 09:47:24",
+                "site_id": 1,
+                "queue_id": 1,
+                "team_id": 1,
+                "assigned_to_user_id": 3,
+                "owner_user_id": 3
+            },
+            "monitors": [
+                {
+                    "id": 10,
+                    "device_id": 10,
+                    "kind": "tls",
+                    "affects_availability": 0,
+                    "current_state": "healthy",
+                    "effective_state": "healthy",
+                    "availability_episode": null,
+                    "condition_episode": null
+                }
+            ],
+            "source_events": [
+                {
+                    "id": 12,
+                    "event_type": "monitor_failed",
+                    "source": "oblivion_monitoring",
+                    "occurred_at": "2026-09-12 09:47:23"
+                },
+                {
+                    "id": 13,
+                    "event_type": "monitor_recovered",
+                    "source": "oblivion_monitoring",
+                    "occurred_at": "2026-09-12 09:47:24"
+                }
+            ],
+            "activity_counts": [
+                {
+                    "type": "created_from_monitoring",
+                    "count": 1
+                },
+                {
+                    "type": "routing_applied",
+                    "count": 1
+                },
+                {
+                    "type": "monitoring_recovered",
+                    "count": 1
+                }
+            ]
+        },
+        "condition_urgent": {
+            "ticket": {
+                "id": 15,
+                "reference": "IT-000015",
+                "status": "open",
+                "status_reason": "monitoring_fault",
+                "monitoring_recovered_at": null,
+                "site_id": 1,
+                "queue_id": 1,
+                "team_id": 1,
+                "assigned_to_user_id": 3,
+                "owner_user_id": 3
+            },
+            "monitors": [
+                {
+                    "id": 11,
+                    "device_id": 11,
+                    "kind": "tls",
+                    "affects_availability": 0,
+                    "current_state": "failed",
+                    "effective_state": "failed",
+                    "availability_episode": null,
+                    "condition_episode": "{\"key\": \"8b6145ee5715baa7576686d846cdef12d1d4f0b89dd38ed5104b231f2cbe36c1\", \"site_id\": 1, \"version\": 1, \"device_id\": 11, \"monitor_id\": 11, \"started_at\": \"2026-09-11T21:47:24+00:00\", \"condition_kind\": \"tls\", \"observation_id\": 14}"
+                }
+            ],
+            "source_events": [
+                {
+                    "id": 14,
+                    "event_type": "monitor_failed",
+                    "source": "oblivion_monitoring",
+                    "occurred_at": "2026-09-12 09:47:24"
+                }
+            ],
+            "activity_counts": [
+                {
+                    "type": "created_from_monitoring",
+                    "count": 1
+                },
+                {
+                    "type": "routing_applied",
+                    "count": 1
+                }
+            ]
+        },
+        "condition_other_site": {
+            "ticket": {
+                "id": 16,
+                "reference": "IT-000016",
+                "status": "open",
+                "status_reason": "monitoring_fault",
+                "monitoring_recovered_at": null,
+                "site_id": 3,
+                "queue_id": null,
+                "team_id": null,
+                "assigned_to_user_id": null,
+                "owner_user_id": null
+            },
+            "monitors": [
+                {
+                    "id": 13,
+                    "device_id": 13,
+                    "kind": "tls",
+                    "affects_availability": 0,
+                    "current_state": "failed",
+                    "effective_state": "failed",
+                    "availability_episode": null,
+                    "condition_episode": "{\"key\": \"706ab92ea5f0607b094515fe429dea9aebc7b9d96f061175be6c1e94cf1a1cb0\", \"site_id\": 3, \"version\": 1, \"device_id\": 13, \"monitor_id\": 13, \"started_at\": \"2026-09-11T21:47:24+00:00\", \"condition_kind\": \"tls\", \"observation_id\": 16}"
+                }
+            ],
+            "source_events": [
+                {
+                    "id": 16,
+                    "event_type": "monitor_failed",
+                    "source": "oblivion_monitoring",
+                    "occurred_at": "2026-09-12 09:47:24"
+                }
+            ],
+            "activity_counts": [
+                {
+                    "type": "created_from_monitoring",
+                    "count": 1
+                },
+                {
+                    "type": "routing_applied",
+                    "count": 1
+                }
+            ]
+        }
+    },
+    "ticket_count": 24
+}

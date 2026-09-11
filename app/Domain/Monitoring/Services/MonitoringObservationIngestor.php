@@ -117,7 +117,7 @@ final class MonitoringObservationIngestor
             $locked->suppressed_at = $suppressionReason === null ? null : ($locked->suppressed_at ?? $input->observedAt);
             $locked->save();
 
-            $deviceEvent = $this->createAvailabilityEvent(
+            $deviceEvent = $this->createIssueEvent(
                 monitor: $locked,
                 observation: $observation,
                 input: $input,
@@ -353,7 +353,7 @@ final class MonitoringObservationIngestor
         return [$monitor->current_state, null, null];
     }
 
-    private function createAvailabilityEvent(
+    private function createIssueEvent(
         Monitor $monitor,
         MonitorObservation $observation,
         ObservationInput $input,
@@ -361,14 +361,17 @@ final class MonitoringObservationIngestor
         MonitorState $from,
         MonitorState $to,
     ): ?DeviceEvent {
-        if (! $monitor->affects_availability || $to === MonitorState::Suppressed) {
+        if ($to === MonitorState::Suppressed
+            || (! $monitor->affects_availability && $monitor->device->domain !== 'it_infrastructure')) {
             return null;
         }
 
-        $episode = MonitoringAvailabilityEpisode::current($monitor, $siteId);
+        $episode = MonitoringIssueEpisode::current($monitor, $siteId);
+        $failureType = $monitor->affects_availability ? 'offline' : 'monitor_failed';
+        $recoveryType = $monitor->affects_availability ? 'online' : 'monitor_recovered';
         $eventType = match (true) {
-            $to === MonitorState::Failed && $from !== MonitorState::Failed => 'offline',
-            $to === MonitorState::Healthy && ($from === MonitorState::Failed || $episode !== null) => 'online',
+            $to === MonitorState::Failed && $from !== MonitorState::Failed => $failureType,
+            $to === MonitorState::Healthy && ($from === MonitorState::Failed || $episode !== null) => $recoveryType,
             default => null,
         };
 
@@ -376,15 +379,17 @@ final class MonitoringObservationIngestor
             return null;
         }
 
-        if ($eventType === 'offline') {
-            $episode ??= MonitoringAvailabilityEpisode::begin($monitor, $observation, $siteId);
+        if ($eventType === $failureType) {
+            $episode ??= MonitoringIssueEpisode::begin($monitor, $observation, $siteId);
         }
-        $monitor->forceFill(['availability_episode' => $eventType === 'offline' ? $episode : null])->save();
+        $episodeField = MonitoringIssueEpisode::field($eventType);
+        $monitor->forceFill([$episodeField => $eventType === $failureType ? $episode : null])->save();
 
         $rootMonitorId = $monitor->root_cause_monitor_id ?? $monitor->id;
+        $condition = $monitor->affects_availability ? 'availability' : 'monitor:'.$monitor->id;
         $correlationKey = hash(
             'sha256',
-            "site:{$siteId}:device:{$monitor->device_id}:root:{$rootMonitorId}:condition:availability",
+            "site:{$siteId}:device:{$monitor->device_id}:root:{$rootMonitorId}:condition:{$condition}",
         );
 
         return DeviceEvent::create([
@@ -398,8 +403,8 @@ final class MonitoringObservationIngestor
                 'observation_id' => $observation->id,
                 'root_cause_monitor_id' => $rootMonitorId,
                 'monitor_correlation_key' => $correlationKey,
-                'availability_episode_version' => 1,
-                'availability_episode' => $episode,
+                $episodeField.'_version' => 1,
+                $episodeField => $episode,
                 'site_id' => $siteId,
                 'from_state' => $from->value,
                 'to_state' => $to->value,

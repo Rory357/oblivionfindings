@@ -1,0 +1,324 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/monitoring/monitoring-incident-evidence-card.test.tsx (3 tests | 1 failed) 77ms
+     × distinguishes a failed technical check from recorded device availability 55ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/monitoring/monitoring-incident-evidence-card.test.tsx > Monitoring incident evidence source > distinguishes a failed technical check from recorded device availability
+TestingLibraryElementError: Unable to find an element with the text: Technical check failed. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <article
+      class="overflow-hidden rounded-xl border border-status-info/30 bg-status-info-bg/50"
+      data-testid="monitoring-incident-evidence"
+    >
+      <div
+        class="flex items-start gap-2.5 border-b border-status-info/20 px-3 py-2.5"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-lock-keyhole mt-0.5 h-4 w-4 flex-none text-status-info"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle
+            cx="12"
+            cy="16"
+            r="1"
+          />
+          <rect
+            height="12"
+            rx="2"
+            width="18"
+            x="3"
+            y="10"
+          />
+          <path
+            d="M7 10V7a5 5 0 0 1 10 0v3"
+          />
+        </svg>
+        <div
+          class="min-w-0 flex-1"
+        >
+          <div
+            class="flex flex-wrap items-center justify-between gap-2"
+          >
+            <h3
+              class="text-[12.5px] font-bold text-foreground"
+            >
+              Frozen when the incident was raised
+            </h3>
+            <span
+              class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-circle-check h-3 w-3"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                />
+                <path
+                  d="m9 12 2 2 4-4"
+                />
+              </svg>
+              Integrity verified
+            </span>
+          </div>
+          <p
+            class="mt-0.5 text-[11px] text-muted-foreground"
+          >
+            Sealed 
+            Sat 12 Sept, 1:00 pm
+             · later live changes do not rewrite this evidence.
+          </p>
+        </div>
+      </div>
+      <dl
+        class="grid gap-2 px-3 py-3 sm:grid-cols-2"
+      >
+        <div
+          class="rounded-lg border border-border/60 bg-background/70 px-2.5 py-2"
+          data-slot="card"
+        >
+          <dt
+            class="flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-radio-tower h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"
+              />
+              <path
+                d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"
+              />
+              <circle
+                cx="12"
+                cy="9"
+                r="2"
+              />
+              <path
+                d="M16.2 4.8c2 2 2.26 5.11.8 7.47"
+              />
+              <path
+                d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1"
+              />
+              <path
+                d="M9.5 18h5"
+              />
+              <path
+                d="m8 22 4-11 4 11"
+              />
+            </svg>
+            Source route
+          </dt>
+          <dd
+            class="mt-1 text-[12px] font-semibold text-foreground"
+          >
+            Direct to IT
+          </dd>
+          <dd
+            class="mt-1 text-[11px] text-muted-foreground"
+          >
+            Recorded from
+             
+            device monitoring
+            . This evidence has no Control Room alert.
+          </dd>
+        </div>
+        <div
+          class="rounded-lg border border-border/60 bg-background/70 px-2.5 py-2"
+          data-slot="card"
+        >
+          <dt
+            class="flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-server h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                height="8"
+                rx="2"
+                ry="2"
+                width="20"
+                x="2"
+                y="2"
+              />
+              <rect
+                height="8"
+                rx="2"
+                ry="2"
+                width="20"
+                x="2"
+                y="14"
+              />
+              <line
+                x1="6"
+                x2="6.01"
+                y1="6"
+                y2="6"
+              />
+              <line
+                x1="6"
+                x2="6.01"
+                y1="18"
+                y2="18"
+              />
+            </svg>
+            Device at capture
+          </dt>
+          <dd
+            class="mt-1 truncate text-[12px] font-semibold text-foreground"
+          >
+            Test switch
+          </dd>
+          <dd
+            class="mt-0.5 text-[11px] text-muted-foreground"
+          >
+            Test Site
+          </dd>
+          <dd
+            class="mt-1 flex flex-wrap gap-1.5"
+          >
+            <span
+              class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-muted text-muted-foreground border-border"
+            >
+              Device status: 
+              Active
+            </span>
+            <span
+              class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-muted text-muted-foreground border-border"
+            >
+              Recorded health:
+               
+              Healthy
+            </span>
+          </dd>
+          <dd
+            class="text-caption mt-1 text-muted-foreground"
+          >
+            These are the device record values at capture. The monitoring observation is recorded separately below.
+          </dd>
+        </div>
+        <div
+          class="rounded-lg border border-border/60 bg-background/70 px-2.5 py-2 sm:col-span-2"
+          data-slot="card"
+        >
+          <dt
+            class="flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-clock3 h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+              />
+              <polyline
+                points="12 6 12 12 16.5 12"
+              />
+            </svg>
+            Trigger observation
+          </dt>
+          <dd
+            class="mt-1 text-[12px] font-semibold text-foreground"
+          >
+            Technical check failed
+             ·
+             
+            Sat 12 Sept, 1:00 pm
+          </dd>
+          <dd
+            class="mt-1 text-[11.5px] text-muted-foreground"
+          >
+            A confirmed monitoring fault requires technical verification.
+          </dd>
+        </div>
+      </dl>
+      <p
+        class="border-t border-status-info/20 px-3 py-2 font-mono text-[10px] text-muted-foreground"
+      >
+        Evidence v
+        2
+         · SHA-256
+         
+        sealed
+        …
+      </p>
+    </article>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/monitoring/monitoring-incident-evidence-card.test.tsx:37:23
+     35|             />,
+     36|         );
+     37|         expect(screen.getByText('Technical check failed')).toBeInTheDo…
+       |                       ^
+     38|         expect(screen.getByText(/Recorded health: Healthy/)).toBeInThe…
+     39|         expect(screen.queryByText('Offline')).not.toBeInTheDocument();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  09:27:03
+   Duration  2.79s (transform 99ms, setup 138ms, import 1.30s, tests 77ms, environment 1.10s)
+

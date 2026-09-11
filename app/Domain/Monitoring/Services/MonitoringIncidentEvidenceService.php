@@ -124,7 +124,7 @@ final class MonitoringIncidentEvidenceService
                 || (int) $ticket->site_id !== $siteId
                 || (int) $event->device_id !== (int) $device->id
                 || $canonicalLinks !== ($alert === null ? 1 : 2)
-                || ($alert === null && ($event->event_type !== 'offline'
+                || ($alert === null && (! in_array($event->event_type, MonitoringIssueEpisode::FAILURE_TYPES, true)
                     || ! MonitoringWorkRouting::hasDirectSourceEvidence($event, $siteId)))) {
                 throw new DomainException('Monitoring incident evidence is not canonical.');
             }
@@ -203,7 +203,7 @@ final class MonitoringIncidentEvidenceService
                 'occurred_at' => $event->occurred_at?->toIso8601String(),
                 'message' => MonitoringTechnicalSummary::observation($event->event_type),
                 'monitor_correlation_key' => $monitorCorrelationKey,
-                'availability_episode_key' => MonitoringAvailabilityEpisode::fromEvent($event, (int) $site->id)['key'] ?? null,
+                MonitoringIssueEpisode::field($event->event_type).'_key' => MonitoringIssueEpisode::fromEvent($event, (int) $site->id)['key'] ?? null,
             ],
         ];
     }

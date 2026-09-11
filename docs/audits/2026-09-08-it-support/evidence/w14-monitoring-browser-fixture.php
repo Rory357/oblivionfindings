@@ -22,6 +22,7 @@ use App\Jobs\DispatchFleetSignalOutbox;
 use App\Models\Asset;
 use App\Models\ControlRoom\SignalRule;
 use App\Models\ControlRoom\SignalSource;
+use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetSignal;
 use App\Models\FleetSignalOutbox;
@@ -119,11 +120,21 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
         $retryCases = [];
         $historyPending = [];
         $cases = [];
+        SignalRule::query()->create([
+            'name' => 'W14 isolated technical-check policy',
+            'signal_source_id' => SignalSource::query()->where('slug', 'security_devices')->sole()->id,
+            'signal_type_id' => SignalType::query()->where('code', 'device_monitor_failed')->sole()->id,
+            'signal_type_code' => 'device_monitor_failed', 'priority' => 1, 'output_severity' => 'medium',
+            'output_tier' => 2, 'is_active' => true, 'deduplicate' => true, 'dedup_window_minutes' => 30,
+        ]);
         $nativeCases = ['direct', 'recovered', 'urgent', 'other_site', 'urgent_recovered', 'retry', 'retry_stale', 'retry_access'];
+        $nativeCases = [...$nativeCases, 'condition_direct', 'condition_recovered', 'condition_urgent', 'condition_retry', 'condition_other_site'];
         foreach (array_merge($nativeCases, array_map(fn (int $number): string => 'history_pending_'.$number, range(1, 13))) as $case) {
-            $siteId = (int) $fixtures['sites'][$case === 'other_site' ? 'c' : 'a'];
-            $urgent = in_array($case, ['urgent', 'urgent_recovered'], true);
-            SignalRule::query()->where('signal_type_code', 'device_offline')->update(['output_severity' => $urgent ? 'high' : 'medium']);
+            $technical = str_starts_with($case, 'condition_');
+            $scenario = $technical ? substr($case, strlen('condition_')) : $case;
+            $siteId = (int) $fixtures['sites'][$scenario === 'other_site' ? 'c' : 'a'];
+            $urgent = in_array($scenario, ['urgent', 'urgent_recovered'], true);
+            SignalRule::query()->where('signal_type_code', $technical ? 'device_monitor_failed' : 'device_offline')->update(['output_severity' => $urgent ? 'high' : 'medium']);
             $device = Device::factory()->itInfrastructure()->create(['name' => 'W14 '.$context['token'].' synthetic '.$case.' switch']);
             DeviceAssignment::query()->create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE,
                 'assignable_id' => $siteId, 'assignment_type' => 'permanent', 'assigned_at' => now()->subHour(), 'assigned_by_user_id' => $tech->id]);
@@ -131,7 +142,7 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
                 'failure_duration_seconds' => 0, 'recovery_duration_seconds' => 0]);
             $monitor = Monitor::factory()->create(['device_id' => $device->id, 'profile_id' => $profile->id, 'collector_id' => null,
                 'name' => 'W14 synthetic '.$case.' availability', 'current_state' => MonitorState::Healthy,
-                'effective_state' => MonitorState::Healthy, 'affects_availability' => true]);
+                'effective_state' => MonitorState::Healthy, 'kind' => $technical ? 'tls' : 'icmp', 'affects_availability' => ! $technical]);
             $time = CarbonImmutable::now()->subMinute()->startOfSecond();
             $failure = app(MonitoringObservationIngestor::class)->ingest($monitor,
                 new ObservationInput('w14-'.$case.'-failed', MonitorState::Failed, $time), $siteId, (int) $device->id, null)->deviceEvent;
@@ -149,7 +160,7 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
 
                 continue;
             }
-            if (str_starts_with($case, 'retry')) {
+            if (str_starts_with($scenario, 'retry')) {
                 $outbox = $failure->signalOutbox()->sole();
                 $failedDelivery($outbox, new DispatchDeviceEventSignalOutbox($outbox->id), new DispatchDeviceMonitoringTicket($outbox->id));
                 $retryCases[$case] = ['source' => 'device', 'outbox_id' => $outbox->id, 'device_id' => $device->id, 'site_id' => $siteId];
@@ -158,7 +169,7 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
             }
             $outbox = $deliver($failure);
             $ticket = ItTicket::query()->findOrFail($outbox->it_ticket_ids[0]);
-            if (in_array($case, ['recovered', 'urgent_recovered'], true)) {
+            if (in_array($scenario, ['recovered', 'urgent_recovered'], true)) {
                 $recovery = app(MonitoringObservationIngestor::class)->ingest($monitor,
                     new ObservationInput('w14-'.$case.'-healthy', MonitorState::Healthy, $time->addSecond()), $siteId, (int) $device->id, null)->deviceEvent;
                 w06BrowserRequire($recovery !== null, 'Synthetic recovery has no canonical source event.');
@@ -166,10 +177,10 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
             }
             $ticket->refresh();
             $snapshot = MonitoringIncidentEvidenceSnapshot::query()->where('it_ticket_id', $ticket->id)->sole();
-            w06BrowserRequire($snapshot->hasValidChecksum() && ($case === 'other_site' || $ticket->queue_id === $queue->id)
+            w06BrowserRequire($snapshot->hasValidChecksum() && ($scenario === 'other_site' || $ticket->queue_id === $queue->id)
                 && ($urgent ? $snapshot->control_room_alert_id !== null : $snapshot->control_room_alert_id === null),
                 'Synthetic routing or evidence does not match its declared case.');
-            if ($case === 'urgent_recovered') {
+            if ($scenario === 'urgent_recovered') {
                 $alert = $snapshot->alert;
                 w06BrowserRequire($alert?->status === 'open' && ! empty($alert->context['monitoring_recoveries'])
                     && $ticket->status === 'open' && $ticket->monitoring_recovered_at !== null,
