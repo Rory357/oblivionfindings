@@ -4,7 +4,7 @@ namespace App\Domain\It\Services;
 
 use App\Domain\It\Enums\ItTicketCommandChannel;
 use App\Domain\It\Exceptions\ItTicketCommandConflict;
-use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
+use App\Domain\Monitoring\Services\MonitoringWorkRouting;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -345,7 +345,7 @@ final class ItTicketLinkService
                 $sourceEvent = $sourceEvent ? DeviceEvent::query()->whereKey($sourceEvent->id)->lockForUpdate()->first() : null;
                 if ($sourceEvent === null || (int) $sourceEvent->device_id !== (int) $device->id
                     || $sourceEvent->event_type !== 'offline'
-                    || ! MonitoringAvailabilityEpisode::hasCanonicalObservations($sourceEvent, $siteId)) {
+                    || ! MonitoringWorkRouting::hasDirectSourceEvidence($sourceEvent, $siteId)) {
                     throw new DomainException('Direct monitoring work requires canonical source observation evidence.');
                 }
             }

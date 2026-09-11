@@ -318,7 +318,7 @@ class ItTicketController extends Controller
                 ] : null] : []),
                 'requester' => [
                     'id' => $ticket->requester?->id,
-                    'name' => $ticket->requester?->name ?? 'Unknown',
+                    'name' => $ticket->requester?->name ?? ($ticket->source === 'system' && $ticket->requester_user_id === null ? 'System' : 'Unknown'),
                     'role' => $requesterProfile?->position_title ?? $requesterProfile?->position_role,
                     'href' => $staffProfileHrefs[(int) $ticket->requester_user_id] ?? null,
                 ],

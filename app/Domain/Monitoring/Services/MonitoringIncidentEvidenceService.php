@@ -70,7 +70,7 @@ final class MonitoringIncidentEvidenceService
                 || (int) $event->device_id !== (int) $device->id
                 || $canonicalLinks !== ($alert === null ? 1 : 2)
                 || ($alert === null && ($event->event_type !== 'offline'
-                    || ! MonitoringAvailabilityEpisode::hasCanonicalObservations($event, $siteId)))) {
+                    || ! MonitoringWorkRouting::hasDirectSourceEvidence($event, $siteId)))) {
                 throw new DomainException('Monitoring incident evidence is not canonical.');
             }
 

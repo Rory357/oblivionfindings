@@ -206,6 +206,19 @@ class SignalProcessingService
                 }
             }
 
+            if ($signal->signal_type_code === 'device_offline'
+                && data_get($signal->normalized_data, 'availability_episode_version') === null) {
+                $eventId = data_get($signal->normalized_data, 'device_event_id');
+                $sourceEvent = is_int($eventId) ? DeviceEvent::query()->find($eventId) : null;
+                $routing = $sourceEvent ? MonitoringWorkRouting::recoveredLegacyDecision($signal, $sourceEvent) : null;
+                if ($routing !== null) {
+                    $signal->update(['normalized_data' => [...($signal->normalized_data ?? []), 'it_work_routing' => $routing]]);
+                    $signal->markProcessed(null, 'Recovery preceded outage delivery; technical verification is required.');
+
+                    return null;
+                }
+            }
+
             $incident = $this->trustedIncidentForSignal($signal);
             if ($incident !== null) {
                 $existingAlert = $this->exactAlertForIncident($incident);
@@ -354,6 +367,31 @@ class SignalProcessingService
                 return 0;
             }
 
+            $legacyEvent = null;
+            $legacyFailure = null;
+            $legacyAlertId = null;
+            if (! $nativeEpisode) {
+                $eventId = data_get($signal->normalized_data, 'device_event_id');
+                $legacyEvent = is_int($eventId) ? DeviceEvent::query()->find($eventId) : null;
+                if ($legacyEvent && $signal->signalSource?->slug === 'security_devices'
+                    && $signal->external_ref === 'device_event_'.$legacyEvent->id
+                    && (int) $legacyEvent->device_id === $canonicalDeviceId
+                    && $legacyEvent->occurred_at?->equalTo($signal->occurred_at)) {
+                    $legacyFailure = MonitoringAvailabilityEpisode::legacyFailureForRecovery($legacyEvent, (int) $signal->site_id);
+                }
+                if ($legacyFailure === null) {
+                    $signal->markProcessed(null, 'Recovery has no matching canonical fault; technical verification is required.');
+
+                    return 0;
+                }
+                $original = Signal::query()->where('signal_source_id', $signal->signal_source_id)
+                    ->where('site_id', $signal->site_id)->where('signal_type_code', 'device_offline')
+                    ->where('external_ref', 'device_event_'.$legacyFailure->id)
+                    ->where('normalized_data->canonical_device_id', $canonicalDeviceId)
+                    ->where('normalized_data->device_event_id', $legacyFailure->id)->first();
+                $legacyAlertId = $original?->alert_id ?? $original?->correlated_alert_id;
+            }
+
             if (! $signal->device_id && $canonicalDeviceId <= 0) {
                 $signal->markProcessed(null, 'No device identity was available for recovery matching.');
 
@@ -367,7 +405,7 @@ class SignalProcessingService
             }
 
             $alertsQuery = ControlRoomAlert::query()
-                ->when(! $nativeEpisode, fn ($query) => $query->unresolved())
+                ->when(! $nativeEpisode, fn ($query) => $query->whereKey($legacyAlertId ?? 0))
                 ->where('source', 'security_devices')
                 ->where('site_id', $signal->site_id)
                 ->where(function ($query) use ($signal, $canonicalDeviceId): void {
@@ -396,12 +434,15 @@ class SignalProcessingService
             $alerts = $alertsQuery->lockForUpdate()->get();
 
             foreach ($alerts as $alert) {
-                if ($nativeEpisode) {
+                if ($nativeEpisode || $legacyFailure !== null) {
+                    $recoveryKey = $nativeEpisode ? $episodeKey : 'legacy:'.$legacyFailure->id;
+                    $recoveryEvent = $nativeEvent ?? $legacyEvent;
                     $context = $alert->context ?? [];
-                    $context['monitoring_recoveries'][$episodeKey] = [
+                    $context['monitoring_recoveries'][$recoveryKey] = [
                         'recovery_signal_id' => (int) $signal->id,
-                        'device_event_id' => (int) $nativeEvent->id,
-                        'observed_at' => $nativeEvent->occurred_at->toIso8601String(),
+                        'device_event_id' => (int) $recoveryEvent->id,
+                        'offline_device_event_id' => $legacyFailure?->id,
+                        'observed_at' => $recoveryEvent->occurred_at->toIso8601String(),
                         'verification_required' => true,
                     ];
                     $alert->update(['context' => $context]);
@@ -412,21 +453,11 @@ class SignalProcessingService
 
                     continue;
                 }
-                $this->resolveAlert(
-                    $alert,
-                    'Monitoring confirmed that the device recovered.',
-                    'monitoring_recovery',
-                    [
-                        'recovery_signal_id' => $signal->id,
-                        'monitor_correlation_key' => $correlationKey,
-                        'availability_episode_key' => $episodeKey,
-                    ],
-                );
             }
 
-            $signal->markProcessed(null, $nativeEpisode
-                ? 'Monitoring recovery evidence recorded; operational verification is required.'
-                : 'Resolved matching device-offline alerts.');
+            $signal->markProcessed(null, $alerts->isEmpty()
+                ? 'Recovery has no matching delivered fault; technical verification is required.'
+                : 'Monitoring recovery evidence recorded; operational verification is required.');
 
             return $alerts->count();
         }, self::TRANSACTION_ATTEMPTS);

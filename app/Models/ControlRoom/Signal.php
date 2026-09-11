@@ -59,7 +59,10 @@ class Signal extends Model
 
     public function setReceivedAtAttribute($value): void
     {
-        $this->attributes['occurred_at'] = $value;
+        // Compatibility input for older callers; receipt must never replace source occurrence.
+        if (empty($this->attributes['occurred_at'])) {
+            $this->setAttribute('occurred_at', $value);
+        }
     }
 
     public function signalSource(): BelongsTo

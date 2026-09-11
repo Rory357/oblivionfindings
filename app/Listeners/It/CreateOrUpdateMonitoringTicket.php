@@ -12,6 +12,7 @@ use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Domain\Monitoring\Services\MonitoringWorkRouting;
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceEventSignalOutbox;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
@@ -75,7 +76,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             if (data_get($event->deviceEvent->payload, 'availability_episode_version') === 1 && $episode === null) {
                 throw new DomainException('source_scope_changed');
             }
-            $ticket = $this->ticketForAlert($event->device, $lockedAlert, $siteId, $episode['key'] ?? null);
+            $ticket = $this->ticketForAlert($event->device, $lockedAlert, $siteId, $episode['key'] ?? null, (int) $event->deviceEvent->id);
 
             if ($ticket) {
                 $this->links->linkMonitoringEvidence($ticket, $event->device, $lockedAlert, [
@@ -89,16 +90,15 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                     $event->deviceEvent,
                     $this->monitorCorrelationKey($event),
                 );
+                if (! $this->hasMonitoringEvidence($ticket, $event->deviceEvent->id)) {
+                    ItTicketEvent::record($ticket, 'monitoring_evidence_added', null, $this->eventEvidence($event, $lockedAlert));
+                }
                 if (in_array($ticket->status, ItTicket::OPEN_STATUSES, true)
-                    && ($episode === null || $ticket->monitoring_recovered_at === null)) {
+                    && ($episode === null ? $this->isLatestMonitoringFailure($ticket, $event->deviceEvent) : $ticket->monitoring_recovered_at === null)) {
                     $ticket->forceFill([
                         'status_reason' => 'monitoring_outage',
                         'monitoring_recovered_at' => null,
                     ])->save();
-                }
-
-                if (! $this->hasMonitoringEvidence($ticket, $event->deviceEvent->id)) {
-                    ItTicketEvent::record($ticket, 'monitoring_evidence_added', null, $this->eventEvidence($event, $lockedAlert));
                 }
 
                 if (in_array($ticket->status, ItTicket::OPEN_STATUSES, true)) {
@@ -173,6 +173,10 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             if ($correlationKey === null && ! $legacyRecovery && ! $nativeEpisode) {
                 return ['outcome' => 'recovery_unmatched', 'ticket_ids' => []];
             }
+            $legacyFailure = $nativeEpisode ? null : MonitoringAvailabilityEpisode::legacyFailureForRecovery($event->deviceEvent, $siteId);
+            if (! $nativeEpisode && $legacyFailure === null) {
+                return ['outcome' => 'recovery_unmatched', 'ticket_ids' => []];
+            }
 
             $ticketsQuery = ItTicket::query()
                 ->where('source', 'system')
@@ -213,10 +217,13 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             }
             if (! $nativeEpisode) {
                 $ticketsQuery->whereHas('events', fn ($events) => $events->where('type', 'created_from_monitoring')
-                    ->whereNull('payload->availability_episode_key'));
+                    ->whereNull('payload->availability_episode_key'))
+                    ->whereHas('events', fn ($events) => $events->whereIn('type', ['created_from_monitoring', 'monitoring_evidence_added'])
+                        ->where('payload->device_event_id', $legacyFailure->id));
             }
 
-            $tickets = $ticketsQuery->lockForUpdate()->get();
+            $tickets = $ticketsQuery->lockForUpdate()->get()
+                ->filter(fn (ItTicket $ticket): bool => $nativeEpisode || $this->isLatestMonitoringFailure($ticket, $legacyFailure));
 
             foreach ($tickets as $ticket) {
                 if ($ticket->monitoring_recovered_at !== null) {
@@ -234,6 +241,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                     'signal_id' => $event->signal->id,
                     'monitor_correlation_key' => $correlationKey,
                     'availability_episode_key' => $episode['key'] ?? null,
+                    'offline_device_event_id' => $legacyFailure?->id,
                 ]);
             }
 
@@ -242,15 +250,15 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
         });
     }
 
-    private function ticketForAlert(Device $device, ?ControlRoomAlert $alert, int $siteId, ?string $episodeKey): ?ItTicket
+    private function ticketForAlert(Device $device, ?ControlRoomAlert $alert, int $siteId, ?string $episodeKey, int $sourceEventId): ?ItTicket
     {
         return ItTicket::query()
             ->where('source', 'system')
             ->where('work_type', 'incident')
-            ->when($episodeKey === null, fn ($tickets) => $tickets->whereIn('status', ItTicket::OPEN_STATUSES))
+            ->when($episodeKey === null && $alert !== null, fn ($tickets) => $tickets->whereIn('status', ItTicket::OPEN_STATUSES))
             ->where('site_id', $siteId)
             ->where('is_organisation_wide', false)
-            ->when($episodeKey === null, fn ($tickets) => $tickets->whereHas('links', function ($query) use ($alert): void {
+            ->when($episodeKey === null && $alert !== null, fn ($tickets) => $tickets->whereHas('links', function ($query) use ($alert): void {
                 $query
                     ->where('relationship', 'source_alert')
                     ->where('linkable_type', $alert->getMorphClass())
@@ -258,6 +266,8 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                     ->where('context->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
                     ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION);
             }))
+            ->when($episodeKey === null && $alert === null, fn ($tickets) => $tickets->whereHas('events', fn ($events) => $events
+                ->where('type', 'created_from_monitoring')->where('payload->device_event_id', $sourceEventId)))
             ->when($episodeKey !== null, fn ($tickets) => $tickets->whereHas('events', fn ($events) => $events
                 ->where('type', 'created_from_monitoring')->where('payload->availability_episode_key', $episodeKey)))
             ->whereHas('links', function ($query) use ($device): void {
@@ -288,6 +298,10 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
 
     private function applyObservedRecovery(ItTicket $ticket, DeviceSignalPublished $failure): void
     {
+        if (data_get($failure->deviceEvent->payload, 'availability_episode_version') === null
+            && ! $this->isLatestMonitoringFailure($ticket, $failure->deviceEvent)) {
+            return;
+        }
         $recovery = MonitoringAvailabilityEpisode::recoveryFor($failure->deviceEvent, (int) $ticket->site_id);
         if ($recovery === null || $ticket->monitoring_recovered_at !== null) {
             return;
@@ -299,6 +313,18 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             'monitor_correlation_key' => data_get($recovery->payload, 'monitor_correlation_key'),
             'availability_episode_key' => MonitoringAvailabilityEpisode::fromEvent($recovery, (int) $ticket->site_id)['key'] ?? null,
         ]);
+    }
+
+    private function isLatestMonitoringFailure(ItTicket $ticket, DeviceEvent $failure): bool
+    {
+        $eventIds = $ticket->events()->whereIn('type', ['created_from_monitoring', 'monitoring_evidence_added'])
+            ->get(['payload'])->map(fn (ItTicketEvent $event) => data_get($event->payload, 'device_event_id'))
+            ->filter(fn ($id): bool => is_int($id))->all();
+        $latest = DeviceEvent::query()->whereIn('id', $eventIds)->where('device_id', $failure->device_id)
+            ->where('source', 'oblivion_monitoring')->where('event_type', 'offline')
+            ->orderByDesc('occurred_at')->orderByDesc('id')->first(['id']);
+
+        return $latest?->id === $failure->id;
     }
 
     /**

@@ -1,0 +1,169 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_65dffe695b254636",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Monitoring\MonitoringRecoveryPipelineTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit records exact legacy recovery for verification without closing the alert or ticket[39m[90m                     [39m [90m174.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit keeps explicit occurrence time regardless of legacy receipt field order[39m[90m                                  [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not apply a delayed legacy recovery to a later fault on the same correlated ticket[39m[90m                  [39m [90m0.30s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects legacy recovery when its preceding source event is already online or from another site[39m[90m           [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit processes an identity-less recovery without resolving unrelated alerts[39m[90m                                   [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects non-recovery signals from the device recovery path[39m[90m                                               [39m [90m0.13s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Monitoring\MonitoringAvailabilityEpisodeTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdelayed recovery affects only its original episode even when the same monitor fails again[39m[90m                   [39m [90m0.37s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery delivered before IT creation is retained as verification evidence without closing the later ticket[39m[90m [39m [90m0.26s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnative recovery requires an audit commit and retries without resolving operational work[39m[90m                     [39m [90m0.28s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlate native recovery preserves a settled alert and only projects evidence to source-authorised roles[39m[90m        [39m [90m0.42s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma recovery without its own canonical observation cannot settle operational or technical evidence[39m[90m            [39m [90m0.27s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma recovered episode delivered late does not create a stale Control Room alarm or falsely complete technical[39m[90m…[39m [90m0.28s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmaintenance suppression retains the episode and a confirmed healthy observation emits its recovery[39m[90m          [39m [90m0.29s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresuming a still-failed monitor after maintenance reuses its episode beyond the generic alert deduplication[39m[90m…[39m [90m0.30s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma new confirmed episode after closure creates fresh work and preserves the old settled record[39m[90m               [39m [90m0.35s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirmed threshold state defines an outage even when the raw observation reports healthy[39m[90m                   [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing episode state produces unmatched recovery instead of closing an unproven outage[39m[90m                     [39m [90m0.27s[39m  
+  [32;1m✓[39;22m[90m [39m[90mobservation replay and late older evidence cannot rewind or duplicate an episode[39m[90m                            [39m [90m0.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mepisode and monitor state roll back with source-event publication failure and retry once[39m[90m                    [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma forged episode tuple fails closed before producing an alert or ticket[39m[90m                                     [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma legacy broad recovery cannot settle a new native episode[39m[90m                                                  [39m [90m0.26s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfigured nonurgent faults create one direct ticket and sealed source evidence despite a high transport hi[39m[90m…[39m [90m0.26s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfigured nonurgent faults create one direct ticket and sealed source evidence despite a high transport hi[39m[90m…[39m [90m0.29s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfigured nonurgent faults create one direct ticket and sealed source evidence despite a high transport hi[39m[90m…[39m [90m0.27s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdirect technical work uses the current eligible queue owner and cover without inventing people[39m[90m              [39m [90m0.29s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdirect evidence needs current ticket and device access without requiring unrelated Control Room access[39m[90m      [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma direct routing decision survives a policy edit while mutated recorded decisions are rejected[39m[90m              [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing canonical observation evidence rejects direct routing before source acknowledgement[39m[90m                 [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdirect creation failure remains independently retryable without an operational alert[39m[90m                        [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90moperational or unassessed faults keep Control Room coordination with ('high')[39m[90m                               [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90moperational or unassessed faults keep Control Room coordination with ('critical')[39m[90m                           [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90moperational or unassessed faults keep Control Room coordination with (null)[39m[90m                                 [39m [90m0.40s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresumed evidence for a settled episode does not create or reopen technical work[39m[90m                             [39m [90m0.28s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdirect queued work denies a device moved to another Site after source delivery[39m[90m                              [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mretained type-FK rules remain specific and explicit wildcard rules preserve their configured precedence[39m[90m     [39m [90m0.28s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconflicting rule type identifiers cannot authorize bypassing operational coordination[39m[90m                       [39m [90m0.21s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Monitoring\DependencySuppressionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps a downstream symptom visible but suppresses its alert and ticket behind one root cause[39m[90m             [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects cycles and cross Site dependencies and ignores weak inferred edges[39m[90m                               [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit persists a suppressed symptom and root cause without emitting a duplicate availability event[39m[90m             [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit recovers only the matching Control Room alert and IT incident when one of two root monitors recovers[39m[90m     [39m [90m0.37s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItMonitoringTicketIntegrationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit links one ticket idempotently to a canonical device and alert[39m[90m                                            [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects a human ticket link without a current responsible actor[39m[90m                                          [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects monitoring links when canonical device and alert site evidence is absent[39m[90m                         [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit allows a system incident without a human requester[39m[90m                                                       [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit creates one linked system incident for a confirmed IT infrastructure outage[39m[90m                              [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit keeps separate canonical Device outages distinct without Control Room projections[39m[90m                        [39m [90m0.24s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit adds repeated evidence to the same ticket instead of creating a duplicate[39m[90m                                [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit creates a fresh incident when an outage repeats after the earlier monitoring ticket was resolved[39m[90m         [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit marks the ticket monitoring recovered but leaves technician resolution open[39m[90m                              [39m [90m0.24s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not recover a system ticket that lacks the enforced monitoring principal evidence[39m[90m                   [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not turn security or healthcare signals into automatic IT incidents without policy with ('security'[39m[90m…[39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not turn security or healthcare signals into automatic IT incidents without policy with ('iot_healt[39m[90m…[39m [90m0.15s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItControlRoomMonitoringContextTest[39m
+  [32;1m✓[39;22m[90m [39m[90mone immutable incident snapshot preserves original evidence while both workspaces show live canonical state[39m[90m [39m [90m0.32s[39m  
+  [32;1m✓[39;22m[90m [39m[90msource permissions Site access and checksum integrity fail closed on both projections[39m[90m                       [39m [90m0.35s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.29s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistorical monitoring diagnostics stay protected without changing stored evidence or human authored descrip[39m[90m…[39m [90m0.55s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItMonitoringDeliveryRecoveryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mlost queued listener is recovered once independently of the acknowledged Control Room alert[39m[90m                 [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT insertion failure rolls back its ticket and evidence but preserves Control Room delivery for retry[39m[90m       [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexhausted failures require an explicit durable retry and preserve lifetime attempts during a queue outage[39m[90m   [39m [90m0.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('site')[39m[90m                         [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('inactive_site')[39m[90m                [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('domain')[39m[90m                       [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('episode')[39m[90m                      [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('signal')[39m[90m                       [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90minactive source requires repair and explicit retry without discarding the approved scope binding[39m[90m            [39m [90m0.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90munmatched recovery is explicit and unsupported device domains never create technical work[39m[90m                   [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy acknowledged events remain unverified rather than recreating already settled IT work[39m[90m                 [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequired completion audit failure rolls back the IT result and is recoverable without duplicating the alert[39m[90m [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT dispatch intent rolls back with an interrupted source acknowledgement and is prepared on retry[39m[90m           [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelivery audit counters accept bounded integers and reject free text provider material[39m[90m                      [39m [90m0.12s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\SecurityDevices\DeviceEventSignalPipelineTest[39m
+  [32;1m✓[39;22m[90m [39m[90msignal types and source are seeded[39m[90m                                                                          [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcritical alarm trigger produces control room alert[39m[90m                                                          [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90minfo level event does not create a new alert per dedup[39m[90m                                                      [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown event type falls back to generic catchall[39m[90m                                                           [39m [90m0.17s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\ControlRoom\SignalProcessingServiceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mingest creates signal[39m[90m                                                                                       [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mingest deduplicates by idempotency key[39m[90m                                                                      [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprocess creates alert from signal with matching rule[39m[90m                                                        [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprocess skips signal during maintenance window[39m[90m                                                              [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprocess without matching rule creates default alert[39m[90m                                                         [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mincident tagged signals correlate only to the exact incident[39m[90m                                                [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mincident tagged signal prefers its direct alert outside fuzzy constraints[39m[90m                                   [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mincident tagged signal rejects ambiguous context claims[39m[90m                                                     [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90msubmitted incident signal synchronises the existing hs event alert backlink[39m[90m                                 [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcritical trusted signal promotes the complete existing medium journey[39m[90m                                       [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdirect incident alert with a different client is rejected without correlation[39m[90m                               [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcontext incident alert with a different client is rejected without linking[39m[90m                                  [39m [90m0.58s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgeneric signals still use fuzzy deduplication[39m[90m                                                               [39m [90m0.58s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlone worker correlation pushes the complete immutable tuple into the locking query[39m[90m                          [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprocess all pending processes batch[39m[90m                                                                         [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprocess all pending respects limit[39m[90m                                                                          [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mingest from device creates signal[39m[90m                                                                           [39m [90m0.58s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Fleet\FleetAvailabilityRecoveryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mrecovery records one safe episode without closing the alert[39m[90m                                                 [39m [90m0.50s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery delivered first does not raise a stale offline or recovery alarm[39m[90m                                   [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed old recovery does not modify a later offline episode[39m[90m                                                [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed recovery rechecks current scope with data set "moved site"[39m[90m                                          [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed recovery rechecks current scope with data set "inactive site"[39m[90m                                       [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed recovery rechecks current scope with data set "re-paired device"[39m[90m                                    [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma replacement device does not recover the previous device[39m[90m                                                   [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mchanged source evidence cannot reuse an offline episode key[39m[90m                                                 [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery outbox failure rolls back the heartbeat and can retry[39m[90m                                              [39m [90m0.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy offline state without episode evidence records unmatched recovery[39m[90m                                    [39m [90m0.17s[39m  
+
+  [90mTests:[39m    [32;1m104 passed[39;22m[90m (721 assertions)[39m
+  [90mDuration:[39m [39m205.86s[39m
+
+{"phase":"focused_tests_finished","exit_code":0}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_65dffe695b254636",
+    "database_mutations_performed": false
+}

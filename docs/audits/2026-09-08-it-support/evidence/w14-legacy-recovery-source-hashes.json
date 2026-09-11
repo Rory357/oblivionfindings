@@ -1,0 +1,30 @@
+[
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringAvailabilityEpisode.php",
+    "sha256": "9ddd3a07335f3a732dcf3b388b14915f42113fb31993e4b55f78d29f8cce14cb"
+  },
+  {
+    "path": "app/Domain/Monitoring/Presenters/MonitoringIncidentEvidencePresenter.php",
+    "sha256": "88f99a89568394fd983bdcd66b473f19ee31028299d41f5cb2da8c895b30b249"
+  },
+  {
+    "path": "app/Services/ControlRoom/SignalProcessingService.php",
+    "sha256": "a578826201b191c4013003739284c7f08becf4946e0b3cd1933793ab40fcca08"
+  },
+  {
+    "path": "app/Listeners/It/CreateOrUpdateMonitoringTicket.php",
+    "sha256": "531551ae4b45c6d8cbb18fd70b0c3065d8ae88c342903a7847134e3f2d32c253"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItTicketController.php",
+    "sha256": "e652f3e06b4d4c7f9458c24aeb86f459ceb26175827fa33e6194878221e2346a"
+  },
+  {
+    "path": "tests/Feature/Monitoring/MonitoringRecoveryPipelineTest.php",
+    "sha256": "c69f5fdd1c5c3618d1a531f6590879d9d0b78487469f446c1836f5169a5199b3"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w14-monitoring-browser-fixture.php",
+    "sha256": "00f3ab86d7faafe363beaafd32365cb074cc8f14adae22e6a2b3801798a121b4"
+  }
+]

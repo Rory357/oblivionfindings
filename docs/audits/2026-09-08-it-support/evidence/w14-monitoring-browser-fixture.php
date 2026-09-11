@@ -62,12 +62,12 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
             'is_default' => true, 'site_ids' => [$fixtures['sites']['a'], $fixtures['sites']['b']],
             'cover_user_id' => $cover->id, 'default_assignee_user_id' => $tech->id,
         ]]);
-        $deliver = static function (DeviceEvent $event): DeviceEventSignalOutbox {
+        $deliver = static function (DeviceEvent $event, string $expectedItStatus = 'applied'): DeviceEventSignalOutbox {
             $outbox = $event->signalOutbox()->sole();
             app()->call([new DispatchDeviceEventSignalOutbox($outbox->id), 'handle']);
             app()->call([new DispatchDeviceMonitoringTicket($outbox->id), 'handle']);
             $outbox->refresh();
-            w06BrowserRequire($outbox->status === 'sent' && $outbox->it_status === 'applied', 'Synthetic monitoring delivery failed.');
+            w06BrowserRequire($outbox->status === 'sent' && $outbox->it_status === $expectedItStatus, 'Synthetic monitoring delivery failed.');
 
             return $outbox;
         };
@@ -107,6 +107,34 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
                     && $ticket->status === 'open' && $ticket->monitoring_recovered_at !== null,
                     'Synthetic urgent recovery must preserve both operational and technical work.');
             }
+            $cases[$case] = ['ticket_id' => $ticket->id, 'reference' => $ticket->reference, 'device_id' => $device->id,
+                'alert_id' => $snapshot->control_room_alert_id, 'site_id' => $siteId, 'outbox_id' => $outbox->id,
+                'status' => $ticket->status, 'status_reason' => $ticket->status_reason, 'evidence_version' => $snapshot->evidence_version];
+        }
+
+        foreach (['legacy_recovered', 'legacy_reordered'] as $case) {
+            $reordered = $case === 'legacy_reordered';
+            $siteId = (int) $fixtures['sites']['a'];
+            $device = Device::factory()->itInfrastructure()->create(['name' => 'W14 '.$context['token'].' synthetic '.$case.' switch']);
+            DeviceAssignment::query()->create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE,
+                'assignable_id' => $siteId, 'assignment_type' => 'permanent', 'assigned_at' => now()->subHour(), 'assigned_by_user_id' => $tech->id]);
+            $time = CarbonImmutable::now()->subMinute()->startOfSecond();
+            $payload = ['monitor_correlation_key' => hash('sha256', 'synthetic-'.$case.'-'.$context['token']), 'site_id' => $siteId];
+            $failure = DeviceEvent::query()->create(['device_id' => $device->id, 'event_type' => 'offline', 'severity' => 'high',
+                'source' => 'oblivion_monitoring', 'occurred_at' => $time, 'payload' => $payload]);
+            $outbox = $reordered ? null : $deliver($failure);
+            $recovery = DeviceEvent::query()->create(['device_id' => $device->id, 'event_type' => 'online', 'severity' => 'info',
+                'source' => 'oblivion_monitoring', 'occurred_at' => $time->addSecond(), 'payload' => $payload]);
+            $deliver($recovery, $reordered ? 'ignored' : 'applied');
+            $outbox ??= $deliver($failure);
+            $ticket = ItTicket::query()->findOrFail($outbox->it_ticket_ids[0]);
+            $snapshot = MonitoringIncidentEvidenceSnapshot::query()->where('it_ticket_id', $ticket->id)->sole();
+            w06BrowserRequire($snapshot->hasValidChecksum()
+                && ($reordered ? $snapshot->control_room_alert_id === null
+                    : ($snapshot->alert?->status === 'open'
+                        && data_get($snapshot->alert->context, 'monitoring_recoveries.legacy:'.$failure->id.'.verification_required') === true))
+                && $ticket->status === 'open' && $ticket->monitoring_recovered_at !== null,
+                'Synthetic legacy recovery must preserve operational and technical work with exact fault evidence.');
             $cases[$case] = ['ticket_id' => $ticket->id, 'reference' => $ticket->reference, 'device_id' => $device->id,
                 'alert_id' => $snapshot->control_room_alert_id, 'site_id' => $siteId, 'outbox_id' => $outbox->id,
                 'status' => $ticket->status, 'status_reason' => $ticket->status_reason, 'evidence_version' => $snapshot->evidence_version];

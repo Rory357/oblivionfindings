@@ -1,0 +1,30 @@
+[
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringWorkRouting.php",
+    "sha256": "c64209de70d02fc8d7f1e4e2cd142cc589cc1264029fdeb36a8bbf0dc19d24d7"
+  },
+  {
+    "path": "app/Services/ControlRoom/SignalProcessingService.php",
+    "sha256": "597ae8ac5219418fb391dd2bca972f345d7de90c8ac32e6dc25e1ab4711e5f32"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketLinkService.php",
+    "sha256": "4236f59d23a74babf300888ae598014b63479671b41048043f88cc3075b717fc"
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringIncidentEvidenceService.php",
+    "sha256": "3b6ee994f720e728b774a296ad89c39bffdddd95c81abbf81bdd6a89b8ec4ab9"
+  },
+  {
+    "path": "app/Listeners/It/CreateOrUpdateMonitoringTicket.php",
+    "sha256": "d558bcb6172a014c1ce2a78be82a311062525739af9c3cb7a3ceba471769b299"
+  },
+  {
+    "path": "tests/Feature/Monitoring/MonitoringRecoveryPipelineTest.php",
+    "sha256": "dc4bb0e6071660007caf9567e8b3fa0cebf19560fc59e262befa12eade3a8250"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w14-monitoring-browser-fixture.php",
+    "sha256": "126a8fd6067c160c30a62330b581a5815054a306441fe0b0af7ee5805fbe17c4"
+  }
+]

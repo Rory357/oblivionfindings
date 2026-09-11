@@ -48,7 +48,14 @@ final class MonitoringAvailabilityEpisode
     {
         $episode = self::fromEvent($failure, $siteId);
         if ($episode === null) {
-            return null;
+            if (data_get($failure->payload, 'availability_episode_version') !== null) {
+                return null;
+            }
+
+            return DeviceEvent::query()->where('device_id', $failure->device_id)->where('event_type', 'online')
+                ->where('source', 'oblivion_monitoring')->where('occurred_at', '>=', $failure->occurred_at)
+                ->orderBy('occurred_at')->orderBy('id')->lazy(100)
+                ->first(fn (DeviceEvent $recovery): bool => self::legacyFailureForRecovery($recovery, $siteId)?->id === $failure->id);
         }
 
         return DeviceEvent::query()->where('device_id', $failure->device_id)->where('event_type', 'online')
@@ -56,6 +63,37 @@ final class MonitoringAvailabilityEpisode
             ->where('occurred_at', '>=', $failure->occurred_at)->orderBy('occurred_at')->orderBy('id')
             ->lazy(100)->first(fn (DeviceEvent $event): bool => (self::fromEvent($event, $siteId)['key'] ?? null) === $episode['key']
                 && self::hasCanonicalObservations($event, $siteId));
+    }
+
+    /** Historical sources have no observation tuple; bind recovery to one preceding canonical fault. */
+    public static function legacyFailureForRecovery(DeviceEvent $recovery, int $siteId): ?DeviceEvent
+    {
+        $key = data_get($recovery->payload, 'monitor_correlation_key');
+        if ($recovery->source !== 'oblivion_monitoring' || $recovery->event_type !== 'online'
+            || $recovery->occurred_at === null || data_get($recovery->payload, 'availability_episode_version') !== null
+            || (data_get($recovery->payload, 'site_id') !== null && data_get($recovery->payload, 'site_id') !== $siteId)
+            || ($key !== null && (! is_string($key) || preg_match('/\A[a-f0-9]{64}\z/', $key) !== 1))
+            || ($key === null && data_get($recovery->payload, 'legacy_monitoring_recovery') !== true)) {
+            return null;
+        }
+
+        $previous = DeviceEvent::query()->where('device_id', $recovery->device_id)
+            ->where('source', $recovery->source)->whereIn('event_type', ['offline', 'online'])
+            ->where(function ($query) use ($recovery): void {
+                $query->where('occurred_at', '<', $recovery->occurred_at)
+                    ->orWhere(fn ($sameTime) => $sameTime->where('occurred_at', $recovery->occurred_at)->where('id', '<', $recovery->id));
+            })
+            ->when($key === null, fn ($query) => $query->whereNull('payload->monitor_correlation_key'),
+                fn ($query) => $query->where('payload->monitor_correlation_key', $key))
+            ->orderByDesc('occurred_at')->orderByDesc('id')->first();
+
+        if (! $previous || $previous->event_type !== 'offline'
+            || data_get($previous->payload, 'availability_episode_version') !== null
+            || (data_get($previous->payload, 'site_id') !== null && data_get($previous->payload, 'site_id') !== $siteId)) {
+            return null;
+        }
+
+        return $previous;
     }
 
     /** Source capability is proved by immutable observations, never a payload label alone. */
