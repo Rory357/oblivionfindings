@@ -1,0 +1,49 @@
+{
+  "captured_at": "2026-09-11T20:09:35.5166570Z",
+  "source": [
+    {
+      "path": "app/Domain/It/Services/ItTechnicalDeliveryService.php",
+      "sha256": "01e9bd0445322ffc906ad704684edea490f9fe58702e72d1f736cf768c461df6"
+    },
+    {
+      "path": "app/Domain/It/Services/ItTechnicalDeliveryOperationsPresenter.php",
+      "sha256": "28dd74bc7f9cdabbfc9296d36256b5d7c0ee9a1c30127de0da4fd2c2835732c0"
+    },
+    {
+      "path": "app/Domain/It/Services/ItTechnicalDeliveryRecoveryService.php",
+      "sha256": "a6e4679c77b53a35d0925b5ba0b7c08c1231f9283c84a81f024f4998be9e14ed"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+      "sha256": "fbc8ebffd7f20c54d1524130a16f976071a72eecc185708fa2c84c9a700032ed"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItTechnicalDeliveryController.php",
+      "sha256": "851cb9c14aa551433b601dadaabd5b2942de5db6fd706922dbaf6c0ac4ec1d6a"
+    },
+    {
+      "path": "app/Http/Middleware/ProtectItDraftResponses.php",
+      "sha256": "1b6b3022a16b485940c1b7948c8cd3811e6c4c306fbfc4df5e73f41d42744008"
+    },
+    {
+      "path": "routes/web.php",
+      "sha256": "5f7050fa8ffaa2685811e87ad823429b3b2eae65d66b13b528eaebc4295e1486"
+    },
+    {
+      "path": "resources/js/components/it/it-service-operations.tsx",
+      "sha256": "e7bff2ee1ed89b7e9cc3c67fd5e50a0805447a3a934e3b2c03c90399fa613146"
+    },
+    {
+      "path": "resources/js/components/it/it-technical-delivery-health.tsx",
+      "sha256": "a6c7423b1a40b969ddfa03ff2f95dbfc05510d1ea12864b8d18d2626c199cdc7"
+    },
+    {
+      "path": "resources/js/components/it/it-technical-delivery-health.test.tsx",
+      "sha256": "1575bf49c5b9f0f254725b358219ac28419c2f8e1e28cc17e66db8dfd78d5963"
+    },
+    {
+      "path": "tests/Feature/It/ItTechnicalDeliveryOperationsTest.php",
+      "sha256": "cd118dc9d2418561fe0bcf5c39499400ec7c7602df932ada7aca179b7080df43"
+    }
+  ]
+}

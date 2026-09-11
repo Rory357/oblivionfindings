@@ -114,10 +114,12 @@ abstract class ItTechnicalDeliveryService
         ];
     }
 
-    public function retry(int $outboxId): void
+    /** The optional guard runs under the same row lock as the retry allowance. */
+    public function retry(int $outboxId, ?Closure $guard = null): void
     {
-        DB::transaction(function () use ($outboxId): void {
+        DB::transaction(function () use ($outboxId, $guard): void {
             $outbox = $this->outboxes()->whereKey($outboxId)->lockForUpdate()->firstOrFail();
+            $guard?->__invoke($outbox);
             if ($outbox->status !== 'sent' || ! in_array($outbox->it_status, ['failed', 'dead_letter', 'unroutable'], true)) {
                 throw new DomainException('Only failed IT outcomes of delivered source events can be retried.');
             }

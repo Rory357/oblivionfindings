@@ -1,0 +1,1 @@
+{"tool":"pint","result":"fixed","files":[{"path":"tests\\Feature\\It\\ItTechnicalDeliveryOperationsTest.php","fixers":["ordered_imports"]}]}

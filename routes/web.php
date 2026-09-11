@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\It\ItCatalogController;
 use App\Http\Controllers\It\ItChangeController;
 use App\Http\Controllers\It\ItControlRoomHandoffController;
+use App\Http\Controllers\It\ItTechnicalDeliveryController;
 use App\Http\Controllers\It\ItKbController;
 use App\Http\Controllers\It\ItMajorIncidentController;
 use App\Http\Controllers\It\ItProblemController;
@@ -251,6 +252,8 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
 
     Route::middleware('permission:it.manage')->group(function () {
         Route::get('/it/setup', [ItServiceManagementSetupController::class, 'index'])->name('it.setup.index');
+        Route::get('/it/setup/technical-deliveries/{source}/{delivery}', ItTechnicalDeliveryController::class)->where('source', 'device|fleet')->whereNumber('delivery')->name('it.technical-deliveries.review');
+        Route::post('/it/setup/technical-deliveries/{source}/{delivery}/retry', ItTechnicalDeliveryController::class)->where('source', 'device|fleet')->whereNumber('delivery')->name('it.technical-deliveries.retry');
         Route::post('/it/setup/validate-candidate', [ItServiceManagementSetupController::class, 'validateCandidate'])->name('it.setup.validate-candidate');
         Route::post('/it/setup/commands/{requestUuid}/recover', [ItServiceManagementSetupController::class, 'recoverCommand'])->whereUuid('requestUuid')->name('it.setup.commands.recover');
         Route::post('/it/setup/commands/{requestUuid}/cancel', [ItServiceManagementSetupController::class, 'cancelCommand'])->whereUuid('requestUuid')->name('it.setup.commands.cancel');

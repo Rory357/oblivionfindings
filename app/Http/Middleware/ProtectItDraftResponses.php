@@ -25,7 +25,13 @@ final class ProtectItDraftResponses
     public static function applies(Request $request): bool
     {
         return $request->is('it/drafts', 'it/drafts/*', 'it/tickets/*/task-candidates/validate', 'it/tickets/*/tasks/*/history', 'it/tickets/*/approval-history')
-            || self::isApprovalCommand($request) || self::isControlRoomHandoff($request);
+            || self::isApprovalCommand($request) || self::isControlRoomHandoff($request)
+            || self::isTechnicalDelivery($request);
+    }
+
+    private static function isTechnicalDelivery(Request $request): bool
+    {
+        return $request->is('it/setup/technical-deliveries/*');
     }
 
     private static function isControlRoomHandoff(Request $request): bool
@@ -63,6 +69,9 @@ final class ProtectItDraftResponses
                         : ($request->is('it/tickets/*/tasks/*/history')
                             ? 'Sign in again, then reload this task’s history.' : 'Sign in again, then check this draft before continuing.'))),
             ], 401);
+            if (self::isTechnicalDelivery($request)) {
+                $response = response()->json(['code' => 'session_expired', 'message' => 'Sign in again, then review the current delivery outcome.'], 401);
+            }
         }
         $response->headers->set('Cache-Control', 'no-store, private');
 
@@ -86,6 +95,16 @@ final class ProtectItDraftResponses
             $exception instanceof HttpExceptionInterface => $exception->getStatusCode(),
             default => 500,
         };
+        if (self::isTechnicalDelivery($request)) {
+            return response()->json(match (true) {
+                $exception instanceof ValidationException => ['code' => 'delivery_validation_failed', 'message' => 'Review the delivery request fields.', 'errors' => $exception->errors()],
+                $status === 401 || $status === 419 => ['code' => 'session_expired', 'message' => 'Sign in again, then review the current delivery outcome.'],
+                $status === 403 => ['code' => 'access_unavailable', 'message' => 'Your delivery access is no longer available.'],
+                $status === 404 => ['code' => 'delivery_unavailable', 'message' => 'This delivery is unavailable.'],
+                $status === 409 => ['code' => 'delivery_changed', 'message' => 'Delivery changed. Review its current outcome before requesting another retry.'],
+                default => ['code' => 'delivery_outcome_unknown', 'message' => 'The retry outcome could not be confirmed. Review the current delivery before retrying.'],
+            }, $status, ['Cache-Control' => 'no-store, private']);
+        }
         if (self::isControlRoomHandoff($request)) {
             return response()->json(match (true) {
                 $exception instanceof ValidationException => ['code' => 'handoff_validation_failed', 'message' => 'Review the IT handoff fields.', 'errors' => $exception->errors()],

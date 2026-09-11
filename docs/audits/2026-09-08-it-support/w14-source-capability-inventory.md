@@ -14,6 +14,8 @@ Historical adapter inspection (superseded by the implementation below) confirmed
 
 ## Current implementation update — 12 September 2026
 
+The operator create/link/review/recovery UI is now mounted and has actual desktop browser evidence in `evidence/w14-handoff-desktop-browser-results.md`, including lost-response recovery, unchanged retry, cancellation before/after commit, stale review and sign-out concealment. Earlier pending-UI descriptions below are superseded. The next local slice adds source-scoped delivery health/history to the existing Operations audit; see `evidence/w14-technical-delivery-operations-results.md` for exact running checks and remaining guarded retry/browser work. Unsupported non-availability source adapters and full W14/E13 acceptance remain open.
+
 Direct native/Fleet availability intake, canonical evidence/recovery and human handoff coordination now have implementation and isolated verification evidence. The urgent operator HTTP contract is implemented; its approved desktop interaction and browser acceptance remain next. See [handoff integration results](evidence/w14-handoff-monitoring-results.md), [HTTP/UI continuation](evidence/w14-handoff-http-contract.md) and the authoritative top of implementation-progress.md. The source observations and earlier next-step notes below are retained as discovery history; they do not imply those completed adapters still need to be built. Unsupported health/source dependencies remain open.
 
 ## Native device monitoring

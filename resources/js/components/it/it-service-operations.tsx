@@ -26,8 +26,13 @@ import {
     type DeliveryHealth,
     type MailboxHealth,
 } from './it-channel-health';
+import {
+    ItTechnicalDeliveryHealth,
+    type TechnicalDeliveryHealth,
+} from './it-technical-delivery-health';
 
 export interface OperationsAudit {
+    technical_delivery_health?: TechnicalDeliveryHealth;
     automation_history?: AutomationHistory;
     api_health?: ApiOperationsHealth;
     mailbox_health?: MailboxHealth;
@@ -616,6 +621,10 @@ export function ItServiceOperations({
                 viewerId={actorId}
             />
             <ItApiOperations health={audit.api_health} viewerId={actorId} />
+            <ItTechnicalDeliveryHealth
+                health={audit.technical_delivery_health}
+                viewerId={actorId}
+            />
 
             <section
                 aria-label="Email delivery"

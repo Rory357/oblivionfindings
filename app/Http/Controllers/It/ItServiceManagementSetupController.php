@@ -17,6 +17,7 @@ use App\Domain\It\Services\ItServiceIdentityCredentialService;
 use App\Domain\It\Services\ItServiceManagementSetupService;
 use App\Domain\It\Services\ItSetupCommandService;
 use App\Domain\It\Services\ItSlaReadService;
+use App\Domain\It\Services\ItTechnicalDeliveryOperationsPresenter;
 use App\Domain\It\Services\ItTicketRoutingEligibility;
 use App\Domain\It\Services\ItTicketRoutingService;
 use App\Domain\It\Services\ItWorkAccessService;
@@ -79,6 +80,8 @@ class ItServiceManagementSetupController extends Controller
             'automation_to' => ['nullable', 'date_format:Y-m-d'],
             'automation_page' => ['sometimes', 'required', 'integer', 'min:1'],
             'api_request_page' => ['sometimes', 'required', 'integer', 'min:1'],
+            'device_delivery_page' => ['sometimes', 'required', 'integer', 'min:1'],
+            'fleet_delivery_page' => ['sometimes', 'required', 'integer', 'min:1'],
             'review_resource' => ['sometimes', 'required', 'in:teams,queues,services'],
             'actor_user_id' => ['sometimes', 'required', 'integer', 'min:1'],
             'delivery_comment_id' => ['sometimes', 'required', 'integer', 'min:1'],
@@ -314,6 +317,7 @@ class ItServiceManagementSetupController extends Controller
             : 0;
 
         $operationsAudit = [
+            'technical_delivery_health' => app(ItTechnicalDeliveryOperationsPresenter::class)->operations($user, $automationPeriod),
             'automation_history' => app(ItAutomationOperationsPresenter::class)->operations($user, $automationPeriod, $request->integer('automation_page', 1)),
             'api_health' => app(ItApiOperationsPresenter::class)->operations(
                 $user, $manageableApiIdentities, $request->integer('api_request_page', 1), $automationPeriod,

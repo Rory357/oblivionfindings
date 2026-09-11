@@ -1,0 +1,57 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_f0485481558d4d53",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTechnicalDeliveryOperationsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mtechnical delivery facts use only permitted current sources and never project raw diagnostics with ('devi[39m[90m…[39m [90m232.46s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtechnical delivery facts use only permitted current sources and never project raw diagnostics with ('fleet'[39m[90m…[39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrevoked source access and unapproved actors have no delivery counts[39m[90m                                         [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mscope drift and a lost last approved site remove counts as well as history[39m[90m                                  [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown outcome text is concealed and source delivery never implies IT success[39m[90m                              [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtechnical history is bounded and page clamping preserves complete visible counts[39m[90m                            [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90man unapplied delivery schema reports unavailable instead of healthy zero metrics[39m[90m                            [39m [90m0.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup operations publishes current actor-bound technical delivery facts and validates pages[39m[90m                 [39m [90m1.79s[39m  
+
+  [90mTests:[39m    [32;1m8 passed[39;22m[90m (112 assertions)[39m
+  [90mDuration:[39m [39m238.84s[39m
+
+{"exit_code":0,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_f0485481558d4d53",
+    "database_mutations_performed": false
+}
