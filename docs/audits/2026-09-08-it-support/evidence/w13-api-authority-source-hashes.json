@@ -1,0 +1,42 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItApiWorkItemService.php",
+    "sha256": "3d1f4decf969e8e0ec9551bac848be2839d75f6dc85e72b04beb04d52e56308c"
+  },
+  {
+    "path": "app/Domain/It/Services/ItWorkAccessService.php",
+    "sha256": "8af0dead1ea9c5bf719504e0b475130a23f1fc44f9dbcda45b6b11e58aa8dcad"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketVersionService.php",
+    "sha256": "087e3a22d693e628edd73dca59e58f624a79bd497bde9e41d6ca34462dcec68a"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketIntakeService.php",
+    "sha256": "c39f5e3c8698560ef34233070b860b9ee911efc35fca263efa89097f1fc49277"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketInteractionService.php",
+    "sha256": "b68be5fc996a3b8852f887099d1be8aee49df854042a5e86cdb153c70fefc9b9"
+  },
+  {
+    "path": "app/Domain/It/Services/ItWorkTransitionService.php",
+    "sha256": "3a7ee27593b7c7ead69885e924136d88808cb22a380654adb2de0a5712c4888e"
+  },
+  {
+    "path": "tests/Feature/It/ItWorkAccessControllerTest.php",
+    "sha256": "2f63cedb1dba70346440bb1c7302bf238f570c05c721de1416b5bc21b54a9641"
+  },
+  {
+    "path": "tests/Feature/It/ItApiTransitionProvenanceTest.php",
+    "sha256": "35fe979d0c6b011a0523a5e347b2c8f7aa9d668af99ebfe9ab1bb91d63ba5aef"
+  },
+  {
+    "path": "tests/Concurrency/It/ItApiAuthorizationConcurrencyTest.php",
+    "sha256": "6141fd0bc538bf762783685b8de02a1ad4d8d32442a2a6d187a9f6d337d1dad0"
+  },
+  {
+    "path": "tests/Support/It/api-authorization-concurrency-worker.php",
+    "sha256": "6f3af45636f07a81d27678cb11c5d732e92c5f8057ed55bf856e5c61b93c545f"
+  }
+]

@@ -1,0 +1,28 @@
+
+   PASS  Tests\Unit\It\RetryItAttachmentCleanupTest
+  ✓ it rejects invalid batch sizes without querying readiness or starting any run with ('0')                     0.05s  
+  ✓ it rejects invalid batch sizes without querying readiness or starting any run with ('1001')
+  ✓ it rejects invalid batch sizes without querying readiness or starting any run with ('-1')
+  ✓ it rejects invalid batch sizes without querying readiness or starting any run with ('1.5')
+  ✓ it rejects invalid batch sizes without querying readiness or starting any run with ('many')
+  ✓ it does not touch storage when automation recording is unavailable                                           0.01s  
+  ✓ it records incomplete000010 readiness as failed without calling cleanup with (true)
+  ✓ it records incomplete000010 readiness as failed without calling cleanup with (false)
+  ✓ it reports completed batches with additional pending work and leaves reserved evidence unclassified          0.01s  
+  ✓ it uses the bounded default and never classifies reserved intentions as deletable or complete
+  ✓ it returns failed for partial deletion without erasing successful counts
+  ✓ it does not report a healthy batch while existing canonical reconciliation remains
+  ✓ it keeps deferred or newly fenced outcomes non-successful with ('deferred')
+  ✓ it keeps deferred or newly fenced outcomes non-successful with ('reconciliation_required')
+  ✓ it does not begin physical cleanup when the run cannot be recorded
+  ✓ it records a safe failure when retry throws without exposing provider paths or exception text
+  ✓ it rejects partial malformed or contradictory result envelopes without fabricated counts with dataset "partial"
+  ✓ it rejects partial malformed or contradictory result envelopes without fabricated counts with dataset "negative"
+  ✓ it rejects partial malformed or contradictory result envelopes without fabricated counts with dataset "contradictory"
+  ✓ it rejects partial malformed or contradictory result envelopes without fabricated counts with dataset "private extra"
+  ✓ it retains known cleanup counts when later reconciliation evidence is unavailable
+  ✓ it retains known counts but reports failure when the terminal automation write fails
+
+  Tests:    22 passed (257 assertions)
+  Duration: 0.35s
+

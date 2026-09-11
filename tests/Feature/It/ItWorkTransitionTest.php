@@ -212,6 +212,7 @@ it('blocks settlement until approvals required tasks and resolution evidence are
             to: ItWorkflowState::Resolved,
             resolutionCode: 'restored',
             resolutionSummary: 'The failed switch was replaced and service checks passed.',
+            resolutionVerification: 'Verified the replacement switch restores connectivity.',
         ),
     );
 
@@ -282,7 +283,9 @@ it('allows an owning requester reply to resume waiting work without manage permi
         ->and($result->waiting_party)->toBeNull()
         ->and($result->waiting_reason)->toBeNull()
         ->and($result->waiting_since)->toBeNull()
-        ->and($result->sla_paused_minutes)->toBeGreaterThanOrEqual(29);
+        ->and($result->sla_paused_minutes)->toBe(0)
+        ->and($result->sla_state)->toBe('unmeasured')
+        ->and($result->sla_policy_snapshot['pause_unit'])->toBe('legacy_unknown');
 });
 
 it('exposes the governed transition through the existing ticket authorization boundary', function () {
@@ -296,6 +299,7 @@ it('exposes the governed transition through the existing ticket authorization bo
 
     $this->actingAs($agent)
         ->post("/it/tickets/{$ticket->id}/transitions", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'workflow_state' => 'triaged',
             'reason' => 'Impact and urgency confirmed',
             'next_action' => 'Assign the infrastructure team',
@@ -310,6 +314,7 @@ it('exposes the governed transition through the existing ticket authorization bo
 
     $this->actingAs($outsider)
         ->post("/it/tickets/{$ticket->id}/transitions", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'workflow_state' => 'in_progress',
         ])
         ->assertForbidden();

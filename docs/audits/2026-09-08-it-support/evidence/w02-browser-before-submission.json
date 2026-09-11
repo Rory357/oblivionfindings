@@ -1,0 +1,15 @@
+{
+    "captured_at": "2026-09-09T00:43:42+00:00",
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "database_mutations_performed": false,
+    "app_asset": "assets/app-CNxGQfWT.js",
+    "app_css": [
+        "assets/app-pjifONb0.css"
+    ],
+    "it_asset": "assets/index-BDU3X7ee.js",
+    "manifest_sha256": "54f5f842477942a946c3c6fd788906f77ce4156cfa3856b66d8e80643ea73252",
+    "tickets": [],
+    "receipts": [],
+    "deliveries": [],
+    "historical_closed_count": 1
+}

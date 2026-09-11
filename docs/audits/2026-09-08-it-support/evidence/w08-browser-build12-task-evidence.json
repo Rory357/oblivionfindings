@@ -1,0 +1,269 @@
+{
+    "observed_at": "2026-09-09T19:44:08+00:00",
+    "token": "31663d7907934871",
+    "database": "oblivion_it_draft_browser_31663d7907934871",
+    "time_context": {
+        "elapsed_ms": 0.12,
+        "rows": [
+            {
+                "session_time_zone": "SYSTEM",
+                "system_time_zone": "New Zealand Standard Time"
+            }
+        ]
+    },
+    "tickets": {
+        "elapsed_ms": 0.26,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 7,
+                "status": "open"
+            },
+            {
+                "id": 4,
+                "lock_version": 1,
+                "status": "open"
+            }
+        ]
+    },
+    "tasks": {
+        "elapsed_ms": 0.28,
+        "rows": [
+            {
+                "id": 1,
+                "ticket_id": 1,
+                "team_id": null,
+                "assigned_to_user_id": null,
+                "status": "completed",
+                "is_required": 1,
+                "evidence_required": 0,
+                "due_at": null,
+                "due_at_epoch": null,
+                "sort_order": 10,
+                "completed_by_user_id": 3,
+                "completed_at": "2026-09-10 07:42:23",
+                "completed_at_epoch": 1788982943,
+                "title_sha256": "5cfe41f98be981706f024b74074616e40a299bd303628ab13e9797562bf855df",
+                "description_sha256": "1304e37369b67f072df58e0d46196ce9e2bbadb0cef0e9082ca6483bd53c78d1",
+                "completion_note_sha256": "c68d8600d9ebcf96e63d173136b0d11abb67818f578dc10696c74fbacc9ba9bf",
+                "evidence_sha256": null,
+                "evidence_count": null
+            },
+            {
+                "id": 2,
+                "ticket_id": 1,
+                "team_id": null,
+                "assigned_to_user_id": null,
+                "status": "completed",
+                "is_required": 1,
+                "evidence_required": 0,
+                "due_at": null,
+                "due_at_epoch": null,
+                "sort_order": 20,
+                "completed_by_user_id": 3,
+                "completed_at": "2026-09-10 07:41:36",
+                "completed_at_epoch": 1788982896,
+                "title_sha256": "1f2a2b91943ff873aca2c5e133e945ff22f18f2f2f740b45f08265c70a2c7c59",
+                "description_sha256": null,
+                "completion_note_sha256": "00756cc57ed957f19342bd10ffe35326ad6181f2c245aaccd620944ad983728e",
+                "evidence_sha256": null,
+                "evidence_count": null
+            }
+        ]
+    },
+    "dependencies": {
+        "elapsed_ms": 0.18,
+        "rows": [
+            {
+                "task_id": 2,
+                "depends_on_task_id": 1
+            }
+        ]
+    },
+    "receipts": {
+        "elapsed_ms": 0.29,
+        "rows": [
+            {
+                "id": 1,
+                "actor_user_id": 3,
+                "operation": "task.create",
+                "request_uuid": "a3d87912-1d1a-4bc8-9e26-3d3640941046",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 2,
+                "committed_at": "2026-09-10 07:40:45",
+                "result_state": "committed",
+                "task_id": "1"
+            },
+            {
+                "id": 2,
+                "actor_user_id": 3,
+                "operation": "task.complete",
+                "request_uuid": "d18c6667-a082-4c96-a463-f7844778f653",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 3,
+                "committed_at": "2026-09-10 07:41:11",
+                "result_state": "committed",
+                "task_id": "1"
+            },
+            {
+                "id": 3,
+                "actor_user_id": 3,
+                "operation": "task.create",
+                "request_uuid": "49c4e2b3-c12d-41d1-b89d-3b7f3c7a4da8",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 4,
+                "committed_at": "2026-09-10 07:41:32",
+                "result_state": "committed",
+                "task_id": "2"
+            },
+            {
+                "id": 4,
+                "actor_user_id": 3,
+                "operation": "task.complete",
+                "request_uuid": "2b7c2472-fc29-488f-8cfb-20e5cdfa271c",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 5,
+                "committed_at": "2026-09-10 07:41:36",
+                "result_state": "committed",
+                "task_id": "2"
+            },
+            {
+                "id": 5,
+                "actor_user_id": 3,
+                "operation": "task.reopen",
+                "request_uuid": "6bc8c9be-95b8-4525-ade2-6f78008f360a",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 6,
+                "committed_at": "2026-09-10 07:42:07",
+                "result_state": "committed",
+                "task_id": "1"
+            },
+            {
+                "id": 6,
+                "actor_user_id": 3,
+                "operation": "task.complete",
+                "request_uuid": "6b47ccd7-cc8d-4f4b-9fd4-629c70ee6102",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 7,
+                "committed_at": "2026-09-10 07:42:23",
+                "result_state": "committed",
+                "task_id": "1"
+            }
+        ]
+    },
+    "events": {
+        "elapsed_ms": 0.3,
+        "rows": [
+            {
+                "id": 1,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_created",
+                "created_at": "2026-09-09 19:40:45",
+                "task_id": "1",
+                "payload_sha256": "1adbfbb4e8d65cb711216410491501be90cdf17e7c205b32f8fe2bee98e6b352"
+            },
+            {
+                "id": 2,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_completed",
+                "created_at": "2026-09-09 19:41:11",
+                "task_id": "1",
+                "payload_sha256": "0df0a6a73501cfd7fcdf4635b3516eff7ca01d353f2303a18127b4331a4bd01e"
+            },
+            {
+                "id": 3,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_created",
+                "created_at": "2026-09-09 19:41:32",
+                "task_id": "2",
+                "payload_sha256": "925f07686c5d574e7d128d4b2be1c0e76c20fa20d9cb80d2813153699fdfae77"
+            },
+            {
+                "id": 4,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_completed",
+                "created_at": "2026-09-09 19:41:36",
+                "task_id": "2",
+                "payload_sha256": "e204928e95deafccd0a9be30fb1fa6a7a0d5706f15e8004bd90504ef30c982a9"
+            },
+            {
+                "id": 5,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_reopened",
+                "created_at": "2026-09-09 19:42:07",
+                "task_id": "1",
+                "payload_sha256": "f75c98d27b282d020941648ccfd82a5ddbb5f84af4539c13f9fc65201728596d"
+            },
+            {
+                "id": 6,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_completed",
+                "created_at": "2026-09-09 19:42:23",
+                "task_id": "1",
+                "payload_sha256": "8bc23ed52ae0bc9eca84ac030d033e6d804d2ac1533d0983cba067656c8b7dac"
+            }
+        ]
+    },
+    "audits": {
+        "elapsed_ms": 0.26,
+        "rows": [
+            {
+                "id": 16,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.created",
+                "created_at": "2026-09-10 07:40:45",
+                "meta_sha256": "15c49473759247154f8dd4f0f091a338e0ba2a189d4477ee3dfa3b28e69e64d4"
+            },
+            {
+                "id": 18,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.completed",
+                "created_at": "2026-09-10 07:41:11",
+                "meta_sha256": "683ace6171a85c502d8f5190de5a0833d791fe3b0909901ea62d247f7228c883"
+            },
+            {
+                "id": 20,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.created",
+                "created_at": "2026-09-10 07:41:32",
+                "meta_sha256": "2b01866a58e3ddf60f82ea4fecb582ad3f70d932e441d61995c7494328c47117"
+            },
+            {
+                "id": 22,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.completed",
+                "created_at": "2026-09-10 07:41:36",
+                "meta_sha256": "5795623a7d3ab4e5fb523a4564de5e6ac4c8cc0ed9dc18a1dfb01084243ce211"
+            },
+            {
+                "id": 24,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.reopened",
+                "created_at": "2026-09-10 07:42:07",
+                "meta_sha256": "e27fad7ffcc7f81bc55f07bf0c94b66e3cb989e27c6e022885b2ca6ec03946b2"
+            },
+            {
+                "id": 26,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.completed",
+                "created_at": "2026-09-10 07:42:23",
+                "meta_sha256": "102ea615efa7419f649fa80812b01f982b36ddb39cf20bde8c3ce3a18d6efeb1"
+            }
+        ]
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false
+}

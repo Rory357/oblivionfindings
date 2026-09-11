@@ -1,0 +1,11 @@
+{
+    "extends": "./tsconfig.json",
+    "include": [
+        "vitest.it-compiler.config.ts",
+        "vitest.it-recovery-control.config.ts",
+        "tests/Frontend/It/task-recovery.compiler.test.tsx",
+        "resources/js/hooks/use-it-ticket-draft-memory.ts",
+        "resources/js/test/setup.ts",
+        "resources/js/**/*.d.ts"
+    ]
+}

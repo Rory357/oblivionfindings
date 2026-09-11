@@ -21,6 +21,7 @@ class ItWorkTask extends Model
         'team_id',
         'assigned_to_user_id',
         'completed_by_user_id',
+        'approval_id',
         'title',
         'description',
         'status',
@@ -40,6 +41,8 @@ class ItWorkTask extends Model
         'evidence' => 'array',
         'completed_at' => 'datetime',
         'sort_order' => 'integer',
+        'current_completion_id' => 'integer',
+        'approval_id' => 'integer',
     ];
 
     public function ticket(): BelongsTo
@@ -90,5 +93,20 @@ class ItWorkTask extends Model
     public function completedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'completed_by_user_id');
+    }
+
+    public function completions(): HasMany
+    {
+        return $this->hasMany(ItWorkTaskCompletion::class, 'task_id');
+    }
+
+    public function currentCompletion(): BelongsTo
+    {
+        return $this->belongsTo(ItWorkTaskCompletion::class, 'current_completion_id');
+    }
+
+    public function approval(): BelongsTo
+    {
+        return $this->belongsTo(ItTicketApproval::class, 'approval_id');
     }
 }

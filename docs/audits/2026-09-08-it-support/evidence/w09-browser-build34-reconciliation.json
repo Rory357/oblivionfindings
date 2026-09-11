@@ -1,0 +1,11 @@
+{
+  "four_reciprocal_rows": true,
+  "related_pair": true,
+  "duplicate_pair": true,
+  "four_committed_receipts": true,
+  "eight_events": true,
+  "eight_audits": true,
+  "all_open_unmerged": true,
+  "versions_exact": true,
+  "discarded_target_unchanged": true
+}

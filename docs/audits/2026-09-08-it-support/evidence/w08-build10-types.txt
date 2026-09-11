@@ -1,0 +1,26 @@
+npm notice run types
+npm notice run tsc --noEmit
+resources/js/components/it/__tests__/ticket-work-tasks.test.tsx(595,16): error TS2571: Object is of type 'unknown'.
+resources/js/components/it/__tests__/ticket-work-tasks.test.tsx(837,35): error TS18046: 'config.data' is of type 'unknown'.
+resources/js/hooks/it-ticket-draft-memory.ts(357,55): error TS2339: Property 'operation' does not exist on type 'ItDraftContext'.
+  Property 'operation' does not exist on type '{ purpose: "requester_intake" | "technician_intake"; requestUuid: string; ticketId?: undefined; }'.
+resources/js/hooks/it-work-task-memory.test.tsx(119,27): error TS2345: Argument of type '{ kind: "persisted"; draftUuid: string; actorId: number; context: ItDraftContext; snapshot: ItDraftSnapshot; pendingSave?: { snapshot: ItDraftSnapshot; revision: number; }; pendingUpload?: { file: File; uploadUuid: string; revision: number; }; ... 5 more ...; selectedFiles?: File[]; }' is not assignable to parameter of type 'ItDraftMemoryCandidate'.
+  Type '{ kind: "persisted"; draftUuid: string; actorId: number; context: ItDraftContext; snapshot: ItDraftSnapshot; pendingSave?: { snapshot: ItDraftSnapshot; revision: number; }; pendingUpload?: { file: File; uploadUuid: string; revision: number; }; ... 5 more ...; selectedFiles?: File[]; }' is not assignable to type 'ItPersistedDraftMemoryCandidate'.
+    Type '{ kind: "persisted"; draftUuid: string; actorId: number; context: ItDraftContext; snapshot: ItDraftSnapshot; pendingSave?: { snapshot: ItDraftSnapshot; revision: number; }; pendingUpload?: { file: File; uploadUuid: string; revision: number; }; ... 5 more ...; selectedFiles?: File[]; }' is not assignable to type '{ kind?: "persisted" | undefined; draftUuid: string; memoryUuid?: undefined; revision: number; selectedFiles?: undefined; }'.
+      Types of property 'selectedFiles' are incompatible.
+        Type 'File[] | undefined' is not assignable to type 'undefined'.
+          Type 'File[]' is not assignable to type 'undefined'.
+resources/js/hooks/it-work-task-memory.test.tsx(262,26): error TS2339: Property 'candidate' does not exist on type 'never'.
+resources/js/hooks/it-work-task-memory.test.tsx(265,26): error TS2339: Property 'candidate' does not exist on type 'never'.
+resources/js/hooks/it-work-task-memory.test.tsx(266,26): error TS2339: Property 'localAuthorization' does not exist on type 'never'.
+resources/js/hooks/it-work-task-memory.test.tsx(267,26): error TS2339: Property 'serverResumed' does not exist on type 'never'.
+resources/js/pages/it/tickets/show.test.tsx(1067,58): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/pages/it/tickets/show.test.tsx(1076,66): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.

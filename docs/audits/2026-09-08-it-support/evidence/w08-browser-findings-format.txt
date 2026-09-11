@@ -1,0 +1,7 @@
+npm notice run npx
+npm notice run prettier --write resources/js/components/it/ticket-work-task-history.tsx resources/js/components/it/ticket-work-tasks.tsx resources/js/components/it/resolve-ticket-dialog.tsx resources/js/components/it/__tests__/ticket-work-task-lifecycle.test.tsx resources/js/components/it/__tests__/resolve-ticket-dialog.test.tsx
+resources/js/components/it/ticket-work-task-history.tsx 425ms
+resources/js/components/it/ticket-work-tasks.tsx 109ms
+resources/js/components/it/resolve-ticket-dialog.tsx 107ms
+resources/js/components/it/__tests__/ticket-work-task-lifecycle.test.tsx 69ms
+resources/js/components/it/__tests__/resolve-ticket-dialog.test.tsx 86ms

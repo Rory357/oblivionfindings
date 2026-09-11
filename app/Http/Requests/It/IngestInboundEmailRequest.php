@@ -20,9 +20,13 @@ class IngestInboundEmailRequest extends FormRequest
         return [
             'from' => ['required', 'email'],
             'subject' => ['nullable', 'string', 'max:255'],
-            'text' => ['nullable', 'string'],
-            'message_id' => ['nullable', 'string', 'max:255'],
-            'in_reply_to' => ['nullable', 'string', 'max:255'],
+            'text' => ['nullable', 'string', 'max:100000'],
+            'message_id' => ['nullable', 'string', 'max:16384'],
+            'in_reply_to' => ['nullable', 'string', 'max:16384'],
+            'references' => ['nullable', 'string', 'max:16384'],
+            'auto_submitted' => ['nullable', 'string', 'max:16384'],
+            'content_type' => ['nullable', 'string', 'max:16384'],
+            'return_path' => ['nullable', 'string', 'max:16384'],
         ];
     }
 }

@@ -1,0 +1,61 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_42433699459f40bc",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSavedTicketFilterTest[39m
+  [32;1m✓[39;22m[90m [39m[90man agent saves only allow-listed filters and currently accessible options[39m[90m                                 [39m [90m163.43s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma personal filter applies server-side and combines Site scope with queue filters[39m[90m                            [39m [90m2.40s[39m  
+  [32;1m✓[39;22m[90m [39m[90msaved filter payloads are private and stale Site access is pruned before display[39m[90m                            [39m [90m2.27s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforeign saved filter reads and direct-object deletion fail closed[39m[90m                                           [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequest-only staff cannot create personal agent queue filters[39m[90m                                               [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mone filter normalizer never reuses another actors permitted options[39m[90m                                         [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma reused filter normalizer drops revoked Site and retired service options before applying or listing saved[39m[90m… [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpersonal ticket totals match all own rows independently from the agent queue filter[39m[90m                         [39m [90m2.34s[39m  
+  [32;1m✓[39;22m[90m [39m[90moperational view counts and rows agree without exposing participant-only waiting or ownership with ('unowne[39m[90m…[39m [90m4.41s[39m  
+  [32;1m✓[39;22m[90m [39m[90moperational view counts and rows agree without exposing participant-only waiting or ownership with ('waitin[39m[90m…[39m [90m4.47s[39m  
+  [32;1m✓[39;22m[90m [39m[90moperational view counts and rows agree without exposing participant-only waiting or ownership with ('waitin[39m[90m…[39m [90m4.47s[39m  
+  [32;1m✓[39;22m[90m [39m[90moperational view counts and rows agree without exposing participant-only waiting or ownership with ('waitin[39m[90m…[39m [90m4.50s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItWorkAccessServiceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mboolean and query access decisions share the same strict work visibility matrix[39m[90m                             [39m [90m0.36s[39m  
+  [32;1m✓[39;22m[90m [39m[90msensitive and organisation wide capabilities unlock only their explicit staff paths[39m[90m                         [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly current employment and active non archived primary or secondary sites become approved[39m[90m                  [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdirect decisions reload canonical site team and queue fields before authorising[39m[90m                             [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket scope assignment accepts only one authorised scope path[39m[90m                                              [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket and child policies delegate direct reads and writes to the canonical parent scope[39m[90m                    [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmerge requires canonical work access to both source and target Sites[39m[90m                                        [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrestricted IT scope permissions are seeded to administrators only[39m[90m                                           [39m [90m0.69s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSlaReadTest[39m
+  [32;1m✓[39;22m[90m [39m[90mlive header queue detail reports and CSV reconcile without trusting stale SLA state[39m[90m                         [39m [90m3.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('ok', ['ok'])[39m[90m   [39m [90m2.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('at_risk', ['at[39m[90m…[39m [90m2.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('breached', ['b[39m[90m…[39m [90m2.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('met', ['met'])[39m[90m [39m [90m2.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('paused', ['pau[39m[90m…[39m [90m2.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery SLA filter uses live evidence before pagination and excludes an unapproved Site with ('unmeasured', [[39m[90m…[39m [90m2.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe unmeasured actionable view matches its open-work count and excludes settled unknown history[39m[90m             [39m [90m2.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma stopped SLA watchdog becomes stale in the hub and reports then recovers[39m[90m                                   [39m [90m3.40s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequesters receive their own clock evidence without operational aggregates[39m[90m                                  [39m [90m2.97s[39m  
+
+  [90mTests:[39m    [32;1m30 passed[39;22m[90m (503 assertions)[39m
+  [90mDuration:[39m [39m221.80s[39m
+

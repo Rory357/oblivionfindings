@@ -190,7 +190,7 @@ test('credential reauth endpoint toggles the flag and audits an edit row', funct
         ->exists())->toBeTrue();
 });
 
-test('global audit feed returns scoped JSON for credential revealers', function () {
+test('global audit feed returns scoped JSON for credential auditors', function () {
     $credential = gvcCredential($this->site, ['label' => 'Server Room PIN']);
     SiteCredentialAuditLog::create([
         'credential_id' => $credential->id,
@@ -227,12 +227,13 @@ test('vendor-only user is forbidden from the credential audit feed', function ()
         ->assertForbidden();
 });
 
-test('credential metadata viewers without reveal rights are forbidden from the global audit feed', function () {
+test('credential metadata viewers without audit rights are forbidden from the global audit feed', function () {
     $viewer = User::factory()->create(['role' => 'team_lead', 'approved_at' => now()]);
     $viewer->roles()->syncWithoutDetaching([Role::query()->where('name', 'team_lead')->firstOrFail()->id]);
 
     expect($viewer->canDo('credentials.view'))->toBeTrue();
     expect($viewer->canDo('credentials.reveal'))->toBeFalse();
+    expect($viewer->canDo('credentials.audit'))->toBeFalse();
 
     $this->actingAs($viewer)
         ->getJson('/vendors/audit')
@@ -264,6 +265,9 @@ test('global feeds are scoped to the user\'s assigned sites (no horizontal acces
     // A credential viewer assigned to site A only via their HR profile.
     $scoped = User::factory()->create(['role' => 'maintenance_coordinator', 'approved_at' => now()]);
     $scoped->roles()->syncWithoutDetaching([Role::query()->where('name', 'maintenance_coordinator')->firstOrFail()->id]);
+    $scoped->permissionOverrides()->syncWithoutDetaching([
+        Permission::query()->where('key', 'credentials.audit')->firstOrFail()->id => ['allowed' => true],
+    ]);
     HrEmployeeProfile::create([
         'user_id' => $scoped->id,
         'employee_number' => 'EMP-'.$scoped->id,

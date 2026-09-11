@@ -1,0 +1,127 @@
+{
+  "recorded_at": "2026-09-11T00:34:52.3970849Z",
+  "backend_run": "it_4f1eaa9216d04c3a",
+  "backend_status": "227 passed, one test assertion failure resolved by operations_rerun",
+  "sources": [
+    {
+      "path": "app/Domain/It/Services/ItEmailDeliveryService.php",
+      "sha256": "33b25fb48e8117c619a717583e051302cb23bcbf2a35a8323a8070045a6ce16e"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+      "sha256": "dbc68b4a7e268d9df7be34a2ca52327d928ffc3216bde2cc828d6f3146d12f8f"
+    },
+    {
+      "path": "tests/Feature/It/ItEmailConfigurationTest.php",
+      "sha256": "851697ec63b05626f4bad6506a270d1b7cd121123713d84edbdb45f5445ac49c"
+    },
+    {
+      "path": "tests/Feature/It/ItTicketNotificationOutboxTest.php",
+      "sha256": "ef6e4441ec5c3e3f609ae08ad2d74ce17ff6100a071926eb378484a1f3fbad2f"
+    },
+    {
+      "path": "tests/Feature/It/ItNotificationAccessTest.php",
+      "sha256": "bba1aa72922deaaabdf8ba55537fd631bc6fec5c0c543e7f2fdaf6ab62a776e1"
+    },
+    {
+      "path": "tests/Feature/It/ItServiceOperationsTest.php",
+      "sha256": "fdaa4c8f3dfe18c8dfdbafa1344c262a61b9d6c37423ea19436e01347a0815cd"
+    },
+    {
+      "path": "tests/Feature/It/ItTicketBulkTest.php",
+      "sha256": "33b9c6c482bbd5c11ec81bf216105ebbe02c9e670bedea99f739b776d500cdd9"
+    },
+    {
+      "path": "tests/Feature/It/ItTicketWorkspaceTest.php",
+      "sha256": "80eb7b3e8a44b93d758d79e75bed36a2cce2d5d1473a28ba8bce292db4fd3224"
+    },
+    {
+      "path": "tests/Feature/It/ItOutboundMessageIdentityTest.php",
+      "sha256": "f850b3588d1ea3d0951f4e9e5250568f37e94f93c140ebd3186a86d80681e2bb"
+    },
+    {
+      "path": "tests/Feature/It/ItGmailDeliveryIntegrationTest.php",
+      "sha256": "205ee9667da9c4436397fac89866ac6ca7a7990ca8f4d00a0a6ac82cec096fca"
+    },
+    {
+      "path": "tests/Feature/It/ItSupportMailboxTransportTest.php",
+      "sha256": "cb89afa7fafa249a4031334d209be83ffb10b1cba7492081ea6295f31450a523"
+    },
+    {
+      "path": "tests/Feature/It/ItServiceCatalogTest.php",
+      "sha256": "c43531cf83b18386dcaab14b2022c2b8e3d4d88ac632664049ad8244d753de8c"
+    },
+    {
+      "path": "tests/Feature/It/ItProvisioningTest.php",
+      "sha256": "e66909a7f0c673620dca28536a4d895b04c684ca4a55e4a086e3a328b0c7f64d"
+    },
+    {
+      "path": "tests/Feature/It/ItProvisioningWorkflowTest.php",
+      "sha256": "b03da30cdfb02dfb4c1dbb1524a5c0fcb3a3ee24987d2debce5a1e92af4d333b"
+    },
+    {
+      "path": "tests/Feature/It/ItProvisioningBulkTest.php",
+      "sha256": "fbbeb14e5b943e7f7decc0c4066cf31af10a20cfaca8a84c72a69c9bd15f0dd5"
+    }
+  ],
+  "full_w12_verified": false,
+  "operations_rerun": {
+    "token": "it_defb7983197840ce",
+    "status": "passed",
+    "tests": 23,
+    "assertions": 288,
+    "corrected_test": "tests/Feature/It/ItServiceOperationsTest.php",
+    "corrected_sha256": "204367da6309af6f82d44114761551ac7528cd8357e2ccdd54d085b8dd1815c3"
+  },
+  "ui_verification": {
+    "tests": 26,
+    "status": "tests, scoped lint and full TypeScript passed",
+    "sources": [
+      {
+        "path": "resources/js/components/it/it-service-operations.tsx",
+        "sha256": "1dbfe0e4888cded66dd1e0c9a3fa0037da3fdf63dde0952e859e7fc02c66eb05"
+      },
+      {
+        "path": "resources/js/components/it/__tests__/it-service-operations.test.tsx",
+        "sha256": "5201a161ba53383c248be3eff2e3d1bf502c6544e7820ee915bbd5c3f5cabc07"
+      }
+    ],
+    "build_exit": 0,
+    "manifest_sha256": "fa7d491ab582335d21698faf3a6ffe51a45ad6da68c339772cc3221add54e711",
+    "browser_verified": false
+  },
+  "final_ui_verification": {
+    "sources": [
+      {
+        "path": "resources/js/components/it/it-service-operations.tsx",
+        "sha256": "5ad415755752cf12201765f77922e2d63d7b5a7cf5e9cabb528b115d3bbf221e"
+      },
+      {
+        "path": "resources/js/components/it/ticket-property-mutation.tsx",
+        "sha256": "bf57b8d1ec5b5a885569f9fa4302aa2a19599fe219b11c9bbb8885d4ecbe3abe"
+      },
+      {
+        "path": "resources/js/components/it/__tests__/it-service-operations.test.tsx",
+        "sha256": "94267f400243fde0dc1084ea01e0806847687c3b293c99c6839cc25625785810"
+      },
+      {
+        "path": "resources/js/components/it/__tests__/ticket-property-mutation.test.tsx",
+        "sha256": "45e17b3d6a7564f1151c7001cf825695e030331b83f520ade0ee381aac7c9cc4"
+      }
+    ],
+    "tests": 52,
+    "test_files": 2,
+    "scoped_lint": "passed",
+    "full_typescript": "91450 exit 0, final-types-corrected.txt",
+    "initial_final_typescript": "TS2352 recorded in final-types.txt; corrected type-only interface to type alias",
+    "runtime_equivalence": "w12-delivery-recovery-type-only-proof.json",
+    "build_exit": 0,
+    "manifest_sha256": "0c4f05f87e230e11d4fd82e56130427511d5c23d97d46b93f051c10c188b13f5",
+    "asset": "app-xgo-TVyg.js",
+    "bounded_browser_verified": true,
+    "final_oracle": "w12-delivery-recovery-final-observed.json",
+    "cleanup_exit": 0,
+    "independent_postflight": "w12-delivery-recovery-final-postflight.json",
+    "full_w12_verified": false
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "capturedAt": "2026-09-10T19:56:19.114Z",
+  "sourceFiles": [
+    {
+      "path": "database/migrations/2026_09_11_000020_add_inbound_quarantine_review.php",
+      "sha256": "d0046cc3ef8caca3a3ae89eb3429bad4ef764edcfda619e051b0b7d07da9c49e"
+    },
+    {
+      "path": "app/Models/ItInboundEmail.php",
+      "sha256": "3c1cfacd1fa7ea3c85fd337af2a5812672ca1e24237b6bb57459988ee90ecf16"
+    },
+    {
+      "path": "app/Domain/It/InboundEmailIngestor.php",
+      "sha256": "6dd9d44675455a59b55a5503b444b9a14d65b00ea849ce382e3628a243ca9356"
+    },
+    {
+      "path": "app/Domain/It/Services/ItInboundQuarantineReview.php",
+      "sha256": "3df2280c3f50ddd119c646782b7412451492d5be620c96f55d6bfd7d31ee40bc"
+    },
+    {
+      "path": "app/Http/Controllers/Settings/ItInboundQuarantineController.php",
+      "sha256": "92a6861fa5ca8d63176c63f3d5189a95fe0c9825afd79a80068ea0b8a7191032"
+    },
+    {
+      "path": "routes/settings.php",
+      "sha256": "31ca2d53032862d00eebfe02c117718ba281de431c268fb8674b500a5556671f"
+    },
+    {
+      "path": "resources/js/pages/settings/it-mailbox.tsx",
+      "sha256": "c2bfc784ab1ecfcc4b0483ba7f4c9f2d338f15ecd4e1995d3324e76c8cd379d3"
+    },
+    {
+      "path": "resources/js/components/settings/it-mailbox-quarantine-contract.ts",
+      "sha256": "8c0174f2a9d3448f51b2177e0eacc19ea5dc17c91a0fd062446985170a15ad35"
+    },
+    {
+      "path": "resources/js/components/settings/it-mailbox-quarantine.tsx",
+      "sha256": "12debcdb1644a00148856bcb11c1271ec142f470e1b248672dd30d8fec91943a"
+    },
+    {
+      "path": "resources/js/components/settings/__tests__/it-mailbox-quarantine.test.tsx",
+      "sha256": "d43a87dd79eac8077a702c5c47351d979b87b9340f334d8da48d60ef7c37d636"
+    },
+    {
+      "path": "tests/Feature/It/ItInboundQuarantineReviewTest.php",
+      "sha256": "c86408880975bd30bb8f9511f1f9b307fa34725c46ab378ee559fe08682e3c99"
+    },
+    {
+      "path": "docs/runbooks/it-mailbox-quarantine-recovery.md",
+      "sha256": "6d7b9f55bdc4c9235782060ea43e5019e140b61e0d3452961971f64eca16fe1c"
+    },
+    {
+      "path": "docs/audits/2026-09-08-it-support/evidence/w11-browser-mailbox-reconcile.php",
+      "sha256": "11126c5be39ed9371e3b101c868407e969096a720657b005d4d1d47d57f88ee3"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "DESIGN.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/DESIGN_TOKENS.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LIST_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LOADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/oblivion-loader-01-demo.html",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "unchanged": true
+    }
+  ],
+  "backend": {
+    "token": "it_61c130cd79004a0f",
+    "tests": 72,
+    "assertions": 619,
+    "postflightChecks": 14
+  },
+  "uiTests": 15,
+  "browser": {
+    "token": "7574d29be8994d0d",
+    "retries": 2,
+    "auditEvents": 4,
+    "unchangedAccessStayedQuarantined": true,
+    "privateObjects": 8,
+    "hashesMatch": true,
+    "cleanup": {
+      "token": "7574d29be8994d0d",
+      "database": "oblivion_it_draft_browser_7574d29be8994d0d",
+      "checks": {
+        "schema_absent": true,
+        "owned_directory_absent": true
+      },
+      "database_mutations_performed": false
+    }
+  },
+  "manifest": "914586e1e6900cc46fdefa469e5088eb16ee2a0417b6cbdcfb456462895920ac",
+  "fullW11Accepted": false,
+  "fullGoalComplete": false
+}

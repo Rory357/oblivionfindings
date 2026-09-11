@@ -1,0 +1,86 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItTicketLinkService.php",
+    "sha256": "a3d01a5c658e70edf7eaeca22bc33e6a1587be20590d9f7e5920de5627f65729"
+  },
+  {
+    "path": "app/Domain/It/Presenters/ItTicketContextPresenter.php",
+    "sha256": "da4ee15975bbdeae4930e8a24c231e1c2362c724367efb10c65de159f04fb685"
+  },
+  {
+    "path": "app/Domain/It/Presenters/ItTicketActivityPresenter.php",
+    "sha256": "05d771229bd4fb4d6a671b9d18ea97d04cfc67f7cba6dd638685b291de247710"
+  },
+  {
+    "path": "app/Models/ItTicketLink.php",
+    "sha256": "14c0c09315eaf5592806a11b2327e33b812b20c86ab72979fa102543feb6c6d7"
+  },
+  {
+    "path": "app/Models/ItTicketCommandReceipt.php",
+    "sha256": "c038480631b23e5c9caeaee951f5dcd78faabdf5dc90da81ae30fd55f8bd3eb4"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItTicketRelationshipController.php",
+    "sha256": "e657a5172495f0a075411e8ae7db038ec00cb74b94b926d4e4af1b9e697dda07"
+  },
+  {
+    "path": "app/Http/Requests/It/ReadTicketRelatedWorkRequest.php",
+    "sha256": "1c6a55f95ae727f78789ee270b279c9f78e0b45b6d1dcb462c44ee6d68cd1479"
+  },
+  {
+    "path": "app/Http/Requests/It/TicketRelationshipCommandRequest.php",
+    "sha256": "1d069130254899153352c30dac55b7db297ca48d1f1f2348f363a6e324cd1e79"
+  },
+  {
+    "path": "routes/web.php",
+    "sha256": "9363a71fb04ceaac5f217d25ddf061a4c8efbf146defc164cada0b2b5ef925b4"
+  },
+  {
+    "path": "tests/Feature/It/ItTicketRelationshipTest.php",
+    "sha256": "bb2ec3293033eaad09460d00c9dc6b3b9aaf382d0353fe6fce6dd551d4aed00d"
+  },
+  {
+    "path": "resources/js/hooks/it-ticket-relationship-contract.ts",
+    "sha256": "1dd8090b4c73b0ef8a004b0d8bf77d5d755a36fe6d38425d4bc10afc5821165b"
+  },
+  {
+    "path": "resources/js/hooks/use-it-ticket-relationship-command.ts",
+    "sha256": "634270854a5deacf29fe8bbfc69a25c8a17f75e39d57ab9ed63419cb744039b4"
+  },
+  {
+    "path": "resources/js/hooks/use-it-ticket-relationship-command.test.tsx",
+    "sha256": "0cdf92095fa48f3bdb43cc2a3144042459523a0a673c54537d5a3ed753ff5cd3"
+  },
+  {
+    "path": "resources/js/components/it/ticket-related-work.tsx",
+    "sha256": "d83c54439bc6a008ae9ee6b9f2ba9481f1b6e2ad5ecab2bfebc8131797e921c5"
+  },
+  {
+    "path": "resources/js/components/it/__tests__/ticket-related-work.test.tsx",
+    "sha256": "d6e702cf575e40dffd0d8b8a6afa467559d1b71326c6b376f01212a382106039"
+  },
+  {
+    "path": "resources/js/components/it/ticket-thread.tsx",
+    "sha256": "93413308e068baf24d86ac78f993424006207fd5ce1145b8a19e102ec6f893c3"
+  },
+  {
+    "path": "resources/js/pages/it/tickets/show.tsx",
+    "sha256": "c01ca9dfa2a656d952054d34ff64164eb0453e886a0363616b1fe55db8cb36f5"
+  },
+  {
+    "path": "tests/Concurrency/It/ItTicketRelationshipConcurrencyTest.php",
+    "sha256": "e4e0ecf26ffcebd0b489bea7fbeb87857a446533fa9e1d4075d9cc7c28a7c5ee"
+  },
+  {
+    "path": "tests/Support/It/relationship-concurrency-worker.php",
+    "sha256": "8654447ccb4366feac0cfc80443516bc854a4aa2e643a1584299700da2829ebe"
+  },
+  {
+    "path": "tests/Concurrency/It/README.md",
+    "sha256": "bb6db89cafd541fc64fd5576ba2cc8f468665182a9f0cb65a54f0b500967e019"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w08-owned-browser-task-evidence.php",
+    "sha256": "0144cae4d877a3a166b2fdd9cdfba1ecc6f341e33aa90be9fd6cebf66d72822c"
+  }
+]

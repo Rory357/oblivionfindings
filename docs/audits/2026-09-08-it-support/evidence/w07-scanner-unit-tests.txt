@@ -1,0 +1,24 @@
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\Files\ConsentEvidenceScannerCompatibilityTest[39m
+  [32;1m✓[39;22m[90m [39m[90mkeeps the existing consent config and exact array contract with data set #0[39m[90m                                 [39m [90m0.44s[39m  
+  [32;1m✓[39;22m[90m [39m[90mkeeps the existing consent config and exact array contract with data set #1[39m
+  [32;1m✓[39;22m[90m [39m[90mkeeps the existing consent config and exact array contract with data set #2[39m
+  [32;1m✓[39;22m[90m [39m[90mmissing real path and configuration reach the fail closed neutral contract[39m
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\Files\MalwareScannerTest[39m
+  [32;1m✓[39;22m[90m [39m[90mmaps exit codes without exposing output or executing a process with data set "clean"[39m[90m                        [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmaps exit codes without exposing output or executing a process with data set "infected"[39m
+  [32;1m✓[39;22m[90m [39m[90mmaps exit codes without exposing output or executing a process with data set "scanner failure"[39m
+  [32;1m✓[39;22m[90m [39m[90mmaps exit codes without exposing output or executing a process with data set "interrupted"[39m[90m                  [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpreserves bounded timeout fd pass and configured scanner name with data set #0[39m
+  [32;1m✓[39;22m[90m [39m[90mpreserves bounded timeout fd pass and configured scanner name with data set #1[39m
+  [32;1m✓[39;22m[90m [39m[90mpreserves bounded timeout fd pass and configured scanner name with data set #2[39m
+  [32;1m✓[39;22m[90m [39m[90mpreserves bounded timeout fd pass and configured scanner name with data set #3[39m
+  [32;1m✓[39;22m[90m [39m[90mmissing or non file configuration fails closed before constructing a process[39m
+  [32;1m✓[39;22m[90m [39m[90mmissing or non file input is unavailable and no process is constructed[39m
+  [32;1m✓[39;22m[90m [39m[90mrunner exception returns only safe failure metadata[39m[90m                                                         [39m [90m0.01s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtimeout has a distinct safe code without claiming a clean result[39m[90m                                            [39m [90m0.04s[39m  
+
+  [90mTests:[39m    [32;1m16 passed[39;22m[90m (89 assertions)[39m
+  [90mDuration:[39m [39m0.86s[39m
+

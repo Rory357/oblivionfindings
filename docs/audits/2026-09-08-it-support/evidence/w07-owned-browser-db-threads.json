@@ -1,0 +1,21 @@
+{
+    "at_utc": "2026-09-09T07:23:11+00:00",
+    "database": "oblivion_it_draft_browser_2379f5391c4c48c2",
+    "threads": [
+        {
+            "ID": 4152,
+            "DB": "oblivion_it_support_test_it_9781854c55014e96",
+            "COMMAND": "Sleep",
+            "TIME": 0,
+            "STATE": ""
+        },
+        {
+            "ID": 4153,
+            "DB": "oblivion_it_draft_browser_2379f5391c4c48c2",
+            "COMMAND": "Query",
+            "TIME": 0,
+            "STATE": "executing"
+        }
+    ],
+    "database_mutations_performed": false
+}

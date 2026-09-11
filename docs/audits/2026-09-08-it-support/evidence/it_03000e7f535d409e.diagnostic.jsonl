@@ -1,0 +1,2 @@
+{"sequence":1,"utc":"2026-09-09T05:50:37+00:00","pid":50420,"memory_bytes":2097152,"peak_memory_bytes":2097152,"phase":"prepend_started","memory_limit":"1024M"}
+{"sequence":2,"utc":"2026-09-09T05:50:37+00:00","pid":50420,"memory_bytes":14680064,"peak_memory_bytes":16777216,"phase":"early_shutdown","last_error":{"type":1,"file":"docs/audits/2026-09-08-it-support/evidence/isolated-test-diagnostic.php","line":76},"output_buffer_depth":0,"phpunit_internal_error_buffered":false,"internal_error_locations":[]}

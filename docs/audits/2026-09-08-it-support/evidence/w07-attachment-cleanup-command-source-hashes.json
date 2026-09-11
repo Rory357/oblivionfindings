@@ -1,0 +1,14 @@
+[
+  {
+    "path": "app/Console/Commands/RetryItAttachmentCleanup.php",
+    "sha256": "27e6d2cc7bb287b2a80d1999be50cf3664af48af33412dab24f335f5836ccc4a"
+  },
+  {
+    "path": "tests/Unit/It/RetryItAttachmentCleanupTest.php",
+    "sha256": "9a52a15a613c49a29ca133d133a406738f80a542a6f4c2e9202f444a2cec8ec7"
+  },
+  {
+    "path": "app/Domain/It/Services/ItAttachmentStorageIntentService.php",
+    "sha256": "80f32a51ee8c3c3a2c767b68a9d32d1596426a6c36ba207c22c9b71c46b148fa"
+  }
+]

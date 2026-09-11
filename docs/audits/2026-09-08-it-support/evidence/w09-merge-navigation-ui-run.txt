@@ -1,0 +1,57 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/pages/it/tickets/show.test.tsx (29 tests | 1 failed) 5853ms
+     × keeps original merged work history readable and its section navigation on the original record 281ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > keeps original merged work history readable and its section navigation on the original record
+TypeError: [Function get] is not a spy or a call to a spy!
+ ❯ resources/js/pages/it/tickets/show.test.tsx:212:28
+    210|         ).not.toBeInTheDocument();
+    211|         fireEvent.click(screen.getByRole('tab', { name: 'Approvals' })…
+    212|         expect(router.get).toHaveBeenCalledWith(
+       |                            ^
+    213|             '/it/tickets/42/original',
+    214|             { tab: 'approvals' },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+TypeError: Cannot read properties of undefined (reading 'url')
+ ❯ Router.visit node_modules/@inertiajs/core/dist/index.esm.js:2429:62
+ ❯ Router.get node_modules/@inertiajs/core/dist/index.esm.js:2355:17
+ ❯ visitTab resources/js/pages/it/tickets/show.tsx:468:16
+    466|     );
+    467|     const visitTab = (tab: string, after?: () => void) =>
+    468|         router.get(
+       |                ^
+    469|             `/it/tickets/${ticket.id}${ticket.is_merged ? '/original' …
+    470|             { tab: ticketWorkspaceTab(tab, canViewWork) },
+ ❯ go resources/js/components/it/ticket-workspace-header.tsx:170:9
+ ❯ onClick resources/js/components/it/ticket-workspace-header.tsx:396:33
+ ❯ onClick node_modules/@inertiajs/react/dist/index.esm.js:1379:9
+ ❯ executeDispatch node_modules/react-dom/cjs/react-dom-client.development.js:19116:9
+ ❯ runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ ❯ processDispatchQueue node_modules/react-dom/cjs/react-dom-client.development.js:19166:19
+ ❯ node_modules/react-dom/cjs/react-dom-client.development.js:19767:9
+
+This error originated in "resources/js/pages/it/tickets/show.test.tsx" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "keeps original merged work history readable and its section navigation on the original record". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 42 passed (43)
+     Errors  1 error
+   Start at  16:11:00
+   Duration  10.76s (transform 1.27s, setup 266ms, import 5.61s, tests 7.56s, environment 1.92s)
+

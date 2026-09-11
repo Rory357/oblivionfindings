@@ -2,8 +2,11 @@
  * gold-standard /hr/leave board: KPI stat cards and lane rows are bespoke
  * link-buttons, not shadcn <Button>/<Card> cases. Every colour is a design
  * token; deep-links reuse the queue's saved-view params. */
+import { SlaChip } from '@/components/it/sla-chip';
+import type { SlaVerdict } from '@/components/it/sla-evidence';
+import { ticketWatcherActivity } from '@/components/it/ticket-watcher-activity';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
-import { router } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import {
     Activity,
     AlarmClock,
@@ -21,6 +24,10 @@ import {
     XCircle,
     type LucideIcon,
 } from 'lucide-react';
+import {
+    TicketConversationSummary,
+    type TicketConversation,
+} from './ticket-conversation-summary';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -32,6 +39,7 @@ interface SlaLaneRow {
     title: string;
     priority: string;
     sla_state: string;
+    sla?: SlaVerdict;
     resolution_due_at: string | null;
     assignee: string | null;
 }
@@ -51,6 +59,10 @@ interface AgingLaneRow {
     assignee: string | null;
     age: string | null;
 }
+interface AwaitingItLaneRow extends Omit<AwaitingLaneRow, 'age'> {
+    created_age: string | null;
+    conversation?: TicketConversation;
+}
 
 interface ActivityRow {
     id: number;
@@ -63,6 +75,8 @@ interface ActivityRow {
 }
 
 export interface OverviewPayload {
+    conversation_ready?: boolean;
+    awaiting_it_lane?: AwaitingItLaneRow[];
     avg_first_response_mins: number | null;
     sla_lane: SlaLaneRow[];
     awaiting_lane: AwaitingLaneRow[];
@@ -121,6 +135,12 @@ export function ItOverview({
         priority ? rows.filter((row) => row.priority === priority) : rows;
     const slaLane = byPriority(overview.sla_lane);
     const awaitingLane = byPriority(overview.awaiting_lane);
+    const conversationReady =
+        overview.conversation_ready === true &&
+        Array.isArray(overview.awaiting_it_lane);
+    const awaitingItLane = conversationReady
+        ? byPriority(overview.awaiting_it_lane ?? [])
+        : [];
     const agingLane = byPriority(overview.aging_lane);
     return (
         <div className="flex flex-col gap-4">
@@ -142,7 +162,7 @@ export function ItOverview({
                     title="SLA at risk / breached"
                     tone={slaLane.length > 0 ? 'critical' : 'neutral'}
                     viewHref="/it?tab=tickets&view=breaching"
-                    empty="Every open ticket is comfortably within SLA."
+                    empty="No at-risk or breached tickets in this selection. Check SLA measurement and watchdog status in the header."
                     rows={slaLane}
                     render={(t) => (
                         <LaneRow
@@ -151,27 +171,14 @@ export function ItOverview({
                             title={t.title}
                             priority={t.priority}
                             onClick={() => onOpenTicket(t.id)}
-                            meta={
-                                <StatusBadge
-                                    variant={
-                                        t.sla_state === 'breached'
-                                            ? 'critical'
-                                            : 'warning'
-                                    }
-                                    size="sm"
-                                >
-                                    {t.sla_state === 'breached'
-                                        ? 'Breached'
-                                        : 'At risk'}
-                                </StatusBadge>
-                            }
+                            meta={<SlaChip ticket={t} />}
                         />
                     )}
                 />
 
                 <LaneCard
                     icon={Inbox}
-                    title="Awaiting agent reply"
+                    title="Awaiting first reply"
                     tone={awaitingLane.length > 0 ? 'warning' : 'neutral'}
                     viewHref="/it?tab=tickets&view=awaiting_reply"
                     empty="No tickets are waiting on a first response."
@@ -185,12 +192,55 @@ export function ItOverview({
                             onClick={() => onOpenTicket(t.id)}
                             meta={
                                 <span className="text-[11.5px] text-muted-foreground">
-                                    {t.age ?? '—'}
+                                    Ticket age: {t.age ?? 'unavailable'}
                                 </span>
                             }
                         />
                     )}
                 />
+
+                {conversationReady ? (
+                    <LaneCard
+                        icon={Inbox}
+                        title="Awaiting IT"
+                        tone={awaitingItLane.length > 0 ? 'warning' : 'neutral'}
+                        viewHref="/it?tab=tickets&view=awaiting_it"
+                        empty="No open tickets in this selection have a recorded next public response with IT."
+                        rows={awaitingItLane}
+                        render={(ticket) => (
+                            <LaneRow
+                                key={ticket.id}
+                                reference={ticket.reference}
+                                title={ticket.title}
+                                priority={ticket.priority}
+                                onClick={() => onOpenTicket(ticket.id)}
+                                meta={
+                                    <span className="text-caption block">
+                                        <TicketConversationSummary
+                                            conversation={ticket.conversation}
+                                            ready
+                                        />
+                                        <span className="block">
+                                            Ticket age:{' '}
+                                            {ticket.created_age ??
+                                                'unavailable'}
+                                        </span>
+                                    </span>
+                                }
+                            />
+                        )}
+                    />
+                ) : (
+                    <div className="rounded-2xl border border-border bg-card p-4">
+                        <p className="text-[13px] font-bold">
+                            Current public reply responsibility
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            Reply responsibility is unavailable. The first-reply
+                            view remains available.
+                        </p>
+                    </div>
+                )}
 
                 <LaneCard
                     icon={Clock}
@@ -318,9 +368,8 @@ function activityVerb(
         case 'reopened':
             return 'reopened this ticket';
         case 'watcher_added':
-            return 'started watching';
         case 'watcher_removed':
-            return 'stopped watching';
+            return ticketWatcherActivity(type, payload);
         default:
             return label(type).toLowerCase();
     }
@@ -467,13 +516,13 @@ function LaneCard<T>({
                 </span>
                 <span className="text-[13px] font-bold">{title}</span>
                 {rows.length > 0 ? (
-                    <button
-                        type="button"
-                        onClick={() => go(viewHref)}
+                    <Link
+                        href={viewHref}
+                        aria-label={`View all ${title.toLowerCase()}`}
                         className="ml-auto text-[11.5px] font-semibold text-primary hover:underline"
                     >
                         View all →
-                    </button>
+                    </Link>
                 ) : null}
             </div>
             {rows.length === 0 ? (

@@ -1,0 +1,223 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+Not implemented: navigation to another Document
+ ❯ resources/js/components/lists/entity-interactions.test.tsx (4 tests | 1 failed) 303ms
+     × derives card selection styling from the checkbox contract and retains legacy activation 35ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/lists/entity-interactions.test.tsx > Canonical list interactions > derives card selection styling from the checkbox contract and retains legacy activation
+TestingLibraryElementError: Found multiple elements with the role "button" and name `/Legacy card/`
+
+Here are the matching elements:
+
+Ignored nodes: comments, script, style
+<div
+  class="bg-card text-card-foreground border group relative flex flex-col gap-0 overflow-hidden rounded-[14px] py-0 shadow-sm transition-all duration-150 outline-none hover:-translate-y-0.5 hover:border-primary hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+  data-slot="card"
+  role="button"
+  tabindex="0"
+>
+  <div
+    class="h-[3px] w-full bg-status-success"
+  />
+  <div
+    class="flex flex-1 flex-col gap-3 px-4 pt-3.5 pb-3.5"
+  >
+    <div
+      class="flex items-start gap-3"
+    >
+      <div
+        class="min-w-0 flex-1"
+      >
+        <h3
+          class="truncate text-[15px] leading-tight font-[650] tracking-tight"
+        >
+          Legacy card
+        </h3>
+      </div>
+      <div>
+        <button
+          aria-expanded="false"
+          aria-haspopup="menu"
+          aria-label="Actions for Legacy card"
+          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring -mt-0.5 -mr-1"
+          data-slot="dropdown-menu-trigger"
+          data-state="closed"
+          id="radix-_r_6_"
+          type="button"
+        >
+          <svg
+            class="lucide lucide-ellipsis-vertical size-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="1"
+            />
+            <circle
+              cx="12"
+              cy="5"
+              r="1"
+            />
+            <circle
+              cx="12"
+              cy="19"
+              r="1"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+Ignored nodes: comments, script, style
+<button
+  aria-expanded="false"
+  aria-haspopup="menu"
+  aria-label="Actions for Legacy card"
+  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring -mt-0.5 -mr-1"
+  data-slot="dropdown-menu-trigger"
+  data-state="closed"
+  id="radix-_r_6_"
+  type="button"
+>
+  <svg
+    class="lucide lucide-ellipsis-vertical size-4"
+    fill="none"
+    height="24"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="2"
+    viewBox="0 0 24 24"
+    width="24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <circle
+      cx="12"
+      cy="12"
+      r="1"
+    />
+    <circle
+      cx="12"
+      cy="5"
+      r="1"
+    />
+    <circle
+      cx="12"
+      cy="19"
+      r="1"
+    />
+  </svg>
+</button>
+
+(If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <div
+      class="bg-card text-card-foreground border group relative flex flex-col gap-0 overflow-hidden rounded-[14px] py-0 shadow-sm transition-all duration-150 outline-none hover:-translate-y-0.5 hover:border-primary hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+      data-slot="card"
+      role="button"
+      tabindex="0"
+    >
+      <div
+        class="h-[3px] w-full bg-status-success"
+      />
+      <div
+        class="flex flex-1 flex-col gap-3 px-4 pt-3.5 pb-3.5"
+      >
+        <div
+          class="flex items-start gap-3"
+        >
+          <div
+            class="min-w-0 flex-1"
+          >
+            <h3
+              class="truncate text-[15px] leading-tight font-[650] tracking-tight"
+            >
+              Legacy card
+            </h3>
+          </div>
+          <div>
+            <button
+              aria-expanded="false"
+              aria-haspopup="menu"
+              aria-label="Actions for Legacy card"
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring -mt-0.5 -mr-1"
+              data-slot="dropdown-menu-trigger"
+              data-state="closed"
+              id="radix-_r_6_"
+              type="button"
+            >
+              <svg
+                class="lucide lucide-ellipsis-vertical size-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="1"
+                />
+                <circle
+                  cx="12"
+                  cy="5"
+                  r="1"
+                />
+                <circle
+                  cx="12"
+                  cy="19"
+                  r="1"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ getElementError node_modules/@testing-library/dom/dist/query-helpers.js:20:35
+ ❯ getMultipleElementsFoundError node_modules/@testing-library/dom/dist/query-helpers.js:23:10
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:55:13
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/lists/entity-interactions.test.tsx:103:34
+    101|             />,
+    102|         );
+    103|         fireEvent.keyDown(screen.getByRole('button', { name: /Legacy c…
+       |                                  ^
+    104|             key: ' ',
+    105|         });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  1 failed | 15 passed (16)
+   Start at  14:56:41
+   Duration  4.47s (transform 981ms, setup 733ms, import 9.00s, tests 1.77s, environment 5.01s)
+

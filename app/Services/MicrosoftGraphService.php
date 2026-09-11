@@ -3,6 +3,16 @@
 namespace App\Services;
 
 use App\Contracts\CalendarOAuthToken;
+use App\Domain\It\Data\ItEmailAttachment;
+use App\Domain\It\Exceptions\ItInboundContentException;
+use App\Domain\It\Exceptions\ItInboundHeaderException;
+use App\Domain\It\Services\ItEmailAttachments;
+use App\Domain\It\Services\ItEmailContent;
+use App\Domain\It\Services\ItEmailHeaders;
+use App\Domain\It\Services\ItEmailMessageIdentifiers;
+use App\Services\Integration\Exceptions\MailboxProviderFailure;
+use App\Services\Integration\MailboxMessagePage;
+use App\Services\Integration\MailboxProviderHttp;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -28,7 +38,7 @@ class MicrosoftGraphService
         }
 
         $response = Http::asForm()->post(
-            'https://login.microsoftonline.com/' . config('services.microsoft.tenant') . '/oauth2/v2.0/token',
+            'https://login.microsoftonline.com/'.config('services.microsoft.tenant').'/oauth2/v2.0/token',
             [
                 'client_id' => config('services.microsoft.client_id'),
                 'client_secret' => config('services.microsoft.client_secret'),
@@ -150,6 +160,16 @@ class MicrosoftGraphService
 
     // Mail methods
 
+    /** Preserve notification headers and MIME parts through the existing Graph transport. */
+    public function sendMimeMail(string $mime): void
+    {
+        $response = MailboxProviderHttp::send(fn () => MailboxProviderHttp::client($this->token, 'microsoft')
+            ->withBody(base64_encode($mime), 'text/plain')->post('/me/sendMail'));
+        if ($response->status() !== 202) {
+            throw new MailboxProviderFailure('invalid_response');
+        }
+    }
+
     public function sendMail(string $to, string $subject, string $body, array $attachments = []): bool
     {
         $message = [
@@ -160,7 +180,7 @@ class MicrosoftGraphService
             ],
         ];
 
-        if (!empty($attachments)) {
+        if (! empty($attachments)) {
             $message['message']['attachments'] = $attachments;
         }
 
@@ -177,18 +197,23 @@ class MicrosoftGraphService
      */
     public function listUnreadMessages(string $mailboxUpn, int $limit = 25): array
     {
-        $response = $this->client()->get('/users/'.rawurlencode($mailboxUpn).'/mailFolders/inbox/messages', [
-            '$filter' => 'isRead eq false',
+        $response = MailboxProviderHttp::send(fn () => MailboxProviderHttp::client($this->token, 'microsoft')->get('/users/'.rawurlencode($mailboxUpn).'/mailFolders/inbox/messages', [
+            '$filter' => 'receivedDateTime ge 0001-01-01T00:00:00Z and isRead eq false',
             '$select' => 'id,subject,from,body,bodyPreview,internetMessageId,receivedDateTime',
             '$top' => $limit,
             '$orderby' => 'receivedDateTime asc',
-        ]);
-
-        if (! $response->successful()) {
-            return [];
+        ]));
+        $body = MailboxProviderHttp::object($response);
+        if (! is_array($body['value'] ?? null) || ! array_is_list($body['value'])) {
+            throw new MailboxProviderFailure('invalid_response');
+        }
+        foreach ($body['value'] as $message) {
+            if (! is_array($message) || ! is_string($message['id'] ?? null) || $message['id'] === '') {
+                throw new MailboxProviderFailure('invalid_response');
+            }
         }
 
-        return collect($response->json('value', []))
+        return collect($body['value'])
             ->map(fn (array $m) => [
                 'remote_id' => (string) ($m['id'] ?? ''),
                 'from' => (string) ($m['from']['emailAddress']['address'] ?? ''),
@@ -199,33 +224,166 @@ class MicrosoftGraphService
                 // off the IT-… reference in the subject (InboundEmailIngestor).
                 'in_reply_to' => null,
             ])
-            ->filter(fn (array $m) => $m['remote_id'] !== '' && $m['from'] !== '')
             ->values()
             ->all();
+    }
+
+    /** Discover IDs before changing unread flags. Preserve the provider's opaque nextLink. */
+    public function discoverUnread(string $mailboxUpn, ?\DateTimeInterface $before, ?string $continuation = null, int $limit = 100): MailboxMessagePage
+    {
+        if ($limit < 1 || $limit > 100) {
+            throw new MailboxProviderFailure('invalid_response');
+        }
+        $path = '/users/'.rawurlencode($mailboxUpn).'/mailFolders/inbox/messages';
+        if ($continuation !== null) {
+            $this->validateMailboxContinuation($mailboxUpn, $continuation);
+        }
+        $response = MailboxProviderHttp::send(function () use ($continuation, $path, $before, $limit) {
+            $request = MailboxProviderHttp::client($this->token, 'microsoft')->withHeaders(['Prefer' => 'IdType="ImmutableId"']);
+
+            return $continuation !== null ? $request->get($continuation) : $request->get($path, [
+                '$filter' => ($before ? 'receivedDateTime lt '.\DateTimeImmutable::createFromInterface($before)->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z') : 'receivedDateTime ge 0001-01-01T00:00:00Z').' and isRead eq false',
+                '$select' => 'id', '$top' => $limit, '$orderby' => 'receivedDateTime asc',
+            ]);
+        });
+        $body = MailboxProviderHttp::object($response);
+        if (! is_array($body['value'] ?? null) || ! array_is_list($body['value'])) {
+            throw new MailboxProviderFailure('invalid_response');
+        }
+        $ids = [];
+        foreach ($body['value'] as $item) {
+            if (! is_array($item) || ! is_string($item['id'] ?? null)) {
+                throw new MailboxProviderFailure('invalid_response');
+            }
+            $ids[] = $item['id'];
+        }
+        $next = $body['@odata.nextLink'] ?? null;
+        if ($next !== null) {
+            if (! is_string($next)) {
+                throw new MailboxProviderFailure('invalid_response');
+            }
+            $this->validateMailboxContinuation($mailboxUpn, $next);
+        }
+
+        return new MailboxMessagePage($ids, $next);
+    }
+
+    private function validateMailboxContinuation(string $mailbox, string $url, ?string $messageId = null): void
+    {
+        $parts = parse_url($url);
+        // Validate before constructing an authenticated request, including restored cursors.
+        if (strlen($url) > 16384 || ! is_array($parts) || ($parts['scheme'] ?? '') !== 'https'
+            || ($parts['host'] ?? '') !== 'graph.microsoft.com'
+            || isset($parts['user']) || isset($parts['pass'])
+            || isset($parts['port']) || isset($parts['fragment'])
+            || rawurldecode($parts['path'] ?? '') !== '/v1.0/users/'.$mailbox.($messageId === null ? '/mailFolders/inbox/messages' : '/messages/'.$messageId.'/attachments')
+            || empty($parts['query']) || preg_match('/[\x00-\x20\x7f]/', $url)) {
+            throw new MailboxProviderFailure('invalid_response');
+        }
+    }
+
+    public function readMessage(string $mailboxUpn, string $messageId, bool $includeAttachments = false): array
+    {
+        $response = MailboxProviderHttp::send(fn () => MailboxProviderHttp::client($this->token, 'microsoft')
+            ->withHeaders(['Prefer' => 'IdType="ImmutableId"'])
+            ->get('/users/'.rawurlencode($mailboxUpn).'/messages/'.rawurlencode($messageId), [
+                '$select' => 'id,subject,from,body,bodyPreview,internetMessageId,internetMessageHeaders',
+            ]));
+        $message = MailboxProviderHttp::object($response);
+        if (($message['id'] ?? null) !== $messageId || ! is_array($message['body'] ?? null)) {
+            throw new MailboxProviderFailure('invalid_response');
+        }
+        $parser = new ItEmailHeaders;
+        $headers = $parser->read($message['internetMessageHeaders'] ?? []);
+        (new ItEmailContent)->assertHumanMessage($headers);
+        $address = $message['from']['emailAddress']['address'] ?? '';
+        if (! is_string($address)) {
+            throw new ItInboundHeaderException('sender_ambiguous');
+        }
+        $from = $parser->sender($address);
+        if (isset($headers['from']) && $parser->sender($headers['from']) !== $from) {
+            throw new ItInboundHeaderException('sender_ambiguous');
+        }
+        $identity = $message['internetMessageId'] ?? null;
+        if ($identity !== null && ! is_string($identity)) {
+            throw new ItInboundHeaderException;
+        }
+        if (isset($headers['message-id']) && (new ItEmailMessageIdentifiers)->messageId($headers['message-id'])
+            !== (new ItEmailMessageIdentifiers)->messageId($identity)) {
+            throw new ItInboundHeaderException('conflicting_message_headers');
+        }
+
+        return [
+            'remote_id' => $messageId,
+            'from' => $from,
+            'subject' => $message['subject'] ?? null, 'text' => $this->plainTextBody($message),
+            'message_id' => $identity, 'in_reply_to' => $headers['in-reply-to'] ?? null,
+            'references' => $headers['references'] ?? null,
+            ...($includeAttachments ? ['attachments' => $this->attachmentManifest($mailboxUpn, $messageId)] : []),
+        ];
+    }
+
+    /** Never infer absence from hasAttachments: that flag excludes inline files. */
+    private function attachmentManifest(string $mailbox, string $messageId): array
+    {
+        $files = $seen = [];
+        $next = null;
+        for ($page = 0; $page < 6; $page++) {
+            $body = MailboxProviderHttp::object(MailboxProviderHttp::send(function () use ($mailbox, $messageId, $next) {
+                $client = MailboxProviderHttp::client($this->token, 'microsoft')->withHeaders(['Prefer' => 'IdType="ImmutableId"']);
+
+                return $next !== null ? $client->get($next) : $client->get('/users/'.rawurlencode($mailbox).'/messages/'.rawurlencode($messageId).'/attachments', [
+                    '$select' => 'id,name,size,contentType,isInline', '$top' => ItEmailAttachments::MAX_FILES + 1,
+                ]);
+            }));
+            if (! is_array($body['value'] ?? null) || ! array_is_list($body['value'])) {
+                throw new MailboxProviderFailure('invalid_response');
+            }
+            $files = [...$files, ...$body['value']];
+            if (count($files) > ItEmailAttachments::MAX_FILES) {
+                throw new ItInboundContentException('too_many_attachments');
+            }
+            $next = $body['@odata.nextLink'] ?? null;
+            if ($next === null) {
+                return (new ItEmailAttachments)->graph($files);
+            }
+            if (! is_string($next) || isset($seen[$next])) {
+                throw new MailboxProviderFailure('invalid_response');
+            }
+            $this->validateMailboxContinuation($mailbox, $next, $messageId);
+            $seen[$next] = true;
+        }
+        throw new MailboxProviderFailure('invalid_response');
+    }
+
+    /** Unscanned bytes: caller must use canonical private staging and scan policy. */
+    public function readAttachmentContents(string $mailbox, string $messageId, ItEmailAttachment $file): string
+    {
+        if ($file->provider !== 'microsoft' || $messageId === '' || strlen($messageId) > 4096 || preg_match('/[\x00-\x20\x7f]/', $messageId)) {
+            throw new ItInboundContentException('invalid_attachment_metadata');
+        }
+
+        return (new ItEmailAttachments)->contents($file, fn (string $id): array => MailboxProviderHttp::object(
+            MailboxProviderHttp::send(fn () => MailboxProviderHttp::client($this->token, 'microsoft', ItEmailAttachments::FILE_RESPONSE_BYTES)
+                ->withHeaders(['Prefer' => 'IdType="ImmutableId"'])
+                ->get('/users/'.rawurlencode($mailbox).'/messages/'.rawurlencode($messageId).'/attachments/'.rawurlencode($id)))
+        ));
     }
 
     /** Flag a mailbox message read so the next poll doesn't re-ingest it. */
     public function markRead(string $mailboxUpn, string $messageId): bool
     {
-        return $this->client()
-            ->patch('/users/'.rawurlencode($mailboxUpn).'/messages/'.rawurlencode($messageId), ['isRead' => true])
-            ->successful();
+        MailboxProviderHttp::send(fn () => MailboxProviderHttp::client($this->token, 'microsoft')
+            ->withHeaders(['Prefer' => 'IdType="ImmutableId"'])
+            ->patch('/users/'.rawurlencode($mailboxUpn).'/messages/'.rawurlencode($messageId), ['isRead' => true]));
+
+        return true;
     }
 
-    /** Best-effort plain text from a Graph message body (text, html, or preview). */
+    /** Complete bounded body; a provider preview is never a replacement for missing content. */
     private function plainTextBody(array $message): string
     {
-        $type = strtolower((string) ($message['body']['contentType'] ?? ''));
-        $content = (string) ($message['body']['content'] ?? '');
-
-        if ($content !== '' && $type !== 'html') {
-            return trim($content);
-        }
-        if ($content !== '') {
-            return trim(html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5));
-        }
-
-        return trim((string) ($message['bodyPreview'] ?? ''));
+        return (new ItEmailContent)->graph($message['body'] ?? null);
     }
 
     // User info

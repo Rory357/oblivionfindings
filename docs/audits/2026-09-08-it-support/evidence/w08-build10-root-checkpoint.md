@@ -1,0 +1,28 @@
+# W08 Build10 source gate — root
+
+9 September 2026. Goal active; W08 and release acceptance remain incomplete. This note records preparation/checks, not a completed build or current browser acceptance.
+
+- Preserved the existing working tree and all protected design files. The plan's top-level dated clarification now explicitly carries the user's desktop-only/no-browser-resizing instruction; the existing W19 multi-resource/schedules addition remains in scope.
+- Root host integration passes original actor/ticket/version and canonical refresh into the task register, omits private work navigation/counts for participant-only access, and retains editable work after a real conflict. The ticket header uses the opt-in shared title wrapping. The Setup Home breadcrumb now targets the dashboard.
+- A screenshot of the historical Build9 page at the unchanged **1072 × 856** viewport showed the two-column Messages section squeezing the conversation. Root moved its existing balanced column breakpoint from `lg` to `xl`; this gives the conversation the available width in the current desktop window while retaining the 1.7fr/minimum360px secondary column for wider windows. Source only until the next build/browser check; no mobile-specific view or resizing.
+- W07 validation changes and the quiet pristine-generation recovery rule remain as described in `w07-file-validation-results.md` and `w07-browser-build9-results.md`. Build9 does not verify the newer frontend corrections.
+
+## Actual source checks
+
+1. First combined UI snapshot: 339 passed/2 failed (341), host assertions still used pre-wizard/private-work expectations. Corrected those tests to enter Task title and to distinguish a settled authorized worker from a redacted participant. Log `w08-root-combined-ui-tests.txt`.
+2. Second snapshot: 339 passed/2 failed (341), different composer asynchronous focus/current-version assertions. Agent read-only diagnosis reproduced neither product failure: cancellation subset 2/2 and composer36/36 passed. Root awaited the scheduled focus and confirmation dismissal, then asserted the actual review GET before its result. No speculative product cancellation change. Logs `w08-root-combined-ui-recheck.txt`, `w08-cancellation-review-diagnosis.txt`, `w08-composer-review-diagnosis.txt`.
+3. Frozen selected20-file gate **331 passed/20 files/14.99s**, session32733 exit0. The explicitly selected group differs from the earlier341 group; do not present it as 341 passing cases or sum overlapping runs. `w08-root-combined-ui-final.txt` includes verbose per-case/file results. Root scoped14-file ESLint exit0 with no warnings (`w08-root-eslint-final.txt`).
+4. Full TypeScript80980 exited2 on seven new test-only diagnostics: task-memory union/closure narrowing and two unsupported `exact` role-selector options. Root removed its two unsupported options; W02 owns its five task-memory diagnostics. Original failure preserved in `w08-build10-types.txt`.
+5. Independent review then reopened the task source gate for capacity-safe Keep-and-close, complete current-value conflict review, accessible error targets, and approved due-time formatting. W02/W00 own those bounded corrections. Run affected checks and full types on their final freeze before building.
+6. New read-only `w08-owned-browser-task-evidence.php` has syntax exit0 and independent W01 source review with no concrete issue. It has **not run**. It requires explicit fresh token/fingerprint, exact owner/readiness/current-assets proof and matching PDO schema; only bounded SELECTs for synthetic tickets1/4 and hashes/opaque IDs are emitted. Reads are labelled sequential, not an atomic snapshot.
+
+## Next step
+
+Obtain final task UI freezes, verify the changed sources, build once and record the actual manifest/entry/no-hot proof. Start a fresh reviewed browser token, execute `w08-build10-browser-checklist.md`, and record actual outcomes separately. No schema import or isolated browser server is running at this checkpoint. All production policies/providers/AI remain unchanged; later completion history, approval lifecycle and personal-work integration stay open.
+
+## Later frozen checks and remaining bounded accessibility issue
+
+- W02's capacity/current-snapshot fix and validation/due corrections passed **174 tests/10 files/10.67s**, strict scoped lint0. This includes a newly pending exact command whose values match a previously cleared snapshot: it must still be retained. W00's complete current-value review passed8 tests and final strict lint0; its earlier0-error/3-warning harness run is separately recorded.
+- Root final host gate **73 tests/3 files/9.44s passed**, session46222 exit0; show/drawer/composer and strict scoped lint0. Current expanded runtime sources were frozen throughout that host gate.
+- Second full type check5523 exited2 on three additional diagnostics: two unknown test HTTP payloads and a task-context union narrowing inside a callback. W02 owns narrow corrections; no passing full-type claim yet. Logs `w08-build10-types-final.txt` and `w08-build10-host-ui-final.txt`.
+- The expanded suite exposed a pre-existing live W07 accessibility issue: shared `Field` clones a generated `id` onto the raw-attachment branch's React Fragment (`components/wizard/primitives.tsx:81–89`, `it-wizards.tsx` two intake branches). The Fragment accepts no id, so the outer label has no matching control. The actual dropzone remains keyboard-operable and retained-file tests pass; this is not data loss. Track a bounded explicit dropzone label/error association and Fragment exclusion in W07, with meaningful verification. It is not silently certified by the passing recovery suite. No shared Field change is included in this Build10 checkpoint.

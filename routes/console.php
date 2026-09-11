@@ -227,7 +227,7 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
 
-// IT service operations owns these three definitions so the scheduler and
+// IT service operations owns these definitions so the scheduler and
 // the HTTP health view consume one canonical cadence and name catalogue.
 app(ItAutomationScheduleCatalog::class)->register();
 

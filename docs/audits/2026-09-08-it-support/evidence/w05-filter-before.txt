@@ -1,0 +1,79 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_37ed2467ecb34685",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItSavedTicketFilterTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mone filter normalizer never reuses another actors permitted options[39m[90m                                       [39m [90m175.77s[39m  
+  [31;1m⨯[39;22m[90m [39m[90ma reused filter normalizer drops revoked Site and retired service options before applying or listing saved[39m[90m… [39m [90m0.14s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItSavedTicketFilterTest[22m [90m>[39m one filter normalizer never reuses another actors permitted op…   
+[39;1m  Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+-Array &0 []
++Array &0 [
++    'site_id' => 1,
++    'assignee' => 1,
++][39;22m
+
+  at [32mtests\Feature\It\ItSavedTicketFilterTest.php[39m:[32m200[39m
+    196▕ 
+    197▕     expect($normalizer->sanitize($first, ['site_id' => $site->id, 'assignee' => $first->id]))
+    198▕         ->toBe(['site_id' => $site->id, 'assignee' => $first->id]);
+    199▕     expect($normalizer->sanitize($second, ['site_id' => $site->id, 'assignee' => $first->id]))
+  ➜ 200▕         ->toBe([]);
+    201▕     expect($normalizer->sanitize($second, ['site_id' => $otherSite->id, 'assignee' => $second->id]))
+    202▕         ->toBe(['site_id' => $otherSite->id, 'assignee' => $second->id]);
+    203▕ });
+    204▕
+
+  [33m1   [39m[39;1mtests\Feature\It\ItSavedTicketFilterTest.php[39;22m:[39;1m200[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItSavedTicketFilterTest[22m [90m>[39m a reused filter normalizer drops revoked Site and retired serv…   
+[39;1m  Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+     'ticket_status' => 'open',
++    'site_id' => 3,
++    'service' => 1,
+ ][39;22m
+
+  at [32mtests\Feature\It\ItSavedTicketFilterTest.php[39m:[32m220[39m
+    216▕ 
+    217▕     HrEmployeeProfile::query()->where('user_id', $owner->id)->update(['primary_site_id' => $currentSite->id]);
+    218▕     $service->update(['is_active' => false]);
+    219▕ 
+  ➜ 220▕     expect($normalizer->sanitize($owner, $saved->filters))->toBe(['ticket_status' => 'open']);
+    221▕     expect($normalizer->ownedRows($owner))->toBe([['id' => $saved->id, 'name' => 'Previous scope']]);
+    222▕     expect($saved->fresh()->filters)->toBe(['ticket_status' => 'open']);
+    223▕ });
+    224▕
+
+  [33m1   [39m[39;1mtests\Feature\It\ItSavedTicketFilterTest.php[39;22m:[39;1m220[39;22m
+
+
+  [90mTests:[39m    [31;1m2 failed[39;22m[90m (4 assertions)[39m
+  [90mDuration:[39m [39m176.15s[39m
+

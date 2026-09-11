@@ -138,10 +138,10 @@ beforeEach(function () {
     secureApiAssignSite($this->manager, $this->defaultSite);
 });
 
-test('admins create opaque hashed service identities and see the reusable secret once', function () {
-    $rawToken = null;
+test('admins issue opaque hashed service identities through the no-store JSON command boundary', function () {
+    $requestUuid = (string) str()->uuid();
     $response = $this->actingAs($this->manager)
-        ->post('/it/setup/api-identities', [
+        ->postJson('/it/setup/api-identities', [
             'name' => 'Auvik migration bridge',
             'description' => 'Temporary approved intake bridge.',
             'actor_user_id' => $this->manager->id,
@@ -152,14 +152,19 @@ test('admins create opaque hashed service identities and see the reusable secret
             'read_fields' => [],
             'require_signature' => true,
             'rate_limit_per_minute' => 30,
+            'request_uuid' => $requestUuid,
+            'viewer_user_id' => $this->manager->id,
         ])
-        ->assertRedirect('/it/setup')
-        ->assertSessionHasNoErrors()
-        ->assertSessionHas('it_api_credential', function (array $credential) use (&$rawToken): bool {
-            $rawToken = $credential['token'] ?? null;
-
-            return is_string($rawToken) && str_starts_with($rawToken, 'ofi_');
-        });
+        ->assertOk()
+        ->assertHeader('Cache-Control', 'no-store, private')
+        ->assertSessionMissing('it_api_credential')
+        ->assertJsonPath('viewer_user_id', $this->manager->id)
+        ->assertJsonPath('request_uuid', $requestUuid)
+        ->assertJsonPath('operation', 'issue')
+        ->assertJsonPath('state', 'confirmed')
+        ->assertJsonPath('replayed', false);
+    $rawToken = $response->json('credential.token');
+    expect($rawToken)->toBeString()->toStartWith('ofi_');
 
     $identity = ItServiceIdentity::query()->sole();
     [, , $secret] = explode('_', (string) $rawToken, 3);
@@ -173,17 +178,26 @@ test('admins create opaque hashed service identities and see the reusable secret
     $firstView->assertInertia(fn ($page) => $page
         ->where('apiIdentities.0.id', $identity->id)
         ->where('apiIdentities.0.name', 'Auvik migration bridge')
-        ->has('oneTimeApiCredential.token')
-        ->where('oneTimeApiCredential.identity_id', $identity->id));
+        ->missing('oneTimeApiCredential')
+        ->missing('apiIdentities.0.token_hash'));
     $this->actingAs($this->manager)
         ->get('/it/setup')
         ->assertInertia(fn ($page) => $page
-            ->where('oneTimeApiCredential', null)
+            ->missing('oneTimeApiCredential')
             ->missing('apiIdentities.0.token_hash'));
 
     $this->actingAs($this->manager)
-        ->post("/it/setup/api-identities/{$identity->id}/revoke")
-        ->assertRedirect('/it/setup');
+        ->postJson("/it/setup/api-identities/{$identity->id}/revoke", [
+            'request_uuid' => (string) str()->uuid(),
+            'viewer_user_id' => $this->manager->id,
+            'expected_version' => $identity->configuration_version,
+        ])
+        ->assertOk()
+        ->assertHeader('Cache-Control', 'no-store, private')
+        ->assertJsonPath('operation', 'revoke')
+        ->assertJsonPath('state', 'confirmed')
+        ->assertJsonPath('credential', null)
+        ->assertSessionMissing('it_api_credential');
 
     expect($identity->refresh()->revoked_at)->not->toBeNull()
         ->and(AuditLog::query()->where('action', 'it.api.identity.created')->exists())->toBeTrue()
@@ -386,6 +400,7 @@ test('service identities append public comments and transition through canonical
 
     $this->withHeaders(secureApiHeaders($credential['token'], ['Idempotency-Key' => (string) fake()->uuid()]))
         ->postJson("/api/v1/it/work-items/{$ticket->id}/transitions", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'to' => 'in_progress',
             'reason' => 'Native monitor recovery is being verified.',
             'next_action' => 'Observe for ten minutes.',

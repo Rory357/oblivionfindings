@@ -1,0 +1,146 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/it-service-operations.test.tsx (10 tests | 1 failed) 309ms
+     × shows authorized live counts separately from the selected historical batch 27ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/it-service-operations.test.tsx > Operations cleanup and scheduler evidence > shows authorized live counts separately from the selected historical batch
+TestingLibraryElementError: Unable to find an element with the text: /Reserved files may still belong to active or uncertain work/. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<section
+  aria-label="Attachment cleanup evidence"
+  class="border-t border-border px-5 py-4"
+>
+  <div
+    class="flex flex-wrap items-center gap-2"
+  >
+    <svg
+      aria-hidden="true"
+      class="lucide lucide-shield-check size-4"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+      />
+      <path
+        d="m9 12 2 2 4-4"
+      />
+    </svg>
+    <h3
+      class="font-semibold"
+    >
+      Attachment cleanup
+    </h3>
+    <span
+      class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-info-bg text-status-info border-status-info/30"
+    >
+      Storage records available
+    </span>
+  </div>
+  <p
+    class="text-caption mt-2"
+  >
+    Recovery covers confirmed rollbacks and temporary copies of accepted email attachments. Quarantined files are retained; reserved files may belong to active or uncertain work.
+  </p>
+  <dl
+    class="mt-3 grid gap-3 sm:grid-cols-3"
+  >
+    <div>
+      <dt
+        class="text-caption"
+      >
+        Pending cleanup
+      </dt>
+      <dd
+        class="font-semibold"
+      >
+        12
+      </dd>
+    </div>
+    <div>
+      <dt
+        class="text-caption"
+      >
+        Unclassified reservations
+      </dt>
+      <dd
+        class="font-semibold"
+      >
+        23
+      </dd>
+    </div>
+    <div>
+      <dt
+        class="text-caption"
+      >
+        Needs reconciliation
+      </dt>
+      <dd
+        class="font-semibold"
+      >
+        34
+      </dd>
+    </div>
+  </dl>
+  <div
+    class="text-subtle mt-3"
+  >
+    <p>
+      Latest shown batch · 
+      Wed 9 Sept, 2:00 pm
+       ·
+       
+      Failed
+    </p>
+    <p>
+      1
+       deleted · 
+      1
+       
+      failed · 
+      0
+       deferred ·
+       
+      0
+       need reconciliation
+    </p>
+  </div>
+  <p
+    class="text-caption mt-2"
+  >
+    Checked 
+    Wed 9 Sept, 2:00 pm
+    . A retry never authorizes removal of unknown files.
+  </p>
+</section>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/it/__tests__/it-service-operations.test.tsx:157:22
+    155|         expect(evidence.getByText('34')).toBeVisible();
+    156|         expect(
+    157|             evidence.getByText(
+       |                      ^
+    158|                 /Reserved files may still belong to active or uncertai…
+    159|             ),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 passed (10)
+   Start at  06:26:17
+   Duration  27.65s (transform 161ms, setup 1.50s, import 14.17s, tests 309ms, environment 11.16s)
+

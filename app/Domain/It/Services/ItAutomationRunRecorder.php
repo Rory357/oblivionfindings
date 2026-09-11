@@ -8,12 +8,14 @@ use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskSkipped;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Console\Scheduling\Event;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use WeakMap;
 
 class ItAutomationRunRecorder
 {
-    /** @var array<int, int> task object id => run id */
-    private static array $activeRunIds = [];
+    /** @var WeakMap<Event, int>|null Keep the run through both finished and failed events. */
+    private static ?WeakMap $activeRunIds = null;
 
     public function starting(ScheduledTaskStarting $event): void
     {
@@ -25,7 +27,8 @@ class ItAutomationRunRecorder
             $event->task->description,
             $event->task->expression,
         );
-        self::$activeRunIds[spl_object_id($event->task)] = $run->id;
+        self::$activeRunIds ??= new WeakMap;
+        self::$activeRunIds[$event->task] = $run->id;
     }
 
     public function begin(string $key, ?string $expression = null): ItAutomationRun
@@ -40,7 +43,12 @@ class ItAutomationRunRecorder
 
     public function finished(ScheduledTaskFinished $event): void
     {
-        $this->complete($event->task, 'succeeded', (int) round($event->runtime * 1000));
+        // Laravel emits Finished before Failed for a nonzero command exit.
+        // A background dispatch is not evidence that execution completed.
+        if ($event->task->runInBackground) {
+            return;
+        }
+        $this->complete($event->task, $event->task->exitCode === 0 ? 'succeeded' : 'failed', (int) round($event->runtime * 1000));
     }
 
     public function failed(ScheduledTaskFailed $event): void
@@ -49,7 +57,7 @@ class ItAutomationRunRecorder
             $event->task,
             'failed',
             null,
-            Str::limit($event->exception->getMessage(), 2000, ''),
+            ItAutomationRunDiagnostics::failure($event->task->description ?? ''),
         );
     }
 
@@ -72,12 +80,12 @@ class ItAutomationRunRecorder
         if (! $this->isSchedulerRecordedAutomation($task)) {
             return;
         }
-        $objectId = spl_object_id($task);
-        $runId = self::$activeRunIds[$objectId] ?? null;
-        unset(self::$activeRunIds[$objectId]);
+        self::$activeRunIds ??= new WeakMap;
+        $runId = self::$activeRunIds[$task] ?? null;
         $run = $runId ? ItAutomationRun::query()->find($runId) : null;
         if (! $run) {
             $run = $this->begin($task->description, $task->expression);
+            self::$activeRunIds[$task] = $run->id;
         }
         $this->completeRun($run, $status, $runtimeMs, $error);
     }
@@ -90,18 +98,28 @@ class ItAutomationRunRecorder
         ?string $error = null,
         ?array $result = null,
     ): void {
-        $run->forceFill([
-            'status' => $status,
-            'finished_at' => now(),
-            'runtime_ms' => $runtimeMs,
-            'error_summary' => $error,
-            'result_summary' => $result,
-        ])->save();
+        if (! in_array($status, ['succeeded', 'failed', 'skipped'], true)) {
+            throw new InvalidArgumentException('An automation completion needs a terminal status.');
+        }
+        DB::transaction(function () use ($run, $status, $runtimeMs, $result): void {
+            $current = ItAutomationRun::query()->lockForUpdate()->findOrFail($run->id);
+            if ($current->status === 'running' && $current->finished_at === null) {
+                $current->forceFill([
+                    'status' => $status,
+                    'finished_at' => now(),
+                    'runtime_ms' => $runtimeMs === null ? null : max(0, $runtimeMs),
+                    'error_summary' => $status === 'failed' ? ItAutomationRunDiagnostics::failure($current->automation_key) : null,
+                    'result_summary' => $result,
+                ])->save();
+            }
+            // A stale worker or duplicate scheduler event cannot rewrite a terminal outcome.
+            $run->setRawAttributes($current->getAttributes(), true);
+        });
     }
 
     private function isSchedulerRecordedAutomation(Event $task): bool
     {
-        return $this->isItAutomation($task) && $task->description !== 'it.poll-mailbox';
+        return $this->isItAutomation($task) && ! in_array($task->description, ['it.poll-mailbox', 'it.check-sla', 'it.retry-attachment-cleanup', 'it.check-approval-deadlines'], true);
     }
 
     private function isItAutomation(Event $task): bool

@@ -1,0 +1,1 @@
+resources/js/components/settings/__tests__/sso-configuration-form.test.tsx(102,109): error TS2722: Cannot invoke an object which is possibly 'undefined'.

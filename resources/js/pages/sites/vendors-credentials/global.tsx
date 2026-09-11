@@ -121,6 +121,7 @@ type Props = {
         vendorsManage: boolean;
         credentialsManage: boolean;
         credentialsReveal: boolean;
+        credentialsAudit: boolean;
         manageCredentialTypes: boolean;
     };
 };
@@ -578,7 +579,7 @@ export default function GlobalVendorsCredentials({
                       },
                   ]
                 : []),
-            ...(can.credentials
+            ...(can.credentialsAudit
                 ? [
                       {
                           icon: History,
@@ -700,7 +701,7 @@ export default function GlobalVendorsCredentials({
     const hasMoreActions =
         can.vendorsManage ||
         can.credentialsManage ||
-        can.credentialsReveal ||
+        can.credentialsAudit ||
         can.manageCredentialTypes;
 
     const healthTotal = credHealth.ok + credHealth.due + credHealth.overdue;
@@ -841,7 +842,7 @@ export default function GlobalVendorsCredentials({
                                                     Export credentials (CSV)
                                                 </DropdownMenuItem>
                                             )}
-                                            {can.credentialsReveal && (
+                                            {can.credentialsAudit && (
                                                 <>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem
@@ -1278,11 +1279,19 @@ export default function GlobalVendorsCredentials({
                                 mode: 'remove-totp',
                             }))
                         }
-                        onHistory={() => {
-                            const label = credentialDialog.target?.label;
-                            setCredentialDialog({ mode: null, target: null });
-                            setAuditOpen({ focusLabel: label });
-                        }}
+                        onHistory={
+                            can.credentialsAudit
+                                ? () => {
+                                      const label =
+                                          credentialDialog.target?.label;
+                                      setCredentialDialog({
+                                          mode: null,
+                                          target: null,
+                                      });
+                                      setAuditOpen({ focusLabel: label });
+                                  }
+                                : undefined
+                        }
                     />
                     <DeleteCredentialDialog
                         isOpen={credentialDialog.mode === 'delete'}
@@ -1303,12 +1312,14 @@ export default function GlobalVendorsCredentials({
                 </>
             )}
 
-            <AuditLogDialog
-                isOpen={!!auditOpen}
-                focusLabel={auditOpen?.focusLabel}
-                siteId={siteFilter !== 'all' ? Number(siteFilter) : null}
-                onClose={() => setAuditOpen(null)}
-            />
+            {can.credentialsAudit && (
+                <AuditLogDialog
+                    isOpen={!!auditOpen}
+                    focusLabel={auditOpen?.focusLabel}
+                    siteId={siteFilter !== 'all' ? Number(siteFilter) : null}
+                    onClose={() => setAuditOpen(null)}
+                />
+            )}
 
             <ManageCredentialTypesDialog
                 isOpen={typesOpen}

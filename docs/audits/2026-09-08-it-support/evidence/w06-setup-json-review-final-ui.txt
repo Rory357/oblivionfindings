@@ -1,0 +1,230 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/pages/it/setup/queue-routing.test.tsx (11 tests | 1 failed) 5097ms
+     × does not treat an empty current lookup as proof an uncertain create failed 495ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/it/setup/queue-routing.test.tsx > accountable queue setup > does not treat an empty current lookup as proof an uncertain create failed
+TestingLibraryElementError: Found multiple elements with the role "button" and name `/Review/`
+
+Here are the matching elements:
+
+Ignored nodes: comments, script, style
+<button
+  class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-accent"
+  type="button"
+>
+  <span
+    class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-muted text-muted-foreground"
+  >
+    <svg
+      class="lucide lucide-clipboard-check h-3.5 w-3.5"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect
+        height="4"
+        rx="1"
+        ry="1"
+        width="8"
+        x="8"
+        y="2"
+      />
+      <path
+        d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+      />
+      <path
+        d="m9 14 2 2 4-4"
+      />
+    </svg>
+  </span>
+  <span
+    class="min-w-0"
+  >
+    <span
+      class="block text-[13px] font-semibold text-muted-foreground"
+    >
+      Review
+    </span>
+    <span
+      class="block truncate text-[11px] text-muted-foreground"
+    >
+      Check before saving
+    </span>
+  </span>
+</button>
+
+Ignored nodes: comments, script, style
+<button
+  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+  data-slot="button"
+  type="button"
+>
+  Review current queue
+</button>
+
+(If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  >
+    <main>
+      <div
+        class="space-y-5"
+      >
+        <header
+          class="eh-header text-primary-foreground"
+        >
+          <div
+            class="relative z-[1] flex h-full flex-col"
+          >
+            <div
+              class="flex flex-col px-[22px] pt-[18px]"
+            >
+              <div
+                class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+              >
+                <div
+                  class="flex min-w-0 items-start gap-[13px]"
+                >
+                  <span
+                    class="eh-mark-ring"
+                  >
+                    <svg
+                      class="lucide lucide-route size-5"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <circle
+                        cx="6"
+                        cy="19"
+                        r="3"
+                      />
+                      <path
+                        d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"
+                      />
+                      <circle
+                        cx="18"
+                        cy="5"
+                        r="3"
+                      />
+                    </svg>
+                  </span>
+                  <div
+                    class="flex min-w-0 flex-col"
+                  >
+                    <div
+                      class="flex flex-wrap items-center gap-2"
+                    >
+                      <h1
+                        class="truncate text-[22px] leading-tight font-bold tracking-tight"
+                      >
+                        IT setup
+                      </h1>
+                    </div>
+                    <p
+                      class="mt-[3px] text-[13px] text-primary-foreground/65"
+                    >
+                      Ownership, routing and service configuration ·
+                       
+                      Snapshot from this page load
+                    </p>
+                  </div>
+                </div>
+                <div
+                  class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                >
+                  <div
+                    class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                  >
+                    <svg
+                      class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <circle
+                        cx="11"
+                        cy="11"
+                        r="8"
+                      />
+                      <path
+                        d="m21 21-4.3-4.3"
+                      />
+                    </svg>
+                    <input
+                      class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                      placeholder="Search queues"
+                      type="search"
+                      value=""
+                    />
+                    <kbd
+                      aria-hidden="true"
+                      class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                    >
+                      /
+                    </kbd>
+                  </div>
+                  <button
+                    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+                    type="button"
+                  >
+                    <svg
+                      cla...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ getElementError node_modules/@testing-library/dom/dist/query-helpers.js:20:35
+ ❯ getMultipleElementsFoundError node_modules/@testing-library/dom/dist/query-helpers.js:23:10
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:55:13
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ step resources/js/pages/it/setup/queue-routing.test.tsx:79:28
+     77| }
+     78| function step(label: string) {
+     79|     fireEvent.click(screen.getByRole('button', { name: new RegExp(labe…
+       |                            ^
+     80| }
+     81| function save() {
+ ❯ resources/js/pages/it/setup/queue-routing.test.tsx:485:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 31 passed (32)
+   Start at  16:08:09
+   Duration  8.81s (transform 828ms, setup 534ms, import 9.48s, tests 9.25s, environment 4.02s)
+

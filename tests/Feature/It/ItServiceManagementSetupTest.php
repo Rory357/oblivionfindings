@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\ItModuleNavigation;
+use App\Domain\It\Services\ItServiceManagementSetupService;
 use App\Models\AuditLog;
 use App\Models\ItQueue;
 use App\Models\ItService;
@@ -64,9 +65,12 @@ test('IT pages share the approved grouped navigation while preserving existing d
             ->where('itNavigation.2.label', 'Operations')
             ->where('itNavigation.3.label', 'Setup')
             ->where('itNavigation.0.items.0.label', 'Overview')
-            ->where('itNavigation.0.items.3.href', '/it?tab=knowledge')
+            ->has('itNavigation.0.items', 3)
             ->where('itNavigation.1.items.0.href', '/it?tab=catalog')
             ->where('itNavigation.1.items.1.label', 'Provisioning')
+            ->where('itNavigation.1.items.2.href', '/it/work')
+            ->where('itNavigation.1.items.3.href', '/it/knowledge')
+            ->where('itNavigation.1.items.4.href', '/it/reports')
             ->where('itNavigation.2.items.0.href', '/it/problems')
             ->where('itNavigation.3.items.0.href', '/it/setup'));
 
@@ -298,7 +302,10 @@ test('setup exposes Site-scoped workload counts and keeps configuration applicat
     $remoteManager = serviceManagementSetupUser('hr');
     serviceManagementAssignSite($remoteManager, $remoteSite);
     $this->actingAs($remoteManager)
-        ->patch("/it/setup/teams/{$team->id}", ['name' => 'Shared service desk'])
+        ->patch("/it/setup/teams/{$team->id}", [
+            'name' => 'Shared service desk',
+            'configuration_version' => app(ItServiceManagementSetupService::class)->teamVersion($team->fresh()),
+        ])
         ->assertRedirect()
         ->assertSessionDoesntHaveErrors();
     expect($team->fresh()->name)->toBe('Shared service desk');
@@ -311,4 +318,23 @@ test('setup exposes Site-scoped workload counts and keeps configuration applicat
             'site_ids' => [$archivedSite->id],
         ])
         ->assertSessionHasErrors('site_ids.0');
+});
+
+test('setup queue and service risk counts use authorized live clock evidence instead of cached states', function () {
+    $queue = ItQueue::factory()->create();
+    $service = ItService::factory()->create();
+    $attributes = [
+        'site_id' => $this->site->id, 'queue_id' => $queue->id, 'it_service_id' => $service->id,
+        'status' => 'open', 'assigned_to_user_id' => null, 'owner_user_id' => null,
+        'created_at' => now()->subHours(2), 'first_response_due_at' => now()->subHour(),
+        'resolution_due_at' => now()->addHour(), 'sla_state' => 'ok',
+    ];
+    $liveBreach = ItTicket::factory()->create($attributes);
+    ItTicket::factory()->create([
+        ...$attributes, 'first_response_due_at' => null, 'resolution_due_at' => null, 'sla_state' => 'breached',
+    ]);
+    ItTicket::factory()->create([...$attributes, 'site_id' => Site::factory()->create()->id]);
+    $this->actingAs($this->manager)->get('/it/setup?tab=queues')->assertInertia(fn ($page) => $page
+        ->where('queues.0.workload.sla_risk', 1)->where('services.0.workload.sla_risk', 1));
+    expect($liveBreach->fresh()->sla_state)->toBe('ok');
 });

@@ -189,18 +189,22 @@ test('boolean and query access decisions share the same strict work visibility m
         'responsible_queue',
     ];
     $queryIds = $access->applyViewScope(ItTicket::query(), $agent)->pluck('id')->all();
+    $workIds = $access->applyWorkScope(ItTicket::query(), $agent)->pluck('id')->all();
 
     foreach ($tickets as $name => $ticket) {
         expect($access->canView($agent, $ticket))
             ->toBe(in_array($name, $expectedForAgent, true), $name);
         expect(in_array($ticket->id, $queryIds, true))
             ->toBe(in_array($name, $expectedForAgent, true), "query: {$name}");
+        expect(in_array($ticket->id, $workIds, true))
+            ->toBe($access->canWork($agent, $ticket), "work query: {$name}");
     }
 
     expect($access->canView($requester, $tickets['requester']))->toBeTrue()
         ->and($access->canWork($requester, $tickets['requester']))->toBeFalse()
         ->and($access->canView($requestedFor, $tickets['requested_for']))->toBeTrue()
         ->and($access->canWork($requestedFor, $tickets['requested_for']))->toBeFalse()
+        ->and($access->applyWorkScope(ItTicket::query(), $requester)->exists())->toBeFalse()
         ->and($access->canWork($agent, $tickets['participant_agent']))->toBeFalse()
         ->and($access->applyViewScope(ItTicket::query(), $requester)->pluck('id')->all())
         ->toBe([$tickets['requester']->id])

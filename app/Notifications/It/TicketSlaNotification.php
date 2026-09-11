@@ -29,7 +29,7 @@ class TicketSlaNotification extends Notification implements ShouldQueue, TracksI
     {
         $subject = match ($this->transition) {
             'breached' => "SLA breached — {$this->ticket->reference} {$this->ticket->title}",
-            'escalation' => "Unassigned urgent ticket — {$this->ticket->reference} {$this->ticket->title}",
+            'escalation' => "Urgent ticket needs cover — {$this->ticket->reference} {$this->ticket->title}",
             default => "SLA at risk — {$this->ticket->reference} {$this->ticket->title}",
         };
 
@@ -63,18 +63,18 @@ class TicketSlaNotification extends Notification implements ShouldQueue, TracksI
                 ->action('Open the ticket', url("/it/tickets/{$this->ticket->id}"))
                 ->line('Jump in or reassign — the requester is still waiting.'),
             'escalation' => $mail
-                ->subject("Unassigned urgent ticket — {$this->ticket->reference} {$this->ticket->title}")
+                ->subject("Urgent ticket needs cover — {$this->ticket->reference} {$this->ticket->title}")
                 ->error()
-                ->line('An urgent ticket has sat unassigned for over 30 minutes:')
+                ->line('An urgent ticket needs an available technician:')
                 ->line("**{$this->ticket->reference}** — {$this->ticket->title}")
-                ->action('Assign it now', url("/it/tickets/{$this->ticket->id}"))
-                ->line('You were notified as an administrator — nobody owns this yet.'),
+                ->action('Review responsibility', url("/it/tickets/{$this->ticket->id}"))
+                ->line('Confirm who will take the next action.'),
             default => $mail
                 ->subject("SLA at risk — {$this->ticket->reference} {$this->ticket->title}")
                 ->line("The {$clockLabel} target is nearly out of time on:")
                 ->line("**{$this->ticket->reference}** — {$this->ticket->title}")
                 ->action('Open the ticket', url("/it/tickets/{$this->ticket->id}"))
-                ->line('You were notified as the assignee.'),
+                ->line('Review the next action or arrange cover.'),
         };
     }
 

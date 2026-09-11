@@ -1,0 +1,7 @@
+Browser tab: 1, Title: "IT & Support - Laravel", URL: "https://oblivionfindings.test/it?tab=tickets".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
++			220 pop up button (collapsed) Description: Notifications, ID: radix-_r_2b_, Secondary Actions: Expand
++				221 image
++			222 pop up button (collapsed) Description: Announcements, ID: radix-_r_2d_, Secondary Actions: Expand
++				223 image
+The focused UI element is 1 AXWebArea IT & Support - Laravel, URL: oblivionfindings.test/it?tab=tickets

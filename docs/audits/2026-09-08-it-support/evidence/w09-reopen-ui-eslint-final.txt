@@ -1,0 +1,2 @@
+npm notice run npx
+npm notice run eslint resources/js/components/it/ticket-reopen-dialog.tsx resources/js/components/it/ticket-version-conflict.tsx resources/js/components/it/__tests__/ticket-reopen-dialog.test.tsx

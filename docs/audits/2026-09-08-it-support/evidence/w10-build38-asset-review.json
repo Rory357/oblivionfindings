@@ -1,0 +1,14 @@
+{
+  "token": "46072a8ced874baf",
+  "database": "oblivion_it_draft_browser_46072a8ced874baf",
+  "server_pid": 13412,
+  "previous_fingerprint": "4ffc77e58804c5637f530d2cf75622d7e8f8b7712790f56d11aaff4426690ba9",
+  "next_fingerprint": "4082e1c8e497ac3a6b7ef7b38819367a3ac3c41af631c27f0a9653f922509036",
+  "previous_asset_sha256": "3853b851a405040b3593afc5a7a37a0cae8f86593bebcdf6bb9464246156f2f2",
+  "next_asset_sha256": "f32b6e2097117471496be4aaeb82ee7d95bb92d77708a565b39c1d865b5c42b3",
+  "helpers_migrations_schema_unchanged": true,
+  "database_mutations": false,
+  "session_and_key_changed": false,
+  "router_guards_unchanged": true,
+  "provider_configuration_changed": false
+}

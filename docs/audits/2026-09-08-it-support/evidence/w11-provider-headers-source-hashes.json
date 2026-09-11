@@ -1,0 +1,34 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItEmailHeaders.php",
+    "sha256": "F403658FEE85C485AD4EA599CFDD00C055FB9E49A7E92AA0A11074586DDB35B0"
+  },
+  {
+    "path": "app/Domain/It/Services/ItMailboxInbox.php",
+    "sha256": "41A3A40A39C15660CC4459ECC66723FD91AAAD5AAA880B8F682677F42239FC5E"
+  },
+  {
+    "path": "app/Domain/It/InboundEmailIngestor.php",
+    "sha256": "8C64A4E5A12AC0FF67C255628906A85D8D0E79D5AD84C21AF49B36E9351DF878"
+  },
+  {
+    "path": "app/Services/MicrosoftGraphService.php",
+    "sha256": "930B9F757E6A04A1315E2B74F5EDFE4A4B60F70E5F626A0B07A52FFD4EAC1AF4"
+  },
+  {
+    "path": "app/Services/GoogleGmailService.php",
+    "sha256": "456382D7A9638D79287C03A2D928AB2AE7FE8EC54FEE78C1F62D331106DCA543"
+  },
+  {
+    "path": "tests/Unit/It/ItEmailHeadersTest.php",
+    "sha256": "09A7827E6C2936351023913ECA7C23E765B4EB55A6DF38914F96CF52EED0C125"
+  },
+  {
+    "path": "tests/Feature/It/ItInboundProviderHeadersTest.php",
+    "sha256": "32F2AFE9F1724AFC22EB8893D9E62B3D423A7E5A49701EF53E5B35DB364AE792"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w11-mailbox-browser-fixture.php",
+    "sha256": "9B129AD8C4F5F763525EFE302E168241E48B893578DF70CFD1ED6F6706E5DB3A"
+  }
+]

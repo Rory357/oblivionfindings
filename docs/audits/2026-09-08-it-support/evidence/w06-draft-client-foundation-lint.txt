@@ -1,0 +1,9 @@
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\ticket-draft-recovery.tsx
+  221:17  warning  Consider Card/CardHeader/CardContent from @/components/ui/card for plain rounded bordered panels. Leave custom layout surfaces as raw divs with an inline disable comment  no-restricted-syntax
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\hooks\use-it-ticket-draft.ts
+  858:19  warning  The ref value 'epoch.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'epoch.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+✖ 2 problems (0 errors, 2 warnings)
+

@@ -1,0 +1,45 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > starts the next matching audience draft through one explicit action (internal false)
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > starts the next matching audience draft through one explicit action (internal true)
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"draft_uuid":"3a966432-a1ce-40ef-8e9c-ac2716e1ecdd"}
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"revision":4}
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"state":"active","has_content":true,"capabilities":{"read":true,"start_new":false}}
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"audience":"internal"}
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"capabilities":{"read":false,"start_new":false}}
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"blocker":{"code":"ticket_settled","message":"Reopen this ticket."}}
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > keeps a failed next-message check retryable without rotating or claiming readiness
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > ignores a late successful next-message check after session loss
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > ignores a late successful next-message check after access loss
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > ignores a late successful next-message check after unmount loss
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > preserves a newer File selection when a recovered original reply has the same body and base version
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > a cancellation finding a committed reply preserves the ACK hold until explicit review (saved drafts false) 403ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > a cancellation finding a committed reply preserves the ACK hold until explicit review (saved drafts true) 308ms
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > replaces both audience forms when scope changes {"actorId":8} without rebinding old private work
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > replaces both audience forms when scope changes {"ticketId":12} without rebinding old private work
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > purges both audience buffers when the host confirms access loss
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > purges both audience buffers when the host confirms actor loss
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > conceals session-bound work and restores both audiences only after the host clears the session blocker
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > refreshes the committed conversation while retaining an unmatched saved draft
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > purges confirmed denied text and files from the current audience RAM input
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > conceals and purges both audiences after generic403 until each receives fresh access proof
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > registers the original pending body and version while retaining newer RAM text after commit
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > a failed second RAM proof withholds restored content and offers a deliberate retry
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > draft419 before a command keeps entered work concealed and provides login plus canonical draft retry
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > current-ticket review419 without a UUID conceals but preserves text and recovers through explicit current-version review
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > cancels an uncertain command only after explicit confirmation and retains the entered text
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > keeps independent public/internal text and never converts a private note when switching audience
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > retains submitted text/files while the outcome is unknown and blocks a different new reply
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > clears only a confirmed matching message, reports delivery failure, and permits a second reply with the committed version
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > keeps a newer unsent message when recovering an earlier command receipt
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not quietly replace the original version when the ticket changes during editing
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > removes private note controls and content when internal access is revoked
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > conceals a denied message without falsely showing a successful post
+ ↓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > rejects an over-limit file selection as a whole instead of silently dropping files
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 34 skipped (36)
+   Start at  23:24:26
+   Duration  3.48s (transform 188ms, setup 117ms, import 1.68s, tests 713ms, environment 813ms)
+

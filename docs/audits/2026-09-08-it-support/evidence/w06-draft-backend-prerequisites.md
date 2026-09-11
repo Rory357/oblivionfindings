@@ -1,0 +1,25 @@
+# W06 draft backend prerequisites
+
+Source follow-up, 2026-09-09. Read the complete `w06-draft-persistence-design.md` and checked the concrete canonical owners below. Root opened the W06 backend dependency gate after W05 core contracts stabilized. The proposed 14-day IT draft retention is awaiting the user's decision. The disabled backend foundation and unapplied migration000007 are now being implemented; persistence remains disabled and no browser database schema or runtime configuration was changed.
+
+## Confirmed extension points
+
+- `app/Services/Incidents/IncidentReportDraftService.php` is the existing encryption/revision/HMAC precedent, not a reusable IT authorization service. Its retention is a hardcoded 14 days, it deletes on discard and allows expired identities to save again. Do not copy those lifecycle assumptions into IT. `IncidentReportDraft` uses `encrypted:array` and hides ciphertext/hash; its controller uses no-store on successful read/save. IT must also ensure no-store on conflict/denial and explicitly allow-list nested partial fields rather than treating a validated parent array as an arbitrary storage bag.
+- `ItTicketIntakeService::createCommand` locks User then actor/channel/operation/request UUID receipt; its receipt/replay remains the authority for uncertain submission. An intake draft must bind to that existing request UUID without inventing a second submission identity or overriding W02's reference-only uncertain recovery.
+- Existing-ticket `ItTicketTriageService` and resolve/reopen interaction writes lock Ticket then reload/lock current User through `ItTicketVersionService`. Proposed draft save/discard/consume for those contexts must follow Ticket → current User → draft → staged files consistently. Public comment currently locks Ticket but has no idempotent committed-comment receipt; W07 must integrate actual acknowledgement and consumption before a composer draft is cleared.
+- `ItAttachmentStorageService::store` currently accepts `ItTicket|ItTicketComment`; `ItTicketController::downloadAttachment` recognizes those same parents and fails closed otherwise. Durable draft files must extend these canonical parent/storage/download boundaries together. `deleteStored` currently ignores false deletion results; draft expiry/discard needs explicit tracked cleanup/retry, not a success claim. Scanner/quarantine completion remains W07.
+- `config/it.php` has no draft settings. A future `drafts.enabled=false` plus an unset required retention value can keep both runtime storage and prune work inert until an explicit policy is recorded. Isolated tests may set explicit fixture values. Do not change the live environment or silently take the incident module's 14 days as IT policy.
+
+## Context reuse must be explicit before migration
+
+The design requires uniqueness across actor + operation + non-null context key + audience, and a terminal marker that blocks delayed writes. Retaining that unique row also means a new public reply draft for the same ticket cannot simply insert another row after the previous one was sent or discarded.
+
+Root-approved technical contract: use a stable context slot and server-issued UUID generations. Initialize/check creates a slot only when absent; save never creates a missing UUID. Consumed/discarded slots scrub payload and remain terminal. A new draft for an existing terminal slot requires an explicit start-new command with the expected terminal UUID/revision, rotates to a fresh server UUID, and advances the monotonic revision. A delayed old-UUID save cannot initialize or resurrect anything, and a delayed start-new cannot rotate a newer active generation. Expiry cleanup may remove expired slots because save remains update-only; metadata initialization alone must never import an old payload. Existing intake request UUIDs remain separate from these recovery UUID generations.
+
+The unique actor/purpose/non-null-context/audience slot uses no nullable unique columns. Approval of this technical generation contract does not approve an organisational retention or cleanup policy.
+
+## Bounded proposed backend ownership after the gate
+
+Own the IT draft model/service/controller/requests, exact six purpose contracts (requester intake, technician intake, public reply, internal note, ticket edit, public resolution), feature-disabled configuration, migration, and isolated permission/encryption/revision/terminal/concurrency tests. Coordinate intake/interaction transaction integration with the canonical owners; coordinate UI prompt/autosave/drawer handoff with the frontend owner. Do not broaden doc-only roles into ticket draft access. Public/internal contexts remain independently authorized; old binding checks precede a scope change or removal of selected references.
+
+Before runtime enablement: record retention and terminal/cleanup ownership, exercise expired-file cleanup failure/retry, verify same-actor session recovery and other-actor concealment, and complete actual desktop browser Back/Forward/drawer/file/unknown-command journeys. This note does not mark any W06 criterion Implemented or Verified.

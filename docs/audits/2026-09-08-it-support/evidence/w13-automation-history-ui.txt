@@ -1,0 +1,402 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/it-automation-history.test.tsx (4 tests | 1 failed) 730ms
+     × pages using the server URL and keeps unavailable evidence distinct from an empty history 79ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/it-automation-history.test.tsx > automation run history > pages using the server URL and keeps unavailable evidence distinct from an empty history
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Next page"
+
+Here are the accessible roles:
+
+  region:
+
+  Name "Automation run history":
+  <section
+    aria-label="Automation run history"
+    class="border-t border-border p-5"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Automation run history":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="text-subtle"
+  />
+
+  Name "":
+  <p
+    class="text-caption"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "AutomationOutcomeStartedExecution finishedActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 2fr 1.5fr 1.4fr 1.4fr 32px;"
+  />
+
+  Name "Poll support mailboxRun 26Mailbox scan pendingFri 11 Sept, 1:00 pmFri 11 Sept, 1:01 pm":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 2fr 1.5fr 1.4fr 1.4fr 32px;"
+    tabindex="0"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Automation":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Outcome":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Started":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Execution finished":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Poll support mailboxRun 26":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Mailbox scan pending":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Fri 11 Sept, 1:00 pm":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Fri 11 Sept, 1:01 pm":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Actions for Poll support mailbox":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Poll support mailbox"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_f_"
+    type="button"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <section
+      aria-label="Automation run history"
+      class="border-t border-border p-5"
+    >
+      <div
+        class="space-y-5"
+      >
+        <div
+          class="flex flex-wrap items-center justify-between gap-3"
+        >
+          <div
+            class="flex min-w-0 items-baseline gap-2.5"
+          >
+            <h2
+              class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+            >
+              Automation run history
+            </h2>
+            <span
+              class="text-caption shrink-0"
+            >
+              1 of 26 executions shown · page 1 of 2
+            </span>
+          </div>
+        </div>
+        <p
+          class="text-subtle"
+        >
+          Each row is one execution. A finished mailbox batch can still leave a scan pending. 
+          1
+           executions have no completed outcome; this does not prove that a worker is active.
+        </p>
+        <p
+          class="text-caption"
+        >
+          Oldest unfinished execution:
+           
+          Thu 10 Sept, 2:00 pm
+           · Checked
+           
+          Fri 11 Sept, 2:00 pm
+        </p>
+        <div
+          class="bg-card text-card-foreground flex flex-col border shadow-sm gap-0 overflow-hidden rounded-[14px] py-0"
+          data-slot="card"
+        >
+          <div
+            class="scrollbar-pretty overflow-x-auto"
+          >
+            <div
+              role="table"
+              style="min-width: 900px;"
+            >
+              <div
+                class="grid h-8 items-center border-b border-border bg-muted/60"
+                role="row"
+                style="grid-template-columns: 2fr 1.5fr 1.4fr 1.4fr 32px;"
+              >
+                <span
+                  class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+                  role="columnheader"
+                >
+                  Automation
+                </span>
+                <span
+                  class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+                  role="columnheader"
+                >
+                  Outcome
+                </span>
+                <span
+                  class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+                  role="columnheader"
+                >
+                  Started
+                </span>
+                <span
+                  class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+                  role="columnheader"
+                >
+                  Execution finished
+                </span>
+                <span
+                  aria-label="Actions"
+                  role="columnheader"
+                />
+              </div>
+              <div
+                class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+                role="row"
+                style="grid-template-columns: 2fr 1.5fr 1.4fr 1.4fr 32px;"
+                tabindex="0"
+              >
+                <span
+                  class="flex min-w-0 items-center gap-2.5 px-3"
+                  role="cell"
+                >
+                  <span
+                    class="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[8px] bg-primary/15 text-primary"
+                  >
+                    <svg
+                      class="lucide lucide-activity size-4"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"
+                      />
+                    </svg>
+                  </span>
+                  <span
+                    class="min-w-0"
+                  >
+                    <span
+                      class="flex items-center gap-1.5"
+                    >
+                      <span
+                        class="truncate text-[13px] font-semibold text-foreground"
+                      >
+                        Poll support mailbox
+                      </span>
+                    </span>
+                    <span
+                      class="block truncate text-[11.5px] text-muted-foreground"
+                    >
+                      <span
+                        id="it-automation-run-26"
+                      >
+                        Run 
+                        26
+                      </span>
+                    </span>
+                  </span>
+                </span>
+                <span
+                  class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+                  role="cell"
+                >
+                  <span
+                    class="inline-flex items-center gap-1 border px-2.5 py-0.5 text-xs bg-status-warning-bg text-status-warning border-status-warning/30 rounded-[8px] font-semibold"
+                  >
+                    Mailbox scan pending
+                  </span>
+                </span>
+                <span
+                  class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+                  role="cell"
+                >
+                  <span
+                    class="inline-flex h-[22px] items-center gap-1 rounded-[8px] px-2 text-[11.5px] font-medium text-muted-foreground bg-muted"
+                  >
+                    Fri 11 Sept, 1:00 pm
+                  </span>
+                </span>
+                <span
+                  class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+                  role="cell"
+                >
+                  <span
+                    class="inline-flex h-[22px] items-center gap-1 rounded-[8px] px-2 text-[11.5px] font-medium text-muted-foreground bg-muted"
+                  >
+                    Fri 11 Sept, 1:01 pm
+                  </span>
+                </span>
+                <span
+                  class="flex items-center justify-end pr-1.5"
+                  role="cell"
+                >
+                  <div>
+                    <button
+                      aria-expanded="false"
+                      aria-haspopup="menu"
+                      aria-label="Actions for Poll support mailbox"
+                      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                      data-slot="dropdown-menu-trigger"
+                      data-state="closed"
+                      id="radix-_r_f_"
+                      type="button"
+                    >
+                      <svg
+                        class="lucide lucide-ellipsis-vertical size-4"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="1"
+                        />
+                        <circle
+                          cx="12"
+                          cy="5"
+                          r="1"
+                        />
+                        <circle
+                          cx="12"
+                          cy="19"
+                          r="1"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/it/it-automation-history.test.tsx:140:32
+    138|             <ItAutomationHistory health={health} viewerId={7} />,
+    139|         );
+    140|         fireEvent.click(screen.getByRole('button', { name: 'Next page'…
+       |                                ^
+    141|         expect(router.get).toHaveBeenCalledWith(
+    142|             health.links[1].url,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 34 passed (35)
+   Start at  19:38:00
+   Duration  6.78s (transform 618ms, setup 739ms, import 7.98s, tests 3.27s, environment 6.01s)
+

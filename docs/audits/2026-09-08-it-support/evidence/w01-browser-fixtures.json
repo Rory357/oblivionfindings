@@ -1,0 +1,274 @@
+{
+    "prefix": "IT Support W01 20260909",
+    "created": true,
+    "existing_records_modified": false,
+    "reference_allocator_used": true,
+    "notifications_sent": false,
+    "sites": {
+        "a": {
+            "id": 9403,
+            "name": "IT Support W01 20260909 Site A"
+        },
+        "b": {
+            "id": 9404,
+            "name": "IT Support W01 20260909 Site B"
+        },
+        "c": {
+            "id": 9405,
+            "name": "IT Support W01 20260909 Site C"
+        }
+    },
+    "users": {
+        "tech": {
+            "id": 230,
+            "name": "IT Support W01 20260909 Restricted technician",
+            "approved_site_ids": [
+                9403,
+                9404
+            ],
+            "can_request": true,
+            "can_view": true,
+            "can_manage": true,
+            "can_sensitive": false,
+            "can_organisation_wide": false
+        },
+        "requester": {
+            "id": 231,
+            "name": "IT Support W01 20260909 Requester",
+            "approved_site_ids": [
+                9403,
+                9404
+            ],
+            "can_request": true,
+            "can_view": false,
+            "can_manage": false,
+            "can_sensitive": false,
+            "can_organisation_wide": false
+        },
+        "other": {
+            "id": 232,
+            "name": "IT Support W01 20260909 Other requester",
+            "approved_site_ids": [
+                9403,
+                9405
+            ],
+            "can_request": true,
+            "can_view": false,
+            "can_manage": false,
+            "can_sensitive": false,
+            "can_organisation_wide": false
+        }
+    },
+    "tickets": {
+        "requester_own": {
+            "id": 9,
+            "reference": "IT-000009",
+            "title": "IT Support W01 20260909 \u2014 Requester own request",
+            "site_id": 9403,
+            "requester_id": 231,
+            "requested_for_id": null,
+            "technician_can_view": true,
+            "technician_can_work": true,
+            "requester_can_view": true,
+            "comments": [
+                {
+                    "id": 8,
+                    "internal": false,
+                    "attachments": [
+                        {
+                            "id": 1,
+                            "download_path": "/it/attachments/1",
+                            "stored": true
+                        }
+                    ]
+                },
+                {
+                    "id": 9,
+                    "internal": true,
+                    "attachments": [
+                        {
+                            "id": 2,
+                            "download_path": "/it/attachments/2",
+                            "stored": true
+                        }
+                    ]
+                }
+            ]
+        },
+        "requester_other_same_site": {
+            "id": 10,
+            "reference": "IT-000010",
+            "title": "IT Support W01 20260909 \u2014 Other requester at approved site",
+            "site_id": 9403,
+            "requester_id": 232,
+            "requested_for_id": null,
+            "technician_can_view": true,
+            "technician_can_work": true,
+            "requester_can_view": false,
+            "comments": [
+                {
+                    "id": 10,
+                    "internal": false,
+                    "attachments": [
+                        {
+                            "id": 3,
+                            "download_path": "/it/attachments/3",
+                            "stored": true
+                        }
+                    ]
+                },
+                {
+                    "id": 11,
+                    "internal": true,
+                    "attachments": [
+                        {
+                            "id": 4,
+                            "download_path": "/it/attachments/4",
+                            "stored": true
+                        }
+                    ]
+                }
+            ]
+        },
+        "restricted_other_site": {
+            "id": 11,
+            "reference": "IT-000011",
+            "title": "IT Support W01 20260909 \u2014 Other requester at unapproved site",
+            "site_id": 9405,
+            "requester_id": 232,
+            "requested_for_id": null,
+            "technician_can_view": false,
+            "technician_can_work": false,
+            "requester_can_view": false,
+            "comments": [
+                {
+                    "id": 12,
+                    "internal": false,
+                    "attachments": [
+                        {
+                            "id": 5,
+                            "download_path": "/it/attachments/5",
+                            "stored": true
+                        }
+                    ]
+                },
+                {
+                    "id": 13,
+                    "internal": true,
+                    "attachments": [
+                        {
+                            "id": 6,
+                            "download_path": "/it/attachments/6",
+                            "stored": true
+                        }
+                    ]
+                }
+            ]
+        },
+        "technician_participant_sensitive": {
+            "id": 12,
+            "reference": "IT-000012",
+            "title": "IT Support W01 20260909 \u2014 Technician participating in sensitive work",
+            "site_id": 9403,
+            "requester_id": 230,
+            "requested_for_id": null,
+            "technician_can_view": true,
+            "technician_can_work": false,
+            "requester_can_view": false,
+            "comments": [
+                {
+                    "id": 14,
+                    "internal": false,
+                    "attachments": [
+                        {
+                            "id": 7,
+                            "download_path": "/it/attachments/7",
+                            "stored": true
+                        }
+                    ]
+                },
+                {
+                    "id": 15,
+                    "internal": true,
+                    "attachments": [
+                        {
+                            "id": 8,
+                            "download_path": "/it/attachments/8",
+                            "stored": true
+                        }
+                    ]
+                }
+            ]
+        },
+        "technician_participant_unapproved": {
+            "id": 13,
+            "reference": "IT-000013",
+            "title": "IT Support W01 20260909 \u2014 Technician requested-for at unapproved site",
+            "site_id": 9405,
+            "requester_id": 232,
+            "requested_for_id": 230,
+            "technician_can_view": true,
+            "technician_can_work": false,
+            "requester_can_view": false,
+            "comments": [
+                {
+                    "id": 16,
+                    "internal": false,
+                    "attachments": [
+                        {
+                            "id": 9,
+                            "download_path": "/it/attachments/9",
+                            "stored": true
+                        }
+                    ]
+                },
+                {
+                    "id": 17,
+                    "internal": true,
+                    "attachments": [
+                        {
+                            "id": 10,
+                            "download_path": "/it/attachments/10",
+                            "stored": true
+                        }
+                    ]
+                }
+            ]
+        },
+        "technician_work_allowed": {
+            "id": 14,
+            "reference": "IT-000014",
+            "title": "IT Support W01 20260909 \u2014 Permitted technician work at second site",
+            "site_id": 9404,
+            "requester_id": 231,
+            "requested_for_id": null,
+            "technician_can_view": true,
+            "technician_can_work": true,
+            "requester_can_view": true,
+            "comments": [
+                {
+                    "id": 18,
+                    "internal": false,
+                    "attachments": [
+                        {
+                            "id": 11,
+                            "download_path": "/it/attachments/11",
+                            "stored": true
+                        }
+                    ]
+                },
+                {
+                    "id": 19,
+                    "internal": true,
+                    "attachments": [
+                        {
+                            "id": 12,
+                            "download_path": "/it/attachments/12",
+                            "stored": true
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

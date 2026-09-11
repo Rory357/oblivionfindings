@@ -1,0 +1,30 @@
+{
+  "sources": [
+    {
+      "path": "app/Listeners/It/RecordItEmailDelivery.php",
+      "sha256": "f380acf5ef1571709b6dce39a3ca7890b8523fea4ab45cb36d693fef7f9fa8d2"
+    },
+    {
+      "path": "app/Providers/EventServiceProvider.php",
+      "sha256": "f42e422d53f73857dfc1b84fe6e97a606cf89dc7d365da266b36ad79f746079e"
+    },
+    {
+      "path": "app/Mail/MicrosoftGraphTransport.php",
+      "sha256": "2529d3c04a0324c6088051ccfcc9ecc763e980602c438fd5c506e2d3d9649e0f"
+    },
+    {
+      "path": "app/Services/MicrosoftGraphService.php",
+      "sha256": "f05a85fc6a79e18e04c36bf849f3960609378cf606002b894ed062df35c72969"
+    },
+    {
+      "path": "tests/Feature/It/ItTicketNotificationOutboxTest.php",
+      "sha256": "c2bade77e7f3fb10c967940b0cb5875ad7c0af85bfceb3616b27327a99c58506"
+    },
+    {
+      "path": "tests/Feature/It/ItOutboundLoopTransportTest.php",
+      "sha256": "3af8c2a6732817e31bc2da706955cff52c0fbe9775175debb7768092a6eedba6"
+    }
+  ],
+  "protected_evidence": "w11-loop-protected-hashes.json",
+  "checked_at": "2026-09-11T09:43:03.1790045+12:00"
+}

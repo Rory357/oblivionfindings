@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
 use App\Models\User;
+use App\Services\SsoConfigurationService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
@@ -72,8 +73,10 @@ class ProfileController extends Controller
                 'passwordChangedAt' => $this->serializeDateTime(data_get($user, 'password_changed_at')),
                 'roles' => $roleLabels,
                 'twoFactorEnabled' => $user->two_factor_confirmed_at !== null,
-                'microsoftLinked' => false,
-                'googleLinked' => false,
+                'microsoftLinked' => $user->identities()->where('provider', 'microsoft')->exists(),
+                'googleLinked' => $user->identities()->where('provider', 'google')->exists(),
+                'ssoLinkPrefix' => $user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true) ? '/portal' : '',
+                'ssoAvailable' => app(SsoConfigurationService::class)->availability($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true) ? 'portal' : 'staff'),
                 'profilePhotoPath' => $user->profile_photo_path,
             ],
         ]);
@@ -99,6 +102,7 @@ class ProfileController extends Controller
                 function (string $attribute, mixed $value, \Closure $fail) use ($user, $allowedKeys) {
                     if (! in_array($value, $allowedKeys, true)) {
                         $fail('That landing page is no longer available.');
+
                         return;
                     }
                     // Confirm the user has a role that offers this landing.
@@ -219,8 +223,6 @@ class ProfileController extends Controller
         return $query->first();
     }
 
-
-
     /**
      * Update the user's profile photo.
      */
@@ -269,7 +271,7 @@ class ProfileController extends Controller
         try {
             $data = file_get_contents($file->getRealPath());
             $src = @imagecreatefromstring($data);
-            if (!$src) {
+            if (! $src) {
                 throw new \RuntimeException('Unable to read image');
             }
 
@@ -280,7 +282,7 @@ class ProfileController extends Controller
             $y = (int) floor(($h - $size) / 2);
 
             $crop = imagecrop($src, ['x' => $x, 'y' => $y, 'width' => $size, 'height' => $size]);
-            if (!$crop) {
+            if (! $crop) {
                 $crop = $src;
             }
 
@@ -301,7 +303,7 @@ class ProfileController extends Controller
             }
             imagedestroy($src);
 
-            $filename = trim($dir, '/') . '/' . Str::uuid()->toString() . '.jpg';
+            $filename = trim($dir, '/').'/'.Str::uuid()->toString().'.jpg';
             Storage::disk('public')->put($filename, $jpg);
 
             return $filename;

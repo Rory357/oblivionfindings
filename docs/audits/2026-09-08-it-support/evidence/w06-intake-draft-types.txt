@@ -1,0 +1,10 @@
+resources/js/components/it/ticket-intake-draft.tsx(110,22): error TS2741: Property 'icon' is missing in type '{ children: (Element | Element[])[]; title: string; }' but required in type '{ icon: ComponentType<{ className?: string | undefined; }>; title: string; onEdit?: (() => void) | undefined; span?: boolean | undefined; children: ReactNode; }'.
+resources/js/hooks/use-it-ticket-page-leave.test.tsx(88,58): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/pages/it/index.tsx(835,9): error TS2322: Type 'number | null' is not assignable to type 'number | undefined'.
+  Type 'null' is not assignable to type 'number | undefined'.
+resources/js/pages/it/tickets/show.tsx(275,9): error TS2322: Type 'number | null' is not assignable to type 'number | undefined'.
+  Type 'null' is not assignable to type 'number | undefined'.

@@ -2,11 +2,11 @@
 
 namespace App\Domain\It\Services;
 
-use App\Domain\It\ItStaffDirectory;
 use App\Models\ItKbArticle;
 use App\Models\User;
 use App\Services\AuditLogger;
 use DomainException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +20,7 @@ final class ItKbLifecycleService
 {
     public function __construct(
         private readonly ItWorkAccessService $workAccess,
+        private readonly ItKbAccessService $knowledgeAccess,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -64,6 +65,10 @@ final class ItKbLifecycleService
         return DB::transaction(function () use ($article, $actor, $data): ItKbArticle {
             $locked = $this->lockArticle($article);
             $this->guardActor($actor);
+            $this->guardArticle($locked, $actor);
+            if ($locked->status !== 'draft') {
+                throw new DomainException('Return this article to draft before editing its content.');
+            }
             $data = $this->normaliseOptions($locked, $actor, $data);
             $locked->fill(Arr::except($data, ['status', 'slug']));
             $changedFields = array_keys($locked->getDirty());
@@ -107,6 +112,7 @@ final class ItKbLifecycleService
         DB::transaction(function () use ($article, $actor, $reason): void {
             $locked = $this->lockArticle($article);
             $this->guardActor($actor);
+            $this->guardArticle($locked, $actor);
 
             if ($locked->status === 'in_review') {
                 throw new DomainException('Return this article to draft before deleting it.');
@@ -195,7 +201,8 @@ final class ItKbLifecycleService
     ): ItKbArticle {
         return DB::transaction(function () use ($article, $actor, $to, $reason): ItKbArticle {
             $locked = $this->lockArticle($article);
-            $this->guardActor($actor);
+            $this->guardActor($actor, in_array($to, ['published', 'retired'], true) ? ItKbAccessService::REVIEW : ItKbAccessService::AUTHOR);
+            $this->guardArticle($locked, $actor);
             $from = (string) $locked->status;
             if ($to === 'retired') {
                 $locked->retirement_reason = trim((string) $reason);
@@ -260,29 +267,23 @@ final class ItKbLifecycleService
         return ItKbArticle::query()->lockForUpdate()->findOrFail($article->getKey());
     }
 
-    private function guardActor(User $actor): void
+    private function guardActor(User $actor, string $capability = ItKbAccessService::AUTHOR): void
     {
-        if ($actor->approved_at === null || ! $actor->canDo('it.manage')) {
-            throw new DomainException('You are not allowed to manage this knowledge article.');
+        if ($actor->approved_at === null || ! $actor->canDo($capability)) {
+            throw new AuthorizationException('You do not have the required knowledge capability for this action.');
         }
     }
 
     private function guardPublishedVisible(ItKbArticle $article, User $actor): void
     {
-        $hasEntryPermission = $actor->canDo('it.request')
-            || $actor->canDo('it.view')
-            || $actor->canDo('it.manage');
-        $visible = match ($article->audience) {
-            'all_staff' => $hasEntryPermission,
-            'it_agents' => $actor->canDo('it.view') || $actor->canDo('it.manage'),
-            'specific_sites' => $hasEntryPermission && array_intersect(
-                array_map('intval', $article->site_scope ?? []),
-                $this->workAccess->approvedSiteIds($actor),
-            ) !== [],
-            default => false,
-        };
+        if (! $this->knowledgeAccess->canReadPublished($actor, $article)) {
+            throw (new ModelNotFoundException)->setModel(ItKbArticle::class, [$article->id]);
+        }
+    }
 
-        if ($article->status !== 'published' || ! $visible) {
+    private function guardArticle(ItKbArticle $article, User $actor): void
+    {
+        if (! $this->knowledgeAccess->canManage($actor, $article)) {
             throw (new ModelNotFoundException)->setModel(ItKbArticle::class, [$article->id]);
         }
     }
@@ -306,9 +307,9 @@ final class ItKbLifecycleService
         }
 
         $ownerId = (int) ($data['owner_user_id'] ?? $article?->owner_user_id ?? $actor->id);
-        $owner = ItStaffDirectory::agents()->firstWhere('id', $ownerId);
+        $owner = $this->knowledgeAccess->owners()->firstWhere('id', $ownerId);
         if (! $owner instanceof User) {
-            throw new DomainException('Choose an active IT article owner.');
+            throw new DomainException('Choose an active knowledge author or reviewer as the article owner.');
         }
         if ($siteIds !== []
             && ! $owner->canDo('it.organisationWide')

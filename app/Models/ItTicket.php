@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Domain\It\Services\ItSlaClockService;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Services\References\ReferenceNumberGenerator;
 use App\Support\It\BusinessHours;
+use Carbon\CarbonInterface;
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * A helpdesk ticket, raised self-service by any staff member (source
@@ -55,10 +59,12 @@ class ItTicket extends Model
 
     public const URGENCIES = ['low', 'normal', 'high', 'critical'];
 
-    public const SLA_STATES = ['ok', 'at_risk', 'breached', 'met'];
+    public const SLA_STATES = ['ok', 'at_risk', 'breached', 'met', 'paused', 'unmeasured'];
 
     /** Statuses that count as "open" for queues, badges and saved views. */
     public const OPEN_STATUSES = ['open', 'in_progress', 'waiting'];
+
+    protected $attributes = ['lock_version' => 1];
 
     protected $fillable = [
         'reference',
@@ -85,6 +91,9 @@ class ItTicket extends Model
         'priority',
         'impact',
         'urgency',
+        'priority_decision',
+        'routing_decision',
+        'routing_override',
         'is_sensitive',
         'status',
         'status_reason',
@@ -96,12 +105,19 @@ class ItTicket extends Model
         'resolution_due_at',
         'due_at',
         'first_responded_at',
+        'next_response_party',
+        'sla_original_policy_snapshot',
+        'sla_policy_snapshot',
+        'first_response_breached_at',
+        'resolution_breached_at',
+        'sla_checked_at',
         'sla_state',
         'sla_paused_minutes',
         'waiting_since',
         'resolved_at',
         'resolution_code',
         'resolution_summary',
+        'resolution_verification',
         'monitoring_recovered_at',
         'closed_at',
         'reopened_count',
@@ -111,9 +127,20 @@ class ItTicket extends Model
     ];
 
     protected $casts = [
+        'lock_version' => 'integer',
+        'priority_decision' => 'array',
+        'routing_decision' => 'array',
+        'routing_override' => 'array',
         'first_response_due_at' => 'datetime',
         'resolution_due_at' => 'datetime',
         'first_responded_at' => 'datetime',
+        'last_public_comment_id' => 'integer',
+        'last_public_commented_at' => 'datetime',
+        'sla_original_policy_snapshot' => 'array',
+        'sla_policy_snapshot' => 'array',
+        'first_response_breached_at' => 'datetime',
+        'resolution_breached_at' => 'datetime',
+        'sla_checked_at' => 'datetime',
         'waiting_since' => 'datetime',
         'resolved_at' => 'datetime',
         'monitoring_recovered_at' => 'datetime',
@@ -143,6 +170,43 @@ class ItTicket extends Model
                 $ticket->reference = static::nextReference();
             }
         });
+    }
+
+    /**
+     * Allocate versions from the locked persisted row, never an older model
+     * instance. Canonical services own intent checks and lifecycle decisions;
+     * this narrow wrapper keeps every Eloquent ticket write monotonic while
+     * retaining Laravel's update events, dirty fields and audit behaviour.
+     * Ticket mutations must use the model, not mass query-builder updates.
+     */
+    protected function performUpdate(Builder $query)
+    {
+        return $this->getConnection()->transaction(function () use ($query): bool {
+            $current = $this->setKeysForSaveQuery(clone $query)
+                ->lockForUpdate()->firstOrFail(['lock_version']);
+            $previousVersion = $this->lock_version;
+            $this->lock_version = (int) $current->lock_version + 1;
+            $saved = parent::performUpdate($query);
+            if (! $saved) {
+                $this->lock_version = $previousVersion;
+            }
+
+            return $saved;
+        });
+    }
+
+    /** Conversation responsibility is independent of the first-response SLA clock. */
+    public function scopeAwaitingIt(Builder $query): Builder
+    {
+        return $query->whereIn($this->qualifyColumn('status'), self::OPEN_STATUSES)
+            ->whereNull($this->qualifyColumn('merged_into_ticket_id'))
+            ->where($this->qualifyColumn('next_response_party'), 'it');
+    }
+
+    /** Preserve existing pages while an additive schema change is pending. */
+    public static function hasConversationEvidence(): bool
+    {
+        return Schema::hasColumn((new static)->getTable(), 'next_response_party');
     }
 
     /** Allocate the next globally serialized application reference. */
@@ -277,7 +341,7 @@ class ItTicket extends Model
      */
     public function approvalState(): ?string
     {
-        return $this->approvals()->value('status');
+        return $this->approvals()->first()?->effectiveStatus();
     }
 
     public function comments(): HasMany
@@ -356,16 +420,44 @@ class ItTicket extends Model
      */
     public function stampSlaDueDates(): void
     {
-        [$firstResponseMinutes, $resolutionMinutes] = ItSlaPolicy::minutesFor((string) $this->priority);
-
-        $calendar = ItSlaPolicy::calendarFor((string) $this->priority);
-        $anchor = $this->created_at ?? now();
-
-        // Working-time targets when the application has a business-hours calendar;
-        // a null calendar keeps the continuous 24/7 clock (unchanged). ->utc()
-        // so a worker-timezone result stores as the correct instant.
-        $this->first_response_due_at = BusinessHours::addWorkingMinutes($anchor, $firstResponseMinutes, $calendar)->utc();
-        $this->resolution_due_at = BusinessHours::addWorkingMinutes($anchor, $resolutionMinutes, $calendar)->utc();
+        $clock = app(ItSlaClockService::class);
+        $at = now();
+        $previous = $this->sla_policy_snapshot;
+        $hadClocks = $this->first_response_due_at !== null || $this->resolution_due_at !== null;
+        $initialStamp = ! $this->exists || ($this->wasRecentlyCreated && ! $hadClocks);
+        $clock->synchronize($this, $at);
+        if (! $initialStamp && $this->waiting_since !== null) {
+            $this->checkpointSlaPause($at);
+        }
+        $policy = ItSlaPolicy::query()->where('priority', (string) $this->priority)->first();
+        $snapshot = $clock->policySnapshot((string) $this->priority, $policy, $at);
+        if (($this->sla_policy_snapshot['pause_unit'] ?? null) === 'legacy_unknown'
+            || (! $initialStamp && $previous === null && ((int) $this->sla_paused_minutes > 0 || $this->waiting_since !== null))) {
+            $snapshot['pause_unit'] = 'legacy_unknown';
+        }
+        if ($initialStamp && $this->sla_original_policy_snapshot === null) {
+            $this->sla_original_policy_snapshot = $snapshot;
+        }
+        $this->sla_policy_snapshot = $snapshot;
+        $anchor = $this->created_at ?? $at;
+        if ($initialStamp || $this->first_response_due_at !== null) {
+            $this->first_response_due_at = BusinessHours::addWorkingMinutes($anchor, $snapshot['first_response_minutes'], $snapshot['calendar'])->utc();
+        }
+        if ($initialStamp || $this->resolution_due_at !== null) {
+            $this->resolution_due_at = BusinessHours::addWorkingMinutes($anchor, $snapshot['resolution_minutes'], $snapshot['calendar'])->utc();
+        }
+        $clock->synchronize($this, $at);
+        if (! $initialStamp && $this->exists) {
+            ItTicketEvent::record($this, 'sla_policy_changed', auth()->id(), [
+                'previous_policy' => $previous,
+                'policy' => $snapshot,
+                'original_policy_recorded' => $this->sla_original_policy_snapshot !== null,
+                'first_response_due_at' => $this->first_response_due_at?->toIso8601String(),
+                'resolution_due_at' => $this->resolution_due_at?->toIso8601String(),
+                'banked_pause_minutes' => (int) $this->sla_paused_minutes,
+                'pause_checkpoint_at' => $this->waiting_since?->toIso8601String(),
+            ]);
+        }
     }
 
     /* ------------------------------------------------------------------ */
@@ -378,8 +470,10 @@ class ItTicket extends Model
      */
     public function startWaiting(): void
     {
+        app(ItSlaClockService::class)->synchronize($this, now());
         $this->status = 'waiting';
         $this->waiting_since = $this->waiting_since ?? now();
+        app(ItSlaClockService::class)->synchronize($this, now());
     }
 
     /**
@@ -390,11 +484,29 @@ class ItTicket extends Model
     public function stopWaiting(string $nextStatus = 'in_progress'): void
     {
         if ($this->waiting_since) {
-            $this->sla_paused_minutes = (int) $this->sla_paused_minutes
-                + (int) $this->waiting_since->diffInMinutes(now());
+            app(ItSlaClockService::class)->synchronize($this, now());
+            $this->checkpointSlaPause(now());
             $this->waiting_since = null;
         }
         $this->status = $nextStatus;
+        app(ItSlaClockService::class)->synchronize($this, now());
+    }
+
+    /** Preserve elapsed working time before a resume or an explicit policy change. */
+    private function checkpointSlaPause(CarbonInterface $at): void
+    {
+        $snapshot = $this->sla_policy_snapshot;
+        try {
+            if (($snapshot['pause_unit'] ?? null) !== 'business_minutes') {
+                throw new DomainException('The previous pause calendar is not recorded.');
+            }
+            $this->sla_paused_minutes = (int) $this->sla_paused_minutes
+                + BusinessHours::workingMinutesBetween($this->waiting_since, $at, $snapshot['calendar'] ?? null);
+        } catch (DomainException) {
+            // An unmeasured pause must not trap work in waiting or invent a conversion.
+            $this->sla_policy_snapshot = [...($snapshot ?? []), 'pause_unit' => 'legacy_unknown'];
+        }
+        $this->waiting_since = $at;
     }
 
     /* ------------------------------------------------------------------ */

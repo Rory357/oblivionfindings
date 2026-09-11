@@ -2,6 +2,15 @@
 
 return [
 
+    // Runtime persistence remains off until the organisation explicitly sets
+    // content retention and bounded terminal-metadata retention. Tests supply
+    // isolated fixture values; the incident module's policy is not inherited.
+    'drafts' => [
+        'enabled' => env('IT_DRAFTS_ENABLED', false),
+        'retention_days' => env('IT_DRAFT_RETENTION_DAYS'),
+        'terminal_retention_days' => env('IT_DRAFT_TERMINAL_RETENTION_DAYS'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Ticket approval categories
@@ -32,6 +41,13 @@ return [
 
     'inbound_mail' => [
         'secret' => env('IT_INBOUND_MAIL_SECRET'),
+        // No executable is selected implicitly. An unavailable scanner blocks file ingestion.
+        'malware_scanner' => [
+            'binary' => env('IT_INBOUND_MALWARE_SCANNER_BINARY'),
+            'name' => env('IT_INBOUND_MALWARE_SCANNER_NAME', 'clamav'),
+            'fd_pass' => env('IT_INBOUND_MALWARE_SCANNER_FD_PASS', false),
+            'timeout_seconds' => env('IT_INBOUND_MALWARE_SCANNER_TIMEOUT', 30),
+        ],
     ],
 
     /* Normalised provider callback for delivered, failed, and bounced mail. */

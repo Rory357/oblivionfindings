@@ -1,0 +1,15 @@
+resources/js/hooks/it-approval-work.ts 357ms
+resources/js/hooks/use-it-approval-editor.ts 84ms
+resources/js/hooks/it-ticket-approval-contract.ts 45ms (unchanged)
+resources/js/components/it/ticket-approval-controls.tsx 48ms
+[error] resources/js/components/it/ticket-approval-record.tsx: SyntaxError: '}' expected. (42:17)
+[error]   40 |                 <ReviewRow label="Request reason" value={<span className="break-words whitespace-pre-wrap">{record.reason_evidence.request.value ?? (record.reason_evidence.request.provenance === 'legacy_unattributed' ? 'No separately attributed request reason' : 'No reason supplied')}</span>} />
+[error]   41 |                 {record.reason_evidence.legacy_reason && <ReviewRow label="Historical note · attribution unknown" value={<span className="break-words whitespace-pre-wrap">{record.reason_evidence.legacy_reason}</span>} />
+[error] > 42 |                 {record.decided_at && <><ReviewRow label="Decision by" value={record.decided_by?.name ?? 'Not recorded'} /><ReviewRow label="Decision at" value={formatDateTime(record.decided_at)} /><ReviewRow label="Decision reason" value={<span className="break-words whitespace-pre-wrap">{record.reason_evidence.decision.value ?? 'No separately attributed reason recorded'}</span>} /></>}
+[error]      |                 ^
+[error]   43 |                 {record.status === 'expired' && <p className="text-sm">{record.expired_at ? `Expiry recorded ${formatDateTime(record.expired_at)}.` : 'The deadline has passed. The expiry job has not yet recorded the transition.'} No human decision is implied.</p>}
+[error]   44 |                 {record.status === 'cancelled' && <><ReviewRow label="Cancelled at" value={record.cancelled_at ? formatDateTime(record.cancelled_at) : 'Not recorded'} /><ReviewRow label="Cancellation reason" value={<span className="break-words whitespace-pre-wrap">{record.cancellation_reason ?? 'Not recorded'}</span>} /></>}
+[error]   45 |                 {['rejected', 'expired', 'cancelled'].includes(record.status) && <p className="text-sm text-muted-foreground">Review what needs to change, then request a new approval. This request’s evidence is preserved.</p>}
+resources/js/components/it/ticket-approval-recovery.tsx 40ms
+resources/js/components/it/ticket-approval-dialog.tsx 70ms
+resources/js/pages/it/tickets/show.tsx 176ms

@@ -46,14 +46,61 @@ class IdentityDisconnectTest extends TestCase
         $this->assertSame(1, $audit->meta['deleted']);
     }
 
+    public function test_failed_required_audit_rolls_back_unlink_and_retains_pending_flow(): void
+    {
+        $user = User::factory()->create(['approved_at' => now()]);
+        $identity = $this->createIdentity($user, 'google');
+        $fail = true;
+        AuditLog::creating(function (AuditLog $audit) use (&$fail): void {
+            if ($fail && $audit->action === 'identity.disconnected') {
+                throw new \RuntimeException('Isolated identity audit failure');
+            }
+        });
+        try {
+            $this->actingAs($user)->withSession(['sso.flow' => ['provider' => 'google']])
+                ->post('/auth/google/disconnect')->assertStatus(500)
+                ->assertSessionHas('sso.flow.provider', 'google');
+        } finally {
+            $fail = false;
+        }
+        $this->assertDatabaseHas('identities', ['id' => $identity->id]);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'identity.disconnected']);
+        $this->post('/auth/google/disconnect')->assertRedirect()->assertSessionMissing('sso.flow');
+        $this->assertDatabaseMissing('identities', ['id' => $identity->id]);
+    }
+
+    public function test_unlink_only_affects_current_user_and_clears_the_pending_sign_in_flow(): void
+    {
+        $user = User::factory()->create(['approved_at' => now()]);
+        $this->createIdentity($user, 'google');
+        $other = User::factory()->create(['approved_at' => now()]);
+        $otherIdentity = Identity::create(['user_id' => $other->id, 'provider' => 'google', 'provider_user_id' => 'other-google-subject', 'email' => $other->email]);
+        $this->actingAs($user)->withSession(['sso.flow' => ['provider' => 'google'], 'oauth_link_user' => $user->id])
+            ->post('/auth/google/disconnect')->assertRedirect()
+            ->assertSessionMissing('sso.flow')->assertSessionMissing('oauth_link_user');
+        $this->assertDatabaseHas('identities', ['id' => $otherIdentity->id]);
+        $audit = AuditLog::where('action', 'identity.disconnected')->firstOrFail();
+        $this->assertStringNotContainsString('google-token', json_encode($audit->meta));
+    }
+
+    public function test_revoked_account_cannot_disconnect_using_a_stale_authenticated_user(): void
+    {
+        $user = User::factory()->create(['approved_at' => now()]);
+        $identity = $this->createIdentity($user, 'google');
+        $this->actingAs($user);
+        User::whereKey($user->id)->update(['approved_at' => null]);
+        $this->post('/auth/google/disconnect')->assertForbidden();
+        $this->assertDatabaseHas('identities', ['id' => $identity->id]);
+    }
+
     private function createIdentity(User $user, string $provider): Identity
     {
         return Identity::create([
             'user_id' => $user->id,
             'provider' => $provider,
-            'provider_user_id' => $provider . '-user',
+            'provider_user_id' => $provider.'-user',
             'email' => $user->email,
-            'access_token' => $provider . '-token',
+            'access_token' => $provider.'-token',
             'token_expires_at' => now()->addHour(),
         ]);
     }

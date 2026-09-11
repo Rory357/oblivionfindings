@@ -27,6 +27,7 @@ import {
     BookOpen,
     Briefcase,
     Building2,
+    CalendarClock,
     CalendarDays,
     Car,
     CheckCircle2,
@@ -650,7 +651,12 @@ function buildIconNavItems({
     // IT & Support — the account/access/equipment request queue fed by
     // onboarding IT tasks, plus the helpdesk. Requesters (everyone on staff)
     // see it too: they raise and track their own tickets there.
-    if (can?.it?.view || can?.it?.request) {
+    if (
+        can?.it?.view ||
+        can?.it?.request ||
+        can?.it?.knowledge_author ||
+        can?.it?.knowledge_review
+    ) {
         items.push({
             id: 'it-provisioning',
             icon: Server,
@@ -786,14 +792,37 @@ function buildIconNavItems({
 // ── Build sub-panel groups for each section ──────────────────────────────
 
 function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
-    if (!can?.it?.view && !can?.it?.request) return [];
+    if (
+        !can?.it?.view &&
+        !can?.it?.request &&
+        !can?.it?.knowledge_author &&
+        !can?.it?.knowledge_review
+    )
+        return [];
     return [
         {
             label: 'IT & Support',
             items: [
-                { title: 'Service desk', href: '/it', icon: Server },
+                ...(can?.it?.view || can?.it?.request
+                    ? [{ title: 'Service desk', href: '/it', icon: Server }]
+                    : []),
+                {
+                    title:
+                        can?.it?.view ||
+                        can?.it?.knowledge_author ||
+                        can?.it?.knowledge_review
+                            ? 'Knowledge & Documentation'
+                            : 'Guides',
+                    href: '/it/knowledge',
+                    icon: BookOpen,
+                },
                 ...(can?.it?.view
                     ? [
+                          {
+                              title: 'Work planning',
+                              href: '/it/work',
+                              icon: CalendarClock,
+                          },
                           {
                               title: 'Problems',
                               href: '/it/problems',
@@ -808,6 +837,11 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                               title: 'Major incidents',
                               href: '/it/major-incidents',
                               icon: Server,
+                          },
+                          {
+                              title: 'Reports',
+                              href: '/it/reports',
+                              icon: BarChart3,
                           },
                       ]
                     : []),

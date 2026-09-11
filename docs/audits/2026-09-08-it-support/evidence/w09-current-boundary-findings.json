@@ -1,0 +1,5 @@
+[
+    "database/migrations/2026_08_23_000210_govern_payroll_source_replay.php|new_tenant_partition_migration|1|759b6ffea819a48a",
+    "database/migrations/2026_08_23_000230_create_workforce_availability_coverage_actions.php|new_tenant_partition_migration|1|759b6ffea819a48a",
+    "tests/Feature/Monitoring/MetricRetentionTest.php|legacy_storage_read|4|d7899c8e43196339"
+]

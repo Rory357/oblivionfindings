@@ -1,0 +1,98 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/ticket-routing-dialog.test.tsx (3 tests | 2 failed) 369ms
+     × requires a reason and submits the version captured when the form opened 236ms
+     × keeps ownership choices and the explanation after a stale rejection 67ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-routing-dialog.test.tsx > ticket routing changes > requires a reason and submits the version captured when the form opened
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ resources/js/components/it/__tests__/ticket-routing-dialog.test.tsx:50:34
+     48|         );
+     49|         fireEvent.click(screen.getByRole('button', { name: 'Save routi…
+     50|         expect(patch.mock.calls[0][0]).toBe('/it/tickets/42');
+       |                                  ^
+     51|         expect(patch.mock.calls[0][1]).toEqual({
+     52|             expected_version: 7,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-routing-dialog.test.tsx > ticket routing changes > keeps ownership choices and the explanation after a stale rejection
+TypeError: Cannot read properties of undefined (reading '2')
+ ❯ resources/js/components/it/__tests__/ticket-routing-dialog.test.tsx:79:31
+     77|         fireEvent.click(screen.getByRole('button', { name: 'Save routi…
+     78|         act(() => {
+     79|             patch.mock.calls[0][2]?.onError?.({
+       |                               ^
+     80|                 expected_version:
+     81|                     'This ticket changed. Review its current routing f…
+ ❯ node_modules/@testing-library/react/dist/act-compat.js:47:24
+ ❯ process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ❯ Proxy.<anonymous> node_modules/@testing-library/react/dist/act-compat.js:46:25
+ ❯ resources/js/components/it/__tests__/ticket-routing-dialog.test.tsx:78:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 2 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+TypeError: Cannot read properties of undefined (reading 'patch')
+ ❯ submit resources/js/components/it/ticket-routing-dialog.tsx:83:9
+     81|                       routing_reason: data.routing_reason.trim(),
+     82|                   },
+     83|         ).patch(`/it/tickets/${ticket.id}`, {
+       |         ^
+     84|             preserveScroll: true,
+     85|             onSuccess: (page) => {
+ ❯ executeDispatch node_modules/react-dom/cjs/react-dom-client.development.js:19116:9
+ ❯ runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ ❯ processDispatchQueue node_modules/react-dom/cjs/react-dom-client.development.js:19166:19
+ ❯ node_modules/react-dom/cjs/react-dom-client.development.js:19767:9
+ ❯ batchedUpdates$1 node_modules/react-dom/cjs/react-dom-client.development.js:3255:40
+ ❯ dispatchEventForPluginEventSystem node_modules/react-dom/cjs/react-dom-client.development.js:19320:7
+ ❯ dispatchEvent node_modules/react-dom/cjs/react-dom-client.development.js:23585:11
+ ❯ dispatchDiscreteEvent node_modules/react-dom/cjs/react-dom-client.development.js:23553:11
+ ❯ HTMLBodyElement.callTheUserObjectsOperation node_modules/jsdom/lib/generated/idl/EventListener.js:26:30
+
+This error originated in "resources/js/components/it/__tests__/ticket-routing-dialog.test.tsx" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "requires a reason and submits the version captured when the form opened". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯ Uncaught Exception ⎯⎯⎯⎯⎯
+TypeError: Cannot read properties of undefined (reading 'patch')
+ ❯ submit resources/js/components/it/ticket-routing-dialog.tsx:83:9
+     81|                       routing_reason: data.routing_reason.trim(),
+     82|                   },
+     83|         ).patch(`/it/tickets/${ticket.id}`, {
+       |         ^
+     84|             preserveScroll: true,
+     85|             onSuccess: (page) => {
+ ❯ executeDispatch node_modules/react-dom/cjs/react-dom-client.development.js:19116:9
+ ❯ runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ ❯ processDispatchQueue node_modules/react-dom/cjs/react-dom-client.development.js:19166:19
+ ❯ node_modules/react-dom/cjs/react-dom-client.development.js:19767:9
+ ❯ batchedUpdates$1 node_modules/react-dom/cjs/react-dom-client.development.js:3255:40
+ ❯ dispatchEventForPluginEventSystem node_modules/react-dom/cjs/react-dom-client.development.js:19320:7
+ ❯ dispatchEvent node_modules/react-dom/cjs/react-dom-client.development.js:23585:11
+ ❯ dispatchDiscreteEvent node_modules/react-dom/cjs/react-dom-client.development.js:23553:11
+ ❯ HTMLBodyElement.callTheUserObjectsOperation node_modules/jsdom/lib/generated/idl/EventListener.js:26:30
+
+This error originated in "resources/js/components/it/__tests__/ticket-routing-dialog.test.tsx" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "keeps ownership choices and the explanation after a stale rejection". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 10 passed (12)
+     Errors  2 errors
+   Start at  13:34:28
+   Duration  3.10s (transform 226ms, setup 246ms, import 3.00s, tests 851ms, environment 1.64s)
+

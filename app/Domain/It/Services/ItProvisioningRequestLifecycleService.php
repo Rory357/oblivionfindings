@@ -384,8 +384,11 @@ final class ItProvisioningRequestLifecycleService
 
     private function guard(ItProvisioningRequest $request, User $actor): void
     {
-        if (! $this->access->canManage($actor, $request)) {
-            throw new DomainException('You are not allowed to manage this provisioning request.');
+        // A bulk operation or already-open form can hold an older User with
+        // loaded roles. Recheck the current actor at the locked write boundary.
+        $current = User::query()->whereKey($actor->getKey())->lockForUpdate()->first();
+        if (! $current || ! $this->access->canManage($current, $request)) {
+            throw new AuthorizationException('You are not allowed to manage this provisioning request.');
         }
     }
 

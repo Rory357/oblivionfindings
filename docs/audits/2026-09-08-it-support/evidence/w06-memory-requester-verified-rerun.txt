@@ -1,0 +1,100 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_454facc536d74784",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketRequesterOptionsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mticket requester choices preserve HR profile identity and expose only eligible approved staff user identi[39m[90m…[39m [90m184.86s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketLocalDraftTest[39m
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery proves the exact context with persistence disabled and never touches draft storage[39m[90m          [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery rejects stale browser actor identity without returning proof[39m[90m                                [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery checks old selected scopes even after replacement or clearing with (false)[39m[90m                  [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery checks old selected scopes even after replacement or clearing with (true)[39m[90m                   [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma newly selected unapproved Site is denied before a memory proof is issued[39m[90m                                  [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic participant memory does not grant internal note or technician recovery with ('internal_note')[39m[90m        [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic participant memory does not grant internal note or technician recovery with ('ticket_edit')[39m[90m          [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthorized public memory can resume without borrowing a newer ticket version[39m[90m                                [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90msettled work can recover authorized memory for review but cannot submit it[39m[90m                                  [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrevoked current ticket access denies a memory proof even for a retained service actor[39m[90m                       [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcommitted intake requires canonical receipt recovery before local memory can be adopted[39m[90m                     [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([['PRIVATE UNAP[39m[90m…[39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([[['PRIVATE UNA[39m[90m…[39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([[[], [], [], …[39m[90m…[39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([1]) #1[39m[90m         [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([1]) #2[39m[90m         [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with (['not-a-uuid'])[39m[90m [39m [90m0.86s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketDraftTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (false, 2, 3)[39m[90m               [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, null, 3)[39m[90m             [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, 2, null)[39m[90m             [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, '1.5', 3)[39m[90m            [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft metadata never hydrates private fields and explicit resume decrypts only the owner content[39m[90m            [39m [90m0.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown foreign and inaccessible draft identities disclose the same safe response[39m[90m                           [39m [90m0.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic and internal drafts stay separate and participant status never grants internal recovery[39m[90m              [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90mold Site bindings are checked before cleared fields or an accessible replacement can be saved[39m[90m               [39m [90m0.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcurrent role and account approval are rechecked despite a retained service actor[39m[90m                            [39m [90m1.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90midentical lost acknowledgement retries return the saved revision but changed stale text conflicts[39m[90m           [39m [90m0.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdiscard is revision aware idempotent and a fresh generation cannot be changed by delayed old requests[39m[90m       [39m [90m1.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90msettled workflow and changed ticket version block submission without destroying authorized text[39m[90m             [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcommitted intake receipt suspends draft changes and points only to canonical recovery[39m[90m                       [39m [90m0.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconsumption shares the canonical transaction and rollback restores the draft[39m[90m                                [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexpired private contents cannot resume or save and expiration never resets the generation silently[39m[90m          [39m [90m0.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid partial payloads never flash into session and unexpected failures return no private debug data[39m[90m      [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90munauthenticated and missing-route draft responses remain uncached JSON[39m[90m                                      [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical ticket creation consumes exactly its submitted draft and receipt replay does not repeat consumpti[39m[90m…[39m [90m0.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstale draft or rejected canonical intake leaves no new receipt ticket or scrubbed content[39m[90m                   [39m [90m0.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical edit rejects stale draft revisions then consumes only the confirmed version in its transaction[39m[90m    [39m [90m0.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfailed canonical resolution rolls back draft consumption and a valid retry resolves with its public note[39m[90m    [39m [90m0.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhub and ticket drawer advertise only effectively configured draft recovery without creating a slot with (fa[39m[90m…[39m [90m3.00s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhub and ticket drawer advertise only effectively configured draft recovery without creating a slot with (tr[39m[90m…[39m [90m2.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhub and ticket drawer advertise only effectively configured draft recovery without creating a slot with (tr[39m[90m…[39m [90m2.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcandidate authorization binds the exact local request without returning or persisting private fields[39m[90m        [39m [90m0.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcandidate validation rechecks newer unsaved Site bindings even when saved metadata remains available[39m[90m        [39m [90m0.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcandidate conflicts and terminal generations never authorize stale local recovery[39m[90m                           [39m [90m1.01s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcandidate authorization keeps the displayed base version and rejects impossible versions[39m[90m                    [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcandidate validation cannot bypass actor purpose or current internal audience authorization[39m[90m                 [39m [90m1.02s[39m  
+
+  [90mTests:[39m    [32;1m47 passed[39;22m[90m (469 assertions)[39m
+  [90mDuration:[39m [39m233.90s[39m
+
+{"exit_code":0,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_454facc536d74784",
+    "database_mutations_performed": false
+}

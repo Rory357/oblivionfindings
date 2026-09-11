@@ -1,0 +1,54 @@
+[
+  {
+    "path": "app/Domain/It/Exceptions/ItInboundHeaderException.php",
+    "sha256": "23C826439DF80D2F1D15ECE2C21817D51FCB9CCA4349C4E05F8748BE9ABE8DC5"
+  },
+  {
+    "path": "app/Domain/It/Services/ItEmailMessageIdentifiers.php",
+    "sha256": "9F9DC46A2EC4187EF1097036F95D6B77E56166A2596B393C848F7329A4074C50"
+  },
+  {
+    "path": "app/Domain/It/InboundEmailIngestor.php",
+    "sha256": "70F2229E0BEB32C4A44E79EEB78C7F3D7D75A09DF8F10F894B694CFC679CCC61"
+  },
+  {
+    "path": "app/Domain/It/ItTicketReferenceResolver.php",
+    "sha256": "A440F52EFA7828E779C918A5E74D90D939616F508FA1F6CED81866C533188924"
+  },
+  {
+    "path": "app/Models/ItInboundEmail.php",
+    "sha256": "5920125C668F39F850AA23EA675848D199429D1DCD618E8F31B626425F18D742"
+  },
+  {
+    "path": "app/Services/GoogleGmailService.php",
+    "sha256": "A9992EF6380285E1B09DFE839A965CD0C94E6F825083CF52BB2708F3DF61BA94"
+  },
+  {
+    "path": "app/Services/MicrosoftGraphService.php",
+    "sha256": "844E5A63A02CCA7FC0EF12B75DEFBF2B8A82733F0EE8CD03755C627FDDA6782B"
+  },
+  {
+    "path": "app/Http/Requests/It/IngestInboundEmailRequest.php",
+    "sha256": "43327CC6BCC914771D4B310714577B612A6FEF4186E813C983552C92D97D12E2"
+  },
+  {
+    "path": "database/migrations/2026_09_11_000017_add_it_inbound_message_identity.php",
+    "sha256": "AFB45597D62CAF233A2EA3AE447CF1E585F5AE31AB7A0480499A7E2C749D8E13"
+  },
+  {
+    "path": "tests/Unit/It/ItEmailMessageIdentifiersTest.php",
+    "sha256": "DB9DD92FE1E8E7C2BBA343A1DE8DD8592A43B6BE600676981C7E4100818632EC"
+  },
+  {
+    "path": "tests/Feature/It/ItInboundIdentityTest.php",
+    "sha256": "AA587EF719B5EDB0268C2DE20ED5DBE6DD3B9F138D8DD09C1A028581994E5285"
+  },
+  {
+    "path": "tests/Concurrency/It/ItInboundIdentityConcurrencyTest.php",
+    "sha256": "E7BD49D9E2C539C2D3F85378CAA37799D68242D98AD63ABCC95DBA5EDA54CED1"
+  },
+  {
+    "path": "tests/Support/It/inbound-identity-concurrency-worker.php",
+    "sha256": "033CD719226DE27FDD1667566D9B5FEE32E885C83D77B8431B66F2C1BD3640BA"
+  }
+]

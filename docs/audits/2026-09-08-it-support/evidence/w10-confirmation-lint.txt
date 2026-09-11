@@ -1,0 +1,6 @@
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\hooks\__tests__\use-sso-leave-confirmation.test.tsx
+  46:13  warning  Consider <Button> from @/components/ui/button. If the raw <button> is intentional (custom layout / selector card), add an inline disable comment with reason  no-restricted-syntax
+
+✖ 1 problem (0 errors, 1 warning)
+

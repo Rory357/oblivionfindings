@@ -5,6 +5,7 @@ namespace App\Http\Controllers\It;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItChangeService;
 use App\Domain\It\Services\ItLinkedContextOptions;
+use App\Domain\It\Services\ItSlaReadService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Http\Controllers\Controller;
@@ -144,7 +145,7 @@ class ItChangeController extends Controller
                     'requester' => $this->userOption($ticket->approvals->first()->requester),
                     'approver' => $this->userOption($ticket->approvals->first()->approver),
                 ] : null,
-                'sla_state' => $ticket->sla_state,
+                ...app(ItSlaReadService::class)->present($ticket),
                 'comments_count' => $ticket->comments_count,
                 'tasks_count' => $ticket->tasks_count,
                 'approvals_count' => $ticket->approvals_count,

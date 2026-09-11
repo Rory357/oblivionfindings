@@ -1,0 +1,57 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/ticket-command-wizard.test.tsx (6 tests | 4 failed) 1407ms
+     × can go back or explicitly close an uncertain result after HTTP 500 and recover on reopening 433ms
+     × can go back or explicitly close an uncertain result after HTTP 409 and recover on reopening 185ms
+     × can go back or explicitly close an uncertain result after HTTP 419 and recover on reopening 167ms
+     × stops only waiting when a busy wizard is closed, and keeps the request after going back 145ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-command-wizard.test.tsx > Ticket command exit recovery > can go back or explicitly close an uncertain result after HTTP 500 and recover on reopening
+ FAIL  resources/js/components/it/__tests__/ticket-command-wizard.test.tsx > Ticket command exit recovery > can go back or explicitly close an uncertain result after HTTP 409 and recover on reopening
+ FAIL  resources/js/components/it/__tests__/ticket-command-wizard.test.tsx > Ticket command exit recovery > can go back or explicitly close an uncertain result after HTTP 419 and recover on reopening
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ resources/js/components/it/__tests__/ticket-command-wizard.test.tsx:107:43
+    105|             expect(screen.queryByRole('alertdialog')).not.toBeInTheDoc…
+    106|             expect(screen.getByRole('dialog')).toBeVisible();
+    107|             expect(sessionStorage.length).toBe(0);
+       |                                           ^
+    108|             expect(axios.post).toHaveBeenCalledTimes(1);
+    109|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-command-wizard.test.tsx > Ticket command exit recovery > stops only waiting when a busy wizard is closed, and keeps the request after going back
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ resources/js/components/it/__tests__/ticket-command-wizard.test.tsx:177:39
+    175|             screen.getByRole('button', { name: 'Retry same request' }),
+    176|         ).toBeEnabled();
+    177|         expect(sessionStorage.length).toBe(0);
+       |                                       ^
+    178|     });
+    179|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+
+ Test Files  1 failed | 8 passed (9)
+      Tests  4 failed | 87 passed (91)
+   Start at  17:52:42
+   Duration  13.45s (transform 1.57s, setup 1.75s, import 12.75s, tests 20.98s, environment 12.51s)
+

@@ -1,0 +1,58 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItServiceIdentityCredentialService.php",
+    "sha256": "89caecc85086215b24be68a8b2a9f232cf61455f4f39247a8c0ed3c884462d86"
+  },
+  {
+    "path": "app/Domain/It/Services/ItServiceIdentityCommandService.php",
+    "sha256": "52ea6da6b58a25bd56fe66528e40cf0d1b47615331f53262556c408878461f3b"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceIdentityController.php",
+    "sha256": "92a8301c67aae2fc46a69dbab3ce68d814d5f32a35092d77bdc4b8b7de580e8f"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+    "sha256": "92f2147f954184fdba3eb5d323ffce5dea72b72c75b3937005a4cb8b273d85d8"
+  },
+  {
+    "path": "app/Http/Requests/It/StoreItServiceIdentityRequest.php",
+    "sha256": "b8cedccd3530d45fd285710564449b44a8ec5a504db9425fe44ec24ef21d7930"
+  },
+  {
+    "path": "app/Models/ItServiceIdentity.php",
+    "sha256": "3073c2d9fd39f529a62e6bea13a4e2d54c690b41b245b5589971ae6099c64fbc"
+  },
+  {
+    "path": "app/Models/ItServiceIdentityCommandReceipt.php",
+    "sha256": "efef11fed69496b3d22f2f76050dba4583611c467ec13f1a936d27276046401d"
+  },
+  {
+    "path": "database/migrations/2026_09_11_000024_add_it_service_identity_commands.php",
+    "sha256": "d6fd8dbc4f20c35c9d945d5702f27bb69e2dc5b747d4d4aef4ed9cc4694e695a"
+  },
+  {
+    "path": "routes/web.php",
+    "sha256": "ea4e70ea0ce46a9a4f125cb5570dfdff64c28bb0ba98ce411e402ac8d314ec80"
+  },
+  {
+    "path": "tests/Feature/It/ItServiceIdentityLifecycleTest.php",
+    "sha256": "fcde17e257b61c1e0764982cd30529336b2224a1a3151923a66827335363bc38"
+  },
+  {
+    "path": "tests/Feature/It/ItSecureApiTest.php",
+    "sha256": "69e9636eea9de48fee025c302f2ea8e148bf36c7b51885a5fb816d82298fba30"
+  },
+  {
+    "path": "tests/Feature/It/ItSecureApiAccessBoundaryTest.php",
+    "sha256": "941674028fd92c50322aa9c1d01a6de9f48843ab083f2726841908191852d60a"
+  },
+  {
+    "path": "app/Domain/It/Services/ItWorkAccessService.php",
+    "sha256": "a80947b24e93d66550ad033a209505d325224ffdc78278d35143d1db5ae92434"
+  },
+  {
+    "path": "app/Http/Middleware/RecordItApiRequest.php",
+    "sha256": "9f5ce639e18fe24fd40235f00dc61722f9e07744c06ef83d561a7cfdecb85e97"
+  }
+]

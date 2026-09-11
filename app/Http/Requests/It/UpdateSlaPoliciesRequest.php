@@ -3,6 +3,8 @@
 namespace App\Http\Requests\It;
 
 use App\Models\ItTicket;
+use App\Support\It\BusinessHours;
+use DomainException;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -59,6 +61,20 @@ class UpdateSlaPoliciesRequest extends FormRequest
                 && $this->filled('open_time') && $this->filled('close_time')
                 && $this->input('close_time') <= $this->input('open_time')) {
                 $validator->errors()->add('close_time', 'The close time must be after the open time.');
+            }
+            if (! $this->boolean('business_hours_enabled') || $validator->errors()->isNotEmpty()) {
+                return;
+            }
+            $calendar = [
+                'business_hours' => array_fill_keys($this->input('working_days'), [[$this->input('open_time'), $this->input('close_time')]]),
+                'holiday_dates' => $this->input('holiday_dates', []),
+            ];
+            foreach (ItTicket::PRIORITIES as $priority) {
+                try {
+                    BusinessHours::addWorkingMinutes(now(), (int) $this->input("{$priority}.resolution_minutes"), $calendar);
+                } catch (DomainException) {
+                    $validator->errors()->add("{$priority}.resolution_minutes", 'This target exceeds the calendar’s supported range. Add working time or shorten the target.');
+                }
             }
         });
     }

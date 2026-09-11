@@ -1,0 +1,15 @@
+{
+  "token": "472da947a1b04395",
+  "launch_failure": {
+    "private_exception_suppressed": true,
+    "failed_at": "2026-09-09T06:08:52.9551206Z",
+    "token": "472da947a1b04395"
+  },
+  "schema_created": {
+    "database": "oblivion_it_draft_browser_472da947a1b04395",
+    "token": "472da947a1b04395",
+    "created_at": "2026-09-09T18:07:31+12:00"
+  },
+  "server_start_record_absent": true,
+  "diagnosis_evidence": "w06-owned-browser-diagnosis.txt"
+}

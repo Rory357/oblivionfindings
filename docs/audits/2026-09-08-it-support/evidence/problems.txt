@@ -1,0 +1,24 @@
+IT & Support
+Problems & known errors
+IT & SUPPORT
+Problems & known errors
+
+Investigate recurring incidents once, publish a safe workaround, and govern the permanent fix.
+
+New problem
+Search problems
+All states
+All states
+Investigating
+Known error
+Resolved
+Closed
+Apply filters
+Problem register
+1 records
+IT-000002
+Investigating
+High
+E2E recurring WAN instability
+
+Intermittent service degradation across managed sites.

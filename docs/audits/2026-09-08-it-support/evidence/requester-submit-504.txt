@@ -1,0 +1,67 @@
+Browser tab: 2, Title: "IT & Support - Laravel", URL: "https://oblivionfindings.test/it".
+0 AXWebArea IT & Support - Laravel, URL: oblivionfindings.test/it
+	1 container
+		91 AXWebArea 504 Gateway Time-out, URL: oblivionfindings.test/it
+			92 heading 504 Gateway Time-out, Value: 1
+				93 text 504 Gateway Time-out
+			94 text nginx/1.25.2
+		2 container Notifications alt+T
+		3 container Raise a ticket, ID: radix-_r_28_
+			4 heading Raise a ticket, Value: 2, ID: radix-_r_29_
+				5 text Raise a ticket
+			6 text Tell IT what's broken — they see it instantly.
+			7 container
+				8 image
+				9 text Raise a ticket IT helpdesk
+				10 button Raise a ticket Under 30 seconds
+					11 image
+					12 text Raise a ticket
+					13 text Under 30 seconds
+				14 text Completeness 100 %
+				15 progress indicator Description: Completeness, Value: 100
+			16 container
+				17 text Raise a ticket
+				18 button Close
+					19 image
+			54 container
+				55 image
+				56 heading What’s the problem?, Value: 2
+					57 text What’s the problem?
+				58 text One line is enough — you can add detail if it helps. What's broken? *
+				59 text field (settable) What's broken? *
+				60 text What kind of thing is it?
+				61 checkbox Device or hardware Phone, laptop, printer, charger…, Value: 1
+					62 image
+					63 text Device or hardware
+					64 text Phone, laptop, printer, charger…
+				65 checkbox Account or sign-in Locked out, passwords, email, Value: 0
+					66 image
+					67 text Account or sign-in
+					68 text Locked out, passwords, email
+				69 checkbox Wi-Fi or network No internet, VPN trouble, Value: 0
+					70 image
+					71 text Wi-Fi or network
+					72 text No internet, VPN trouble
+				73 checkbox Something else Anything IT should look at, Value: 0
+					74 image
+					75 text Something else
+					76 text Anything IT should look at
+				77 text How urgent is it?
+				78 checkbox Stops me supporting someone right now, Value: 0
+				79 checkbox Blocking my work, Value: 0
+				80 checkbox Annoying but I can work, Value: 1
+				81 checkbox Whenever, Value: 0
+				82 text More details optional
+				83 text entry area (settable) More details optional, Value: Disposable local audit request. Simulated printer issue; no operational action or external communication required.
+				84 text Photos or files optional — a photo says a lot
+				85 button Drop a photo of the problem or browse from your computer Images, PDF or documents — up to 5 files
+					86 image
+					87 text Drop a photo of the problem
+					88 container
+						89 text or  browse  from your computer
+					90 text Images, PDF or documents — up to 5 files
+			51 container
+				52 button Cancel
+				53 button Raise ticket
+
+The focused UI element is 0 AXWebArea IT & Support - Laravel, URL: oblivionfindings.test/it

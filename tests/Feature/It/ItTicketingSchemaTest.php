@@ -71,6 +71,7 @@ test('agents can move a ticket to waiting through the update route', function ()
 
     $this->actingAs($agent)
         ->patch("/it/tickets/{$ticket->id}", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'status' => 'waiting',
             'waiting_party' => 'requester',
             'waiting_reason' => 'Waiting for the requester to confirm the outcome.',

@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests\It;
 
+use App\Domain\It\Services\ItKbAccessService;
 use App\Models\ItKbArticle;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
  * Create a knowledge-base article (§I / §N6). Authoring is agent work —
- * `it.manage` only; requesters read published articles, they never write.
+ * Explicit knowledge author permission; ticket management does not imply it.
  */
 class StoreKbArticleRequest extends FormRequest
 {
@@ -16,7 +17,7 @@ class StoreKbArticleRequest extends FormRequest
     {
         $user = $this->user();
 
-        return (bool) ($user && $user->canDo('it.manage'));
+        return $user !== null && app(ItKbAccessService::class)->canAuthorRecords($user);
     }
 
     /**

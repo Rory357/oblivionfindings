@@ -1,0 +1,122 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_9cd15f0d4173479a",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItTicketRoutingDecisionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpriority decisions cover every impact and urgency with monotonic escalation[39m[90m                               [39m [90m269.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy priority adapters preserve their level while new dimensions govern assessment[39m[90m                        [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnew responsibility cannot inherit site access from an old assignment or inactive employment[39m[90m                 [39m [90m0.58s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcover selection consumes approved HR absence without exposing or copying private leave details[39m[90m              [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpriority overrides preserve their reason through later impact changes until explicit release[39m[90m                [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfallback activation requires a distinct current scoped cover while incomplete setup remains editable inacti[39m[90m…[39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester chooses either approved site and cannot submit an active third site[39m[90m                             [39m [90m1.33s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mbrowser email and scoped service API intake share the same accountable fallback rule[39m[90m                        [39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90mspecific routing is deterministic and a fallback cannot ignore its site restriction[39m[90m                         [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproved absence routes to named cover and returning primary resumes automatic responsibility[39m[90m               [39m [90m0.71s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mmanual queue and unassigned choices survive classification until a reasoned explicit release[39m[90m                [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90man inactive manual assignee is suspended without erasing the recorded intention[39m[90m                             [39m [90m0.78s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItServiceManagementSetupTest[39m
+  [32;1m✓[39;22m[90m [39m[90mIT pages share the approved grouped navigation while preserving existing deep links[39m[90m                         [39m [90m5.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation emits the requester catalogue only with exact request access[39m[90m                                  [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation never produces an unsupported SLA tab[39m[90m                                                         [39m [90m0.59s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation requires the exact Security destination permissions and module access[39m[90m                         [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents configure application teams membership roles services and queue routing with audit[39m[90m                   [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket intake applies the highest priority matching queue service owner team and default assignee[39m[90m           [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup exposes Site-scoped workload counts and keeps configuration application-wide[39m[90m                          [39m [90m2.95s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItEmailInboundTest[39m
+  [32;1m✓[39;22m[90m [39m[90memail is a recognised ticket source[39m[90m                                                                         [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90man inbound email row records its ticket link[39m[90m                                                                [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90man unmatched inbound email can be logged without a ticket[39m[90m                                                   [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe inbound webhook uses its dedicated form request[39m[90m                                                         [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe webhook rejects a missing or wrong shared secret[39m[90m                                                        [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe webhook is inert when no secret is configured[39m[90m                                                           [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma known sender opens a new ticket by email[39m[90m                                                                  [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma reply carrying a ticket reference threads onto that ticket[39m[90m                                                [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe ingestor can be driven directly — the poller contract (E1)[39m[90m                                              [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90man unknown sender is quarantined and never auto-ticketed[39m[90m                                                    [39m [90m0.11s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItMonitoringTicketIntegrationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit links one ticket idempotently to a canonical device and alert[39m[90m                                            [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects a human ticket link without a current responsible actor[39m[90m                                          [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects monitoring links when canonical device and alert site evidence is absent[39m[90m                         [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit allows a system incident without a human requester[39m[90m                                                       [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit creates one linked system incident for a confirmed IT infrastructure outage[39m[90m                              [39m [90m0.26s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit keeps separate canonical Device outages distinct without Control Room projections[39m[90m                        [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit adds repeated evidence to the same ticket instead of creating a duplicate[39m[90m                                [39m [90m0.24s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit creates a fresh incident when an outage repeats after the earlier monitoring ticket was resolved[39m[90m         [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit marks the ticket monitoring recovered but leaves technician resolution open[39m[90m                              [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not recover a system ticket that lacks the enforced monitoring principal evidence[39m[90m                   [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not turn security or healthcare signals into automatic IT incidents without policy with ('security'[39m[90m…[39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not turn security or healthcare signals into automatic IT incidents without policy with ('iot_healt[39m[90m…[39m [90m0.17s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSecureApiAccessBoundaryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mservice API reauthorizes the execution account and conceals route objects before validation[39m[90m                 [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90mservice API create reauthorizes Site and requires explicit organisation wide scope[39m[90m                          [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90midempotent replay rechecks current route authority and re-presents current fields[39m[90m                           [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90msigned requests bind the idempotency key against captured fresh key replay[39m[90m                                  [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mAPI resource exposes only field-gated linked context authorized at use time[39m[90m                                 [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mAPI create rejects inactive service links and replay storage never retains comment text[39m[90m                     [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcomment and transition services reauthorize the locked canonical ticket before mutation[39m[90m                     [39m [90m0.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90midentity setup rejects Sites and exceptional abilities unavailable to the execution account[39m[90m                 [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90midentity setup cannot borrow another execution accounts wider Sites or exceptional authority[39m[90m                [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate recording retains its authorization subject when authority changes before response recording[39m[90m         [39m [90m0.71s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTicketRoutingDecisionTest[22m [90m>[39m browser email and scoped service A… [41;1m ModelNotFoundException [49;22m  
+[39;1m  No query results for model [App\Models\ItTicket].[39;22m
+
+  at [32mvendor\laravel\framework\src\Illuminate\Database\Eloquent\Builder.php[39m:[32m634[39m
+    630▕             return $result;
+    631▕         }
+    632▕ 
+    633▕         if (is_null($result)) {
+  ➜ 634▕             throw (new ModelNotFoundException)->setModel(
+    635▕                 get_class($this->model), $id
+    636▕             );
+    637▕         }
+    638▕
+
+  [33m1   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\Eloquent\Builder.php[39;22m:[39;1m634[39;22m
+  [33m2   [39m[39;1mtests\Feature\It\ItTicketRoutingDecisionTest.php[39;22m:[39;1m199[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTicketRoutingDecisionTest[22m [90m>[39m manual queue and unassigned choices surviv… [41;1m QueryException [49;22m  
+[39;1m  SQLSTATE[42S22]: Column not found: 1054 Unknown column 'subject_id' in 'where clause' (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_it_support_test_it_9cd15f0d4173479a, SQL: select exists(select * from `audit_logs` where `action` = it.ticket.routing.applied and `subject_id` = 11) as `exists`)[39;22m
+
+  at [32mvendor\laravel\framework\src\Illuminate\Database\Connection.php[39m:[32m426[39m
+    422▕             );
+    423▕ 
+    424▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    425▕ 
+  ➜ 426▕             $statement->execute();
+    427▕ 
+    428▕             return $statement->fetchAll(...$fetchUsing);
+    429▕         });
+    430▕     }
+
+  [33m1   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\Connection.php[39;22m:[39;1m426[39;22m
+  [33m2   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\Connection.php[39;22m:[39;1m830[39;22m
+
+
+  [90mTests:[39m    [31;1m2 failed[39;22m[90m,[39m[39m [39m[32;1m49 passed[39;22m[90m (381 assertions)[39m
+  [90mDuration:[39m [39m300.31s[39m
+

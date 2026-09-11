@@ -99,6 +99,8 @@ type ProfileData = {
     twoFactorEnabled: boolean;
     microsoftLinked: boolean;
     googleLinked: boolean;
+    ssoLinkPrefix?: '' | '/portal';
+    ssoAvailable?: { microsoft: boolean; google: boolean };
     profilePhotoPath: string | null;
 };
 
@@ -1127,7 +1129,7 @@ export default function Profile({
                                             </p>
                                             <p className="text-xs text-muted-foreground">
                                                 {profileData.microsoftLinked
-                                                    ? 'Connected'
+                                                    ? 'Linked'
                                                     : 'Not connected'}
                                             </p>
                                         </div>
@@ -1147,16 +1149,23 @@ export default function Profile({
                                         >
                                             Disconnect
                                         </Button>
-                                    ) : (
+                                    ) : profileData.ssoAvailable?.microsoft ? (
                                         <Button
                                             size="sm"
                                             variant="outline"
                                             asChild
                                         >
-                                            <a href="/auth/microsoft/redirect?link=1">
+                                            <a
+                                                href={`${profileData.ssoLinkPrefix ?? ''}/auth/microsoft/redirect?link=1`}
+                                            >
                                                 Connect
                                             </a>
                                         </Button>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">
+                                            Sign-in is unavailable for this
+                                            account.
+                                        </p>
                                     )}
                                 </div>
                                 {/* Google */}
@@ -1191,7 +1200,7 @@ export default function Profile({
                                             </p>
                                             <p className="text-xs text-muted-foreground">
                                                 {profileData.googleLinked
-                                                    ? 'Connected'
+                                                    ? 'Linked'
                                                     : 'Not connected'}
                                             </p>
                                         </div>
@@ -1211,16 +1220,23 @@ export default function Profile({
                                         >
                                             Disconnect
                                         </Button>
-                                    ) : (
+                                    ) : profileData.ssoAvailable?.google ? (
                                         <Button
                                             size="sm"
                                             variant="outline"
                                             asChild
                                         >
-                                            <a href="/auth/google/redirect?link=1">
+                                            <a
+                                                href={`${profileData.ssoLinkPrefix ?? ''}/auth/google/redirect?link=1`}
+                                            >
                                                 Connect
                                             </a>
                                         </Button>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">
+                                            Sign-in is unavailable for this
+                                            account.
+                                        </p>
                                     )}
                                 </div>
                             </CardContent>

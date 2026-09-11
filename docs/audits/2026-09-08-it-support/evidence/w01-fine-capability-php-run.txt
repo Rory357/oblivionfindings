@@ -1,0 +1,1083 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_17f403548c1e4f5d",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItKnowledgeCapabilityTest[39m
+  [32;1m✓[39;22m[90m [39m[90mfine knowledge and credential audit grants are admin-only defaults and migration is additive and idempote[39m[90m…[39m [90m256.54s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma knowledge-only author reaches scoped drafts and owner options without any ticket or provisioning rights[39m[90m   [39m [90m6.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma separate knowledge reviewer can publish and retire within current audience but cannot author or restore[39m[90m   [39m [90m2.84s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mknowledge grants preserve full-audience mutation denial and capability revocation returns authorization fai[39m[90m…[39m [90m5.40s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItKnowledgeAccessTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mknowledge discovery filters draft bodies and published suggestions to current approved Sites[39m[90m                [39m [90m0.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.15s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mknowledge service reauthorizes the canonical audience and preserves permitted authoring[39m[90m                     [39m [90m0.99s[39m  
+  [31;1m⨯[39;22m[90m [39m[90monly the existing explicit all-Sites capability extends scoped knowledge governance[39m[90m                         [39m [90m0.11s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItKbTest[39m
+  [32;1m✓[39;22m[90m [39m[90man agent creates a KB article with an application-unique slug[39m[90m                                               [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents edit articles and use the governed publish lifecycle while the slug stays stable[39m[90m                     [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mKB authoring requires its explicit grant while deletion is reasoned and draft-only[39m[90m                          [39m [90m0.87s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mthe knowledge catalogue reaches agents but never a self-service payload[39m[90m                                     [39m [90m1.54s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mpure requesters browse only published articles; agents get the full catalogue instead[39m[90m                       [39m [90m3.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester read is recorded while helpful feedback is one canonical vote per user[39m[90m                          [39m [90m2.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowse endpoints never touch a draft article[39m[90m                                                                [39m [90m0.72s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItServiceOperationsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mservice operations schema records knowledge evidence email delivery and canonical scheduler runs[39m[90m            [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge can only enter managed lifecycle states through lifecycle actions[39m[90m                                 [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge follows review publish and retire lifecycle with ownership scope and evidence[39m[90m                     [39m [90m2.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90msite-scoped and agent-only knowledge never leaks to the wrong requester[39m[90m                                     [39m [90m2.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic ticket replies create visible outbound delivery records and failed mail can be retried[39m[90m               [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery mail-capable IT notification exposes delivery tracking context[39m[90m                                        [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning cancellation mail is visible and can be retried safely[39m[90m                                         [39m [90m0.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocal mail acceptance remains distinct from provider delivery and provider events are ordered[39m[90m               [39m [90m0.59s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovider delivery status rejects excessive future skew without poisoning later ordering[39m[90m                     [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthenticated delivery callbacks reject excessive future skew without mutating the delivery[39m[90m                 [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery IT mail type creates a visible delivery and can be retried safely[39m[90m                                     [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe authenticated delivery callback records ordered bounces without exposing other deliveries[39m[90m               [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexisting IT schedules are named once and their runs are recorded from Laravel scheduler events[39m[90m              [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomation completions update the exact run when executions overlap[39m[90m                                         [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmailbox polling records the queued job outcome rather than scheduler dispatch[39m[90m                               [39m [90m0.65s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mreports reconcile expanded operations metrics to drill-down filters[39m[90m                                         [39m [90m0.76s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mfirst contact resolution includes tickets with internal notes and reconciles to its drill down[39m[90m              [39m [90m0.71s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mbacklog age buckets are half open and never double count boundaries[39m[90m                                         [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup shows an access-safe operations audit for channels automations and configuration gaps[39m[90m                 [39m [90m2.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe automation catalogue remains visible when console routes are not loaded[39m[90m                                 [39m [90m0.63s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Sites\CredentialAuditCapabilityTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcredential auditors read scoped activity without receiving reveal copy TOTP or management permissions[39m[90m       [39m [90m4.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauditor direct-object and global feeds follow current Site assignment and hide unrelated credentials[39m[90m        [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma reveal grant does not imply audit rights and revoked audit access returns 403[39m[90m                             [39m [90m2.66s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Sites\VaultAccessScopeTest[39m
+  [32;1m✓[39;22m[90m [39m[90mvault metadata and audit feeds deny empty current Site scope with ('missing profile')[39m[90m                       [39m [90m2.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvault metadata and audit feeds deny empty current Site scope with ('ended profile')[39m[90m                         [39m [90m4.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvault metadata and audit feeds deny empty current Site scope with ('last assignment removed')[39m[90m               [39m [90m4.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvault feeds honor only the same explicit all-Sites exception as direct credential access[39m[90m                    [39m [90m4.73s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Sites\VendorsCredentialsGlobalTest[39m
+  [32;1m✓[39;22m[90m [39m[90mglobal index exposes enriched vendor/credential fields and manage flags[39m[90m                                     [39m [90m2.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvendor compliance fields persist globally and remain complete in the site profile workspace[39m[90m                 [39m [90m3.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvendor flags endpoint toggles preferred and active[39m[90m                                                          [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcredential rotate stamps last_rotated_at and audits a rotate row[39m[90m                                            [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcredential reauth endpoint toggles the flag and audits an edit row[39m[90m                                          [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mglobal audit feed returns scoped JSON for credential auditors[39m[90m                                               [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvendor-only user is forbidden from the credential audit feed[39m[90m                                                [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcredential metadata viewers without audit rights are forbidden from the global audit feed[39m[90m                   [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mglobal feeds are scoped to the user's assigned sites (no horizontal access)[39m[90m                                 [39m [90m2.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcredential update without a vendor_id key keeps the existing vendor link[39m[90m                                    [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcredential update can set and clear the vendor link when vendor_id is sent[39m[90m                                  [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma failed re-auth reveal is recorded as reauth_failed[39m[90m                                                        [39m [90m0.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mglobal audit feed excludes routine view_list rows[39m[90m                                                           [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanage-less user cannot toggle flags, rotate, or change reauth[39m[90m                                              [39m [90m0.65s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItKnowledgeCapabilityTest[22m [90m>[39m knowledge grants preserve full-audience mutation denial and…    
+[39;1m  Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+The following exception occurred during the last request:
+
+Error: Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor() in C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItProvisioningController.php:1234
+Stack trace:
+#0 C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItProvisioningController.php(243): App\Http\Controllers\It\ItProvisioningController->summary(Object(App\Models\User), true)
+#1 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Controller.php(54): App\Http\Controllers\It\ItProvisioningController->index(Object(Illuminate\Http\Request))
+#2 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(43): Illuminate\Routing\Controller->callAction('index', Array)
+#3 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(269): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\It\ItProvisioningController), 'index')
+#4 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(215): Illuminate\Routing\Route->runController()
+#5 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#6 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->{closure:Illuminate\Routing\Router::runRouteWithinStack():821}(Object(Illuminate\Http\Request))
+#7 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#8 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'it.request|it.v...')
+#9 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\AddContentSecurityPolicy.php(49): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#10 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\AddContentSecurityPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#11 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\PreventSearchIndexing.php(14): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#12 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventSearchIndexing->handle(Object(Illuminate\Http\Request), Object(Closure))
+#13 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets.php(32): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#14 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets->handle(Object(Illuminate\Http\Request), Object(Closure))
+#15 C:\Users\steph\Herd\oblivionfindings\vendor\inertiajs\inertia-laravel\src\Middleware.php(122): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#16 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleInertiaRequests.php(58): Inertia\Middleware->handle(Object(Illuminate\Http\Request), Object(Closure))
+#17 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleInertiaRequests->handle(Object(Illuminate\Http\Request), Object(Closure))
+#18 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceTwoFactorPolicy.php(16): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#19 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceTwoFactorPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#20 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsureAccountStillApproved.php(35): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#21 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureAccountStillApproved->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceSessionTimeout.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#23 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceSessionTimeout->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleAppearance.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#25 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleAppearance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#27 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#29 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#30 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#31 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle(Object(Illuminate\Http\Request), Object(Closure))
+#32 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#33 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#34 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#35 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#36 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#38 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#39 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#40 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#41 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#42 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#43 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#44 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#45 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#46 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#47 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->{closure:Illuminate\Foundation\Http\Kernel::dispatchToRouter():197}(Object(Illuminate\Http\Request))
+#48 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#49 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#51 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#52 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#53 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#55 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#57 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#58 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#59 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#60 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#61 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#62 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#63 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#64 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#65 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#66 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\TraceItTicketCreation.php(20): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#67 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\TraceItTicketCreation->handle(Object(Illuminate\Http\Request), Object(Closure))
+#68 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#69 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#70 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#71 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#72 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(368): Illuminate\Foundation\Testing\TestCase->call('GET', '/it', Array, Array, Array, Array)
+#73 C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItKnowledgeCapabilityTest.php(127): Illuminate\Foundation\Testing\TestCase->get('/it')
+#74 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseMethodFactory.php(177): P\Tests\Feature\It\ItKnowledgeCapabilityTest->{closure:C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItKnowledgeCapabilityTest.php:122}()
+#75 [internal function]: P\Tests\Feature\It\ItKnowledgeCapabilityTest->{closure:Pest\Factories\TestCaseMethodFactory::getClosure():167}()
+#76 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): call_user_func_array(Object(Closure), Array)
+#77 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Support\ExceptionTrace.php(26): P\Tests\Feature\It\ItKnowledgeCapabilityTest->{closure:Pest\Concerns\Testable::__callClosure():509}()
+#78 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): Pest\Support\ExceptionTrace::ensure(Object(Closure))
+#79 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(336): P\Tests\Feature\It\ItKnowledgeCapabilityTest->__callClosure(Object(Closure), Array)
+#80 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseFactory.php(175) : eval()'d code(44): P\Tests\Feature\It\ItKnowledgeCapabilityTest->__runTest(Object(Closure))
+#81 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(1335): P\Tests\Feature\It\ItKnowledgeCapabilityTest->__pest_evaluable_knowledge_grants_preserve_full_audience_mutation_denial_and_capability_revocation_returns_authorization_failures()
+#82 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#83 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#84 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(359): PHPUnit\Framework\TestRunner->run(Object(P\Tests\Feature\It\ItKnowledgeCapabilityTest))
+#85 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#86 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#87 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#88 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\Application.php(229): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#89 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Kernel.php(103): PHPUnit\TextUI\Application->run(Array)
+#90 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(195): Pest\Kernel->handle(Array, Array)
+#91 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(203): {closure:C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest:19}()
+#92 C:\Users\steph\Herd\oblivionfindings\vendor\bin\pest(119): include('C:\\Users\\steph\\...')
+#93 {main}
+
+----------------------------------------------------------------------------------
+
+Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor()[39;22m
+
+  at [32mtests\Feature\It\ItKnowledgeCapabilityTest.php[39m:[32m127[39m
+    123▕     $otherSite = Site::factory()->create();
+    124▕     $actor = knowledgeCapabilityActor($this->knowledgeSite, [ItKbAccessService::AUTHOR, ItKbAccessService::REVIEW, 'it.view', 'it.manage']);
+    125▕     $overlap = ItKbArticle::factory()->create(['status' => 'in_review', 'audience' => 'specific_sites', 'site_scope' => [$this->knowledgeSite->id, $otherSite->id]]);
+    126▕     $hidden = ItKbArticle::factory()->create(['status' => 'in_review', 'audience' => 'specific_sites', 'site_scope' => [$otherSite->id]]);
+  ➜ 127▕     $this->actingAs($actor)->get('/it')->assertOk()
+    128▕         ->assertInertia(fn ($page) => $page->has('kbArticles', 1)->where('kbArticles.0.id', $overlap->id)
+    129▕             ->where('kbArticles.0.can.author', false)->where('kbArticles.0.can.review', false));
+    130▕     foreach ([$overlap, $hidden] as $article) {
+    131▕         $this->actingAs($actor)->post("/it/kb/{$article->id}/publish")->assertNotFound();
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItKnowledgeAccessTest[22m [90m>[39m knowledge discovery filters draft bodies and published suggestio…   
+[39;1m  Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+The following exception occurred during the last request:
+
+Error: Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor() in C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItProvisioningController.php:1234
+Stack trace:
+#0 C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItProvisioningController.php(243): App\Http\Controllers\It\ItProvisioningController->summary(Object(App\Models\User), true)
+#1 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Controller.php(54): App\Http\Controllers\It\ItProvisioningController->index(Object(Illuminate\Http\Request))
+#2 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(43): Illuminate\Routing\Controller->callAction('index', Array)
+#3 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(269): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\It\ItProvisioningController), 'index')
+#4 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(215): Illuminate\Routing\Route->runController()
+#5 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#6 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->{closure:Illuminate\Routing\Router::runRouteWithinStack():821}(Object(Illuminate\Http\Request))
+#7 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#8 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'it.request|it.v...')
+#9 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\AddContentSecurityPolicy.php(49): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#10 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\AddContentSecurityPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#11 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\PreventSearchIndexing.php(14): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#12 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventSearchIndexing->handle(Object(Illuminate\Http\Request), Object(Closure))
+#13 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets.php(32): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#14 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets->handle(Object(Illuminate\Http\Request), Object(Closure))
+#15 C:\Users\steph\Herd\oblivionfindings\vendor\inertiajs\inertia-laravel\src\Middleware.php(122): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#16 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleInertiaRequests.php(58): Inertia\Middleware->handle(Object(Illuminate\Http\Request), Object(Closure))
+#17 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleInertiaRequests->handle(Object(Illuminate\Http\Request), Object(Closure))
+#18 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceTwoFactorPolicy.php(16): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#19 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceTwoFactorPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#20 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsureAccountStillApproved.php(35): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#21 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureAccountStillApproved->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceSessionTimeout.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#23 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceSessionTimeout->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleAppearance.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#25 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleAppearance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#27 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#29 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#30 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#31 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle(Object(Illuminate\Http\Request), Object(Closure))
+#32 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#33 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#34 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#35 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#36 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#38 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#39 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#40 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#41 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#42 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#43 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#44 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#45 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#46 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#47 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->{closure:Illuminate\Foundation\Http\Kernel::dispatchToRouter():197}(Object(Illuminate\Http\Request))
+#48 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#49 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#51 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#52 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#53 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#55 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#57 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#58 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#59 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#60 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#61 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#62 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#63 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#64 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#65 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#66 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\TraceItTicketCreation.php(20): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#67 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\TraceItTicketCreation->handle(Object(Illuminate\Http\Request), Object(Closure))
+#68 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#69 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#70 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#71 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#72 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(368): Illuminate\Foundation\Testing\TestCase->call('GET', '/it', Array, Array, Array, Array)
+#73 C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItKnowledgeAccessTest.php(68): Illuminate\Foundation\Testing\TestCase->get('/it')
+#74 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseMethodFactory.php(177): P\Tests\Feature\It\ItKnowledgeAccessTest->{closure:C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItKnowledgeAccessTest.php:44}()
+#75 [internal function]: P\Tests\Feature\It\ItKnowledgeAccessTest->{closure:Pest\Factories\TestCaseMethodFactory::getClosure():167}()
+#76 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): call_user_func_array(Object(Closure), Array)
+#77 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Support\ExceptionTrace.php(26): P\Tests\Feature\It\ItKnowledgeAccessTest->{closure:Pest\Concerns\Testable::__callClosure():509}()
+#78 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): Pest\Support\ExceptionTrace::ensure(Object(Closure))
+#79 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(336): P\Tests\Feature\It\ItKnowledgeAccessTest->__callClosure(Object(Closure), Array)
+#80 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseFactory.php(175) : eval()'d code(17): P\Tests\Feature\It\ItKnowledgeAccessTest->__runTest(Object(Closure))
+#81 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(1335): P\Tests\Feature\It\ItKnowledgeAccessTest->__pest_evaluable_knowledge_discovery_filters_draft_bodies_and_published_suggestions_to_current_approved_Sites()
+#82 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#83 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#84 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(359): PHPUnit\Framework\TestRunner->run(Object(P\Tests\Feature\It\ItKnowledgeAccessTest))
+#85 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#86 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#87 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#88 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\Application.php(229): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#89 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Kernel.php(103): PHPUnit\TextUI\Application->run(Array)
+#90 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(195): Pest\Kernel->handle(Array, Array)
+#91 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(203): {closure:C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest:19}()
+#92 C:\Users\steph\Herd\oblivionfindings\vendor\bin\pest(119): include('C:\\Users\\steph\\...')
+#93 {main}
+
+----------------------------------------------------------------------------------
+
+Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor()[39;22m
+
+  at [32mtests\Feature\It\ItKnowledgeAccessTest.php[39m:[32m68[39m
+     64▕         'title' => 'Hidden third-site publication', 'body' => 'Unapproved published body.',
+     65▕         'audience' => 'specific_sites', 'site_scope' => [$hiddenSite->id],
+     66▕     ]);
+     67▕ 
+  ➜  68▕     $this->actingAs($agent)->get('/it')->assertOk()
+     69▕         ->assertInertia(fn ($page) => $page
+     70▕             ->has('kbArticles', 4)
+     71▕             ->where('kbArticles', fn ($articles) => collect($articles)->pluck('id')->sort()->values()->all()
+     72▕                 === collect([$general->id, $agents->id, $local->id, $secondaryDraft->id])->sort()->values()->all()))
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItKnowledgeAccessTest[22m [90m>[39m knowledge service reauthorizes the canonical audience and preser…   
+[39;1m  Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+The following exception occurred during the last request:
+
+Error: Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor() in C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItProvisioningController.php:1234
+Stack trace:
+#0 C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItProvisioningController.php(243): App\Http\Controllers\It\ItProvisioningController->summary(Object(App\Models\User), true)
+#1 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Controller.php(54): App\Http\Controllers\It\ItProvisioningController->index(Object(Illuminate\Http\Request))
+#2 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(43): Illuminate\Routing\Controller->callAction('index', Array)
+#3 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(269): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\It\ItProvisioningController), 'index')
+#4 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(215): Illuminate\Routing\Route->runController()
+#5 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#6 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->{closure:Illuminate\Routing\Router::runRouteWithinStack():821}(Object(Illuminate\Http\Request))
+#7 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#8 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'it.request|it.v...')
+#9 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\AddContentSecurityPolicy.php(49): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#10 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\AddContentSecurityPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#11 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\PreventSearchIndexing.php(14): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#12 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventSearchIndexing->handle(Object(Illuminate\Http\Request), Object(Closure))
+#13 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets.php(32): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#14 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets->handle(Object(Illuminate\Http\Request), Object(Closure))
+#15 C:\Users\steph\Herd\oblivionfindings\vendor\inertiajs\inertia-laravel\src\Middleware.php(122): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#16 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleInertiaRequests.php(58): Inertia\Middleware->handle(Object(Illuminate\Http\Request), Object(Closure))
+#17 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleInertiaRequests->handle(Object(Illuminate\Http\Request), Object(Closure))
+#18 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceTwoFactorPolicy.php(16): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#19 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceTwoFactorPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#20 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsureAccountStillApproved.php(35): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#21 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureAccountStillApproved->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceSessionTimeout.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#23 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceSessionTimeout->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleAppearance.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#25 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleAppearance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#27 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#29 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#30 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#31 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle(Object(Illuminate\Http\Request), Object(Closure))
+#32 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#33 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#34 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#35 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#36 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#38 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#39 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#40 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#41 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#42 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#43 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#44 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#45 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#46 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#47 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->{closure:Illuminate\Foundation\Http\Kernel::dispatchToRouter():197}(Object(Illuminate\Http\Request))
+#48 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#49 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#51 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#52 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#53 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#55 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#57 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#58 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#59 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#60 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#61 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#62 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#63 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#64 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#65 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#66 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\TraceItTicketCreation.php(20): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#67 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\TraceItTicketCreation->handle(Object(Illuminate\Http\Request), Object(Closure))
+#68 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#69 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#70 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#71 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#72 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(368): Illuminate\Foundation\Testing\TestCase->call('GET', '/it', Array, Array, Array, Array)
+#73 C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItKnowledgeAccessTest.php(138): Illuminate\Foundation\Testing\TestCase->get('/it')
+#74 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseMethodFactory.php(177): P\Tests\Feature\It\ItKnowledgeAccessTest->{closure:C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItKnowledgeAccessTest.php:122}()
+#75 [internal function]: P\Tests\Feature\It\ItKnowledgeAccessTest->{closure:Pest\Factories\TestCaseMethodFactory::getClosure():167}()
+#76 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): call_user_func_array(Object(Closure), Array)
+#77 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Support\ExceptionTrace.php(26): P\Tests\Feature\It\ItKnowledgeAccessTest->{closure:Pest\Concerns\Testable::__callClosure():509}()
+#78 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): Pest\Support\ExceptionTrace::ensure(Object(Closure))
+#79 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(336): P\Tests\Feature\It\ItKnowledgeAccessTest->__callClosure(Object(Closure), Array)
+#80 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseFactory.php(175) : eval()'d code(41): P\Tests\Feature\It\ItKnowledgeAccessTest->__runTest(Object(Closure))
+#81 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(1335): P\Tests\Feature\It\ItKnowledgeAccessTest->__pest_evaluable_knowledge_service_reauthorizes_the_canonical_audience_and_preserves_permitted_authoring()
+#82 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#83 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#84 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(359): PHPUnit\Framework\TestRunner->run(Object(P\Tests\Feature\It\ItKnowledgeAccessTest))
+#85 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#86 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#87 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#88 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\Application.php(229): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#89 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Kernel.php(103): PHPUnit\TextUI\Application->run(Array)
+#90 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(195): Pest\Kernel->handle(Array, Array)
+#91 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(203): {closure:C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest:19}()
+#92 C:\Users\steph\Herd\oblivionfindings\vendor\bin\pest(119): include('C:\\Users\\steph\\...')
+#93 {main}
+
+----------------------------------------------------------------------------------
+
+Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor()[39;22m
+
+  at [32mtests\Feature\It\ItKnowledgeAccessTest.php[39m:[32m138[39m
+    134▕         'audience' => 'specific_sites', 'site_scope' => [$site->id, $otherSite->id],
+    135▕     ]);
+    136▕     expect(app(ItKbAccessService::class)->canReadPublished($actor, $sharedGuide))->toBeTrue()
+    137▕         ->and(app(ItKbAccessService::class)->canManage($actor, $sharedGuide))->toBeFalse();
+  ➜ 138▕     $this->actingAs($actor)->get('/it')->assertOk()
+    139▕         ->assertInertia(fn ($page) => $page->has('kbArticles', 1)
+    140▕             ->where('kbArticles.0.id', $sharedGuide->id)->where('kbArticles.0.can.manage', false));
+    141▕     $this->actingAs($actor)->patch("/it/kb/{$sharedGuide->id}", ['body' => 'Partial-site editor attempt.'])
+    142▕         ->assertNotFound();
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItKnowledgeAccessTest[22m [90m>[39m only the existing explicit all-Sites cap… [41;1m AuthorizationException [49;22m  
+[39;1m  You do not have the required knowledge capability for this action.[39;22m
+
+  at [32mapp\Domain\It\Services\ItKbLifecycleService.php[39m:[32m273[39m
+    269▕ 
+    270▕     private function guardActor(User $actor, string $capability = ItKbAccessService::AUTHOR): void
+    271▕     {
+    272▕         if ($actor->approved_at === null || ! $actor->canDo($capability)) {
+  ➜ 273▕             throw new AuthorizationException('You do not have the required knowledge capability for this action.');
+    274▕         }
+    275▕     }
+    276▕ 
+    277▕     private function guardPublishedVisible(ItKbArticle $article, User $actor): void
+
+  [33m1   [39m[39;1mapp\Domain\It\Services\ItKbLifecycleService.php[39;22m:[39;1m273[39;22m
+  [33m2   [39m[39;1mapp\Domain\It\Services\ItKbLifecycleService.php[39;22m:[39;1m30[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItKbTest[22m [90m>[39m the knowledge catalogue reaches agents but never a self-service payload          
+[39;1m  Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+The following exception occurred during the last request:
+
+Error: Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor() in C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItProvisioningController.php:1234
+Stack trace:
+#0 C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItProvisioningController.php(243): App\Http\Controllers\It\ItProvisioningController->summary(Object(App\Models\User), true)
+#1 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Controller.php(54): App\Http\Controllers\It\ItProvisioningController->index(Object(Illuminate\Http\Request))
+#2 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(43): Illuminate\Routing\Controller->callAction('index', Array)
+#3 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(269): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\It\ItProvisioningController), 'index')
+#4 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(215): Illuminate\Routing\Route->runController()
+#5 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#6 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->{closure:Illuminate\Routing\Router::runRouteWithinStack():821}(Object(Illuminate\Http\Request))
+#7 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#8 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'it.request|it.v...')
+#9 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\AddContentSecurityPolicy.php(49): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#10 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\AddContentSecurityPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#11 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\PreventSearchIndexing.php(14): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#12 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventSearchIndexing->handle(Object(Illuminate\Http\Request), Object(Closure))
+#13 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets.php(32): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#14 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets->handle(Object(Illuminate\Http\Request), Object(Closure))
+#15 C:\Users\steph\Herd\oblivionfindings\vendor\inertiajs\inertia-laravel\src\Middleware.php(122): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#16 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleInertiaRequests.php(58): Inertia\Middleware->handle(Object(Illuminate\Http\Request), Object(Closure))
+#17 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleInertiaRequests->handle(Object(Illuminate\Http\Request), Object(Closure))
+#18 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceTwoFactorPolicy.php(16): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#19 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceTwoFactorPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#20 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsureAccountStillApproved.php(35): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#21 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureAccountStillApproved->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceSessionTimeout.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#23 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceSessionTimeout->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleAppearance.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#25 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleAppearance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#27 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#29 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#30 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#31 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle(Object(Illuminate\Http\Request), Object(Closure))
+#32 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#33 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#34 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#35 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#36 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#38 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#39 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#40 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#41 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#42 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#43 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#44 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#45 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#46 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#47 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->{closure:Illuminate\Foundation\Http\Kernel::dispatchToRouter():197}(Object(Illuminate\Http\Request))
+#48 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#49 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#51 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#52 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#53 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#55 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#57 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#58 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#59 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#60 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#61 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#62 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#63 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#64 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#65 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#66 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\TraceItTicketCreation.php(20): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#67 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\TraceItTicketCreation->handle(Object(Illuminate\Http\Request), Object(Closure))
+#68 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#69 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#70 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#71 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#72 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(368): Illuminate\Foundation\Testing\TestCase->call('GET', '/it', Array, Array, Array, Array)
+#73 C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItKbTest.php(146): Illuminate\Foundation\Testing\TestCase->get('/it')
+#74 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseMethodFactory.php(177): P\Tests\Feature\It\ItKbTest->{closure:C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItKbTest.php:142}()
+#75 [internal function]: P\Tests\Feature\It\ItKbTest->{closure:Pest\Factories\TestCaseMethodFactory::getClosure():167}()
+#76 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): call_user_func_array(Object(Closure), Array)
+#77 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Support\ExceptionTrace.php(26): P\Tests\Feature\It\ItKbTest->{closure:Pest\Concerns\Testable::__callClosure():509}()
+#78 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): Pest\Support\ExceptionTrace::ensure(Object(Closure))
+#79 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(336): P\Tests\Feature\It\ItKbTest->__callClosure(Object(Closure), Array)
+#80 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseFactory.php(175) : eval()'d code(44): P\Tests\Feature\It\ItKbTest->__runTest(Object(Closure))
+#81 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(1335): P\Tests\Feature\It\ItKbTest->__pest_evaluable_the_knowledge_catalogue_reaches_agents_but_never_a_self_service_payload()
+#82 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#83 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#84 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(359): PHPUnit\Framework\TestRunner->run(Object(P\Tests\Feature\It\ItKbTest))
+#85 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#86 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#87 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#88 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\Application.php(229): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#89 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Kernel.php(103): PHPUnit\TextUI\Application->run(Array)
+#90 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(195): Pest\Kernel->handle(Array, Array)
+#91 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(203): {closure:C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest:19}()
+#92 C:\Users\steph\Herd\oblivionfindings\vendor\bin\pest(119): include('C:\\Users\\steph\\...')
+#93 {main}
+
+----------------------------------------------------------------------------------
+
+Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor()[39;22m
+
+  at [32mtests\Feature\It\ItKbTest.php[39m:[32m147[39m
+    143▕     ItKbArticle::factory()->create(['status' => 'published']);
+    144▕ 
+    145▕     $this->actingAs($this->hr)
+    146▕         ->get('/it')
+  ➜ 147▕         ->assertOk()
+    148▕         ->assertInertia(fn ($page) => $page->has('kbArticles', 1));
+    149▕ 
+    150▕     // A self-service requester never receives the agent Knowledge catalogue.
+    151▕     $worker = kbUser('support_worker');
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItKbTest[22m [90m>[39m pure requesters browse only published articles; agents get the full catalogue…   
+[39;1m  Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+The following exception occurred during the last request:
+
+Error: Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor() in C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItProvisioningController.php:1234
+Stack trace:
+#0 C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItProvisioningController.php(243): App\Http\Controllers\It\ItProvisioningController->summary(Object(App\Models\User), true)
+#1 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Controller.php(54): App\Http\Controllers\It\ItProvisioningController->index(Object(Illuminate\Http\Request))
+#2 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(43): Illuminate\Routing\Controller->callAction('index', Array)
+#3 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(269): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\It\ItProvisioningController), 'index')
+#4 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(215): Illuminate\Routing\Route->runController()
+#5 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#6 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->{closure:Illuminate\Routing\Router::runRouteWithinStack():821}(Object(Illuminate\Http\Request))
+#7 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#8 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'it.request|it.v...')
+#9 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\AddContentSecurityPolicy.php(49): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#10 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\AddContentSecurityPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#11 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\PreventSearchIndexing.php(14): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#12 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventSearchIndexing->handle(Object(Illuminate\Http\Request), Object(Closure))
+#13 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets.php(32): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#14 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets->handle(Object(Illuminate\Http\Request), Object(Closure))
+#15 C:\Users\steph\Herd\oblivionfindings\vendor\inertiajs\inertia-laravel\src\Middleware.php(122): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#16 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleInertiaRequests.php(58): Inertia\Middleware->handle(Object(Illuminate\Http\Request), Object(Closure))
+#17 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleInertiaRequests->handle(Object(Illuminate\Http\Request), Object(Closure))
+#18 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceTwoFactorPolicy.php(16): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#19 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceTwoFactorPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#20 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsureAccountStillApproved.php(35): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#21 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureAccountStillApproved->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceSessionTimeout.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#23 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceSessionTimeout->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleAppearance.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#25 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleAppearance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#27 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#29 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#30 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#31 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle(Object(Illuminate\Http\Request), Object(Closure))
+#32 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#33 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#34 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#35 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#36 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#38 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#39 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#40 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#41 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#42 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#43 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#44 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#45 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#46 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#47 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->{closure:Illuminate\Foundation\Http\Kernel::dispatchToRouter():197}(Object(Illuminate\Http\Request))
+#48 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#49 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#51 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#52 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#53 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#55 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#57 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#58 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#59 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#60 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#61 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#62 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#63 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#64 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#65 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#66 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\TraceItTicketCreation.php(20): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#67 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\TraceItTicketCreation->handle(Object(Illuminate\Http\Request), Object(Closure))
+#68 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#69 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#70 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#71 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#72 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(368): Illuminate\Foundation\Testing\TestCase->call('GET', '/it', Array, Array, Array, Array)
+#73 C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItKbTest.php(170): Illuminate\Foundation\Testing\TestCase->get('/it')
+#74 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseMethodFactory.php(177): P\Tests\Feature\It\ItKbTest->{closure:C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItKbTest.php:158}()
+#75 [internal function]: P\Tests\Feature\It\ItKbTest->{closure:Pest\Factories\TestCaseMethodFactory::getClosure():167}()
+#76 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): call_user_func_array(Object(Closure), Array)
+#77 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Support\ExceptionTrace.php(26): P\Tests\Feature\It\ItKbTest->{closure:Pest\Concerns\Testable::__callClosure():509}()
+#78 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): Pest\Support\ExceptionTrace::ensure(Object(Closure))
+#79 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(336): P\Tests\Feature\It\ItKbTest->__callClosure(Object(Closure), Array)
+#80 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseFactory.php(175) : eval()'d code(53): P\Tests\Feature\It\ItKbTest->__runTest(Object(Closure))
+#81 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(1335): P\Tests\Feature\It\ItKbTest->__pest_evaluable_pure_requesters_browse_only_published_articles__agents_get_the_full_catalogue_instead()
+#82 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#83 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#84 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(359): PHPUnit\Framework\TestRunner->run(Object(P\Tests\Feature\It\ItKbTest))
+#85 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#86 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#87 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#88 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\Application.php(229): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#89 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Kernel.php(103): PHPUnit\TextUI\Application->run(Array)
+#90 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(195): Pest\Kernel->handle(Array, Array)
+#91 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(203): {closure:C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest:19}()
+#92 C:\Users\steph\Herd\oblivionfindings\vendor\bin\pest(119): include('C:\\Users\\steph\\...')
+#93 {main}
+
+----------------------------------------------------------------------------------
+
+Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor()[39;22m
+
+  at [32mtests\Feature\It\ItKbTest.php[39m:[32m171[39m
+    167▕ 
+    168▕     // Agents get the management catalogue (both), not the requester browse list.
+    169▕     $this->actingAs($this->hr)
+    170▕         ->get('/it')
+  ➜ 171▕         ->assertOk()
+    172▕         ->assertInertia(fn ($page) => $page->has('kbArticles', 2)->has('kbPublished', 0));
+    173▕ });
+    174▕ 
+    175▕ test('a requester read is recorded while helpful feedback is one canonical vote per user', function () {
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItServiceOperationsTest[22m [90m>[39m reports reconcile expanded operations metrics to drill-down fi…   
+[39;1m  Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+The following exception occurred during the last request:
+
+Error: Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor() in C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItReportsController.php:556
+Stack trace:
+#0 C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItReportsController.php(195): App\Http\Controllers\It\ItReportsController->kpis(Object(Illuminate\Support\Carbon), Object(Illuminate\Support\Carbon), Object(App\Models\User))
+#1 C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItReportsController.php(48): App\Http\Controllers\It\ItReportsController->report(Object(Illuminate\Support\Carbon), Object(Illuminate\Support\Carbon), Object(App\Models\User))
+#2 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Controller.php(54): App\Http\Controllers\It\ItReportsController->data(Object(Illuminate\Http\Request))
+#3 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(43): Illuminate\Routing\Controller->callAction('data', Array)
+#4 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(269): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\It\ItReportsController), 'data')
+#5 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(215): Illuminate\Routing\Route->runController()
+#6 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#7 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->{closure:Illuminate\Routing\Router::runRouteWithinStack():821}(Object(Illuminate\Http\Request))
+#8 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#9 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'it.view')
+#10 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#11 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'it.request|it.v...')
+#12 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\AddContentSecurityPolicy.php(49): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#13 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\AddContentSecurityPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#14 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\PreventSearchIndexing.php(14): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#15 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventSearchIndexing->handle(Object(Illuminate\Http\Request), Object(Closure))
+#16 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets.php(32): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#17 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets->handle(Object(Illuminate\Http\Request), Object(Closure))
+#18 C:\Users\steph\Herd\oblivionfindings\vendor\inertiajs\inertia-laravel\src\Middleware.php(122): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#19 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleInertiaRequests.php(58): Inertia\Middleware->handle(Object(Illuminate\Http\Request), Object(Closure))
+#20 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleInertiaRequests->handle(Object(Illuminate\Http\Request), Object(Closure))
+#21 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceTwoFactorPolicy.php(16): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#22 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceTwoFactorPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#23 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsureAccountStillApproved.php(35): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#24 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureAccountStillApproved->handle(Object(Illuminate\Http\Request), Object(Closure))
+#25 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceSessionTimeout.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#26 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceSessionTimeout->handle(Object(Illuminate\Http\Request), Object(Closure))
+#27 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleAppearance.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#28 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleAppearance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#29 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#30 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#31 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#32 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#33 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#34 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle(Object(Illuminate\Http\Request), Object(Closure))
+#35 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#36 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#38 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#39 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#40 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#41 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#42 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#43 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#44 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#45 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#46 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#47 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#48 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#49 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#50 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->{closure:Illuminate\Foundation\Http\Kernel::dispatchToRouter():197}(Object(Illuminate\Http\Request))
+#51 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#52 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#53 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#55 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#57 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#58 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#59 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#60 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#61 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#62 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#63 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#64 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#65 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#66 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#67 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#68 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#69 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\TraceItTicketCreation.php(20): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#70 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\TraceItTicketCreation->handle(Object(Illuminate\Http\Request), Object(Closure))
+#71 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#72 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#73 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#74 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#75 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(573): Illuminate\Foundation\Testing\TestCase->call('GET', '/it/reports/dat...', Array, Array, Array, Array, '[]')
+#76 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(381): Illuminate\Foundation\Testing\TestCase->json('GET', '/it/reports/dat...', Array, Array, 0)
+#77 C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItServiceOperationsTest.php(724): Illuminate\Foundation\Testing\TestCase->getJson('/it/reports/dat...')
+#78 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseMethodFactory.php(177): P\Tests\Feature\It\ItServiceOperationsTest->{closure:C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItServiceOperationsTest.php:686}()
+#79 [internal function]: P\Tests\Feature\It\ItServiceOperationsTest->{closure:Pest\Factories\TestCaseMethodFactory::getClosure():167}()
+#80 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): call_user_func_array(Object(Closure), Array)
+#81 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Support\ExceptionTrace.php(26): P\Tests\Feature\It\ItServiceOperationsTest->{closure:Pest\Concerns\Testable::__callClosure():509}()
+#82 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): Pest\Support\ExceptionTrace::ensure(Object(Closure))
+#83 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(336): P\Tests\Feature\It\ItServiceOperationsTest->__callClosure(Object(Closure), Array)
+#84 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseFactory.php(175) : eval()'d code(152): P\Tests\Feature\It\ItServiceOperationsTest->__runTest(Object(Closure))
+#85 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(1335): P\Tests\Feature\It\ItServiceOperationsTest->__pest_evaluable_reports_reconcile_expanded_operations_metrics_to_drill_down_filters()
+#86 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#87 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#88 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(359): PHPUnit\Framework\TestRunner->run(Object(P\Tests\Feature\It\ItServiceOperationsTest))
+#89 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#90 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#91 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#92 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\Application.php(229): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#93 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Kernel.php(103): PHPUnit\TextUI\Application->run(Array)
+#94 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(195): Pest\Kernel->handle(Array, Array)
+#95 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(203): {closure:C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest:19}()
+#96 C:\Users\steph\Herd\oblivionfindings\vendor\bin\pest(119): include('C:\\Users\\steph\\...')
+#97 {main}
+
+----------------------------------------------------------------------------------
+
+Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor()[39;22m
+
+  at [32mtests\Feature\It\ItServiceOperationsTest.php[39m:[32m725[39m
+    721▕     $from = now()->subDays(30)->toDateString();
+    722▕     $to = now()->toDateString();
+    723▕     $data = $this->actingAs($this->manager)
+    724▕         ->getJson("/it/reports/data?from={$from}&to={$to}")
+  ➜ 725▕         ->assertOk()
+    726▕         ->json();
+    727▕     expect($data['backlog_age'])->toHaveKeys(['under_2_days', 'days_2_to_7', 'days_8_to_30', 'over_30_days'])
+    728▕         ->and($data['backlog_age']['days_8_to_30']['count'])->toBe(1)
+    729▕         ->and($data['backlog_age']['days_8_to_30']['href'])->toContain('age=8_30')
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItServiceOperationsTest[22m [90m>[39m first contact resolution includes tickets with internal notes…    
+[39;1m  Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+The following exception occurred during the last request:
+
+Error: Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor() in C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItReportsController.php:556
+Stack trace:
+#0 C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItReportsController.php(195): App\Http\Controllers\It\ItReportsController->kpis(Object(Illuminate\Support\Carbon), Object(Illuminate\Support\Carbon), Object(App\Models\User))
+#1 C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItReportsController.php(48): App\Http\Controllers\It\ItReportsController->report(Object(Illuminate\Support\Carbon), Object(Illuminate\Support\Carbon), Object(App\Models\User))
+#2 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Controller.php(54): App\Http\Controllers\It\ItReportsController->data(Object(Illuminate\Http\Request))
+#3 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(43): Illuminate\Routing\Controller->callAction('data', Array)
+#4 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(269): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\It\ItReportsController), 'data')
+#5 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(215): Illuminate\Routing\Route->runController()
+#6 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#7 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->{closure:Illuminate\Routing\Router::runRouteWithinStack():821}(Object(Illuminate\Http\Request))
+#8 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#9 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'it.view')
+#10 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#11 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'it.request|it.v...')
+#12 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\AddContentSecurityPolicy.php(49): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#13 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\AddContentSecurityPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#14 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\PreventSearchIndexing.php(14): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#15 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventSearchIndexing->handle(Object(Illuminate\Http\Request), Object(Closure))
+#16 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets.php(32): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#17 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets->handle(Object(Illuminate\Http\Request), Object(Closure))
+#18 C:\Users\steph\Herd\oblivionfindings\vendor\inertiajs\inertia-laravel\src\Middleware.php(122): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#19 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleInertiaRequests.php(58): Inertia\Middleware->handle(Object(Illuminate\Http\Request), Object(Closure))
+#20 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleInertiaRequests->handle(Object(Illuminate\Http\Request), Object(Closure))
+#21 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceTwoFactorPolicy.php(16): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#22 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceTwoFactorPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#23 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsureAccountStillApproved.php(35): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#24 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureAccountStillApproved->handle(Object(Illuminate\Http\Request), Object(Closure))
+#25 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceSessionTimeout.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#26 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceSessionTimeout->handle(Object(Illuminate\Http\Request), Object(Closure))
+#27 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleAppearance.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#28 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleAppearance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#29 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#30 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#31 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#32 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#33 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#34 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle(Object(Illuminate\Http\Request), Object(Closure))
+#35 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#36 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#38 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#39 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#40 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#41 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#42 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#43 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#44 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#45 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#46 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#47 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#48 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#49 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#50 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->{closure:Illuminate\Foundation\Http\Kernel::dispatchToRouter():197}(Object(Illuminate\Http\Request))
+#51 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#52 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#53 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#55 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#57 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#58 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#59 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#60 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#61 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#62 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#63 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#64 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#65 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#66 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#67 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#68 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#69 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\TraceItTicketCreation.php(20): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#70 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\TraceItTicketCreation->handle(Object(Illuminate\Http\Request), Object(Closure))
+#71 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#72 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#73 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#74 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#75 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(573): Illuminate\Foundation\Testing\TestCase->call('GET', '/it/reports/dat...', Array, Array, Array, Array, '[]')
+#76 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(381): Illuminate\Foundation\Testing\TestCase->json('GET', '/it/reports/dat...', Array, Array, 0)
+#77 C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItServiceOperationsTest.php(760): Illuminate\Foundation\Testing\TestCase->getJson('/it/reports/dat...')
+#78 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseMethodFactory.php(177): P\Tests\Feature\It\ItServiceOperationsTest->{closure:C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItServiceOperationsTest.php:746}()
+#79 [internal function]: P\Tests\Feature\It\ItServiceOperationsTest->{closure:Pest\Factories\TestCaseMethodFactory::getClosure():167}()
+#80 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): call_user_func_array(Object(Closure), Array)
+#81 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Support\ExceptionTrace.php(26): P\Tests\Feature\It\ItServiceOperationsTest->{closure:Pest\Concerns\Testable::__callClosure():509}()
+#82 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): Pest\Support\ExceptionTrace::ensure(Object(Closure))
+#83 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(336): P\Tests\Feature\It\ItServiceOperationsTest->__callClosure(Object(Closure), Array)
+#84 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseFactory.php(175) : eval()'d code(161): P\Tests\Feature\It\ItServiceOperationsTest->__runTest(Object(Closure))
+#85 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(1335): P\Tests\Feature\It\ItServiceOperationsTest->__pest_evaluable_first_contact_resolution_includes_tickets_with_internal_notes_and_reconciles_to_its_drill_down()
+#86 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#87 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#88 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(359): PHPUnit\Framework\TestRunner->run(Object(P\Tests\Feature\It\ItServiceOperationsTest))
+#89 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#90 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#91 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#92 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\Application.php(229): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#93 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Kernel.php(103): PHPUnit\TextUI\Application->run(Array)
+#94 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(195): Pest\Kernel->handle(Array, Array)
+#95 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(203): {closure:C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest:19}()
+#96 C:\Users\steph\Herd\oblivionfindings\vendor\bin\pest(119): include('C:\\Users\\steph\\...')
+#97 {main}
+
+----------------------------------------------------------------------------------
+
+Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor()[39;22m
+
+  at [32mtests\Feature\It\ItServiceOperationsTest.php[39m:[32m761[39m
+    757▕     $to = now()->toDateString();
+    758▕ 
+    759▕     $metric = $this->actingAs($this->manager)
+    760▕         ->getJson("/it/reports/data?from={$from}&to={$to}")
+  ➜ 761▕         ->assertOk()
+    762▕         ->json('first_contact_resolution');
+    763▕     expect($metric['resolved'])->toBe(1)
+    764▕         ->and($metric['first_contact'])->toBe(1)
+    765▕         ->and($metric['href'])->toContain('first_contact=1');
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItServiceOperationsTest[22m [90m>[39m backlog age buckets are half open and never double count bound…   
+[39;1m  Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+The following exception occurred during the last request:
+
+Error: Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor() in C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItReportsController.php:556
+Stack trace:
+#0 C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItReportsController.php(195): App\Http\Controllers\It\ItReportsController->kpis(Object(Illuminate\Support\Carbon), Object(Illuminate\Support\Carbon), Object(App\Models\User))
+#1 C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\It\ItReportsController.php(48): App\Http\Controllers\It\ItReportsController->report(Object(Illuminate\Support\Carbon), Object(Illuminate\Support\Carbon), Object(App\Models\User))
+#2 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Controller.php(54): App\Http\Controllers\It\ItReportsController->data(Object(Illuminate\Http\Request))
+#3 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(43): Illuminate\Routing\Controller->callAction('data', Array)
+#4 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(269): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\It\ItReportsController), 'data')
+#5 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(215): Illuminate\Routing\Route->runController()
+#6 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#7 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->{closure:Illuminate\Routing\Router::runRouteWithinStack():821}(Object(Illuminate\Http\Request))
+#8 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#9 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'it.view')
+#10 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#11 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'it.request|it.v...')
+#12 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\AddContentSecurityPolicy.php(49): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#13 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\AddContentSecurityPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#14 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\PreventSearchIndexing.php(14): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#15 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventSearchIndexing->handle(Object(Illuminate\Http\Request), Object(Closure))
+#16 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets.php(32): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#17 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets->handle(Object(Illuminate\Http\Request), Object(Closure))
+#18 C:\Users\steph\Herd\oblivionfindings\vendor\inertiajs\inertia-laravel\src\Middleware.php(122): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#19 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleInertiaRequests.php(58): Inertia\Middleware->handle(Object(Illuminate\Http\Request), Object(Closure))
+#20 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleInertiaRequests->handle(Object(Illuminate\Http\Request), Object(Closure))
+#21 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceTwoFactorPolicy.php(16): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#22 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceTwoFactorPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#23 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnsureAccountStillApproved.php(35): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#24 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureAccountStillApproved->handle(Object(Illuminate\Http\Request), Object(Closure))
+#25 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\EnforceSessionTimeout.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#26 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceSessionTimeout->handle(Object(Illuminate\Http\Request), Object(Closure))
+#27 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\HandleAppearance.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#28 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleAppearance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#29 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#30 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#31 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#32 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#33 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#34 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle(Object(Illuminate\Http\Request), Object(Closure))
+#35 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#36 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#38 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#39 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#40 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#41 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#42 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#43 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#44 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#45 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#46 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#47 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#48 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#49 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#50 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->{closure:Illuminate\Foundation\Http\Kernel::dispatchToRouter():197}(Object(Illuminate\Http\Request))
+#51 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#52 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#53 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#55 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#57 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#58 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#59 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#60 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#61 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#62 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#63 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#64 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#65 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#66 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#67 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#68 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#69 C:\Users\steph\Herd\oblivionfindings\app\Http\Middleware\TraceItTicketCreation.php(20): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#70 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\TraceItTicketCreation->handle(Object(Illuminate\Http\Request), Object(Closure))
+#71 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#72 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#73 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#74 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#75 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(573): Illuminate\Foundation\Testing\TestCase->call('GET', '/it/reports/dat...', Array, Array, Array, Array, '[]')
+#76 C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(381): Illuminate\Foundation\Testing\TestCase->json('GET', '/it/reports/dat...', Array, Array, 0)
+#77 C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItServiceOperationsTest.php(786): Illuminate\Foundation\Testing\TestCase->getJson('/it/reports/dat...')
+#78 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseMethodFactory.php(177): P\Tests\Feature\It\ItServiceOperationsTest->{closure:C:\Users\steph\Herd\oblivionfindings\tests\Feature\It\ItServiceOperationsTest.php:774}()
+#79 [internal function]: P\Tests\Feature\It\ItServiceOperationsTest->{closure:Pest\Factories\TestCaseMethodFactory::getClosure():167}()
+#80 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): call_user_func_array(Object(Closure), Array)
+#81 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Support\ExceptionTrace.php(26): P\Tests\Feature\It\ItServiceOperationsTest->{closure:Pest\Concerns\Testable::__callClosure():509}()
+#82 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): Pest\Support\ExceptionTrace::ensure(Object(Closure))
+#83 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(336): P\Tests\Feature\It\ItServiceOperationsTest->__callClosure(Object(Closure), Array)
+#84 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseFactory.php(175) : eval()'d code(170): P\Tests\Feature\It\ItServiceOperationsTest->__runTest(Object(Closure))
+#85 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(1335): P\Tests\Feature\It\ItServiceOperationsTest->__pest_evaluable_backlog_age_buckets_are_half_open_and_never_double_count_boundaries()
+#86 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#87 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#88 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(359): PHPUnit\Framework\TestRunner->run(Object(P\Tests\Feature\It\ItServiceOperationsTest))
+#89 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#90 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#91 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#92 C:\Users\steph\Herd\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\Application.php(229): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#93 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\src\Kernel.php(103): PHPUnit\TextUI\Application->run(Array)
+#94 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(195): Pest\Kernel->handle(Array, Array)
+#95 C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest(203): {closure:C:\Users\steph\Herd\oblivionfindings\vendor\pestphp\pest\bin\pest:19}()
+#96 C:\Users\steph\Herd\oblivionfindings\vendor\bin\pest(119): include('C:\\Users\\steph\\...')
+#97 {main}
+
+----------------------------------------------------------------------------------
+
+Call to undefined method App\Domain\It\Services\ItAutomationScheduleCatalog::freshnessFor()[39;22m
+
+  at [32mtests\Feature\It\ItServiceOperationsTest.php[39m:[32m786[39m
+    782▕             'created_at' => $now->copy()->subDays($days),
+    783▕         ]);
+    784▕     }
+    785▕ 
+  ➜ 786▕     $data = $this->actingAs($this->manager)->getJson('/it/reports/data')->assertOk()->json('backlog_age');
+    787▕     $sum = collect($data)->sum('count');
+    788▕     expect($sum)->toBe(3)
+    789▕         ->and($data['under_2_days']['count'])->toBe(1)
+    790▕         ->and($data['days_2_to_7']['count'])->toBe(1)
+
+
+  [90mTests:[39m    [31;1m9 failed[39;22m[90m,[39m[39m [39m[32;1m53 passed[39;22m[90m (768 assertions)[39m
+  [90mDuration:[39m [39m352.14s[39m
+

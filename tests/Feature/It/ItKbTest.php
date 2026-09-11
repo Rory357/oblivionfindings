@@ -3,6 +3,7 @@
 use App\Models\AuditLog;
 use App\Models\ItKbArticle;
 use App\Models\ItKbInteraction;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -20,6 +21,12 @@ function kbUser(string $role): User
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->hr = kbUser('hr');
+    // This lifecycle fixture is explicitly both an author and a reviewer;
+    // ordinary IT management no longer conveys either capability.
+    $this->hr->permissionOverrides()->syncWithoutDetaching(
+        Permission::query()->whereIn('key', ['it.knowledge.author', 'it.knowledge.review'])
+            ->pluck('id')->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all(),
+    );
 });
 
 test('an agent creates a KB article with an application-unique slug', function () {
@@ -80,12 +87,13 @@ test('agents edit articles and use the governed publish lifecycle while the slug
 
     $this->actingAs($this->hr)->patch("/it/kb/{$article->id}", [
         'body' => 'Published guidance corrected without bypassing lifecycle state.',
-    ])->assertRedirect();
+    ])->assertRedirect()->assertSessionHas('error', 'Return this article to draft before editing its content.');
     expect($article->fresh()->status)->toBe('published')
+        ->and($article->fresh()->body)->toBe('Edited body.')
         ->and($article->fresh()->slug)->toBe($slug);
 });
 
-test('KB authoring is agent-only while deletion is reasoned and draft-only', function () {
+test('KB authoring requires its explicit grant while deletion is reasoned and draft-only', function () {
     $worker = kbUser('support_worker');
     $first = ItKbArticle::factory()->create();
     $second = ItKbArticle::factory()->create();

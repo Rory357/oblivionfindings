@@ -1,0 +1,10 @@
+{
+  "token": "it_f8082a930d9945d2",
+  "passed": 1,
+  "failed": 0,
+  "assertions": 30.0,
+  "execution_seconds": 182.0,
+  "wrapper_exit": 0,
+  "schema_absent_postflight": true,
+  "real_workers": true
+}

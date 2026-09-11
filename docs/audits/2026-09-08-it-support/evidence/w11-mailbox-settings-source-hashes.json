@@ -1,0 +1,70 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItMailboxConfigurationService.php",
+    "sha256": "58EBFA23EFC728C9F9D2976E39FC8CD6EFA392F6C211561FAB2D0F6D62658938"
+  },
+  {
+    "path": "app/Domain/It/Services/ItMailboxConnectionPresenter.php",
+    "sha256": "19ECC993441FEFDA2B2B418D123BEE4FCA0906B5F331D3D9768C63A227B71E3A"
+  },
+  {
+    "path": "app/Domain/It/Services/ItMailboxInbox.php",
+    "sha256": "BD911BDB68E29C4F854D27AA31E186D2FB2DA148679F681BC894EF0787998085"
+  },
+  {
+    "path": "app/Domain/It/Services/ItMailboxPollState.php",
+    "sha256": "01454308BBA07AF7809847A007773453937F363B7BBE4E6900B71996AAA4BA67"
+  },
+  {
+    "path": "app/Models/ItMailboxConnection.php",
+    "sha256": "F2EE85E7DA8668B7B2A03EDFAA498E26E466D27C99866BC1F9450C9B273EE6AA"
+  },
+  {
+    "path": "app/Jobs/PollItMailboxJob.php",
+    "sha256": "697C469DB8D7A3BE5D3898D8188C00B2E6024701360C0EEE95925BAFFEE52111"
+  },
+  {
+    "path": "app/Http/Controllers/Settings/ItMailboxSettingsController.php",
+    "sha256": "40F8D6402BC06C62481509F3739835CBD3C894162D352C1F68D218D1A9F28A5B"
+  },
+  {
+    "path": "app/Http/Controllers/Settings/ItMailboxOAuthController.php",
+    "sha256": "D6DD9CE364A54314B7DB5EBC330EE4DFADFABDA56139AAA51DA04743FD2BBBCD"
+  },
+  {
+    "path": "app/Http/Requests/Settings/UpdateItMailboxRequest.php",
+    "sha256": "CDBE98D70B962081DDB35C7124FCDB32208C6D3CB73A640F9920403EC4861CBA"
+  },
+  {
+    "path": "resources/js/pages/settings/it-mailbox.tsx",
+    "sha256": "E543B6D5505EE23BBD25605730FA43DAEECDB5304924F90D987D93E5E894917E"
+  },
+  {
+    "path": "resources/js/components/settings/it-mailbox-provider.tsx",
+    "sha256": "B30E68EE363575F3941D6AF6D44F652EFA4C6390C32BCCD756DF6FE32EBFEE24"
+  },
+  {
+    "path": "resources/js/components/settings/it-mailbox-contract.ts",
+    "sha256": "EC8A2F9FE4623EC0912E48BB4F3794385FE6B0C2A0448D9738015AF3519C09B5"
+  },
+  {
+    "path": "resources/js/hooks/use-settings-leave-confirmation.tsx",
+    "sha256": "63C318FA417C9BA5DE8D32C6859AAAAF5C6719CDEBBE0B758CA829B7E4F580E1"
+  },
+  {
+    "path": "resources/js/hooks/use-sso-leave-confirmation.tsx",
+    "sha256": "00DCA36ADEFAA33660BC825ABD88391134AE0EA422345D31F616B1E83E5DF55D"
+  },
+  {
+    "path": "resources/js/components/settings/__tests__/it-mailbox-recovery.test.tsx",
+    "sha256": "072994E4FE5989F8C55326EF498CDAEA491FB3AEF36DE0EFD4E6A8D0EDBBACEC"
+  },
+  {
+    "path": "tests/Feature/It/ItMailboxSettingsTest.php",
+    "sha256": "934DDEB12FB62EAD48C94F5D622235E9B662A6DDF48919CBB97966DD8CAB5C60"
+  },
+  {
+    "path": "tests/Support/It/mailbox-poll-concurrency-worker.php",
+    "sha256": "FD6E67DED62B4FD2ABF99FB91EE8EFCE396301007C99CF7D1AC33486D6AEC06C"
+  }
+]

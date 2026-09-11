@@ -1,0 +1,88 @@
+{
+    "ready": true,
+    "created_at": "2026-09-09T10:16:37+00:00",
+    "database": "oblivion_it_draft_browser_f55d5818cbf5499b",
+    "registry_count": 1002,
+    "fixtures": {
+        "sites": {
+            "a": 1,
+            "b": 2,
+            "c": 3
+        },
+        "actors": {
+            "requester": {
+                "id": 1,
+                "login": "w06-requester@demo.test"
+            },
+            "other": {
+                "id": 2,
+                "login": "w06-other@demo.test"
+            },
+            "tech": {
+                "id": 3,
+                "login": "w06-tech@demo.test"
+            },
+            "restricted": {
+                "id": 4,
+                "login": "w06-restricted@demo.test"
+            }
+        },
+        "permissions": {
+            "requester": [
+                "it.request"
+            ],
+            "other": [
+                "it.request"
+            ],
+            "tech": [
+                "it.request",
+                "it.view",
+                "it.manage",
+                "it.viewSensitive"
+            ],
+            "restricted": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ]
+        },
+        "tickets": {
+            "public_workspace": {
+                "id": 1,
+                "reference": "IT-000001"
+            },
+            "sensitive_participant": {
+                "id": 2,
+                "reference": "IT-000002"
+            },
+            "unapproved_site": {
+                "id": 3,
+                "reference": "IT-000003"
+            },
+            "resolve_workspace": {
+                "id": 4,
+                "reference": "IT-000004"
+            }
+        },
+        "retention_is_synthetic_only": true
+    },
+    "drafts_enabled": true,
+    "synthetic_retention_days": [
+        2,
+        3
+    ],
+    "provider_configuration_checks": {
+        "mailboxes_absent": true,
+        "app_settings_absent": true,
+        "service_providers_cleared": true
+    }
+}
+{
+  "started": true,
+  "token": "f55d5818cbf5499b",
+  "database": "oblivion_it_draft_browser_f55d5818cbf5499b",
+  "pid": 39548,
+  "url": "http://127.0.0.1:8766",
+  "root": "C:\\Users\\steph\\Herd\\oblivionfindings\\storage\\framework\\testing\\it-draft-browser-f55d5818cbf5499b",
+  "browser_verified": false
+}

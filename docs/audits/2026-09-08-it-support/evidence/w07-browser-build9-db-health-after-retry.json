@@ -1,0 +1,61 @@
+{
+    "observed_at": "2026-09-09T10:23:34+00:00",
+    "token": "f55d5818cbf5499b",
+    "database": "oblivion_it_draft_browser_f55d5818cbf5499b",
+    "connection_ms": 22.48,
+    "schema": {
+        "elapsed_ms": 0.64,
+        "rows": [
+            {
+                "schema_count": 1
+            }
+        ]
+    },
+    "tables": {
+        "elapsed_ms": 1.71,
+        "rows": [
+            {
+                "TABLE_NAME": "it_attachment_storage_intents",
+                "TABLE_TYPE": "BASE TABLE",
+                "ENGINE": "InnoDB",
+                "estimated_rows": 0
+            },
+            {
+                "TABLE_NAME": "it_ticket_comments",
+                "TABLE_TYPE": "BASE TABLE",
+                "ENGINE": "InnoDB",
+                "estimated_rows": 0
+            },
+            {
+                "TABLE_NAME": "it_tickets",
+                "TABLE_TYPE": "BASE TABLE",
+                "ENGINE": "InnoDB",
+                "estimated_rows": 4
+            },
+            {
+                "TABLE_NAME": "migrations",
+                "TABLE_TYPE": "BASE TABLE",
+                "ENGINE": "InnoDB",
+                "estimated_rows": 1002
+            },
+            {
+                "TABLE_NAME": "sessions",
+                "TABLE_TYPE": "BASE TABLE",
+                "ENGINE": "InnoDB",
+                "estimated_rows": 0
+            },
+            {
+                "TABLE_NAME": "users",
+                "TABLE_TYPE": "BASE TABLE",
+                "ENGINE": "InnoDB",
+                "estimated_rows": 4
+            }
+        ]
+    },
+    "processes": {
+        "elapsed_ms": 0.8,
+        "rows": []
+    },
+    "database_mutations_performed": false,
+    "raw_sql_and_private_values_emitted": false
+}

@@ -1,0 +1,2381 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/pages/it/setup/setup-workspace.test.tsx (3 tests | 2 failed) 824ms
+     × uses one connected header and filters the actual list while keeping scoped meters factual 474ms
+     × links meters and rail to real filtered views using history-preserving navigation 223ms
+ ❯ resources/js/components/it/__tests__/it-module-navigation.test.tsx (7 tests | 4 failed) 1068ms
+     × renders service management setup with workload and contextual create actions 268ms
+     × shows scoped API identity metadata and a one-time credential in setup 202ms
+     × makes joiner mover and leaver templates understandable from setup 128ms
+     × shows configuration, email delivery, and existing scheduler health in one operations audit 141ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/it-module-navigation.test.tsx > IT & Support grouped navigation > renders service management setup with workload and contextual create actions
+TestingLibraryElementError: Unable to find an accessible element with the role "heading" and name "Teams, queues & services"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  Name "":
+  <main
+    class="space-y-5"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "IT setup":
+  <h1
+    class="truncate text-[22px] leading-tight font-bold tracking-tight"
+  />
+
+  Name "Teams":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  Name "Network operations":
+  <h3
+    class="truncate text-[15px] leading-tight font-[650] tracking-tight"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search teams"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New team":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "View active teams":
+  <button
+    aria-label="View active teams"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View active queues":
+  <button
+    aria-label="View active queues"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View routing gaps":
+  <button
+    aria-label="View routing gaps"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 eh-meter--warning"
+    type="button"
+  />
+
+  Name "View active services":
+  <button
+    aria-label="View active services"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "Availability":
+  <button
+    aria-controls="radix-_r_0_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Find a view":
+  <button
+    aria-label="Find a view"
+    class="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
+    title="Find a view"
+    type="button"
+  />
+
+  Name "Network operations Team membership and ownership Active4 open tickets2 members2 tasks1 queues No managerNo members No accountable person Team manager Edit":
+  <div
+    class="bg-card text-card-foreground border group relative flex flex-col gap-0 overflow-hidden rounded-[14px] py-0 shadow-sm transition-all duration-150 outline-none hover:-translate-y-0.5 hover:border-primary hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+    data-slot="card"
+    role="button"
+    tabindex="0"
+  />
+
+  Name "Actions for Network operations":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Network operations"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring -mt-0.5 -mr-1"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_4_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "Setup layout":
+  <div
+    aria-label="Setup layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  tablist:
+
+  Name "Service management setup":
+  <div
+    aria-label="Service management setup"
+    class="flex w-full flex-wrap items-end gap-1"
+    role="tablist"
+  />
+
+  --------------------------------------------------
+  tab:
+
+  Name "Teams":
+  <button
+    aria-selected="true"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary"
+    role="tab"
+    type="button"
+  />
+
+  Name "Queues":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Services":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Catalogue":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Workflows":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "API":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Operations":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  --------------------------------------------------
+  region:
+
+  Name "Teams":
+  <section
+    aria-label="Teams"
+    class="space-y-4"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <main
+          class="space-y-5"
+        >
+          <header
+            class="eh-header text-primary-foreground"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-route size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="6"
+                          cy="19"
+                          r="3"
+                        />
+                        <path
+                          d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"
+                        />
+                        <circle
+                          cx="18"
+                          cy="5"
+                          r="3"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="truncate text-[22px] leading-tight font-bold tracking-tight"
+                        >
+                          IT setup
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Ownership, routing and service configuration ·
+                         
+                        Snapshot from this page load
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search teams"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                    <button
+                      class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+                      type="button"
+                    >
+                      <svg
+                        class="lucide lucide-plus size-4"
+                        fill="none"
+                        height="24"
+                        stroke="cur...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/it/__tests__/it-module-navigation.test.tsx:184:20
+    182|
+    183|         expect(
+    184|             screen.getByRole('heading', { name: 'Teams, queues & servi…
+       |                    ^
+    185|         ).toBeVisible();
+    186|         expect(screen.getByText('Network operations')).toBeVisible();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  resources/js/components/it/__tests__/it-module-navigation.test.tsx > IT & Support grouped navigation > shows scoped API identity metadata and a one-time credential in setup
+TestingLibraryElementError: Unable to find an accessible element with the role "tab" and name "API identities"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  Name "":
+  <main
+    class="space-y-5"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "IT setup":
+  <h1
+    class="truncate text-[22px] leading-tight font-bold tracking-tight"
+  />
+
+  Name "API identities":
+  <h2
+    class="font-semibold"
+  />
+
+  Name "Copy Native monitoring's credential now":
+  <h3
+    class="font-semibold"
+  />
+
+  Name "Native monitoring":
+  <h3
+    class="font-semibold"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  Name "":
+  <p
+    class="text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="mt-1 text-sm text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="mt-1 font-mono text-xs text-primary"
+  />
+
+  Name "":
+  <p
+    class="mt-3 text-sm text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="mt-3 flex items-start gap-2 text-xs text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search api"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "View active teams":
+  <button
+    aria-label="View active teams"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View active queues":
+  <button
+    aria-label="View active queues"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View routing gaps":
+  <button
+    aria-label="View routing gaps"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View active services":
+  <button
+    aria-label="View active services"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "Find a view":
+  <button
+    aria-label="Find a view"
+    class="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
+    title="Find a view"
+    type="button"
+  />
+
+  Name "New API identity":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+  />
+
+  Name "Copy":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+    type="button"
+  />
+
+  Name "Revoke":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+    data-slot="button"
+  />
+
+  --------------------------------------------------
+  tablist:
+
+  Name "Service management setup":
+  <div
+    aria-label="Service management setup"
+    class="flex w-full flex-wrap items-end gap-1"
+    role="tablist"
+  />
+
+  --------------------------------------------------
+  tab:
+
+  Name "Teams":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Queues":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Services":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Catalogue":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Workflows":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "API":
+  <button
+    aria-selected="true"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary"
+    role="tab"
+    type="button"
+  />
+
+  Name "Operations":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  --------------------------------------------------
+  status:
+
+  Name "":
+  <div
+    class="m-4 rounded-xl border border-status-warning/35 bg-status-warning-bg p-4"
+    role="status"
+  />
+
+  --------------------------------------------------
+  textbox:
+
+  Name "One-time API credential":
+  <input
+    aria-label="One-time API credential"
+    class="border-input file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive font-mono text-xs"
+    data-slot="input"
+    readonly=""
+    value="ofi_public_secret-shown-once"
+  />
+
+  --------------------------------------------------
+  article:
+
+  Name "":
+  <article
+    class="rounded-xl border border-border/70 p-4"
+  />
+
+  --------------------------------------------------
+  term:
+
+  Name "":
+  <dt
+    class="text-muted-foreground"
+  />
+
+  Name "":
+  <dt
+    class="text-muted-foreground"
+  />
+
+  Name "":
+  <dt
+    class="text-muted-foreground"
+  />
+
+  Name "":
+  <dt
+    class="text-muted-foreground"
+  />
+
+  Name "":
+  <dt
+    class="text-muted-foreground"
+  />
+
+  Name "":
+  <dt
+    class="text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  definition:
+
+  Name "":
+  <dd
+    class="font-medium"
+  />
+
+  Name "":
+  <dd
+    class="font-medium"
+  />
+
+  Name "":
+  <dd
+    class="font-medium"
+  />
+
+  Name "":
+  <dd
+    class="font-medium"
+  />
+
+  Name "":
+  <dd
+    class="font-medium"
+  />
+
+  Name "":
+  <dd
+    class="font-medium"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <main
+          class="space-y-5"
+        >
+          <header
+            class="eh-header text-primary-foreground"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-route size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="6"
+                          cy="19"
+                          r="3"
+                        />
+                        <path
+                          d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"
+                        />
+                        <circle
+                          cx="18"
+                          cy="5"
+                          r="3"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="truncate text-[22px] leading-tight font-bold tracking-tight"
+                        >
+                          IT setup
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Ownership, routing and service configuration ·
+                         
+                        Snapshot from this page load
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search api"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2"
+                >
+                  <button
+                    aria-label="View active teams"
+                    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+                    type="button"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="lucide lucide-arrow-up-right eh-...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/it/__tests__/it-module-navigation.test.tsx:252:20
+    250|
+    251|         expect(
+    252|             screen.getByRole('tab', { name: 'API identities' }),
+       |                    ^
+    253|         ).toHaveAttribute('aria-selected', 'true');
+    254|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  resources/js/components/it/__tests__/it-module-navigation.test.tsx > IT & Support grouped navigation > makes joiner mover and leaver templates understandable from setup
+TestingLibraryElementError: Unable to find an accessible element with the role "tab" and name "Provisioning workflows"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  Name "":
+  <main
+    class="space-y-5"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "IT setup":
+  <h1
+    class="truncate text-[22px] leading-tight font-bold tracking-tight"
+  />
+
+  Name "Teams":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search teams"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New team":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "View active teams":
+  <button
+    aria-label="View active teams"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View active queues":
+  <button
+    aria-label="View active queues"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View routing gaps":
+  <button
+    aria-label="View routing gaps"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View active services":
+  <button
+    aria-label="View active services"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "Availability":
+  <button
+    aria-controls="radix-_r_r_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Find a view":
+  <button
+    aria-label="Find a view"
+    class="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
+    title="Find a view"
+    type="button"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "Setup layout":
+  <div
+    aria-label="Setup layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  tablist:
+
+  Name "Service management setup":
+  <div
+    aria-label="Service management setup"
+    class="flex w-full flex-wrap items-end gap-1"
+    role="tablist"
+  />
+
+  --------------------------------------------------
+  tab:
+
+  Name "Teams":
+  <button
+    aria-selected="true"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary"
+    role="tab"
+    type="button"
+  />
+
+  Name "Queues":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Services":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Catalogue":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Workflows":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "API":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Operations":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  --------------------------------------------------
+  region:
+
+  Name "Teams":
+  <section
+    aria-label="Teams"
+    class="space-y-4"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <main
+          class="space-y-5"
+        >
+          <header
+            class="eh-header text-primary-foreground"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-route size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="6"
+                          cy="19"
+                          r="3"
+                        />
+                        <path
+                          d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"
+                        />
+                        <circle
+                          cx="18"
+                          cy="5"
+                          r="3"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="truncate text-[22px] leading-tight font-bold tracking-tight"
+                        >
+                          IT setup
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Ownership, routing and service configuration ·
+                         
+                        Snapshot from this page load
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search teams"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                    <button
+                      class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+                      type="button"
+                    >
+                      <svg
+                        class="lucide lucide-plus size-4"
+                        fill="none"
+                        height="24"
+                        stroke="cur...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/it/__tests__/it-module-navigation.test.tsx:318:20
+    316|
+    317|         fireEvent.click(
+    318|             screen.getByRole('tab', { name: 'Provisioning workflows' }…
+       |                    ^
+    319|         );
+    320|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  resources/js/components/it/__tests__/it-module-navigation.test.tsx > IT & Support grouped navigation > shows configuration, email delivery, and existing scheduler health in one operations audit
+TestingLibraryElementError: Unable to find an accessible element with the role "tab" and name "Operations audit"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  Name "":
+  <main
+    class="space-y-5"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "IT setup":
+  <h1
+    class="truncate text-[22px] leading-tight font-bold tracking-tight"
+  />
+
+  Name "Teams":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search teams"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New team":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "View active teams":
+  <button
+    aria-label="View active teams"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View active queues":
+  <button
+    aria-label="View active queues"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View routing gaps":
+  <button
+    aria-label="View routing gaps"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View active services":
+  <button
+    aria-label="View active services"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "Availability":
+  <button
+    aria-controls="radix-_r_15_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Find a view":
+  <button
+    aria-label="Find a view"
+    class="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
+    title="Find a view"
+    type="button"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "Setup layout":
+  <div
+    aria-label="Setup layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  tablist:
+
+  Name "Service management setup":
+  <div
+    aria-label="Service management setup"
+    class="flex w-full flex-wrap items-end gap-1"
+    role="tablist"
+  />
+
+  --------------------------------------------------
+  tab:
+
+  Name "Teams":
+  <button
+    aria-selected="true"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary"
+    role="tab"
+    type="button"
+  />
+
+  Name "Queues":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Services":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Catalogue":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Workflows":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "API":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Operations":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  --------------------------------------------------
+  region:
+
+  Name "Teams":
+  <section
+    aria-label="Teams"
+    class="space-y-4"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <main
+          class="space-y-5"
+        >
+          <header
+            class="eh-header text-primary-foreground"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-route size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="6"
+                          cy="19"
+                          r="3"
+                        />
+                        <path
+                          d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"
+                        />
+                        <circle
+                          cx="18"
+                          cy="5"
+                          r="3"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="truncate text-[22px] leading-tight font-bold tracking-tight"
+                        >
+                          IT setup
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Ownership, routing and service configuration ·
+                         
+                        Snapshot from this page load
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search teams"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                    <button
+                      class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+                      type="button"
+                    >
+                      <svg
+                        class="lucide lucide-plus size-4"
+                        fill="none"
+                        height="24"
+                        stroke="cur...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/components/it/__tests__/it-module-navigation.test.tsx:424:32
+    422|         );
+    423|
+    424|         fireEvent.click(screen.getByRole('tab', { name: 'Operations au…
+       |                                ^
+    425|
+    426|         expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  resources/js/pages/it/setup/setup-workspace.test.tsx > Setup workspace presentation > uses one connected header and filters the actual list while keeping scoped meters factual
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name `/Active teams/`
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main
+    class="space-y-5"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "IT setup":
+  <h1
+    class="truncate text-[22px] leading-tight font-bold tracking-tight"
+  />
+
+  Name "Teams":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  Name "Network team":
+  <h3
+    class="truncate text-[15px] leading-tight font-[650] tracking-tight"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search teams"
+    type="search"
+    value="Network"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New team":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "View active teams":
+  <button
+    aria-label="View active teams"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View active queues":
+  <button
+    aria-label="View active queues"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View routing gaps":
+  <button
+    aria-label="View routing gaps"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 eh-meter--warning"
+    type="button"
+  />
+
+  Name "View active services":
+  <button
+    aria-label="View active services"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "Availability":
+  <button
+    aria-controls="radix-_r_0_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Find a view":
+  <button
+    aria-label="Find a view"
+    class="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
+    title="Find a view"
+    type="button"
+  />
+
+  Name "Network team Network access Active3 open tickets1 members2 tasks1 queues DM Desk manager Team manager Edit":
+  <div
+    class="bg-card text-card-foreground border group relative flex flex-col gap-0 overflow-hidden rounded-[14px] py-0 shadow-sm transition-all duration-150 outline-none hover:-translate-y-0.5 hover:border-primary hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+    data-slot="card"
+    role="button"
+    tabindex="0"
+  />
+
+  Name "Actions for Network team":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Network team"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring -mt-0.5 -mr-1"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_4_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "Setup layout":
+  <div
+    aria-label="Setup layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  tablist:
+
+  Name "Service management setup":
+  <div
+    aria-label="Service management setup"
+    class="flex w-full flex-wrap items-end gap-1"
+    role="tablist"
+  />
+
+  --------------------------------------------------
+  tab:
+
+  Name "Teams":
+  <button
+    aria-selected="true"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary"
+    role="tab"
+    type="button"
+  />
+
+  Name "Queues":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Services":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Catalogue":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Workflows":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "API":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Operations":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  --------------------------------------------------
+  region:
+
+  Name "Teams":
+  <section
+    aria-label="Teams"
+    class="space-y-4"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main
+      class="space-y-5"
+    >
+      <header
+        class="eh-header text-primary-foreground"
+      >
+        <div
+          class="relative z-[1] flex h-full flex-col"
+        >
+          <div
+            class="flex flex-col px-[22px] pt-[18px]"
+          >
+            <div
+              class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+            >
+              <div
+                class="flex min-w-0 items-start gap-[13px]"
+              >
+                <span
+                  class="eh-mark-ring"
+                >
+                  <svg
+                    class="lucide lucide-route size-5"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle
+                      cx="6"
+                      cy="19"
+                      r="3"
+                    />
+                    <path
+                      d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"
+                    />
+                    <circle
+                      cx="18"
+                      cy="5"
+                      r="3"
+                    />
+                  </svg>
+                </span>
+                <div
+                  class="flex min-w-0 flex-col"
+                >
+                  <div
+                    class="flex flex-wrap items-center gap-2"
+                  >
+                    <h1
+                      class="truncate text-[22px] leading-tight font-bold tracking-tight"
+                    >
+                      IT setup
+                    </h1>
+                  </div>
+                  <p
+                    class="mt-[3px] text-[13px] text-primary-foreground/65"
+                  >
+                    Ownership, routing and service configuration ·
+                     
+                    Snapshot from this page load
+                  </p>
+                </div>
+              </div>
+              <div
+                class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+              >
+                <div
+                  class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                >
+                  <svg
+                    class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle
+                      cx="11"
+                      cy="11"
+                      r="8"
+                    />
+                    <path
+                      d="m21 21-4.3-4.3"
+                    />
+                  </svg>
+                  <input
+                    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                    placeholder="Search teams"
+                    type="search"
+                    value="Network"
+                  />
+                  <kbd
+                    aria-hidden="true"
+                    class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                  >
+                    /
+                  </kbd>
+                </div>
+                <button
+                  class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+                  type="button"
+                >
+                  <svg
+                    class="lucide lucide-plus size-4"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M5 12h14"
+                    />
+                    <pat...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/setup/setup-workspace.test.tsx:104:20
+    102|         ).not.toBeInTheDocument();
+    103|         expect(
+    104|             screen.getByRole('button', { name: /Active teams/ }),
+       |                    ^
+    105|         ).toHaveTextContent('1 of 2 teams');
+    106|         expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  resources/js/pages/it/setup/setup-workspace.test.tsx > Setup workspace presentation > links meters and rail to real filtered views using history-preserving navigation
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name `/Routing gaps/`
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main
+    class="space-y-5"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "IT setup":
+  <h1
+    class="truncate text-[22px] leading-tight font-bold tracking-tight"
+  />
+
+  Name "Teams":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  Name "Network team":
+  <h3
+    class="truncate text-[15px] leading-tight font-[650] tracking-tight"
+  />
+
+  Name "Archived team":
+  <h3
+    class="truncate text-[15px] leading-tight font-[650] tracking-tight"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search teams"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New team":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "View active teams":
+  <button
+    aria-label="View active teams"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View active queues":
+  <button
+    aria-label="View active queues"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "View routing gaps":
+  <button
+    aria-label="View routing gaps"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 eh-meter--warning"
+    type="button"
+  />
+
+  Name "View active services":
+  <button
+    aria-label="View active services"
+    class="eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+    type="button"
+  />
+
+  Name "Availability":
+  <button
+    aria-controls="radix-_r_e_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Find a view":
+  <button
+    aria-label="Find a view"
+    class="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
+    title="Find a view"
+    type="button"
+  />
+
+  Name "Network team Network access Active3 open tickets1 members2 tasks1 queues DM Desk manager Team manager Edit":
+  <div
+    class="bg-card text-card-foreground border group relative flex flex-col gap-0 overflow-hidden rounded-[14px] py-0 shadow-sm transition-all duration-150 outline-none hover:-translate-y-0.5 hover:border-primary hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+    data-slot="card"
+    role="button"
+    tabindex="0"
+  />
+
+  Name "Actions for Network team":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Network team"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring -mt-0.5 -mr-1"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_i_"
+    type="button"
+  />
+
+  Name "Archived team Team membership and ownership Inactive0 open tickets0 members0 tasks0 queues No managerNo members No accountable person Team manager Edit":
+  <div
+    class="bg-card text-card-foreground border group relative flex flex-col gap-0 overflow-hidden rounded-[14px] py-0 shadow-sm transition-all duration-150 outline-none hover:-translate-y-0.5 hover:border-primary hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring cursor-pointer opacity-75"
+    data-slot="card"
+    role="button"
+    tabindex="0"
+  />
+
+  Name "Actions for Archived team":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Archived team"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring -mt-0.5 -mr-1"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_k_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "Setup layout":
+  <div
+    aria-label="Setup layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  tablist:
+
+  Name "Service management setup":
+  <div
+    aria-label="Service management setup"
+    class="flex w-full flex-wrap items-end gap-1"
+    role="tablist"
+  />
+
+  --------------------------------------------------
+  tab:
+
+  Name "Teams":
+  <button
+    aria-selected="true"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary"
+    role="tab"
+    type="button"
+  />
+
+  Name "Queues":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Services":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Catalogue":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Workflows":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "API":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  Name "Operations":
+  <button
+    aria-selected="false"
+    class="inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
+    role="tab"
+    type="button"
+  />
+
+  --------------------------------------------------
+  region:
+
+  Name "Teams":
+  <section
+    aria-label="Teams"
+    class="space-y-4"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <main
+      class="space-y-5"
+    >
+      <header
+        class="eh-header text-primary-foreground"
+      >
+        <div
+          class="relative z-[1] flex h-full flex-col"
+        >
+          <div
+            class="flex flex-col px-[22px] pt-[18px]"
+          >
+            <div
+              class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+            >
+              <div
+                class="flex min-w-0 items-start gap-[13px]"
+              >
+                <span
+                  class="eh-mark-ring"
+                >
+                  <svg
+                    class="lucide lucide-route size-5"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle
+                      cx="6"
+                      cy="19"
+                      r="3"
+                    />
+                    <path
+                      d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"
+                    />
+                    <circle
+                      cx="18"
+                      cy="5"
+                      r="3"
+                    />
+                  </svg>
+                </span>
+                <div
+                  class="flex min-w-0 flex-col"
+                >
+                  <div
+                    class="flex flex-wrap items-center gap-2"
+                  >
+                    <h1
+                      class="truncate text-[22px] leading-tight font-bold tracking-tight"
+                    >
+                      IT setup
+                    </h1>
+                  </div>
+                  <p
+                    class="mt-[3px] text-[13px] text-primary-foreground/65"
+                  >
+                    Ownership, routing and service configuration ·
+                     
+                    Snapshot from this page load
+                  </p>
+                </div>
+              </div>
+              <div
+                class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+              >
+                <div
+                  class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                >
+                  <svg
+                    class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle
+                      cx="11"
+                      cy="11"
+                      r="8"
+                    />
+                    <path
+                      d="m21 21-4.3-4.3"
+                    />
+                  </svg>
+                  <input
+                    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                    placeholder="Search teams"
+                    type="search"
+                    value=""
+                  />
+                  <kbd
+                    aria-hidden="true"
+                    class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                  >
+                    /
+                  </kbd>
+                </div>
+                <button
+                  class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+                  type="button"
+                >
+                  <svg
+                    class="lucide lucide-plus size-4"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M5 12h14"
+                    />
+                    <path
+...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/setup/setup-workspace.test.tsx:115:32
+    113|         const get = vi.spyOn(router, 'get').mockImplementation(() => {…
+    114|         render(<ItSetupIndex {...props} />);
+    115|         fireEvent.click(screen.getByRole('button', { name: /Routing ga…
+       |                                ^
+    116|         expect(get.mock.calls[0]).toEqual([
+    117|             '/it/setup',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  2 failed | 2 passed (4)
+      Tests  6 failed | 21 passed (27)
+   Start at  15:35:55
+   Duration  7.93s (transform 713ms, setup 510ms, import 8.05s, tests 8.50s, environment 3.80s)
+

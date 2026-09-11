@@ -6,10 +6,13 @@ use App\Domain\It\Data\ItTransitionInput;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItApiWorkItemService;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\It\Api\LinkItApiWorkItemRequest;
 use App\Http\Requests\It\Api\StoreItApiCommentRequest;
 use App\Http\Requests\It\Api\StoreItApiWorkItemRequest;
 use App\Http\Requests\It\Api\TransitionItApiWorkItemRequest;
+use App\Http\Requests\It\Api\UpdateItApiWorkItemRequest;
 use App\Http\Resources\ItApiWorkItemResource;
+use App\Models\ItApiRequest;
 use App\Models\ItServiceIdentity;
 use App\Models\ItTicket;
 use DomainException;
@@ -21,7 +24,7 @@ class ItApiWorkItemController extends Controller
 
     public function store(StoreItApiWorkItemRequest $request)
     {
-        $ticket = $this->workItems->create($this->identity($request), $request->validated());
+        $ticket = $this->workItems->create($this->identity($request), $request->validated(), $this->apiRequest($request));
 
         return (new ItApiWorkItemResource($ticket))->response()->setStatusCode(201);
     }
@@ -31,14 +34,37 @@ class ItApiWorkItemController extends Controller
         return new ItApiWorkItemResource($this->ticket($request, $workItem, 'work:read', false));
     }
 
+    public function update(UpdateItApiWorkItemRequest $request, int $workItem)
+    {
+        try {
+            return new ItApiWorkItemResource($this->workItems->update(
+                $this->identity($request), $this->validatedTicket($request), $request->validated(), $this->apiRequest($request),
+            ));
+        } catch (DomainException $exception) {
+            return response()->json(['message' => $exception->getMessage(), 'code' => 'update_rejected'], 422);
+        }
+    }
+
+    public function related(LinkItApiWorkItemRequest $request, int $workItem): ItApiWorkItemResource
+    {
+        return new ItApiWorkItemResource($this->workItems->changeRelated(
+            $this->identity($request), $workItem, $request->validated(), $this->apiRequest($request),
+        ));
+    }
+
     public function comment(StoreItApiCommentRequest $request, int $workItem)
     {
         $identity = $this->identity($request);
-        $comment = $this->workItems->addPublicComment(
-            $identity,
-            $this->validatedTicket($request),
-            (string) $request->validated('body'),
-        );
+        try {
+            $comment = $this->workItems->addPublicComment(
+                $identity,
+                $this->validatedTicket($request),
+                (string) $request->validated('body'),
+                $this->apiRequest($request),
+            );
+        } catch (DomainException $exception) {
+            return response()->json(['message' => $exception->getMessage(), 'code' => 'comment_rejected'], 422);
+        }
 
         return response()->json(['data' => [
             'id' => $comment->id,
@@ -66,6 +92,8 @@ class ItApiWorkItemController extends Controller
                     resolutionCode: $data['resolution_code'] ?? null,
                     resolutionSummary: $data['resolution_summary'] ?? null,
                     source: 'service_api',
+                    expectedVersion: (int) $data['expected_version'],
+                    resolutionVerification: $data['resolution_verification'] ?? null,
                 ),
             );
         } catch (DomainException $exception) {
@@ -84,6 +112,14 @@ class ItApiWorkItemController extends Controller
         $identity = $request->attributes->get('it_service_identity');
 
         return $identity;
+    }
+
+    private function apiRequest(Request $request): ItApiRequest
+    {
+        $receipt = $request->attributes->get('it_api_request');
+        abort_unless($receipt instanceof ItApiRequest, 500);
+
+        return $receipt;
     }
 
     private function ticket(

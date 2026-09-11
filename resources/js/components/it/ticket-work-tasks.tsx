@@ -1,26 +1,19 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
-import { Textarea } from '@/components/ui/textarea';
+import type {
+    ItWorkTaskCommitted,
+    ItWorkTaskOperation,
+    ItWorkTaskRecord,
+} from '@/hooks/it-work-task-command';
+import { summarizeItWorkTasks } from '@/hooks/it-work-task-lifecycle';
+import {
+    purgeItWorkTaskMemory,
+    useItWorkTaskMemoryNotices,
+} from '@/hooks/use-it-ticket-draft-memory';
+import { pendingItWorkTaskCommands } from '@/hooks/use-it-work-task-command';
 import { formatDateTime } from '@/lib/datetime';
-import { router } from '@inertiajs/react';
 import {
     Ban,
     CalendarClock,
@@ -28,8 +21,8 @@ import {
     CircleAlert,
     ClipboardCheck,
     Clock3,
-    FileCheck2,
     ListChecks,
+    ListOrdered,
     Pencil,
     PlayCircle,
     Plus,
@@ -37,74 +30,49 @@ import {
     UserRound,
     UsersRound,
 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useState } from 'react';
-import { toast } from 'sonner';
+import { useEffect, useRef, useState } from 'react';
+import { TicketWorkTaskActionDialog } from './ticket-work-task-action-dialog';
+import {
+    TicketWorkTaskHistory,
+    TicketWorkTaskReadiness,
+} from './ticket-work-task-history';
+import { TicketWorkTaskWizard } from './ticket-work-task-wizard';
 
-export interface TicketWorkTask {
-    id: number;
-    title: string;
-    description: string | null;
-    status: 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
-    due_at: string | null;
-    is_required: boolean;
-    evidence_required: boolean;
-    evidence: string[] | null;
-    completion_note: string | null;
-    completed_at: string | null;
-    sort_order: number;
-    team: { id: number; name: string } | null;
-    assignee: { id: number; name: string } | null;
-    completed_by: { id: number; name: string } | null;
-    dependencies: {
-        id: number;
-        title: string;
-        status: string;
-    }[];
-}
-
+export type TicketWorkTask = ItWorkTaskRecord;
 interface Option {
     id: number;
     name: string;
 }
-
 interface Props {
+    actorId: number;
     ticketId: number;
+    version: number;
     tasks: TicketWorkTask[];
+    /** A redacted task array is not an empty work register. */
+    canViewWork: boolean;
     canManage: boolean;
+    taskWork?: {
+        storage_ready: boolean;
+        can_create: boolean;
+        can_reorder: boolean;
+    };
     assignees: Option[];
     teams: Option[];
+    approvals?: { id: number; status: string }[];
+    onCommitted: (result: ItWorkTaskCommitted) => void;
+    onAccessLost?: () => void;
+    onSessionExpired?: () => void;
 }
-
-type TaskDialog =
-    | { type: 'create' }
-    | { type: 'edit'; task: TicketWorkTask }
-    | { type: 'complete'; task: TicketWorkTask }
-    | { type: 'reopen'; task: TicketWorkTask }
-    | null;
-
-interface TaskDraft {
-    title: string;
-    description: string;
-    status: 'pending' | 'in_progress' | 'blocked' | 'cancelled';
-    team_id: string;
-    assigned_to_user_id: string;
-    due_at: string;
-    is_required: boolean;
-    evidence_required: boolean;
-    dependency_ids: number[];
-    reason: string;
-}
-
-const NONE = 'none';
-
-const taskStatus = (
-    value: TicketWorkTask['status'],
-): {
-    label: string;
-    variant: StatusVariant;
-    icon: typeof Clock3;
-} => {
-    switch (value) {
+type TaskDialog = {
+    type: ItWorkTaskOperation;
+    task: TicketWorkTask | null;
+    version: number;
+    intent?: 'cancel' | 'restore';
+} | null;
+const presentation = (
+    status: TicketWorkTask['status'],
+): { label: string; variant: StatusVariant; icon: typeof Clock3 } => {
+    switch (status) {
         case 'in_progress':
             return { label: 'In progress', variant: 'info', icon: PlayCircle };
         case 'blocked':
@@ -122,1121 +90,615 @@ const taskStatus = (
     }
 };
 
-const toDateTimeInput = (value: string | null): string => {
-    if (!value) return '';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-    return local.toISOString().slice(0, 16);
-};
-
-const blankDraft = (): TaskDraft => ({
-    title: '',
-    description: '',
-    status: 'pending',
-    team_id: NONE,
-    assigned_to_user_id: NONE,
-    due_at: '',
-    is_required: true,
-    evidence_required: false,
-    dependency_ids: [],
-    reason: '',
-});
-
-const draftFromTask = (task: TicketWorkTask): TaskDraft => ({
-    title: task.title,
-    description: task.description ?? '',
-    status: task.status === 'completed' ? 'pending' : task.status,
-    team_id: task.team ? String(task.team.id) : NONE,
-    assigned_to_user_id: task.assignee ? String(task.assignee.id) : NONE,
-    due_at: toDateTimeInput(task.due_at),
-    is_required: task.is_required,
-    evidence_required: task.evidence_required,
-    dependency_ids: task.dependencies.map((dependency) => dependency.id),
-    reason: '',
-});
-
+/** Existing work register; mutations now use actor/version-bound canonical commands. */
 export function TicketWorkTasks({
+    actorId,
     ticketId,
+    version,
     tasks,
+    canViewWork,
     canManage,
+    taskWork,
     assignees,
     teams,
+    approvals = [],
+    onCommitted,
+    onAccessLost,
+    onSessionExpired,
 }: Props) {
     const [dialog, setDialog] = useState<TaskDialog>(null);
-    const [draft, setDraft] = useState<TaskDraft>(blankDraft);
-    const [completionNote, setCompletionNote] = useState('');
-    const [evidence, setEvidence] = useState('');
-    const [reopenReason, setReopenReason] = useState('');
-    const [processing, setProcessing] = useState(false);
-    const [errors, setErrors] = useState<Record<string, string>>({});
-
-    const completedCount = tasks.filter(
-        (task) => task.status === 'completed',
-    ).length;
-    const requiredOutstanding = tasks.filter(
-        (task) => task.is_required && task.status !== 'completed',
-    ).length;
-    if (tasks.length === 0 && !canManage) return null;
-
-    const resetDialog = () => {
-        setDialog(null);
-        setErrors({});
-        setCompletionNote('');
-        setEvidence('');
-        setReopenReason('');
-    };
-
-    const closeDialog = () => {
-        if (processing) return;
-        resetDialog();
-    };
-
-    const openCreate = () => {
-        setDraft(blankDraft());
-        setErrors({});
-        setDialog({ type: 'create' });
-    };
-
-    const openEdit = (task: TicketWorkTask) => {
-        setDraft(draftFromTask(task));
-        setErrors({});
-        setDialog({ type: 'edit', task });
-    };
-
-    const flashResult = (
-        page: { props: Record<string, unknown> },
-        fallback: string,
-    ): boolean => {
-        const flash = page.props.flash as
-            | { error?: string; success?: string }
-            | undefined;
-        if (flash?.error) {
-            toast.error(flash.error);
-            return false;
+    const [accessLost, setAccessLost] = useState(false);
+    const [revision, setRevision] = useState(0);
+    const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
+    const previousScope = useRef({ actorId, ticketId });
+    const notices = useItWorkTaskMemoryNotices(actorId, ticketId);
+    let pending: ReturnType<typeof pendingItWorkTaskCommands> = [];
+    let pendingUnavailable = false;
+    if (canViewWork && !accessLost && Number.isSafeInteger(actorId)) {
+        try {
+            pending = pendingItWorkTaskCommands(actorId, ticketId);
+        } catch {
+            pendingUnavailable = true;
         }
-        toast.success(flash?.success ?? fallback);
-        return true;
-    };
-
-    const taskPayload = () => ({
-        title: draft.title.trim(),
-        description: draft.description.trim() || null,
-        ...(dialog?.type === 'edit' ? { status: draft.status } : {}),
-        team_id: draft.team_id === NONE ? null : Number(draft.team_id),
-        assigned_to_user_id:
-            draft.assigned_to_user_id === NONE
-                ? null
-                : Number(draft.assigned_to_user_id),
-        due_at: draft.due_at || null,
-        is_required: draft.is_required,
-        evidence_required: draft.evidence_required,
-        dependency_ids: draft.dependency_ids,
-        ...(dialog?.type === 'edit' && draft.status === 'cancelled'
-            ? { reason: draft.reason.trim() }
-            : {}),
-    });
-
-    const submitTask = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        if (draft.title.trim() === '' || !dialog) return;
-        if (
-            dialog.type === 'edit' &&
-            draft.status === 'cancelled' &&
-            (draft.is_required || draft.reason.trim() === '')
-        )
+    }
+    useEffect(() => {
+        if (!canViewWork || accessLost) {
+            purgeItWorkTaskMemory(actorId, ticketId);
+            setDialog(null);
+        }
+    }, [actorId, ticketId, canViewWork, accessLost]);
+    useEffect(() => {
+        const previous = previousScope.current;
+        if (previous.actorId !== actorId || previous.ticketId !== ticketId) {
+            purgeItWorkTaskMemory(previous.actorId, previous.ticketId);
+            setDialog(null);
+            setAccessLost(false);
+            previousScope.current = { actorId, ticketId };
+        }
+    }, [actorId, ticketId]);
+    useEffect(() => {
+        if (!canViewWork || accessLost || (!notices.length && !pending.length))
             return;
-
-        const options = {
-            preserveScroll: true,
-            onStart: () => setProcessing(true),
-            onError: (nextErrors: Record<string, string>) =>
-                setErrors(nextErrors),
-            onSuccess: (page: { props: Record<string, unknown> }) => {
-                if (
-                    flashResult(
-                        page,
-                        dialog.type === 'create'
-                            ? 'Work task added.'
-                            : 'Work task updated.',
-                    )
-                )
-                    resetDialog();
-            },
-            onFinish: () => setProcessing(false),
+        const warn = (event: BeforeUnloadEvent) => {
+            event.preventDefault();
+            event.returnValue = '';
         };
-
-        if (dialog.type === 'create') {
-            router.post(
-                `/it/tickets/${ticketId}/tasks`,
-                taskPayload(),
-                options,
+        window.addEventListener('beforeunload', warn);
+        return () => window.removeEventListener('beforeunload', warn);
+    }, [canViewWork, accessLost, notices.length, pending.length, revision]);
+    if (!canViewWork) return null;
+    const deny = () => {
+        purgeItWorkTaskMemory(actorId, ticketId);
+        setDialog(null);
+        setAccessLost(true);
+        onAccessLost?.();
+    };
+    if (accessLost)
+        return (
+            <div
+                role="status"
+                className="rounded-lg border border-border p-4 text-sm"
+            >
+                Current access to private task work could not be confirmed. Task
+                details have been removed. Refresh the ticket before continuing.
+            </div>
+        );
+    const {
+        completed: complete,
+        outstanding,
+        needsReview,
+        unverified,
+    } = summarizeItWorkTasks(tasks);
+    const commandsReady =
+        canManage &&
+        Number.isSafeInteger(actorId) &&
+        actorId > 0 &&
+        Number.isSafeInteger(version) &&
+        version > 0;
+    const open = (
+        type: ItWorkTaskOperation,
+        task: TicketWorkTask | null = null,
+        intent?: 'cancel' | 'restore',
+    ) => {
+        if (
+            commandsReady &&
+            (type !== 'create' ||
+                (taskWork?.storage_ready && taskWork.can_create)) &&
+            (type !== 'reorder' ||
+                (taskWork?.storage_ready && taskWork.can_reorder))
+        )
+            setDialog({ type, task, version, intent });
+    };
+    const recover = (operation: ItWorkTaskOperation, taskId: number | null) => {
+        const task =
+            taskId === null
+                ? null
+                : (tasks.find((item) => item.id === taskId) ?? null);
+        if (taskId !== null && task === null) {
+            setRecoveryMessage(
+                'The task is not in the current authorized register. Refresh the ticket to check current access. The retained proposal and pending command reference have not been discarded.',
             );
-        } else if (dialog.type === 'edit') {
-            router.patch(
-                `/it/tickets/${ticketId}/tasks/${dialog.task.id}`,
-                taskPayload(),
-                options,
-            );
+            onAccessLost?.();
+            return;
         }
+        setRecoveryMessage(null);
+        setDialog({ type: operation, task, version });
     };
-
-    const submitCompletion = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        if (dialog?.type !== 'complete') return;
-        const evidenceRows = evidence
-            .split(/\r?\n/)
-            .map((row) => row.trim())
-            .filter(Boolean)
-            .slice(0, 20);
-        if (dialog.task.evidence_required && evidenceRows.length === 0) return;
-
-        router.post(
-            `/it/tickets/${ticketId}/tasks/${dialog.task.id}/complete`,
-            {
-                completion_note: completionNote.trim() || null,
-                evidence: evidenceRows,
-            },
-            {
-                preserveScroll: true,
-                onStart: () => setProcessing(true),
-                onError: (nextErrors) => setErrors(nextErrors),
-                onSuccess: (page) => {
-                    if (flashResult(page, 'Work task completed.'))
-                        resetDialog();
-                },
-                onFinish: () => setProcessing(false),
-            },
-        );
+    const handleCommitted = (result: ItWorkTaskCommitted) => {
+        setRevision((value) => value + 1);
+        onCommitted(result);
     };
-
-    const submitReopen = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        if (dialog?.type !== 'reopen' || reopenReason.trim() === '') return;
-
-        router.post(
-            `/it/tickets/${ticketId}/tasks/${dialog.task.id}/reopen`,
-            { reason: reopenReason.trim() },
-            {
-                preserveScroll: true,
-                onStart: () => setProcessing(true),
-                onError: (nextErrors) => setErrors(nextErrors),
-                onSuccess: (page) => {
-                    if (flashResult(page, 'Work task reopened.')) resetDialog();
-                },
-                onFinish: () => setProcessing(false),
-            },
-        );
+    const close = () => {
+        setDialog(null);
+        setRevision((value) => value + 1);
     };
-
-    const toggleDependency = (id: number, checked: boolean) => {
-        setDraft((current) => ({
-            ...current,
-            dependency_ids: checked
-                ? [...current.dependency_ids, id]
-                : current.dependency_ids.filter(
-                      (candidate) => candidate !== id,
-                  ),
-        }));
-    };
-
-    const editingTaskId = dialog?.type === 'edit' ? dialog.task.id : null;
-    const dependencyOptions = tasks.filter(
-        (task) => task.id !== editingTaskId && task.status !== 'cancelled',
-    );
-
     return (
-        <section
-            aria-labelledby="ticket-work-tasks"
-            className="border-t border-border/60 pt-3"
-        >
-            <div className="flex flex-wrap items-center justify-between gap-2">
+        <section aria-labelledby="ticket-work-tasks" className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <ListChecks
                         aria-hidden="true"
-                        className="h-3.5 w-3.5 text-muted-foreground"
+                        className="size-4 text-muted-foreground"
                     />
-                    <h2
-                        id="ticket-work-tasks"
-                        className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase"
-                    >
+                    <h2 id="ticket-work-tasks" className="text-section-title">
                         Work tasks
                     </h2>
                 </div>
-                {canManage ? (
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="frontline-focus min-h-11"
-                        onClick={openCreate}
-                    >
-                        <Plus aria-hidden="true" className="h-3.5 w-3.5" />
-                        Add task
-                    </Button>
-                ) : null}
-            </div>
-
-            {tasks.length > 0 ? (
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <StatusBadge
-                        variant={
-                            completedCount === tasks.length ? 'success' : 'info'
-                        }
-                        size="sm"
-                    >
-                        <ClipboardCheck
-                            aria-hidden="true"
-                            className="h-3 w-3"
-                        />
-                        {completedCount} of {tasks.length} complete
-                    </StatusBadge>
-                    {requiredOutstanding > 0 ? (
-                        <StatusBadge variant="warning" size="sm">
-                            <CircleAlert
-                                aria-hidden="true"
-                                className="h-3 w-3"
-                            />
-                            {requiredOutstanding} required outstanding
-                        </StatusBadge>
-                    ) : null}
-                </div>
-            ) : null}
-
-            {tasks.length === 0 ? (
-                <div className="mt-2 rounded-xl border border-dashed border-border px-3 py-3 text-center">
-                    <ListChecks
-                        aria-hidden="true"
-                        className="mx-auto h-4 w-4 text-muted-foreground"
-                    />
-                    <p className="mt-1 text-[12px] text-muted-foreground">
-                        No work tasks have been added.
-                    </p>
-                </div>
-            ) : (
-                <ul className="mt-2 space-y-2">
-                    {tasks.map((task) => {
-                        const presentation = taskStatus(task.status);
-                        const StatusIcon = presentation.icon;
-                        const incompleteDependencies = task.dependencies.filter(
-                            (dependency) => dependency.status !== 'completed',
-                        );
-                        const overdue =
-                            task.due_at !== null &&
-                            task.status !== 'completed' &&
-                            task.status !== 'cancelled' &&
-                            new Date(task.due_at).getTime() < Date.now();
-
-                        return (
-                            <li
-                                key={task.id}
-                                className="rounded-xl border border-border/70 bg-muted/20 p-3"
+                {canManage && (
+                    <div className="flex gap-2">
+                        {tasks.length > 1 && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={
+                                    !commandsReady ||
+                                    !taskWork?.storage_ready ||
+                                    !taskWork.can_reorder
+                                }
+                                onClick={() => open('reorder')}
                             >
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-[12.5px] font-semibold text-foreground">
+                                <ListOrdered className="size-4" />
+                                Reorder tasks
+                            </Button>
+                        )}
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={
+                                !commandsReady ||
+                                !taskWork?.storage_ready ||
+                                !taskWork.can_create
+                            }
+                            onClick={() => open('create')}
+                        >
+                            <Plus className="size-4" />
+                            Add task
+                        </Button>
+                    </div>
+                )}
+            </div>
+            {pendingUnavailable && (
+                <p role="alert" className="text-sm text-status-warning">
+                    Pending command references could not be read. Restore
+                    browser session storage before changing tasks.
+                </p>
+            )}
+            {canManage && !taskWork?.storage_ready && (
+                <p role="status" className="text-sm text-muted-foreground">
+                    Task creation and reordering are unavailable until current
+                    work capabilities are ready.
+                </p>
+            )}
+            {recoveryMessage && (
+                <p role="status" className="text-sm text-status-warning">
+                    {recoveryMessage}
+                </p>
+            )}
+            {(notices.length > 0 || pending.length > 0) && (
+                <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+                    <h3 className="text-sm font-semibold">
+                        Task work to recover
+                    </h3>
+                    <p className="text-caption text-muted-foreground">
+                        Entered details remain concealed until current access is
+                        checked. A pending command must be checked or cancelled
+                        before a new command can replace it.
+                    </p>
+                    {notices.map((notice, index) => (
+                        <Button
+                            key={notice.bufferId}
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                                recover(
+                                    notice.context.operation,
+                                    notice.context.taskId,
+                                )
+                            }
+                        >
+                            Open retained {notice.context.operation} draft{' '}
+                            {index + 1}
+                        </Button>
+                    ))}
+                    {pending.map((entry, index) => (
+                        <Button
+                            key={`${entry.operation}:${entry.taskId}:${entry.requestUuid}`}
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                                recover(entry.operation, entry.taskId)
+                            }
+                        >
+                            Review pending task command {index + 1}
+                        </Button>
+                    ))}
+                </div>
+            )}
+            {tasks.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                    <StatusBadge
+                        variant={complete === tasks.length ? 'success' : 'info'}
+                        size="sm"
+                    >
+                        <ClipboardCheck className="size-3" />
+                        {complete} of {tasks.length} verified complete
+                    </StatusBadge>
+                    {needsReview > 0 && (
+                        <StatusBadge variant="warning" size="sm">
+                            {needsReview}{' '}
+                            {needsReview === 1
+                                ? 'completion needs'
+                                : 'completions need'}{' '}
+                            review
+                        </StatusBadge>
+                    )}
+                    {unverified > 0 && (
+                        <StatusBadge variant="warning" size="sm">
+                            {unverified}{' '}
+                            {unverified === 1 ? 'completion' : 'completions'}{' '}
+                            unverified
+                        </StatusBadge>
+                    )}
+                    {outstanding > 0 && (
+                        <StatusBadge variant="warning" size="sm">
+                            <CircleAlert className="size-3" />
+                            {outstanding} required outstanding
+                        </StatusBadge>
+                    )}
+                </div>
+            )}
+            {tasks.length === 0 ? (
+                <EmptyState
+                    icon={ListChecks}
+                    title="No work tasks yet"
+                    description="Add concrete work and evidence requirements when they are needed for this ticket."
+                    variant="compact"
+                />
+            ) : (
+                <ul className="space-y-3">
+                    {tasks.map((task) => {
+                        const state = presentation(task.status);
+                        const Icon = state.icon;
+                        const prerequisitesBlocked =
+                            task.readiness?.prerequisites !== 'ready';
+                        const overdue =
+                            task.due_at &&
+                            !['completed', 'cancelled'].includes(task.status) &&
+                            new Date(task.due_at).getTime() < Date.now();
+                        return (
+                            <li key={task.id} id={`task-${task.id}`}>
+                                <Card className="gap-3 p-4">
+                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                        <h3 className="min-w-0 flex-1 text-sm font-semibold break-words">
                                             {task.title}
-                                        </p>
-                                        <div className="mt-1 flex flex-wrap gap-1.5">
+                                        </h3>
+                                        <div className="flex flex-wrap gap-1.5">
                                             <StatusBadge
-                                                variant={presentation.variant}
+                                                variant={state.variant}
                                                 size="sm"
                                             >
-                                                <StatusIcon
-                                                    aria-hidden="true"
-                                                    className="h-3 w-3"
-                                                />
-                                                {presentation.label}
+                                                <Icon className="size-3" />
+                                                {state.label}
                                             </StatusBadge>
-                                            <StatusBadge
-                                                variant={
-                                                    task.is_required
-                                                        ? 'warning'
-                                                        : 'neutral'
-                                                }
-                                                size="sm"
-                                            >
-                                                {task.is_required
-                                                    ? 'Required'
-                                                    : 'Optional'}
-                                            </StatusBadge>
-                                            {task.evidence_required ? (
+                                            {task.is_required && (
                                                 <StatusBadge
                                                     variant="info"
                                                     size="sm"
                                                 >
-                                                    <FileCheck2
-                                                        aria-hidden="true"
-                                                        className="h-3 w-3"
-                                                    />
+                                                    Required
+                                                </StatusBadge>
+                                            )}
+                                            {task.evidence_required && (
+                                                <StatusBadge
+                                                    variant="neutral"
+                                                    size="sm"
+                                                >
                                                     Evidence required
                                                 </StatusBadge>
-                                            ) : null}
+                                            )}
                                         </div>
                                     </div>
-                                </div>
-
-                                {task.description ? (
-                                    <p className="mt-2 text-[11.5px] whitespace-pre-wrap text-muted-foreground">
-                                        {task.description}
-                                    </p>
-                                ) : null}
-
-                                <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
-                                    {task.due_at ? (
-                                        <p
-                                            className={
-                                                overdue
-                                                    ? 'flex items-center gap-1.5 font-semibold text-destructive'
-                                                    : 'flex items-center gap-1.5'
-                                            }
-                                        >
-                                            <CalendarClock
-                                                aria-hidden="true"
-                                                className="h-3.5 w-3.5"
-                                            />
-                                            {overdue ? 'Overdue' : 'Due'} ·{' '}
-                                            {formatDateTime(task.due_at)}
+                                    {task.description && (
+                                        <p className="text-sm break-words whitespace-pre-wrap">
+                                            {task.description}
                                         </p>
-                                    ) : null}
-                                    {task.team ? (
-                                        <p className="flex items-center gap-1.5">
-                                            <UsersRound
-                                                aria-hidden="true"
-                                                className="h-3.5 w-3.5"
-                                            />
-                                            Team · {task.team.name}
-                                        </p>
-                                    ) : null}
-                                    {task.assignee ? (
-                                        <p className="flex items-center gap-1.5">
-                                            <UserRound
-                                                aria-hidden="true"
-                                                className="h-3.5 w-3.5"
-                                            />
-                                            Owner · {task.assignee.name}
-                                        </p>
-                                    ) : null}
-                                </div>
-
-                                {task.dependencies.length > 0 ? (
-                                    <Card className="mt-2 gap-0 rounded-lg border-border/60 px-2.5 py-2 shadow-none">
-                                        <p className="text-[10.5px] font-semibold text-muted-foreground">
-                                            Depends on
-                                        </p>
-                                        <ul className="mt-1 space-y-1">
-                                            {task.dependencies.map(
-                                                (dependency) => (
-                                                    <li
-                                                        key={dependency.id}
-                                                        className="flex items-center gap-1.5 text-[11px]"
-                                                    >
-                                                        {dependency.status ===
-                                                        'completed' ? (
-                                                            <CheckCircle2
-                                                                aria-hidden="true"
-                                                                className="h-3.5 w-3.5 text-status-success"
-                                                            />
-                                                        ) : (
-                                                            <Clock3
-                                                                aria-hidden="true"
-                                                                className="h-3.5 w-3.5 text-status-warning"
-                                                            />
-                                                        )}
-                                                        <span>
-                                                            {dependency.title}
-                                                        </span>
-                                                    </li>
-                                                ),
-                                            )}
-                                        </ul>
-                                    </Card>
-                                ) : null}
-
-                                {task.status === 'completed' ? (
-                                    <div className="mt-2 rounded-lg border border-status-success/25 bg-status-success-bg px-2.5 py-2 text-[11px]">
-                                        <p className="font-semibold text-status-success">
-                                            Completed
-                                            {task.completed_by
-                                                ? ` by ${task.completed_by.name}`
-                                                : ''}
-                                            {task.completed_at
-                                                ? ` · ${formatDateTime(task.completed_at)}`
-                                                : ''}
-                                        </p>
-                                        {task.completion_note ? (
-                                            <p className="mt-1 text-foreground">
-                                                {task.completion_note}
+                                    )}
+                                    <div className="text-caption flex flex-wrap gap-x-5 gap-y-2 text-muted-foreground">
+                                        {task.due_at && (
+                                            <span
+                                                className={`flex items-center gap-1.5 ${overdue ? 'text-status-critical' : ''}`}
+                                            >
+                                                <CalendarClock className="size-3.5" />
+                                                {overdue ? 'Overdue' : 'Due'} ·{' '}
+                                                {formatDateTime(task.due_at)}
+                                            </span>
+                                        )}
+                                        {task.team && (
+                                            <span className="flex items-center gap-1.5">
+                                                <UsersRound className="size-3.5" />
+                                                Team · {task.team.name}
+                                            </span>
+                                        )}
+                                        {task.assignee && (
+                                            <span className="flex items-center gap-1.5">
+                                                <UserRound className="size-3.5" />
+                                                Owner · {task.assignee.name}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {task.dependencies.length > 0 && (
+                                        <div className="space-y-1 rounded-lg border border-border bg-muted/20 p-3">
+                                            <p className="text-caption font-semibold">
+                                                Depends on
                                             </p>
-                                        ) : null}
-                                        {task.evidence?.length ? (
-                                            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-muted-foreground">
-                                                {task.evidence.map(
-                                                    (item, index) => (
+                                            <ul className="space-y-1">
+                                                {task.dependencies.map(
+                                                    (dependency) => (
                                                         <li
-                                                            key={`${task.id}-evidence-${index}`}
+                                                            key={dependency.id}
+                                                            className="flex items-center gap-2 text-sm"
                                                         >
-                                                            {item}
+                                                            {dependency.status ===
+                                                            'completed' ? (
+                                                                <CheckCircle2 className="size-3.5 shrink-0 text-status-success" />
+                                                            ) : (
+                                                                <Clock3 className="size-3.5 shrink-0 text-status-warning" />
+                                                            )}
+                                                            <a
+                                                                href={`#task-${dependency.id}`}
+                                                                className="min-w-0 break-words text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                                            >
+                                                                {
+                                                                    dependency.title
+                                                                }
+                                                            </a>
                                                         </li>
                                                     ),
                                                 )}
                                             </ul>
-                                        ) : null}
-                                    </div>
-                                ) : null}
-
-                                {canManage ? (
-                                    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/60 pt-2">
-                                        {task.status === 'completed' ? (
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                className="frontline-focus min-h-11"
-                                                onClick={() => {
-                                                    setReopenReason('');
-                                                    setErrors({});
-                                                    setDialog({
-                                                        type: 'reopen',
-                                                        task,
-                                                    });
-                                                }}
-                                            >
-                                                <RotateCcw
-                                                    aria-hidden="true"
-                                                    className="h-3.5 w-3.5"
-                                                />
-                                                Reopen task
-                                            </Button>
-                                        ) : (
-                                            <>
+                                        </div>
+                                    )}
+                                    {task.status === 'completed' && (
+                                        <div className="space-y-2 rounded-lg border border-status-success/25 bg-status-success-bg p-3 text-sm">
+                                            <p className="font-semibold text-status-success">
+                                                Completed
+                                                {task.completed_by
+                                                    ? ` by ${task.completed_by.name}`
+                                                    : ''}
+                                                {task.completed_at
+                                                    ? ` · ${formatDateTime(task.completed_at)}`
+                                                    : ''}
+                                            </p>
+                                            {task.completion_note && (
+                                                <p className="break-words whitespace-pre-wrap">
+                                                    {task.completion_note}
+                                                </p>
+                                            )}
+                                            {task.evidence?.length ? (
+                                                <ul className="list-disc space-y-1 pl-5">
+                                                    {task.evidence.map(
+                                                        (reference, index) => (
+                                                            <li
+                                                                key={index}
+                                                                className="break-words"
+                                                            >
+                                                                {reference}
+                                                            </li>
+                                                        ),
+                                                    )}
+                                                </ul>
+                                            ) : null}
+                                        </div>
+                                    )}
+                                    <TicketWorkTaskReadiness
+                                        readiness={task.readiness}
+                                        ticketId={ticketId}
+                                    />
+                                    {task.approval && (
+                                        <p className="text-sm">
+                                            Approval request #{task.approval.id}{' '}
+                                            ·{' '}
+                                            {task.approval.status.replaceAll(
+                                                '_',
+                                                ' ',
+                                            )}
+                                        </p>
+                                    )}
+                                    <TicketWorkTaskHistory
+                                        actorId={actorId}
+                                        ticketId={ticketId}
+                                        taskId={task.id}
+                                        version={version}
+                                        canView={canViewWork}
+                                        onAccessLost={deny}
+                                        onSessionExpired={onSessionExpired}
+                                    />
+                                    {canManage && (
+                                        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                                            {task.status === 'completed' ? (
                                                 <Button
                                                     type="button"
                                                     size="sm"
                                                     variant="outline"
-                                                    className="frontline-focus min-h-11"
+                                                    disabled={
+                                                        !commandsReady ||
+                                                        task.readiness
+                                                            ?.can_reopen !==
+                                                            true
+                                                    }
                                                     onClick={() =>
-                                                        openEdit(task)
+                                                        open('reopen', task)
                                                     }
                                                 >
-                                                    <Pencil
-                                                        aria-hidden="true"
-                                                        className="h-3.5 w-3.5"
-                                                    />
-                                                    Edit task
+                                                    <RotateCcw className="size-4" />
+                                                    Reopen task
                                                 </Button>
-                                                {task.status !== 'cancelled' ? (
+                                            ) : (
+                                                <>
                                                     <Button
                                                         type="button"
                                                         size="sm"
-                                                        className="frontline-focus min-h-11"
+                                                        variant="outline"
                                                         disabled={
-                                                            incompleteDependencies.length >
-                                                            0
+                                                            !commandsReady ||
+                                                            task.readiness
+                                                                ?.can_edit !==
+                                                                true
                                                         }
-                                                        onClick={() => {
-                                                            setCompletionNote(
-                                                                '',
-                                                            );
-                                                            setEvidence('');
-                                                            setErrors({});
-                                                            setDialog({
-                                                                type: 'complete',
-                                                                task,
-                                                            });
-                                                        }}
+                                                        onClick={() =>
+                                                            open('update', task)
+                                                        }
                                                     >
-                                                        <CheckCircle2
-                                                            aria-hidden="true"
-                                                            className="h-3.5 w-3.5"
-                                                        />
-                                                        Complete task
+                                                        <Pencil className="size-4" />
+                                                        Edit task
                                                     </Button>
-                                                ) : null}
-                                            </>
-                                        )}
-                                        {incompleteDependencies.length > 0 &&
-                                        task.status !== 'completed' ? (
-                                            <p className="w-full text-[10.5px] text-status-warning">
-                                                Complete{' '}
-                                                {incompleteDependencies.length}{' '}
-                                                prerequisite
-                                                {incompleteDependencies.length ===
-                                                1
-                                                    ? ''
-                                                    : 's'}{' '}
-                                                first.
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                ) : null}
+                                                    {task.status !==
+                                                        'cancelled' && (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            disabled={
+                                                                !commandsReady ||
+                                                                task.readiness
+                                                                    ?.can_complete !==
+                                                                    true
+                                                            }
+                                                            onClick={() =>
+                                                                open(
+                                                                    'complete',
+                                                                    task,
+                                                                )
+                                                            }
+                                                        >
+                                                            <CheckCircle2 className="size-4" />
+                                                            Complete task
+                                                        </Button>
+                                                    )}
+                                                    {task.status ===
+                                                    'cancelled' ? (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={
+                                                                !commandsReady ||
+                                                                task.readiness
+                                                                    ?.can_restore !==
+                                                                    true
+                                                            }
+                                                            onClick={() =>
+                                                                open(
+                                                                    'update',
+                                                                    task,
+                                                                    'restore',
+                                                                )
+                                                            }
+                                                        >
+                                                            <RotateCcw className="size-4" />
+                                                            Restore task
+                                                        </Button>
+                                                    ) : (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={
+                                                                !commandsReady ||
+                                                                task.readiness
+                                                                    ?.can_cancel !==
+                                                                    true
+                                                            }
+                                                            onClick={() =>
+                                                                open(
+                                                                    'update',
+                                                                    task,
+                                                                    'cancel',
+                                                                )
+                                                            }
+                                                        >
+                                                            <Ban className="size-4" />
+                                                            Cancel task
+                                                        </Button>
+                                                    )}
+                                                </>
+                                            )}
+                                            {prerequisitesBlocked &&
+                                                task.status !== 'completed' && (
+                                                    <p className="text-caption w-full text-status-warning">
+                                                        Review the current
+                                                        prerequisite blockers
+                                                        before completing this
+                                                        task.
+                                                    </p>
+                                                )}
+                                            {task.is_required &&
+                                                ![
+                                                    'completed',
+                                                    'cancelled',
+                                                ].includes(task.status) && (
+                                                    <p className="text-caption w-full text-muted-foreground">
+                                                        Required work cannot be
+                                                        cancelled. Edit the task
+                                                        to review and record why
+                                                        it is no longer
+                                                        required.
+                                                    </p>
+                                                )}
+                                        </div>
+                                    )}
+                                </Card>
                             </li>
                         );
                     })}
                 </ul>
             )}
-
-            <Dialog
-                open={dialog?.type === 'create' || dialog?.type === 'edit'}
-                onOpenChange={(open) => !open && closeDialog()}
-            >
-                <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-2xl">
-                    <form onSubmit={submitTask}>
-                        <DialogHeader>
-                            <DialogTitle>
-                                {dialog?.type === 'edit'
-                                    ? 'Edit work task'
-                                    : 'Add work task'}
-                            </DialogTitle>
-                            <DialogDescription>
-                                Break the ticket into owned, auditable work.
-                                Required tasks and prerequisites must be
-                                complete before settlement.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                            <TaskField
-                                id="task-title"
-                                label="Task title"
-                                error={errors.title}
-                                className="sm:col-span-2"
-                            >
-                                <Input
-                                    id="task-title"
-                                    value={draft.title}
-                                    onChange={(event) =>
-                                        setDraft((current) => ({
-                                            ...current,
-                                            title: event.target.value,
-                                        }))
-                                    }
-                                    maxLength={255}
-                                    required
-                                    placeholder="State the specific outcome"
-                                />
-                            </TaskField>
-
-                            <TaskField
-                                id="task-description"
-                                label="Instructions (optional)"
-                                error={errors.description}
-                                className="sm:col-span-2"
-                            >
-                                <Textarea
-                                    id="task-description"
-                                    value={draft.description}
-                                    onChange={(event) =>
-                                        setDraft((current) => ({
-                                            ...current,
-                                            description: event.target.value,
-                                        }))
-                                    }
-                                    maxLength={5000}
-                                    rows={3}
-                                    placeholder="What must be done and how should it be verified?"
-                                />
-                            </TaskField>
-
-                            {dialog?.type === 'edit' ? (
-                                <TaskField
-                                    id="task-status"
-                                    label="Working status"
-                                    error={errors.status}
-                                >
-                                    <Select
-                                        value={draft.status}
-                                        onValueChange={(value) =>
-                                            setDraft((current) => ({
-                                                ...current,
-                                                status: value as TaskDraft['status'],
-                                                reason:
-                                                    value === 'cancelled'
-                                                        ? current.reason
-                                                        : '',
-                                            }))
-                                        }
-                                    >
-                                        <SelectTrigger
-                                            id="task-status"
-                                            className="frontline-focus min-h-11"
-                                        >
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="pending">
-                                                Pending
-                                            </SelectItem>
-                                            <SelectItem value="in_progress">
-                                                In progress
-                                            </SelectItem>
-                                            <SelectItem value="blocked">
-                                                Blocked
-                                            </SelectItem>
-                                            <SelectItem value="cancelled">
-                                                Cancelled
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </TaskField>
-                            ) : null}
-
-                            <TaskField
-                                id="task-due-at"
-                                label="Due date and time (optional)"
-                                error={errors.due_at}
-                            >
-                                <Input
-                                    id="task-due-at"
-                                    type="datetime-local"
-                                    value={draft.due_at}
-                                    onChange={(event) =>
-                                        setDraft((current) => ({
-                                            ...current,
-                                            due_at: event.target.value,
-                                        }))
-                                    }
-                                    className="min-h-11"
-                                />
-                            </TaskField>
-
-                            <TaskField
-                                id="task-team"
-                                label="Responsible team (optional)"
-                                error={errors.team_id}
-                            >
-                                <Select
-                                    value={draft.team_id}
-                                    onValueChange={(value) =>
-                                        setDraft((current) => ({
-                                            ...current,
-                                            team_id: value,
-                                        }))
-                                    }
-                                >
-                                    <SelectTrigger
-                                        id="task-team"
-                                        className="frontline-focus min-h-11"
-                                    >
-                                        <SelectValue placeholder="No team" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={NONE}>
-                                            No team
-                                        </SelectItem>
-                                        {teams.map((team) => (
-                                            <SelectItem
-                                                key={team.id}
-                                                value={String(team.id)}
-                                            >
-                                                {team.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </TaskField>
-
-                            <TaskField
-                                id="task-assignee"
-                                label="Task owner (optional)"
-                                error={errors.assigned_to_user_id}
-                            >
-                                <Select
-                                    value={draft.assigned_to_user_id}
-                                    onValueChange={(value) =>
-                                        setDraft((current) => ({
-                                            ...current,
-                                            assigned_to_user_id: value,
-                                        }))
-                                    }
-                                >
-                                    <SelectTrigger
-                                        id="task-assignee"
-                                        className="frontline-focus min-h-11"
-                                    >
-                                        <SelectValue placeholder="No owner" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={NONE}>
-                                            No owner
-                                        </SelectItem>
-                                        {assignees.map((assignee) => (
-                                            <SelectItem
-                                                key={assignee.id}
-                                                value={String(assignee.id)}
-                                            >
-                                                {assignee.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </TaskField>
-
-                            <div className="space-y-2 sm:col-span-2">
-                                <CheckRow
-                                    id="task-required"
-                                    checked={draft.is_required}
-                                    onChange={(checked) =>
-                                        setDraft((current) => ({
-                                            ...current,
-                                            is_required: checked,
-                                            status:
-                                                checked &&
-                                                current.status === 'cancelled'
-                                                    ? 'pending'
-                                                    : current.status,
-                                        }))
-                                    }
-                                    title="Required before settlement"
-                                    description="The ticket cannot be resolved until this task is complete."
-                                />
-                                <CheckRow
-                                    id="task-evidence-required"
-                                    checked={draft.evidence_required}
-                                    onChange={(checked) =>
-                                        setDraft((current) => ({
-                                            ...current,
-                                            evidence_required: checked,
-                                        }))
-                                    }
-                                    title="Require completion evidence"
-                                    description="The technician must record at least one evidence reference."
-                                />
-                            </div>
-
-                            {dependencyOptions.length > 0 ? (
-                                <fieldset className="rounded-xl border border-border p-3 sm:col-span-2">
-                                    <legend className="px-1 text-sm font-medium">
-                                        Prerequisites (optional)
-                                    </legend>
-                                    <p className="mb-2 text-xs text-muted-foreground">
-                                        This task cannot be completed until
-                                        every selected prerequisite is complete.
-                                    </p>
-                                    <div className="grid gap-2 sm:grid-cols-2">
-                                        {dependencyOptions.map((candidate) => (
-                                            <CheckRow
-                                                key={candidate.id}
-                                                id={`task-dependency-${candidate.id}`}
-                                                checked={draft.dependency_ids.includes(
-                                                    candidate.id,
-                                                )}
-                                                onChange={(checked) =>
-                                                    toggleDependency(
-                                                        candidate.id,
-                                                        checked,
-                                                    )
-                                                }
-                                                title={candidate.title}
-                                                description={
-                                                    taskStatus(candidate.status)
-                                                        .label
-                                                }
-                                            />
-                                        ))}
-                                    </div>
-                                    {errors.dependency_ids ? (
-                                        <p
-                                            role="alert"
-                                            className="mt-2 text-xs text-destructive"
-                                        >
-                                            {errors.dependency_ids}
-                                        </p>
-                                    ) : null}
-                                </fieldset>
-                            ) : null}
-
-                            {dialog?.type === 'edit' &&
-                            draft.status === 'cancelled' ? (
-                                <TaskField
-                                    id="task-cancel-reason"
-                                    label="Reason for cancelling"
-                                    error={errors.reason}
-                                    className="sm:col-span-2"
-                                >
-                                    <Textarea
-                                        id="task-cancel-reason"
-                                        value={draft.reason}
-                                        onChange={(event) =>
-                                            setDraft((current) => ({
-                                                ...current,
-                                                reason: event.target.value,
-                                            }))
-                                        }
-                                        rows={3}
-                                        maxLength={2000}
-                                        required
-                                        disabled={draft.is_required}
-                                        placeholder="Explain why this optional task is no longer needed"
-                                    />
-                                    {draft.is_required ? (
-                                        <p className="text-xs text-status-warning">
-                                            Required tasks cannot be cancelled.
-                                            Make it optional first or complete
-                                            it.
-                                        </p>
-                                    ) : null}
-                                </TaskField>
-                            ) : null}
-                        </div>
-
-                        <DialogFooter className="mt-6 gap-2 sm:gap-0">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="min-h-11"
-                                disabled={processing}
-                                onClick={closeDialog}
-                            >
-                                Keep reviewing
-                            </Button>
-                            <Button
-                                type="submit"
-                                className="min-h-11"
-                                disabled={
-                                    processing ||
-                                    draft.title.trim() === '' ||
-                                    (dialog?.type === 'edit' &&
-                                        draft.status === 'cancelled' &&
-                                        (draft.is_required ||
-                                            draft.reason.trim() === ''))
-                                }
-                            >
-                                {dialog?.type === 'edit' ? (
-                                    <Pencil
-                                        aria-hidden="true"
-                                        className="h-4 w-4"
-                                    />
-                                ) : (
-                                    <Plus
-                                        aria-hidden="true"
-                                        className="h-4 w-4"
-                                    />
-                                )}
-                                {processing
-                                    ? 'Saving…'
-                                    : dialog?.type === 'edit'
-                                      ? 'Save task'
-                                      : 'Add task'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog
-                open={dialog?.type === 'complete'}
-                onOpenChange={(open) => !open && closeDialog()}
-            >
-                <DialogContent className="sm:max-w-lg">
-                    <form onSubmit={submitCompletion}>
-                        <DialogHeader>
-                            <DialogTitle>Complete work task</DialogTitle>
-                            <DialogDescription>
-                                Confirm the outcome for “
-                                {dialog?.type === 'complete'
-                                    ? dialog.task.title
-                                    : 'this task'}
-                                ”. This becomes part of the ticket&apos;s
-                                working record.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-5 space-y-4">
-                            <TaskField
-                                id="task-completion-note"
-                                label="Completion note (optional)"
-                                error={errors.completion_note}
-                            >
-                                <Textarea
-                                    id="task-completion-note"
-                                    value={completionNote}
-                                    onChange={(event) =>
-                                        setCompletionNote(event.target.value)
-                                    }
-                                    rows={4}
-                                    maxLength={5000}
-                                    placeholder="What was completed and verified?"
-                                />
-                            </TaskField>
-                            <TaskField
-                                id="task-completion-evidence"
-                                label={
-                                    dialog?.type === 'complete' &&
-                                    dialog.task.evidence_required
-                                        ? 'Evidence references'
-                                        : 'Evidence references (optional)'
-                                }
-                                error={errors.evidence}
-                            >
-                                <Textarea
-                                    id="task-completion-evidence"
-                                    value={evidence}
-                                    onChange={(event) =>
-                                        setEvidence(event.target.value)
-                                    }
-                                    rows={4}
-                                    maxLength={10_000}
-                                    required={
-                                        dialog?.type === 'complete' &&
-                                        dialog.task.evidence_required
-                                    }
-                                    placeholder="One ticket, screenshot, test or change reference per line"
-                                />
-                            </TaskField>
-                        </div>
-                        <DialogFooter className="mt-6 gap-2 sm:gap-0">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="min-h-11"
-                                disabled={processing}
-                                onClick={closeDialog}
-                            >
-                                Keep open
-                            </Button>
-                            <Button
-                                type="submit"
-                                className="min-h-11"
-                                disabled={
-                                    processing ||
-                                    (dialog?.type === 'complete' &&
-                                        dialog.task.evidence_required &&
-                                        evidence.trim() === '')
-                                }
-                            >
-                                <CheckCircle2
-                                    aria-hidden="true"
-                                    className="h-4 w-4"
-                                />
-                                {processing ? 'Completing…' : 'Complete task'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog
-                open={dialog?.type === 'reopen'}
-                onOpenChange={(open) => !open && closeDialog()}
-            >
-                <DialogContent className="sm:max-w-lg">
-                    <form onSubmit={submitReopen}>
-                        <DialogHeader>
-                            <DialogTitle>Reopen work task</DialogTitle>
-                            <DialogDescription>
-                                Reopening clears the previous completion note
-                                and evidence. Record what changed so the next
-                                technician knows what to verify again.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-5">
-                            <TaskField
-                                id="task-reopen-reason"
-                                label="Reason for reopening"
-                                error={errors.reason}
-                            >
-                                <Textarea
-                                    id="task-reopen-reason"
-                                    value={reopenReason}
-                                    onChange={(event) =>
-                                        setReopenReason(event.target.value)
-                                    }
-                                    rows={4}
-                                    maxLength={2000}
-                                    required
-                                    placeholder="For example, the change was rolled back and evidence must be collected again"
-                                />
-                            </TaskField>
-                        </div>
-                        <DialogFooter className="mt-6 gap-2 sm:gap-0">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="min-h-11"
-                                disabled={processing}
-                                onClick={closeDialog}
-                            >
-                                Keep completed
-                            </Button>
-                            <Button
-                                type="submit"
-                                className="min-h-11"
-                                disabled={
-                                    processing || reopenReason.trim() === ''
-                                }
-                            >
-                                <RotateCcw
-                                    aria-hidden="true"
-                                    className="h-4 w-4"
-                                />
-                                {processing ? 'Reopening…' : 'Reopen task'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            {dialog &&
+                (dialog.type === 'create' || dialog.type === 'update') && (
+                    <TicketWorkTaskWizard
+                        open
+                        actorId={actorId}
+                        ticketId={ticketId}
+                        version={dialog.version}
+                        task={dialog.task}
+                        tasks={tasks}
+                        assignees={assignees}
+                        teams={teams}
+                        approvals={approvals}
+                        canCreate={
+                            !!taskWork?.storage_ready && taskWork.can_create
+                        }
+                        intent={dialog.intent}
+                        canManage={canManage}
+                        onClose={close}
+                        onCommitted={handleCommitted}
+                        onAccessLost={deny}
+                        onSessionExpired={onSessionExpired}
+                    />
+                )}
+            {dialog &&
+                (dialog.type === 'complete' ||
+                    dialog.type === 'reopen' ||
+                    dialog.type === 'reorder') && (
+                    <TicketWorkTaskActionDialog
+                        open
+                        actorId={actorId}
+                        ticketId={ticketId}
+                        version={dialog.version}
+                        operation={dialog.type}
+                        canReorder={
+                            !!taskWork?.storage_ready && taskWork.can_reorder
+                        }
+                        task={dialog.task}
+                        tasks={tasks}
+                        canManage={canManage}
+                        onClose={close}
+                        onCommitted={handleCommitted}
+                        onAccessLost={deny}
+                        onSessionExpired={onSessionExpired}
+                    />
+                )}
         </section>
-    );
-}
-
-function TaskField({
-    id,
-    label,
-    error,
-    className,
-    children,
-}: {
-    id: string;
-    label: string;
-    error?: string;
-    className?: string;
-    children: ReactNode;
-}) {
-    return (
-        <div className={className}>
-            <label htmlFor={id} className="text-sm font-medium">
-                {label}
-            </label>
-            <div className="mt-1.5">{children}</div>
-            {error ? (
-                <p role="alert" className="mt-1 text-xs text-destructive">
-                    {error}
-                </p>
-            ) : null}
-        </div>
-    );
-}
-
-function CheckRow({
-    id,
-    checked,
-    onChange,
-    title,
-    description,
-}: {
-    id: string;
-    checked: boolean;
-    onChange: (checked: boolean) => void;
-    title: string;
-    description: string;
-}) {
-    return (
-        <label
-            htmlFor={id}
-            className="frontline-focus flex min-h-11 cursor-pointer items-start gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"
-        >
-            <Checkbox
-                id={id}
-                checked={checked}
-                onCheckedChange={(value) => onChange(value === true)}
-                className="mt-0.5"
-            />
-            <span className="min-w-0">
-                <span className="block text-[12px] font-semibold">{title}</span>
-                <span className="block text-[10.5px] text-muted-foreground">
-                    {description}
-                </span>
-            </span>
-        </label>
     );
 }

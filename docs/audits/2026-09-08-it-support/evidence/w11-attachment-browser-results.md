@@ -1,0 +1,36 @@
+# W11 protected email files — desktop browser and recovery evidence
+
+11 September2026. Maps to W11, F03/F05, B01/B02 and E05/E10. This is a verified bounded slice; full findings/packages/scenarios and release gate remain open. All messages, identities, provider responses and scanner outcomes below are explicitly synthetic. No real provider traffic, scanner configuration or communications.
+
+## Implementation and backend checks
+
+- Fixed per-file deletion audit failure so other selected inbound copies continue; current accepted pending ownership is rechecked before separate retry-timing metadata. Failed/unavailable audit evidence is never deletion success. Full details in `w11-cleanup-audit-failure-results.md`.
+- Browser exposed a confirmed UI defect: scanner failures rendered only generic connection recovery. `ItInboundAttachmentUnavailable` now provides fixed scanner/storage/cleanup guidance; `ItMailboxConnectionPresenter` allowlists those codes without exposing raw provider/scanner errors. Mailbox alert heading now refers to processing. Existing authorization and cooldown remain unchanged.
+- Standalone cleanup87493 terminal0/tokenit_b853404eee5740df:1test74assertions170s. Staging4896 terminal0/tokenit_106dc9d5e53d4710:1test86assertions181s. Settings21770 terminal0/tokenit_4aa64d1ccb874a0b:22tests258assertions209s, including five scanner/storage/cleanup guidance datasets, no raw errors, no unnecessary authorization, real retry delay and restricted role denial. All three runs14postflight/exact schema absence.
+- Existing mailbox interaction tests9passed4.22s. Focused Pint and helper syntax checks passed. Build87221 terminal0/3m28s. Manifest `f4cf36bf858b5ad84cd0b7f9f3f7834124884e62fbb3362eb965818ad2942a1f`; JS `app-DRtcY0-P.js`, CSS `app-CE9g3ZyJ.css`. No design files modified.
+
+## Runtime and actual browser journey
+
+Owned runtime `724533b40323406b`, bootstrap75833 terminal0, PHP14856, loopback8766, exact checkout and disposable schema. Array mail/sync queue/CSRF bypass false; `w11-attachment-browser-runtime.json`. Extended existing opt-in fixture from38 to43messages/provider, including clean request, clean reply to an already accepted parent, duplicate, unknown sender and harmless simulated infected file. Synthetic scanner reports first request39 attempt unavailable, subsequent retry clean. Real production scanner remains unconfigured/disabled.
+
+In-app tab24, unchanged1235×856 desktop window, approximately06:53–07:10 NZST:
+
+1. Normal operator login; Enter on Microsoft and Gmail “Poll mailbox now”. Both showed pending1/quarantine10; Microsoft also acknowledgement1 from the existing simulated503. Poll disabled during real cooldown. Initial safe generic error was insufficiently specific; corrected as described above.
+2. Preserved the same failed database/files while building. Reviewed asset refresh applied without DB/session/provider changes. Refresh helper now preserves the owner’s opt-in mailbox-fixture mode. Old fingerprint `3c9e842997c9428fe97d504998d3e0e62ee80450255f32b8a334a3f0c95847b5`; final fingerprint `73b489edf838610f7d8bdb6721967dafb705922d5b3751ebe5f7cd3579b7f3c0`. Initial restricted-shell CIM observation denied, authorized read retry succeeded; preview/apply JSON retained. No security guard bypass.
+3. Reloaded current assets. Both providers displayed “Mailbox processing needs attention” with explicit scanner-service guidance while their original failed files remained pending. Screenshot visually inspected inline; no disk screenshot claimed. Enter retried each after the actual cooldown, without clock manipulation/reconnect. Both showed Last poll completed, processing0, acknowledgement0, quarantine10.
+4. Requester login landed on My Day (an initial expected-/it navigation wait timed out; actual page inspected), then normal Service desk navigation. Requester saw Microsoft ticket64/Gmail ticket65, each one original file. Gmail Files tab activated with Enter and showed the same canonical link14. No horizontal overflow: Files view client/document1235px, window1235×856; JS matched the current manifest. No browser resizing.
+5. Microsoft original ticket8 and Gmail original ticket36 each displayed the existing ordinary reply plus exactly one new file reply, despite replayed file messages. File links3/9, sizes37/34bytes. Request files13/14, sizes41/38bytes. No technician/internal actions were granted to requester.
+6. **Successful browser download completion remains UNVERIFIED.** Activating Gmail link14 opened a new tab25 (`target=_blank`). Waiting for download on the source tab timed out; the owned target tab was blank after the response. One documented download-event/navigation attempt on that tab failed with “paused download response is no longer available” and a navigation timeout (tool call130seconds). No successful downloaded artifact or full file-transfer claim. No security warning was bypassed and no alternate browser was used. Closed tab25; independent verification continued.
+7. Logged in as other requester `w06-other@demo.test`. Copied request links13/14, comment links3/9 and quarantined infected links6/12 each rendered404 Not Found. Returning to `/it` showed only that user’s one fixture request, not the58 imported requests. This browser evidence proves denial for this role; broader admin/source-row denial remains covered by earlier backend tests, not claimed from this journey.
+
+## Persisted reconciliation and cleanup
+
+Read-only before/after/final JSON records canonical state and private-object hashes, without paths. Each provider ended31processed/2duplicate/10quarantine, all43acknowledged. Request39 read twice for scanner retry; every other transport message read once. Microsoft message1 acknowledged twice without reread/reingestion. Final58 imported tickets and4replies match committed command receipts and canonical audit counts.
+
+Four canonical attachments retain clean scan provenance and deleted source-copy references. Six accepted/duplicate temporary copies are deleted. Two unknown-sender clean copies and two simulated infected copies remain private. All8remaining objects match recorded hashes;12synthetic scan calls. `w11-attachment-browser-checkpoint.cjs` validates the authoritative JSON/test/postflight evidence and protected design hashes; it explicitly records download completion as unverified.
+
+Owned tabs24/25 closed, user tabs preserved. Cleanup40158 terminal0; independent postflight confirms exact schema and owned directory absent. No active server/browser/runtime/build/test/import/cleanup remains. WorkingDB untouched; migrations17/18/19 unapplied there; production AI off; no deploy.
+
+## Precise continuation
+
+Do not repeat completed parsing/staging/intake foundations or mark full W11/E10 complete. Remaining: successful in-app download artifact confirmation when the tool can complete it; quarantine review/retry/retention and scanner readiness; actual worker crash/uncertain-commit and claim contention; merged/settled/outside-window policies, legacy identity backfill and full acceptance review. W27 shared PageHeaderRail arrow-key gap remains recorded. Live scanner/provider/retention readiness remains operational acceptance; synthetic outcomes do not prove it. Proceed with independent quarantine lifecycle work if browser downloads remain unavailable.

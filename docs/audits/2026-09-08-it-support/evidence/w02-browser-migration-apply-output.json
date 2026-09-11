@@ -1,0 +1,78 @@
+{
+    "mode": "applied",
+    "approval_fingerprint": "f7bef81b37105932f47f5343e7fc1047cea230d0daf036dbeb40a7de87f35082",
+    "invariants_verified": true,
+    "migration_sha256": {
+        "2026_09_09_000001_create_it_ticket_command_receipts": "251e9e49389c666d15a92b2d1991d143b850288508be543dbb17a1c4948ff48d",
+        "2026_09_09_000002_add_lock_version_to_it_tickets": "cf9b9c20492252d680ad13b6e193e12a49bccb6943a3dffe2f621a913b1961af",
+        "2026_09_09_000003_add_dispatch_intent_to_it_email_deliveries": "20fc1889538f36584338b1ea0bf0750c59f2bf0a9bea4091bca9f228a1a947ea"
+    },
+    "before": {
+        "captured_at": "2026-09-09T00:21:34+00:00",
+        "record_counts": {
+            "users": 232,
+            "sites": 26,
+            "it_tickets": 14,
+            "it_ticket_comments": 19,
+            "it_ticket_events": 25,
+            "it_attachments": 12,
+            "it_email_deliveries": 4
+        },
+        "ticket_state_sha256": "bbb4ba36b20ecb381b4dd4dd50851209616c7638ac4e8702859b851b361b95ab",
+        "migration_state": {
+            "allowlisted": {
+                "2026_09_09_000001_create_it_ticket_command_receipts": "pending",
+                "2026_09_09_000002_add_lock_version_to_it_tickets": "pending",
+                "2026_09_09_000003_add_dispatch_intent_to_it_email_deliveries": "pending"
+            },
+            "unrelated_pending": [],
+            "registry_count": 992
+        },
+        "protected_hashes": {
+            "DESIGN.md": "96863e01d924e954255cd61f550396c2f2eea9778bbaab7e8570ef9d63279c22",
+            "design_styles/APP_SHELL_STYLE_GUIDE.md": "62515485265119962773e6015fefe38be94434aae468acd017c078da61b20ab5",
+            "design_styles/BUTTON_STYLE_GUIDE.md": "86259475c987d6e30001604316379eb608aea9f83e16941b6aa476a94bca6957",
+            "design_styles/DESIGN_TOKENS.md": "c3ee6c8acaa22049084f819e3ad2a33f457e936e467492079f16c15e9a611d2b",
+            "design_styles/LIST_STYLE_GUIDE.md": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac",
+            "design_styles/LOADER_STYLE_GUIDE.md": "cc20485e6e42e0a848b8cacc8ac6124e5e5a01206d966de6ebbbdec39dbe2a91",
+            "design_styles/NAVIGATION_STYLE_GUIDE.md": "9295cdb1386322b8a088ae03de41bc3c75a0fbe3e8fa3331c92c704ccb15895d",
+            "design_styles/PAGE_HEADER_STYLE_GUIDE.md": "a528a0e863a676fdbbfcb028e532ece2799e39a7345ca3c1eca619ac4491d931",
+            "design_styles/POPUP_STYLE_GUIDE.md": "aee723e21491e9be908554a6f200d73204280a63d9028ea78de6bb9049f4a477",
+            "design_styles/oblivion-loader-01-demo.html": "748c94c030984d16c1a78f3b70855d1cf8f22461ab017e4ac8287ab9e8809cdf"
+        }
+    },
+    "after": {
+        "captured_at": "2026-09-09T00:21:35+00:00",
+        "record_counts": {
+            "users": 232,
+            "sites": 26,
+            "it_tickets": 14,
+            "it_ticket_comments": 19,
+            "it_ticket_events": 25,
+            "it_attachments": 12,
+            "it_email_deliveries": 4
+        },
+        "ticket_state_sha256": "bbb4ba36b20ecb381b4dd4dd50851209616c7638ac4e8702859b851b361b95ab",
+        "migration_state": {
+            "allowlisted": {
+                "2026_09_09_000001_create_it_ticket_command_receipts": "applied",
+                "2026_09_09_000002_add_lock_version_to_it_tickets": "applied",
+                "2026_09_09_000003_add_dispatch_intent_to_it_email_deliveries": "applied"
+            },
+            "unrelated_pending": [],
+            "registry_count": 995
+        },
+        "protected_hashes": {
+            "DESIGN.md": "96863e01d924e954255cd61f550396c2f2eea9778bbaab7e8570ef9d63279c22",
+            "design_styles/APP_SHELL_STYLE_GUIDE.md": "62515485265119962773e6015fefe38be94434aae468acd017c078da61b20ab5",
+            "design_styles/BUTTON_STYLE_GUIDE.md": "86259475c987d6e30001604316379eb608aea9f83e16941b6aa476a94bca6957",
+            "design_styles/DESIGN_TOKENS.md": "c3ee6c8acaa22049084f819e3ad2a33f457e936e467492079f16c15e9a611d2b",
+            "design_styles/LIST_STYLE_GUIDE.md": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac",
+            "design_styles/LOADER_STYLE_GUIDE.md": "cc20485e6e42e0a848b8cacc8ac6124e5e5a01206d966de6ebbbdec39dbe2a91",
+            "design_styles/NAVIGATION_STYLE_GUIDE.md": "9295cdb1386322b8a088ae03de41bc3c75a0fbe3e8fa3331c92c704ccb15895d",
+            "design_styles/PAGE_HEADER_STYLE_GUIDE.md": "a528a0e863a676fdbbfcb028e532ece2799e39a7345ca3c1eca619ac4491d931",
+            "design_styles/POPUP_STYLE_GUIDE.md": "aee723e21491e9be908554a6f200d73204280a63d9028ea78de6bb9049f4a477",
+            "design_styles/oblivion-loader-01-demo.html": "748c94c030984d16c1a78f3b70855d1cf8f22461ab017e4ac8287ab9e8809cdf"
+        }
+    }
+}

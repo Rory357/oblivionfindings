@@ -1,0 +1,13 @@
+{
+    "created": true,
+    "user_id": 233,
+    "name": "IT Support W03 20260909 Synthetic absence cover",
+    "role_id": 28,
+    "site_ids": [
+        9403,
+        9404
+    ],
+    "existing_users_changed": false,
+    "teams_or_queues_created": false,
+    "real_communications": false
+}

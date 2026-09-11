@@ -1,0 +1,2 @@
+npm notice run npx
+npm notice run eslint resources/js/components/it/sla-evidence.tsx resources/js/components/it/sla-chip.tsx resources/js/components/it/it-hero.tsx resources/js/components/it/it-overview.tsx resources/js/components/it/it-reports.tsx resources/js/components/it/__tests__/sla-evidence.test.tsx resources/js/components/it/__tests__/it-reports.test.tsx resources/js/pages/it/tickets/show.tsx --max-warnings=0

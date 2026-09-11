@@ -1,0 +1,31 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/ticket-work-task-review.test.tsx (8 tests | 1 failed) 403ms
+     × shows every current editable value and evidence before explicit adoption without overwriting the proposal 173ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-work-task-review.test.tsx > Current work task review > shows every current editable value and evidence before explicit adoption without overwriting the proposal
+Error: expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  Wed 9 Sep, 1:30 pm
+Received:
+  Due (New Zealand time)Wed 9 Sept, 1:30 pm
+ ❯ resources/js/components/it/__tests__/ticket-work-task-review.test.tsx:198:47
+    196|             'Current Infrastructure Team',
+    197|         );
+    198|         expect(row('Due (New Zealand time)')).toHaveTextContent(
+       |                                               ^
+    199|             'Wed 9 Sep, 1:30 pm',
+    200|         );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+   Start at  23:38:06
+   Duration  3.28s (transform 183ms, setup 115ms, import 1.81s, tests 403ms, environment 797ms)
+

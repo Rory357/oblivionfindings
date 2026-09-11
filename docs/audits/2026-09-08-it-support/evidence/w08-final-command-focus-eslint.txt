@@ -1,0 +1,2 @@
+npm notice run npx
+npm notice run eslint resources/js/hooks/use-it-ticket-approval-command.ts resources/js/hooks/use-it-ticket-approval-command.test.tsx resources/js/hooks/use-it-work-task-history.ts --max-warnings=0

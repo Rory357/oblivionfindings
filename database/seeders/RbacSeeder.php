@@ -429,6 +429,8 @@ class RbacSeeder extends Seeder
             ['key' => 'it.request', 'description' => 'Raise and track your own IT tickets', 'group' => 'it', 'module' => 'Operations'],
             ['key' => 'it.organisationWide', 'description' => 'Access explicitly organisation-wide IT work', 'group' => 'it', 'module' => 'Operations'],
             ['key' => 'it.viewSensitive', 'description' => 'Access sensitive IT work within an approved scope', 'group' => 'it', 'module' => 'Operations'],
+            ['key' => 'it.knowledge.author', 'description' => 'Author and submit scoped IT knowledge drafts', 'group' => 'it', 'module' => 'Operations'],
+            ['key' => 'it.knowledge.review', 'description' => 'Publish and retire scoped IT knowledge after review', 'group' => 'it', 'module' => 'Operations'],
 
             // Settings
             ['key' => 'settings.terminology.manage', 'description' => 'Manage UI terminology', 'group' => 'settings', 'module' => 'System'],
@@ -509,6 +511,7 @@ class RbacSeeder extends Seeder
             // Credentials
             ['key' => 'credentials.view', 'description' => 'View credential list', 'group' => 'credentials', 'module' => 'Operations'],
             ['key' => 'credentials.reveal', 'description' => 'Reveal credential values', 'group' => 'credentials', 'module' => 'Operations'],
+            ['key' => 'credentials.audit', 'description' => 'Review scoped credential activity without revealing secrets', 'group' => 'credentials', 'module' => 'Operations'],
             ['key' => 'credentials.manage', 'description' => 'Manage credentials', 'group' => 'credentials', 'module' => 'Operations'],
 
             // Site Damages

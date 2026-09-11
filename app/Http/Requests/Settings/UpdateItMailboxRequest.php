@@ -15,6 +15,8 @@ class UpdateItMailboxRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'connection_id' => ['required', 'integer', 'min:1'],
+            'expected_version' => ['required', 'integer', 'min:1'],
             'mailbox_email' => ['nullable', 'email', 'max:255'],
         ];
     }

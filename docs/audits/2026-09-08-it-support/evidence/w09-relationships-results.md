@@ -1,0 +1,47 @@
+# W09/B07 related-ticket command lifecycle — 10 September 2026
+
+Status: Implemented; scoped automated verification passed as recorded below. Browser and actual concurrent-worker acceptance remain open. Whole W09/E08 are incomplete.
+
+Extends canonical ItTicketLinkService and ItTicketLink with reciprocal related_ticket / duplicate_ticket references. Source and counterpart must both be workable for changes; read labels/counts/history are filtered against fresh actor access. These references do not change specialized problem/change/major-incident membership, copy conversations, merge records, settle work or grant access. Scoped discovery uses bounded pages of20 and parameterized title/reference search.
+
+Commands lock the pair in canonical order, validate both reviewed versions and bind actor/source/target/action/type/UUID in the existing receipt store. Changed rows increment both versions, record internal events and fail-closed audits in one transaction. Same payload replays historical outcomes without reapplying a later removed link. Recovery reauthorizes; cancellation persists a tombstone and truthfully returns committed if execution already won. Browser session storage retains only opaque IDs/type/UUID; same-request retry uses the frozen in-memory payload. Remount can check/cancel; malformed, denied, expired, timed-out and unknown responses never show success. Shared WizardShell provides review, guarded leave, focus/scroll control and confirmed outcome.
+
+## Actual automated evidence
+
+- Initial backend40526/token it_a6c97ca48d164081 failed because a Pest fixture used its reserved target property. Corrected fixture name; no product verification from this run. Second37001/token it_d5179e099ea3477d passed9tests. Both disposed schemas, all14 postflight checks true.
+- Third74699/token it_10470ac769b24b94 exposed a genuine same-second touch/version defect before linked count assertion; exit1. Corrected to explicitly dirty the canonical version, matching existing work-task/merge pattern, and froze time before fixtures. All14 postflight checks true/schema absent.
+- Final fourth26120/token it_1de66f8ecf0c4edb: terminal0, Pest0,9passed/87assertions from diagnostic events. Reciprocal add/remove, preserved comments/status, replay/historical recovery, cancellation races in sequential order, both stale versions, actor/site denial and count/activity redaction, invalid self/merged/closed/specialized intent, no-op/type change and audit rollback/retry. All14 postflight guards true/schema absent. These are not simultaneous-worker claims.
+- First UI:34passed/3failed from new component locator names assuming whitespace between spans. Corrected locators. Second run terminal0,37passed/3files,9.33s. Hook tests cover lost acknowledgement/remount, stopped waiting/late result, cancellation losing to commit, wrong-actor result, stale version, blocked storage and actor/access changes. Existing ticket workspace tests included.
+- Added real component remove-review/reset test initially expected a different success label. Corrected expectation to actual truthful recorded-change label; second removal run terminal0,4passed/6.34s. Verified bound remove action/type/versions and cleared removal intent on return to selection.
+- Types86891 terminal0; scoped production/test ESLint0. New removal test final type/lint10589 pending at this checkpoint.
+- Scoped PHP Pint9files0; routes syntax0. Whole routes/web.php Pint check reports existing line-ending/negation formatting outside the new route definitions; unrelated formatting preserved.
+
+## Browser checkpoint
+
+Build34 process49488 running. No browser/runtime started yet. Next: verify exact manifest/checkout on isolated loopback runtime, restricted technician actual add/remove on both records with refreshed counts/history, keyboard review/back/discard, requester-hidden controls and access/error recovery. Never resize. Preserve owned runtime teardown proof. Update this report with observed evidence only.
+
+## Final automated and real-browser evidence
+
+Final full types and removal-test lint10589 exited0. Standalone real-worker concurrency44250/token it_3be569ba26844903 exited0/Pest0: one test, three races,85assertions. Both workers reached the held canonical pair before release; duplicate UUID returns committed/replayed once, opposite-direction add yields one commit and one stale version, execution versus cancellation yields one consistent committed-or-cancelled result. Links, versions, event/audit counts and original message identities/status reconcile. All14 postflight guards true/schema absent. No particular nondeterministic winner is claimed. New sources: tests/Concurrency/It/ItTicketRelationshipConcurrencyTest.php, tests/Support/It/relationship-concurrency-worker.php, standalone README entry.
+
+Build34 handle49488 terminal0/4m4s, app-D5ErimNf.js; manifest aaa28d29ed9e863d975fe5b325dbeb9383189ea2f5fb19641a7d42aa26372bfb. Runtime preview confirmed unchanged six helper hashes, migrations and schema. Launcher37102 terminal0, token267232c251704116, fingerprint11614ef10bf1ade774e0dfd695d9abf608282fbcfe0b983c9003803a377200c7. Readiness/proof binds this checkout, unique schema/storage, local environment, actual CSRF, array mail, sync queue and absent provider configuration. No Herd environment changed. Proof: w09-browser-build34-preview.json and w09-browser-build34-runtime.json.
+
+Actual Codex in-app browser tab5, normal restricted-user4 login. DOM app asset exactly matches Build34. Observed1235×856, never resized. Wizard screenshot inspected inline (no saved screenshot artifact claimed); approved shared rail/body/footer remain usable. Related chooser contains permitted4/5/6/7 and excludes sensitive2/unapproved-Site3/self1. Search with no match shows genuine empty state; reference search recovers. Tab from search field to Search to candidate and Space selection works; review step receives heading focus.
+
+1. On /it/tickets/1?tab=links, reviewed and saved related_ticket1→4. Confirmed result only after server acknowledgement; source linked meter1→2 and real link to4.
+2. Followed canonical link to4; /it/tickets/4?tab=links shows reverse1 and meter2. Reviewed Remove relationship from4, saved, meter2→1 and empty list. Activity on4 retained human-readable link/unlink events. Reloaded1 independently and verified removal there.
+3. Held a reviewed possible duplicate1→7 in tab5. Opened second real tab6 with same normal session and saved related1→4. Submitting older1→7 review returned explicit stale-record alert with Save disabled and no success. Refresh records and review again cleared selection, returned to choose, focused heading. Selected/reviewed7 with current versions and saved duplicate successfully. Source list showed both relationship types and meter3. Confirmed tab6 outcome then closed it.
+4. Prepared but did not submit1→6. Escape opened explicit discard confirmation; Cancel preserved exact review; Escape→Discard proposal left no relationship or receipt for6.
+5. Normal sign-out, header Log in, requester1 normal login lands /my-day. /it/tickets/1?tab=links shows no Related tickets region, no management controls and linked meter1 (permitted Site only). Activity says nothing on trail, hiding all four internal relationship changes. Browser warning/error log returned[]. Tab5 explicitly closed before teardown.
+
+Tool-only interruption: public home has two Log in links; strict locator refused ambiguity, then observed banner-scoped link succeeded. No authentication bypass. Automated component accessible-name spacing differs from real Chromium; tests use whitespace-tolerant names. Read-only reconciliation initially used incorrectly grouped PowerShell boolean operators; corrected pair grouping against captured rows, all9checks true. No product mutation was repeated because of these tooling issues.
+
+Read-only final database evidence: w09-browser-build34-final-evidence.json and w09-browser-build34-reconciliation.json. Four reciprocal rows (1↔4 related,1↔7 duplicate), four committed receipts, eight paired events/audits; all1/4/6/7 open/unmerged; versions5/4/1/2;6 untouched. Reader extended only with bounded relationship projections, no secrets/private bodies. This is final-state capture, not a before-and-after snapshot claim. Ten protected design hashes unchanged: w09-build34-protected-design-check.json.
+
+Cleanup70172 pending at this writing; append terminal and independent absence proof before leaving the slice.
+
+## Remaining acceptance
+
+These passing checks verify the bounded link/unlink slice, not all W09. Real-browser uncertain acknowledgement, remount check/cancel and session-revocation journeys remain to exercise (hook/backend and actual worker coverage is recorded separately). Above20-row pagination has no real-browser claim. Intake/triage duplicate suggestions are still outstanding; current duplicate ranking is in the merge chooser. Remaining merge acceptance includes nonzero files/watchers/approval-bearing and browser loss/session/cancel recovery. Known-error/article/resolution-to-reviewed-knowledge depends on W21; quality reporting depends on W17. Whole E08, W09 and the full goal remain open.
+
+Cleanup70172 terminal0; independent postflight0 confirms schema_absent=true and owned_directory_absent=true. No owned build/test/browser runtime remains. Build34 token267232c251704116 is removed and must not be reused. Final diffcheck0; production source unchanged from the recorded build.

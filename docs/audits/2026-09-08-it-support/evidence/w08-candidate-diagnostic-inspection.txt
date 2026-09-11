@@ -1,0 +1,45 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_d87f132e99d3412e",
+    "database_mutations_performed": false
+}
+{"phase":"diagnostic_enabled","path":"C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\audits\\2026-09-08-it-support\\evidence\\it_d87f132e99d3412e.diagnostic.jsonl"}
+{"approval_candidate_diagnostic_reports":[{"message":"IT draft request failed","exception_type":"App\\Exceptions\\TaskProviderNavigationException","keys":["failure_id","exception_type","source_file","source_line"]},{"message":"IT draft request failed","exception_type":"RuntimeException","keys":["failure_id","exception_type","source_file","source_line"]}]}
+{"exit_code":1,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_d87f132e99d3412e",
+    "database_mutations_performed": false
+}

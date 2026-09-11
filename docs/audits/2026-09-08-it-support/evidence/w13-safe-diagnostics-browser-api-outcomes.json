@@ -1,0 +1,8 @@
+{
+  "recorded_validation_failures": 26,
+  "retained_rollback_failures": 1,
+  "recovered_attempts": 2,
+  "recovery_replayed": true,
+  "synthetic_legacy_pending": 1,
+  "synthetic_legacy_delivery": 1
+}

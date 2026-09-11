@@ -2,239 +2,102 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Domain\It\Services\ItEmailDeliveryService;
+use App\Domain\It\Services\ItOutboundMailer;
 use App\Http\Controllers\Controller;
-use App\Models\AppSetting;
-use App\Services\MicrosoftGraphService;
+use App\Models\ItEmailDelivery;
+use App\Services\EmailConfiguration;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Mail;
-use Throwable;
+use Illuminate\Support\Arr;
 
 class EmailSettingsController extends Controller
 {
-    private const SETTINGS_KEY = 'settings.email.configuration';
-
-    private const SMTP_PASSWORD_KEY = 'settings.email.smtp_password';
+    public function __construct(private readonly EmailConfiguration $settings) {}
 
     public function index(Request $request)
     {
         $this->authorizeAccess($request);
+        $state = $this->state($request);
 
-        return inertia('settings/email-settings', [
-            'settings' => $this->loadSettings(),
-            'connections' => $this->loadConnections($request),
-            'smtp_password_saved' => AppSetting::query()->where('key', self::SMTP_PASSWORD_KEY)->exists(),
-        ]);
+        return $request->expectsJson() ? response()->json(['data' => $state]) : inertia('settings/email-settings', $state);
     }
 
     public function update(Request $request)
     {
         $this->authorizeAccess($request);
+        $saved = $this->settings->save($request);
 
-        $validated = $this->validateSettings($request);
-
-        $settings = [
-            'provider' => $validated['provider'],
-            'smtp_host' => $validated['smtp_host'] ?? '',
-            'smtp_port' => (int) ($validated['smtp_port'] ?? config('mail.mailers.smtp.port', 587)),
-            'smtp_encryption' => $validated['smtp_encryption'],
-            'smtp_username' => $validated['smtp_username'] ?? '',
-            'from_address' => $validated['from_address'] ?? '',
-            'from_name' => $validated['from_name'] ?? '',
-        ];
-
-        AppSetting::updateOrCreate(
-            ['key' => self::SETTINGS_KEY],
-            ['value' => $settings],
-        );
-
-        if (($validated['smtp_password'] ?? '') !== '') {
-            AppSetting::updateOrCreate(
-                ['key' => self::SMTP_PASSWORD_KEY],
-                ['value' => Crypt::encryptString($validated['smtp_password'])],
-            );
-        }
-
-        return back()->with('success', 'Email settings updated.');
+        return $request->expectsJson() ? response()->json(['data' => $this->state($request, $saved)])
+            : back()->with('success', 'Email settings saved.');
     }
 
-    public function test(Request $request)
+    public function test(Request $request, ItEmailDeliveryService $deliveries)
     {
         $this->authorizeAccess($request);
+        abort_unless($this->settings->canManage($request->user()?->fresh()), 403);
+        $input = $request->validate(['request_uuid' => ['required', 'uuid'], 'expected_version' => ['required', 'integer', 'min:1'], 'expected_actor_id' => ['required', 'integer', 'min:1']]);
+        abort_unless((int) $input['expected_actor_id'] === (int) $request->user()->id, 403);
+        $delivery = $deliveries->prepareConfigurationTest($request, $input['request_uuid'], (int) $input['expected_version']);
+        $deliveries->dispatchPending(limit: 1, deliveryId: $delivery->id);
 
-        $validated = $this->validateSettings($request);
-        $provider = $validated['provider'];
+        return response()->json(['data' => $this->testState($delivery->fresh())]);
+    }
 
-        try {
-            if ($provider === 'smtp') {
-                $this->sendSmtpTest($request, $validated);
+    public function showTest(Request $request, string $uuid)
+    {
+        $this->authorizeAccess($request);
+        abort_unless($this->settings->canManage($request->user()?->fresh()), 403);
+        $delivery = ItEmailDelivery::query()->where('recipient_user_id', $request->user()->id)
+            ->where('notification_type', 'it_email_configuration_test')->where('notification_uuid', $uuid)->firstOrFail();
 
-                return back()->with('success', 'Test email sent to '.$request->user()->email.'.');
-            }
-
-            if ($provider === 'microsoft') {
-                $identity = $request->user()
-                    ->identities()
-                    ->where('provider', 'microsoft')
-                    ->first();
-
-                if (! $identity) {
-                    return back()->with('error', 'Connect a Microsoft account before sending a test email.');
-                }
-
-                $sent = (new MicrosoftGraphService($identity))->sendMail(
-                    $request->user()->email,
-                    'Oblivion Findings email test',
-                    '<p>This is a test email from Oblivion Findings.</p>'
-                );
-
-                return $sent
-                    ? back()->with('success', 'Test email sent to '.$request->user()->email.'.')
-                    : back()->with('error', 'Microsoft could not send the test email.');
-            }
-
-            return back()->with('warning', 'Test email is not available for Google Workspace yet.');
-        } catch (Throwable $exception) {
-            report($exception);
-
-            return back()->with('error', 'Test email failed: '.$exception->getMessage());
-        }
+        return response()->json(['data' => $this->testState($delivery)]);
     }
 
     private function authorizeAccess(Request $request): void
     {
-        abort_unless($request->user()?->canDo('settings.access.manage'), 403);
+        abort_unless($request->user()?->fresh()?->canDo('settings.access.manage'), 403);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function validateSettings(Request $request): array
+    private function state(Request $request, ?array $configuration = null): array
     {
-        return $request->validate([
-            'provider' => ['required', 'in:smtp,microsoft,google'],
-            'smtp_host' => ['nullable', 'string', 'max:255'],
-            'smtp_port' => ['nullable', 'integer', 'between:1,65535'],
-            'smtp_encryption' => ['required', 'in:tls,ssl,none'],
-            'smtp_username' => ['nullable', 'string', 'max:255'],
-            'smtp_password' => ['nullable', 'string', 'max:1000'],
-            'from_address' => ['nullable', 'email', 'max:255'],
-            'from_name' => ['nullable', 'string', 'max:255'],
-        ]);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function loadSettings(): array
-    {
-        $defaults = [
-            'provider' => 'smtp',
-            'smtp_host' => (string) config('mail.mailers.smtp.host', ''),
-            'smtp_port' => (int) config('mail.mailers.smtp.port', 587),
-            'smtp_encryption' => (string) (config('mail.mailers.smtp.scheme') ?: 'none'),
-            'smtp_username' => (string) (config('mail.mailers.smtp.username') ?? ''),
-            'from_address' => (string) (config('mail.from.address') ?? ''),
-            'from_name' => (string) (config('mail.from.name') ?? ''),
-        ];
-
-        $stored = AppSetting::query()->where('key', self::SETTINGS_KEY)->value('value');
-
-        if (! is_array($stored)) {
-            return $defaults;
-        }
-
-        return [
-            'provider' => in_array($stored['provider'] ?? null, ['smtp', 'microsoft', 'google'], true)
-                ? $stored['provider']
-                : $defaults['provider'],
-            'smtp_host' => (string) ($stored['smtp_host'] ?? $defaults['smtp_host']),
-            'smtp_port' => (int) ($stored['smtp_port'] ?? $defaults['smtp_port']),
-            'smtp_encryption' => in_array($stored['smtp_encryption'] ?? null, ['tls', 'ssl', 'none'], true)
-                ? $stored['smtp_encryption']
-                : $defaults['smtp_encryption'],
-            'smtp_username' => (string) ($stored['smtp_username'] ?? $defaults['smtp_username']),
-            'from_address' => (string) ($stored['from_address'] ?? $defaults['from_address']),
-            'from_name' => (string) ($stored['from_name'] ?? $defaults['from_name']),
-        ];
-    }
-
-    /**
-     * @return array<string, array{connected: bool, email: string|null}>
-     */
-    private function loadConnections(Request $request): array
-    {
-        $identities = $request->user()
-            ->identities()
-            ->whereIn('provider', ['microsoft', 'google'])
-            ->get()
-            ->keyBy('provider');
-
-        return [
-            'microsoft' => [
-                'connected' => $identities->has('microsoft'),
-                'email' => $identities->get('microsoft')?->email,
-            ],
-            'google' => [
-                'connected' => $identities->has('google'),
-                'email' => $identities->get('google')?->email,
-            ],
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $validated
-     */
-    private function sendSmtpTest(Request $request, array $validated): void
-    {
-        $scheme = $validated['smtp_encryption'] === 'none'
-            ? null
-            : $validated['smtp_encryption'];
-
-        $passwordSetting = AppSetting::query()->where('key', self::SMTP_PASSWORD_KEY)->value('value');
-        $password = ($validated['smtp_password'] ?? '') !== ''
-            ? $validated['smtp_password']
-            : ($passwordSetting ? Crypt::decryptString((string) $passwordSetting) : config('mail.mailers.smtp.password'));
-
-        $defaultMailer = (string) config('mail.default', 'smtp');
-
-        if (in_array($defaultMailer, ['array', 'log'], true)) {
-            Mail::mailer($defaultMailer)->raw('This is a test email from Oblivion Findings.', function ($message) use ($request, $validated) {
-                $message->to($request->user()->email)
-                    ->subject('Oblivion Findings email test');
-
-                if (($validated['from_address'] ?? '') !== '') {
-                    $message->from(
-                        $validated['from_address'],
-                        $validated['from_name'] ?: config('mail.from.name')
-                    );
-                }
-            });
-
-            return;
-        }
-
-        config([
-            'mail.mailers.smtp.transport' => 'smtp',
-            'mail.mailers.smtp.host' => $validated['smtp_host'] ?: config('mail.mailers.smtp.host'),
-            'mail.mailers.smtp.port' => (int) ($validated['smtp_port'] ?: config('mail.mailers.smtp.port', 587)),
-            'mail.mailers.smtp.scheme' => $scheme,
-            'mail.mailers.smtp.username' => $validated['smtp_username'] ?: config('mail.mailers.smtp.username'),
-            'mail.mailers.smtp.password' => $password,
-            'mail.from.address' => $validated['from_address'] ?: config('mail.from.address'),
-            'mail.from.name' => $validated['from_name'] ?: config('mail.from.name'),
-        ]);
-
-        Mail::mailer('smtp')->raw('This is a test email from Oblivion Findings.', function ($message) use ($request, $validated) {
-            $message->to($request->user()->email)
-                ->subject('Oblivion Findings email test');
-
-            if (($validated['from_address'] ?? '') !== '') {
-                $message->from(
-                    $validated['from_address'],
-                    $validated['from_name'] ?: config('mail.from.name')
-                );
+        $canManage = $this->settings->canManage($request->user()?->fresh());
+        $configuration ??= $this->settings->current();
+        $issue = null;
+        if ($configuration['support_enabled']) {
+            try {
+                $this->settings->supportConnection($configuration);
+            } catch (\DomainException $exception) {
+                $issue = $exception->getMessage();
             }
-        });
+        }
+        $test = $canManage ? ItEmailDelivery::query()->where('recipient_user_id', $request->user()->id)
+            ->where('notification_type', 'it_email_configuration_test')->latest('id')->first() : null;
+
+        return [
+            'actor_id' => (int) $request->user()->id,
+            'settings' => Arr::except($configuration, 'support_connection_scope_hash'),
+            'can_manage' => $canManage,
+            'connections' => $canManage ? $this->settings->connections() : [],
+            'smtp_password_saved' => $this->settings->passwordSaved(),
+            'capture_mode' => app(ItOutboundMailer::class)->captureMode(),
+            'delivery_issue' => $issue,
+            'last_test' => $test ? $this->testState($test) : null,
+        ];
+    }
+
+    private function testState(ItEmailDelivery $delivery): array
+    {
+        return [
+            'request_uuid' => $delivery->notification_uuid,
+            'configuration_version' => $delivery->notification_context['configuration_version'] ?? null,
+            'capture_mode' => $delivery->notification_context['capture_mode'] ?? null,
+            'status' => $delivery->status,
+            'recipient_email' => $delivery->recipient_email,
+            'attempt_count' => $delivery->attempt_count,
+            'created_at' => $delivery->created_at?->toIso8601String(),
+            'accepted_at' => $delivery->accepted_at?->toIso8601String(),
+            'delivered_at' => $delivery->delivered_at?->toIso8601String(),
+            'failed_at' => $delivery->failed_at?->toIso8601String(),
+        ];
     }
 }

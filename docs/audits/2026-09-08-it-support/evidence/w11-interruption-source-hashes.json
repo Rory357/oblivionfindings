@@ -1,0 +1,117 @@
+{
+  "sources": [
+    {
+      "path": "database/migrations/2026_09_11_000021_bind_mailbox_attachment_reservations.php",
+      "sha256": "c15992e75355303e9e6c76c037b4373f541d761d77a4f29152159a9c4cc03d2a"
+    },
+    {
+      "path": "app/Domain/It/Data/ItScannedEmailAttachment.php",
+      "sha256": "b1632904bacae3bd9d8074a16cea896de17bac0c7a47a88ac092195f438fb87f"
+    },
+    {
+      "path": "app/Domain/It/Services/ItInboundAttachmentStaging.php",
+      "sha256": "575603acc2ad8dd8bc5df9b495dbde1acebaa816f9983042d6676b58a4453eb3"
+    },
+    {
+      "path": "app/Models/ItAttachmentStorageIntent.php",
+      "sha256": "f14a2339bcf2f493a21cc218db356689ebceb75a3b02bc1267d5d36648bd11a9"
+    },
+    {
+      "path": "app/Domain/It/Services/ItAttachmentStorageIntentService.php",
+      "sha256": "a82e60c4d7813c459e310321afcda0feb965cb61b6cbcec00b00ca627311e46c"
+    },
+    {
+      "path": "app/Domain/It/Services/ItAttachmentStorageService.php",
+      "sha256": "f7967aeb1703a472547e0a03ac44c4dcd50893a929ca8e3e8cb1f68968692c34"
+    },
+    {
+      "path": "app/Domain/It/Services/ItMailboxPollState.php",
+      "sha256": "906361eaed15ab2360f368b63a6eb3b9835d1208cf5e7e2e9ffa324d1fe18478"
+    },
+    {
+      "path": "resources/js/components/it/it-service-operations.tsx",
+      "sha256": "96471b5af088edd674186c8547d3357c15ebc9e98ace82f1a85b0c3ec4041057"
+    },
+    {
+      "path": "resources/js/components/it/__tests__/it-service-operations.test.tsx",
+      "sha256": "6cc20b6ce53dc4b8e06daea55f8b063c938b4a513141b2af3846af6a147823d5"
+    },
+    {
+      "path": "tests/Feature/It/ItMailboxPollStateTest.php",
+      "sha256": "60ee26c51d72c38edcfc7b2f1a5c328ac7698f6e6792a9168d0e9ca86220aeed"
+    },
+    {
+      "path": "tests/Concurrency/It/ItMailboxWorkerInterruptionTest.php",
+      "sha256": "be63c66fc46dc01585a35e93be61df0029b330c0ba80382be7a0f80d71a623a7"
+    },
+    {
+      "path": "tests/Support/It/mailbox-interruption-fixture.php",
+      "sha256": "7ebde550138254496cbea14155a9a32ef621c22cc73011cbaaa2a24b23865d7e"
+    },
+    {
+      "path": "tests/Support/It/mailbox-interruption-worker.php",
+      "sha256": "6ab27e7869db5902aaaccf98c395c59ed04877f406503c5c12230fdf5584579b"
+    },
+    {
+      "path": "docs/runbooks/it-attachment-storage-recovery.md",
+      "sha256": "280d594d239afe751ed1512751071a7c7ae4e26bff9739f651f3401290f83477"
+    },
+    {
+      "path": "docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-fixtures.php",
+      "sha256": "28ae5c65557683f4b22fdf4de418d4c09318f814acd1df7c0e0562961dbcd69c"
+    }
+  ],
+  "protected": [
+    {
+      "path": "DESIGN.md",
+      "sha256": "96863e01d924e954255cd61f550396c2f2eea9778bbaab7e8570ef9d63279c22",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md",
+      "sha256": "62515485265119962773e6015fefe38be94434aae468acd017c078da61b20ab5",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md",
+      "sha256": "86259475c987d6e30001604316379eb608aea9f83e16941b6aa476a94bca6957",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/DESIGN_TOKENS.md",
+      "sha256": "c3ee6c8acaa22049084f819e3ad2a33f457e936e467492079f16c15e9a611d2b",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LIST_STYLE_GUIDE.md",
+      "sha256": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/LOADER_STYLE_GUIDE.md",
+      "sha256": "cc20485e6e42e0a848b8cacc8ac6124e5e5a01206d966de6ebbbdec39dbe2a91",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md",
+      "sha256": "9295cdb1386322b8a088ae03de41bc3c75a0fbe3e8fa3331c92c704ccb15895d",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/oblivion-loader-01-demo.html",
+      "sha256": "748c94c030984d16c1a78f3b70855d1cf8f22461ab017e4ac8287ab9e8809cdf",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+      "sha256": "a528a0e863a676fdbbfcb028e532ece2799e39a7345ca3c1eca619ac4491d931",
+      "unchanged": true
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "sha256": "aee723e21491e9be908554a6f200d73204280a63d9028ea78de6bb9049f4a477",
+      "unchanged": true
+    }
+  ],
+  "manifest_sha256": "a3da74abe29220ea6fb05da857a5c18414b5ef9d628513688081ae9784b22912"
+}

@@ -76,6 +76,8 @@ export interface PageHeaderProps {
     /** Profile variant only: the glass back chip destination. */
     backHref?: string;
     title: string;
+    /** Let record titles wrap and reflow actions when their combined width is constrained. */
+    wrapTitle?: boolean;
     /** One status chip beside the title — use <PageHeaderStatusChip>. */
     titleChip?: ReactNode;
     /**
@@ -106,6 +108,7 @@ export function PageHeader({
     mark,
     backHref,
     title,
+    wrapTitle = false,
     titleChip,
     subline,
     actions,
@@ -119,8 +122,18 @@ export function PageHeader({
             <div className="relative z-[1] flex h-full flex-col">
                 <div className="flex flex-col px-[22px] pt-[18px]">
                     {/* top row — identity left, search/actions right */}
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
-                        <div className="flex min-w-0 items-start gap-[13px]">
+                    <div
+                        className={cn(
+                            'flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6',
+                            wrapTitle && 'lg:flex-wrap',
+                        )}
+                    >
+                        <div
+                            className={cn(
+                                'flex min-w-0 items-start gap-[13px]',
+                                wrapTitle && 'lg:flex-[1_0_28rem]',
+                            )}
+                        >
                             {variant === 'profile' && backHref ? (
                                 <Link
                                     href={backHref}
@@ -138,7 +151,14 @@ export function PageHeader({
                                 ) : null)}
                             <div className="flex min-w-0 flex-col">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <h1 className="truncate text-[22px] leading-tight font-bold tracking-tight">
+                                    <h1
+                                        className={cn(
+                                            'text-[22px] leading-tight font-bold tracking-tight',
+                                            wrapTitle
+                                                ? 'max-w-full min-w-0 break-words whitespace-normal'
+                                                : 'truncate',
+                                        )}
+                                    >
                                         {title}
                                     </h1>
                                     {titleChip}
@@ -151,7 +171,12 @@ export function PageHeader({
                             </div>
                         </div>
                         {actions ? (
-                            <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+                            <div
+                                className={cn(
+                                    'flex shrink-0 flex-wrap items-center gap-2 lg:justify-end',
+                                    wrapTitle && 'lg:ml-auto',
+                                )}
+                            >
                                 {actions}
                             </div>
                         ) : null}
@@ -393,6 +418,8 @@ export function PageHeaderMeterBlock({
     value,
     tone = 'brand',
     href,
+    preserveState,
+    preserveScroll,
     onClick,
     ariaLabel,
     children,
@@ -402,6 +429,9 @@ export function PageHeaderMeterBlock({
     value?: ReactNode;
     tone?: PageHeaderMeterTone;
     href?: string;
+    /** Keep an in-page workspace and its unsent fields mounted when following a meter. */
+    preserveState?: boolean;
+    preserveScroll?: boolean;
     onClick?: () => void;
     /** Accessible name; defaults to "View <label>". */
     ariaLabel?: string;
@@ -431,7 +461,12 @@ export function PageHeaderMeterBlock({
         ),
     };
     return href ? (
-        <Link href={href} {...shared}>
+        <Link
+            href={href}
+            preserveState={preserveState}
+            preserveScroll={preserveScroll}
+            {...shared}
+        >
             {body}
         </Link>
     ) : (
@@ -978,6 +1013,14 @@ export function PageHeaderRail<K extends string>({
     decorations?: Partial<Record<K, ReactNode>>;
 }) {
     const [viewsFindOpen, setViewsFindOpen] = useState(false);
+    const [focusedKey, setFocusedKey] = useState<K>(value);
+    const tabButtons = useRef(new Map<K, HTMLButtonElement>());
+    const findButton = useRef<HTMLButtonElement>(null);
+    const pickedKey = useRef<K | null>(null);
+    useEffect(() => setFocusedKey(value), [value]);
+    const entryKey = items.some((item) => item.key === focusedKey)
+        ? focusedKey
+        : (items.find((item) => item.key === value)?.key ?? items[0]?.key);
     return (
         <div
             role="tablist"
@@ -993,6 +1036,33 @@ export function PageHeaderRail<K extends string>({
                         type="button"
                         role="tab"
                         aria-selected={on}
+                        ref={(button) => {
+                            if (button) tabButtons.current.set(it.key, button);
+                            else tabButtons.current.delete(it.key);
+                        }}
+                        tabIndex={it.key === entryKey ? 0 : -1}
+                        onFocus={() => setFocusedKey(it.key)}
+                        onKeyDown={(event) => {
+                            const index = items.findIndex(
+                                (item) => item.key === it.key,
+                            );
+                            const next =
+                                event.key === 'Home'
+                                    ? 0
+                                    : event.key === 'End'
+                                      ? items.length - 1
+                                      : event.key === 'ArrowRight'
+                                        ? (index + 1) % items.length
+                                        : event.key === 'ArrowLeft'
+                                          ? (index + items.length - 1) %
+                                            items.length
+                                          : null;
+                            if (next === null) return;
+                            event.preventDefault();
+                            // Manual activation keeps navigation and unsaved-work guards
+                            // with the existing Enter/Space/click action.
+                            tabButtons.current.get(items[next].key)?.focus();
+                        }}
                         onClick={() => onSelect(it.key)}
                         onContextMenu={
                             onItemContextMenu
@@ -1033,7 +1103,14 @@ export function PageHeaderRail<K extends string>({
             })}
             <button
                 type="button"
-                onClick={onFind ?? (() => setViewsFindOpen(true))}
+                ref={findButton}
+                onClick={
+                    onFind ??
+                    (() => {
+                        pickedKey.current = null;
+                        setViewsFindOpen(true);
+                    })
+                }
                 title={onFind ? 'Find a section (/)' : 'Find a view'}
                 aria-label={onFind ? 'Find a section' : 'Find a view'}
                 className="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
@@ -1055,7 +1132,19 @@ export function PageHeaderRail<K extends string>({
                     open={viewsFindOpen}
                     onOpenChange={setViewsFindOpen}
                     ariaLabel={`Find a view — ${ariaLabel}`}
+                    onCloseAutoFocus={(event) => {
+                        const target =
+                            (pickedKey.current === null
+                                ? null
+                                : tabButtons.current.get(pickedKey.current)) ??
+                            findButton.current;
+                        if (target?.isConnected) {
+                            event.preventDefault();
+                            target.focus();
+                        }
+                    }}
                     onPick={(key) => {
+                        pickedKey.current = key;
                         setViewsFindOpen(false);
                         onSelect(key);
                     }}
@@ -1076,12 +1165,14 @@ function RailViewsPalette<K extends string>({
     onOpenChange,
     onPick,
     ariaLabel,
+    onCloseAutoFocus,
 }: {
     items: PageHeaderRailItem<K>[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onPick: (key: K) => void;
     ariaLabel: string;
+    onCloseAutoFocus: (event: Event) => void;
 }) {
     const [query, setQuery] = useState('');
     useEffect(() => {
@@ -1092,7 +1183,10 @@ function RailViewsPalette<K extends string>({
     );
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-sm gap-3 p-3">
+            <DialogContent
+                className="max-w-sm gap-3 p-3"
+                onCloseAutoFocus={onCloseAutoFocus}
+            >
                 <DialogTitle className="sr-only">{ariaLabel}</DialogTitle>
                 <DialogDescription className="sr-only">
                     Search the views on this page and jump to one.

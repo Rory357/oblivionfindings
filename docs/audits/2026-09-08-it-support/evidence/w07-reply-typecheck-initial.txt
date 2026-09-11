@@ -1,0 +1,63 @@
+npm notice run npx
+npm notice run tsc --noEmit --pretty false
+resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx(50,5): error TS2719: Type '{ persistenceEnabled: boolean; busy: boolean; memoryNotices: import("C:/Users/steph/Herd/oblivionfindings/resources/js/hooks/it-ticket-draft-memory").ItDraftMemoryNotice[]; memoryWarning: string | null; ... 35 more ...; browserBlocker: { ...; } | null; }' is not assignable to type '{ persistenceEnabled: boolean; busy: boolean; memoryNotices: import("C:/Users/steph/Herd/oblivionfindings/resources/js/hooks/it-ticket-draft-memory").ItDraftMemoryNotice[]; memoryWarning: string | null; ... 35 more ...; browserBlocker: { ...; } | null; }'. Two different types with this name exist, but they are unrelated.
+  Types of property 'registerRecoveredSubmission' are incompatible.
+    Type '((snapshot: ItDraftSnapshot, reference: Readonly<ItDraftCommitReference>) => boolean) | undefined' is not assignable to type '(snapshot: ItDraftSnapshot, reference: Readonly<ItDraftCommitReference>) => boolean'.
+      Type 'undefined' is not assignable to type '(snapshot: ItDraftSnapshot, reference: Readonly<ItDraftCommitReference>) => boolean'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(124,7): error TS2741: Property 'canonical_ticket_id' is missing in type '{ id: number; comment_id: number; viewer_user_id: number; request_uuid: string; is_internal: false; lock_version: number; replayed: false; delivery: { requested: true; attempt_statuses: { failed: number; }; }; }' but required in type 'ItCommentCommitted'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(136,59): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(150,65): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(153,66): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(157,65): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(165,17): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(184,61): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(200,61): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(211,61): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(226,61): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(255,61): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/it/__tests__/ticket-reply-composer.test.tsx(268,65): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/hooks/it-ticket-comment-contract.test.ts(174,22): error TS2540: Cannot assign to 'draft_revision' because it is a read-only property.

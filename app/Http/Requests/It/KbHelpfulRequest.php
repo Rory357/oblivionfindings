@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\It;
 
+use App\Domain\It\Services\ItKbAccessService;
+use App\Models\ItKbArticle;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -16,7 +18,16 @@ class KbHelpfulRequest extends FormRequest
     {
         $user = $this->user();
 
-        return (bool) ($user && ($user->canDo('it.request') || $user->canDo('it.view')));
+        if (! $user || (! $user->canDo('it.request') && ! $user->canDo('it.view') && ! $user->canDo('it.manage')
+            && ! app(ItKbAccessService::class)->hasKnowledgeCapability($user))) {
+            return false;
+        }
+
+        $article = $this->route('article');
+        abort_unless($article instanceof ItKbArticle
+            && app(ItKbAccessService::class)->canReadPublished($user, $article), 404);
+
+        return true;
     }
 
     /**

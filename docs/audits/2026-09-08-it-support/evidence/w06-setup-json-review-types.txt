@@ -1,0 +1,1 @@
+resources/js/hooks/it-ticket-draft-contract.ts(38,133): error TS18048: 'context.requestUuid' is possibly 'undefined'.

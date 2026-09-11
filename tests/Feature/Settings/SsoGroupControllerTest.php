@@ -68,7 +68,7 @@ class SsoGroupControllerTest extends TestCase
         $this->actingAs($this->staff)->post('/settings/sso-groups/fetch')->assertForbidden();
     }
 
-    public function test_index_renders_existing_mappings(): void
+    public function test_index_redirects_to_the_canonical_sso_workspace_and_json_returns_saved_rules(): void
     {
         $this->createMapping([
             'provider' => 'microsoft',
@@ -77,13 +77,8 @@ class SsoGroupControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->get('/settings/sso-groups')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('settings/sso-groups')
-                ->has('mappings', 1)
-                ->has('roles')
-                ->has('stats')
-            );
+            ->assertRedirect('/settings/sso?view=groups');
+        $this->getJson('/settings/sso-groups')->assertOk()->assertJsonCount(1, 'mappings')->assertHeader('Cache-Control', 'no-store, private');
     }
 
     public function test_store_creates_mapping(): void
@@ -115,6 +110,7 @@ class SsoGroupControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->put("/settings/sso-groups/{$mapping->id}", [
                 'role_id' => $replacementRole->id,
+                'expected_version' => $mapping->version,
                 'auto_assign' => false,
                 'auto_remove' => true,
             ])
@@ -134,7 +130,7 @@ class SsoGroupControllerTest extends TestCase
         $mapping = $this->createMapping();
 
         $this->actingAs($this->admin)
-            ->delete("/settings/sso-groups/{$mapping->id}")
+            ->delete("/settings/sso-groups/{$mapping->id}", ['expected_version' => $mapping->version])
             ->assertRedirect()
             ->assertSessionHas('success', 'Group mapping deleted.');
 
@@ -207,7 +203,49 @@ class SsoGroupControllerTest extends TestCase
             'role_id' => $this->supportRole->id,
             'auto_assign' => true,
             'auto_remove' => false,
+            'confirm_role_assignment' => true,
+            'assignment_reason' => 'Synthetic approved group assignment.',
         ], $overrides);
+    }
+
+    public function test_role_grants_require_deliberate_review_and_changes_are_audited(): void
+    {
+        $this->actingAs($this->admin)->postJson('/settings/sso-groups', $this->mappingPayload(['confirm_role_assignment' => false]))
+            ->assertUnprocessable()->assertJsonValidationErrors('assignment_reason');
+        $this->assertDatabaseCount('sso_group_mappings', 0);
+        $response = $this->postJson('/settings/sso-groups', $this->mappingPayload(['role_id' => (string) $this->supportRole->id]))->assertOk()->assertJsonPath('status', 'saved')->assertJsonPath('mapping.role_id', (int) $this->supportRole->id);
+        $mapping = SsoGroupMapping::findOrFail($response->json('mapping.id'));
+        $this->assertDatabaseHas('audit_logs', ['action' => 'settings.sso.group_mapping_created', 'auditable_id' => $mapping->id]);
+        $this->postJson('/settings/sso-groups', $this->mappingPayload())->assertUnprocessable()->assertJsonValidationErrors('external_group_id');
+        $payload = ['role_id' => $mapping->role_id, 'auto_assign' => false, 'auto_remove' => true, 'expected_version' => $mapping->version];
+        $this->putJson('/settings/sso-groups/'.$mapping->id, $payload)->assertOk();
+        $this->putJson('/settings/sso-groups/'.$mapping->id, $payload)->assertConflict();
+        $this->deleteJson('/settings/sso-groups/'.$mapping->id, ['expected_version' => $mapping->version])->assertConflict();
+        $this->deleteJson('/settings/sso-groups/'.$mapping->id, ['expected_version' => $mapping->fresh()->version])->assertOk()->assertJsonPath('status', 'removed');
+        $this->assertDatabaseHas('audit_logs', ['action' => 'settings.sso.group_mapping_deleted', 'auditable_id' => $mapping->id]);
+    }
+
+    public function test_directory_result_is_withheld_if_current_actor_access_was_revoked_during_fetch(): void
+    {
+        $this->createMicrosoftIdentity($this->admin, now()->addHour());
+        Http::fake(function () {
+            $this->admin->roles()->detach();
+            $this->admin->forceFill(['role' => 'support_worker'])->save();
+
+            return Http::response(['value' => [['id' => 'private-group', 'displayName' => 'Synthetic restricted group']]]);
+        });
+        $this->actingAs($this->admin)->postJson('/settings/sso-groups/fetch')->assertForbidden()->assertJsonMissingPath('groups');
+    }
+
+    public function test_directory_result_is_withheld_if_its_identity_was_disconnected_during_fetch(): void
+    {
+        $identity = $this->createMicrosoftIdentity($this->admin, now()->addHour());
+        Http::fake(function () use ($identity) {
+            $identity->delete();
+
+            return Http::response(['value' => [['id' => 'private-group', 'displayName' => 'Synthetic restricted group']]]);
+        });
+        $this->actingAs($this->admin)->postJson('/settings/sso-groups/fetch')->assertConflict()->assertJsonMissingPath('groups');
     }
 
     private function createMicrosoftIdentity(User $user, $expiresAt): Identity

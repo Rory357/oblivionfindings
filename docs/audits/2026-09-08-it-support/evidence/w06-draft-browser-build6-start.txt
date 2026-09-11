@@ -1,0 +1,1 @@
+W06 isolated bootstrap stopped. No raw SQL, private values or secrets emitted. Inspect only the owned token directory/schema; no reset or cleanup was attempted.

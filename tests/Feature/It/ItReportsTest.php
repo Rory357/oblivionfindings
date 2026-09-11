@@ -1,9 +1,11 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItSlaClockService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\ItProvisioningRequest;
+use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\Permission;
 use App\Models\Role;
@@ -115,9 +117,15 @@ test('the report aggregates tickets and provisioning across the range', function
         'category' => 'hardware',
     ], $attrs));
 
-    // Four OPEN tickets (point-in-time state).
-    $mk(['priority' => 'urgent', 'status' => 'open', 'assigned_to_user_id' => null, 'sla_state' => 'at_risk']);
-    $mk(['priority' => 'urgent', 'status' => 'open', 'assigned_to_user_id' => null, 'sla_state' => 'breached']);
+    // Clock evidence, rather than a cached label, establishes these outcomes.
+    $snapshot = app(ItSlaClockService::class)->policySnapshot('normal',
+        (new ItSlaPolicy)->forceFill(['first_response_minutes' => 60, 'resolution_minutes' => 240]), now());
+    $mk(['priority' => 'urgent', 'status' => 'open', 'assigned_to_user_id' => null,
+        'created_at' => now()->subMinutes(50), 'first_response_due_at' => now()->addMinutes(10),
+        'resolution_due_at' => now()->addMinutes(190), 'sla_policy_snapshot' => $snapshot]);
+    $mk(['priority' => 'urgent', 'status' => 'open', 'assigned_to_user_id' => null,
+        'created_at' => now()->subMinutes(70), 'first_response_due_at' => now()->subMinutes(10),
+        'resolution_due_at' => now()->addMinutes(170), 'sla_policy_snapshot' => $snapshot]);
     $mk(['priority' => 'high', 'status' => 'in_progress', 'assigned_to_user_id' => $this->agent->id, 'sla_state' => 'ok']);
     $mk(['priority' => 'normal', 'status' => 'open', 'assigned_to_user_id' => null, 'sla_state' => 'ok']);
 
@@ -126,11 +134,15 @@ test('the report aggregates tickets and provisioning across the range', function
         'priority' => 'normal', 'status' => 'resolved',
         'created_at' => now()->subHours(3), 'resolved_at' => now()->subHours(1), // 120 min
         'first_responded_at' => now()->subHours(2)->subMinutes(30),              // 30 min to first reply
+        'first_response_due_at' => now()->subHours(2), 'resolution_due_at' => now()->addHour(),
+        'sla_policy_snapshot' => $snapshot,
         'sla_state' => 'met', 'csat_score' => 5, 'csat_submitted_at' => now()->subMinutes(30),
     ]);
     $mk([
         'priority' => 'normal', 'status' => 'resolved',
         'created_at' => now()->subHours(2), 'resolved_at' => now()->subHours(1), // 60 min
+        'first_responded_at' => now()->subMinutes(90), 'first_response_due_at' => now()->subMinutes(100),
+        'resolution_due_at' => now()->addHours(2), 'sla_policy_snapshot' => $snapshot,
         'sla_state' => 'breached', 'csat_score' => 2, 'csat_submitted_at' => now()->subMinutes(20),
     ]);
 
@@ -152,7 +164,7 @@ test('the report aggregates tickets and provisioning across the range', function
 
     // KPIs — flow over the range.
     expect($json['kpis']['avg_resolution_mins'])->toBe(90);   // (120 + 60) / 2
-    expect($json['kpis']['avg_first_response_mins'])->toBe(30); // only one responded in range
+    expect($json['kpis']['avg_first_response_mins'])->toBe(30); // both public responses were recorded after 30 minutes
     expect($json['kpis']['sla_compliance'])->toEqual(50.0);    // 1 met of 2 measured
     expect($json['kpis']['sla_met'])->toBe(1);
     expect($json['kpis']['sla_measured'])->toBe(2);

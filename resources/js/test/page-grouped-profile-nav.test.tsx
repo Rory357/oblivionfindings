@@ -5,7 +5,8 @@ import {
     useGroupedProfileSearchShortcut,
     type GroupedProfileNavGroup,
 } from '@/components/page/grouped-profile-nav';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { Button } from '@/components/ui/button';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { User } from 'lucide-react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -48,7 +49,48 @@ function ShortcutHarness() {
     return <span>{open ? 'Search open' : 'Search closed'}</span>;
 }
 
+function PaletteHarness() {
+    const [open, setOpen] = useState(false);
+    return (
+        <>
+            <Button onClick={() => setOpen(true)}>Find section</Button>
+            <Button>Behind the dialog</Button>
+            <TabSearchPalette
+                open={open}
+                onClose={() => setOpen(false)}
+                groups={groups}
+                onTab={() => setOpen(false)}
+            />
+        </>
+    );
+}
+
 describe('grouped profile navigation', () => {
+    it('contains keyboard focus in the search dialog and restores its trigger on Escape', async () => {
+        render(<PaletteHarness />);
+        const trigger = screen.getByRole('button', { name: 'Find section' });
+        trigger.focus();
+        fireEvent.click(trigger);
+        expect(
+            screen.getByRole('textbox', { name: 'Find a profile section' }),
+        ).toHaveFocus();
+        expect(
+            screen.queryByRole('button', { name: 'Behind the dialog' }),
+        ).not.toBeInTheDocument();
+        const close = screen.getByRole('button', {
+            name: 'Close',
+        });
+        close.focus();
+        fireEvent.keyDown(close, { key: 'Tab' });
+        expect(
+            screen.getByRole('textbox', { name: 'Find a profile section' }),
+        ).toHaveFocus();
+        fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+        await waitFor(() =>
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+        );
+        await waitFor(() => expect(trigger).toHaveFocus());
+    });
     it('uses a configurable test prefix and remembers the last tab in each group', () => {
         const onOpenGroup = vi.fn();
         const props = {

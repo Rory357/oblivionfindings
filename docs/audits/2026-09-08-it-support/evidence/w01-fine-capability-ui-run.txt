@@ -1,0 +1,196 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/pages/sites/vendors-credentials/global.test.tsx (6 tests | 2 failed) 932ms
+     × renders the hero, health strip and vendor table without crashing 206ms
+     × offers history to an auditor without reveal rights and conceals it immediately after grant revocation 179ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/sites/vendors-credentials/global.test.tsx > GlobalVendorsCredentials > renders the hero, health strip and vendor table without crashing
+TestingLibraryElementError: Unable to find an element with the text: Credential health. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div>
+      <div
+        class="flex w-full flex-col gap-5"
+      >
+        <header
+          class="eh-header text-primary-foreground"
+        >
+          <div
+            class="relative z-[1] flex h-full flex-col"
+          >
+            <div
+              class="flex flex-col px-[22px] pt-[18px]"
+            >
+              <div
+                class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+              >
+                <div
+                  class="flex min-w-0 items-start gap-[13px]"
+                >
+                  <span
+                    class="eh-mark-ring"
+                  >
+                    <svg
+                      class="lucide lucide-package size-5"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"
+                      />
+                      <path
+                        d="M12 22V12"
+                      />
+                      <polyline
+                        points="3.29 7 12 12 20.71 7"
+                      />
+                      <path
+                        d="m7.5 4.27 9 5.15"
+                      />
+                    </svg>
+                  </span>
+                  <div
+                    class="flex min-w-0 flex-col"
+                  >
+                    <div
+                      class="flex flex-wrap items-center gap-2"
+                    >
+                      <h1
+                        class="truncate text-[22px] leading-tight font-bold tracking-tight"
+                      >
+                        Vendors & Credentials
+                      </h1>
+                      <span
+                        class="inline-flex items-center gap-1 border px-2.5 py-0.5 text-xs bg-status-critical-bg text-status-critical border-status-critical/30 rounded-[8px] font-semibold"
+                      >
+                        1
+                         overdue
+                      </span>
+                    </div>
+                    <p
+                      class="mt-[3px] text-[13px] text-primary-foreground/65"
+                    >
+                      Vendor directory & access vault · 2 sites · 1 provider · 1 credential · encrypted at rest · every reveal audited
+                    </p>
+                  </div>
+                </div>
+                <div
+                  class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                >
+                  <div
+                    class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                  >
+                    <svg
+                      class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <circle
+                        cx="11"
+                        cy="11"
+                        r="8"
+                      />
+                      <path
+                        d="m21 21-4.3-4.3"
+                      />
+                    </svg>
+                    <input
+                      class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                      placeholder="Search company, credential, type, or site…"
+                      type="search"
+                      value=""
+                    />
+                    <kbd
+                      aria-hidden="true"
+                      class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                    >
+                      /
+                    </kbd>
+                  </div>
+                  <button
+                    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                    type="button"
+                  >
+                    <svg
+                      class="lucide lucide-truck s...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/sites/vendors-credentials/global.test.tsx:138:23
+    136|         expect(screen.getByText('Capital Plumbing & Gas')).toBeInTheDo…
+    137|         // Health strip zones.
+    138|         expect(screen.getByText('Credential health')).toBeInTheDocumen…
+       |                       ^
+    139|         expect(screen.getByText('Vendor coverage')).toBeInTheDocument(…
+    140|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  resources/js/pages/sites/vendors-credentials/global.test.tsx > GlobalVendorsCredentials > offers history to an auditor without reveal rights and conceals it immediately after grant revocation
+Error: expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <button
+  class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+  data-slot="button"
+  disabled=""
+  type="button"
+>
+  <svg
+    class="lucide lucide-eye mr-2 h-4 w-4"
+    fill="none"
+    height="24"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="2"
+    viewBox="0 0 24 24"
+    width="24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+    />
+    <circle
+      cx="12"
+      cy="12"
+      r="3"
+    />
+  </svg>
+  Re-authenticate & reveal
+</button> instead
+ ❯ resources/js/pages/sites/vendors-credentials/global.test.tsx:203:15
+    201|                 name: /Re-authenticate|Reveal code/,
+    202|             }),
+    203|         ).not.toBeInTheDocument();
+       |               ^
+    204|         fireEvent.click(screen.getByRole('button', { name: 'Reveal his…
+    205|         expect(await screen.findByText('Reveal & audit log')).toBeVisi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 19 passed (21)
+   Start at  13:58:28
+   Duration  9.93s (transform 1.04s, setup 492ms, import 13.63s, tests 1.43s, environment 4.21s)
+

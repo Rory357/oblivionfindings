@@ -1,0 +1,124 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/ticket-merge-recovery.test.tsx (3 tests | 1 failed) 1247ms
+   × confirms cancellation and preserves the reference when cancellation fails 1074ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-merge-recovery.test.tsx > confirms cancellation and preserves the reference when cancellation fails
+TestingLibraryElementError: Unable to find an element with the text: /could not be confirmed/i. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <section
+      aria-label="Merge result recovery"
+      class="space-y-3 rounded-2xl border border-border bg-card p-4"
+    >
+      <h2
+        class="text-sm font-semibold"
+        tabindex="-1"
+      >
+        Recover a merge result
+      </h2>
+      <p
+        class="text-sm text-muted-foreground"
+      >
+        Check the saved outcome of your earlier command. Checking does not submit another merge.
+      </p>
+      <p
+        class="text-sm"
+        role="status"
+      >
+        The merge result is not confirmed. Check its saved result, retry the same command or explicitly cancel it.
+      </p>
+      <div
+        class="flex flex-wrap gap-2"
+      >
+        <button
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+          data-slot="button"
+        >
+          Check merge result 
+          1
+        </button>
+        <button
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+          data-slot="button"
+        >
+          Cancel pending merge 
+          1
+        </button>
+      </div>
+    </section>
+  </div>
+</body>
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <section
+      aria-label="Merge result recovery"
+      class="space-y-3 rounded-2xl border border-border bg-card p-4"
+    >
+      <h2
+        class="text-sm font-semibold"
+        tabindex="-1"
+      >
+        Recover a merge result
+      </h2>
+      <p
+        class="text-sm text-muted-foreground"
+      >
+        Check the saved outcome of your earlier command. Checking does not submit another merge.
+      </p>
+      <p
+        class="text-sm"
+        role="status"
+      >
+        The merge result is not confirmed. Check its saved result, retry the same command or explicitly cancel it.
+      </p>
+      <div
+        class="flex flex-wrap gap-2"
+      >
+        <button
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+          data-slot="button"
+        >
+          Check merge result 
+          1
+        </button>
+        <button
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+          data-slot="button"
+        >
+          Cancel pending merge 
+          1
+        </button>
+      </div>
+    </section>
+  </div>
+</body>
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ resources/js/components/it/__tests__/ticket-merge-recovery.test.tsx:33:18
+     31|     expect(post).not.toHaveBeenCalled();
+     32|     fireEvent.click(screen.getByRole('button', { name: 'Cancel merge c…
+     33|     await screen.findByText(/could not be confirmed/i);
+       |                  ^
+     34|     expect(sessionStorage.getItem(key)).not.toBeNull();
+     35|     expect(screen.queryByRole('button', { name: 'Open confirmed surviv…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  18:54:30
+   Duration  3.16s (transform 139ms, setup 148ms, import 521ms, tests 1.25s, environment 1.02s)
+

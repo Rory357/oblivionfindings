@@ -16,6 +16,8 @@ class ItServiceIdentity extends Model
         'work:read',
         'work:comment',
         'work:transition',
+        'work:update',
+        'work:link',
         'work:sensitive',
         'work:organisation-wide',
     ];
@@ -26,6 +28,9 @@ class ItServiceIdentity extends Model
     ];
 
     public const REQUIRED_CREATE_FIELDS = ['title', 'category', 'priority', 'work_type'];
+
+    /** Explicitly delegated triage properties; ownership and lifecycle use their own commands. */
+    public const UPDATE_FIELDS = ['category', 'subcategory', 'priority', 'impact', 'urgency'];
 
     public const READ_FIELDS = [
         'description', 'category', 'subcategory', 'impact', 'urgency', 'site', 'service', 'asset',
@@ -63,6 +68,8 @@ class ItServiceIdentity extends Model
         'expires_at' => 'datetime',
         'revoked_at' => 'datetime',
         'last_used_at' => 'datetime',
+        'configuration_version' => 'integer',
+        'last_rotated_at' => 'datetime',
     ];
 
     public function actor(): BelongsTo

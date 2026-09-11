@@ -1,0 +1,813 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+stderr | resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > prefills team details, changes only intended fields and requires an explicit save after Review
+You called act(async () => ...) without await. This could lead to unexpected testing behaviour, interleaving multiple act calls and mixing their scopes. You should - await act(async () => ...);
+
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx (7 tests | 7 failed) 483ms
+     × prefills team details, changes only intended fields and requires an explicit save after Review 464ms
+     × validates and focuses identity before native implicit submission can create 4ms
+     × uses categorical status choices and confirms discard while retaining the service draft 2ms
+     × retains validation errors and focuses the rejected field instead of acknowledging success 3ms
+     × requires explicit current-version review and a separate save, retaining draft and unrelated concurrent fields 4ms
+     × keeps uncertain responses and expired-session recovery drafts until current setup can be reviewed 3ms
+     × does not show a success pane for an error flash or an unverified create response 2ms
+ ❯ resources/js/pages/it/setup/queue-routing.test.tsx (10 tests | 1 failed) 4171ms
+     × reviews and explicitly adopts a current version without submitting or overwriting unrelated concurrent fields 443ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/it/setup/queue-routing.test.tsx > accountable queue setup > reviews and explicitly adopts a current version without submitting or overwriting unrelated concurrent fields
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Save queue"
+
+Here are the accessible roles:
+
+  dialog:
+
+  Name "Edit queue":
+  <div
+    aria-describedby="radix-_r_2c_"
+    aria-labelledby="radix-_r_2b_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_2a_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Edit queue":
+  <h2
+    class="text-lg leading-none font-semibold sr-only"
+    data-slot="dialog-title"
+    id="radix-_r_2b_"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="text-muted-foreground text-sm sr-only"
+    data-slot="dialog-description"
+    id="radix-_r_2c_"
+  />
+
+  Name "":
+  <p
+    class="font-semibold"
+  />
+
+  Name "":
+  <p
+    class="text-sm"
+  />
+
+  Name "":
+  <p
+    class="mb-2 text-xs text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  complementary:
+
+  Name "":
+  <aside
+    class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+    data-wizard-region="rail"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Queue detailsName and purpose":
+  <button
+    class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-accent"
+    type="button"
+  />
+
+  Name "AccountabilityManager, technician and cover":
+  <button
+    class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-accent"
+    type="button"
+  />
+
+  Name "Routing rulesSites and matching criteria":
+  <button
+    class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+    type="button"
+  />
+
+  Name "ReviewCheck before saving":
+  <button
+    class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-accent"
+    type="button"
+  />
+
+  Name "Close":
+  <button
+    aria-label="Close"
+    class="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+    type="button"
+  />
+
+  Name "Review current queue":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+    type="button"
+  />
+
+  Name "Cancel":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+    type="button"
+  />
+
+  Name "Back":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+    type="button"
+  />
+
+  Name "Continue":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+    type="button"
+  />
+
+  Name "Close":
+  <button
+    class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+    type="button"
+  />
+
+  --------------------------------------------------
+  progressbar:
+
+  Name "Completeness":
+  <div
+    aria-label="Completeness"
+    aria-valuemax="100"
+    aria-valuemin="0"
+    aria-valuenow="80"
+    class="h-1.5 overflow-hidden rounded-full bg-muted"
+    role="progressbar"
+  />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5"
+    data-wizard-region="header"
+  />
+
+  --------------------------------------------------
+  alert:
+
+  Name "":
+  <div
+    class="mt-4 rounded-xl border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical"
+    role="alert"
+  />
+
+  --------------------------------------------------
+  list:
+
+  Name "":
+  <ul
+    class="mt-1 list-disc pl-5"
+  />
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  <li />
+
+  --------------------------------------------------
+  group:
+
+  Name "":
+  <fieldset
+    class="min-w-0"
+  />
+
+  Name "Work types":
+  <fieldset
+    class="rounded-xl border border-border p-3"
+  />
+
+  Name "Categories":
+  <fieldset
+    class="rounded-xl border border-border p-3"
+  />
+
+  Name "Priorities":
+  <fieldset
+    class="rounded-xl border border-border p-3"
+  />
+
+  Name "Approved Sites":
+  <fieldset
+    class="rounded-xl border border-border p-3"
+  />
+
+  Name "Services":
+  <fieldset
+    class="rounded-xl border border-border p-3"
+  />
+
+  --------------------------------------------------
+  spinbutton:
+
+  Name "Routing priority":
+  <input
+    class="border-input file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"
+    data-slot="input"
+    max="1000"
+    min="0"
+    type="number"
+    value="5"
+  />
+
+  --------------------------------------------------
+  checkbox:
+
+  Name "Active":
+  <input
+    checked=""
+    type="checkbox"
+  />
+
+  Name "Use as fallback queue":
+  <input
+    checked=""
+    type="checkbox"
+  />
+
+  Name "Incident":
+  <input
+    type="checkbox"
+  />
+
+  Name "Service request":
+  <input
+    type="checkbox"
+  />
+
+  Name "Security request":
+  <input
+    type="checkbox"
+  />
+
+  Name "Problem":
+  <input
+    type="checkbox"
+  />
+
+  Name "Change":
+  <input
+    type="checkbox"
+  />
+
+  Name "Task":
+  <input
+    type="checkbox"
+  />
+
+  Name "Major incident":
+  <input
+    type="checkbox"
+  />
+
+  Name "Hardware":
+  <input
+    type="checkbox"
+  />
+
+  Name "Account":
+  <input
+    type="checkbox"
+  />
+
+  Name "Network":
+  <input
+    type="checkbox"
+  />
+
+  Name "Other":
+  <input
+    type="checkbox"
+  />
+
+  Name "Low":
+  <input
+    type="checkbox"
+  />
+
+  Name "Normal":
+  <input
+    type="checkbox"
+  />
+
+  Name "High":
+  <input
+    type="checkbox"
+  />
+
+  Name "Urgent":
+  <input
+    type="checkbox"
+  />
+
+  Name "Approved Site A":
+  <input
+    checked=""
+    type="checkbox"
+  />
+
+  Name "Approved Site B":
+  <input
+    type="checkbox"
+  />
+
+  --------------------------------------------------
+  contentinfo:
+
+  Name "":
+  <footer
+    class="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3.5"
+    data-wizard-region="footer"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  >
+    <main>
+      <main
+        class="space-y-5"
+      >
+        <header
+          class="eh-header text-primary-foreground"
+        >
+          <div
+            class="relative z-[1] flex h-full flex-col"
+          >
+            <div
+              class="flex flex-col px-[22px] pt-[18px]"
+            >
+              <div
+                class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+              >
+                <div
+                  class="flex min-w-0 items-start gap-[13px]"
+                >
+                  <span
+                    class="eh-mark-ring"
+                  >
+                    <svg
+                      class="lucide lucide-route size-5"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <circle
+                        cx="6"
+                        cy="19"
+                        r="3"
+                      />
+                      <path
+                        d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"
+                      />
+                      <circle
+                        cx="18"
+                        cy="5"
+                        r="3"
+                      />
+                    </svg>
+                  </span>
+                  <div
+                    class="flex min-w-0 flex-col"
+                  >
+                    <div
+                      class="flex flex-wrap items-center gap-2"
+                    >
+                      <h1
+                        class="truncate text-[22px] leading-tight font-bold tracking-tight"
+                      >
+                        IT setup
+                      </h1>
+                    </div>
+                    <p
+                      class="mt-[3px] text-[13px] text-primary-foreground/65"
+                    >
+                      Ownership, routing and service configuration ·
+                       
+                      Snapshot from this page load
+                    </p>
+                  </div>
+                </div>
+                <div
+                  class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                >
+                  <div
+                    class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                  >
+                    <svg
+                      class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <circle
+                        cx="11"
+                        cy="11"
+                        r="8"
+                      />
+                      <path
+                        d="m21 21-4.3-4.3"
+                      />
+                    </svg>
+                    <input
+                      class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                      placeholder="Search queues"
+                      type="search"
+                      value=""
+                    />
+                    <kbd
+                      aria-hidden="true"
+                      class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                    >
+                      /
+                    </kbd>
+                  </div>
+                  <button
+                    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+                    type="button"
+                  >
+                    <svg
+                      cl...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/setup/queue-routing.test.tsx:346:20
+    344|         });
+    345|         expect(
+    346|             screen.getByRole('button', { name: 'Save queue' }),
+       |                    ^
+    347|         ).toBeDisabled();
+    348|         fireEvent.click(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > prefills team details, changes only intended fields and requires an explicit save after Review
+TestingLibraryElementError: Unable to find an element with the text: Team saved. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_2_"
+    aria-labelledby="radix-_r_1_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_0_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_1_"
+    >
+      Edit team
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_2_"
+    >
+      Review identity and accountable ownership before saving.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-users-round h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M18 21a8 8 0 0 0-16 0"
+              />
+              <circle
+                cx="10"
+                cy="8"
+                r="5"
+              />
+              <path
+                d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Edit team
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              IT setup
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-accent"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-status-success-bg text-status-success"
+          >
+            <svg
+              class="lucide lucide-check h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M20 6 9 17l-5-5"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-semibold text-foreground"
+            >
+              Identity
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Name and purpose
+            </span>
+          </span>
+        </button>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-accent"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-status-success-bg text-status-success"
+          >
+            <svg
+              class="lucide lucide-check h-3.5 w-3.5"
+              fill="none"
+          ...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx:34:23
+     32|         expect(patch.mock.calls[0][1]).toEqual({configuration_version:…
+     33|         act(() => patch.mock.calls[0][2]?.onSuccess?.({props:{flash:{s…
+     34|         expect(screen.getByText('Team saved')).toBeVisible();
+       |                       ^
+     35|         expect(close).not.toHaveBeenCalled();
+     36|         fireEvent.click(screen.getByRole('button',{name:'Done'}));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > validates and focuses identity before native implicit submission can create
+TestingLibraryElementError: Unable to find an accessible element with the role "textbox" and name "Service name"
+
+There are no accessible roles. But there might be some inaccessible roles. If you wish to access them, then set the `hidden` option to `true`. Learn more about this here: https://testing-library.com/docs/dom-testing-library/api-queries#byrole
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div />
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx:42:33
+     40|         const post = vi.spyOn(router,'post').mockImplementation(() => …
+     41|         render(<SetupRecordWizard kind="service" agents={agents} onClo…
+     42|         fireEvent.submit(screen.getByRole('textbox',{name:'Service nam…
+       |                                 ^
+     43|         await waitFor(() => expect(screen.getByRole('textbox',{name:'S…
+     44|         expect(post).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > uses categorical status choices and confirms discard while retaining the service draft
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name `/Accountability/`
+
+There are no accessible roles. But there might be some inaccessible roles. If you wish to access them, then set the `hidden` option to `true`. Learn more about this here: https://testing-library.com/docs/dom-testing-library/api-queries#byrole
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div />
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ step resources/js/pages/it/setup/setup-record-wizard.test.tsx:11:54
+
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx:54:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > retains validation errors and focuses the rejected field instead of acknowledging success
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name `/Review/`
+
+There are no accessible roles. But there might be some inaccessible roles. If you wish to access them, then set the `hidden` option to `true`. Learn more about this here: https://testing-library.com/docs/dom-testing-library/api-queries#byrole
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div />
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ step resources/js/pages/it/setup/setup-record-wizard.test.tsx:11:54
+
+ ❯ review resources/js/pages/it/setup/setup-record-wizard.test.tsx:12:22
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx:69:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > requires explicit current-version review and a separate save, retaining draft and unrelated concurrent fields
+TestingLibraryElementError: Unable to find an accessible element with the role "textbox" and name "Team name"
+
+There are no accessible roles. But there might be some inaccessible roles. If you wish to access them, then set the `hidden` option to `true`. Learn more about this here: https://testing-library.com/docs/dom-testing-library/api-queries#byrole
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div />
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx:80:33
+     78|         vi.stubGlobal('fetch',vi.fn().mockResolvedValue(currentRespons…
+     79|         render(<SetupRecordWizard kind="team" record={team} agents={ag…
+     80|         fireEvent.change(screen.getByRole('textbox',{name:'Team name'}…
+       |                                 ^
+     81|         review();fireEvent.click(screen.getByRole('button',{name:'Save…
+     82|         act(() => patch.mock.calls[0][2]?.onError?.({configuration_ver…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > keeps uncertain responses and expired-session recovery drafts until current setup can be reviewed
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name `/Review/`
+
+There are no accessible roles. But there might be some inaccessible roles. If you wish to access them, then set the `hidden` option to `true`. Learn more about this here: https://testing-library.com/docs/dom-testing-library/api-queries#byrole
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div />
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ step resources/js/pages/it/setup/setup-record-wizard.test.tsx:11:54
+
+ ❯ review resources/js/pages/it/setup/setup-record-wizard.test.tsx:12:22
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx:98:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  resources/js/pages/it/setup/setup-record-wizard.test.tsx > Setup record wizards > does not show a success pane for an error flash or an unverified create response
+TestingLibraryElementError: Unable to find an accessible element with the role "textbox" and name "Team name"
+
+There are no accessible roles. But there might be some inaccessible roles. If you wish to access them, then set the `hidden` option to `true`. Learn more about this here: https://testing-library.com/docs/dom-testing-library/api-queries#byrole
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div />
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/setup/setup-record-wizard.test.tsx:111:33
+    109|         const post=vi.spyOn(router,'post').mockImplementation(() => {}…
+    110|         render(<SetupRecordWizard kind="team" agents={agents} onClose=…
+    111|         fireEvent.change(screen.getByRole('textbox',{name:'Team name'}…
+       |                                 ^
+    112|         review();fireEvent.click(screen.getByRole('button',{name:'Save…
+    113|         expect(post.mock.calls[0][1]).not.toHaveProperty('configuratio…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  8 failed | 9 passed (17)
+   Start at  15:33:13
+   Duration  7.79s (transform 606ms, setup 268ms, import 4.38s, tests 4.65s, environment 1.87s)
+

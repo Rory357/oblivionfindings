@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\It;
 
+use App\Domain\It\Services\ItAutomationScheduleCatalog;
 use App\Domain\It\Services\ItProvisioningAccessService;
+use App\Domain\It\Services\ItSlaReadService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
@@ -34,6 +36,7 @@ class ItReportsController extends Controller
         private readonly ItWorkAccessService $workAccess,
         private readonly ItProvisioningAccessService $provisioningAccess,
         private readonly SecurityDevicesAccessService $deviceAccess,
+        private readonly ItSlaReadService $slaRead,
     ) {}
 
     /** Agent-only (route gated `permission:it.view`); read-only analytics. */
@@ -135,6 +138,15 @@ class ItReportsController extends Controller
             ['Avg first response (mins)', $k['avg_first_response_mins'] ?? ''],
             ['Avg resolution (mins)', $k['avg_resolution_mins'] ?? ''],
             ['SLA compliance (%)', $k['sla_compliance'] ?? ''],
+            ['SLA met in range', $k['sla_met']],
+            ['SLA fully measured in range', $k['sla_measured']],
+            ['SLA partial measurement in range', $k['sla_resolved']['by_coverage']['partial'] ?? 0],
+            ['SLA no measurement in range', $k['sla_resolved']['by_coverage']['none'] ?? 0],
+            ['SLA unmeasured open tickets', $k['sla_open']['by_state']['unmeasured'] ?? 0],
+            ['SLA paused open tickets', $k['sla_open']['by_state']['paused'] ?? 0],
+            ['SLA watchdog', $k['sla_watchdog']['state'] ?? 'unmeasured'],
+            ['SLA watchdog last successful check', $k['sla_watchdog']['last_success_at'] ?? ''],
+            ['SLA evaluated at', $k['sla_open']['evaluated_at'] ?? ''],
             ['CSAT average', $k['csat_avg'] ?? ''],
             ['CSAT response rate (%)', $k['csat_response_rate'] ?? ''],
             ['Provisioning raised', $p['raised']],
@@ -389,11 +401,13 @@ class ItReportsController extends Controller
     /** @return array<int, array<string, mixed>> */
     private function serviceReliability(Carbon $from, Carbon $to, User $user): array
     {
+        $breaches = $this->slaRead->whereState($this->ticketQuery($user)->whereBetween('created_at', [$from, $to]), ['breached'])
+            ->selectRaw('it_service_id, COUNT(*) AS aggregate')->groupBy('it_service_id')->pluck('aggregate', 'it_service_id');
+
         return ItService::query()
             ->withCount([
                 'tickets as ticket_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereBetween('created_at', [$from, $to]),
                 'tickets as open_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES),
-                'tickets as sla_breach_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereBetween('created_at', [$from, $to])->where('sla_state', 'breached'),
             ])
             ->orderByDesc('ticket_count')
             ->orderBy('name')
@@ -405,7 +419,7 @@ class ItReportsController extends Controller
                 'status' => $service->status,
                 'tickets' => (int) $service->ticket_count,
                 'open' => (int) $service->open_count,
-                'sla_breaches' => (int) $service->sla_breach_count,
+                'sla_breaches' => (int) ($breaches[$service->id] ?? 0),
                 'href' => $this->ticketHref([
                     'service' => $service->id,
                     'from' => $from->toDateString(),
@@ -512,18 +526,19 @@ class ItReportsController extends Controller
         $state = $this->ticketQuery($user)
             ->selectRaw(
                 "SUM(status IN ('open','in_progress','waiting')) AS open_count,
-                 SUM(status IN ('open','in_progress','waiting') AND assigned_to_user_id IS NULL) AS unassigned,
-                 SUM(status IN ('open','in_progress','waiting') AND sla_state = 'at_risk') AS breaching,
-                 SUM(status IN ('open','in_progress','waiting') AND sla_state = 'breached') AS breached"
+                 SUM(status IN ('open','in_progress','waiting') AND assigned_to_user_id IS NULL) AS unassigned"
             )
             ->first();
 
         $resolvedInRange = fn () => $this->ticketQuery($user)
+            ->whereIn('status', ['resolved', 'closed'])
             ->whereBetween('resolved_at', [$from, $to]);
 
         $resolvedCount = $resolvedInRange()->count();
-        $met = $resolvedInRange()->where('sla_state', 'met')->count();
-        $measured = $resolvedInRange()->whereIn('sla_state', ['met', 'breached'])->count();
+        $slaOpen = $this->slaRead->summarize($this->ticketQuery($user)->whereIn('status', ItTicket::OPEN_STATUSES));
+        $slaResolved = $this->slaRead->summarize($resolvedInRange());
+        $met = $slaResolved['by_state']['met'];
+        $measured = $slaResolved['by_coverage']['full'];
         $avgResolution = $resolvedInRange()->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, resolved_at)) AS m')->value('m');
         $csatCount = $resolvedInRange()->whereNotNull('csat_submitted_at')->count();
         $csatAvg = $resolvedInRange()->whereNotNull('csat_submitted_at')->avg('csat_score');
@@ -536,8 +551,8 @@ class ItReportsController extends Controller
         return [
             'open' => (int) ($state->open_count ?? 0),
             'unassigned' => (int) ($state->unassigned ?? 0),
-            'breaching' => (int) ($state->breaching ?? 0),
-            'breached' => (int) ($state->breached ?? 0),
+            'breaching' => $slaOpen['by_state']['at_risk'],
+            'breached' => $slaOpen['by_state']['breached'],
             'resolved' => $resolvedCount,
             'avg_first_response_mins' => $avgFirst !== null ? (int) round((float) $avgFirst) : null,
             'avg_resolution_mins' => $avgResolution !== null ? (int) round((float) $avgResolution) : null,
@@ -545,6 +560,9 @@ class ItReportsController extends Controller
             // Raw met/measured counts back the "X of Y within SLA" microcopy (§S).
             'sla_met' => $met,
             'sla_measured' => $measured,
+            'sla_open' => $slaOpen,
+            'sla_resolved' => $slaResolved,
+            'sla_watchdog' => app(ItAutomationScheduleCatalog::class)->freshnessFor('it.check-sla', $this->slaRead->evaluatedAt()),
             'csat_avg' => $csatAvg !== null ? round((float) $csatAvg, 2) : null,
             'csat_response_rate' => $resolvedCount > 0 ? round($csatCount / $resolvedCount * 100, 1) : null,
         ];

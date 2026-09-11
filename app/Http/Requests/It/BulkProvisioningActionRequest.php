@@ -27,7 +27,7 @@ class BulkProvisioningActionRequest extends FormRequest
     {
         return [
             'ids' => ['required', 'array', 'min:1', 'max:50'],
-            'ids.*' => ['integer'],
+            'ids.*' => ['integer', 'min:1', 'distinct'],
             'action' => ['required', Rule::in(['assign', 'fulfil'])],
             // Assigning distributes work — a real recipient is required (unlike
             // tickets, provisioning has no "unassign" state worth bulk-setting).

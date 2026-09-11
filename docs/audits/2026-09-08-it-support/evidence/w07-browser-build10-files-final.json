@@ -1,0 +1,140 @@
+{
+    "observed_at": "2026-09-09T12:37:35+00:00",
+    "token": "b972632227dd4b91",
+    "database": "oblivion_it_draft_browser_b972632227dd4b91",
+    "time_context": {
+        "elapsed_ms": 0.09,
+        "rows": [
+            {
+                "session_time_zone": "SYSTEM",
+                "system_time_zone": "New Zealand Standard Time"
+            }
+        ]
+    },
+    "ticket": {
+        "elapsed_ms": 0.26,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 11,
+                "status": "open",
+                "next_response_party": "requester",
+                "last_public_comment_id": 1,
+                "last_public_speaker_side": "it",
+                "last_public_commented_at": "2026-09-10 00:28:36"
+            }
+        ]
+    },
+    "comments": {
+        "elapsed_ms": 0.2,
+        "rows": [
+            {
+                "id": 1,
+                "ticket_id": 1,
+                "author_user_id": 4,
+                "is_internal": 0,
+                "speaker_side": "it",
+                "source_channel": "browser",
+                "body_sha256": "5384f2f134cd8fad7884273a1aa48d24aef9aa33348f4e9815b928823fe7f1ee",
+                "created_at": "2026-09-10 00:28:36",
+                "created_at_epoch": 1788956916
+            }
+        ]
+    },
+    "reply_receipts": {
+        "elapsed_ms": 0.25,
+        "rows": [
+            {
+                "id": 9,
+                "actor_user_id": 4,
+                "channel": "browser",
+                "operation": "ticket.comment",
+                "request_uuid": "53603ed1-d6fc-4dfa-beef-ce16e3217a36",
+                "it_ticket_id": 1,
+                "it_ticket_comment_id": 1,
+                "committed_ticket_version": 11,
+                "committed_at": "2026-09-10 00:28:36",
+                "committed_at_epoch": 1788956916,
+                "stored_state": null,
+                "consumed_draft_uuid": "4d8fa67d-4ef8-4831-aa2a-fe5f1de7ce10",
+                "submitted_draft_revision": "5",
+                "consumed_draft_revision": "6"
+            }
+        ]
+    },
+    "attachments": {
+        "elapsed_ms": 0.57,
+        "rows": [
+            {
+                "id": 1,
+                "attachable_type": "it_ticket_comment",
+                "attachable_id": 1,
+                "uploaded_by": 4,
+                "mime": "text\/plain",
+                "recorded_size_bytes": 88,
+                "original_name_sha256": "3a7487cf03a7b9031ea8f9af54d19685f1f757246da22ad3a35246731306a089",
+                "draft_storage_state": null,
+                "draft_cleanup_attempts": 0,
+                "draft_cleanup_error_code": null,
+                "created_at": "2026-09-10 00:27:05",
+                "created_at_epoch": 1788956825,
+                "storage_intent_id": null,
+                "storage_intent_state": null,
+                "storage_intent_revision": null,
+                "storage_intent_cleanup_attempts": null,
+                "storage_intent_cleanup_error_code": null
+            },
+            {
+                "id": 2,
+                "attachable_type": "it_ticket_comment",
+                "attachable_id": 1,
+                "uploaded_by": 4,
+                "mime": "text\/plain",
+                "recorded_size_bytes": 76,
+                "original_name_sha256": "33e09bd743d00cb0ffd3ccd2984405348bab243ea6601713d13d1c6007902abb",
+                "draft_storage_state": null,
+                "draft_cleanup_attempts": 0,
+                "draft_cleanup_error_code": null,
+                "created_at": "2026-09-10 00:28:26",
+                "created_at_epoch": 1788956906,
+                "storage_intent_id": null,
+                "storage_intent_state": null,
+                "storage_intent_revision": null,
+                "storage_intent_cleanup_attempts": null,
+                "storage_intent_cleanup_error_code": null
+            }
+        ]
+    },
+    "reply_outbox": {
+        "elapsed_ms": 0.2,
+        "rows": [
+            {
+                "id": 1,
+                "retry_of_delivery_id": null,
+                "it_ticket_comment_id": 1,
+                "notification_type": "ticket_replied",
+                "audience": "requester",
+                "status": "accepted",
+                "attempt_count": 1,
+                "retry_count": 0,
+                "is_current_attempt": 1
+            }
+        ]
+    },
+    "reply_outbox_counts_by_comment_and_status": {
+        "1": {
+            "accepted": 1
+        }
+    },
+    "current_reply_attempt_counts_by_comment_and_status": {
+        "1": {
+            "accepted": 1
+        }
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false,
+    "file_bytes_read": false,
+    "storage_paths_emitted": false,
+    "size_evidence": "canonical database metadata; physical bytes not inspected"
+}

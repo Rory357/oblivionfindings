@@ -1,0 +1,17 @@
+{
+  "observed_at": "2026-09-10T07:31:46.6891571Z",
+  "token": "180fbb98885047a8",
+  "checks": {
+    "exact_token": true,
+    "both_read_only": true,
+    "original_task_unchanged_across_second_merge": true,
+    "original_task_completed_on_ticket_1": true,
+    "comment_identity_audience_author_body_unchanged": true,
+    "comments_moved_from_4_to_5": true,
+    "chain_1_4_5": true,
+    "two_merge_audits": true,
+    "four_paired_merge_events": true,
+    "unrelated_approval_fixture_unchanged": true
+  },
+  "limitation": "First database capture is after the first merge. Its before/after task preservation is supported by the recorded browser journey, not a nonexistent pre-merge database snapshot. Approval fixture 6 was not merged."
+}

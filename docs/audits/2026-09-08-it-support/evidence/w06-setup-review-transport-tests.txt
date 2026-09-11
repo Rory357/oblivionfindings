@@ -1,0 +1,37 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_9959f24285274da4",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSetupVersionTest[39m
+  [32;1m✓[39;22m[90m [39m[90msetup review returns only the requested current canonical register without an Inertia version with ('team[39m[90m…[39m [90m167.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup review returns only the requested current canonical register without an Inertia version with ('queues[39m[90m…[39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup review returns only the requested current canonical register without an Inertia version with ('servic[39m[90m…[39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup review rejects unsupported resources and current restricted access[39m[90m                                    [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam editors cannot overwrite a newer member role and must explicitly review a new version[39m[90m                  [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mservice editor rejects an obsolete version and preserves the newer status on an explicit retry[39m[90m              [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam and service update endpoints require the displayed version[39m[90m                                             [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical setup mutation rechecks a cached actor permission and approval before writing[39m[90m                     [39m [90m0.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical setup service cannot bypass the version check by omitting transport validation[39m[90m                    [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma failed required audit leaves the service configuration and version unchanged[39m[90m                              [39m [90m0.61s[39m  
+
+  [90mTests:[39m    [32;1m10 passed[39;22m[90m (88 assertions)[39m
+  [90mDuration:[39m [39m175.20s[39m
+

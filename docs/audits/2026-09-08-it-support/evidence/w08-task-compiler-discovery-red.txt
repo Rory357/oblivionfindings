@@ -1,0 +1,51 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+[IT compiler regression] Production React Compiler transform confirmed for the task recovery hook.
+xx
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/Frontend/It/task-recovery.compiler.test.tsx > production-compiled task recovery discovery > advertises a kept task in the existing register without reopening Add task
+AssertionError: The mounted register must publish the kept task notice.: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/Frontend/It/task-recovery.compiler.test.tsx:96:11
+     94|             registerAdvertised,
+     95|             'The mounted register must publish the kept task notice.',
+     96|         ).toBe(true);
+       |           ^
+     97|     });
+     98|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/Frontend/It/task-recovery.compiler.test.tsx > production-compiled task recovery discovery > removes a previously discovered notice after explicit discard in its editor
+Error: The mounted register must remove the explicitly discarded notice.: expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <h3
+  class="text-sm font-semibold"
+>
+  Task work to recover
+</h3> instead
+ ❯ tests/Frontend/It/task-recovery.compiler.test.tsx:139:15
+    137|             screen.queryByText('Task work to recover'),
+    138|             'The mounted register must remove the explicitly discarded…
+    139|         ).not.toBeInTheDocument();
+       |               ^
+    140|     });
+    141| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  00:10:52
+   Duration  5.56s (transform 2.02s, setup 400ms, import 3.63s, tests 567ms, environment 805ms)
+

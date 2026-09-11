@@ -1,0 +1,29 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx (14 tests | 1 failed) 392ms
+     × keeps an untouched ticket_settled generation quiet, but shows the blocker for entered or saved work 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx > TicketDraftRecovery > keeps an untouched ticket_settled generation quiet, but shows the blocker for entered or saved work
+Error: expect(element).toBeEmptyDOMElement()
+
+Received:
+  "<section aria-label="Saved draft" class="space-y-3 rounded-lg border border-border bg-muted/30 p-4 text-sm"><p role="status" aria-live="polite">Reopen this ticket before submitting this draft.</p><div class="flex flex-wrap gap-2"><button data-slot="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*='size-'])]:size-4 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5" type="button" disabled="">Save draft</button></div></section>"
+ ❯ resources/js/components/it/__tests__/ticket-draft-recovery.test.tsx:166:31
+    164|                 />,
+    165|             );
+    166|             expect(container).toBeEmptyDOMElement();
+       |                               ^
+    167|             expect(draft.save).not.toHaveBeenCalled();
+    168|             rerender(<TicketDraftRecovery {...props(draft)} hasLocalCh…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 passed (14)
+   Start at  13:35:14
+   Duration  1.76s (transform 94ms, setup 119ms, import 285ms, tests 392ms, environment 795ms)
+

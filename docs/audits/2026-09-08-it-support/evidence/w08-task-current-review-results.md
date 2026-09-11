@@ -1,0 +1,14 @@
+# W08 complete current-task review
+
+Source checkpoint, 9 September 2026. The current-version review now displays saved title, description, status, assigned technician, responsible team, due time, required/evidence-required flags, prerequisite titles/statuses, order position and recorded completion evidence/actor/time. Collection review displays the server's current saved task order separately from the retained proposed order. Empty or missing values are explicit. It reuses `ReviewCard`, `ReviewRow`, `EmptyState` and the approved New Zealand date formatter.
+
+Only `resources/js/components/it/ticket-work-task-recovery.tsx` changed in application source for this slice. The existing explicit adoption action and current actor/access, unknown-command and settled-ticket guards remain in place; review itself does not submit or rewrite the proposal.
+
+New focused test file: `resources/js/components/it/__tests__/ticket-work-task-review.test.tsx`. It uses the real editor/command hooks with mocked HTTP to verify all current fields, explicit adoption with unchanged proposed title, current-versus-proposed ordering, empty values, actor mismatch, renewed session expiry, settled-ticket denial and unresolved-command blocking.
+
+- Final focused Vitest after approved harness controls: **8 passed, 1 file, 3.53 s**, log `w08-task-current-review-vitest-approved-controls.txt`. The prior successful run was 8 passed / 3.32 s in `w08-task-current-review-vitest-final.txt`.
+- Final scoped ESLint for the component/new test with **`--max-warnings=0`: exit 0, zero errors and zero warnings**, log `w08-task-current-review-eslint-zero-warnings.txt`. The earlier `w08-task-current-review-eslint-final.txt` exited 0 but contained **three raw-button warnings**; it was not a clean strict-lint gate. Root identified those warnings, and the three test harness buttons were replaced with the approved `Button` component. The application component did not change for this correction.
+- Initial run: 7 passed / 1 failed solely because the test expected `Sep` while the installed approved Intl formatter emitted `Sept`. The corrected assertion accepts that month-abbreviation variation while still checking the exact New Zealand date/time; application behavior did not change. Initial log preserved in `w08-task-current-review-vitest.txt`.
+- Owned source hashes before the harness correction remain in `w08-task-current-review-source-hashes.json`; final hashes are in `w08-task-current-review-approved-controls-source-hashes.json`. Source frozen and root/W02 notified.
+
+No PHP tests, database/provider calls, migration changes, full type check or asset build ran in this slice. Source is awaiting the coordinated next build and real desktop browser review. W02 separately owns capacity-safe close and field-focus/date-review fixes; this report does not establish full W08 acceptance.

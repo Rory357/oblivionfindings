@@ -1,0 +1,70 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItTicketMergeService.php",
+    "sha256": "eb7f629f1fdb0c9451ed9d301fc9ebbd82aea63cf5f105b7c8a8e5ff423e9120"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItTicketController.php",
+    "sha256": "6f892efc1144bd6c82256174812e801b5d0e581c44c15d1ab5cfe849b031785e"
+  },
+  {
+    "path": "app/Http/Requests/It/ValidateItMergeCandidateRequest.php",
+    "sha256": "df0fb32629c77e7fbd7dc279d1f31fc3cdf13c4a84f506af62e955fa2c74303d"
+  },
+  {
+    "path": "routes/web.php",
+    "sha256": "af66e2b08582211925d528b5b3f41a34aa3252d168bacb5c1fd3fdf008e14bf5"
+  },
+  {
+    "path": "tests/Feature/It/ItTicketMergeTest.php",
+    "sha256": "83742cecc7367d20148721926615f205055b66408db25ba8e974dfd3053fada2"
+  },
+  {
+    "path": "resources/js/components/it/it-wizards.tsx",
+    "sha256": "cdd80f42c21e6dd007d0b56dede5f5a0d4e40c8e22ba3adb9f98b54ae99de8a5"
+  },
+  {
+    "path": "resources/js/components/it/merge-ticket-dialog.tsx",
+    "sha256": "470aa097136db9d60d543fc4180440a8303f0a3efe8031ce06c218e8fb0ce8c8"
+  },
+  {
+    "path": "resources/js/components/it/ticket-merge-recovery.tsx",
+    "sha256": "730a864b4e0a11d656d937dc8cca6bbdfdae3bc2b6ac1cefd26461382ea33e74"
+  },
+  {
+    "path": "resources/js/components/it/__tests__/merge-ticket-dialog.test.tsx",
+    "sha256": "f4d27ecf49918256fb99054e452018213543c9f65224b870a1fd1666e975d75a"
+  },
+  {
+    "path": "resources/js/components/it/__tests__/ticket-merge-recovery.test.tsx",
+    "sha256": "6a03609c66e891ad33b22b01b2e4c12ba0bffb87d394b53fa54143975fb8fb89"
+  },
+  {
+    "path": "resources/js/pages/it/tickets/show.tsx",
+    "sha256": "4b4bc365f8b0af2d8f5fdd040e0e81a58745672d45209f72c4f4ed9c2631230f"
+  },
+  {
+    "path": "resources/js/hooks/it-ticket-draft-contract.ts",
+    "sha256": "255aea7c68fdb669ffc47669d00ffa453b9ff8c694f29a1d57eae117a946cb13"
+  },
+  {
+    "path": "resources/js/hooks/it-ticket-draft-memory.ts",
+    "sha256": "c2d69a2cb06767e6ac783685063c3b2099df17c940a9bce305e04f739d77ee6b"
+  },
+  {
+    "path": "resources/js/hooks/use-it-ticket-draft-memory.ts",
+    "sha256": "ebe00a79c45b19b4bb4d992b9ad4eb2a9dc03aa87abe8787d2d6fb7ca0678afc"
+  },
+  {
+    "path": "resources/js/hooks/use-it-ticket-merge-command.ts",
+    "sha256": "bab8586316ad25652b8faa447ddbaaecd0535a46f5b7f7146ab17e82aaef4d5e"
+  },
+  {
+    "path": "resources/js/hooks/use-it-ticket-merge-command.test.tsx",
+    "sha256": "4f4c7d6d2f94c372140e74b40fe3c9b50f2b013d72cb2a0246125f844858a017"
+  },
+  {
+    "path": "resources/js/hooks/use-it-ticket-merge-preview.ts",
+    "sha256": "4a040ac3049a2c32dd68115632a22255b3e50afbfe95ed422089992d767252e3"
+  }
+]

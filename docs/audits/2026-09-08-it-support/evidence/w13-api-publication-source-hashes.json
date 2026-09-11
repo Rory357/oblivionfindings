@@ -1,0 +1,91 @@
+{
+  "recorded_at": "2026-09-11T01:32:57.2243995Z",
+  "sources": [
+    {
+      "path": "app/Http/Middleware/RecordItApiRequest.php",
+      "sha256": "73ffc2897df872d2eafa70a2af4e7077bbfd7d2b6a5d23513a914e36ccdba7f4"
+    },
+    {
+      "path": "app/Http/Middleware/AuthenticateItServiceIdentity.php",
+      "sha256": "26a142d8d9950df6e8b6453de9180d4547668503fffdf0eec571159b05e15955"
+    },
+    {
+      "path": "app/Domain/It/Services/ItApiWorkItemService.php",
+      "sha256": "c0917e735a4cc1f862545cc6e394c5e33f738e335c1a786a41b6063cbfd89df9"
+    },
+    {
+      "path": "app/Domain/It/Services/ItServiceIdentityCredentialService.php",
+      "sha256": "0e0bb81a3fc35ed32b866e7a471f9c177aab3cfd499530e3fdee1162123ebe7e"
+    },
+    {
+      "path": "app/Models/ItApiRequest.php",
+      "sha256": "06be7bb71c45bdb6d9365e07c72fc623337b2fbd28a509d24798938f5483ff23"
+    },
+    {
+      "path": "database/migrations/2026_09_11_000023_add_it_api_publication_outcomes.php",
+      "sha256": "f14066d73109d2b883fa4263352432c9f163bbe6175b29e111fce27608d69b2a"
+    },
+    {
+      "path": "tests/Feature/It/ItApiPublicationTest.php",
+      "sha256": "db3a74b42c785398dd24a659bfb352082b4451b985e46c83b367c26895db9004"
+    },
+    {
+      "path": "tests/Feature/It/ItSecureApiTest.php",
+      "sha256": "550be08979fd50c9f9b5a7a207a2da03936d157bc694a0568b556587dfb0b3f2"
+    },
+    {
+      "path": "tests/Concurrency/It/ItApiPublicationConcurrencyTest.php",
+      "sha256": "bbeaff1bed55589a8b81c32f04e757748e197affe05b6f60baf2954f6cac8b26"
+    },
+    {
+      "path": "tests/Support/It/api-publication-concurrency-worker.php",
+      "sha256": "84a4f62cb825af8848d305b9c2820bd1e3b68d3a357a7415748de7215ceb4f09"
+    }
+  ],
+  "initial_feature": {
+    "tests": 14,
+    "full_isolation_postflight": true,
+    "exit_code": 0,
+    "token": "it_5e66b70f02e04167",
+    "assertions": 215
+  },
+  "final_feature": {
+    "token": "it_7b4e95543e62418f",
+    "session": 23617,
+    "status": "passed",
+    "exit_code": 0,
+    "tests": 14,
+    "assertions": 218,
+    "full_isolation_postflight": true
+  },
+  "concurrency": {
+    "initial": {
+      "token": "it_472c31e2aebe42d6",
+      "remaining_error": "second setup rejected by unchanged standalone guard",
+      "session": 37441,
+      "passed_case_assertions": 27,
+      "exit_code": 2,
+      "full_isolation_postflight": true
+    },
+    "corrected_source": {
+      "sha256": "6b393b872a4d1c4f97a9d6f177b91473e1827dc5c853e949851a0ecb69423eba",
+      "path": "tests/Concurrency/It/ItApiPublicationConcurrencyTest.php"
+    },
+    "final": {
+      "token": "it_8dc7962b5d43410e",
+      "session": 98503,
+      "status": "passed",
+      "exit_code": 0,
+      "tests": 1,
+      "assertions": 39,
+      "full_isolation_postflight": true,
+      "scenarios": [
+        "two authenticated HTTP workers at held actor mutex, one publication and one replay",
+        "outer committed response loss, same-key recovery without duplicate"
+      ]
+    }
+  },
+  "full_w13_verified": false,
+  "browser_verified": false,
+  "bounded_publication_verified": true
+}

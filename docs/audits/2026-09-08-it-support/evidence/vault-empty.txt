@@ -1,0 +1,49 @@
+Home
+Sites
+Vendors & Credentials
+Vendors & Credentials
+Vault healthy
+
+Vendor directory & access vault · 1 site · 0 providers · 0 credentials · encrypted at rest · every reveal audited
+
+/
+Add vendor
+Add credential
+VENDORS
+0
+0 active
+PREFERRED
+0
+vendors on call
+VAULT HEALTH
+0
+100%
+0 of 0
+rotated on time
+ROTATION DUE
+0
+need rotating soon
+OVERDUE
+0
+incl. never rotated
+RE-AUTH
+0
+required to reveal
+All sites
+All services
+Any status
+Preferred
+Vendors
+0
+Credentials
+0
+Service providers
+
+Click a vendor to view · use row actions for quick changes · 0 shown
+
+COMPANY	STATUS	ACTIONS
+
+
+No vendors found
+
+Add a vendor to get started

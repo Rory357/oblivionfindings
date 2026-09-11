@@ -1,0 +1,17 @@
+{
+    "extends": "../../../../tsconfig.json",
+    "compilerOptions": {
+        "strict": true,
+        "noEmit": true,
+        "types": ["vitest/globals", "@testing-library/jest-dom/vitest"]
+    },
+    "include": [],
+    "files": [
+        "../../../../resources/js/hooks/use-it-ticket-command.ts",
+        "../../../../resources/js/hooks/use-it-ticket-command.test.tsx",
+        "../../../../resources/js/components/it/ticket-command-wizard.tsx",
+        "../../../../resources/js/components/it/it-wizards.tsx",
+        "../../../../resources/js/components/it/__tests__/ticket-command-wizard.test.tsx",
+        "../../../../resources/js/components/it/__tests__/ticket-creation-access.test.tsx"
+    ]
+}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\It;
 
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItProblemService;
+use App\Domain\It\Services\ItSlaReadService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\It\StoreItProblemRequest;
@@ -122,7 +123,7 @@ class ItProblemController extends Controller
                 'description' => $ticket->description,
                 'category' => $ticket->category,
                 'next_action' => $ticket->next_action,
-                'sla_state' => $ticket->sla_state,
+                ...app(ItSlaReadService::class)->present($ticket),
                 'first_response_due_at' => $ticket->first_response_due_at?->toIso8601String(),
                 'resolution_due_at' => $ticket->resolution_due_at?->toIso8601String(),
                 'comments_count' => $ticket->comments_count,

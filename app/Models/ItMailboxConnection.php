@@ -29,6 +29,8 @@ class ItMailboxConnection extends Model implements CalendarOAuthToken
 
     public const PROVIDER_MICROSOFT = 'microsoft';
 
+    protected $attributes = ['configuration_version' => 1, 'consecutive_poll_failures' => 0];
+
     protected $fillable = [
         'provider',
         'status',
@@ -51,11 +53,24 @@ class ItMailboxConnection extends Model implements CalendarOAuthToken
         'scopes' => 'array',
         'token_expires_at' => 'datetime',
         'last_polled_at' => 'datetime',
+        'configuration_version' => 'integer',
+        'last_poll_attempt_at' => 'datetime',
+        'consecutive_poll_failures' => 'integer',
+        'next_poll_at' => 'datetime',
+        'poll_claim_expires_at' => 'datetime',
+        'inbox_scan_before' => 'datetime',
+        'inbox_scan_cursor' => 'encrypted',
+        'inbox_scan_cursor_hashes' => 'array',
+        'inbox_scan_complete' => 'boolean',
     ];
 
     protected $hidden = [
         'access_token',
         'refresh_token',
+        'poll_claim_token',
+        'inbox_scan_cursor',
+        'inbox_scan_cursor_hashes',
+        'inbox_scan_scope',
     ];
 
     public function createdBy(): BelongsTo
@@ -77,6 +92,15 @@ class ItMailboxConnection extends Model implements CalendarOAuthToken
     public function mailboxEmail(): ?string
     {
         return $this->mailbox_email ?: $this->account_email;
+    }
+
+    /** Canonical provider/account/mailbox boundary; remote IDs remain case-sensitive within it. */
+    public function mailboxScopeHash(): string
+    {
+        return hash('sha256', json_encode([
+            $this->provider, mb_strtolower(trim((string) $this->account_email)),
+            mb_strtolower(trim((string) $this->mailboxEmail())),
+        ], JSON_THROW_ON_ERROR));
     }
 
     /* ------------------------------------------------------------------

@@ -17,6 +17,7 @@
  * Every card carries the kebab AND the right-click context menu, fed by
  * one MenuItem[] (entity-menu.tsx). No readiness/onboarding displays.
  */
+import { Link } from '@inertiajs/react';
 import { ArrowRight, Check } from 'lucide-react';
 import type {
     ComponentType,
@@ -26,6 +27,7 @@ import type {
 } from 'react';
 
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
 import { PersonDisc, ProgressValue } from './entity-cells';
@@ -76,6 +78,14 @@ export interface EntityCardProps {
     /** The one MenuItem[] feeding kebab AND context menu. */
     actions: MenuItem[];
     onOpen?: () => void;
+    href?: string;
+    linkLabel?: string;
+    selection?: {
+        checked: boolean;
+        label: string;
+        onToggle: (checked: boolean) => void;
+        disabled?: boolean;
+    };
     onContextMenu?: (e: MouseEvent) => void;
     /** Fact chips row (EntityChip / EntityStatusChip). */
     chips?: ReactNode;
@@ -103,6 +113,9 @@ export function EntityCard({
     sublineIcon: SubIcon,
     actions,
     onOpen,
+    href,
+    linkLabel,
+    selection,
     onContextMenu,
     chips,
     metric,
@@ -115,8 +128,10 @@ export function EntityCard({
     onToggleSelect,
     className,
 }: EntityCardProps) {
+    selected = selection?.checked ?? selected;
     const activate = () => (selectMode ? onToggleSelect?.() : onOpen?.());
     const onKeyDown = (e: KeyboardEvent) => {
+        if (e.target !== e.currentTarget) return;
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             activate();
@@ -125,8 +140,8 @@ export function EntityCard({
 
     return (
         <Card
-            role="button"
-            tabIndex={0}
+            role={!href && (onOpen || selectMode) ? 'button' : undefined}
+            tabIndex={!href && (onOpen || selectMode) ? 0 : undefined}
             onClick={activate}
             onContextMenu={onContextMenu}
             onKeyDown={onKeyDown}
@@ -144,6 +159,21 @@ export function EntityCard({
             <div className="flex flex-1 flex-col gap-3 px-4 pt-3.5 pb-3.5">
                 {/* 2 — identity row */}
                 <div className="flex items-start gap-3">
+                    {selection ? (
+                        <label
+                            className="flex min-h-11 shrink-0 items-center"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <Checkbox
+                                checked={selection.checked}
+                                disabled={selection.disabled}
+                                onCheckedChange={(checked) =>
+                                    selection.onToggle(checked === true)
+                                }
+                                aria-label={selection.label}
+                            />
+                        </label>
+                    ) : null}
                     {selectMode ? (
                         <span
                             aria-hidden="true"
@@ -166,7 +196,18 @@ export function EntityCard({
                     )}
                     <div className="min-w-0 flex-1">
                         <h3 className="truncate text-[15px] leading-tight font-[650] tracking-tight">
-                            {name}
+                            {href ? (
+                                <Link
+                                    aria-label={linkLabel}
+                                    href={href}
+                                    onClick={(event) => event.stopPropagation()}
+                                    className="underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    {name}
+                                </Link>
+                            ) : (
+                                name
+                            )}
                         </h3>
                         {subline ? (
                             <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
@@ -180,6 +221,7 @@ export function EntityCard({
                     {!selectMode ? (
                         <EntityKebab
                             actions={actions}
+                            label={`Actions for ${name}`}
                             className="-mt-0.5 -mr-1"
                         />
                     ) : null}
@@ -239,7 +281,17 @@ export function EntityCard({
                         ) : null}
                     </div>
                     {/* No onOpen (e.g. an archived record) → no Open affordance. */}
-                    {!selectMode && onOpen ? (
+                    {!selectMode && href ? (
+                        <Link
+                            aria-label={linkLabel}
+                            href={href}
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            {openLabel}
+                            <ArrowRight className="size-3.5" />
+                        </Link>
+                    ) : !selectMode && onOpen ? (
                         <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary">
                             {openLabel}
                             <ArrowRight className="size-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />

@@ -1,0 +1,6 @@
+npm notice run types
+npm notice run tsc --noEmit
+resources/js/components/it/__tests__/ticket-work-tasks.test.tsx(780,16): error TS2571: Object is of type 'unknown'.
+resources/js/components/it/__tests__/ticket-work-tasks.test.tsx(1022,35): error TS18046: 'config.data' is of type 'unknown'.
+resources/js/hooks/it-ticket-draft-memory.ts(357,55): error TS2339: Property 'operation' does not exist on type 'ItDraftContext'.
+  Property 'operation' does not exist on type '{ purpose: "requester_intake" | "technician_intake"; requestUuid: string; ticketId?: undefined; }'.

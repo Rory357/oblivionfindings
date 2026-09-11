@@ -1,0 +1,61 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_1c92ebd123104476",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketLocalDraftTest[39m
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery proves the exact context with persistence disabled and never touches draft storage[39m[90m        [39m [90m251.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery rejects stale browser actor identity without returning proof[39m[90m                                [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery checks old selected scopes even after replacement or clearing with (false)[39m[90m                  [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery checks old selected scopes even after replacement or clearing with (true)[39m[90m                   [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma newly selected unapproved Site is denied before a memory proof is issued[39m[90m                                  [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic participant memory does not grant internal note or technician recovery with ('internal_note')[39m[90m        [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic participant memory does not grant internal note or technician recovery with ('ticket_edit')[39m[90m          [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthorized public memory can resume without borrowing a newer ticket version[39m[90m                                [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90msettled work can recover authorized memory for review but cannot submit it[39m[90m                                  [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrevoked current ticket access denies a memory proof even for a retained service actor[39m[90m                       [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcommitted intake requires canonical receipt recovery before local memory can be adopted[39m[90m                     [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([['PRIVATE UNAP[39m[90m…[39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([[['PRIVATE UNA[39m[90m…[39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([[[], [], [], …[39m[90m…[39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([1]) #1[39m[90m         [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([1]) #2[39m[90m         [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with (['not-a-uuid'])[39m[90m [39m [90m0.83s[39m  
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": false
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_1c92ebd123104476",
+    "database_mutations_performed": false
+}

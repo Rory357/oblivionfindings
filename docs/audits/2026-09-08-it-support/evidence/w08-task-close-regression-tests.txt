@@ -1,0 +1,21 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+stderr | resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > restores the latest text and selected File after same-document unmount with saved drafts disabled
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+stderr | resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > restores the latest text and selected File after same-document unmount with saved drafts disabled
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+stderr | resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > restores the latest text and selected File after same-document unmount with saved drafts disabled
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+Invalid prop `id` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
+
+··············································································································································································
+
+ Test Files  10 passed (10)
+      Tests  174 passed (174)
+   Start at  23:41:38
+   Duration  10.67s (transform 1.85s, setup 1.47s, import 10.22s, tests 20.83s, environment 12.64s)
+

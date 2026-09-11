@@ -292,7 +292,8 @@ test('tickets can be created and resolved from the helpdesk queue', function () 
     expect($ticket->priority)->toBe('high');
 
     $this->actingAs($this->hr)
-        ->post("/it/tickets/{$ticket->id}/resolve", [
+        ->post("/it/tickets/{$ticket->id}/resolve", ['resolution_code' => 'restored', 'resolution_verification' => 'Synthetic verification confirmed the expected result.',
+            'expected_version' => $ticket->fresh()->lock_version,
             'note' => 'Power-cycled the Kyocera and cleared the queue.',
         ])
         ->assertRedirect();
@@ -308,7 +309,7 @@ test('tickets can be created and resolved from the helpdesk queue', function () 
         Role::query()->where('name', 'support_worker')->first()->id,
     ]);
     $this->actingAs($worker)
-        ->patch("/it/tickets/{$ticket->id}", ['status' => 'open'])
+        ->patch("/it/tickets/{$ticket->id}", ['expected_version' => $ticket->fresh()->lock_version, 'status' => 'open'])
         ->assertForbidden();
     $this->actingAs($worker)
         ->post("/it/tickets/{$ticket->id}/resolve")

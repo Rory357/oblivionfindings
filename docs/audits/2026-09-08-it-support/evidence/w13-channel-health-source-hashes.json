@@ -1,0 +1,34 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItMailboxConnectionPresenter.php",
+    "sha256": "cb05ebcbccc6429e1864a27f0b7267005b3ba3c96b8e3542d56395a511ac5cfd"
+  },
+  {
+    "path": "app/Domain/It/Services/ItEmailDeliveryService.php",
+    "sha256": "9d630817ccae6753cf35fd1ed299568e32d5c8652d74bafde223754e5b685a77"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+    "sha256": "a29a4069a52123def3806de463be4a473acad96e3fb2a065cee05aa9302c117e"
+  },
+  {
+    "path": "tests/Feature/It/ItChannelOperationsHealthTest.php",
+    "sha256": "6852f696ecac62065afd1f0e7af7cbb9bd22bfd86562618c8bfccce6683dcdc2"
+  },
+  {
+    "path": "resources/js/components/it/it-channel-health.tsx",
+    "sha256": "5f8619c8945fd07d0942b0013d3df79d6b6557409679cc436c5b648a5c721df3"
+  },
+  {
+    "path": "resources/js/components/it/it-channel-health.test.tsx",
+    "sha256": "f005172103cf6a402c1d977b05edaad1e1715b987bab507ddf051730dbfb8250"
+  },
+  {
+    "path": "resources/js/components/it/it-service-operations.tsx",
+    "sha256": "2262fee3109fe1409d72cbf89395c2b6f90f23f17ba85652f115e1a143e2af68"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w11-mailbox-browser-fixture.php",
+    "sha256": "994f4f7e6b8c3a75cfb8f2bbc1f347e63a62dfff7c3f2c825ec4bf63f49729b6"
+  }
+]

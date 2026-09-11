@@ -26,6 +26,7 @@ describe('MyTicketsList', () => {
                 tickets={[
                     {
                         id: 35,
+                        lock_version: 1,
                         reference: 'IT-000035',
                         title: 'New ticket needs attention',
                         description: 'A keyboard navigation regression.',

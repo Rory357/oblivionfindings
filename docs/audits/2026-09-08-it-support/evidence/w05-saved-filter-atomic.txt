@@ -1,0 +1,41 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_d357b99aff204068",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItSavedTicketFilterTest[39m
+  [32;1m✓[39;22m[90m [39m[90man agent saves only allow-listed filters and currently accessible options[39m[90m                                 [39m [90m253.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma personal filter applies server-side and combines Site scope with queue filters[39m[90m                            [39m [90m2.37s[39m  
+  [32;1m✓[39;22m[90m [39m[90msaved filter payloads are private and stale Site access is pruned before display[39m[90m                            [39m [90m2.27s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforeign saved filter reads and direct-object deletion fail closed[39m[90m                                           [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequest-only staff cannot create personal agent queue filters[39m[90m                                               [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mone filter normalizer never reuses another actors permitted options[39m[90m                                         [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma reused filter normalizer drops revoked Site and retired service options before applying or listing saved[39m[90m… [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpersonal ticket totals match all own rows independently from the agent queue filter[39m[90m                         [39m [90m2.30s[39m  
+  [32;1m✓[39;22m[90m [39m[90moperational view counts and rows agree without exposing participant-only waiting or ownership with ('unowne[39m[90m…[39m [90m4.42s[39m  
+  [32;1m✓[39;22m[90m [39m[90moperational view counts and rows agree without exposing participant-only waiting or ownership with ('waitin[39m[90m…[39m [90m4.44s[39m  
+  [32;1m✓[39;22m[90m [39m[90moperational view counts and rows agree without exposing participant-only waiting or ownership with ('waitin[39m[90m…[39m [90m4.45s[39m  
+  [32;1m✓[39;22m[90m [39m[90moperational view counts and rows agree without exposing participant-only waiting or ownership with ('waitin[39m[90m…[39m [90m4.40s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical saved view creation enforces the current count and database name comparison after request validat[39m[90m…[39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical saved view creation reauthorizes a previously loaded actor and rejects an empty normalized view[39m[90m   [39m [90m0.11s[39m  
+
+  [90mTests:[39m    [32;1m14 passed[39;22m[90m (213 assertions)[39m
+  [90mDuration:[39m [39m278.89s[39m
+

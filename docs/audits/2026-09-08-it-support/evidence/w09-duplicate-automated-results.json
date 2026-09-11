@@ -1,0 +1,15 @@
+{
+  "schema": "oblivion_it_support_test_it_d04d4d7a645c4a66",
+  "wrapper_session": 3345,
+  "pest_exit": 0,
+  "wrapper_exit": 0,
+  "tests": 4,
+  "assertions": 17.0,
+  "all_14_postflight_checks": true,
+  "schema_absent": true,
+  "ui_session": "017db8",
+  "ui_tests": 11,
+  "ui_exit": 0,
+  "types_and_lint_session": 73773,
+  "types_and_lint_exit": 0
+}

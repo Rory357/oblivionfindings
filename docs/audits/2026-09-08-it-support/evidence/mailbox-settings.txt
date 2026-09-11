@@ -1,0 +1,47 @@
+Settings
+Support Mailbox
+Settings
+GENERAL
+Profile
+Appearance
+Password
+Two-Factor Authentication
+BRANDING
+Branding
+ORGANISATION
+Service Contexts
+USER MANAGEMENT
+Users
+Roles
+Overrides & Governance
+IDENTITY & SSO
+SSO Configuration
+NOTIFICATIONS
+My Notifications
+Role Defaults
+Escalation Rules
+Email
+Templates
+INTEGRATIONS
+Calendar Sync
+Support Mailbox
+Device Integrations
+Outbound API & Webhooks
+DATA & COMPLIANCE
+Data & Privacy
+Audit Logs
+SYSTEM
+Modules & Features
+Support Mailbox
+
+Connect the mailbox staff email for IT help. Unread messages are polled hourly and become helpdesk tickets (or thread onto an existing ticket when the subject carries its IT-… reference). Only mail from staff accounts is ticketed.
+
+PROVIDERS
+Microsoft 365 (Exchange)
+Not connected
+OAuth client credentials are not configured for this provider yet.
+Not configured
+Google Workspace (Gmail)
+Not connected
+OAuth client credentials are not configured for this provider yet.
+Not configured

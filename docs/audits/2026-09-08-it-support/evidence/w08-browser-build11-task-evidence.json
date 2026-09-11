@@ -1,0 +1,325 @@
+{
+    "observed_at": "2026-09-09T19:23:41+00:00",
+    "token": "16e7774635a5432c",
+    "database": "oblivion_it_draft_browser_16e7774635a5432c",
+    "time_context": {
+        "elapsed_ms": 0.08,
+        "rows": [
+            {
+                "session_time_zone": "SYSTEM",
+                "system_time_zone": "New Zealand Standard Time"
+            }
+        ]
+    },
+    "tickets": {
+        "elapsed_ms": 0.22,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 9,
+                "status": "open"
+            },
+            {
+                "id": 4,
+                "lock_version": 1,
+                "status": "open"
+            }
+        ]
+    },
+    "tasks": {
+        "elapsed_ms": 0.23,
+        "rows": [
+            {
+                "id": 1,
+                "ticket_id": 1,
+                "team_id": null,
+                "assigned_to_user_id": 3,
+                "status": "completed",
+                "is_required": 0,
+                "evidence_required": 1,
+                "due_at": "2026-09-10 09:30:00",
+                "due_at_epoch": 1788989400,
+                "sort_order": 10,
+                "completed_by_user_id": 3,
+                "completed_at": "2026-09-10 07:14:08",
+                "completed_at_epoch": 1788981248,
+                "title_sha256": "70f597836a40a087f384b72b439fcc9e5701dc13b5e291e32f957cdd204fddda",
+                "description_sha256": "359f121d4aac7b2425894dc98fc9b8ab310bdc32634e2a1c89dea74d9783470b",
+                "completion_note_sha256": "40cc44b886c3311bf7be6dc33e84e682a882716d374a1e193a5dc1d3063f7246",
+                "evidence_sha256": "002ae41eaf3c7aef582eb96f501cb18138e704f2c8c910887e4bd139d25a355a",
+                "evidence_count": 1
+            },
+            {
+                "id": 2,
+                "ticket_id": 1,
+                "team_id": null,
+                "assigned_to_user_id": 4,
+                "status": "completed",
+                "is_required": 1,
+                "evidence_required": 0,
+                "due_at": null,
+                "due_at_epoch": null,
+                "sort_order": 20,
+                "completed_by_user_id": 3,
+                "completed_at": "2026-09-10 07:11:38",
+                "completed_at_epoch": 1788981098,
+                "title_sha256": "aca31491226d768f37b714f1bc6b9987b94c604c8f9eb4c368d6b7d637291514",
+                "description_sha256": null,
+                "completion_note_sha256": "db74e64a2baa9bd3ed8315145f98a59f8b956c0f13253ecfadbcc8f187ecffdf",
+                "evidence_sha256": null,
+                "evidence_count": null
+            }
+        ]
+    },
+    "dependencies": {
+        "elapsed_ms": 0.16,
+        "rows": [
+            {
+                "task_id": 2,
+                "depends_on_task_id": 1
+            }
+        ]
+    },
+    "receipts": {
+        "elapsed_ms": 0.58,
+        "rows": [
+            {
+                "id": 1,
+                "actor_user_id": 3,
+                "operation": "task.create",
+                "request_uuid": "2cb008d1-1da6-4bb1-8e2d-df218a603131",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 2,
+                "committed_at": "2026-09-10 07:09:51",
+                "result_state": "committed",
+                "task_id": "1"
+            },
+            {
+                "id": 2,
+                "actor_user_id": 3,
+                "operation": "task.create",
+                "request_uuid": "a6179692-bd66-460f-9ee2-b155fea7b5db",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 3,
+                "committed_at": "2026-09-10 07:10:34",
+                "result_state": "committed",
+                "task_id": "2"
+            },
+            {
+                "id": 3,
+                "actor_user_id": 3,
+                "operation": "task.complete",
+                "request_uuid": "db494513-faab-4123-87b3-e5689e5f0cac",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 4,
+                "committed_at": "2026-09-10 07:11:11",
+                "result_state": "committed",
+                "task_id": "1"
+            },
+            {
+                "id": 4,
+                "actor_user_id": 3,
+                "operation": "task.complete",
+                "request_uuid": "8fd27543-a15f-4f24-acd3-72d70cb35201",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 5,
+                "committed_at": "2026-09-10 07:11:38",
+                "result_state": "committed",
+                "task_id": "2"
+            },
+            {
+                "id": 5,
+                "actor_user_id": 3,
+                "operation": "task.reopen",
+                "request_uuid": "6dc177b0-a107-4434-b9ff-706e04af5e5d",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 6,
+                "committed_at": "2026-09-10 07:12:02",
+                "result_state": "committed",
+                "task_id": "1"
+            },
+            {
+                "id": 6,
+                "actor_user_id": 3,
+                "operation": "task.update",
+                "request_uuid": "6f9818c2-6d84-4071-9ff2-9e2a0edffdd1",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 7,
+                "committed_at": "2026-09-10 07:13:29",
+                "result_state": "committed",
+                "task_id": "1"
+            },
+            {
+                "id": 7,
+                "actor_user_id": 3,
+                "operation": "task.update",
+                "request_uuid": "07b396d0-e22d-4ce9-b278-be68a1923bf4",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 8,
+                "committed_at": "2026-09-10 07:13:55",
+                "result_state": "committed",
+                "task_id": "1"
+            },
+            {
+                "id": 8,
+                "actor_user_id": 3,
+                "operation": "task.complete",
+                "request_uuid": "00517f08-2c7e-4b66-81a1-23d8bd19cb24",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 9,
+                "committed_at": "2026-09-10 07:14:08",
+                "result_state": "committed",
+                "task_id": "1"
+            }
+        ]
+    },
+    "events": {
+        "elapsed_ms": 0.23,
+        "rows": [
+            {
+                "id": 1,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_created",
+                "created_at": "2026-09-09 19:09:51",
+                "task_id": "1",
+                "payload_sha256": "57f825c339e7ec868697148f1e80d893d22276c72facb5fa98835c42279fdee3"
+            },
+            {
+                "id": 2,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_created",
+                "created_at": "2026-09-09 19:10:34",
+                "task_id": "2",
+                "payload_sha256": "df2fa8cc705155e17bdac4643b5fa59305da208c11f1a4aacd8e7c8bab2b6162"
+            },
+            {
+                "id": 3,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_completed",
+                "created_at": "2026-09-09 19:11:11",
+                "task_id": "1",
+                "payload_sha256": "4d32f377124ccd8994eff469fe3b16a244650037c0d5ab2d18aff5de09a2491b"
+            },
+            {
+                "id": 4,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_completed",
+                "created_at": "2026-09-09 19:11:38",
+                "task_id": "2",
+                "payload_sha256": "eeb5a705e40ca80768fc9c7f58b90e7f86bbee02afb0b57bb4c255ce7ae2e97c"
+            },
+            {
+                "id": 5,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_reopened",
+                "created_at": "2026-09-09 19:12:02",
+                "task_id": "1",
+                "payload_sha256": "1b7123f4433356746f4aead33d069b4207621b3af6d4b59efda2aee43bd72b35"
+            },
+            {
+                "id": 6,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_cancelled",
+                "created_at": "2026-09-09 19:13:29",
+                "task_id": "1",
+                "payload_sha256": "61736a2bf8688da6736df806c6b189129a8f7db285479bef9e9de82e3ce63be8"
+            },
+            {
+                "id": 7,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_restored",
+                "created_at": "2026-09-09 19:13:55",
+                "task_id": "1",
+                "payload_sha256": "0249ebe5988343a4e202ff6ac57d411b4127344365f8c6a82d364a77d904c933"
+            },
+            {
+                "id": 8,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_completed",
+                "created_at": "2026-09-09 19:14:08",
+                "task_id": "1",
+                "payload_sha256": "72aa5fe3fb2b01eba1c5ca1ae04abd3344a12258cf54b2703a886be08d584ae4"
+            }
+        ]
+    },
+    "audits": {
+        "elapsed_ms": 0.26,
+        "rows": [
+            {
+                "id": 16,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.created",
+                "created_at": "2026-09-10 07:09:51",
+                "meta_sha256": "15c49473759247154f8dd4f0f091a338e0ba2a189d4477ee3dfa3b28e69e64d4"
+            },
+            {
+                "id": 18,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.created",
+                "created_at": "2026-09-10 07:10:34",
+                "meta_sha256": "2b01866a58e3ddf60f82ea4fecb582ad3f70d932e441d61995c7494328c47117"
+            },
+            {
+                "id": 20,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.completed",
+                "created_at": "2026-09-10 07:11:11",
+                "meta_sha256": "c1bc519b01caca75e3a61d016797380cd3331fc6b9daebaed1e33803e88ac1c4"
+            },
+            {
+                "id": 22,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.completed",
+                "created_at": "2026-09-10 07:11:38",
+                "meta_sha256": "5795623a7d3ab4e5fb523a4564de5e6ac4c8cc0ed9dc18a1dfb01084243ce211"
+            },
+            {
+                "id": 24,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.reopened",
+                "created_at": "2026-09-10 07:12:02",
+                "meta_sha256": "cd0f919715f3f9d69b79781fc718956da79b868179b745f980a54d05d0657705"
+            },
+            {
+                "id": 26,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.updated",
+                "created_at": "2026-09-10 07:13:29",
+                "meta_sha256": "9ddf7ee61fc60c10ac3cfcf2b810624282d6d3b2a6829f04a73f168a0b691a5d"
+            },
+            {
+                "id": 28,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.updated",
+                "created_at": "2026-09-10 07:13:55",
+                "meta_sha256": "702502e122411d4d6be5ac0524bf905287336ab7d142b438339efcdbde37775e"
+            },
+            {
+                "id": 30,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.completed",
+                "created_at": "2026-09-10 07:14:08",
+                "meta_sha256": "4ce638cec57fd37c1f4b342609a8521bb87ce75b07d8212b0c7ecc2ab97c22a2"
+            }
+        ]
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false
+}

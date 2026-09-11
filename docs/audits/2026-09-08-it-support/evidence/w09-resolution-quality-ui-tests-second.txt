@@ -1,0 +1,236 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/resolve-ticket-dialog.test.tsx (23 tests | 2 failed) 6424ms
+     × resumes explicitly, preserves the saved base version, then saves a reviewed version and consumes the exact generation 1293ms
+     × requires a meaningful note and a strictly committed result before showing success 144ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/resolve-ticket-dialog.test.tsx > resolution lifecycle > resumes explicitly, preserves the saved base version, then saves a reviewed version and consumes the exact generation
+Error: expect(element).toBeEnabled()
+
+Received element is not enabled:
+  <button
+  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+  data-slot="button"
+  disabled=""
+/>
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body
+    data-scroll-locked="1"
+    style="pointer-events: none;"
+  >
+    <span
+      aria-hidden="true"
+      data-aria-hidden="true"
+      data-radix-focus-guard=""
+      style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+      tabindex="0"
+    />
+    <div
+      aria-hidden="true"
+      data-aria-hidden="true"
+    />
+    <div
+      aria-hidden="true"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+      data-aria-hidden="true"
+      data-slot="dialog-overlay"
+      data-state="open"
+      style="pointer-events: auto;"
+    />
+    <div
+      aria-describedby="radix-_r_2j_"
+      aria-labelledby="radix-_r_2i_"
+      class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+      data-slot="dialog-content"
+      data-state="open"
+      id="radix-_r_2h_"
+      role="dialog"
+      style="max-width: min(94vw, 980px); pointer-events: auto;"
+      tabindex="-1"
+    >
+      <h2
+        class="text-lg leading-none font-semibold sr-only"
+        data-slot="dialog-title"
+        id="radix-_r_2i_"
+      >
+        Resolve ticket
+      </h2>
+      <p
+        class="text-muted-foreground text-sm sr-only"
+        data-slot="dialog-description"
+        id="radix-_r_2j_"
+      >
+        IT-000001 — Synthetic unresolved fault
+      </p>
+      <div
+        class="flex min-h-0 overflow-hidden"
+      >
+        <aside
+          class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+          data-wizard-region="rail"
+        >
+          <div
+            class="mb-3 flex items-center gap-2.5"
+          >
+            <span
+              class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+            >
+              <svg
+                class="lucide lucide-circle-check h-5 w-5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                />
+                <path
+                  d="m9 12 2 2 4-4"
+                />
+              </svg>
+            </span>
+            <div>
+              <div
+                class="text-sm leading-tight font-bold"
+              >
+                Resolve
+              </div>
+              <div
+                class="text-[11px] text-muted-foreground"
+              >
+                IT-000001
+              </div>
+            </div>
+          </div>
+          <button
+            class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors bg-primary/10"
+            type="button"
+          >
+            <span
+              class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+            >
+              <svg
+                class="lucide lucide-circle-check h-3.5 w-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                />
+                <path
+                  d="m9 12 2 2 4-4"
+                />
+              </svg>
+            </span>
+            <span
+              class="min-w-0"
+            >
+              <span
+                class="block text-[13px] font-bold text-foreground"
+              >
+                Resolve
+              </span>
+              <span
+                class="block truncate text-[11px] text-muted-foreground"
+              >
+                What fixed it
+              </span>
+            </span>
+          </button>
+          <div
+            class="pt-4 mt-auto"
+          >
+            <div
+              class="mb-1.5 flex justify-between text-[11px] text-muted-foreground"
+            >
+    ...
+ ❯ resources/js/components/it/__tests__/resolve-ticket-dialog.test.tsx:387:15
+    385|             expect(
+    386|                 screen.getByRole('button', { name: 'Resolve ticket' }),
+    387|             ).toBeEnabled(),
+       |               ^
+    388|         );
+    389|         expect(request.mock.calls[2][0]).toMatchObject({
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  resources/js/components/it/__tests__/resolve-ticket-dialog.test.tsx > resolution lifecycle > requires a meaningful note and a strictly committed result before showing success
+AssertionError: expected "vi.fn()" to be called with arguments: [ '/it/tickets/1/resolve', …(2) ]
+
+Received:
+
+  1st vi.fn() call:
+
+@@ -3,13 +3,24 @@
+    {
+      "actor_user_id": 10,
+      "expected_version": 3,
+      "note": "Replaced the cable and verified connectivity.",
+      "notify_requester": true,
++     "resolution_code": "restored",
++     "resolution_verification": "Confirmed access and checked a second connection.",
+    },
+-   ObjectContaining {
++   {
+      "headers": {
+        "Accept": "application/json",
+      },
+-     "signal": Any<AbortSignal>,
++     "signal": AbortSignal {
++       Symbol(kEvents): Map {},
++       Symbol(events.maxEventTargetListeners): 0,
++       Symbol(events.maxEventTargetListenersWarned): false,
++       Symbol(kHandlers): Map {},
++       Symbol(kAborted): false,
++       Symbol(kReason): undefined,
++       Symbol(kComposite): false,
++     },
++     "timeout": 30000,
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ resources/js/components/it/__tests__/resolve-ticket-dialog.test.tsx:526:22
+    524|         submit();
+    525|         await screen.findByText('Resolved', { exact: true });
+    526|         expect(post).toHaveBeenCalledWith(
+       |                      ^
+    527|             '/it/tickets/1/resolve',
+    528|             {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 77 passed (79)
+   Start at  12:34:35
+   Duration  9.15s (transform 556ms, setup 357ms, import 2.02s, tests 6.57s, environment 2.55s)
+

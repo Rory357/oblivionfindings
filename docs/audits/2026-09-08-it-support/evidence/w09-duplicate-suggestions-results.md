@@ -1,0 +1,27 @@
+# W09/B07 — explainable duplicate suggestions
+
+10 September 2026. This slice extends the existing merge chooser. Whole W09 remains In progress; generic related-work commands, intake/triage suggestions and remaining acceptance are not complete.
+
+`ItTicketMergeService::candidates` now owns the existing bounded candidate query, refreshes the source/actor and checks canonical work access and conversation audience. It ranks possible duplicates within up to 100 recent open reports from the same requester and returns at most 50 eligible records. Closed/merged sources return no candidates. Matching never consults comments, files or AI.
+
+Reasons are explicit: normalized identical title with the same site/work type; or the same service/site/work type with at least two distinct title words of four or more characters. These are suggestions requiring human review, not confidence scores or authority to merge. The shared WizardShell displays the reason and search limits; no candidate is automatically selected. Existing preview, acknowledgement, version/recovery and commit controls remain in use.
+
+Changed: `app/Domain/It/Services/ItTicketMergeService.php`, `app/Http/Controllers/It/ItTicketController.php`, `resources/js/components/it/merge-ticket-dialog.tsx`, its focused component test and new `tests/Feature/It/ItTicketDuplicateSuggestionTest.php`. The guarded browser fixture adds a seventh synthetic same-title ticket without changing historical fixture IDs. No schema migration, design-contract change or external execution.
+
+Automated verification: backend wrapper session3345, token `it_d04d4d7a645c4a66`, Pest0/wrapper0, four tests/17 assertions from PHPUnit diagnostics, all14 postflight guards true and schema absent. Tests cover ranking, reason specificity, no writes, audience/site/settled-record filtering, requester JSON privacy and stale actor/source revalidation. UI11 tests pass, 5.32s, including explanation, no automatic selection/network request and retained search behavior. Full TypeScript and scoped ESLint session73773 exit0. Pint passed. Source hashes and results are recorded beside this report.
+
+## Build33 browser verification
+
+Build session19341 exit0, 4m5s. App asset `app-BtNgI1Ag.js`; manifest `43646b03a0e72e88942855e818667942f67019bf1ec4c8e2b528184acd12c666`. Reviewed runtime fingerprint `838f1f4ca2c9ca5213d182f6be2be02a3b84af4faa90acee2eeab060e6ca7110`, token `0ce95b9662854e72`, launcher91434 exit0. Runtime readback confirms the correct checkout, exact disposable schema/storage, normal CSRF, array mail and sync queue; saved as `w09-browser-build33-runtime.json`. Backend testing had already finished and removed its schema before browser setup.
+
+Actual Codex in-app tab4 at `http://127.0.0.1:8766/it/tickets/1`, normal restricted-technician sign-in. DOM script matched the compiled app asset. Current viewport was1235×856; no resize or theme change was made. Screenshot inspected inline: the shared WizardShell shows the explanation, bounded-search copy and reason field without horizontal clipping. No saved screenshot artifact is claimed.
+
+- Target7 appears first with “Possible duplicate · Same title, site and work type”; targets6/5/4 remain available without that reason. No target was preselected and Review merge was disabled. The browser's same-service alternate reason was not exercised; it has backend test coverage.
+- Searching `no-such-ticket` shows the empty-search state. Searching `IT-000007` restores the suggestion. Tab moves from search to the candidate with `aria-pressed=false`; Space selects it.
+- Entering a synthetic reason and requesting Review invokes the actual backend preview for1→7. Both records and zero-count evidence dispositions are shown. `Merge into IT-000007` remains disabled without acknowledgement. No merge command was submitted in this journey.
+- Back preserves target7, search and the exact synthetic reason. Escape opens the discard confirmation; explicit Discard draft and leave closes the unsent proposal. A textarea `value` attribute read returned null (not its current value); the subsequent rendered snapshot shows the retained text and establishes preservation.
+- Normal logout reaches the public landing page; normal requester login lands at `/my-day`. Initial waits expecting a login form immediately after logout and `/it` after requester login were tool navigation assumptions, not product failures. Observed links/destinations were followed to the known ticket. Requester Ticket actions contains only Copy reference/Copy ticket link; merge menu count0 and possible-duplicate text count0. Browser warning/error log returned `[]`.
+
+Restored old loopback tabs refer to deleted prior runtimes. Selecting one for cleanup was blocked by the browser URL policy on its error-page data URL; no bypass was attempted and no old-tab cleanup is claimed. Browser-control reset changed browser inventory IDs, resolved by a fresh inventory; the valid new verification tab was then reused. Tab4 was explicitly closed before Build33 teardown.
+
+Cleanup session39215 exited0. Independent read-only postflight exited0 with `schema_absent=true` and `owned_directory_absent=true`, saved in `w09-browser-build33-cleanup-postflight.json`. No owned build/test/runtime process remains running. This suggestion slice is implemented and browser verified. It does not complete the broader W09/B07 relationship, intake or acceptance work.

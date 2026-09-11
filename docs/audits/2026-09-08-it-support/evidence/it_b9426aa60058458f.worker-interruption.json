@@ -1,0 +1,87 @@
+{
+    "token": "it_b9426aa60058458f",
+    "synthetic_only": true,
+    "outcomes": [
+        {
+            "provider": "microsoft",
+            "phase": "before_commit",
+            "child_pid": 11192,
+            "observed_running_at_checkpoint": true,
+            "terminated": true,
+            "intent_id": 1,
+            "final_intent_state": "deleted",
+            "receipt_id": 1,
+            "ticket_id": 2,
+            "canonical_file_id": 3,
+            "canonical_file_preserved": true,
+            "cleanup": {
+                "requested": 1,
+                "deleted": 1,
+                "failed": 0,
+                "deferred": 0,
+                "reconciliation_required": 0
+            }
+        },
+        {
+            "provider": "microsoft",
+            "phase": "after_commit",
+            "child_pid": 17684,
+            "observed_running_at_checkpoint": true,
+            "terminated": true,
+            "intent_id": 3,
+            "final_intent_state": "attached",
+            "receipt_id": 2,
+            "ticket_id": 3,
+            "canonical_file_id": 5,
+            "canonical_file_preserved": true,
+            "cleanup": {
+                "requested": 0,
+                "deleted": 0,
+                "failed": 0,
+                "deferred": 0,
+                "reconciliation_required": 0
+            }
+        },
+        {
+            "provider": "google",
+            "phase": "before_commit",
+            "child_pid": 36916,
+            "observed_running_at_checkpoint": true,
+            "terminated": true,
+            "intent_id": 4,
+            "final_intent_state": "deleted",
+            "receipt_id": 3,
+            "ticket_id": 5,
+            "canonical_file_id": 8,
+            "canonical_file_preserved": true,
+            "cleanup": {
+                "requested": 1,
+                "deleted": 1,
+                "failed": 0,
+                "deferred": 0,
+                "reconciliation_required": 0
+            }
+        },
+        {
+            "provider": "google",
+            "phase": "after_commit",
+            "child_pid": 38288,
+            "observed_running_at_checkpoint": true,
+            "terminated": true,
+            "intent_id": 6,
+            "final_intent_state": "attached",
+            "receipt_id": 4,
+            "ticket_id": 6,
+            "canonical_file_id": 10,
+            "canonical_file_preserved": true,
+            "cleanup": {
+                "requested": 0,
+                "deleted": 0,
+                "failed": 0,
+                "deferred": 0,
+                "reconciliation_required": 0
+            }
+        }
+    ],
+    "orphans": []
+}

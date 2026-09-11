@@ -1,0 +1,107 @@
+{
+    "prefix": "IT Support W01 KB 20260909",
+    "created": true,
+    "existing_records_modified": false,
+    "notifications_sent": false,
+    "immutable_before_counts": {
+        "users": 232,
+        "roles": 29,
+        "sites": 26,
+        "it_tickets": 14,
+        "it_kb_articles": 1,
+        "it_kb_interactions": 0,
+        "it_email_deliveries": 4
+    },
+    "after_counts": {
+        "users": 232,
+        "roles": 29,
+        "sites": 26,
+        "it_tickets": 14,
+        "it_kb_articles": 7,
+        "it_kb_interactions": 0,
+        "it_email_deliveries": 4
+    },
+    "existing_articles_unchanged_sha256": "03c9256d38f5a37515ef47cb2be0d251d27f84941b65c2afc0de5aeeb7ee2486",
+    "articles": {
+        "site-a-draft": {
+            "id": 2,
+            "title": "IT Support W01 KB 20260909 \u2014 Site A draft guide",
+            "status": "draft",
+            "audience": "specific_sites",
+            "site_scope": [
+                9403
+            ],
+            "tech_catalog_visible": true,
+            "tech_can_manage": true,
+            "tech_can_read_published": false,
+            "requester_can_read_published": false,
+            "interaction_url": "/it/kb/2/view"
+        },
+        "site-a-published": {
+            "id": 3,
+            "title": "IT Support W01 KB 20260909 \u2014 Site A published guide",
+            "status": "published",
+            "audience": "specific_sites",
+            "site_scope": [
+                9403
+            ],
+            "tech_catalog_visible": true,
+            "tech_can_manage": true,
+            "tech_can_read_published": true,
+            "requester_can_read_published": true,
+            "interaction_url": "/it/kb/3/view"
+        },
+        "site-c-draft": {
+            "id": 4,
+            "title": "IT Support W01 KB 20260909 \u2014 Site C hidden draft guide",
+            "status": "draft",
+            "audience": "specific_sites",
+            "site_scope": [
+                9405
+            ],
+            "tech_catalog_visible": false,
+            "tech_can_manage": false,
+            "tech_can_read_published": false,
+            "requester_can_read_published": false,
+            "interaction_url": "/it/kb/4/view"
+        },
+        "site-c-published": {
+            "id": 5,
+            "title": "IT Support W01 KB 20260909 \u2014 Site C hidden published guide",
+            "status": "published",
+            "audience": "specific_sites",
+            "site_scope": [
+                9405
+            ],
+            "tech_catalog_visible": false,
+            "tech_can_manage": false,
+            "tech_can_read_published": false,
+            "requester_can_read_published": false,
+            "interaction_url": "/it/kb/5/view"
+        },
+        "agents-published": {
+            "id": 6,
+            "title": "IT Support W01 KB 20260909 \u2014 Technician internal guide",
+            "status": "published",
+            "audience": "it_agents",
+            "site_scope": null,
+            "tech_catalog_visible": true,
+            "tech_can_manage": true,
+            "tech_can_read_published": true,
+            "requester_can_read_published": false,
+            "interaction_url": "/it/kb/6/view"
+        },
+        "all-staff-published": {
+            "id": 7,
+            "title": "IT Support W01 KB 20260909 \u2014 General staff guide",
+            "status": "published",
+            "audience": "all_staff",
+            "site_scope": null,
+            "tech_catalog_visible": true,
+            "tech_can_manage": true,
+            "tech_can_read_published": true,
+            "requester_can_read_published": true,
+            "interaction_url": "/it/kb/7/view"
+        }
+    }
+}

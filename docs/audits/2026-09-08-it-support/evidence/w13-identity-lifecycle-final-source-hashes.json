@@ -1,0 +1,110 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItServiceIdentityCommandService.php",
+    "sha256": "38916f95b0e978780618c1383b199c3dd14593ce59a6794e7fdf5ceece496327"
+  },
+  {
+    "path": "app/Domain/It/Services/ItServiceIdentityCredentialService.php",
+    "sha256": "89caecc85086215b24be68a8b2a9f232cf61455f4f39247a8c0ed3c884462d86"
+  },
+  {
+    "path": "app/Domain/It/Services/ItWorkAccessService.php",
+    "sha256": "a80947b24e93d66550ad033a209505d325224ffdc78278d35143d1db5ae92434"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceIdentityController.php",
+    "sha256": "92a8301c67aae2fc46a69dbab3ce68d814d5f32a35092d77bdc4b8b7de580e8f"
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+    "sha256": "a4f5573008062c8d0d5e76d78ae6aac840656d5ddc89a103fc9a67e6f5fdf111"
+  },
+  {
+    "path": "app/Http/Middleware/RecordItApiRequest.php",
+    "sha256": "9f5ce639e18fe24fd40235f00dc61722f9e07744c06ef83d561a7cfdecb85e97"
+  },
+  {
+    "path": "app/Http/Requests/It/StoreItServiceIdentityRequest.php",
+    "sha256": "b8cedccd3530d45fd285710564449b44a8ec5a504db9425fe44ec24ef21d7930"
+  },
+  {
+    "path": "app/Models/ItServiceIdentity.php",
+    "sha256": "3073c2d9fd39f529a62e6bea13a4e2d54c690b41b245b5589971ae6099c64fbc"
+  },
+  {
+    "path": "app/Models/ItServiceIdentityCommandReceipt.php",
+    "sha256": "efef11fed69496b3d22f2f76050dba4583611c467ec13f1a936d27276046401d"
+  },
+  {
+    "path": "database/migrations/2026_09_11_000024_add_it_service_identity_commands.php",
+    "sha256": "d6fd8dbc4f20c35c9d945d5702f27bb69e2dc5b747d4d4aef4ed9cc4694e695a"
+  },
+  {
+    "path": "docs/it-support-service-api-v1.md",
+    "sha256": "8ca7a73e2c6301d034d610c61f1ea2c0ab4aac1434ac1ae6ef0031bf4e091fcf"
+  },
+  {
+    "path": "resources/js/components/it/it-api-identities-dialog.test.tsx",
+    "sha256": "36ba026055322e4415737bfe73a0716ab167e84ae3e326800bcdc7881e8864b8"
+  },
+  {
+    "path": "resources/js/components/it/it-api-identities.test.tsx",
+    "sha256": "3ed85f74e68a515f47c5b52e4c8a81da9fd95b08572eec6fd7c9e6025e817455"
+  },
+  {
+    "path": "resources/js/components/it/it-api-identities.tsx",
+    "sha256": "819f5213f3de3254e3db9f6ac242ee49615301094fbbd5c800079935e636854a"
+  },
+  {
+    "path": "resources/js/components/it/it-api-identity-contract.ts",
+    "sha256": "8a05055bf88428f8c12d018df06085e13b863a574120657e19785675ad0ae847"
+  },
+  {
+    "path": "resources/js/components/lists/entity-interactions.test.tsx",
+    "sha256": "5c57cf2827c631b5b7ff695801176c395c0155c7c47cfcee735bed6a8bdf8dff"
+  },
+  {
+    "path": "resources/js/components/lists/entity-menu.tsx",
+    "sha256": "73ef3dfecf6cac04969e5576b7a8e7ada157160e7f0ab47bf4ce0fd4c0ebea3b"
+  },
+  {
+    "path": "resources/js/pages/it/setup/index.tsx",
+    "sha256": "5e4328b3b831f28cd53353b12fa7027c78f34cf3614799a4e5a3f30ef0ea45c6"
+  },
+  {
+    "path": "routes/web.php",
+    "sha256": "ea4e70ea0ce46a9a4f125cb5570dfdff64c28bb0ba98ce411e402ac8d314ec80"
+  },
+  {
+    "path": "tests/Concurrency/It/ItServiceIdentityConcurrencyTest.php",
+    "sha256": "3161d60664da1b2f0e38834966fa5da2f474fafc7ca9a6a2af33c34a649a1141"
+  },
+  {
+    "path": "tests/Concurrency/It/README.md",
+    "sha256": "274fc82d31cf5de57894c917dba6a4cc7edca6738c3746c0fe339ea830471deb"
+  },
+  {
+    "path": "tests/Feature/It/ItApiOperationsScopeTest.php",
+    "sha256": "3c4aaac3ccf421b673b5cfaf1a885704e7cc2496b2ce62f192d99c268f3194ac"
+  },
+  {
+    "path": "tests/Feature/It/ItApiPublicationTest.php",
+    "sha256": "980dbc8bcd23a8168d5a25800dbe0fcda14b80b10310d65b7e33a52f8a22038e"
+  },
+  {
+    "path": "tests/Feature/It/ItSecureApiAccessBoundaryTest.php",
+    "sha256": "941674028fd92c50322aa9c1d01a6de9f48843ab083f2726841908191852d60a"
+  },
+  {
+    "path": "tests/Feature/It/ItSecureApiTest.php",
+    "sha256": "69e9636eea9de48fee025c302f2ea8e148bf36c7b51885a5fb816d82298fba30"
+  },
+  {
+    "path": "tests/Feature/It/ItServiceIdentityLifecycleTest.php",
+    "sha256": "fcde17e257b61c1e0764982cd30529336b2224a1a3151923a66827335363bc38"
+  },
+  {
+    "path": "tests/Support/It/service-identity-concurrency-worker.php",
+    "sha256": "644c40ebeeecbfd3cddc0093f8dc0725ca12b9c77945920346f5113a081ce421"
+  }
+]

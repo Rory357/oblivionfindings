@@ -1,0 +1,20 @@
+[
+  {
+    "token": "it_8121dbdabbe44e71",
+    "passed": 49,
+    "failed": 1,
+    "assertions": 201.0,
+    "execution_seconds": 176.0,
+    "source": "diagnostic event metadata; console summary buffered",
+    "schema_absent_postflight": true
+  },
+  {
+    "token": "it_9aa34fdc38c044f4",
+    "passed": 4,
+    "failed": 0,
+    "assertions": 21.0,
+    "execution_seconds": 170.0,
+    "source": "diagnostic event metadata; console summary buffered",
+    "schema_absent_postflight": true
+  }
+]

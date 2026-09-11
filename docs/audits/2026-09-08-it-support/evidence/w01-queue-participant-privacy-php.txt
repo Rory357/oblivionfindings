@@ -1,0 +1,32 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_1fb42fda601740c1",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketWorkspaceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "s[39m[90m…[39m [90m326.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "sen[39m[90m…[39m [90m7.58s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "una[39m[90m…[39m [90m7.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mparticipant-only technicians receive public ticket projections in every workspace surface with dataset "una[39m[90m…[39m [90m7.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90mread-only IT access does not widen the internal work boundary[39m[90m                                               [39m [90m3.03s[39m  
+
+  [90mTests:[39m    [32;1m5 passed[39;22m[90m (459 assertions)[39m
+  [90mDuration:[39m [39m353.32s[39m
+

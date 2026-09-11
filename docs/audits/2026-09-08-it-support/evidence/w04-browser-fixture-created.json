@@ -1,0 +1,357 @@
+{
+    "guard_passed": true,
+    "mutation_performed": true,
+    "prefix": "ITSupportW04 20260909",
+    "evaluated_at": "2026-09-09T02:11:41+00:00",
+    "existing_records_unchanged": true,
+    "before": {
+        "ticket_hash": "75f2070d0a1429ec12e7e86400422961f03a65c45243f8100b21eb30f58ece12",
+        "policies_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "actor_access_hash": "e711acdfb32ba2c5ec40b921d5f264dba3b4bf0ea9ea413102e8371a11689afb",
+        "sites_hash": "8d048d52c91133d3a58a221120c47e0dfabaa412937b51c029c9c2783b0a1331",
+        "nonfixture_ticket_count": 19
+    },
+    "after": {
+        "ticket_hash": "75f2070d0a1429ec12e7e86400422961f03a65c45243f8100b21eb30f58ece12",
+        "policies_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "actor_access_hash": "e711acdfb32ba2c5ec40b921d5f264dba3b4bf0ea9ea413102e8371a11689afb",
+        "sites_hash": "8d048d52c91133d3a58a221120c47e0dfabaa412937b51c029c9c2783b0a1331",
+        "nonfixture_ticket_count": 19
+    },
+    "aggregate": {
+        "total": 7,
+        "by_state": {
+            "ok": 1,
+            "at_risk": 1,
+            "breached": 1,
+            "met": 1,
+            "paused": 1,
+            "unmeasured": 2
+        },
+        "by_coverage": {
+            "none": 1,
+            "partial": 1,
+            "full": 5
+        },
+        "ever_breached": 1,
+        "clocks": {
+            "first_response": {
+                "by_state": {
+                    "ok": 1,
+                    "at_risk": 1,
+                    "breached": 1,
+                    "met": 2,
+                    "paused": 0,
+                    "unmeasured": 2
+                }
+            },
+            "resolution": {
+                "by_state": {
+                    "ok": 4,
+                    "at_risk": 0,
+                    "breached": 0,
+                    "met": 1,
+                    "paused": 1,
+                    "unmeasured": 1
+                }
+            }
+        },
+        "evaluated_at": "2026-09-09T02:11:41+00:00"
+    },
+    "tickets": [
+        {
+            "id": 20,
+            "reference": "IT-000020",
+            "title": "ITSupportW04 20260909 \u2014 On track",
+            "site_id": 9403,
+            "url": "\/it\/tickets\/20",
+            "version": 2,
+            "verdict": {
+                "state": "ok",
+                "coverage": "full",
+                "ever_breached": false,
+                "evaluated_at": "2026-09-09T02:11:41+00:00",
+                "clocks": {
+                    "first_response": {
+                        "state": "ok",
+                        "reason": null,
+                        "due_at": "2026-09-09T12:11:41+00:00",
+                        "completed_at": null,
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": true,
+                        "paused": false,
+                        "paused_minutes": 0,
+                        "remaining_minutes": 600
+                    },
+                    "resolution": {
+                        "state": "ok",
+                        "reason": null,
+                        "due_at": "2026-09-10T18:11:41+00:00",
+                        "completed_at": null,
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": true,
+                        "paused": false,
+                        "paused_minutes": 0,
+                        "remaining_minutes": 2400
+                    }
+                }
+            },
+            "technician_can_work": true,
+            "requester_can_view": true
+        },
+        {
+            "id": 21,
+            "reference": "IT-000021",
+            "title": "ITSupportW04 20260909 \u2014 Response at risk",
+            "site_id": 9403,
+            "url": "\/it\/tickets\/21",
+            "version": 2,
+            "verdict": {
+                "state": "at_risk",
+                "coverage": "full",
+                "ever_breached": false,
+                "evaluated_at": "2026-09-09T02:11:41+00:00",
+                "clocks": {
+                    "first_response": {
+                        "state": "at_risk",
+                        "reason": null,
+                        "due_at": "2026-09-09T04:11:41+00:00",
+                        "completed_at": null,
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": true,
+                        "paused": false,
+                        "paused_minutes": 0,
+                        "remaining_minutes": 120
+                    },
+                    "resolution": {
+                        "state": "ok",
+                        "reason": null,
+                        "due_at": "2026-09-10T10:11:41+00:00",
+                        "completed_at": null,
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": true,
+                        "paused": false,
+                        "paused_minutes": 0,
+                        "remaining_minutes": 1920
+                    }
+                }
+            },
+            "technician_can_work": true,
+            "requester_can_view": true
+        },
+        {
+            "id": 22,
+            "reference": "IT-000022",
+            "title": "ITSupportW04 20260909 \u2014 Late response retained",
+            "site_id": 9403,
+            "url": "\/it\/tickets\/22",
+            "version": 2,
+            "verdict": {
+                "state": "breached",
+                "coverage": "full",
+                "ever_breached": true,
+                "evaluated_at": "2026-09-09T02:11:41+00:00",
+                "clocks": {
+                    "first_response": {
+                        "state": "breached",
+                        "reason": null,
+                        "due_at": "2026-09-09T00:11:41+00:00",
+                        "completed_at": "2026-09-09T00:21:41+00:00",
+                        "breached_at": "2026-09-09T00:11:41+00:00",
+                        "ever_breached": true,
+                        "policy_recorded": true,
+                        "paused": false,
+                        "paused_minutes": 0,
+                        "remaining_minutes": null
+                    },
+                    "resolution": {
+                        "state": "ok",
+                        "reason": null,
+                        "due_at": "2026-09-10T06:11:41+00:00",
+                        "completed_at": null,
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": true,
+                        "paused": false,
+                        "paused_minutes": 0,
+                        "remaining_minutes": 1680
+                    }
+                }
+            },
+            "technician_can_work": true,
+            "requester_can_view": true
+        },
+        {
+            "id": 23,
+            "reference": "IT-000023",
+            "title": "ITSupportW04 20260909 \u2014 Resolved within both targets",
+            "site_id": 9404,
+            "url": "\/it\/tickets\/23",
+            "version": 2,
+            "verdict": {
+                "state": "met",
+                "coverage": "full",
+                "ever_breached": false,
+                "evaluated_at": "2026-09-09T02:11:41+00:00",
+                "clocks": {
+                    "first_response": {
+                        "state": "met",
+                        "reason": null,
+                        "due_at": "2026-09-09T10:11:41+00:00",
+                        "completed_at": "2026-09-09T00:41:41+00:00",
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": true,
+                        "paused": false,
+                        "paused_minutes": 0,
+                        "remaining_minutes": null
+                    },
+                    "resolution": {
+                        "state": "met",
+                        "reason": null,
+                        "due_at": "2026-09-10T16:11:41+00:00",
+                        "completed_at": "2026-09-09T01:11:41+00:00",
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": true,
+                        "paused": false,
+                        "paused_minutes": 0,
+                        "remaining_minutes": null
+                    }
+                }
+            },
+            "technician_can_work": true,
+            "requester_can_view": true
+        },
+        {
+            "id": 24,
+            "reference": "IT-000024",
+            "title": "ITSupportW04 20260909 \u2014 Waiting for requester",
+            "site_id": 9404,
+            "url": "\/it\/tickets\/24",
+            "version": 2,
+            "verdict": {
+                "state": "paused",
+                "coverage": "full",
+                "ever_breached": false,
+                "evaluated_at": "2026-09-09T02:11:41+00:00",
+                "clocks": {
+                    "first_response": {
+                        "state": "met",
+                        "reason": null,
+                        "due_at": "2026-09-09T10:11:41+00:00",
+                        "completed_at": "2026-09-09T00:41:41+00:00",
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": true,
+                        "paused": false,
+                        "paused_minutes": 0,
+                        "remaining_minutes": null
+                    },
+                    "resolution": {
+                        "state": "paused",
+                        "reason": null,
+                        "due_at": "2026-09-10T17:11:41+00:00",
+                        "completed_at": null,
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": true,
+                        "paused": true,
+                        "paused_minutes": 60,
+                        "remaining_minutes": 2340
+                    }
+                }
+            },
+            "technician_can_work": true,
+            "requester_can_view": true
+        },
+        {
+            "id": 25,
+            "reference": "IT-000025",
+            "title": "ITSupportW04 20260909 \u2014 No historical clocks recorded",
+            "site_id": 9404,
+            "url": "\/it\/tickets\/25",
+            "version": 2,
+            "verdict": {
+                "state": "unmeasured",
+                "coverage": "none",
+                "ever_breached": false,
+                "evaluated_at": "2026-09-09T02:11:41+00:00",
+                "clocks": {
+                    "first_response": {
+                        "state": "unmeasured",
+                        "reason": "clock_not_recorded",
+                        "due_at": null,
+                        "completed_at": null,
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": false,
+                        "paused": false,
+                        "paused_minutes": null,
+                        "remaining_minutes": null
+                    },
+                    "resolution": {
+                        "state": "unmeasured",
+                        "reason": "clock_not_recorded",
+                        "due_at": null,
+                        "completed_at": null,
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": false,
+                        "paused": false,
+                        "paused_minutes": null,
+                        "remaining_minutes": null
+                    }
+                }
+            },
+            "technician_can_work": true,
+            "requester_can_view": true
+        },
+        {
+            "id": 26,
+            "reference": "IT-000026",
+            "title": "ITSupportW04 20260909 \u2014 Response clock not recorded",
+            "site_id": 9404,
+            "url": "\/it\/tickets\/26",
+            "version": 2,
+            "verdict": {
+                "state": "unmeasured",
+                "coverage": "partial",
+                "ever_breached": false,
+                "evaluated_at": "2026-09-09T02:11:41+00:00",
+                "clocks": {
+                    "first_response": {
+                        "state": "unmeasured",
+                        "reason": "clock_not_recorded",
+                        "due_at": null,
+                        "completed_at": null,
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": true,
+                        "paused": false,
+                        "paused_minutes": null,
+                        "remaining_minutes": null
+                    },
+                    "resolution": {
+                        "state": "ok",
+                        "reason": null,
+                        "due_at": "2026-09-10T18:11:41+00:00",
+                        "completed_at": null,
+                        "breached_at": null,
+                        "ever_breached": false,
+                        "policy_recorded": true,
+                        "paused": false,
+                        "paused_minutes": 0,
+                        "remaining_minutes": 2400
+                    }
+                }
+            },
+            "technician_can_work": true,
+            "requester_can_view": true
+        }
+    ]
+}

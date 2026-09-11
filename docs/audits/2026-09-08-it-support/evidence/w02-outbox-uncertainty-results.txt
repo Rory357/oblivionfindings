@@ -1,0 +1,36 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_98c2093095974a56",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketNotificationOutboxTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma committed intent survives a lost post-response dispatch and drains only once[39m[90m                            [39m [90m301.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnotification intent persistence failure rolls back the entire ticket command[39m[90m                                [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpending intent checks revoked access before either channel executes[39m[90m                                         [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery does not repeat accepted uncertain or failed provider attempts with ('accepted')[39m[90m                   [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery does not repeat accepted uncertain or failed provider attempts with ('sending')[39m[90m                    [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery does not repeat accepted uncertain or failed provider attempts with ('failed')[39m[90m                     [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery skips a database channel already persisted before interruption[39m[90m                                     [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma transport exception after sending starts stays uncertain until provider reconciliation[39m[90m                    [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma contending dispatcher leaves an intent pending for the lock owner[39m[90m                                         [39m [90m0.15s[39m  
+
+  [90mTests:[39m    [32;1m9 passed[39;22m[90m (54 assertions)[39m
+  [90mDuration:[39m [39m302.47s[39m
+

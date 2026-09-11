@@ -1,0 +1,38 @@
+[
+  {
+    "sha256": "0a1b9a6583e7edd03c1db2c34e7429feaec62d52626db6f1508f01939b78c54d",
+    "path": "app/Domain/It/Services/ItAutomationRunOutcome.php"
+  },
+  {
+    "sha256": "b87d2088079fa889e76f96bfba72d21c6d5b2bb1caa2883a234d63de11a597e8",
+    "path": "app/Domain/It/Services/ItAutomationScheduleCatalog.php"
+  },
+  {
+    "sha256": "679ecf60c14d550cc7d867f8768b0588913ae6e3cf55103a65e426224fb56d63",
+    "path": "app/Domain/It/Services/ItAutomationOperationsPresenter.php"
+  },
+  {
+    "sha256": "84f570acc4c8f9f10b93418cab6306a2cc0e6b65a6c8e7e95c4fbd4676a3ce67",
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php"
+  },
+  {
+    "sha256": "739f5e66eacb375f274ff28e83cb11830419378b5daf3d4fc604de989d388f86",
+    "path": "tests/Feature/It/ItServiceOperationsTest.php"
+  },
+  {
+    "sha256": "99b82eaf51ebb0c3ebb2b94fffaf09eb64ac4bd9bf6224f51928efab89c880bb",
+    "path": "resources/js/pages/it/setup/index.tsx"
+  },
+  {
+    "sha256": "de23660d655b7f2e64323bf4e9cd632e0402ca18a02156cf620c332d473cbd5b",
+    "path": "resources/js/pages/it/setup/setup-workspace.test.tsx"
+  },
+  {
+    "sha256": "905bb186e9d0291c6426c838fa522d8ea84fe6367460ecf2dae20c6824965f4d",
+    "path": "resources/js/components/it/it-automation-history.tsx"
+  },
+  {
+    "sha256": "82995d309b693bfa898b48e6105044d908f3d93b4c8720614f9c1ec5f84c9273",
+    "path": "resources/js/components/it/it-automation-history.test.tsx"
+  }
+]

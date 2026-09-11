@@ -1,0 +1,53 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_03000e7f535d409e",
+    "database_mutations_performed": false
+}
+{"phase":"diagnostic_enabled","path":"C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\audits\\2026-09-08-it-support\\evidence\\it_03000e7f535d409e.diagnostic.jsonl"}
+
+Fatal error: Uncaught Error: Interface "PHPUnit\Event\Tracer" not found in C:\Users\steph\Herd\oblivionfindings\docs\audits\2026-09-08-it-support\evidence\isolated-test-diagnostic.php:76
+Stack trace:
+#0 {main}
+  thrown in C:\Users\steph\Herd\oblivionfindings\docs\audits\2026-09-08-it-support\evidence\isolated-test-diagnostic.php on line 76
+PHP Fatal error:  Uncaught Error: Interface "PHPUnit\Event\Tracer" not found in C:\Users\steph\Herd\oblivionfindings\docs\audits\2026-09-08-it-support\evidence\isolated-test-diagnostic.php:76
+Stack trace:
+#0 {main}
+  thrown in C:\Users\steph\Herd\oblivionfindings\docs\audits\2026-09-08-it-support\evidence\isolated-test-diagnostic.php on line 76
+{"phase":"focused_tests_finished","exit_code":255}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_03000e7f535d409e",
+    "database_mutations_performed": false
+}

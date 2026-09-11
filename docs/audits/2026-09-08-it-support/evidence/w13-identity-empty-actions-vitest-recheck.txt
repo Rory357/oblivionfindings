@@ -1,0 +1,10 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+Not implemented: navigation to another Document
+
+ Test Files  3 passed (3)
+      Tests  23 passed (23)
+   Start at  17:13:04
+   Duration  41.65s (transform 1.25s, setup 6.78s, import 54.93s, tests 6.84s, environment 49.74s)
+

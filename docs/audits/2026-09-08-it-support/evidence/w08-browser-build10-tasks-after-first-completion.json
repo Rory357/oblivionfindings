@@ -1,0 +1,172 @@
+{
+    "observed_at": "2026-09-09T12:05:01+00:00",
+    "token": "b972632227dd4b91",
+    "database": "oblivion_it_draft_browser_b972632227dd4b91",
+    "tickets": {
+        "elapsed_ms": 0.36,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 4,
+                "status": "open"
+            },
+            {
+                "id": 4,
+                "lock_version": 1,
+                "status": "open"
+            }
+        ]
+    },
+    "tasks": {
+        "elapsed_ms": 10.11,
+        "rows": [
+            {
+                "id": 1,
+                "ticket_id": 1,
+                "team_id": null,
+                "assigned_to_user_id": 3,
+                "status": "completed",
+                "is_required": 1,
+                "evidence_required": 1,
+                "due_at": "2026-09-10 09:30:00",
+                "sort_order": 10,
+                "completed_by_user_id": 3,
+                "completed_at": "2026-09-10 00:04:07",
+                "title_sha256": "24023928c763812876fd20f9667932909b5f24e83ba12805e5e020ca2b8a8200",
+                "description_sha256": "1da82272811405aed76a19146e6e1308d921ee2be586f9df0b5fb066d241d1b2",
+                "completion_note_sha256": "d74e9488d48973a96246c829db48d3e415e3d90d51d81309743fa37d4f4aa151",
+                "evidence_sha256": "e8a6d1d5b96cd5f32c3dad347e30994adcf52f6f8053091ab069b804a2b20f88",
+                "evidence_count": 1
+            },
+            {
+                "id": 2,
+                "ticket_id": 1,
+                "team_id": null,
+                "assigned_to_user_id": 4,
+                "status": "pending",
+                "is_required": 1,
+                "evidence_required": 0,
+                "due_at": null,
+                "sort_order": 20,
+                "completed_by_user_id": null,
+                "completed_at": null,
+                "title_sha256": "f854af8a883e3fa6390d8f821aadb01110e8d91c7dae8dc0d8e4d6963ff62aaa",
+                "description_sha256": "bc7b057bd81f4c32a31e2cf69e6d08cc28ededbfb50399d9bd5f7d96e78adadc",
+                "completion_note_sha256": null,
+                "evidence_sha256": null,
+                "evidence_count": null
+            }
+        ]
+    },
+    "dependencies": {
+        "elapsed_ms": 0.23,
+        "rows": [
+            {
+                "task_id": 2,
+                "depends_on_task_id": 1
+            }
+        ]
+    },
+    "receipts": {
+        "elapsed_ms": 0.2,
+        "rows": [
+            {
+                "id": 1,
+                "actor_user_id": 3,
+                "operation": "task.create",
+                "request_uuid": "3f7348d3-596e-408c-830f-a0d3acf11328",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 2,
+                "committed_at": "2026-09-10 00:01:02",
+                "result_state": "committed",
+                "task_id": "1"
+            },
+            {
+                "id": 2,
+                "actor_user_id": 3,
+                "operation": "task.create",
+                "request_uuid": "7680bb9c-2e4e-4f0c-bfea-97066c4694ca",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 3,
+                "committed_at": "2026-09-10 00:03:03",
+                "result_state": "committed",
+                "task_id": "2"
+            },
+            {
+                "id": 3,
+                "actor_user_id": 3,
+                "operation": "task.complete",
+                "request_uuid": "0c9d5994-e1f6-4f6d-a625-0725ceb63391",
+                "it_ticket_id": 1,
+                "committed_ticket_version": 4,
+                "committed_at": "2026-09-10 00:04:07",
+                "result_state": "committed",
+                "task_id": "1"
+            }
+        ]
+    },
+    "events": {
+        "elapsed_ms": 0.23,
+        "rows": [
+            {
+                "id": 1,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_created",
+                "created_at": "2026-09-09 12:01:02",
+                "task_id": "1",
+                "payload_sha256": "6243095e21784a07bf669cc913753cf9eb1100a03de19d0401673518f34b9845"
+            },
+            {
+                "id": 2,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_created",
+                "created_at": "2026-09-09 12:03:03",
+                "task_id": "2",
+                "payload_sha256": "4ddaf44b2dc81471d903b0b399f82f98398cb809fd2473f314fa2af1dd81e2f3"
+            },
+            {
+                "id": 3,
+                "subject_id": 1,
+                "actor_user_id": 3,
+                "type": "work_task_completed",
+                "created_at": "2026-09-09 12:04:07",
+                "task_id": "1",
+                "payload_sha256": "5451b89753d267cbb793b6f7d8e69254c2c055b4f7b0b33d64b6770c5f1ccd95"
+            }
+        ]
+    },
+    "audits": {
+        "elapsed_ms": 0.23,
+        "rows": [
+            {
+                "id": 16,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.created",
+                "created_at": "2026-09-10 00:01:02",
+                "meta_sha256": "15c49473759247154f8dd4f0f091a338e0ba2a189d4477ee3dfa3b28e69e64d4"
+            },
+            {
+                "id": 18,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.created",
+                "created_at": "2026-09-10 00:03:03",
+                "meta_sha256": "2b01866a58e3ddf60f82ea4fecb582ad3f70d932e441d61995c7494328c47117"
+            },
+            {
+                "id": 20,
+                "user_id": 3,
+                "auditable_id": 1,
+                "action": "it.ticket.task.completed",
+                "created_at": "2026-09-10 00:04:07",
+                "meta_sha256": "63e26f9d4c947840170dfb739dfade176f652971a7f8be86b67a144a171c3f44"
+            }
+        ]
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false
+}

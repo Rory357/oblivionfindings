@@ -1,0 +1,129 @@
+{
+    "ready": true,
+    "created_at": "2026-09-09T22:09:28+00:00",
+    "database": "oblivion_it_draft_browser_06eacb4368dd44d0",
+    "registry_count": 1005,
+    "fixtures": {
+        "sites": {
+            "a": 1,
+            "b": 2,
+            "c": 3
+        },
+        "actors": {
+            "requester": {
+                "id": 1,
+                "login": "w06-requester@demo.test"
+            },
+            "other": {
+                "id": 2,
+                "login": "w06-other@demo.test"
+            },
+            "tech": {
+                "id": 3,
+                "login": "w06-tech@demo.test"
+            },
+            "restricted": {
+                "id": 4,
+                "login": "w06-restricted@demo.test"
+            },
+            "cover": {
+                "id": 5,
+                "login": "w06-cover@demo.test"
+            },
+            "absent": {
+                "id": 6,
+                "login": "w06-absent@demo.test"
+            }
+        },
+        "permissions": {
+            "requester": [
+                "it.request"
+            ],
+            "other": [
+                "it.request"
+            ],
+            "tech": [
+                "it.request",
+                "it.view",
+                "it.manage",
+                "it.viewSensitive"
+            ],
+            "restricted": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ],
+            "cover": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ],
+            "absent": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ]
+        },
+        "tickets": {
+            "public_workspace": {
+                "id": 1,
+                "reference": "IT-000001"
+            },
+            "sensitive_participant": {
+                "id": 2,
+                "reference": "IT-000002"
+            },
+            "unapproved_site": {
+                "id": 3,
+                "reference": "IT-000003"
+            },
+            "resolve_workspace": {
+                "id": 4,
+                "reference": "IT-000004"
+            },
+            "approval_workspace": {
+                "id": 5,
+                "reference": "IT-000005"
+            },
+            "approval_history": {
+                "id": 6,
+                "reference": "IT-000006"
+            }
+        },
+        "approval_history_ids": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+        ],
+        "synthetic_approved_leave_id": 1,
+        "retention_is_synthetic_only": true
+    },
+    "drafts_enabled": true,
+    "synthetic_retention_days": [
+        2,
+        3
+    ],
+    "provider_configuration_checks": {
+        "mailboxes_absent": true,
+        "app_settings_absent": true,
+        "service_providers_cleared": true
+    }
+}
+{
+  "started": true,
+  "token": "06eacb4368dd44d0",
+  "database": "oblivion_it_draft_browser_06eacb4368dd44d0",
+  "pid": 43616,
+  "url": "http://127.0.0.1:8766",
+  "root": "C:\\Users\\steph\\Herd\\oblivionfindings\\storage\\framework\\testing\\it-draft-browser-06eacb4368dd44d0",
+  "browser_verified": false
+}

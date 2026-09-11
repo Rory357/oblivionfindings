@@ -22,6 +22,8 @@ class ItTicketComment extends Model
         'author_user_id',
         'body',
         'is_internal',
+        'speaker_side',
+        'source_channel',
     ];
 
     protected $casts = [

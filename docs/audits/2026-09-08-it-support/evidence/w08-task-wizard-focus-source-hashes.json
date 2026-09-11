@@ -1,0 +1,22 @@
+[
+  {
+    "path": "resources/js/components/it/ticket-work-task-wizard.tsx",
+    "sha256": "dac328603bcd3e67538c9dd500c7576fa28c1433f0598ff5882f8246a7aa3fef"
+  },
+  {
+    "path": "resources/js/components/wizard/shell.tsx",
+    "sha256": "9c6cd35fc0e8f2162b811f6dc8775b823f3a94658dc6d8c051d2f7d5991cfe04"
+  },
+  {
+    "path": "resources/js/components/it/__tests__/ticket-work-task-wizard-focus.test.tsx",
+    "sha256": "2af386aae9dbfc8aba68f140d3fbf0e757eb34dc10b9adea1cc441fb7a76c9ed"
+  },
+  {
+    "path": "resources/js/components/wizard/shell-focus.test.tsx",
+    "sha256": "dc2fc3f0299d10b8d707eb9c59a18126f27fdb61c1a2867c74083b0bef724493"
+  },
+  {
+    "path": "resources/js/components/wizard/shell.test.tsx",
+    "sha256": "198c9aa2532ea4617213fd1c77921f675a070f696bfc0ae52ebfbbbd9a19587d"
+  }
+]

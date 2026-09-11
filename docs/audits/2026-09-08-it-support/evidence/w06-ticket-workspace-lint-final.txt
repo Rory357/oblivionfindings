@@ -1,0 +1,2 @@
+npm notice run npx
+npm notice run eslint resources/js/pages/it/tickets/show.tsx resources/js/pages/it/tickets/show.test.tsx resources/js/components/it/ticket-workspace-header.tsx resources/js/components/it/ticket-thread.tsx resources/js/components/page/page-header.tsx resources/js/components/page/grouped-profile-nav.tsx resources/js/test/page-grouped-profile-nav.test.tsx

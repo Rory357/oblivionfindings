@@ -1,7 +1,9 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItSlaClockService;
 use App\Models\AuditLog;
+use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\Site;
@@ -72,7 +74,8 @@ test('resolving requires a note and posts it as the final public reply', functio
     expect($ticket->fresh()->status)->toBe('in_progress');
 
     $this->actingAs($this->hr)
-        ->post("/it/tickets/{$ticket->id}/resolve", [
+        ->post("/it/tickets/{$ticket->id}/resolve", ['resolution_code' => 'restored', 'resolution_verification' => 'Synthetic verification confirmed the expected result.',
+            'expected_version' => $ticket->fresh()->lock_version,
             'note' => 'Swapped the SIM — data working again.',
         ])
         ->assertRedirect()
@@ -85,8 +88,13 @@ test('resolving requires a note and posts it as the final public reply', functio
 
     // The note is the last PUBLIC comment on the thread.
     $last = $ticket->comments()->orderByDesc('id')->first();
-    expect($last->body)->toBe('Swapped the SIM — data working again.');
+    expect($last->body)->toBe("Swapped the SIM — data working again.\n\nHow it was checked: Synthetic verification confirmed the expected result.");
     expect($last->is_internal)->toBeFalse();
+    expect($last->speaker_side)->toBe('it')
+        ->and($last->source_channel)->toBe('browser')
+        ->and($ticket->last_public_comment_id)->toBe($last->id)
+        ->and($ticket->last_public_speaker_side)->toBe('it')
+        ->and($ticket->next_response_party)->toBe('requester');
     expect($ticket->events()->where('type', 'resolved')->count())->toBe(1)
         ->and(AuditLog::query()
             ->where('action', 'it.work.transitioned')
@@ -113,6 +121,20 @@ test('resolving requires a note and posts it as the final public reply', functio
     Notification::assertNotSentTo($this->hr, TicketResolvedNotification::class);
 });
 
+test('an IT requester resolving their own ticket does not manufacture a technician response', function () {
+    Notification::fake();
+    $ticket = lifecycleTicket(['requester_user_id' => $this->hr->id, 'first_responded_at' => null]);
+    $this->actingAs($this->hr)->post('/it/tickets/'.$ticket->id.'/resolve', ['resolution_code' => 'restored', 'resolution_verification' => 'Synthetic verification confirmed the expected result.',
+        'expected_version' => $ticket->lock_version, 'note' => 'I corrected and checked my own local issue.',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    $saved = $ticket->fresh();
+    expect($saved->status)->toBe('resolved')->and($saved->first_responded_at)->toBeNull()
+        ->and($saved->last_public_speaker_side)->toBe('requester')
+        ->and($saved->comments()->sole()->speaker_side)->toBe('requester')
+        ->and($saved->comments()->sole()->source_channel)->toBe('browser')
+        ->and($saved->events()->where('type', 'first_response_recorded')->count())->toBe(0);
+});
+
 test('the notify toggle silences the requester but never the watchers', function () {
     Notification::fake();
     $watcher = itLifecycleUser('hr');
@@ -121,7 +143,8 @@ test('the notify toggle silences the requester but never the watchers', function
     $ticket->watchers()->attach($watcher->id);
 
     $this->actingAs($this->hr)
-        ->post("/it/tickets/{$ticket->id}/resolve", [
+        ->post("/it/tickets/{$ticket->id}/resolve", ['resolution_code' => 'restored', 'resolution_verification' => 'Synthetic verification confirmed the expected result.',
+            'expected_version' => $ticket->fresh()->lock_version,
             'note' => 'Fixed quietly.',
             'notify_requester' => false,
         ])
@@ -131,18 +154,22 @@ test('the notify toggle silences the requester but never the watchers', function
     Notification::assertSentTo($watcher, TicketResolvedNotification::class);
 });
 
-test('resolving inside the resolution target marks the SLA met', function () {
+test('resolution met requires both clock measurements before the overall SLA is met', function (bool $completeCoverage) {
+    $policy = (new ItSlaPolicy)->forceFill(['first_response_minutes' => 60, 'resolution_minutes' => 240]);
     $ticket = lifecycleTicket([
         'requester_user_id' => $this->worker->id,
         'resolution_due_at' => now()->addHours(4),
+        'first_response_due_at' => $completeCoverage ? now()->addHour() : null,
+        'sla_policy_snapshot' => $completeCoverage ? app(ItSlaClockService::class)->policySnapshot('normal', $policy, now()) : null,
     ]);
 
     $this->actingAs($this->hr)
-        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Done inside target.'])
+        ->post("/it/tickets/{$ticket->id}/resolve", ['resolution_code' => 'restored', 'resolution_verification' => 'Synthetic verification confirmed the expected result.', 'expected_version' => $ticket->fresh()->lock_version, 'note' => 'Done inside target.'])
         ->assertRedirect();
 
-    expect($ticket->fresh()->sla_state)->toBe('met');
-});
+    expect($ticket->fresh()->sla_state)->toBe($completeCoverage ? 'met' : 'unmeasured')
+        ->and(app(ItSlaClockService::class)->verdict($ticket->fresh(), now())['clocks']['resolution']['state'])->toBe('met');
+})->with([true, false]);
 
 test('close requires a reason records it once and reopen brings the ticket back with a bump', function () {
     Notification::fake();
@@ -166,6 +193,7 @@ test('close requires a reason records it once and reopen brings the ticket back 
 
     $this->actingAs($this->hr)
         ->post("/it/tickets/{$ticket->id}/close", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'reason' => 'Requester confirmed the restored service.',
         ])
         ->assertRedirect();
@@ -183,6 +211,7 @@ test('close requires a reason records it once and reopen brings the ticket back 
 
     $this->actingAs($this->hr)
         ->post("/it/tickets/{$ticket->id}/close", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'reason' => 'A stale repeated close.',
         ])
         ->assertSessionHas('error', 'This ticket is already closed.');
@@ -199,6 +228,7 @@ test('close requires a reason records it once and reopen brings the ticket back 
     // Agent reopen: back to open, internal evidence recorded, responsible staff notified.
     $this->actingAs($this->hr)
         ->post("/it/tickets/{$ticket->id}/reopen", [
+            'expected_version' => $ticket->fresh()->lock_version,
             'reason' => 'Monitoring shows the service failed again after validation.',
         ])
         ->assertRedirect();
@@ -213,6 +243,9 @@ test('close requires a reason records it once and reopen brings the ticket back 
         ->and($ticket->comments()->latest('id')->first()->body)
         ->toBe('Monitoring shows the service failed again after validation.')
         ->and($ticket->comments()->latest('id')->first()->is_internal)->toBeTrue()
+        ->and($ticket->comments()->latest('id')->first()->speaker_side)->toBe('it')
+        ->and($ticket->comments()->latest('id')->first()->source_channel)->toBe('browser')
+        ->and($ticket->last_public_comment_id)->toBeNull()
         ->and(AuditLog::query()
             ->where('action', 'it.ticket.reopened')
             ->where('auditable_type', $ticket->getMorphClass())
@@ -252,10 +285,16 @@ test('requesters can reopen within seven days, not after', function () {
 
     $this->actingAs($this->worker)
         ->post("/it/tickets/{$inside->id}/reopen", [
+            'expected_version' => $inside->fresh()->lock_version,
             'reason' => 'The same fault returned when I signed in again.',
         ])
         ->assertRedirect();
     expect($inside->fresh()->status)->toBe('open');
+    expect($inside->fresh()->last_public_comment_id)->toBe($inside->comments()->latest('id')->first()->id)
+        ->and($inside->fresh()->last_public_speaker_side)->toBe('requester')
+        ->and($inside->fresh()->next_response_party)->toBe('it')
+        ->and($inside->comments()->latest('id')->first()->speaker_side)->toBe('requester')
+        ->and($inside->comments()->latest('id')->first()->source_channel)->toBe('browser');
     expect((int) $inside->fresh()->reopened_count)->toBe(1)
         ->and($inside->comments()->latest('id')->first()->body)
         ->toBe('The same fault returned when I signed in again.')
@@ -274,10 +313,47 @@ test('requesters can reopen within seven days, not after', function () {
 
     $this->actingAs($this->worker)
         ->post("/it/tickets/{$outside->id}/reopen", [
+            'expected_version' => $outside->fresh()->lock_version,
             'reason' => 'The fault returned outside the allowed reopen window.',
         ])
         ->assertForbidden();
     expect($outside->fresh()->status)->toBe('resolved');
+});
+
+test('personal list reply and reopen controls respect settlement participant audience and the reopen window', function () {
+    $recent = lifecycleTicket(['requester_user_id' => $this->worker->id, 'status' => 'resolved', 'resolved_at' => now()->subDay()]);
+    $expired = lifecycleTicket(['requester_user_id' => $this->worker->id, 'status' => 'resolved', 'resolved_at' => now()->subDays(9)]);
+    $requestedFor = lifecycleTicket([
+        'requester_user_id' => $this->hr->id, 'requested_for_user_id' => $this->worker->id,
+        'status' => 'resolved', 'resolved_at' => now()->subDay(),
+    ]);
+    $open = lifecycleTicket(['requester_user_id' => $this->worker->id, 'status' => 'open']);
+    $merged = lifecycleTicket(['requester_user_id' => $this->worker->id, 'status' => 'open', 'merged_into_ticket_id' => $open->id]);
+    $this->actingAs($this->worker)->get('/it?tab=my-tickets')->assertOk()
+        ->assertInertia(fn ($page) => $page->has('myTickets', 5)->where('myTickets', function ($rows) use ($recent, $expired, $requestedFor, $open, $merged): bool {
+            $rows = collect($rows)->keyBy('id');
+
+            return $rows[$recent->id]['can_reopen'] === true && $rows[$recent->id]['can_reply'] === false
+                && $rows[$expired->id]['can_reopen'] === false && $rows[$expired->id]['can_reply'] === false
+                && $rows[$requestedFor->id]['can_reopen'] === false && $rows[$requestedFor->id]['can_reply'] === false
+                && $rows[$open->id]['can_reopen'] === false && $rows[$open->id]['can_reply'] === true
+                && $rows[$merged->id]['can_reopen'] === false && $rows[$merged->id]['can_reply'] === false;
+        }));
+    $this->post("/it/tickets/{$requestedFor->id}/reopen", ['expected_version' => $requestedFor->lock_version, 'reason' => 'Cannot reopen on behalf of the requester.'])
+        ->assertForbidden();
+    expect($requestedFor->fresh()->status)->toBe('resolved')->and($requestedFor->events()->count())->toBe(0);
+
+    $sensitive = lifecycleTicket(['requester_user_id' => $this->hr->id, 'is_sensitive' => true, 'status' => 'resolved', 'resolved_at' => now()->subDay()]);
+    $this->actingAs($this->hr)->get('/it?tab=my-tickets')->assertOk()->assertInertia(fn ($page) => $page
+        ->where('myTickets', fn ($rows): bool => collect($rows)->firstWhere('id', $sensitive->id)['can_reopen'] === true));
+    // The IT role does not extend participant-only access beyond the ordinary
+    // requester window or grant private work rights.
+    $sensitive->forceFill(['resolved_at' => now()->subDays(8)])->save();
+    $this->getJson('/it/tickets/'.$sensitive->id)->assertOk()
+        ->assertJsonPath('can.manage', false)->assertJsonPath('can.reopen', false);
+    $this->post('/it/tickets/'.$sensitive->id.'/reopen', [
+        'expected_version' => $sensitive->fresh()->lock_version, 'reason' => 'The requester window has expired.',
+    ])->assertForbidden();
 });
 
 test('the auto-close command sweeps tickets past the reopen window', function () {

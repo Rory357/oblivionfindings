@@ -3,6 +3,7 @@
 namespace App\Http\Requests\It;
 
 use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
+use App\Http\Requests\It\Concerns\ValidatesItApprovalCommand;
 use App\Models\ItTicketApproval;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -12,11 +13,14 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class DecideApprovalRequest extends FormRequest
 {
-    use ConcealsInaccessibleItWork;
+    use ConcealsInaccessibleItWork, ValidatesItApprovalCommand;
 
     public function authorize(): bool
     {
         $approval = $this->workableApprovalOrNotFound();
+        if ($this->route('ticket') !== null) {
+            abort_unless((int) $approval->it_ticket_id === (int) $this->route('ticket')->id, 404);
+        }
 
         return (bool) ($approval instanceof ItTicketApproval && $this->user()?->canDo('it.manage'));
     }
@@ -27,6 +31,7 @@ class DecideApprovalRequest extends FormRequest
     public function rules(): array
     {
         return [
+            ...$this->approvalCommandRules(),
             'decision' => ['required', 'in:approve,reject'],
             'reason' => ['required_if:decision,reject', 'nullable', 'string', 'max:1000'],
         ];

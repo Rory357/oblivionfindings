@@ -1,0 +1,74 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_f6a181398dfb408a",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItBrowserActorBindingTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma new login cannot submit the previous actors create edit or resolution buffer while drafts are disabled[39m[90m  [39m [90m171.48s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmatching current actor commits and command recovery acknowledge that viewer[39m[90m                                 [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmalformed supplied actor bindings fail closed without coercing them to a current login with (null)[39m[90m          [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmalformed supplied actor bindings fail closed without coercing them to a current login with (true)[39m[90m          [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmalformed supplied actor bindings fail closed without coercing them to a current login with ([1])[39m[90m           [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmalformed supplied actor bindings fail closed without coercing them to a current login with ('1e0')[39m[90m         [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmalformed supplied actor bindings fail closed without coercing them to a current login with (0)[39m[90m             [39m [90m0.68s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketCommandTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma browser retry returns the same committed ticket without duplicate activity or notifications[39m[90m               [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mchanged command content conflicts without changing the saved ticket[39m[90m                                         [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery is actor owned and returns only a current authorized reference[39m[90m                                     [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery and conflicting replays distinguish only an owned command whose record is unavailable with ('inacc[39m[90m…[39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery and conflicting replays distinguish only an owned command whose record is unavailable with ('unlin[39m[90m…[39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid input does not reserve the command identity and can be corrected safely[39m[90m                             [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy browser submissions remain compatible while newly served forms adopt command identities[39m[90m              [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnormalized identifiers and watcher ordering do not create false conflicts[39m[90m                                   [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mattachment fingerprints reject replacement content under the same request identity[39m[90m                          [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket audit attachments and command receipt roll back together if the binding cannot persist[39m[90m               [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnotification dispatch failure preserves a successful committed response and a recoverable intent[39m[90m            [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe database rejects a duplicate actor channel and operation command binding[39m[90m                                [39m [90m0.63s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketDraftTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (false, 2, 3)[39m[90m               [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, null, 3)[39m[90m             [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, 2, null)[39m[90m             [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft storage stays disabled until both retention decisions are configured with (true, '1.5', 3)[39m[90m            [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft metadata never hydrates private fields and explicit resume decrypts only the owner content[39m[90m            [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown foreign and inaccessible draft identities disclose the same safe response[39m[90m                           [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic and internal drafts stay separate and participant status never grants internal recovery[39m[90m              [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mold Site bindings are checked before cleared fields or an accessible replacement can be saved[39m[90m               [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcurrent role and account approval are rechecked despite a retained service actor[39m[90m                            [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90midentical lost acknowledgement retries return the saved revision but changed stale text conflicts[39m[90m           [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdiscard is revision aware idempotent and a fresh generation cannot be changed by delayed old requests[39m[90m       [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90msettled workflow and changed ticket version block submission without destroying authorized text[39m[90m             [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcommitted intake receipt suspends draft changes and points only to canonical recovery[39m[90m                       [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconsumption shares the canonical transaction and rollback restores the draft[39m[90m                                [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexpired private contents cannot resume or save and expiration never resets the generation silently[39m[90m          [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid partial payloads never flash into session and unexpected failures return no private debug data[39m[90m      [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90munauthenticated and missing-route draft responses remain uncached JSON[39m[90m                                      [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical ticket creation consumes exactly its submitted draft and receipt replay does not repeat consumpti[39m[90m…[39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstale draft or rejected canonical intake leaves no new receipt ticket or scrubbed content[39m[90m                   [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical edit rejects stale draft revisions then consumes only the confirmed version in its transaction[39m[90m    [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfailed canonical resolution rolls back draft consumption and a valid retry resolves with its public note[39m[90m    [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhub and ticket drawer advertise only effectively configured draft recovery without creating a slot with (fa[39m[90m…[39m [90m2.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhub and ticket drawer advertise only effectively configured draft recovery without creating a slot with (tr[39m[90m…[39m [90m2.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhub and ticket drawer advertise only effectively configured draft recovery without creating a slot with (tr[39m[90m…[39m [90m2.76s[39m  
+
+  [90mTests:[39m    [32;1m43 passed[39;22m[90m (460 assertions)[39m
+  [90mDuration:[39m [39m207.86s[39m
+

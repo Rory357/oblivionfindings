@@ -1,0 +1,12 @@
+{
+  "app/Domain/It/Services/ItTicketMergeService.php": "2808b74bf5d2a39e2a09d4d1c5b7c18b2b2660fdec02f308af22af25499f9913",
+  "app/Http/Requests/It/PreviewTicketMergeRequest.php": "96500b04e30f9d19243e6e0677392544cefa21e3b69c7c8d0e23393bfc7d3ddd",
+  "app/Http/Controllers/It/ItTicketController.php": "1d791685aa3b8ef393230892883d6013f87910fdf4df40e80c423fc50a123669",
+  "routes/web.php": "6a60de62204dc097ab50be43fd39c752bc95649ea124d61839151282f4dbde33",
+  "tests/Feature/It/ItTicketMergeTest.php": "a925f695945b83d809edb7cf98965eb0ff01f4d30100e318a268bd80f41da5eb",
+  "resources/js/hooks/it-ticket-merge-preview.ts": "2e293437665015979592cf21a7ade7b8a951ba98dd3887b90068c2b5ce37f071",
+  "resources/js/hooks/it-ticket-merge-preview.test.ts": "095ff8d1b7d9871b3fff62bb36d38776df129f90170820c0d523a5516d2f0901",
+  "resources/js/hooks/use-it-ticket-merge-preview.ts": "31802acdfa3642ac6a757fc4c5b74cd1ed209bc87257353e2ec44d5cac953c7c",
+  "resources/js/hooks/use-it-ticket-merge-preview.test.tsx": "d36c643a84f1a1f4b7dddbe5cd43790c051136b219cd83ebf7cd2b6dac04178a",
+  "resources/js/components/it/__tests__/ticket-reply-draft-integration.test.tsx": "3736b4c63d692a1984e181011b2a095ee836b3a9ced8e9d1eb8820e4955258e2"
+}

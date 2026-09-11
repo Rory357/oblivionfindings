@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\It\Concerns;
 
-use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItKbAccessService;
+use App\Domain\It\Services\ItLinkedContextOptions;
+use App\Domain\It\Services\ItTicketDraftService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Models\Asset;
 use App\Models\ItKbArticle;
@@ -15,22 +17,16 @@ use Illuminate\Support\Facades\Schema;
  */
 trait BuildsItOptions
 {
+    /** Recovery is available only after both retention durations are configured. */
+    protected function draftRecoveryOptions(): array
+    {
+        return ['enabled' => app(ItTicketDraftService::class)->enabled()];
+    }
+
     /** Current IT agents who share an approved Site or can work the ticket. */
     protected function staffUserOptions(User $viewer, ?ItTicket $ticket = null): array
     {
-        $agents = $ticket
-            ? ItStaffDirectory::agentsForTicket($ticket)
-            : ItStaffDirectory::agentsForSharedSites($viewer);
-
-        return $agents
-            ->map(fn (User $agent) => [
-                'id' => $agent->id,
-                'name' => $agent->name,
-            ])
-            ->unique('id')
-            ->sortBy('name')
-            ->values()
-            ->all();
+        return app(ItLinkedContextOptions::class)->assignableAgents($viewer, $ticket);
     }
 
     /**
@@ -71,18 +67,18 @@ trait BuildsItOptions
      * §I published knowledge-base titles for the ticket-workspace composer's
      * "Suggest from Knowledge" — lean (no body, never client detail) so an
      * agent replying can reference the guide that fixes it. Published only,
-     * globally catalogued; Schema-guarded so a pre-migration render stays empty.
+     * audience-scoped; Schema-guarded so a pre-migration render stays empty.
      *
      * @return array<int, array{id: int, title: string, category: string}>
      */
-    protected function kbSuggestions(): array
+    protected function kbSuggestions(User $viewer): array
     {
         if (! Schema::hasTable('it_kb_articles')) {
             return [];
         }
 
-        return ItKbArticle::query()
-            ->published()
+        return app(ItKbAccessService::class)
+            ->applyViewScope(ItKbArticle::query(), $viewer, publishedOnly: true)
             ->orderByDesc('updated_at')
             ->limit(100)
             ->get(['id', 'title', 'category'])

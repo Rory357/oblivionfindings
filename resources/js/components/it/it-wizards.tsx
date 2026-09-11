@@ -1,9 +1,10 @@
+import { ResolveTicketDialog } from '@/components/it/resolve-ticket-dialog';
 /* The IT & Support dialogs — Log ticket (3-step), Fulfil request and
  * Assign owner (single-step). All built on the shared HR wizard kit
  * (WizardShell + primitives) so they are visually identical to the
  * Add-Client / Asset lifecycle modals. Zero confirm(): every action is a
  * reviewed modal ending in a success pane. */
-import { router, useForm } from '@inertiajs/react';
+import { router, useForm, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     CalendarClock,
@@ -26,15 +27,15 @@ import {
     Wifi,
     X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
     Field,
+    FieldErr,
     InfoCard,
     ReviewCard,
     ReviewRow,
-    Segmented,
     SelectInput,
     StepHead,
     TilePicker,
@@ -44,13 +45,45 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/hr/wizard';
+import { TicketCommandWizard } from '@/components/it/ticket-command-wizard';
+import { TicketDuplicateSuggestions } from '@/components/it/ticket-duplicate-suggestions';
+import {
+    TicketDraftFiles,
+    TicketIntakeDraftPanel,
+} from '@/components/it/ticket-intake-draft';
+import {
+    TICKET_IMPACT_OPTIONS,
+    TICKET_URGENCY_OPTIONS,
+    TicketImpactUrgencyFields,
+    TicketSiteField,
+    type TicketImpact,
+    type TicketIntakePolicy,
+    type TicketPriority,
+    type TicketUrgency,
+} from '@/components/it/ticket-intake-fields';
 import type { TicketRoutingDetails } from '@/components/it/ticket-routing-summary';
+import { TicketVersionConflict } from '@/components/it/ticket-version-conflict';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
+import { preferredIntakeDraft } from '@/hooks/it-intake-draft-locator';
+import type { ItDraftResumed } from '@/hooks/it-ticket-draft-contract';
+import {
+    intakeDraftSnapshot,
+    restoreIntakeDraft,
+    useItIntakeDraft,
+} from '@/hooks/use-it-intake-draft';
+import { useItTicketCommand } from '@/hooks/use-it-ticket-command';
+import type { ItDraftBrowserRestored } from '@/hooks/use-it-ticket-draft';
+import { itIntakeDraftMemoryRequestIds } from '@/hooks/use-it-ticket-draft-memory';
+import {
+    IT_ATTACHMENT_ACCEPT,
+    itAttachmentSelectionError,
+} from '@/lib/it-attachments';
+import type { SharedData } from '@/types';
 
 /* ------------------------------------------------------------------ */
 /*  Shared types                                                       */
@@ -59,6 +92,9 @@ import { Textarea } from '@/components/ui/textarea';
 export interface AssigneeOption {
     id: number;
     name: string;
+    /** Present on canonical assignment options; other identity projections may omit it. */
+    site_ids?: number[];
+    organisation_wide?: boolean;
 }
 
 /** An entry from the canonical assets register, for the ticket asset-link picker. */
@@ -129,7 +165,11 @@ export interface RequestRow {
 }
 
 export interface TicketRow {
+    conversation?: import('./ticket-conversation-summary').TicketConversation;
+    sla?: import('@/components/it/sla-evidence').SlaVerdict;
     id: number;
+    can: { manage: boolean };
+    lock_version: number;
     reference: string | null;
     title: string;
     description: string | null;
@@ -146,16 +186,16 @@ export interface TicketRow {
         | 'change'
         | 'other'
         | null;
-    waiting_reason: string | null;
-    next_action: string | null;
-    waiting_since: string | null;
+    waiting_reason?: string | null;
+    next_action?: string | null;
+    waiting_since?: string | null;
     sla_state: string;
     first_response_due_at: string | null;
     resolution_due_at: string | null;
     first_responded_at: string | null;
     requester: string;
     assignee: AssigneeOption | null;
-    routing: TicketRoutingDetails;
+    routing?: TicketRoutingDetails;
     age: string | null;
     updated: string | null;
     resolved: string | null;
@@ -183,11 +223,14 @@ export interface SlaCalendar {
 export interface EmployeeOption {
     id: number;
     name: string;
+    /** HR profile identity stays id; ticket intake requires the approved user. */
+    requester?: { user_id: number; site_ids: number[] } | null;
 }
 
 /** A knowledge-base article row for the agent Knowledge tab (§I). */
 export interface KbRow {
     id: number;
+    can: { manage: boolean; author: boolean; review: boolean };
     title: string;
     slug: string;
     category: string;
@@ -230,7 +273,12 @@ export type ItModal =
     | { type: 'raise' }
     | {
           type: 'resolve';
-          ticket: { id: number; reference: string | null; title: string };
+          ticket: {
+              id: number;
+              lock_version: number;
+              reference: string | null;
+              title: string;
+          };
       }
     | { type: 'fulfil'; request: RequestRow }
     | { type: 'fail-request'; request: RequestRow }
@@ -272,6 +320,7 @@ export function ItWizard({
     siteOptions = [],
     deviceOptions = [],
     serviceOptions = [],
+    intakePolicy,
     slaPolicies,
     slaCalendar,
     kbSuggestions = [],
@@ -287,6 +336,7 @@ export function ItWizard({
     siteOptions?: SiteOption[];
     deviceOptions?: DeviceOption[];
     serviceOptions?: ServiceOption[];
+    intakePolicy?: TicketIntakePolicy;
     slaPolicies?: SlaPolicyGrid | null;
     slaCalendar?: SlaCalendar | null;
     kbSuggestions?: KbSuggestion[];
@@ -295,17 +345,28 @@ export function ItWizard({
     onDraftKb?: (draft: KbDraft) => void;
     onClose: () => void;
 }) {
+    const page = usePage<
+        SharedData & { draftRecovery?: { enabled: boolean } }
+    >();
+    const actorId = page.props.auth.user.id;
+    const draftRecoveryEnabled = page.props.draftRecovery?.enabled === true;
     if (!modal) return null;
     switch (modal.type) {
         case 'ticket':
             return (
                 <CreateTicketWizard
+                    key={actorId}
+                    actorId={actorId}
+                    draftRecoveryEnabled={draftRecoveryEnabled}
                     assignees={assignees}
+                    employeeOptions={employeeOptions}
                     assetOptions={assetOptions}
                     siteOptions={siteOptions}
                     deviceOptions={deviceOptions}
                     serviceOptions={serviceOptions}
+                    intakePolicy={intakePolicy}
                     slaPolicies={slaPolicies}
+                    slaCalendar={slaCalendar}
                     provisioning={modal.provisioning}
                     onClose={onClose}
                 />
@@ -330,6 +391,10 @@ export function ItWizard({
         case 'raise':
             return (
                 <RaiseTicketDialog
+                    key={actorId}
+                    actorId={actorId}
+                    draftRecoveryEnabled={draftRecoveryEnabled}
+                    siteOptions={siteOptions}
                     kbSuggestions={kbSuggestions}
                     onOpenArticle={onOpenArticle}
                     onClose={onClose}
@@ -387,6 +452,8 @@ export function ItWizard({
                         method: 'patch',
                         url: `/it/tickets/${modal.ticket.id}`,
                         field: 'assigned_to_user_id',
+                        ticketId: modal.ticket.id,
+                        expectedVersion: modal.ticket.lock_version,
                     }}
                     assignees={assignees}
                     onClose={onClose}
@@ -470,37 +537,63 @@ const INTAKE_WORK_TYPE_OPTIONS = [
 ] as const;
 
 function CreateTicketWizard({
+    actorId,
+    draftRecoveryEnabled,
     assignees,
+    employeeOptions,
     assetOptions,
     siteOptions,
     deviceOptions,
     serviceOptions,
+    intakePolicy,
     slaPolicies,
+    slaCalendar,
     provisioning,
     onClose,
 }: {
+    actorId: number;
+    draftRecoveryEnabled: boolean;
     assignees: AssigneeOption[];
+    employeeOptions: EmployeeOption[];
     assetOptions: AssetOption[];
     siteOptions: SiteOption[];
     deviceOptions: DeviceOption[];
     serviceOptions: ServiceOption[];
+    intakePolicy?: TicketIntakePolicy;
     slaPolicies?: SlaPolicyGrid | null;
+    slaCalendar?: SlaCalendar | null;
     provisioning?: { id: number; item: string };
     onClose: () => void;
 }) {
     const wizard = useWizard(TICKET_STEPS.length);
-    const [done, setDone] = useState(false);
-    const [created, setCreated] = useState<{
-        id: number;
-        reference: string | null;
-    } | null>(null);
+    const attachmentId = useId();
+    const command = useItTicketCommand({
+        actorId,
+        draftRequestId:
+            itIntakeDraftMemoryRequestIds(actorId, 'technician_intake')[0] ??
+            preferredIntakeDraft(
+                draftRecoveryEnabled,
+                actorId,
+                'technician_intake',
+            ),
+    });
+    const created = command.result;
+    const done = created !== null;
+    const finishClose = () => {
+        onClose();
+        if (created) router.reload();
+    };
 
     const form = useForm<{
         title: string;
         description: string;
         category: string;
         subcategory: string;
-        priority: string;
+        priority: TicketPriority | 'automatic';
+        impact: TicketImpact;
+        urgency: TicketUrgency;
+        priority_reason: string;
+        routing_reason: string;
         work_type: string;
         it_service_id: string;
         requester_user_id: string;
@@ -516,7 +609,11 @@ function CreateTicketWizard({
         description: '',
         category: 'hardware',
         subcategory: '',
-        priority: 'normal',
+        priority: 'automatic',
+        impact: 'individual',
+        urgency: 'normal',
+        priority_reason: '',
+        routing_reason: '',
         work_type: 'incident',
         it_service_id: UNASSIGNED,
         requester_user_id: UNASSIGNED,
@@ -530,9 +627,91 @@ function CreateTicketWizard({
         attachments: [],
     });
 
+    const initialValues = useRef(form.data);
+    const savedSnapshot = intakeDraftSnapshot(
+        'technician_intake',
+        form.data,
+        wizard.index,
+    );
+    const intake = useItIntakeDraft({
+        enabled: draftRecoveryEnabled,
+        actorId,
+        purpose: 'technician_intake',
+        command,
+        snapshot: savedSnapshot,
+        dirty: form.isDirty,
+        files: form.data.attachments,
+    });
+    const resumeBrowserWork = (restored: ItDraftBrowserRestored) => {
+        form.setData({
+            ...restoreIntakeDraft(initialValues.current, restored.snapshot),
+            attachments: restored.files,
+        });
+        form.clearErrors();
+        wizard.goTo(restored.snapshot.step_index);
+    };
+    const resumeDraft = (saved: ItDraftResumed) => {
+        form.setData({
+            ...restoreIntakeDraft(initialValues.current, saved.payload),
+            attachments: [],
+        });
+        form.clearErrors();
+        wizard.goTo(saved.payload.step_index);
+    };
+    const resetDraftFields = () => {
+        form.reset();
+        form.clearErrors('attachments');
+        wizard.goTo(0);
+    };
+    const { setData, setDefaults, clearErrors } = form;
+    useEffect(() => {
+        if (
+            command.state !== 'access_denied' &&
+            intake.draft.state !== 'access_denied'
+        )
+            return;
+        const cleared = {
+            title: '',
+            description: '',
+            category: 'hardware',
+            subcategory: '',
+            priority: 'automatic' as const,
+            impact: 'individual' as const,
+            urgency: 'normal' as const,
+            priority_reason: '',
+            routing_reason: '',
+            work_type: 'incident',
+            it_service_id: UNASSIGNED,
+            requester_user_id: UNASSIGNED,
+            assigned_to_user_id: UNASSIGNED,
+            asset_id: UNASSIGNED,
+            site_id: UNASSIGNED,
+            device_id: UNASSIGNED,
+            watchers: [],
+            provisioning_request_id: null,
+            attachments: [],
+        };
+        setData(cleared);
+        setDefaults(cleared);
+        clearErrors();
+    }, [command.state, intake.draft.state, setData, setDefaults, clearErrors]);
+    const eligibleAssignees = assignees.filter((candidate) =>
+        candidate.site_ids?.includes(Number(form.data.site_id)),
+    );
+    const eligibleRequesters = employeeOptions.filter((candidate) =>
+        candidate.requester?.site_ids.includes(Number(form.data.site_id)),
+    );
+    const requester = eligibleRequesters.find(
+        (candidate) =>
+            String(candidate.requester?.user_id) ===
+            form.data.requester_user_id,
+    );
+    const requesterValid =
+        form.data.requester_user_id === UNASSIGNED || requester !== undefined;
     const assignee =
-        assignees.find((a) => String(a.id) === form.data.assigned_to_user_id) ??
-        null;
+        eligibleAssignees.find(
+            (a) => String(a.id) === form.data.assigned_to_user_id,
+        ) ?? null;
     const asset =
         assetOptions.find((a) => String(a.id) === form.data.asset_id) ?? null;
     const site =
@@ -552,27 +731,44 @@ function CreateTicketWizard({
     const requesterName =
         form.data.requester_user_id === UNASSIGNED
             ? 'Me (myself)'
-            : (assignees.find(
-                  (a) => String(a.id) === form.data.requester_user_id,
-              )?.name ?? undefined);
+            : requester?.name;
     const detailsValid =
-        form.data.title.trim().length > 0 && form.data.site_id !== UNASSIGNED;
+        form.data.title.trim().length > 0 &&
+        requesterValid &&
+        siteOptions.some((site) => String(site.id) === form.data.site_id);
+    const attachmentCount = draftRecoveryEnabled
+        ? intake.draft.attachments.length
+        : form.data.attachments.length;
+    const hasPriorityOverride = form.data.priority !== 'automatic';
+    const triageValid =
+        (!hasPriorityOverride || form.data.priority_reason.trim().length > 0) &&
+        (form.data.assigned_to_user_id === UNASSIGNED ||
+            (assignee !== null && form.data.routing_reason.trim().length > 0));
+    const assessedPriority =
+        intakePolicy?.priority_matrix[form.data.impact]?.[form.data.urgency];
+    const effectivePriority =
+        form.data.priority === 'automatic'
+            ? assessedPriority
+            : form.data.priority;
 
-    // Live SLA preview — the effective targets for the chosen priority,
-    // projected from now (client-side; updates as priority changes, no re-fetch).
-    const slaTarget = slaPolicies?.[form.data.priority] ?? null;
-    const dueLabel = (mins: number) =>
-        new Date(Date.now() + mins * 60000).toLocaleString('en-NZ', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-            hour: 'numeric',
-            minute: '2-digit',
-        });
+    // Targets describe the configured policy; the server records the calendar
+    // and calculates actual deadlines when the ticket is saved.
+    const slaTarget = effectivePriority
+        ? (slaPolicies?.[effectivePriority] ?? null)
+        : null;
+    const targetLabel = (mins: number) =>
+        `${mins.toLocaleString('en-NZ')} ${slaCalendar?.enabled ? 'working minutes' : 'minutes'}`;
 
     const submit = () => {
-        form.transform((data) => ({
+        const data = form.data;
+        void intake.submit({
             ...data,
+            priority: data.priority === 'automatic' ? null : data.priority,
+            priority_reason: hasPriorityOverride ? data.priority_reason : null,
+            routing_reason:
+                data.assigned_to_user_id === UNASSIGNED
+                    ? null
+                    : data.routing_reason,
             requester_user_id:
                 data.requester_user_id === UNASSIGNED
                     ? null
@@ -592,39 +788,13 @@ function CreateTicketWizard({
                     : Number(data.it_service_id),
             subcategory:
                 data.subcategory.trim() === '' ? null : data.subcategory,
-        }));
-        form.post('/it/tickets', {
-            preserveScroll: true,
-            forceFormData: true,
-            onSuccess: (page) => {
-                const err = pageFlashError(page);
-                if (err) {
-                    toast.error(err);
-                    return;
-                }
-                const flash = page.props.flash as
-                    | { it_ticket?: { id?: number; reference?: string | null } }
-                    | undefined;
-                setCreated(
-                    flash?.it_ticket?.id
-                        ? {
-                              id: flash.it_ticket.id,
-                              reference: flash.it_ticket.reference ?? null,
-                          }
-                        : null,
-                );
-                setDone(true);
-                toast.success(
-                    `Ticket logged${flash?.it_ticket?.reference ? ` — ${flash.it_ticket.reference}` : ''}.`,
-                );
-            },
         });
     };
 
     const logAnother = () => {
         form.reset();
-        setCreated(null);
-        setDone(false);
+        form.clearErrors('attachments');
+        command.reset('new');
         wizard.goTo(0);
     };
 
@@ -637,9 +807,35 @@ function CreateTicketWizard({
     };
 
     return (
-        <WizardShell
+        <TicketCommandWizard
+            command={command}
+            dirty={intake.dirty}
+            onDiscardBrowserWork={() => {
+                intake.draft.clearOwnedBrowserWork();
+                resetDraftFields();
+            }}
+            draftExit={
+                draftRecoveryEnabled
+                    ? {
+                          busy: intake.draft.busy,
+                          canSave:
+                              intake.draft.state === 'ready' &&
+                              intake.draft.draft?.capabilities.save === true,
+                          canDiscard:
+                              ['ready', 'available'].includes(
+                                  intake.draft.state,
+                              ) &&
+                              intake.draft.draft?.capabilities.discard === true,
+                          save: intake.saveForClose,
+                          discard: intake.discardForClose,
+                          keepReference: intake.draft.draft
+                              ? intake.keepReference
+                              : undefined,
+                      }
+                    : undefined
+            }
             open
-            onClose={onClose}
+            onClose={finishClose}
             title="Log & triage ticket"
             description="Log a helpdesk ticket on behalf of a colleague and triage it in one pass."
             railIcon={Ticket}
@@ -648,7 +844,17 @@ function CreateTicketWizard({
             steps={TICKET_STEPS}
             stepIndex={wizard.index}
             onStepClick={wizard.goTo}
-            pct={wizard.progress}
+            pct={Math.round(
+                ([
+                    form.data.title.trim().length > 0,
+                    form.data.site_id !== UNASSIGNED,
+                    !!form.data.category,
+                    !!form.data.impact && !!form.data.urgency,
+                    triageValid,
+                ].filter(Boolean).length /
+                    5) *
+                    100,
+            )}
             success={
                 done ? (
                     <WizardSuccessPane
@@ -658,10 +864,21 @@ function CreateTicketWizard({
                                 : 'Ticket logged'
                         }
                         blurb={
-                            <>
-                                “{form.data.title}” is now in the helpdesk queue
-                                {assignee ? <> with {assignee.name}</> : null}.
-                            </>
+                            command.restoredFromReference ? (
+                                <>
+                                    Your saved request was found. Open it to
+                                    review its details and current owner.
+                                </>
+                            ) : (
+                                <>
+                                    “{form.data.title}” is now in the helpdesk
+                                    queue
+                                    {assignee ? (
+                                        <> with {assignee.name}</>
+                                    ) : null}
+                                    .
+                                </>
+                            )
                         }
                         actions={
                             <>
@@ -679,7 +896,7 @@ function CreateTicketWizard({
                                 <Button variant="outline" onClick={logAnother}>
                                     Log another
                                 </Button>
-                                <Button variant="ghost" onClick={onClose}>
+                                <Button variant="ghost" onClick={finishClose}>
                                     Done
                                 </Button>
                             </>
@@ -696,20 +913,27 @@ function CreateTicketWizard({
             }
             footerEnd={
                 <>
-                    <Button variant="ghost" onClick={onClose}>
-                        Cancel
-                    </Button>
                     {wizard.isLast ? (
                         <Button
                             onClick={submit}
-                            disabled={form.processing || !detailsValid}
+                            disabled={
+                                !intake.canSubmit ||
+                                !detailsValid ||
+                                !triageValid
+                            }
                         >
-                            {form.processing ? 'Logging…' : 'Log ticket'}
+                            {command.isBusy || intake.preparing
+                                ? 'Logging…'
+                                : 'Log ticket'}
                         </Button>
                     ) : (
                         <Button
                             onClick={wizard.next}
-                            disabled={wizard.index === 0 && !detailsValid}
+                            disabled={
+                                !command.canEdit ||
+                                (wizard.index === 0 && !detailsValid) ||
+                                (wizard.index === 1 && !triageValid)
+                            }
                         >
                             Continue
                         </Button>
@@ -717,6 +941,36 @@ function CreateTicketWizard({
                 </>
             }
         >
+            <TicketIntakeDraftPanel
+                intake={intake}
+                command={command}
+                snapshot={savedSnapshot}
+                dirty={form.isDirty}
+                onResume={resumeDraft}
+                onResumeMemory={resumeBrowserWork}
+                onDiscarded={resetDraftFields}
+                onStartNew={resetDraftFields}
+                optionLabels={{
+                    site_id: Object.fromEntries(
+                        siteOptions.map((row) => [row.id, row.name]),
+                    ),
+                    assigned_to_user_id: Object.fromEntries(
+                        assignees.map((row) => [row.id, row.name]),
+                    ),
+                    requester_user_id: Object.fromEntries(
+                        eligibleRequesters.map((row) => [
+                            row.requester!.user_id,
+                            row.name,
+                        ]),
+                    ),
+                    it_service_id: Object.fromEntries(
+                        serviceOptions.map((row) => [row.id, row.name]),
+                    ),
+                    asset_id: Object.fromEntries(
+                        assetOptions.map((row) => [row.id, row.name]),
+                    ),
+                }}
+            />
             {wizard.index === 0 && (
                 <WizardStepPane>
                     <StepHead
@@ -724,19 +978,28 @@ function CreateTicketWizard({
                         title="What’s the issue?"
                         blurb="Log it for the person who hit it, with any detail IT needs to act."
                     />
-                    {provisioning ? (
+                    {form.data.provisioning_request_id !== null &&
+                    command.state !== 'access_denied' ? (
                         <InfoCard icon={Server}>
-                            Linked to provisioning request — “
-                            {provisioning.item}”. The ticket will show on that
-                            request too.
+                            {provisioning?.id ===
+                            form.data.provisioning_request_id
+                                ? `Linked to provisioning request — “${provisioning.item}”.`
+                                : `Linked to provisioning request #${form.data.provisioning_request_id}.`}{' '}
+                            The ticket will show on that request too.
                         </InfoCard>
                     ) : null}
-                    <div className="grid gap-3.5">
-                        {assignees.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3.5">
+                        {employeeOptions.length > 0 ||
+                        form.data.requester_user_id !== UNASSIGNED ? (
                             <Field
                                 label="Requester"
                                 hint="who hit the problem"
-                                error={form.errors.requester_user_id}
+                                error={
+                                    command.fieldErrors.requester_user_id ||
+                                    (!requesterValid
+                                        ? 'The selected requester is unavailable for this Site. Choose an eligible employee or log for yourself.'
+                                        : undefined)
+                                }
                             >
                                 <SelectInput
                                     value={form.data.requester_user_id}
@@ -744,57 +1007,67 @@ function CreateTicketWizard({
                                         form.setData('requester_user_id', v)
                                     }
                                     placeholder="Me (myself)"
+                                    ariaLabel="Requester"
                                     options={[
                                         {
                                             value: UNASSIGNED,
                                             label: 'Me — logging for myself',
                                         },
-                                        ...assignees.map((a) => ({
-                                            value: String(a.id),
+                                        ...(!requesterValid
+                                            ? [
+                                                  {
+                                                      value: form.data
+                                                          .requester_user_id,
+                                                      label: 'Selected requester unavailable for this Site',
+                                                  },
+                                              ]
+                                            : []),
+                                        ...eligibleRequesters.map((a) => ({
+                                            value: String(a.requester!.user_id),
                                             label: a.name,
                                         })),
                                     ]}
                                 />
                             </Field>
                         ) : null}
-                        <Field
-                            label="Ticket Site"
-                            hint="required — where support is needed"
-                            required
-                            error={form.errors.site_id}
-                        >
-                            <SelectInput
-                                value={form.data.site_id}
-                                onChange={(v) => {
-                                    const selectedDevice = deviceOptions.find(
+                        <TicketSiteField
+                            sites={siteOptions}
+                            error={command.fieldErrors.site_id}
+                            value={form.data.site_id}
+                            onChange={(v) => {
+                                const selectedDevice = deviceOptions.find(
+                                    (candidate) =>
+                                        String(candidate.id) ===
+                                        form.data.device_id,
+                                );
+                                const keepsAssignee = assignees
+                                    .find(
                                         (candidate) =>
                                             String(candidate.id) ===
-                                            form.data.device_id,
-                                    );
-                                    form.setData({
-                                        ...form.data,
-                                        site_id: v,
-                                        device_id:
-                                            selectedDevice?.site_id ===
-                                            Number(v)
-                                                ? form.data.device_id
-                                                : UNASSIGNED,
-                                    });
-                                }}
-                                placeholder="Choose a Site"
-                                options={[
-                                    {
-                                        value: UNASSIGNED,
-                                        label: 'Choose a Site',
-                                    },
-                                    ...siteOptions.map((site) => ({
-                                        value: String(site.id),
-                                        label: site.name,
-                                    })),
-                                ]}
-                            />
-                        </Field>
-                        <Field label="Title" required error={form.errors.title}>
+                                            form.data.assigned_to_user_id,
+                                    )
+                                    ?.site_ids?.includes(Number(v));
+                                form.setData({
+                                    ...form.data,
+                                    site_id: v,
+                                    assigned_to_user_id: keepsAssignee
+                                        ? form.data.assigned_to_user_id
+                                        : UNASSIGNED,
+                                    routing_reason: keepsAssignee
+                                        ? form.data.routing_reason
+                                        : '',
+                                    device_id:
+                                        selectedDevice?.site_id === Number(v)
+                                            ? form.data.device_id
+                                            : UNASSIGNED,
+                                });
+                            }}
+                        />
+                        <Field
+                            label="Title"
+                            required
+                            error={command.fieldErrors.title}
+                        >
                             <Input
                                 value={form.data.title}
                                 onChange={(e) =>
@@ -807,7 +1080,7 @@ function CreateTicketWizard({
                         <Field
                             label="Detail"
                             hint="optional"
-                            error={form.errors.description}
+                            error={command.fieldErrors.description}
                         >
                             <Textarea
                                 value={form.data.description}
@@ -818,7 +1091,10 @@ function CreateTicketWizard({
                                 rows={4}
                             />
                         </Field>
-                        <Field label="Category" error={form.errors.category}>
+                        <Field
+                            label="Category"
+                            error={command.fieldErrors.category}
+                        >
                             <TilePicker
                                 value={form.data.category}
                                 onChange={(v) => form.setData('category', v)}
@@ -828,7 +1104,7 @@ function CreateTicketWizard({
                         <Field
                             label="Subcategory"
                             hint="optional"
-                            error={form.errors.subcategory}
+                            error={command.fieldErrors.subcategory}
                         >
                             <Input
                                 value={form.data.subcategory}
@@ -842,36 +1118,89 @@ function CreateTicketWizard({
                         <Field
                             label="Photos or files"
                             hint="optional"
-                            error={form.errors.attachments}
+                            htmlFor={
+                                !draftRecoveryEnabled
+                                    ? `${attachmentId}-input`
+                                    : undefined
+                            }
+                            labelId={
+                                !draftRecoveryEnabled
+                                    ? `${attachmentId}-label`
+                                    : undefined
+                            }
+                            errorId={
+                                !draftRecoveryEnabled
+                                    ? `${attachmentId}-error`
+                                    : undefined
+                            }
+                            error={
+                                form.errors.attachments ??
+                                command.fieldErrors.attachments
+                            }
                         >
-                            <FileDropzone
-                                onFiles={(files) =>
-                                    form.setData(
-                                        'attachments',
-                                        [
-                                            ...form.data.attachments,
-                                            ...files,
-                                        ].slice(0, 5),
-                                    )
-                                }
-                                accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
-                                title="Drop a photo or file"
-                                hint="Images, PDF or documents — up to 5 files"
-                            />
-                            {form.data.attachments.map((file, i) => (
-                                <StagedFileCard
-                                    key={`${file.name}-${i}`}
-                                    file={file}
-                                    onRemove={() =>
-                                        form.setData(
-                                            'attachments',
-                                            form.data.attachments.filter(
-                                                (_, j) => j !== i,
-                                            ),
-                                        )
-                                    }
+                            {draftRecoveryEnabled ? (
+                                <TicketDraftFiles
+                                    draft={intake.draft}
+                                    disabled={!command.canEdit}
                                 />
-                            ))}
+                            ) : (
+                                <>
+                                    <FileDropzone
+                                        id={attachmentId}
+                                        aria-labelledby={`${attachmentId}-label ${attachmentId}-title`}
+                                        aria-describedby={
+                                            (form.errors.attachments ??
+                                            command.fieldErrors.attachments)
+                                                ? `${attachmentId}-error`
+                                                : undefined
+                                        }
+                                        aria-invalid={Boolean(
+                                            form.errors.attachments ??
+                                            command.fieldErrors.attachments,
+                                        )}
+                                        disabled={!command.canEdit}
+                                        onFiles={(files) => {
+                                            if (!command.canEdit) return;
+                                            const error =
+                                                itAttachmentSelectionError(
+                                                    files,
+                                                    form.data.attachments
+                                                        .length,
+                                                );
+                                            if (error) {
+                                                form.setError(
+                                                    'attachments',
+                                                    error,
+                                                );
+                                                return;
+                                            }
+                                            form.clearErrors('attachments');
+                                            form.setData('attachments', [
+                                                ...form.data.attachments,
+                                                ...files,
+                                            ]);
+                                        }}
+                                        accept={IT_ATTACHMENT_ACCEPT}
+                                        title="Drop a photo or file"
+                                        hint="Images, PDF or documents — up to 5 files"
+                                    />
+                                    {form.data.attachments.map((file, i) => (
+                                        <StagedFileCard
+                                            key={`${file.name}-${i}`}
+                                            file={file}
+                                            onRemove={() => {
+                                                form.clearErrors('attachments');
+                                                form.setData(
+                                                    'attachments',
+                                                    form.data.attachments.filter(
+                                                        (_, j) => j !== i,
+                                                    ),
+                                                );
+                                            }}
+                                        />
+                                    ))}
+                                </>
+                            )}
                         </Field>
                     </div>
                 </WizardStepPane>
@@ -884,11 +1213,11 @@ function CreateTicketWizard({
                         title="Priority & owner"
                         blurb="How urgent is it, who picks it up, and what’s it about?"
                     />
-                    <div className="grid gap-3.5">
+                    <div className="grid grid-cols-1 gap-3.5">
                         <Field
                             label="Work type"
                             hint="required — controls the support workflow"
-                            error={form.errors.work_type}
+                            error={command.fieldErrors.work_type}
                         >
                             <TilePicker
                                 value={form.data.work_type}
@@ -899,7 +1228,7 @@ function CreateTicketWizard({
                         <Field
                             label="Affected service"
                             hint="optional — helps route the ticket to the right queue"
-                            error={form.errors.it_service_id}
+                            error={command.fieldErrors.it_service_id}
                         >
                             <SelectInput
                                 value={form.data.it_service_id}
@@ -919,24 +1248,103 @@ function CreateTicketWizard({
                                 ]}
                             />
                         </Field>
-                        <Field label="Priority" error={form.errors.priority}>
-                            <TilePicker
+                        <TicketImpactUrgencyFields
+                            impact={form.data.impact}
+                            urgency={form.data.urgency}
+                            onImpactChange={(value) =>
+                                form.setData('impact', value)
+                            }
+                            onUrgencyChange={(value) =>
+                                form.setData('urgency', value)
+                            }
+                            errors={command.fieldErrors}
+                        />
+                        <InfoCard icon={Flag}>
+                            {assessedPriority ? (
+                                <>
+                                    Assessed priority:{' '}
+                                    <strong>
+                                        {
+                                            PRIORITY_OPTIONS.find(
+                                                (option) =>
+                                                    option.key ===
+                                                    assessedPriority,
+                                            )?.label
+                                        }
+                                    </strong>
+                                    . This follows the current impact and
+                                    urgency policy.
+                                </>
+                            ) : (
+                                'The server will assess priority from impact and urgency when this ticket is saved. A preview is unavailable.'
+                            )}
+                        </InfoCard>
+                        <Field
+                            label="Priority decision"
+                            error={command.fieldErrors.priority}
+                        >
+                            <SelectInput
                                 value={form.data.priority}
-                                onChange={(v) => form.setData('priority', v)}
-                                options={[...PRIORITY_OPTIONS]}
+                                ariaLabel="Priority decision"
+                                onChange={(value) =>
+                                    form.setData({
+                                        ...form.data,
+                                        priority: value as
+                                            | TicketPriority
+                                            | 'automatic',
+                                        priority_reason:
+                                            value === 'automatic'
+                                                ? ''
+                                                : form.data.priority_reason,
+                                    })
+                                }
+                                placeholder="Use assessed priority"
+                                options={[
+                                    {
+                                        value: 'automatic',
+                                        label: 'Use assessed priority',
+                                    },
+                                    ...PRIORITY_OPTIONS.map((option) => ({
+                                        value: option.key,
+                                        label: `Set ${option.label.toLowerCase()} priority`,
+                                    })),
+                                ]}
                             />
                         </Field>
+                        {hasPriorityOverride && (
+                            <Field
+                                label="Why change the assessed priority?"
+                                required
+                                error={command.fieldErrors.priority_reason}
+                            >
+                                <Textarea
+                                    value={form.data.priority_reason}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'priority_reason',
+                                            event.target.value,
+                                        )
+                                    }
+                                    maxLength={1000}
+                                    rows={3}
+                                    placeholder="Explain the operational reason for this priority."
+                                />
+                            </Field>
+                        )}
                         {slaTarget ? (
                             <InfoCard icon={Timer}>
-                                First response due{' '}
+                                First response target:{' '}
                                 <strong>
-                                    {dueLabel(slaTarget.first_response_minutes)}
+                                    {targetLabel(
+                                        slaTarget.first_response_minutes,
+                                    )}
                                 </strong>
-                                , resolution by{' '}
+                                . Resolution target:{' '}
                                 <strong>
-                                    {dueLabel(slaTarget.resolution_minutes)}
+                                    {targetLabel(slaTarget.resolution_minutes)}
                                 </strong>{' '}
-                                at this priority.
+                                at this priority. Deadlines are calculated when
+                                saved.
                             </InfoCard>
                         ) : null}
                         {/* Triage is agent work — self-service requesters get no
@@ -944,13 +1352,26 @@ function CreateTicketWizard({
                         {assignees.length > 0 ? (
                             <Field
                                 label="Assign to"
-                                hint="optional — leave unassigned for triage"
-                                error={form.errors.assigned_to_user_id}
+                                hint="optional — automatic routing applies when saved"
+                                error={
+                                    command.fieldErrors.assigned_to_user_id ??
+                                    (form.data.assigned_to_user_id !==
+                                        UNASSIGNED && !assignee
+                                        ? 'Choose a currently eligible technician for this Site.'
+                                        : undefined)
+                                }
                             >
                                 <SelectInput
                                     value={form.data.assigned_to_user_id}
                                     onChange={(v) =>
-                                        form.setData('assigned_to_user_id', v)
+                                        form.setData({
+                                            ...form.data,
+                                            assigned_to_user_id: v,
+                                            routing_reason:
+                                                v === UNASSIGNED
+                                                    ? ''
+                                                    : form.data.routing_reason,
+                                        })
                                     }
                                     placeholder="Unassigned"
                                     options={[
@@ -958,7 +1379,7 @@ function CreateTicketWizard({
                                             value: UNASSIGNED,
                                             label: 'Unassigned',
                                         },
-                                        ...assignees.map((a) => ({
+                                        ...eligibleAssignees.map((a) => ({
                                             value: String(a.id),
                                             label: a.name,
                                         })),
@@ -966,11 +1387,36 @@ function CreateTicketWizard({
                                 />
                             </Field>
                         ) : null}
+                        {form.data.assigned_to_user_id !== UNASSIGNED && (
+                            <Field
+                                label="Why this technician?"
+                                required
+                                error={command.fieldErrors.routing_reason}
+                            >
+                                <Textarea
+                                    value={form.data.routing_reason}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'routing_reason',
+                                            event.target.value,
+                                        )
+                                    }
+                                    maxLength={1000}
+                                    rows={3}
+                                    placeholder="Explain why this technician should take the work."
+                                />
+                            </Field>
+                        )}
+                        <InfoCard icon={Users}>
+                            {form.data.assigned_to_user_id !== UNASSIGNED
+                                ? 'This manual assignment and its reason are recorded. Later classification changes preserve it until an authorized technician releases the override; the selected technician must remain eligible.'
+                                : 'Routing is applied when the ticket is saved, using its Site, service and classification. The saved ticket shows the actual queue, team and accountable owner, or any setup gap.'}
+                        </InfoCard>
                         {assetOptions.length > 0 ? (
                             <Field
                                 label="Linked asset"
                                 hint="optional — from the assets register"
-                                error={form.errors.asset_id}
+                                error={command.fieldErrors.asset_id}
                             >
                                 <SelectInput
                                     value={form.data.asset_id}
@@ -997,7 +1443,7 @@ function CreateTicketWizard({
                             <Field
                                 label="Affected Device"
                                 hint="optional — canonical Security & Devices record"
-                                error={form.errors.device_id}
+                                error={command.fieldErrors.device_id}
                             >
                                 <SelectInput
                                     value={form.data.device_id}
@@ -1093,6 +1539,21 @@ function CreateTicketWizard({
                         title="Review & log"
                         blurb="Check the ticket before it lands in the queue."
                     />
+                    <TicketDuplicateSuggestions
+                        actorId={actorId}
+                        title={form.data.title}
+                        siteId={
+                            form.data.site_id === UNASSIGNED
+                                ? null
+                                : Number(form.data.site_id)
+                        }
+                        workType={form.data.work_type}
+                        serviceId={
+                            form.data.it_service_id === UNASSIGNED
+                                ? null
+                                : Number(form.data.it_service_id)
+                        }
+                    />
                     <div className="grid gap-3 sm:grid-cols-2">
                         <ReviewCard
                             icon={FileText}
@@ -1124,8 +1585,8 @@ function CreateTicketWizard({
                             <ReviewRow
                                 label="Files"
                                 value={
-                                    form.data.attachments.length > 0
-                                        ? `${form.data.attachments.length} attached`
+                                    attachmentCount > 0
+                                        ? `${attachmentCount} attached`
                                         : undefined
                                 }
                             />
@@ -1149,25 +1610,56 @@ function CreateTicketWizard({
                                 value={service?.name ?? 'Not selected'}
                             />
                             <ReviewRow
-                                label="Priority"
+                                label="Impact"
                                 value={
-                                    PRIORITY_OPTIONS.find(
-                                        (p) => p.key === form.data.priority,
+                                    TICKET_IMPACT_OPTIONS.find(
+                                        (option) =>
+                                            option.value === form.data.impact,
                                     )?.label
                                 }
                             />
+                            <ReviewRow
+                                label="Urgency"
+                                value={
+                                    TICKET_URGENCY_OPTIONS.find(
+                                        (option) =>
+                                            option.value === form.data.urgency,
+                                    )?.label
+                                }
+                            />
+                            <ReviewRow
+                                label="Priority"
+                                value={
+                                    PRIORITY_OPTIONS.find(
+                                        (p) => p.key === effectivePriority,
+                                    )?.label ?? 'Assessed when saved'
+                                }
+                            />
+                            {hasPriorityOverride && (
+                                <ReviewRow
+                                    label="Priority reason"
+                                    value={form.data.priority_reason}
+                                />
+                            )}
                             {slaTarget ? (
                                 <ReviewRow
-                                    label="Resolution due"
-                                    value={dueLabel(
-                                        slaTarget.resolution_minutes,
-                                    )}
+                                    label="Resolution target"
+                                    value={`${targetLabel(slaTarget.resolution_minutes)} · Deadline calculated when saved`}
                                 />
                             ) : null}
                             <ReviewRow
                                 label="Assign to"
-                                value={assignee?.name}
+                                value={
+                                    assignee?.name ??
+                                    'Automatic routing when saved'
+                                }
                             />
+                            {assignee && (
+                                <ReviewRow
+                                    label="Assignment reason"
+                                    value={form.data.routing_reason}
+                                />
+                            )}
                             <ReviewRow
                                 label="Asset"
                                 value={
@@ -1198,7 +1690,7 @@ function CreateTicketWizard({
                     </div>
                 </WizardStepPane>
             )}
-        </WizardShell>
+        </TicketCommandWizard>
     );
 }
 
@@ -1473,7 +1965,7 @@ const RAISE_STEPS: readonly WizardStep[] = [
     {
         key: 'raise',
         label: 'Raise a ticket',
-        blurb: 'Under 30 seconds',
+        blurb: 'Tell IT what you need',
         icon: Ticket,
     },
 ];
@@ -1506,43 +1998,125 @@ const RAISE_CATEGORY_OPTIONS = [
     },
 ] as const;
 
-/** Plain-language urgency → priority. The requester never sees "P1". */
-const URGENCY_OPTIONS: { value: string; label: string }[] = [
-    { value: 'urgent', label: 'Stops me supporting someone right now' },
-    { value: 'high', label: 'Blocking my work' },
-    { value: 'normal', label: 'Annoying but I can work' },
-    { value: 'low', label: 'Whenever' },
-];
-
 function RaiseTicketDialog({
+    actorId,
+    draftRecoveryEnabled,
+    siteOptions,
     kbSuggestions = [],
     onOpenArticle,
     onClose,
 }: {
+    actorId: number;
+    draftRecoveryEnabled: boolean;
+    siteOptions: SiteOption[];
     kbSuggestions?: KbSuggestion[];
     onOpenArticle?: (id: number) => void;
     onClose: () => void;
 }) {
     const wizard = useWizard(RAISE_STEPS.length);
-    const [done, setDone] = useState(false);
+    const attachmentId = useId();
+    const command = useItTicketCommand({
+        actorId,
+        draftRequestId:
+            itIntakeDraftMemoryRequestIds(actorId, 'requester_intake')[0] ??
+            preferredIntakeDraft(
+                draftRecoveryEnabled,
+                actorId,
+                'requester_intake',
+            ),
+    });
+    const done = command.result !== null;
     const [moreDetails, setMoreDetails] = useState(false);
-    const [reference, setReference] = useState<string | null>(null);
+    const reference = command.result?.reference;
+    const finishClose = () => {
+        onClose();
+        if (command.result) router.reload();
+    };
 
     const form = useForm<{
         title: string;
         description: string;
         category: string;
-        priority: string;
+        impact: TicketImpact;
+        urgency: TicketUrgency;
+        site_id: string;
         attachments: File[];
     }>({
         title: '',
         description: '',
         category: 'hardware',
-        priority: 'normal',
+        impact: 'individual',
+        urgency: 'normal',
+        site_id:
+            siteOptions.length === 1 ? String(siteOptions[0].id) : UNASSIGNED,
         attachments: [],
     });
 
-    const valid = form.data.title.trim().length > 0;
+    const initialValues = useRef(form.data);
+    const savedSnapshot = intakeDraftSnapshot(
+        'requester_intake',
+        form.data,
+        wizard.index,
+    );
+    const intake = useItIntakeDraft({
+        enabled: draftRecoveryEnabled,
+        actorId,
+        purpose: 'requester_intake',
+        command,
+        snapshot: savedSnapshot,
+        dirty: form.isDirty,
+        files: form.data.attachments,
+    });
+    const resumeBrowserWork = (restored: ItDraftBrowserRestored) => {
+        form.setData({
+            ...restoreIntakeDraft(initialValues.current, restored.snapshot),
+            attachments: restored.files,
+        });
+        form.clearErrors();
+        wizard.goTo(restored.snapshot.step_index);
+        setMoreDetails(
+            !!restored.snapshot.fields.description || restored.files.length > 0,
+        );
+    };
+    const resumeDraft = (saved: ItDraftResumed) => {
+        form.setData({
+            ...restoreIntakeDraft(initialValues.current, saved.payload),
+            attachments: [],
+        });
+        form.clearErrors();
+        wizard.goTo(saved.payload.step_index);
+        setMoreDetails(
+            !!saved.payload.fields.description || saved.attachments.length > 0,
+        );
+    };
+    const resetDraftFields = () => {
+        form.reset();
+        form.clearErrors('attachments');
+        wizard.goTo(0);
+    };
+    const { setData, setDefaults, clearErrors } = form;
+    useEffect(() => {
+        if (
+            command.state !== 'access_denied' &&
+            intake.draft.state !== 'access_denied'
+        )
+            return;
+        const cleared = {
+            title: '',
+            description: '',
+            category: 'hardware',
+            impact: 'individual' as const,
+            urgency: 'normal' as const,
+            site_id: UNASSIGNED,
+            attachments: [],
+        };
+        setData(cleared);
+        setDefaults(cleared);
+        clearErrors();
+    }, [command.state, intake.draft.state, setData, setDefaults, clearErrors]);
+    const valid =
+        form.data.title.trim().length > 0 &&
+        siteOptions.some((site) => String(site.id) === form.data.site_id);
 
     // Deflection (§I): live-match published article titles as the requester types.
     const query = form.data.title.trim().toLowerCase();
@@ -1554,38 +2128,63 @@ function RaiseTicketDialog({
             : [];
 
     const submit = () => {
-        form.post('/it/tickets', {
-            preserveScroll: true,
-            forceFormData: true,
-            onSuccess: (page) => {
-                const err = pageFlashError(page);
-                if (err) {
-                    toast.error(err);
-                    return;
-                }
-                const flash = page.props.flash as
-                    | { it_ticket?: { reference?: string | null } }
-                    | undefined;
-                setReference(flash?.it_ticket?.reference ?? null);
-                setDone(true);
-                toast.success('Ticket raised — IT can see it now.');
-            },
+        void intake.submit({
+            ...form.data,
+            site_id: Number(form.data.site_id),
         });
     };
 
     return (
-        <WizardShell
+        <TicketCommandWizard
+            command={command}
+            dirty={intake.dirty}
+            draftExit={
+                draftRecoveryEnabled
+                    ? {
+                          busy: intake.draft.busy,
+                          canSave:
+                              intake.draft.state === 'ready' &&
+                              intake.draft.draft?.capabilities.save === true,
+                          canDiscard:
+                              ['ready', 'available'].includes(
+                                  intake.draft.state,
+                              ) &&
+                              intake.draft.draft?.capabilities.discard === true,
+                          save: intake.saveForClose,
+                          discard: intake.discardForClose,
+                          keepReference: intake.draft.draft
+                              ? intake.keepReference
+                              : undefined,
+                      }
+                    : undefined
+            }
             open
-            onClose={onClose}
+            onClose={finishClose}
             title="Raise a ticket"
-            description="Tell IT what's broken — they see it instantly."
+            onDiscardBrowserWork={() => {
+                intake.draft.clearOwnedBrowserWork();
+                resetDraftFields();
+            }}
+            description="Tell IT what you need help with."
             railIcon={Ticket}
             railTitle="Raise a ticket"
             railSub="IT helpdesk"
             steps={RAISE_STEPS}
             stepIndex={wizard.index}
             onStepClick={wizard.goTo}
-            pct={wizard.progress}
+            pct={Math.round(
+                ([
+                    form.data.title.trim().length > 0,
+                    siteOptions.some(
+                        (site) => String(site.id) === form.data.site_id,
+                    ),
+                    !!form.data.category,
+                    !!form.data.impact,
+                    !!form.data.urgency,
+                ].filter(Boolean).length /
+                    5) *
+                    100,
+            )}
             success={
                 done ? (
                     <WizardSuccessPane
@@ -1596,41 +2195,75 @@ function RaiseTicketDialog({
                         }
                         blurb={
                             <>
-                                IT can see it now. We’ll email you when it’s
-                                picked up or resolved — and you can track it any
-                                time in <strong>My tickets</strong>.
+                                Your request is saved. Open it now or return to{' '}
+                                <strong>My tickets</strong> to follow its
+                                progress.
                             </>
                         }
-                        actions={<Button onClick={onClose}>Done</Button>}
+                        actions={
+                            <>
+                                <Button
+                                    onClick={() =>
+                                        command.result &&
+                                        router.visit(command.result.url)
+                                    }
+                                >
+                                    Open {reference}
+                                </Button>
+                                <Button variant="ghost" onClick={finishClose}>
+                                    Done
+                                </Button>
+                            </>
+                        }
                     />
                 ) : undefined
             }
             footerStart={null}
             footerEnd={
                 <>
-                    <Button variant="ghost" onClick={onClose}>
-                        Cancel
-                    </Button>
                     <Button
                         onClick={submit}
-                        disabled={form.processing || !valid}
+                        disabled={!intake.canSubmit || !valid}
                     >
-                        {form.processing ? 'Raising…' : 'Raise ticket'}
+                        {command.isBusy || intake.preparing
+                            ? 'Raising…'
+                            : 'Raise ticket'}
                     </Button>
                 </>
             }
         >
+            <TicketIntakeDraftPanel
+                intake={intake}
+                command={command}
+                snapshot={savedSnapshot}
+                dirty={form.isDirty}
+                onResume={resumeDraft}
+                onDiscarded={resetDraftFields}
+                onStartNew={resetDraftFields}
+                optionLabels={{
+                    site_id: Object.fromEntries(
+                        siteOptions.map((row) => [row.id, row.name]),
+                    ),
+                }}
+                onResumeMemory={resumeBrowserWork}
+            />
             <WizardStepPane>
                 <StepHead
                     icon={Ticket}
                     title="What’s the problem?"
-                    blurb="One line is enough — you can add detail if it helps."
+                    blurb="Choose the affected Site and tell us what happened. You can add more detail if it helps."
                 />
-                <div className="grid gap-3.5">
+                <div className="grid grid-cols-1 gap-3.5">
+                    <TicketSiteField
+                        sites={siteOptions}
+                        value={form.data.site_id}
+                        onChange={(value) => form.setData('site_id', value)}
+                        error={command.fieldErrors.site_id}
+                    />
                     <Field
                         label="What's broken?"
                         required
-                        error={form.errors.title}
+                        error={command.fieldErrors.title}
                     >
                         <Input
                             value={form.data.title}
@@ -1642,9 +2275,18 @@ function RaiseTicketDialog({
                             autoFocus
                         />
                     </Field>
+                    <TicketDuplicateSuggestions
+                        actorId={actorId}
+                        title={form.data.title}
+                        siteId={
+                            form.data.site_id === UNASSIGNED
+                                ? null
+                                : Number(form.data.site_id)
+                        }
+                    />
                     <Field
                         label="What kind of thing is it?"
-                        error={form.errors.category}
+                        error={command.fieldErrors.category}
                     >
                         <TilePicker
                             value={form.data.category}
@@ -1652,18 +2294,19 @@ function RaiseTicketDialog({
                             options={[...RAISE_CATEGORY_OPTIONS]}
                         />
                     </Field>
-                    <Field
-                        label="How urgent is it?"
-                        error={form.errors.priority}
-                    >
-                        <Segmented
-                            value={form.data.priority}
-                            onChange={(v) => form.setData('priority', v)}
-                            options={URGENCY_OPTIONS}
-                        />
-                    </Field>
+                    <TicketImpactUrgencyFields
+                        impact={form.data.impact}
+                        urgency={form.data.urgency}
+                        onImpactChange={(value) =>
+                            form.setData('impact', value)
+                        }
+                        onUrgencyChange={(value) =>
+                            form.setData('urgency', value)
+                        }
+                        errors={command.fieldErrors}
+                    />
                     {kbMatches.length > 0 ? (
-                        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+                        <div className="min-w-0 rounded-xl border border-primary/30 bg-primary/5 p-3">
                             <div className="flex items-center gap-1.5 text-[12px] font-semibold text-primary">
                                 <BookOpen className="h-3.5 w-3.5" /> These might
                                 fix it now
@@ -1693,7 +2336,7 @@ function RaiseTicketDialog({
                             <Field
                                 label="More details"
                                 hint="optional"
-                                error={form.errors.description}
+                                error={command.fieldErrors.description}
                             >
                                 <Textarea
                                     value={form.data.description}
@@ -1710,36 +2353,94 @@ function RaiseTicketDialog({
                             <Field
                                 label="Photos or files"
                                 hint="optional — a photo says a lot"
-                                error={form.errors.attachments}
+                                htmlFor={
+                                    !draftRecoveryEnabled
+                                        ? `${attachmentId}-input`
+                                        : undefined
+                                }
+                                labelId={
+                                    !draftRecoveryEnabled
+                                        ? `${attachmentId}-label`
+                                        : undefined
+                                }
+                                errorId={
+                                    !draftRecoveryEnabled
+                                        ? `${attachmentId}-error`
+                                        : undefined
+                                }
+                                error={
+                                    form.errors.attachments ??
+                                    command.fieldErrors.attachments
+                                }
                             >
-                                <FileDropzone
-                                    onFiles={(files) =>
-                                        form.setData(
-                                            'attachments',
-                                            [
-                                                ...form.data.attachments,
-                                                ...files,
-                                            ].slice(0, 5),
-                                        )
-                                    }
-                                    accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
-                                    title="Drop a photo of the problem"
-                                    hint="Images, PDF or documents — up to 5 files"
-                                />
-                                {form.data.attachments.map((file, i) => (
-                                    <StagedFileCard
-                                        key={`${file.name}-${i}`}
-                                        file={file}
-                                        onRemove={() =>
-                                            form.setData(
-                                                'attachments',
-                                                form.data.attachments.filter(
-                                                    (_, j) => j !== i,
-                                                ),
-                                            )
-                                        }
+                                {draftRecoveryEnabled ? (
+                                    <TicketDraftFiles
+                                        draft={intake.draft}
+                                        disabled={!command.canEdit}
                                     />
-                                ))}
+                                ) : (
+                                    <>
+                                        <FileDropzone
+                                            id={attachmentId}
+                                            aria-labelledby={`${attachmentId}-label ${attachmentId}-title`}
+                                            aria-describedby={
+                                                (form.errors.attachments ??
+                                                command.fieldErrors.attachments)
+                                                    ? `${attachmentId}-error`
+                                                    : undefined
+                                            }
+                                            aria-invalid={Boolean(
+                                                form.errors.attachments ??
+                                                command.fieldErrors.attachments,
+                                            )}
+                                            disabled={!command.canEdit}
+                                            onFiles={(files) => {
+                                                if (!command.canEdit) return;
+                                                const error =
+                                                    itAttachmentSelectionError(
+                                                        files,
+                                                        form.data.attachments
+                                                            .length,
+                                                    );
+                                                if (error) {
+                                                    form.setError(
+                                                        'attachments',
+                                                        error,
+                                                    );
+                                                    return;
+                                                }
+                                                form.clearErrors('attachments');
+                                                form.setData('attachments', [
+                                                    ...form.data.attachments,
+                                                    ...files,
+                                                ]);
+                                            }}
+                                            accept={IT_ATTACHMENT_ACCEPT}
+                                            title="Drop a photo of the problem"
+                                            hint="Images, PDF or documents — up to 5 files"
+                                        />
+                                        {form.data.attachments.map(
+                                            (file, i) => (
+                                                <StagedFileCard
+                                                    key={`${file.name}-${i}`}
+                                                    file={file}
+                                                    onRemove={() => {
+                                                        form.clearErrors(
+                                                            'attachments',
+                                                        );
+                                                        form.setData(
+                                                            'attachments',
+                                                            form.data.attachments.filter(
+                                                                (_, j) =>
+                                                                    j !== i,
+                                                            ),
+                                                        );
+                                                    }}
+                                                />
+                                            ),
+                                        )}
+                                    </>
+                                )}
                             </Field>
                         </>
                     ) : (
@@ -1754,7 +2455,7 @@ function RaiseTicketDialog({
                     )}
                 </div>
             </WizardStepPane>
-        </WizardShell>
+        </TicketCommandWizard>
     );
 }
 
@@ -1762,149 +2463,7 @@ function RaiseTicketDialog({
 /*  Resolve ticket (single step — the note IS the record)             */
 /* ================================================================== */
 
-const RESOLVE_STEPS: readonly WizardStep[] = [
-    {
-        key: 'resolve',
-        label: 'Resolve',
-        blurb: 'What fixed it',
-        icon: CheckCircle2,
-    },
-];
-
-export function ResolveTicketDialog({
-    ticket,
-    onDraftKb,
-    onClose,
-}: {
-    ticket: { id: number; reference: string | null; title: string };
-    onDraftKb?: (draft: KbDraft) => void;
-    onClose: () => void;
-}) {
-    const wizard = useWizard(RESOLVE_STEPS.length);
-    const [done, setDone] = useState(false);
-
-    const form = useForm({
-        note: '',
-        notify_requester: true,
-    });
-
-    const valid = form.data.note.trim().length > 0;
-
-    const submit = () => {
-        form.post(`/it/tickets/${ticket.id}/resolve`, {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                const err = pageFlashError(page);
-                if (err) {
-                    toast.error(err);
-                    return;
-                }
-                setDone(true);
-                toast.success(`Resolved ${ticket.reference ?? 'ticket'}.`);
-            },
-        });
-    };
-
-    return (
-        <WizardShell
-            open
-            onClose={onClose}
-            title="Resolve ticket"
-            description={`${ticket.reference ?? 'Ticket'} — ${ticket.title}`}
-            railIcon={CheckCircle2}
-            railTitle="Resolve"
-            railSub={ticket.reference ?? 'IT helpdesk'}
-            steps={RESOLVE_STEPS}
-            stepIndex={wizard.index}
-            onStepClick={wizard.goTo}
-            pct={wizard.progress}
-            success={
-                done ? (
-                    <WizardSuccessPane
-                        title="Resolved"
-                        blurb={
-                            <>
-                                The resolution note is on the thread as the
-                                final reply
-                                {form.data.notify_requester
-                                    ? ' and the requester has been emailed'
-                                    : ''}
-                                . It auto-closes in 7 days unless reopened.
-                            </>
-                        }
-                        actions={
-                            <>
-                                {onDraftKb ? (
-                                    <Button
-                                        variant="outline"
-                                        onClick={() =>
-                                            onDraftKb({
-                                                title: ticket.title,
-                                                body: form.data.note,
-                                            })
-                                        }
-                                    >
-                                        <BookOpen className="h-3.5 w-3.5" />{' '}
-                                        Draft KB article
-                                    </Button>
-                                ) : null}
-                                <Button onClick={onClose}>Done</Button>
-                            </>
-                        }
-                    />
-                ) : undefined
-            }
-            footerStart={null}
-            footerEnd={
-                <>
-                    <Button variant="ghost" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={submit}
-                        disabled={form.processing || !valid}
-                    >
-                        {form.processing ? 'Resolving…' : 'Resolve ticket'}
-                    </Button>
-                </>
-            }
-        >
-            <WizardStepPane>
-                <StepHead
-                    icon={CheckCircle2}
-                    title="What fixed it?"
-                    blurb="Posted to the thread as the final public reply — the requester reads this."
-                />
-                <div className="grid gap-3.5">
-                    <Field
-                        label="Resolution note"
-                        required
-                        error={form.errors.note}
-                    >
-                        <Textarea
-                            value={form.data.note}
-                            onChange={(e) =>
-                                form.setData('note', e.target.value)
-                            }
-                            placeholder="e.g. Replaced the charging cable and tested — holding 100% overnight."
-                            rows={5}
-                            autoFocus
-                        />
-                    </Field>
-                    <label className="flex items-center gap-2 text-[13px] font-medium">
-                        <Checkbox
-                            checked={form.data.notify_requester}
-                            onCheckedChange={(v) =>
-                                form.setData('notify_requester', v === true)
-                            }
-                        />
-                        Email the requester that it’s fixed
-                    </label>
-                </div>
-            </WizardStepPane>
-        </WizardShell>
-    );
-}
+export { ResolveTicketDialog };
 
 /* ================================================================== */
 /*  SLA targets (single step, admin-only — §N7)                       */
@@ -2128,7 +2687,7 @@ export function SlaPolicyDialog({
                     <StepHead
                         icon={Timer}
                         title="Response & resolution targets"
-                        blurb="Minutes from creation. First response stops at the first public agent reply; resolution pauses while a ticket waits on its requester."
+                        blurb="Targets count from creation. First response stops at the first public agent reply. Resolution pauses during recorded requester, vendor, approver, team, change or other waits."
                     />
                     <div className="grid gap-3">
                         {Object.keys(SLA_DEFAULTS).map((priority) => (
@@ -2402,193 +2961,7 @@ export function SlaPolicyDialog({
 /*  Merge ticket (agent — fold a duplicate into a survivor, §P-S2)     */
 /* ================================================================== */
 
-export interface MergeTarget {
-    id: number;
-    reference: string | null;
-    title: string;
-    priority: string;
-    status: string;
-}
-
-const MERGE_STEPS: readonly WizardStep[] = [
-    {
-        key: 'target',
-        label: 'Merge target',
-        blurb: 'Pick the survivor',
-        icon: GitMerge,
-    },
-];
-
-const MERGE_PRIORITY_VARIANT: Record<string, 'critical' | 'info' | 'neutral'> =
-    {
-        urgent: 'critical',
-        high: 'critical',
-        normal: 'info',
-        low: 'neutral',
-    };
-
-export function MergeTicketDialog({
-    ticket,
-    targets,
-    onClose,
-}: {
-    ticket: { id: number; reference: string | null; title: string };
-    targets: MergeTarget[];
-    onClose: () => void;
-}) {
-    const [q, setQ] = useState('');
-    const [selected, setSelected] = useState<number | null>(null);
-    const [reason, setReason] = useState('');
-    const [processing, setProcessing] = useState(false);
-
-    const filtered = useMemo(() => {
-        const term = q.trim().toLowerCase();
-        if (!term) return targets;
-        return targets.filter(
-            (t) =>
-                (t.reference ?? '').toLowerCase().includes(term) ||
-                t.title.toLowerCase().includes(term),
-        );
-    }, [q, targets]);
-
-    const chosen = targets.find((t) => t.id === selected) ?? null;
-
-    const submit = () => {
-        if (!selected || !reason.trim()) return;
-        setProcessing(true);
-        router.post(
-            `/it/tickets/${ticket.id}/merge`,
-            { target_ticket_id: selected, reason: reason.trim() },
-            {
-                onSuccess: () => toast.success('Ticket merged.'),
-                onError: () =>
-                    toast.error(
-                        'Could not merge — the target may no longer be open.',
-                    ),
-                onFinish: () => setProcessing(false),
-            },
-        );
-    };
-
-    return (
-        <WizardShell
-            open
-            onClose={onClose}
-            title="Merge ticket"
-            description={`Fold ${ticket.reference ?? `#${ticket.id}`} into another open ticket.`}
-            railIcon={GitMerge}
-            railTitle="Merge"
-            railSub="IT helpdesk"
-            steps={MERGE_STEPS}
-            stepIndex={0}
-            onStepClick={() => {}}
-            pct={100}
-            footerEnd={
-                <>
-                    <Button
-                        variant="ghost"
-                        className="min-h-11"
-                        onClick={onClose}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        className="min-h-11"
-                        onClick={submit}
-                        disabled={!selected || !reason.trim() || processing}
-                    >
-                        {processing
-                            ? 'Merging…'
-                            : chosen
-                              ? `Merge into ${chosen.reference ?? `#${chosen.id}`}`
-                              : 'Merge'}
-                    </Button>
-                </>
-            }
-        >
-            <WizardStepPane>
-                <StepHead
-                    icon={GitMerge}
-                    title="Choose the surviving ticket"
-                    blurb="This ticket's conversation and watchers move onto the one you pick; this ticket then closes as a duplicate."
-                />
-                <div className="grid gap-3">
-                    <Input
-                        value={q}
-                        onChange={(e) => setQ(e.target.value)}
-                        placeholder="Search by reference or title…"
-                        aria-label="Search merge targets"
-                    />
-                    <div className="max-h-72 space-y-1.5 overflow-y-auto">
-                        {filtered.length === 0 ? (
-                            <div className="rounded-lg border border-dashed border-border p-4 text-center text-[13px] text-muted-foreground">
-                                {targets.length === 0
-                                    ? 'No other open tickets to merge into.'
-                                    : 'No tickets match your search.'}
-                            </div>
-                        ) : (
-                            filtered.map((t) => {
-                                const on = t.id === selected;
-                                return (
-                                    // eslint-disable-next-line no-restricted-syntax -- selectable list row, not a <Button>
-                                    <button
-                                        key={t.id}
-                                        type="button"
-                                        aria-pressed={on}
-                                        onClick={() => setSelected(t.id)}
-                                        className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
-                                            on
-                                                ? 'border-primary ring-1 ring-primary'
-                                                : 'border-border hover:bg-muted'
-                                        }`}
-                                    >
-                                        <div className="min-w-0">
-                                            <div className="truncate text-[13px] font-semibold">
-                                                {t.title}
-                                            </div>
-                                            <div className="font-mono text-[11.5px] text-muted-foreground">
-                                                {t.reference ?? `#${t.id}`}
-                                            </div>
-                                        </div>
-                                        <StatusBadge
-                                            variant={
-                                                MERGE_PRIORITY_VARIANT[
-                                                    t.priority
-                                                ] ?? 'neutral'
-                                            }
-                                            size="sm"
-                                        >
-                                            {t.priority}
-                                        </StatusBadge>
-                                    </button>
-                                );
-                            })
-                        )}
-                    </div>
-                    <Field
-                        label="Reason for merging"
-                        required
-                        hint="This appears on both ticket timelines."
-                    >
-                        <Textarea
-                            value={reason}
-                            onChange={(event) => setReason(event.target.value)}
-                            rows={3}
-                            maxLength={1000}
-                            required
-                            placeholder="Explain why these are the same request"
-                        />
-                    </Field>
-                    <InfoCard icon={GitMerge}>
-                        Only tickets for the same requester are available.
-                        Merging can’t be undone: the duplicate closes, its
-                        conversation moves, and both records retain the link.
-                    </InfoCard>
-                </div>
-            </WizardStepPane>
-        </WizardShell>
-    );
-}
+export { MergeTicketDialog, type MergeTarget } from './merge-ticket-dialog';
 
 /* ================================================================== */
 /*  KB article (agent, 4 steps: Basics → Audience → Content → Review) */
@@ -3465,15 +3838,25 @@ function AssignDialog({
     heading: string;
     subject: string;
     currentId: number | null;
-    endpoint: { method: 'post' | 'patch'; url: string; field: string };
+    endpoint: {
+        method: 'post' | 'patch';
+        url: string;
+        field: string;
+        ticketId?: number;
+        expectedVersion?: number;
+    };
     assignees: AssigneeOption[];
     onClose: () => void;
 }) {
     const [done, setDone] = useState(false);
     const [search, setSearch] = useState('');
+    const [expectedVersion, setExpectedVersion] = useState(
+        endpoint.expectedVersion,
+    );
 
     const form = useForm({
         [endpoint.field]: currentId != null ? String(currentId) : '',
+        routing_reason: '',
     } as Record<string, string>);
 
     const pickedId = form.data[endpoint.field];
@@ -3488,6 +3871,12 @@ function AssignDialog({
     const submit = () => {
         form.transform((data) => ({
             [endpoint.field]: Number(data[endpoint.field]),
+            ...(endpoint.ticketId !== undefined
+                ? {
+                      expected_version: expectedVersion,
+                      routing_reason: data.routing_reason,
+                  }
+                : {}),
         }));
         const opts = {
             preserveScroll: true,
@@ -3541,7 +3930,13 @@ function AssignDialog({
                     </Button>
                     <Button
                         onClick={submit}
-                        disabled={form.processing || !picked}
+                        disabled={
+                            form.processing ||
+                            !picked ||
+                            (endpoint.ticketId !== undefined &&
+                                !form.data.routing_reason.trim()) ||
+                            !!form.errors.expected_version
+                        }
                     >
                         {form.processing ? 'Assigning…' : 'Assign'}
                     </Button>
@@ -3554,6 +3949,35 @@ function AssignDialog({
                     title="Who works this?"
                     blurb={`Pick the person taking ownership of “${subject}”.`}
                 />
+                <TicketVersionConflict
+                    error={form.errors.expected_version}
+                    ticketId={endpoint.ticketId ?? null}
+                    onReviewed={(version) => {
+                        setExpectedVersion(version);
+                        form.clearErrors('expected_version');
+                    }}
+                />
+                {endpoint.ticketId !== undefined && (
+                    <Field
+                        label="Reason for assignment"
+                        required
+                        error={form.errors.routing_reason}
+                    >
+                        <Textarea
+                            value={form.data.routing_reason}
+                            onChange={(event) =>
+                                form.setData(
+                                    'routing_reason',
+                                    event.target.value,
+                                )
+                            }
+                            rows={3}
+                            maxLength={1000}
+                            placeholder="Explain why this technician should take the work."
+                        />
+                    </Field>
+                )}
+                <FieldErr>{form.errors[endpoint.field]}</FieldErr>
                 <div className="relative mb-3">
                     <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input

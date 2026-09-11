@@ -1,0 +1,22 @@
+[
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\It\\Services\\ItTicketMergeService.php",
+    "Hash": "BD8F12856825F7B10860B6311EA50903AEC96FF931BEEBBA2D6C544FF9400AFD"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Http\\Controllers\\It\\ItTicketController.php",
+    "Hash": "329ED6DE7700D15C956501F34F14FDB9B2266362CDC93600C3B45E578B6CAB76"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\tests\\Feature\\It\\ItTicketDuplicateSuggestionTest.php",
+    "Hash": "F0B1079436C4CF0D6FCF9C2CBE1EBB4D409D277083F696891853F698C1B7FA4A"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\merge-ticket-dialog.tsx",
+    "Hash": "DB3BF3C78380477F770387A55FC54B8B2985F45488FB9FF0D38EE3F3C98EC198"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\__tests__\\merge-ticket-dialog.test.tsx",
+    "Hash": "BC78BC181D0A425D5562C830366943AD9E0D12A5E5D2356F4D5DE2230F87BE44"
+  }
+]

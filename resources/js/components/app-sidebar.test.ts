@@ -9,9 +9,12 @@ describe('app sidebar workforce navigation', () => {
         }).filter((item) => item.section === 'IT & Support');
         expect(catalog.map((item) => item.href)).toEqual([
             '/it',
+            '/it/knowledge',
+            '/it/work',
             '/it/problems',
             '/it/changes',
             '/it/major-incidents',
+            '/it/reports',
             '/it/setup',
         ]);
     });
@@ -20,8 +23,22 @@ describe('app sidebar workforce navigation', () => {
         const catalog = buildNavSearchCatalog({
             can: { it: { request: true } },
         }).filter((item) => item.section === 'IT & Support');
-        expect(catalog.map((item) => item.href)).toEqual(['/it']);
+        expect(catalog.map((item) => item.href)).toEqual([
+            '/it',
+            '/it/knowledge',
+        ]);
     });
+
+    it.each(['knowledge_author', 'knowledge_review'])(
+        'gives %s only the canonical knowledge entry',
+        (capability) => {
+            const catalog = buildNavSearchCatalog({
+                can: { it: { [capability]: true } },
+            }).filter((item) => item.section === 'IT & Support');
+            expect(catalog.map((item) => item.href)).toEqual(['/it/knowledge']);
+            expect(catalog[0].label).toBe('Knowledge & Documentation');
+        },
+    );
 
     it('uses the grouped Security & Devices contract in application search', () => {
         const catalog = buildNavSearchCatalog({

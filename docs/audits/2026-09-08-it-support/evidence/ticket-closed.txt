@@ -1,0 +1,109 @@
+IT & Support
+IT-000007
+Back to IT & Support
+IT-000007
+Closed
+Normal
+AUDIT 2026-09-08 — disposable printer workflow
+
+Raised by Demo Admin · System Administrator · 49m ago
+
+Reopen…
+Watch
+Conversation
+Activity
+9
+DEMO ADMIN — ORIGINAL REPORT
+
+Disposable local audit record. Verify triage, work tasks, resolution and reopening. No operational action required.
+
+Demo Admin
+· requester
+45m ago
+
+AUDIT public reply: I have checked the simulated printer and completed the test task.
+
+Demo Admin
+· requester
+Internal
+14m ago
+
+AUDIT internal note: technician-only diagnostic for disposable workflow.
+
+Demo Admin
+· requester
+13m ago
+
+AUDIT completed: simulated printer restored, required task finished, test-page outcome recorded.
+
+Demo Admin
+· requester
+12m ago
+
+AUDIT: simulated recurrence to verify the reasoned reopen journey.
+
+Demo Admin
+· requester
+39s ago
+
+AUDIT finished: the simulated recurrence is resolved. Disposable verification record only.
+
+This conversation is read-only
+
+Reopen this ticket before adding another reply.
+
+PROPERTIES
+STATUS
+Closed
+PRIORITY
+Normal
+WORK TYPE
+Incident
+AFFECTED SERVICE
+Not classified
+TICKET SITE
+QA Main Site
+CATEGORY
+Hardware
+ASSIGNEE
+Demo Admin
+ROUTED OWNERSHIP
+QUEUE
+Queue not configured
+RESPONSIBLE TEAM
+Team not configured
+ACCOUNTABLE OWNER
+Owner not assigned
+WORK TASKS
+1 of 1 complete
+
+AUDIT: confirm printer test page
+
+Completed
+Required
+
+Completed by Demo Admin · Tue 8 Sept, 3:54 pm
+
+Disposable audit task completed; simulated printer test page accepted.
+
+LINKED CONTEXT
+
+No linked operational records are visible.
+
+WATCHERS (0)
+
+Nobody watching yet.
+
+REQUESTER
+Demo Admin · System Administrator
+SOURCE
+Agent
+RAISED
+Tue 8 Sept, 3:51 pm
+UPDATED
+Tue 8 Sept, 4:40 pm
+RESOLVED
+Tue 8 Sept, 4:39 pm
+CLOSED
+Tue 8 Sept, 4:40 pm
+Copy link to this ticket

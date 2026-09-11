@@ -27,6 +27,12 @@ class EnsureAccountStillApproved
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
+            if (ProtectItDraftResponses::applies($request)) {
+                return response()->json([
+                    'code' => 'access_unavailable', 'message' => 'Your staff access is no longer available.',
+                ], 403);
+            }
+
             return redirect()
                 ->route('login')
                 ->withErrors(['email' => 'Your account access has been revoked. Contact your administrator if this is unexpected.']);

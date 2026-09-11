@@ -1,0 +1,191 @@
+Home
+IT & Support
+IT & Support
+SLA healthy
+
+Service desk · Tickets, requests and service delivery
+
+Log ticket
+OPEN TICKETS
+6
+2 urgent
+UNASSIGNED
+2
+1 urgent · need an owner
+BREACHING SOON
+0
+SLA at risk
+BREACHED
+0
+SLA overdue
+AWAITING REPLY
+6
+conversation needs an agent
+WAITING
+0
+paused on requester or vendor
+SLA MET · 30D
+1
+100%
+1 of 1
+resolved in SLA
+PROVISIONING
+0
+queue healthy
+30 days
+Overview
+Tickets
+6
+Provisioning
+0
+Knowledge
+1
+Reports
+Service catalogue
+1
+My tickets
+0
+Find
+
+Helpdesk analytics — 10 Aug → 8 Sept
+
+Export
+OPEN
+7
+2 unassigned
+SLA AT RISK / BREACHED
+0 / 0
+AVG FIRST RESPONSE
+3m
+AVG RESOLUTION
+—
+SLA COMPLIANCE
+—
+0 resolved
+CSAT AVERAGE
+—
+PROVISIONING RAISED
+0
+FULFILLED
+0
+CREATED VS RESOLVED
+CSV
+10 Aug
+16 Aug
+22 Aug
+28 Aug
+3 Sept
+0
+1
+2
+3
+4
+Created
+Resolved
+OPEN BY PRIORITY
+CSV
+Low
+0
+0%
+Normal
+2
+29%
+High
+3
+43%
+Urgent
+2
+29%
+OPEN BY CATEGORY
+CSV
+Hardware
+1
+14%
+Account
+1
+14%
+Network
+5
+71%
+Other
+0
+0%
+TOP REQUESTERS
+CSV
+Demo Admin
+1
+AGENT WORKLOAD (OPEN)
+CSV
+Demo Admin
+5
+Demand & ageing
+
+Where work is arriving from and how long it has been waiting. Every row opens the matching queue.
+
+OPEN BACKLOG AGE
+Under 2 days
+1
+Days 2 to 7
+0
+Days 8 to 30
+6
+Over 30 days
+0
+CONTACT CHANNELS
+Portal
+0
+Agent
+1
+System
+0
+Email
+0
+Quality & outcomes
+
+Resolution quality, operational outcomes and the automation that keeps the desk moving.
+
+RESOLUTION QUALITY
+Reopened tickets
+—
+0 of 0
+First-contact resolution
+—
+0 of 0
+OPERATIONAL OUTCOMES
+Major incidents
+0
+0 open · 0 restored
+Successful changes
+—
+0 successful · 0 failed
+Recurring problems
+0
+0 root causes · 0 known errors
+Successful automation runs
+0
+0 failed · 0 skipped
+Service & Device context
+
+Ticket demand joined to its recorded service and canonical Device context.
+
+SERVICES
+Managed connectivity
+5 open · 0 SLA breaches · Operational
+0
+DEVICE-LINKED INCIDENTS
+Affected Devices
+0
+0 open incidents · 0 recovered incidents
+Data quality
+
+Open work that is missing routing or ownership data. Clear these gaps to keep reports trustworthy.
+
+NEEDS ATTENTION
+Missing service
+2
+Missing queue
+7
+Missing team
+7
+Unassigned
+2

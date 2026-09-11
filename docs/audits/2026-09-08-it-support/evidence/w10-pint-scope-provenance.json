@@ -1,0 +1,53 @@
+{
+  "recorded_at_utc": "2026-09-09T02:54:32.4565887Z",
+  "event": "Unintended Pint --dirty formatting after recorded helper executions; no helper executed by this formatting command",
+  "formatted_files": [
+    {
+      "file": "implementation-runtime-readonly.php",
+      "sha256": "7059cc74c25246bfafb34055660cedb5213d6eecdd6253b8e0ddc62197e62fda"
+    },
+    {
+      "file": "isolated-test-preflight.php",
+      "sha256": "5af167b750813721c496d026a40113b810729707c9515e82cc24c9195bd8e1b3"
+    },
+    {
+      "file": "it-additive-browser-migrations.php",
+      "sha256": "f27b5fa4e341231c75389e5b9798adcc028fca198bc3f834f6e2337a1bea2d94"
+    },
+    {
+      "file": "read-only-runtime.php",
+      "sha256": "cf29b79b4142748b0e8dab50c1daa5acc29d2da64993663fc6a91cfcab3668a5"
+    },
+    {
+      "file": "w01-browser-fixtures.php",
+      "sha256": "f6c2e7a55864e510198a8a9d41e6783dca74e5c4fd1317e7140ce10bf6c48fce"
+    },
+    {
+      "file": "w01-knowledge-browser-fixtures.php",
+      "sha256": "9a7a7b262e7209a10d03afd698458787d149e3fe2d940f97a04378cb4c2fc2d2"
+    },
+    {
+      "file": "w02-browser-hold-requester.php",
+      "sha256": "27c42a6f21786b4f10d380491abe26aa0d062667a10a5c724bc43f8fc491f2ed"
+    },
+    {
+      "file": "w02-browser-migrations.php",
+      "sha256": "3b2a0f505d701b17130effdaf9c8b2eafc4fdb6f2b412d6974c38fd70f8fc242"
+    },
+    {
+      "file": "w02-browser-results.php",
+      "sha256": "bd6f090e6c3b0236e08caf12df9c9e130ea35328d7099bb751cdbf6358a6664e"
+    },
+    {
+      "file": "w03-browser-cover-fixture.php",
+      "sha256": "7d9d37a297cb1faf42289914932dc59b467d7f4851cb5d0cd80230d158d3493d"
+    },
+    {
+      "file": "w04-browser-fixtures.php",
+      "sha256": "4e8972c407567f40c23f9f33dc3c7fddc61cf959766ac1ecf67a3c6922d2f663"
+    }
+  ],
+  "knowledge_permissions_gate_sha256": "36d53e1099b797743f393b2ee666798856b1a09be689c82e879b0309dc8349b5",
+  "knowledge_permissions_gate_unchanged": true,
+  "tracked_EventServiceProvider": "Only added import and shortened AuthEventSubscriber class reference reverted; root @record listener fixes preserved"
+}

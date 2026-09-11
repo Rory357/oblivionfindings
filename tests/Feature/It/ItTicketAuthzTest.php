@@ -63,6 +63,7 @@ test('agents can still log-and-triage with an assignee in one step', function ()
             'priority' => 'normal',
             'site_id' => $this->site->id,
             'assigned_to_user_id' => $this->hr->id,
+            'routing_reason' => 'I will prepare the starter laptop.',
         ])
         ->assertRedirect()
         ->assertSessionHas('success');
@@ -122,7 +123,7 @@ test('requesters cannot work the queue or the provisioning routes', function () 
     ]);
 
     $this->actingAs($this->worker)
-        ->patch("/it/tickets/{$ticket->id}", ['status' => 'in_progress'])
+        ->patch("/it/tickets/{$ticket->id}", ['expected_version' => $ticket->fresh()->lock_version, 'status' => 'in_progress'])
         ->assertForbidden();
 
     $this->actingAs($this->worker)

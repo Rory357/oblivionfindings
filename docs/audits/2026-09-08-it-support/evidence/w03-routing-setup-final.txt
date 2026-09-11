@@ -1,0 +1,54 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_969304687289426e",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketRoutingDecisionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mqueue browser edits require the reviewed configuration and preserve concurrent routing changes[39m[90m            [39m [90m360.35s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma revoked cover blocks activation but does not prevent disabling the queue[39m[90m                                  [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90morganisation-wide access cannot configure a foreign Site and fallback coverage cannot silently widen[39m[90m        [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrouting stops using a default assignee or cover removed from its team[39m[90m                                       [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpriority decisions cover every impact and urgency with monotonic escalation[39m[90m                                 [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy priority adapters preserve their level while new dimensions govern assessment[39m[90m                        [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnew responsibility cannot inherit site access from an old assignment or inactive employment[39m[90m                 [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcover selection consumes approved HR absence without exposing or copying private leave details[39m[90m              [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpriority overrides preserve their reason through later impact changes until explicit release[39m[90m                [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfallback activation requires a distinct current scoped cover while incomplete setup remains editable inacti[39m[90m…[39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester chooses either approved site and cannot submit an active third site[39m[90m                             [39m [90m0.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowser email and scoped service API intake share the same accountable fallback rule[39m[90m                        [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90mspecific routing is deterministic and a fallback cannot ignore its site restriction[39m[90m                         [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproved absence routes to named cover and returning primary resumes automatic responsibility[39m[90m               [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanual queue and unassigned choices survive classification until a reasoned explicit release[39m[90m                [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90man inactive manual assignee is suspended without erasing the recorded intention[39m[90m                             [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreceipts committed by the W02 payload contract still replay after dimensional intake is added[39m[90m               [39m [90m0.67s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItServiceManagementSetupTest[39m
+  [32;1m✓[39;22m[90m [39m[90mIT pages share the approved grouped navigation while preserving existing deep links[39m[90m                         [39m [90m4.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation emits the requester catalogue only with exact request access[39m[90m                                  [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation never produces an unsupported SLA tab[39m[90m                                                         [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT navigation requires the exact Security destination permissions and module access[39m[90m                         [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents configure application teams membership roles services and queue routing with audit[39m[90m                   [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket intake applies the highest priority matching queue service owner team and default assignee[39m[90m           [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup exposes Site-scoped workload counts and keeps configuration application-wide[39m[90m                          [39m [90m3.40s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup queue and service risk counts use authorized live clock evidence instead of cached states[39m[90m             [39m [90m2.81s[39m  
+
+  [90mTests:[39m    [32;1m25 passed[39;22m[90m (289 assertions)[39m
+  [90mDuration:[39m [39m387.45s[39m
+

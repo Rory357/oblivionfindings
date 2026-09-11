@@ -1,0 +1,12 @@
+{
+  "ticket_closed": true,
+  "exactly_one_reopen": true,
+  "final_summary_matches": true,
+  "final_verification_matches": true,
+  "first_public_body_matches": true,
+  "reopen_public_body_matches": true,
+  "second_public_body_matches": true,
+  "exactly_three_public_comments": true,
+  "exactly_two_resolution_audits": true,
+  "exactly_one_confirmation": true
+}

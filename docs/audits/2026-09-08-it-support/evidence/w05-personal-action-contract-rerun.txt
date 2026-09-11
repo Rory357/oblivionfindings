@@ -1,0 +1,35 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_fe06bc23a42e478b",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTicketLifecycleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mresolving requires a note and posts it as the final public reply[39m[90m                                          [39m [90m251.36s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe notify toggle silences the requester but never the watchers[39m[90m                                             [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresolution met requires both clock measurements before the overall SLA is met with (true)[39m[90m                   [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresolution met requires both clock measurements before the overall SLA is met with (false)[39m[90m                  [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclose requires a reason records it once and reopen brings the ticket back with a bump[39m[90m                       [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequesters can reopen within seven days, not after[39m[90m                                                          [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpersonal list reply and reopen controls respect settlement participant audience and the reopen window[39m[90m       [39m [90m5.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe auto-close command sweeps tickets past the reopen window[39m[90m                                                [39m [90m0.68s[39m  
+
+  [90mTests:[39m    [32;1m8 passed[39;22m[90m (104 assertions)[39m
+  [90mDuration:[39m [39m261.25s[39m
+

@@ -4,6 +4,7 @@ namespace App\Support\It;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use DomainException;
 
 /**
  * Working-time arithmetic for the IT helpdesk SLA clocks (§P-S1, stretch).
@@ -39,10 +40,10 @@ class BusinessHours
      */
     public static function addWorkingMinutes(CarbonInterface $start, int $minutes, ?array $calendar = null): CarbonImmutable
     {
-        $cursor = CarbonImmutable::instance($start)->setTimezone(self::timezone());
+        $cursor = CarbonImmutable::instance($start)->setTimezone(self::timezone($calendar));
 
         if ($minutes <= 0 || ! self::hasWindows($calendar)) {
-            return $cursor->addMinutes(max(0, $minutes));
+            return self::addElapsedMinutes($cursor, max(0, $minutes));
         }
 
         $windows = self::windows($calendar);
@@ -61,7 +62,7 @@ class BusinessHours
                     $available = max(0, (int) $effectiveStart->diffInMinutes($windowClose));
 
                     if ($remaining <= $available) {
-                        return $effectiveStart->addMinutes($remaining);
+                        return self::addElapsedMinutes($effectiveStart, $remaining);
                     }
                     $remaining -= $available;
                     $cursor = $windowClose;
@@ -70,8 +71,7 @@ class BusinessHours
             $cursor = $cursor->addDay()->startOfDay();
         }
 
-        // Unreachable while hasWindows() is true; defensive fallback.
-        return $cursor->addMinutes($remaining);
+        throw new DomainException('The SLA calendar cannot establish a deadline within its supported range.');
     }
 
     /**
@@ -82,7 +82,7 @@ class BusinessHours
      */
     public static function workingMinutesBetween(CarbonInterface $from, CarbonInterface $to, ?array $calendar = null): int
     {
-        $tz = self::timezone();
+        $tz = self::timezone($calendar);
         $start = CarbonImmutable::instance($from)->setTimezone($tz);
         $end = CarbonImmutable::instance($to)->setTimezone($tz);
 
@@ -111,6 +111,10 @@ class BusinessHours
                 }
             }
             $cursor = $cursor->addDay()->startOfDay();
+        }
+
+        if ($cursor->lessThan($end)) {
+            throw new DomainException('The SLA calendar interval exceeds its supported range.');
         }
 
         return $total;
@@ -154,9 +158,14 @@ class BusinessHours
         return false;
     }
 
-    private static function timezone(): string
+    private static function timezone(?array $calendar): string
     {
-        return config('app.worker_timezone', 'Pacific/Auckland');
+        return $calendar['timezone'] ?? config('app.worker_timezone', 'Pacific/Auckland');
+    }
+
+    private static function addElapsedMinutes(CarbonImmutable $at, int $minutes): CarbonImmutable
+    {
+        return $at->utc()->addMinutes($minutes)->setTimezone($at->timezone);
     }
 
     /**
@@ -172,10 +181,25 @@ class BusinessHours
         $out = [];
         foreach (self::DAY_KEYS as $key) {
             $day = is_array($raw[$key] ?? null) ? $raw[$key] : [];
-            $out[$key] = array_values(array_map(
-                fn ($w) => [(string) $w[0], (string) $w[1]],
-                array_filter($day, fn ($w) => is_array($w) && isset($w[0], $w[1])),
-            ));
+            foreach ($day as $window) {
+                if (! is_array($window) || count($window) !== 2
+                    || ! is_string($window[0] ?? null) || ! is_string($window[1] ?? null)
+                    || ! preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D', $window[0])
+                    || ! preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D', $window[1])
+                    || $window[0] >= $window[1]) {
+                    throw new DomainException('The SLA calendar contains an invalid working window.');
+                }
+            }
+            usort($day, fn (array $left, array $right) => $left[0] <=> $right[0]);
+            $out[$key] = [];
+            foreach ($day as [$open, $close]) {
+                $last = array_key_last($out[$key]);
+                if ($last !== null && $open <= $out[$key][$last][1]) {
+                    $out[$key][$last][1] = max($close, $out[$key][$last][1]);
+                } else {
+                    $out[$key][] = [$open, $close];
+                }
+            }
         }
 
         return $out;

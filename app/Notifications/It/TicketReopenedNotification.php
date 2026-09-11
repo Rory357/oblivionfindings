@@ -10,8 +10,8 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * A settled ticket is back: tells the assignee their fix didn't stick (or
- * an agent reopened it). Reference + title only.
+ * A settled ticket is back: notify its assignee and current watchers.
+ * Reference + title only.
  */
 class TicketReopenedNotification extends Notification implements ShouldQueue, TracksItEmailDelivery
 {
@@ -40,10 +40,10 @@ class TicketReopenedNotification extends Notification implements ShouldQueue, Tr
         return (new MailMessage)
             ->subject("Reopened — {$this->ticket->reference} {$this->ticket->title}")
             ->greeting("Hello {$notifiable->name},")
-            ->line('A resolved ticket assigned to you has been reopened:')
+            ->line('A resolved ticket has been reopened:')
             ->line("**{$this->ticket->reference}** — {$this->ticket->title}")
             ->action('Open the ticket', url("/it/tickets/{$this->ticket->id}"))
-            ->line('You were notified because the ticket is assigned to you.');
+            ->line('Open the ticket to review the latest update.');
     }
 
     public function toArray(object $notifiable): array

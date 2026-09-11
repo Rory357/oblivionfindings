@@ -1,0 +1,8 @@
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\components\it\__tests__\ticket-work-task-review.test.tsx
+  112:13  warning  Consider <Button> from @/components/ui/button. If the raw <button> is intentional (custom layout / selector card), add an inline disable comment with reason  no-restricted-syntax
+  118:13  warning  Consider <Button> from @/components/ui/button. If the raw <button> is intentional (custom layout / selector card), add an inline disable comment with reason  no-restricted-syntax
+  124:13  warning  Consider <Button> from @/components/ui/button. If the raw <button> is intentional (custom layout / selector card), add an inline disable comment with reason  no-restricted-syntax
+
+✖ 3 problems (0 errors, 3 warnings)
+

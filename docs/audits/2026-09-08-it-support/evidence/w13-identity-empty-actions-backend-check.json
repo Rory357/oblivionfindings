@@ -1,0 +1,74 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItServiceIdentityCommandService.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Domain/It/Services/ItServiceIdentityCredentialService.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Domain/It/Services/ItWorkAccessService.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceIdentityController.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Middleware/RecordItApiRequest.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Http/Requests/It/StoreItServiceIdentityRequest.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Models/ItServiceIdentity.php",
+    "unchanged": true
+  },
+  {
+    "path": "app/Models/ItServiceIdentityCommandReceipt.php",
+    "unchanged": true
+  },
+  {
+    "path": "database/migrations/2026_09_11_000024_add_it_service_identity_commands.php",
+    "unchanged": true
+  },
+  {
+    "path": "routes/web.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Concurrency/It/ItServiceIdentityConcurrencyTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Feature/It/ItApiOperationsScopeTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Feature/It/ItApiPublicationTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Feature/It/ItSecureApiAccessBoundaryTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Feature/It/ItSecureApiTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Feature/It/ItServiceIdentityLifecycleTest.php",
+    "unchanged": true
+  },
+  {
+    "path": "tests/Support/It/service-identity-concurrency-worker.php",
+    "unchanged": true
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "no_comments_before": true,
+  "exactly_two_comments": true,
+  "exact_note_hashes": true,
+  "internal_author4_ticket6": true,
+  "ticket6_two_version_advances": true,
+  "approvals_unchanged": true,
+  "unrelated_tickets_unchanged": true,
+  "evidence_reads_no_mutation": true
+}

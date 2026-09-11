@@ -1,0 +1,33 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_50343a08fce9478d",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Auth\OAuth\IdentityDisconnectTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdisconnect requires authentication[39m[90m                                                                        [39m [90m246.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdisconnect rejects unknown provider[39m[90m                                                                         [39m [90m1.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdisconnect deletes selected identity and audits action[39m[90m                                                      [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfailed required audit rolls back unlink and retains pending flow[39m[90m                                            [39m [90m4.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90munlink only affects current user and clears the pending sign in flow[39m[90m                                        [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrevoked account cannot disconnect using a stale authenticated user[39m[90m                                          [39m [90m0.16s[39m  
+
+  [90mTests:[39m    [32;1m6 passed[39;22m[90m (24 assertions)[39m
+  [90mDuration:[39m [39m253.27s[39m
+

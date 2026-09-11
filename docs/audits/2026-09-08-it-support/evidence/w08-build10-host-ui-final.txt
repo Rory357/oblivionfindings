@@ -1,0 +1,97 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > starts the next matching audience draft through one explicit action (internal false) 292ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > keeps exit, Close and GET guards for session-concealed retained work (pending false) 383ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > starts the next matching audience draft through one explicit action (internal true) 153ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > keeps exit, Close and GET guards for session-concealed retained work (pending true) 199ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"draft_uuid":"3a966432-a1ce-40ef-8e9c-ac2716e1ecdd"} 108ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"revision":4} 92ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > drops the departed work guard after confirmed access denial and purge 72ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"state":"active","has_content":true,"capabilities":{"read":true,"start_new":false}} 99ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > retains the same concealed composer across session expiry and requires an authorized retry 143ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"audience":"internal"} 98ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"capabilities":{"read":false,"start_new":false}} 90ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > manages watchers from People and feedback through the actor-bound command 184ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > purges entered agent-side work when current ticket capabilities narrow 78ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not rotate a mismatched, active or blocked saved generation: {"blocker":{"code":"ticket_settled","message":"Reopen this ticket."}} 67ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > protects browser exit and generic GET navigation while allowing comment POST 74ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > conceals a changed-account response and offers a normal page reload 44ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > keeps a failed next-message check retryable without rotating or claiming readiness 86ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > ignores a late successful next-message check after session loss 85ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > keeps entered work through an unrelated parent render with a fresh close callback 48ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > ignores a late successful next-message check after access loss 82ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > requires an explicit decision before Escape discards work 123ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > does not lose work during full-page handoff without an explicit discard 78ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > ignores a late successful next-message check after unmount loss 75ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > preserves a newer File selection when a recovered original reply has the same body and base version 66ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > keeps the current composer mounted when refreshing or retrying a failed refresh 85ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > shows session recovery inline and never treats a settled error as loading 58ms
+ ✓ resources/js/components/it/__tests__/ticket-drawer.test.tsx > ticket drawer lifecycle > returns keyboard focus to the opening control after an ordinary close 109ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > a cancellation finding a committed reply preserves the ACK hold until explicit review (saved drafts false) 258ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > purges an open private task editor when the same actor becomes a participant 643ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > a cancellation finding a committed reply preserves the ACK hold until explicit review (saved drafts true) 299ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > replaces both audience forms when scope changes {"actorId":8} without rebinding old private work 66ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > replaces both audience forms when scope changes {"ticketId":12} without rebinding old private work 62ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > purges both audience buffers when the host confirms access loss 55ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > purges both audience buffers when the host confirms actor loss 57ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > conceals session-bound work and restores both audiences only after the host clears the session blocker 77ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > purges an open private approval decision when current decision permission is removed 154ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > refreshes the committed conversation while retaining an unmatched saved draft 45ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > purges confirmed denied text and files from the current audience RAM input 30ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > refreshes the whole canonical audience so narrowed Site and worker permissions remove old KB hints and linked work 384ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > conceals and purges both audiences after generic403 until each receives fresh access proof 63ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > registers the original pending body and version while retaining newer RAM text after commit 117ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > a failed second RAM proof withholds restored content and offers a deliberate retry 68ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > draft419 before a command keeps entered work concealed and provides login plus canonical draft retry 61ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > conceals reply and record data after scoped HTTP 419 and only restores session work after proof 293ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > conceals reply and record data after scoped HTTP 403 and only restores session work after proof 85ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > current-ticket review419 without a UUID conceals but preserves text and recovers through explicit current-version review 87ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > cancels an uncertain command only after explicit confirmation and retains the entered text 86ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > keeps independent public/internal text and never converts a private note when switching audience 61ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > retains submitted text/files while the outcome is unknown and blocks a different new reply 69ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > conceals the original composer before changed auth props apply and requires a full reload 101ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > clears only a confirmed matching message, reports delivery failure, and permits a second reply with the committed version 83ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > keeps a newer unsent message when recovering an earlier command receipt 27ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > does not quietly replace the original version when the ticket changes during editing 37ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > removes private note controls and content when internal access is revoked 48ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > conceals a denied message without falsely showing a successful post 26ms
+ ✓ resources/js/components/it/__tests__/ticket-reply-composer.test.tsx > ticket reply composer audience and commit lifecycle > rejects an over-limit file selection as a whole instead of silently dropping files 19ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > recovers raw classification through the canonical property editor after unmount with its original version 310ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > shows refreshed canonical classification when the field has not been edited 123ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > submits the version at the start of classification editing after a newer ticket refresh 341ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > retains unsaved classification text on refresh but never renders it for another actor or ticket 263ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > returns to current server values after a matching classification commit is observed 198ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > keeps an unsent reply through section changes and browser Back while exposing canonical section links 110ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > uses keyboard tab navigation and a real scoped section search 123ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > opens settled work directly for an authorized technician without editing controls 100ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > invalid section input falls back to the conversation and actor changes clear the unsent field 90ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > does not offer reply on settled work and gives the permitted reopen action 64ms
+stderr | resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > reports clipboard failure without a copied success message
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > retains an honest failure and retry action if watching is rejected 323ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > reports clipboard failure without a copied success message 94ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > confirms a watch only for the returned actor, ticket, version and desired state: 'non-command response' 231ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > confirms a watch only for the returned actor, ticket, version and desired state: 'another ticket' 450ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > confirms a watch only for the returned actor, ticket, version and desired state: 'exact watcher command' 220ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > links each header meter to an actual section while preserving unsent fields 77ms
+ ✓ resources/js/pages/it/tickets/show.test.tsx > Ticket workspace > omits private work summaries and navigation for a participant, including a copied work-section URL 79ms
+
+ Test Files  3 passed (3)
+      Tests  73 passed (73)
+   Start at  23:43:12
+   Duration  9.44s (transform 1.37s, setup 367ms, import 7.42s, tests 9.74s, environment 2.92s)
+

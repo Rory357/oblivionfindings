@@ -32,6 +32,10 @@ Route::prefix('v1/it')->name('api.v1.it.')->middleware(['it.service', 'it.api.re
         ->middleware('it.ability:work:create')->name('work-items.store');
     Route::get('/work-items/{workItem}', [ItApiWorkItemController::class, 'show'])
         ->middleware('it.ability:work:read')->name('work-items.show');
+    Route::patch('/work-items/{workItem}', [ItApiWorkItemController::class, 'update'])
+        ->middleware('it.ability:work:update')->name('work-items.update');
+    Route::post('/work-items/{workItem}/relationships', [ItApiWorkItemController::class, 'related'])
+        ->middleware('it.ability:work:link')->name('work-items.relationships.store');
     Route::post('/work-items/{workItem}/comments', [ItApiWorkItemController::class, 'comment'])
         ->middleware('it.ability:work:comment')->name('work-items.comments.store');
     Route::post('/work-items/{workItem}/transitions', [ItApiWorkItemController::class, 'transition'])

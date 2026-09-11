@@ -1,0 +1,59 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_0a4c4293ec6f47f3",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItTicketLocalDraftTest[39m
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery proves the exact context with persistence disabled and never touches draft storage[39m[90m        [39m [90m169.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery rejects stale browser actor identity without returning proof[39m[90m                                [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery checks old selected scopes even after replacement or clearing with (false)[39m[90m                  [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmemory recovery checks old selected scopes even after replacement or clearing with (true)[39m[90m                   [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma newly selected unapproved Site is denied before a memory proof is issued[39m[90m                                  [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic participant memory does not grant internal note or technician recovery with ('internal_note')[39m[90m        [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpublic participant memory does not grant internal note or technician recovery with ('ticket_edit')[39m[90m          [39m [90m0.86s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mauthorized public memory can resume without borrowing a newer ticket version[39m[90m                                [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90msettled work can recover authorized memory for review but cannot submit it[39m[90m                                  [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrevoked current ticket access denies a memory proof even for a retained service actor[39m[90m                       [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcommitted intake requires canonical receipt recovery before local memory can be adopted[39m[90m                     [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([['PRIVATE UNAP[39m[90m…[39m [90m0.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([[['PRIVATE UNA[39m[90m…[39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([[[], [], [], …[39m[90m…[39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([1]) #1[39m[90m         [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with ([1]) #2[39m[90m         [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvalid local candidate and scope fields never flash private input or fabricate proof with (['not-a-uuid'])[39m[90m [39m [90m0.85s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTicketLocalDraftTest[22m [90m>[39m authorized public memory can resume without borrowing a newer t…   
+[39;1m  Failed asserting that 2 is identical to 3.[39;22m
+
+  at [32mtests\Feature\It\ItTicketLocalDraftTest.php[39m:[32m100[39m
+     96▕         ...$this->candidate, 'actor_user_id' => $this->agent->id, 'request_uuid' => null,
+     97▕         'ticket_id' => $this->ticket->id, 'purpose' => 'public_resolution',
+     98▕         'fields' => ['note' => 'Original resolution text'], 'base_ticket_version' => 1,
+     99▕     ])->assertOk()->assertJsonPath('candidate.authorized', true)
+  ➜ 100▕         ->assertJsonPath('candidate.base_ticket_version', 1)->assertJsonPath('candidate.current_ticket_version', 3)
+    101▕         ->assertJsonPath('candidate.capabilities.submit', false)->assertJsonPath('candidate.blocker.code', 'ticket_changed')
+    102▕         ->assertDontSee('Original resolution text');
+    103▕     expect($this->ticket->fresh()->lock_version)->toBe(3);
+    104▕ });
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m16 passed[39;22m[90m (94 assertions)[39m
+  [90mDuration:[39m [39m183.72s[39m
+

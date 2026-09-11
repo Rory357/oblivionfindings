@@ -1,0 +1,2 @@
+npm notice run types
+npm notice run tsc --noEmit

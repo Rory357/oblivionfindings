@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\It;
 
+use App\Domain\It\Data\ItTicketApprovalInput;
 use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
+use App\Http\Requests\It\Concerns\ValidatesItApprovalCommand;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -11,7 +13,7 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class RequestApprovalRequest extends FormRequest
 {
-    use ConcealsInaccessibleItWork;
+    use ConcealsInaccessibleItWork, ValidatesItApprovalCommand;
 
     public function authorize(): bool
     {
@@ -26,7 +28,9 @@ class RequestApprovalRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'reason' => ['nullable', 'string', 'max:1000'],
+            ...$this->approvalCommandRules(),
+            'approval_id' => ['prohibited'],
+            ...ItTicketApprovalInput::rules('request'),
         ];
     }
 }

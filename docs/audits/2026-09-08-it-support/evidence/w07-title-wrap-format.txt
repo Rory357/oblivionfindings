@@ -1,0 +1,4 @@
+npm notice run npx
+npm notice run prettier --write resources/js/components/page/page-header.tsx resources/js/components/it/ticket-workspace-header.tsx
+resources/js/components/page/page-header.tsx 532ms (unchanged)
+resources/js/components/it/ticket-workspace-header.tsx 74ms (unchanged)

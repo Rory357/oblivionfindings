@@ -1,0 +1,30 @@
+{
+    "guard_passed": true,
+    "mutation_performed": false,
+    "prefix": "IT Support W01 KB 20260909",
+    "proposed_articles": 6,
+    "existing_fixture_articles": 0,
+    "immutable_before_counts": {
+        "users": 232,
+        "roles": 29,
+        "sites": 26,
+        "it_tickets": 14,
+        "it_kb_articles": 1,
+        "it_kb_interactions": 0,
+        "it_email_deliveries": 4
+    },
+    "existing_articles_sha256": "03c9256d38f5a37515ef47cb2be0d251d27f84941b65c2afc0de5aeeb7ee2486",
+    "actor_ids": {
+        "tech": 230,
+        "requester": 231
+    },
+    "cases": [
+        "site-a-draft",
+        "site-a-published",
+        "site-c-draft",
+        "site-c-published",
+        "agents-published",
+        "all-staff-published"
+    ],
+    "requires_reviewed_create_flag": true
+}

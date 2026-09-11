@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
+use App\Actions\Fortify\EnsureUserIsApproved;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Services\SsoConfigurationService;
 use App\Support\SecurityPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -53,7 +55,7 @@ class FortifyServiceProvider extends ServiceProvider
                 CanonicalizeUsername::class,
                 Features::enabled(Features::twoFactorAuthentication()) ? RedirectIfTwoFactorAuthenticatable::class : null,
                 AttemptToAuthenticate::class,
-                \App\Actions\Fortify\EnsureUserIsApproved::class,
+                EnsureUserIsApproved::class,
                 PrepareAuthenticatedSession::class,
             ]);
         });
@@ -79,6 +81,7 @@ class FortifyServiceProvider extends ServiceProvider
             'canResetPassword' => Features::enabled(Features::resetPasswords()),
             'canRegister' => Features::enabled(Features::registration()),
             'status' => $request->session()->get('status'),
+            'ssoProviders' => app(SsoConfigurationService::class)->availability('staff'),
         ]));
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/reset-password', [

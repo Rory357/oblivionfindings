@@ -2,6 +2,7 @@
 
 use App\Contracts\CalendarOAuthToken;
 use App\Services\GoogleGmailService;
+use App\Services\Integration\Exceptions\MailboxProviderFailure;
 use Illuminate\Support\Facades\Http;
 
 /*
@@ -41,6 +42,7 @@ function itGmailB64(string $text): string
 test('listUnreadMessages fetches each stub and normalises headers and bodies', function () {
     Http::fake([
         'gmail.googleapis.com/gmail/v1/users/me/messages/gm-1*' => Http::response([
+            'id' => 'gm-1',
             'snippet' => 'plain snippet',
             'payload' => [
                 'mimeType' => 'multipart/alternative',
@@ -57,6 +59,7 @@ test('listUnreadMessages fetches each stub and normalises headers and bodies', f
             ],
         ], 200),
         'gmail.googleapis.com/gmail/v1/users/me/messages/gm-2*' => Http::response([
+            'id' => 'gm-2',
             'snippet' => 'fallback snippet',
             'payload' => [
                 'mimeType' => 'text/html',
@@ -90,10 +93,11 @@ test('listUnreadMessages fetches each stub and normalises headers and bodies', f
         && $request->hasHeader('Authorization', 'Bearer fake-google-token'));
 });
 
-test('listUnreadMessages returns empty on a Gmail error', function () {
+test('listUnreadMessages reports a Gmail permission error instead of an empty inbox', function () {
     Http::fake(['gmail.googleapis.com/*' => Http::response(['error' => 'denied'], 403)]);
 
-    expect(itGmailService()->listUnreadMessages())->toBe([]);
+    expect(fn () => itGmailService()->listUnreadMessages())
+        ->toThrow(MailboxProviderFailure::class, 'denied mailbox access');
 });
 
 test('markRead removes the UNREAD label', function () {

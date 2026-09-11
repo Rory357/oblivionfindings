@@ -1,0 +1,68 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_4820396fe3f7435e",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Concurrency\It\ItTicketMergeCommandConcurrencyTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mreal workers serialize duplicate opposite and cancelled merges[39m[90m                                            [39m [90m178.02s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Concurrency\It\ItTicketMergeCommandConcurrencyTest[22m [90m>[39m real workers serialize duplica… [41;1m QueryException [49;22m  
+[39;1m  SQLSTATE[42S22]: Column not found: 1054 Unknown column 'ticket_id' in 'where clause' (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_it_support_test_it_4820396fe3f7435e, SQL: select count(*) as aggregate from `it_ticket_events` where `type` = merged and `ticket_id` in (1, 2))[39;22m
+
+  at [32mvendor\laravel\framework\src\Illuminate\Database\Connection.php[39m:[32m426[39m
+    422▕             );
+    423▕ 
+    424▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    425▕ 
+  ➜ 426▕             $statement->execute();
+    427▕ 
+    428▕             return $statement->fetchAll(...$fetchUsing);
+    429▕         });
+    430▕     }
+
+  [33m1   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\Connection.php[39;22m:[39;1m426[39;22m
+  [33m2   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\Connection.php[39;22m:[39;1m830[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m (16 assertions)[39m
+  [90mDuration:[39m [39m178.34s[39m
+
+{"phase":"focused_tests_finished","exit_code":2}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_4820396fe3f7435e",
+    "database_mutations_performed": false
+}

@@ -1,0 +1,28 @@
+{
+    "read_at": "2026-09-09T02:56:03+00:00",
+    "applied": true,
+    "real_communications": false,
+    "synthetic_users": [
+        {
+            "id": 234,
+            "fixture": "author",
+            "verified_before": false,
+            "verified_after": true,
+            "other_fields_unchanged": true
+        },
+        {
+            "id": 235,
+            "fixture": "reviewer",
+            "verified_before": false,
+            "verified_after": true,
+            "other_fields_unchanged": true
+        },
+        {
+            "id": 236,
+            "fixture": "auditor",
+            "verified_before": false,
+            "verified_after": true,
+            "other_fields_unchanged": true
+        }
+    ]
+}

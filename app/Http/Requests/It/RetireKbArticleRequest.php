@@ -2,13 +2,17 @@
 
 namespace App\Http\Requests\It;
 
+use App\Domain\It\Services\ItKbAccessService;
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItKnowledge;
 use Illuminate\Foundation\Http\FormRequest;
 
 class RetireKbArticleRequest extends FormRequest
 {
+    use ConcealsInaccessibleItKnowledge;
+
     public function authorize(): bool
     {
-        return (bool) $this->user()?->canDo('it.manage');
+        return $this->canManageKnowledge(ItKbAccessService::REVIEW);
     }
 
     /** @return array<string, array<int, string>> */

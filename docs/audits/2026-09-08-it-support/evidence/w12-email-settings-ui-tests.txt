@@ -1,0 +1,29 @@
+Command:
+& 'C:\Users\steph\.hermes\node\node.exe' node_modules\vitest\vitest.mjs run resources/js/components/settings/email-configuration-contract.test.ts resources/js/components/settings/email-configuration-dialog.test.tsx resources/js/pages/settings/email-settings.test.tsx resources/js/components/page/page-header-rail.test.tsx --reporter=verbose
+
+Exit code: 0
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ✓ resources/js/components/settings/email-configuration-contract.test.ts > email configuration response contract > accepts only a complete, non-secret settings state 2ms
+ ✓ resources/js/components/settings/email-configuration-contract.test.ts > email configuration response contract > requires a UUID test identity and labels captured acceptance accurately 0ms
+ ✓ resources/js/pages/settings/email-settings.test.tsx > email settings delivery recovery > recovers the strict UUID saved for this actor instead of creating a second test request 199ms
+ ✓ resources/js/pages/settings/email-settings.test.tsx > email settings delivery recovery > clears a known-unsubmitted pointer and blocks another send until a fresh read 77ms
+ ✓ resources/js/pages/settings/email-settings.test.tsx > email settings delivery recovery > blocks delivery tests after a failed saved-settings read 71ms
+ ✓ resources/js/pages/settings/email-settings.test.tsx > email settings delivery recovery > conceals settings and request state when a refresh loses permission 37ms
+ ✓ resources/js/pages/settings/email-settings.test.tsx > email settings delivery recovery > does not expose a restricted viewer’s delivery-test history 23ms
+ ✓ resources/js/components/settings/email-configuration-dialog.test.tsx > email settings save confirmation and recovery > announces saved only after the expected next version for the current actor 257ms
+ ✓ resources/js/components/settings/email-configuration-dialog.test.tsx > email settings save confirmation and recovery > does not claim success for an unconfirmed save and requires a read before retrying 133ms
+ ✓ resources/js/components/settings/email-configuration-dialog.test.tsx > email settings save confirmation and recovery > shows the same conflict-review path and adopts its reviewed version 112ms
+ ✓ resources/js/components/settings/email-configuration-dialog.test.tsx > email settings save confirmation and recovery > hands a mismatched actor or revoked access back to the page so it can conceal the dialog 94ms
+ ✓ resources/js/components/settings/email-configuration-dialog.test.tsx > email settings save confirmation and recovery > stops waiting without treating the save as failed or successful 80ms
+ ✓ resources/js/components/page/page-header-rail.test.tsx > moves and wraps keyboard focus without activating a view or bypassing its navigation guard 119ms
+ ✓ resources/js/components/page/page-header-rail.test.tsx > returns focus to Find after Escape cancellation 65ms
+ ✓ resources/js/components/page/page-header-rail.test.tsx > returns focus to Find after Close cancellation 53ms
+ ✓ resources/js/components/page/page-header-rail.test.tsx > returns focus to the chosen view after filtering and keyboard selection 76ms
+ ✓ resources/js/components/page/page-header-rail.test.tsx > keeps one keyboard entry after the focused view is removed or selection changes externally 17ms
+
+ Test Files  4 passed (4)
+      Tests  17 passed (17)
+   Start at  11:23:53
+   Duration  10.00s (transform 559ms, setup 531ms, import 11.13s, tests 1.42s, environment 4.66s)

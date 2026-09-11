@@ -12,13 +12,15 @@ use App\Http\Controllers\It\ItProblemController;
 use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\It\ItReportsController;
 use App\Http\Controllers\It\ItSavedTicketFilterController;
+use App\Http\Controllers\It\ItServiceIdentityController;
 use App\Http\Controllers\It\ItServiceManagementSetupController;
+use App\Http\Controllers\It\ItTicketApprovalController;
 use App\Http\Controllers\It\ItTicketController;
+use App\Http\Controllers\It\ItTicketDuplicateSuggestionController;
+use App\Http\Controllers\It\ItTicketRelationshipController;
+use App\Http\Controllers\It\ItWorkspaceRedirectController;
 use App\Http\Controllers\It\ItWorkTaskController;
-use App\Http\Controllers\LegacyRouteRedirectController;
-use App\Http\Controllers\MyCalendarController;
-use App\Http\Controllers\MyDayActionsController;
-use App\Http\Controllers\MyDayMedicationsController;
+use App\Http\Controllers\It\ItWorkTaskHistoryController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -47,6 +49,10 @@ use App\Http\Controllers\MyDayMedicationsController;
 |
 */
 
+use App\Http\Controllers\LegacyRouteRedirectController;
+use App\Http\Controllers\MyCalendarController;
+use App\Http\Controllers\MyDayActionsController;
+use App\Http\Controllers\MyDayMedicationsController;
 use App\Http\Controllers\MyTasksController;
 use App\Http\Controllers\QualityChecklistController;
 use App\Http\Controllers\RosterController;
@@ -160,8 +166,32 @@ Route::get('/my-roster', [RosterController::class, 'index'])
 // tracks their own tickets) + the agent provisioning/ticket queues. Built
 // from docs/IT_PROVISIONING_WIREFRAME.md; ticketing per
 // docs/IT_TICKETING_GAP_ANALYSIS.md.
-Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () {
+// The canonical knowledge destination also serves separately entitled authors
+// and reviewers. Its grants never open the ticket/provisioning route group.
+Route::middleware(['auth', 'permission:it.request|it.view|it.knowledge.author|it.knowledge.review'])->group(function () {
     Route::get('/it', [ItProvisioningController::class, 'index'])->name('it.index');
+    Route::get('/it/knowledge', [ItWorkspaceRedirectController::class, 'knowledge'])->name('it.knowledge.index');
+    Route::get('/it/reports', [ItWorkspaceRedirectController::class, 'reports'])->middleware('permission:it.view')->name('it.reports.index');
+    Route::get('/it/work', [ItWorkspaceRedirectController::class, 'work'])->middleware('permission:it.view')->name('it.work.index');
+    Route::post('/it/kb/{article}/view', [ItKbController::class, 'view'])->name('it.kb.view');
+    Route::post('/it/kb/{article}/helpful', [ItKbController::class, 'helpful'])->name('it.kb.helpful');
+    Route::middleware('permission:it.knowledge.author')->group(function () {
+        Route::post('/it/kb', [ItKbController::class, 'store'])->name('it.kb.store');
+        Route::patch('/it/kb/{article}', [ItKbController::class, 'update'])->name('it.kb.update');
+        Route::post('/it/kb/{article}/submit-review', [ItKbController::class, 'submitReview'])->name('it.kb.submit-review');
+        Route::post('/it/kb/{article}/restore', [ItKbController::class, 'restore'])->name('it.kb.restore');
+        Route::delete('/it/kb/{article}', [ItKbController::class, 'destroy'])->name('it.kb.destroy');
+    });
+    Route::middleware('permission:it.knowledge.review')->group(function () {
+        Route::post('/it/kb/{article}/publish', [ItKbController::class, 'publish'])->name('it.kb.publish');
+        Route::post('/it/kb/{article}/retire', [ItKbController::class, 'retire'])->name('it.kb.retire');
+    });
+});
+
+Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () {
+    require __DIR__.'/it-drafts.php';
+    Route::post('/it/tickets/duplicate-suggestions', ItTicketDuplicateSuggestionController::class)->name('it.tickets.duplicate-suggestions');
+    Route::post('/it/tickets/{ticket}/duplicate-suggestions', ItTicketDuplicateSuggestionController::class)->middleware('permission:it.manage')->name('it.tickets.duplicate-suggestions.show');
     Route::post('/it/ticket-filters', [ItSavedTicketFilterController::class, 'store'])
         ->middleware('permission:it.view')
         ->name('it.ticket-filters.store');
@@ -181,14 +211,23 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     // Self-service: raising a ticket needs it.request (or it.manage for
     // agents logging on behalf of others) — enforced via ItTicketPolicy.
     Route::post('/it/tickets', [ItProvisioningController::class, 'storeTicket'])->name('it.tickets.store');
+    Route::get('/it/ticket-commands/{requestUuid}', [ItProvisioningController::class, 'recoverTicketCommand'])
+        ->whereUuid('requestUuid')->name('it.ticket-commands.show');
     // The workspace: agents see every ticket, requesters their own
     // (ItTicketPolicy; internal notes stripped server-side).
     Route::get('/it/tickets/{ticket}', [ItTicketController::class, 'show'])->name('it.tickets.show');
+    Route::get('/it/tickets/{ticket}/original', [ItTicketController::class, 'original'])->name('it.tickets.original');
+    Route::get('/it/tickets/{ticket}/tasks/{task}/history', ItWorkTaskHistoryController::class)->name('it.tickets.tasks.history');
     Route::post('/it/tickets/{ticket}/comments', [ItTicketController::class, 'storeComment'])->name('it.tickets.comments.store');
+    Route::get('/it/tickets/{ticket}/comment-commands/{requestUuid}', [ItTicketController::class, 'recoverCommentCommand'])
+        ->whereUuid('requestUuid')->name('it.tickets.comment-commands.show');
+    Route::post('/it/tickets/{ticket}/comment-commands/{requestUuid}/cancel', [ItTicketController::class, 'cancelCommentCommand'])
+        ->whereUuid('requestUuid')->name('it.tickets.comment-commands.cancel');
     Route::get('/it/attachments/{attachment}', [ItTicketController::class, 'downloadAttachment'])->name('it.attachments.download');
     // Reopen: agents anytime, the requester within 7 days of resolution
     // (ItTicketPolicy::reopen owns the window).
     Route::post('/it/tickets/{ticket}/reopen', [ItTicketController::class, 'reopen'])->name('it.tickets.reopen');
+    Route::post('/it/tickets/{ticket}/confirm-resolution', [ItTicketController::class, 'confirmResolution'])->name('it.tickets.confirm-resolution');
     // CSAT: the requester rates their own resolved ticket (ItTicketPolicy::csat
     // owns the who/when — agents 403, editable until the ticket closes).
     Route::post('/it/tickets/{ticket}/csat', [ItTicketController::class, 'csat'])->name('it.tickets.csat');
@@ -209,13 +248,11 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         ->middleware('permission:it.view')
         ->name('it.reports.export');
 
-    // Knowledge base browse — anyone who can reach /it (it.request or it.view)
-    // reads published articles and votes; the controller guards published + access rules.
-    Route::post('/it/kb/{article}/view', [ItKbController::class, 'view'])->name('it.kb.view');
-    Route::post('/it/kb/{article}/helpful', [ItKbController::class, 'helpful'])->name('it.kb.helpful');
-
     Route::middleware('permission:it.manage')->group(function () {
         Route::get('/it/setup', [ItServiceManagementSetupController::class, 'index'])->name('it.setup.index');
+        Route::post('/it/setup/validate-candidate', [ItServiceManagementSetupController::class, 'validateCandidate'])->name('it.setup.validate-candidate');
+        Route::post('/it/setup/commands/{requestUuid}/recover', [ItServiceManagementSetupController::class, 'recoverCommand'])->whereUuid('requestUuid')->name('it.setup.commands.recover');
+        Route::post('/it/setup/commands/{requestUuid}/cancel', [ItServiceManagementSetupController::class, 'cancelCommand'])->whereUuid('requestUuid')->name('it.setup.commands.cancel');
         Route::post('/it/setup/teams', [ItServiceManagementSetupController::class, 'storeTeam'])->name('it.setup.teams.store');
         Route::patch('/it/setup/teams/{team}', [ItServiceManagementSetupController::class, 'updateTeam'])->name('it.setup.teams.update');
         Route::post('/it/setup/queues', [ItServiceManagementSetupController::class, 'storeQueue'])->name('it.setup.queues.store');
@@ -226,8 +263,13 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::patch('/it/setup/catalogue-items/{catalogItem}', [ItServiceManagementSetupController::class, 'updateCatalogItem'])->name('it.setup.catalogue-items.update');
         Route::post('/it/setup/catalogue-items/{catalogItem}/publish', [ItServiceManagementSetupController::class, 'publishCatalogItem'])->name('it.setup.catalogue-items.publish');
         Route::post('/it/setup/catalogue-items/{catalogItem}/unpublish', [ItServiceManagementSetupController::class, 'unpublishCatalogItem'])->name('it.setup.catalogue-items.unpublish');
-        Route::post('/it/setup/api-identities', [ItServiceManagementSetupController::class, 'storeIdentity'])->name('it.setup.api-identities.store');
-        Route::post('/it/setup/api-identities/{identity}/revoke', [ItServiceManagementSetupController::class, 'revokeIdentity'])->name('it.setup.api-identities.revoke');
+        Route::get('/it/setup/api-identities', [ItServiceIdentityController::class, 'index'])->name('it.setup.api-identities.index');
+        Route::post('/it/setup/api-identities', [ItServiceIdentityController::class, 'store'])->name('it.setup.api-identities.store');
+        Route::post('/it/setup/api-identities/commands/recover', [ItServiceIdentityController::class, 'recover'])->name('it.setup.api-identities.commands.recover');
+        Route::post('/it/setup/api-identities/commands/cancel', [ItServiceIdentityController::class, 'cancel'])->name('it.setup.api-identities.commands.cancel');
+        Route::patch('/it/setup/api-identities/{identity}', [ItServiceIdentityController::class, 'update'])->whereNumber('identity')->name('it.setup.api-identities.update');
+        Route::post('/it/setup/api-identities/{identity}/rotate', [ItServiceIdentityController::class, 'rotate'])->whereNumber('identity')->name('it.setup.api-identities.rotate');
+        Route::post('/it/setup/api-identities/{identity}/revoke', [ItServiceIdentityController::class, 'revoke'])->whereNumber('identity')->name('it.setup.api-identities.revoke');
         Route::post('/it/setup/provisioning-templates', [ItServiceManagementSetupController::class, 'storeProvisioningTemplate'])->name('it.setup.provisioning-templates.store');
         Route::patch('/it/setup/provisioning-templates/{template}', [ItServiceManagementSetupController::class, 'updateProvisioningTemplate'])->name('it.setup.provisioning-templates.update');
         Route::post('/it/setup/email-deliveries/{delivery}/retry', [ItServiceManagementSetupController::class, 'retryEmailDelivery'])->name('it.setup.email-deliveries.retry');
@@ -253,29 +295,41 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::post('/it/tickets/bulk', [ItTicketController::class, 'bulk'])->name('it.tickets.bulk');
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
         Route::post('/it/tickets/{ticket}/devices', [ItTicketController::class, 'linkDevice'])->name('it.tickets.devices.store');
+        Route::get('/it/tickets/{ticket}/related-work', [ItTicketRelationshipController::class, 'index'])->name('it.tickets.related-work.index');
+        Route::post('/it/tickets/{ticket}/related-work', [ItTicketRelationshipController::class, 'command'])->name('it.tickets.related-work.command');
+        Route::get('/it/tickets/{ticket}/relationship-commands/{requestUuid}', [ItTicketRelationshipController::class, 'command'])->whereUuid('requestUuid')->name('it.tickets.relationship-commands.show');
+        Route::post('/it/tickets/{ticket}/relationship-commands/{requestUuid}/cancel', [ItTicketRelationshipController::class, 'command'])->whereUuid('requestUuid')->name('it.tickets.relationship-commands.cancel');
         Route::delete('/it/tickets/{ticket}/devices/{device}', [ItTicketController::class, 'unlinkDevice'])->name('it.tickets.devices.destroy');
         Route::post('/it/tickets/{ticket}/resolve', [ItProvisioningController::class, 'resolveTicket'])->name('it.tickets.resolve');
         Route::post('/it/tickets/{ticket}/close', [ItTicketController::class, 'close'])->name('it.tickets.close');
         Route::post('/it/tickets/{ticket}/transitions', [ItTicketController::class, 'transition'])->name('it.tickets.transitions.store');
+        Route::post('/it/tickets/{ticket}/task-candidates/validate', [ItWorkTaskController::class, 'validateCandidate'])->name('it.tickets.task-candidates.validate');
+        Route::get('/it/tickets/{ticket}/task-commands/{operation}/{requestUuid}', [ItWorkTaskController::class, 'recover'])->whereIn('operation', ['create', 'update', 'complete', 'reopen', 'reorder'])->whereUuid('requestUuid')->name('it.tickets.task-commands.show');
+        Route::post('/it/tickets/{ticket}/task-commands/{operation}/{requestUuid}/cancel', [ItWorkTaskController::class, 'cancel'])->whereIn('operation', ['create', 'update', 'complete', 'reopen', 'reorder'])->whereUuid('requestUuid')->name('it.tickets.task-commands.cancel');
+        Route::patch('/it/tickets/{ticket}/tasks/reorder', [ItWorkTaskController::class, 'reorder'])->name('it.tickets.tasks.reorder');
         Route::post('/it/tickets/{ticket}/tasks', [ItWorkTaskController::class, 'store'])->name('it.tickets.tasks.store');
         Route::patch('/it/tickets/{ticket}/tasks/{task}', [ItWorkTaskController::class, 'update'])->name('it.tickets.tasks.update');
         Route::post('/it/tickets/{ticket}/tasks/{task}/complete', [ItWorkTaskController::class, 'complete'])->name('it.tickets.tasks.complete');
         Route::post('/it/tickets/{ticket}/tasks/{task}/reopen', [ItWorkTaskController::class, 'reopen'])->name('it.tickets.tasks.reopen');
         Route::post('/it/tickets/{ticket}/merge', [ItTicketController::class, 'merge'])->name('it.tickets.merge');
-        Route::post('/it/tickets/{ticket}/approvals', [ItTicketController::class, 'requestApproval'])->name('it.tickets.approvals.request');
-        Route::post('/it/approvals/{approval}/decide', [ItTicketController::class, 'decideApproval'])->name('it.approvals.decide');
+        Route::get('/it/tickets/{ticket}/merge-preview', [ItTicketController::class, 'mergePreview'])->name('it.tickets.merge-preview');
+        Route::post('/it/tickets/{ticket}/merge-candidates/validate', [ItTicketController::class, 'validateMergeCandidate'])->name('it.tickets.merge-candidate');
+        Route::get('/it/tickets/{ticket}/merge-commands/{requestUuid}', [ItTicketController::class, 'mergeCommand'])->whereUuid('requestUuid')->name('it.tickets.merge-command');
+        Route::post('/it/tickets/{ticket}/merge-commands/{requestUuid}/cancel', [ItTicketController::class, 'mergeCommand'])->whereUuid('requestUuid')->name('it.tickets.merge-command.cancel');
+        Route::post('/it/tickets/{ticket}/approvals', [ItTicketApprovalController::class, 'request'])->name('it.tickets.approvals.request');
+        Route::get('/it/tickets/{ticket}/approval-history', [ItTicketApprovalController::class, 'history'])->name('it.tickets.approvals.history');
+        Route::post('/it/tickets/{ticket}/approval-candidates/validate', [ItTicketApprovalController::class, 'validateCandidate'])->name('it.tickets.approvals.validate-candidate');
+        Route::post('/it/approvals/{approval}/decide', [ItTicketApprovalController::class, 'decide'])->name('it.approvals.decide');
+        Route::post('/it/tickets/{ticket}/approvals/{approval}/decide', [ItTicketApprovalController::class, 'decideNested'])->name('it.tickets.approvals.decide');
+        Route::post('/it/tickets/{ticket}/approvals/{approval}/withdraw', [ItTicketApprovalController::class, 'withdraw'])->name('it.tickets.approvals.withdraw');
+        Route::get('/it/tickets/{ticket}/approval-commands/{operation}/{requestUuid}', [ItTicketApprovalController::class, 'recover'])->whereIn('operation', ['request', 'decide', 'withdraw'])->whereUuid('requestUuid')->name('it.tickets.approval-commands.show');
+        Route::post('/it/tickets/{ticket}/approval-commands/{operation}/{requestUuid}/cancel', [ItTicketApprovalController::class, 'cancel'])->whereIn('operation', ['request', 'decide', 'withdraw'])->whereUuid('requestUuid')->name('it.tickets.approval-commands.cancel');
         Route::post('/it/tickets/{ticket}/watch', [ItTicketController::class, 'watch'])->name('it.tickets.watch');
         Route::post('/it/tickets/{ticket}/unwatch', [ItTicketController::class, 'unwatch'])->name('it.tickets.unwatch');
+        Route::patch('/it/tickets/{ticket}/watchers/{watcherUserId}', [ItTicketController::class, 'updateWatcher'])
+            ->whereNumber('watcherUserId')->name('it.tickets.watchers.update');
         // SLA target grid — admin-only on top of it.manage (FormRequest authorize).
         Route::put('/it/sla-policies', [ItProvisioningController::class, 'updateSlaPolicies'])->name('it.sla.update');
-        // Knowledge base authoring (§I) — agents create/edit/publish/delete.
-        Route::post('/it/kb', [ItKbController::class, 'store'])->name('it.kb.store');
-        Route::patch('/it/kb/{article}', [ItKbController::class, 'update'])->name('it.kb.update');
-        Route::post('/it/kb/{article}/submit-review', [ItKbController::class, 'submitReview'])->name('it.kb.submit-review');
-        Route::post('/it/kb/{article}/publish', [ItKbController::class, 'publish'])->name('it.kb.publish');
-        Route::post('/it/kb/{article}/retire', [ItKbController::class, 'retire'])->name('it.kb.retire');
-        Route::post('/it/kb/{article}/restore', [ItKbController::class, 'restore'])->name('it.kb.restore');
-        Route::delete('/it/kb/{article}', [ItKbController::class, 'destroy'])->name('it.kb.destroy');
     });
 });
 

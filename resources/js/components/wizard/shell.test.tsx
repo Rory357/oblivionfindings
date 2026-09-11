@@ -1,9 +1,17 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from '@testing-library/react';
 import { Circle } from 'lucide-react';
 import type { ComponentProps } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 import { WizardShell, WizardSuccessPane } from './shell';
 
@@ -22,6 +30,13 @@ const twoSteps = [
     },
 ] as const;
 
+afterEach(async () => {
+    cleanup();
+    // FocusScope defers its unmount callback. Settle it before the next
+    // independent wizard mounts, so it cannot interrupt that focus scope.
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+});
+
 function renderWizard(
     overrides: Partial<ComponentProps<typeof WizardShell>> = {},
 ) {
@@ -29,9 +44,9 @@ function renderWizard(
 
     const rendered = render(
         <>
-            <button id="outside-action" type="button">
+            <Button id="outside-action" type="button">
                 Outside action
-            </button>
+            </Button>
             <WizardShell
                 open
                 onClose={onClose}
@@ -43,12 +58,12 @@ function renderWizard(
                 steps={twoSteps}
                 stepIndex={0}
                 onStepClick={vi.fn()}
-                footerStart={<button type="button">Cancel</button>}
-                footerEnd={<button type="button">Continue</button>}
+                footerStart={<Button type="button">Cancel</Button>}
+                footerEnd={<Button type="button">Continue</Button>}
                 {...overrides}
             >
                 <label htmlFor="receipt-number">Receipt number</label>
-                <input id="receipt-number" />
+                <Input id="receipt-number" />
             </WizardShell>
         </>,
     );
@@ -109,7 +124,7 @@ describe('WizardShell', () => {
                 <WizardSuccessPane
                     title="Fuel logged"
                     blurb="The purchase is now part of the asset record."
-                    actions={<button type="button">Close</button>}
+                    actions={<Button type="button">Close</Button>}
                 />
             ),
         });

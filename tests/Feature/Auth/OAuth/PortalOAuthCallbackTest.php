@@ -6,13 +6,12 @@ use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Socialite\Facades\Socialite;
-use Laravel\Socialite\Two\User as SocialiteUser;
-use Mockery;
+use Tests\Support\FakesSsoProvider;
 use Tests\TestCase;
 
 class PortalOAuthCallbackTest extends TestCase
 {
+    use FakesSsoProvider;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -20,6 +19,7 @@ class PortalOAuthCallbackTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+        $this->configureSsoFixture();
     }
 
     public function test_portal_google_callback_creates_pending_next_of_kin_user(): void
@@ -44,12 +44,13 @@ class PortalOAuthCallbackTest extends TestCase
 
     public function test_portal_microsoft_callback_logs_in_existing_user(): void
     {
-        $user = User::factory()->create([
+        $user = User::factory()->withoutTwoFactor()->create([
             'email' => 'existing.family@example.test',
             'approved_at' => now(),
             'role' => 'next_of_kin',
         ]);
         $user->roles()->attach(Role::where('name', 'next_of_kin')->firstOrFail());
+        $user->identities()->create(['provider' => 'microsoft', 'provider_user_id' => 'portal-ms-123', 'email' => $user->email]);
         $this->fakeSocialiteUser('microsoft', [
             'id' => 'portal-ms-123',
             'name' => 'Existing Family',
@@ -64,7 +65,7 @@ class PortalOAuthCallbackTest extends TestCase
 
     public function test_portal_callback_does_not_log_in_existing_pending_user(): void
     {
-        User::factory()->create([
+        User::factory()->withoutTwoFactor()->create([
             'email' => 'pending.family@example.test',
             'approved_at' => null,
             'role' => 'next_of_kin',
@@ -95,26 +96,11 @@ class PortalOAuthCallbackTest extends TestCase
     }
 
     /**
-     * @param array{id: string, name: string, email: string|null} $attributes
+     * @param  array{id: string, name: string, email: string|null}  $attributes
      */
     private function fakeSocialiteUser(string $provider, array $attributes): void
     {
-        $user = (new SocialiteUser())->map($attributes);
-        $user->setRaw([
-            ...$attributes,
-            'mail' => $attributes['email'],
-            'userPrincipalName' => $attributes['email'],
-        ]);
-        $user->setToken($provider.'-access-token');
-        $user->setRefreshToken($provider.'-refresh-token');
-        $user->setExpiresIn(3600);
-
-        $driver = Mockery::mock();
-        $driver->shouldReceive('stateless')->andReturnSelf();
-        $driver->shouldReceive('user')->andReturn($user);
-
-        Socialite::shouldReceive('driver')
-            ->with($provider)
-            ->andReturn($driver);
+        $this->fakeSsoProvider($provider, $attributes);
+        $this->beginSsoFixture($provider, 'portal');
     }
 }

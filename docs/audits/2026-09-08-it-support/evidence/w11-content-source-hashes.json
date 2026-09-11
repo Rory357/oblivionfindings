@@ -1,0 +1,58 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItEmailContent.php",
+    "sha256": "1CC518B1FBADF6B96A8E5489975B2BAC2F8E5D5A29E70BED787B0B0A0BC124AD"
+  },
+  {
+    "path": "app/Domain/It/Exceptions/ItInboundContentException.php",
+    "sha256": "EF0C501332F09DCB995094571774A8111C9FF11EC7D7862B642007561998F65E"
+  },
+  {
+    "path": "app/Domain/It/Services/ItEmailHeaders.php",
+    "sha256": "83A202E594F9E1D9C11B2F35BFD22EB6514AF3632C07E94B01E9A2A0684F8F7E"
+  },
+  {
+    "path": "app/Domain/It/Services/ItMailboxInbox.php",
+    "sha256": "364C4D5C5B53451F6ED57814794B85B57410261F5659BDA13B44D625F1EE6850"
+  },
+  {
+    "path": "app/Domain/It/InboundEmailIngestor.php",
+    "sha256": "FB8376815F6A348EE1C23BFD34A8AE130781A852E320F58E92926C9B01011211"
+  },
+  {
+    "path": "app/Services/MicrosoftGraphService.php",
+    "sha256": "A1DE124C3D96AC4CCB5DA3497BCA32692C6CE48165EE944DE3B0201FA20A7A76"
+  },
+  {
+    "path": "app/Services/GoogleGmailService.php",
+    "sha256": "53130BAC01081CD28665F6A13AD34ECB59C406E95C6D2D06CDCAFD7B13DFB492"
+  },
+  {
+    "path": "app/Http/Requests/It/IngestInboundEmailRequest.php",
+    "sha256": "6E623B1D6B9EC0CBA6D497D6F5BB52D9BC15A3A8A91FF757E2412AF5B68AC880"
+  },
+  {
+    "path": "tests/Unit/It/ItEmailContentTest.php",
+    "sha256": "060836145BC794DFF5907DD2676C382198FEE075A9C0BBD6F1838B1FFE074951"
+  },
+  {
+    "path": "tests/Feature/It/ItInboundContentLifecycleTest.php",
+    "sha256": "A3E639CFC26FE8FD7853963D5C2FFF957234D00DFDEB86AE5CCBD0FA238C19D7"
+  },
+  {
+    "path": "tests/Feature/It/ItInboundProviderHeadersTest.php",
+    "sha256": "D3FBD660BFF6DE3F70FBEFAC3997A90A26B43BBF74EABFCCEC475AF88D733BE3"
+  },
+  {
+    "path": "tests/Feature/It/ItMailboxPollTest.php",
+    "sha256": "FE9E0F9DF0E9BC508AD93230A408419F1AE176EF41E28E2C9584825126CAA3A8"
+  },
+  {
+    "path": "tests/Feature/It/ItGmailMailTest.php",
+    "sha256": "4810B01D77E238C84CE5D305F1A3112D61A91CD38D386450C8B6222041CCD056"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w11-mailbox-browser-fixture.php",
+    "sha256": "1359FBED228E2A7F3EC835ADEE4F741A09C9F57C61EB60E15093C53EB875F7D7"
+  }
+]

@@ -8,6 +8,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import type { ComponentProps } from 'react';
 
 export function ConfirmDialog({
     open,
@@ -17,6 +18,7 @@ export function ConfirmDialog({
     description,
     confirmText = 'Confirm',
     variant = 'destructive',
+    onCloseAutoFocus,
 }: {
     open: boolean;
     onClose: () => void;
@@ -25,6 +27,9 @@ export function ConfirmDialog({
     description: string;
     confirmText?: string;
     variant?: 'destructive' | 'default';
+    onCloseAutoFocus?: ComponentProps<
+        typeof AlertDialogContent
+    >['onCloseAutoFocus'];
 }) {
     return (
         <AlertDialog
@@ -33,7 +38,7 @@ export function ConfirmDialog({
                 if (!isOpen) onClose();
             }}
         >
-            <AlertDialogContent>
+            <AlertDialogContent onCloseAutoFocus={onCloseAutoFocus}>
                 <AlertDialogHeader>
                     <AlertDialogTitle>{title}</AlertDialogTitle>
                     <AlertDialogDescription>

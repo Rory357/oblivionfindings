@@ -1,0 +1,52 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/hooks/use-it-ticket-draft-browser.test.tsx (3 tests | 1 failed) 182ms
+     × restores newer text separately from an unconfirmed saved draft command and retries its exact original revision 151ms
+ ❯ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx (12 tests | 1 failed) 6299ms
+     × does not resurrect explicitly discarded current browser work on close 234ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/hooks/use-it-ticket-draft-browser.test.tsx > Shared draft browser handoff > restores newer text separately from an unconfirmed saved draft command and retries its exact original revision
+AssertionError: expected 'Original submitted note' to be 'Newer text typed during recovery' // Object.is equality
+
+Expected: "Newer text typed during recovery"
+Received: "Original submitted note"
+
+ ❯ resources/js/hooks/use-it-ticket-draft-browser.test.tsx:209:52
+    207|                 back.result.current.memoryNotices[0].bufferId,
+    208|             );
+    209|             expect(restored?.snapshot.fields.note).toBe(
+       |                                                    ^
+    210|                 'Newer text typed during recovery',
+    211|             );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  resources/js/components/it/__tests__/ticket-intake-draft.test.tsx > Opt-in requester intake drafts > does not resurrect explicitly discarded current browser work on close
+Error: expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <button
+  class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 has-[>svg]:px-2.5"
+  data-slot="button"
+  type="button"
+>
+  Resume browser work
+</button> instead
+ ❯ resources/js/components/it/__tests__/ticket-intake-draft.test.tsx:233:15
+    231|         expect(
+    232|             screen.queryByRole('button', { name: 'Resume browser work'…
+    233|         ).not.toBeInTheDocument();
+       |               ^
+    234|     });
+    235|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 13 passed (15)
+   Start at  17:46:25
+   Duration  9.54s (transform 434ms, setup 226ms, import 2.36s, tests 6.48s, environment 1.69s)
+

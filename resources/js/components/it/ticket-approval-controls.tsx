@@ -1,18 +1,20 @@
 import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
+import type { ItApprovalWork } from '@/hooks/it-approval-work';
+import type {
+    ItApprovalCommitted,
+    ItApprovalOperation,
+} from '@/hooks/it-ticket-approval-contract';
+import { pendingItApprovalCommands } from '@/hooks/use-it-ticket-approval-command';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
-import { Textarea } from '@/components/ui/textarea';
-import { router } from '@inertiajs/react';
-import { Check, ShieldCheck, XCircle } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
-import { toast } from 'sonner';
+    purgeItApprovalMemory,
+    useItApprovalMemoryNotices,
+} from '@/hooks/use-it-ticket-draft-memory';
+import { ShieldCheck } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { TicketApprovalDialog } from './ticket-approval-dialog';
+import { TicketApprovalHistory } from './ticket-approval-history';
+import { approvalStatus, TicketApprovalRecord } from './ticket-approval-record';
 
 export interface TicketApprovalSummary {
     id: number;
@@ -23,292 +25,266 @@ export interface TicketApprovalSummary {
     requested_at: string | null;
     decided_at: string | null;
 }
-
 interface Props {
+    actorId: number;
     ticket: {
         id: number;
         reference: string | null;
+        lock_version: number;
         approval: TicketApprovalSummary | null;
     };
-    canRequest: boolean;
-    canDecide: boolean;
-    formatDateTime: (iso: string | null) => string;
+    work: ItApprovalWork | null;
+    onCommitted: (result: ItApprovalCommitted) => void;
+    onAccessLost: () => void;
+    onSessionExpired?: () => void;
 }
-
-type ApprovalAction = 'request' | 'approve' | 'reject';
-
+type Action = {
+    operation: ItApprovalOperation;
+    approvalId: number | null;
+    decision?: 'approve' | 'reject';
+};
 export function TicketApprovalControls({
+    actorId,
     ticket,
-    canRequest,
-    canDecide,
-    formatDateTime,
+    work,
+    onCommitted,
+    onAccessLost,
+    onSessionExpired,
 }: Props) {
-    const [action, setAction] = useState<ApprovalAction | null>(null);
-    const [reason, setReason] = useState('');
-    const [processing, setProcessing] = useState(false);
-    const [errors, setErrors] = useState<Record<string, string>>({});
-
-    const approvalBadge = ((): { label: string; variant: StatusVariant } => {
-        switch (ticket.approval?.status) {
-            case 'approved':
-                return { label: 'Approved', variant: 'success' };
-            case 'rejected':
-                return { label: 'Rejected', variant: 'critical' };
-            case 'pending':
-                return { label: 'Awaiting approval', variant: 'warning' };
-            default:
-                return { label: 'Approval needed', variant: 'warning' };
+    const [action, setAction] = useState<Action | null>(null);
+    const [denied, setDenied] = useState(false);
+    const [scope] = useState(`${actorId}:${ticket.id}`);
+    const previous = useRef({ actorId, ticketId: ticket.id });
+    const sameScope = scope === `${actorId}:${ticket.id}`;
+    const notices = useItApprovalMemoryNotices(actorId, ticket.id);
+    const canView = work !== null && sameScope && !denied;
+    let pending: ReturnType<typeof pendingItApprovalCommands> = [];
+    let journalUnavailable = false;
+    if (canView) {
+        try {
+            pending = pendingItApprovalCommands(actorId, ticket.id);
+        } catch {
+            journalUnavailable = true;
         }
-    })();
-
-    const approvalMeta = (() => {
-        const approval = ticket.approval;
-        if (!approval) {
-            return 'A manager must approve this before the ticket can be settled.';
-        }
-        if (approval.status === 'pending') {
-            return `Requested by ${approval.requested_by_name ?? 'an IT technician'}${approval.requested_at ? ` · ${formatDateTime(approval.requested_at)}` : ''}${approval.reason ? ` — ${approval.reason}` : ''}.`;
-        }
-
-        const verb = approval.status === 'approved' ? 'Approved' : 'Rejected';
-        return `${verb} by ${approval.approver_name ?? 'an IT manager'}${approval.decided_at ? ` · ${formatDateTime(approval.decided_at)}` : ''}${approval.reason ? ` — ${approval.reason}` : ''}.`;
-    })();
-
-    const begin = (nextAction: ApprovalAction) => {
-        setReason('');
-        setErrors({});
-        setAction(nextAction);
-    };
-
-    const close = () => {
-        if (!processing) {
+    }
+    useEffect(() => {
+        if (!canView) {
+            purgeItApprovalMemory(
+                previous.current.actorId,
+                previous.current.ticketId,
+            );
             setAction(null);
-            setReason('');
-            setErrors({});
         }
+    }, [canView]);
+    useEffect(() => {
+        if (!canView || (!notices.length && !pending.length)) return;
+        const warn = (event: BeforeUnloadEvent) => {
+            event.preventDefault();
+            event.returnValue = '';
+        };
+        window.addEventListener('beforeunload', warn);
+        return () => window.removeEventListener('beforeunload', warn);
+    }, [canView, notices.length, pending.length]);
+    const deny = () => {
+        purgeItApprovalMemory(actorId, ticket.id);
+        setDenied(true);
+        setAction(null);
+        onAccessLost();
     };
-
-    const submit = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        if (!action) return;
-
-        const requesting = action === 'request';
-        const url = requesting
-            ? `/it/tickets/${ticket.id}/approvals`
-            : `/it/approvals/${ticket.approval?.id}/decide`;
-        const payload = requesting
-            ? { reason: reason.trim() || null }
-            : { decision: action, reason: reason.trim() || null };
-
-        router.post(url, payload, {
-            preserveScroll: true,
-            onStart: () => setProcessing(true),
-            onError: (nextErrors) => setErrors(nextErrors),
-            onSuccess: () => {
-                setAction(null);
-                setReason('');
-                setErrors({});
-                toast.success(
-                    requesting
-                        ? 'Approval requested.'
-                        : action === 'approve'
-                          ? 'Approval granted.'
-                          : 'Approval rejected.',
-                );
-            },
-            onFinish: () => setProcessing(false),
-        });
-    };
-
-    const dialogCopy = (() => {
-        switch (action) {
-            case 'request':
-                return {
-                    title: 'Request manager approval',
-                    description:
-                        'Send this ticket to another IT manager for a recorded decision before settlement.',
-                    label: 'Why is approval needed? (optional)',
-                    confirm: 'Request approval',
-                };
-            case 'approve':
-                return {
-                    title: 'Approve this request',
-                    description:
-                        'Confirm that the requested work may proceed. Your decision is written to the ticket timeline and audit history.',
-                    label: 'Decision note (optional)',
-                    confirm: 'Approve request',
-                };
-            case 'reject':
-                return {
-                    title: 'Reject this request',
-                    description:
-                        'Stop this request from being settled as approved. Explain what must change so the requester can act.',
-                    label: 'Reason for rejection',
-                    confirm: 'Reject request',
-                };
-            default:
-                return null;
-        }
-    })();
-
+    const badge = approvalStatus(
+        canView ? work?.current?.status : ticket.approval?.status,
+    );
+    if (!sameScope || denied)
+        return (
+            <p role="status" className="text-sm">
+                Current access to approval work is unavailable. Refresh this
+                ticket before continuing.
+            </p>
+        );
     return (
-        <>
-            <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3.5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                        <ShieldCheck
-                            className="h-4 w-4 flex-none text-muted-foreground"
-                            aria-hidden="true"
-                        />
-                        <span className="text-[13px] font-semibold">
-                            Manager approval
-                        </span>
-                        <StatusBadge variant={approvalBadge.variant} size="sm">
-                            {approvalBadge.label}
-                        </StatusBadge>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        {canRequest ? (
+        <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                    <ShieldCheck
+                        aria-hidden="true"
+                        className="h-4 w-4 text-muted-foreground"
+                    />
+                    <span className="text-sm font-semibold">
+                        Manager approval
+                    </span>
+                    <StatusBadge variant={badge.variant} size="sm">
+                        {badge.label}
+                    </StatusBadge>
+                </div>
+                {canView && (
+                    <div className="flex flex-wrap gap-2">
+                        {work.can_request && (
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="min-h-11"
-                                onClick={() => begin('request')}
+                                onClick={() =>
+                                    setAction({
+                                        operation: 'request',
+                                        approvalId: null,
+                                    })
+                                }
                             >
-                                <ShieldCheck
-                                    className="h-4 w-4"
-                                    aria-hidden="true"
-                                />
                                 Request approval
                             </Button>
-                        ) : null}
-                        {canDecide ? (
+                        )}
+                        {work.can_decide && work.current && (
                             <>
                                 <Button
                                     size="sm"
-                                    className="min-h-11"
-                                    onClick={() => begin('approve')}
+                                    onClick={() =>
+                                        setAction({
+                                            operation: 'decide',
+                                            approvalId: work.current!.id,
+                                            decision: 'approve',
+                                        })
+                                    }
                                 >
-                                    <Check
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />
                                     Approve
                                 </Button>
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="min-h-11"
-                                    onClick={() => begin('reject')}
+                                    onClick={() =>
+                                        setAction({
+                                            operation: 'decide',
+                                            approvalId: work.current!.id,
+                                            decision: 'reject',
+                                        })
+                                    }
                                 >
-                                    <XCircle
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />
                                     Reject
                                 </Button>
                             </>
-                        ) : null}
+                        )}
+                        {work.can_withdraw && work.current && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                    setAction({
+                                        operation: 'withdraw',
+                                        approvalId: work.current!.id,
+                                    })
+                                }
+                            >
+                                Cancel request
+                            </Button>
+                        )}
                     </div>
-                </div>
-                <p className="mt-1.5 text-[12px] text-muted-foreground">
-                    {approvalMeta}
-                </p>
+                )}
             </div>
-
-            <Dialog
-                open={action !== null}
-                onOpenChange={(open) => !open && close()}
-            >
-                <DialogContent className="sm:max-w-lg">
-                    {dialogCopy ? (
-                        <form onSubmit={submit}>
-                            <DialogHeader>
-                                <DialogTitle>{dialogCopy.title}</DialogTitle>
-                                <DialogDescription>
-                                    {dialogCopy.description}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="mt-5 space-y-2">
-                                <label
-                                    htmlFor="ticket-approval-reason"
-                                    className="text-sm font-medium"
-                                >
-                                    {dialogCopy.label}
-                                </label>
-                                <Textarea
-                                    id="ticket-approval-reason"
-                                    value={reason}
-                                    onChange={(event) =>
-                                        setReason(event.target.value)
-                                    }
-                                    required={action === 'reject'}
-                                    rows={4}
-                                    maxLength={1000}
-                                    aria-invalid={
-                                        errors.reason ? true : undefined
-                                    }
-                                    aria-describedby={
-                                        errors.reason
-                                            ? 'ticket-approval-reason-error'
-                                            : undefined
-                                    }
-                                />
-                                {errors.reason ? (
-                                    <p
-                                        id="ticket-approval-reason-error"
-                                        role="alert"
-                                        className="text-sm text-destructive"
-                                    >
-                                        {errors.reason}
-                                    </p>
-                                ) : null}
-                            </div>
-                            <DialogFooter className="mt-6 gap-2 sm:gap-0">
+            {!canView ? (
+                <p className="text-sm text-muted-foreground">
+                    An authorized IT manager records the decision before this
+                    ticket can be settled.
+                </p>
+            ) : (
+                <>
+                    {!work.storage_ready && (
+                        <p role="status" className="text-sm">
+                            Approval history storage is not ready. Approval
+                            changes are unavailable until setup is complete.
+                        </p>
+                    )}
+                    {journalUnavailable && (
+                        <p
+                            role="alert"
+                            className="text-sm text-status-critical"
+                        >
+                            Pending approval references could not be read.
+                            Restore access to browser session storage before
+                            sending another command.
+                        </p>
+                    )}
+                    {!action &&
+                        notices.map((notice, index) => (
+                            <div
+                                key={notice.bufferId}
+                                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"
+                            >
+                                <span className="text-sm">
+                                    Retained approval draft {index + 1} ·{' '}
+                                    {notice.context.operation}
+                                </span>
                                 <Button
-                                    type="button"
                                     variant="outline"
-                                    className="min-h-11"
-                                    disabled={processing}
-                                    onClick={close}
-                                >
-                                    Keep reviewing
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    variant={
-                                        action === 'reject'
-                                            ? 'destructive'
-                                            : 'default'
+                                    onClick={() =>
+                                        setAction({
+                                            operation: notice.context.operation,
+                                            approvalId:
+                                                notice.context.approvalId,
+                                        })
                                     }
-                                    className="min-h-11"
-                                    disabled={processing}
                                 >
-                                    {action === 'approve' ? (
-                                        <Check
-                                            className="h-4 w-4"
-                                            aria-hidden="true"
-                                        />
-                                    ) : action === 'reject' ? (
-                                        <XCircle
-                                            className="h-4 w-4"
-                                            aria-hidden="true"
-                                        />
-                                    ) : (
-                                        <ShieldCheck
-                                            className="h-4 w-4"
-                                            aria-hidden="true"
-                                        />
-                                    )}
-                                    {processing
-                                        ? 'Saving decision…'
-                                        : dialogCopy.confirm}
+                                    Review retained approval draft {index + 1}
                                 </Button>
-                            </DialogFooter>
-                        </form>
-                    ) : null}
-                </DialogContent>
-            </Dialog>
-        </>
+                            </div>
+                        ))}
+                    {!action &&
+                        pending.map((reference, index) => (
+                            <div
+                                key={reference.requestUuid}
+                                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"
+                            >
+                                <span className="text-sm">
+                                    Pending approval command {index + 1} ·{' '}
+                                    {reference.operation}
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    onClick={() =>
+                                        setAction({
+                                            operation: reference.operation,
+                                            approvalId: reference.approvalId,
+                                        })
+                                    }
+                                >
+                                    Review pending approval command {index + 1}
+                                </Button>
+                            </div>
+                        ))}
+                    {work.current ? (
+                        <TicketApprovalRecord record={work.current} />
+                    ) : (
+                        <p className="text-sm text-muted-foreground">
+                            No approval request has been recorded. Choose the
+                            responsible approver to begin.
+                        </p>
+                    )}
+                    {work.storage_ready && (
+                        <TicketApprovalHistory
+                            actorId={actorId}
+                            ticketId={ticket.id}
+                            version={ticket.lock_version}
+                            total={work.total}
+                            currentApprovalId={work.current?.id ?? null}
+                            onAccessLost={deny}
+                            onSessionExpired={onSessionExpired}
+                        />
+                    )}
+                    {action && (
+                        <TicketApprovalDialog
+                            key={`${actorId}:${ticket.id}:${action.operation}:${action.approvalId}`}
+                            actorId={actorId}
+                            ticketId={ticket.id}
+                            version={ticket.lock_version}
+                            work={work}
+                            approvalId={action.approvalId}
+                            operation={action.operation}
+                            initialDecision={action.decision}
+                            onClose={() => setAction(null)}
+                            onCommitted={onCommitted}
+                            onAccessLost={deny}
+                            onSessionExpired={onSessionExpired}
+                        />
+                    )}
+                </>
+            )}
+        </div>
     );
 }

@@ -142,12 +142,12 @@ test('a ticket in an approval category is flagged requires_approval at creation'
     expect(ItTicket::query()->firstWhere('title', 'Wifi flaky')->requires_approval)->toBeFalse();
 });
 
-test('an agent requests approval, notifying the other agents but not themselves', function () {
+test('an agent requests approval, notifying the named approver but not themselves', function () {
     Notification::fake();
     $ticket = approvalTicket(['category' => 'account', 'requires_approval' => true]);
 
     $this->actingAs($this->agent)
-        ->post("/it/tickets/{$ticket->id}/approvals", ['reason' => 'New starter needs the shared mailbox'])
+        ->post("/it/tickets/{$ticket->id}/approvals", ['reason' => 'New starter needs the shared mailbox', 'primary_approver_user_id' => $this->manager->id])
         ->assertRedirect();
 
     expect($ticket->approvals()->where('status', 'pending')->count())->toBe(1)
@@ -163,12 +163,12 @@ test('repeating an approval request is explained without creating duplicate work
     $ticket = approvalTicket(['requires_approval' => true]);
 
     $this->actingAs($this->agent)
-        ->post("/it/tickets/{$ticket->id}/approvals", ['reason' => 'Manager sign-off required'])
+        ->post("/it/tickets/{$ticket->id}/approvals", ['reason' => 'Manager sign-off required', 'primary_approver_user_id' => $this->manager->id])
         ->assertRedirect();
 
     $this->actingAs($this->manager)
         ->from(route('it.tickets.show', $ticket))
-        ->post("/it/tickets/{$ticket->id}/approvals", ['reason' => 'Duplicate request'])
+        ->post("/it/tickets/{$ticket->id}/approvals", ['reason' => 'Duplicate request', 'primary_approver_user_id' => $this->agent->id])
         ->assertRedirect()
         ->assertSessionHas('error', 'This ticket already has an active approval decision.');
 
@@ -295,7 +295,7 @@ test('a ticket needing approval cannot be resolved until it is approved', functi
 
     $this->actingAs($this->agent)
         ->from(route('it.tickets.show', $ticket))
-        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Set the account up'])
+        ->post("/it/tickets/{$ticket->id}/resolve", ['resolution_code' => 'restored', 'resolution_verification' => 'Synthetic verification confirmed the expected result.', 'expected_version' => $ticket->fresh()->lock_version, 'note' => 'Set the account up'])
         ->assertRedirect()
         ->assertSessionHas('error');
     expect($ticket->refresh()->status)->toBe('in_progress');
@@ -309,7 +309,7 @@ test('a ticket needing approval cannot be resolved until it is approved', functi
     ]);
 
     $this->actingAs($this->agent)
-        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Set the account up'])
+        ->post("/it/tickets/{$ticket->id}/resolve", ['resolution_code' => 'restored', 'resolution_verification' => 'Synthetic verification confirmed the expected result.', 'expected_version' => $ticket->fresh()->lock_version, 'note' => 'Set the account up'])
         ->assertRedirect();
     expect($ticket->refresh()->status)->toBe('resolved');
 });
@@ -329,7 +329,7 @@ test('a rejected approval still blocks resolution', function () {
 
     $this->actingAs($this->agent)
         ->from(route('it.tickets.show', $ticket))
-        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Trying anyway'])
+        ->post("/it/tickets/{$ticket->id}/resolve", ['resolution_code' => 'restored', 'resolution_verification' => 'Synthetic verification confirmed the expected result.', 'expected_version' => $ticket->fresh()->lock_version, 'note' => 'Trying anyway'])
         ->assertSessionHas('error');
     expect($ticket->refresh()->status)->toBe('in_progress');
 });
@@ -342,7 +342,7 @@ test('the update route also refuses to resolve an unapproved ticket', function (
 
     $this->actingAs($this->agent)
         ->from(route('it.tickets.show', $ticket))
-        ->patch("/it/tickets/{$ticket->id}", ['status' => 'resolved'])
+        ->patch("/it/tickets/{$ticket->id}", ['expected_version' => $ticket->fresh()->lock_version, 'status' => 'resolved'])
         ->assertSessionHasErrors('status');
     expect($ticket->refresh()->status)->toBe('in_progress');
 });
@@ -351,12 +351,12 @@ test('an approved ticket still resolves only through the governed resolution jou
     $ticket = approvedTicket($this->agent->id, $this->manager->id);
 
     $this->actingAs($this->agent)
-        ->patch("/it/tickets/{$ticket->id}", ['status' => 'resolved'])
+        ->patch("/it/tickets/{$ticket->id}", ['expected_version' => $ticket->fresh()->lock_version, 'status' => 'resolved'])
         ->assertSessionHasErrors('status');
     expect($ticket->refresh()->status)->toBe('in_progress');
 
     $this->actingAs($this->agent)
-        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Approved account access was provisioned and verified.'])
+        ->post("/it/tickets/{$ticket->id}/resolve", ['resolution_code' => 'restored', 'resolution_verification' => 'Synthetic verification confirmed the expected result.', 'expected_version' => $ticket->fresh()->lock_version, 'note' => 'Approved account access was provisioned and verified.'])
         ->assertRedirect();
     expect($ticket->refresh()->status)->toBe('resolved');
 });
@@ -369,7 +369,7 @@ test('a ticket that does not require approval resolves normally', function () {
     ]);
 
     $this->actingAs($this->agent)
-        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Rebooted the access point'])
+        ->post("/it/tickets/{$ticket->id}/resolve", ['resolution_code' => 'restored', 'resolution_verification' => 'Synthetic verification confirmed the expected result.', 'expected_version' => $ticket->fresh()->lock_version, 'note' => 'Rebooted the access point'])
         ->assertRedirect();
     expect($ticket->refresh()->status)->toBe('resolved');
 });

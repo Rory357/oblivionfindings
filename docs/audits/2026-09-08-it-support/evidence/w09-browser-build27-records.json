@@ -1,0 +1,214 @@
+{
+    "observed_at": "2026-09-10T03:54:17+00:00",
+    "token": "8c26976a426145a4",
+    "database": "oblivion_it_draft_browser_8c26976a426145a4",
+    "time_context": {
+        "elapsed_ms": 0.13,
+        "rows": [
+            {
+                "session_time_zone": "SYSTEM",
+                "system_time_zone": "New Zealand Standard Time"
+            }
+        ]
+    },
+    "tickets": {
+        "elapsed_ms": 0.31,
+        "rows": [
+            {
+                "id": 1,
+                "lock_version": 2,
+                "status": "closed"
+            },
+            {
+                "id": 4,
+                "lock_version": 5,
+                "status": "closed"
+            }
+        ]
+    },
+    "tasks": {
+        "elapsed_ms": 0.24,
+        "rows": []
+    },
+    "dependencies": {
+        "elapsed_ms": 1.66,
+        "rows": []
+    },
+    "receipts": {
+        "elapsed_ms": 0.18,
+        "rows": []
+    },
+    "events": {
+        "elapsed_ms": 0.2,
+        "rows": []
+    },
+    "audits": {
+        "elapsed_ms": 0.21,
+        "rows": []
+    },
+    "approvals": {
+        "ticket": {
+            "elapsed_ms": 0.16,
+            "rows": [
+                {
+                    "id": 5,
+                    "lock_version": 1,
+                    "status": "open"
+                }
+            ]
+        },
+        "requests": {
+            "elapsed_ms": 0.18,
+            "rows": []
+        },
+        "receipts": {
+            "elapsed_ms": 0.13,
+            "rows": []
+        },
+        "events": {
+            "elapsed_ms": 0.14,
+            "rows": []
+        },
+        "audits": {
+            "elapsed_ms": 0.15,
+            "rows": []
+        }
+    },
+    "resolution": {
+        "ticket": {
+            "elapsed_ms": 0.16,
+            "rows": [
+                {
+                    "id": 4,
+                    "lock_version": 5,
+                    "status": "closed",
+                    "workflow_state": "closed",
+                    "resolved_at": "2026-09-10 03:51:24",
+                    "closed_at": "2026-09-10 03:52:21",
+                    "reopened_count": 0,
+                    "resolution_code": "restored",
+                    "resolution_summary_sha256": "d858787e4e21e11aedbfcbed26563a7dde0a84d256253bf8c769f6fea8304ee7",
+                    "resolution_verification_sha256": "0616487dfd0e229678766d574ee01500ff006c14c56e7ee6db1ad4ef0d6d2fb3",
+                    "csat_score": null,
+                    "csat_submitted_at": null,
+                    "csat_comment_sha256": null
+                }
+            ]
+        },
+        "comments": {
+            "elapsed_ms": 0.16,
+            "rows": [
+                {
+                    "id": 1,
+                    "author_user_id": 4,
+                    "is_internal": 0,
+                    "speaker_side": "it",
+                    "source_channel": "browser",
+                    "created_at": "2026-09-10 15:51:24",
+                    "body_sha256": "81a4cf624652dcb3dfa1b487a7e322045fbba6dca0ed9f6254563b6386c7b7bf"
+                }
+            ]
+        },
+        "conversation": {
+            "elapsed_ms": 0.16,
+            "rows": [
+                {
+                    "id": 4,
+                    "last_public_comment_id": 1,
+                    "last_public_speaker_side": "it",
+                    "next_response_party": "requester"
+                }
+            ]
+        },
+        "events": {
+            "elapsed_ms": 0.23,
+            "rows": [
+                {
+                    "id": 1,
+                    "actor_user_id": 4,
+                    "type": "resolved",
+                    "created_at": "2026-09-10 03:51:24",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 3,
+                    "actor_user_id": 4,
+                    "type": "closed",
+                    "created_at": "2026-09-10 03:52:21",
+                    "source": "legacy_close"
+                }
+            ]
+        },
+        "audits": {
+            "elapsed_ms": 0.23,
+            "rows": [
+                {
+                    "id": 24,
+                    "user_id": 4,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 15:51:24",
+                    "source": "legacy_resolve"
+                },
+                {
+                    "id": 27,
+                    "user_id": 4,
+                    "action": "it.ticket.resolved",
+                    "created_at": "2026-09-10 15:51:24",
+                    "source": null
+                },
+                {
+                    "id": 29,
+                    "user_id": 4,
+                    "action": "it.work.transitioned",
+                    "created_at": "2026-09-10 15:52:21",
+                    "source": "legacy_close"
+                }
+            ]
+        }
+    },
+    "closure": {
+        "events": {
+            "elapsed_ms": 0.19,
+            "rows": [
+                {
+                    "id": 3,
+                    "ticket_id": 4,
+                    "actor_user_id": 4,
+                    "type": "closed",
+                    "reason_sha256": "982976800cd52d1fc1bc4aa5144ff230dca6c9ca02517e78e131bf8016baf502",
+                    "source": "legacy_close"
+                },
+                {
+                    "id": 4,
+                    "ticket_id": 1,
+                    "actor_user_id": 4,
+                    "type": "closed",
+                    "reason_sha256": "d1c771b82ef54d966c571bd6f523573db0ebffaa341959468e4e091f96d7ec06",
+                    "source": "bulk_close"
+                }
+            ]
+        },
+        "audits": {
+            "elapsed_ms": 0.2,
+            "rows": [
+                {
+                    "id": 30,
+                    "ticket_id": 4,
+                    "user_id": 4,
+                    "action": "it.ticket.closed",
+                    "source": "legacy_close"
+                },
+                {
+                    "id": 33,
+                    "ticket_id": 1,
+                    "user_id": 4,
+                    "action": "it.ticket.closed",
+                    "source": "bulk_close"
+                }
+            ]
+        }
+    },
+    "sequential_read_only_observations": true,
+    "database_mutations_performed": false,
+    "raw_private_values_emitted": false
+}

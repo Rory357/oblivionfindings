@@ -2,19 +2,21 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\BindsItBrowserActor;
 use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use Illuminate\Foundation\Http\FormRequest;
 
 /** Reopening settled work requires a useful explanation from either audience. */
 class ReopenTicketRequest extends FormRequest
 {
+    use BindsItBrowserActor;
     use ConcealsInaccessibleItWork;
 
     public function authorize(): bool
     {
         $ticket = $this->visibleTicketOrNotFound();
 
-        return (bool) $this->user()?->can('reopen', $ticket);
+        return $this->hasCurrentBrowserActor() && (bool) $this->user()?->can('reopen', $ticket);
     }
 
     protected function prepareForValidation(): void
@@ -28,6 +30,8 @@ class ReopenTicketRequest extends FormRequest
     public function rules(): array
     {
         return [
+            ...$this->browserActorRules(),
+            'expected_version' => ['required', 'integer', 'min:1'],
             'reason' => ['required', 'string', 'min:5', 'max:2000'],
         ];
     }

@@ -1,0 +1,1 @@
+{"tool":"pint","result":"fixed","files":[{"path":"tests\\Feature\\Tasks\\TaskProviderAuthorizationArchitectureTest.php","fixers":["single_quote"]}]}

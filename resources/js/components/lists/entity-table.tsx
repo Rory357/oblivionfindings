@@ -16,10 +16,12 @@
  * Wide tables scroll inside their own overflow-x-auto — the page body
  * never scrolls horizontally.
  */
+import { Link } from '@inertiajs/react';
 import { Check } from 'lucide-react';
 import type { ComponentType, MouseEvent, ReactNode } from 'react';
 
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
 import { EntityKebab, type MenuItem } from './entity-menu';
@@ -40,6 +42,7 @@ export interface EntityTableIdentity {
     /** Custom 30px mark (person avatar) — wins over `icon`. */
     mark?: ReactNode;
     name: string;
+    linkLabel?: string;
     subline?: ReactNode;
     /** Small extra rendered after the name (e.g. a signal dot). */
     extra?: ReactNode;
@@ -56,6 +59,15 @@ export interface EntityTableProps<T> {
     /** The one MenuItem[] feeding kebab AND context menu. */
     actionsFor: (row: T) => MenuItem[];
     onOpen?: (row: T) => void;
+    /** A real identity link; optional so existing row activation is unchanged. */
+    hrefFor?: (row: T) => string;
+    selection?: {
+        keys: ReadonlySet<string | number>;
+        onToggle: (row: T, checked: boolean) => void;
+        labelFor: (row: T) => string;
+        canSelect?: (row: T) => boolean;
+        disabled?: boolean;
+    };
     onRowContextMenu?: (e: MouseEvent, row: T) => void;
     /** Dim archived/inactive rows. */
     mutedFor?: (row: T) => boolean;
@@ -86,6 +98,8 @@ export function EntityTable<T>({
     columns,
     actionsFor,
     onOpen,
+    hrefFor,
+    selection,
     onRowContextMenu,
     mutedFor,
     minWidth = 900,
@@ -138,20 +152,27 @@ export function EntityTable<T>({
                     {rows.map((row) => {
                         const key = rowKey(row);
                         const id = identity(row);
-                        const selected = selectedKeys?.has(key) ?? false;
+                        const selected =
+                            (selection?.keys ?? selectedKeys)?.has(key) ??
+                            false;
                         const muted = mutedFor?.(row) ?? false;
                         const Icon = id.icon;
                         return (
                             <div
                                 key={key}
                                 role="row"
-                                tabIndex={0}
+                                tabIndex={
+                                    !hrefFor && (onOpen || selectMode)
+                                        ? 0
+                                        : undefined
+                                }
                                 onClick={() =>
                                     selectMode
                                         ? onToggleSelect?.(row)
                                         : onOpen?.(row)
                                 }
                                 onKeyDown={(e) => {
+                                    if (e.target !== e.currentTarget) return;
                                     if (e.key === 'Enter' || e.key === ' ') {
                                         e.preventDefault();
                                         if (selectMode) onToggleSelect?.(row);
@@ -175,6 +196,29 @@ export function EntityTable<T>({
                                     role="cell"
                                     className="flex min-w-0 items-center gap-2.5 px-3"
                                 >
+                                    {selection &&
+                                    selection.canSelect?.(row) !== false ? (
+                                        <label
+                                            className="flex min-h-11 shrink-0 items-center"
+                                            onClick={(event) =>
+                                                event.stopPropagation()
+                                            }
+                                        >
+                                            <Checkbox
+                                                checked={selected}
+                                                disabled={selection.disabled}
+                                                onCheckedChange={(checked) =>
+                                                    selection.onToggle(
+                                                        row,
+                                                        checked === true,
+                                                    )
+                                                }
+                                                aria-label={selection.labelFor(
+                                                    row,
+                                                )}
+                                            />
+                                        </label>
+                                    ) : null}
                                     {selectMode ? (
                                         <span
                                             aria-hidden="true"
@@ -197,9 +241,22 @@ export function EntityTable<T>({
                                     )}
                                     <span className="min-w-0">
                                         <span className="flex items-center gap-1.5">
-                                            <span className="truncate text-[13px] font-semibold text-foreground">
-                                                {id.name}
-                                            </span>
+                                            {hrefFor ? (
+                                                <Link
+                                                    aria-label={id.linkLabel}
+                                                    href={hrefFor(row)}
+                                                    onClick={(event) =>
+                                                        event.stopPropagation()
+                                                    }
+                                                    className="truncate text-[13px] font-semibold text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                                >
+                                                    {id.name}
+                                                </Link>
+                                            ) : (
+                                                <span className="truncate text-[13px] font-semibold text-foreground">
+                                                    {id.name}
+                                                </span>
+                                            )}
                                             {id.extra}
                                         </span>
                                         {id.subline ? (
@@ -232,6 +289,7 @@ export function EntityTable<T>({
                                     {!selectMode ? (
                                         <EntityKebab
                                             actions={actionsFor(row)}
+                                            label={`Actions for ${id.name}`}
                                         />
                                     ) : null}
                                 </span>

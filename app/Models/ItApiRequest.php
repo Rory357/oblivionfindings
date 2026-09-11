@@ -20,12 +20,17 @@ class ItApiRequest extends Model
         'response_status',
         'response_body',
         'completed_at',
+        'execution_state',
+        'attempt_count',
+        'last_attempt_at',
     ];
 
     protected $casts = [
         'response_status' => 'integer',
         'response_body' => 'array',
         'completed_at' => 'datetime',
+        'attempt_count' => 'integer',
+        'last_attempt_at' => 'datetime',
     ];
 
     public function identity(): BelongsTo
