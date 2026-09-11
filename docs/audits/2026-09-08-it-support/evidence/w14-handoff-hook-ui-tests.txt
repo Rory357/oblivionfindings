@@ -1,0 +1,40 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/hooks/use-it-control-room-handoff-command.test.tsx (5 tests | 1 failed) 576ms
+   × retains only an opaque identity across a lost acknowledgement and remount, then recovers without resubmitting 87ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/hooks/use-it-control-room-handoff-command.test.tsx > retains only an opaque identity across a lost acknowledgement and remount, then recovers without resubmitting
+AssertionError: expected [ 'actorId', 'alertId', 'requestUuid' ] to deeply equal [ 'action', 'actorId', …(4) ]
+
+- Expected
++ Received
+
+  [
+-   "action",
+    "actorId",
+-   "relationship",
+-   "requestUuid",
+    "alertId",
+-   "targetId",
++   "requestUuid",
+  ]
+
+ ❯ resources/js/hooks/use-it-control-room-handoff-command.test.tsx:59:42
+     57|     const identity = first.result.current.identity!;
+     58|     expect(JSON.parse(sessionStorage.getItem(storageKey)!)).toEqual(id…
+     59|     expect(Object.keys(identity).sort()).toEqual([
+       |                                          ^
+     60|         'action',
+     61|         'actorId',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 9 passed (10)
+   Start at  06:27:29
+   Duration  2.58s (transform 113ms, setup 263ms, import 726ms, tests 582ms, environment 2.09s)
+

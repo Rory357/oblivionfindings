@@ -4,6 +4,7 @@ namespace App\Domain\It\Services;
 
 use App\Domain\It\Exceptions\ItTicketCommandConflict;
 use App\Models\ControlRoomAlert;
+use App\Models\ItService;
 use App\Models\ItTicket;
 use App\Models\ItTicketCommandReceipt;
 use App\Models\ItTicketEvent;
@@ -31,6 +32,14 @@ final class ItControlRoomHandoffService
         private readonly ItTicketVersionService $versions,
     ) {}
 
+    /** Opening recovery remains available after the operational alert is resolved. */
+    public function canPrepare(ControlRoomAlert $alert, User $actor): bool
+    {
+        return $actor->approved_at !== null && $actor->canDo('it.view') && $actor->canDo('it.manage')
+            && $actor->canDo('controlRoom.alerts.manage') && $this->alerts->canView($alert, $actor)
+            && $alert->site_id !== null && in_array((int) $alert->site_id, $this->work->approvedSiteIds($actor), true);
+    }
+
     /** Permission-safe discovery; never copy the operational alert's free text into technical work. */
     public function preview(ControlRoomAlert $alert, User $actor, string $search = ''): array
     {
@@ -52,6 +61,9 @@ final class ItControlRoomHandoffService
         return [
             'viewer_user_id' => (int) $actor->id, 'alert_id' => (int) $alert->id,
             'alert_version' => $this->alertVersion($alert),
+            'can_start' => in_array($alert->status, ControlRoomAlert::ACTIVE_STATUSES, true),
+            'site' => ['id' => (int) $alert->site_id, 'name' => $alert->site?->name],
+            'services' => ItService::query()->where('is_active', true)->orderBy('name')->get(['id', 'name'])->toArray(),
             'existing_work' => $visible->map(fn (ItTicket $ticket): array => $this->ticketData($ticket))->values()->all(),
             'has_existing_work' => $existing->isNotEmpty(),
             'candidates' => $query->orderByDesc('id')->limit(25)->get()

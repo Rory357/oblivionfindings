@@ -1,0 +1,3 @@
+resources/js/hooks/use-it-control-room-handoff-command.test.tsx(22,37): error TS2339: Property 'targetId' does not exist on type 'HandoffIdentity'.
+resources/js/hooks/use-it-control-room-handoff-command.test.tsx(25,34): error TS2339: Property 'action' does not exist on type 'HandoffIdentity'.
+resources/js/hooks/use-it-control-room-handoff-command.test.tsx(26,40): error TS2339: Property 'relationship' does not exist on type 'HandoffIdentity'.

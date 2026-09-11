@@ -19,6 +19,9 @@ export interface HandoffPreview {
     viewer_user_id: number;
     alert_id: number;
     alert_version: string;
+    can_start: boolean;
+    site: { id: number; name: string | null };
+    services: { id: number; name: string }[];
     existing_work: HandoffTicket[];
     has_existing_work: boolean;
     candidates: HandoffTicket[];
@@ -54,6 +57,11 @@ export type HandoffResult =
           outcome: 'created' | 'linked' | 'existing';
           ticket: HandoffTicket;
       };
+
+type WithoutIdentity<T> = T extends HandoffIdentity
+    ? Omit<T, keyof HandoffIdentity>
+    : never;
+export type HandoffSelection = WithoutIdentity<HandoffIntent>;
 
 const positive = (value: unknown): value is number =>
     Number.isSafeInteger(value) && Number(value) > 0;
@@ -125,6 +133,17 @@ export function readHandoffPreview(
         typeof data.alert_version !== 'string' ||
         !/^[a-f0-9]{64}$/.test(data.alert_version) ||
         typeof data.has_existing_work !== 'boolean' ||
+        typeof data.can_start !== 'boolean' ||
+        !draftRecord(data.site) ||
+        !positive(data.site.id) ||
+        (data.site.name !== null && typeof data.site.name !== 'string') ||
+        !Array.isArray(data.services) ||
+        data.services.some(
+            (service) =>
+                !draftRecord(service) ||
+                !positive(service.id) ||
+                typeof service.name !== 'string',
+        ) ||
         !Array.isArray(data.existing_work) ||
         data.existing_work.length > 25 ||
         !Array.isArray(data.candidates) ||
@@ -138,6 +157,9 @@ export function readHandoffPreview(
         viewer_user_id: actorId,
         alert_id: alertId,
         alert_version: data.alert_version,
+        can_start: data.can_start,
+        site: { id: data.site.id, name: data.site.name },
+        services: data.services as { id: number; name: string }[],
         existing_work: existing as HandoffTicket[],
         has_existing_work: data.has_existing_work,
         candidates: candidates as HandoffTicket[],

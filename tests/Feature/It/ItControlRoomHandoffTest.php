@@ -30,6 +30,7 @@ use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetSignal;
 use App\Models\FleetSignalOutbox;
+use App\Models\ItService;
 use App\Models\ItTicket;
 use App\Models\ItTicketCommandReceipt;
 use App\Models\Permission;
@@ -89,6 +90,20 @@ function handoffUrl(string $suffix = ''): string
 {
     return '/it/control-room/alerts/'.test()->alert->id.'/handoff'.$suffix;
 }
+
+test('handoff preview uses canonical site services and permits recovery after alert resolution', function () {
+    $service = ItService::query()->create(['key' => 'handoff-network', 'name' => 'Network service', 'is_active' => true]);
+    ItService::query()->create(['key' => 'handoff-retired', 'name' => 'Retired service', 'is_active' => false]);
+    expect($this->handoff->canPrepare($this->alert, $this->actor))->toBeTrue();
+    $preview = $this->handoff->preview($this->alert, $this->actor);
+    expect($preview['can_start'])->toBeTrue()->and($preview['site']['id'])->toBe($this->site->id)
+        ->and($preview['services'])->toBe([['id' => $service->id, 'name' => 'Network service']]);
+    $this->alert->update(['status' => 'resolved']);
+    expect($this->handoff->canPrepare($this->alert, $this->actor))->toBeTrue()
+        ->and($this->handoff->preview($this->alert, $this->actor)['can_start'])->toBeFalse();
+    $this->role->permissions()->detach(Permission::where('key', 'it.manage')->value('id'));
+    expect($this->handoff->canPrepare($this->alert, User::query()->findOrFail($this->actor->id)))->toBeFalse();
+});
 
 test('handoff HTTP preview is actor-bound private and contains no operational free text', function () {
     $ticket = handoffTarget();

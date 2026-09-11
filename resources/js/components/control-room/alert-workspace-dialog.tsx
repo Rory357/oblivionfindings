@@ -1,4 +1,5 @@
 import { LinkedJourney } from '@/components/control-room/alert-workspace/linked-journey';
+import { ControlRoomItHandoffDialog } from '@/components/control-room/it-handoff-dialog';
 import {
     JourneyGateList,
     type JourneyGateData,
@@ -142,6 +143,7 @@ export type WorkspaceAlert = {
 };
 
 export type AlertWorkspaceDetail = {
+    it_handoff?: { viewer_user_id: number; can_open: boolean };
     return_to?: string;
     alert: WorkspaceAlert;
     playbook_run: {
@@ -632,6 +634,8 @@ export function AlertWorkspaceDialog({
 }) {
     const [section, setSection] = useState<SectionKey>('overview');
     const [action, setAction] = useState<ActionKey | null>(null);
+    const [handoffOpen, setHandoffOpen] = useState(false);
+    const handoffReturnFocus = useRef(false);
 
     const d = detail;
     const a = d.alert;
@@ -678,12 +682,12 @@ export function AlertWorkspaceDialog({
             blurb: d.monitoring_recovery
                 ? 'recovery recorded'
                 : d.monitoring_incident_evidence
-                ? d.evidence_packs.length
-                    ? `sealed snapshot · ${d.evidence_packs.length} pack${d.evidence_packs.length === 1 ? '' : 's'}`
-                    : 'sealed monitoring snapshot'
-                : d.evidence_packs.length
-                  ? `${d.evidence_packs.length} pack${d.evidence_packs.length === 1 ? '' : 's'}`
-                  : 'no packs',
+                  ? d.evidence_packs.length
+                      ? `sealed snapshot · ${d.evidence_packs.length} pack${d.evidence_packs.length === 1 ? '' : 's'}`
+                      : 'sealed monitoring snapshot'
+                  : d.evidence_packs.length
+                    ? `${d.evidence_packs.length} pack${d.evidence_packs.length === 1 ? '' : 's'}`
+                    : 'no packs',
             icon: Package,
         },
         {
@@ -853,9 +857,41 @@ export function AlertWorkspaceDialog({
 
     const railExtra = d.can.watch ? <WatchToggle d={d} /> : null;
 
+    if (handoffOpen && d.it_handoff) {
+        return (
+            <ControlRoomItHandoffDialog
+                actorId={d.it_handoff.viewer_user_id}
+                alertId={a.id}
+                alertReference={alertRef}
+                allowed={d.it_handoff.can_open}
+                onClose={() => {
+                    setHandoffOpen(false);
+                    setSection('linked');
+                    handoffReturnFocus.current = true;
+                    router.reload({ preserveScroll: true });
+                }}
+            />
+        );
+    }
+
     return (
         <WizardShell
             open={open}
+            onOpenAutoFocus={(event) => {
+                if (handoffReturnFocus.current) {
+                    handoffReturnFocus.current = false;
+                    const trigger =
+                        event.target instanceof HTMLElement
+                            ? event.target.querySelector<HTMLElement>(
+                                  '[data-it-handoff-trigger]',
+                              )
+                            : null;
+                    if (trigger) {
+                        event.preventDefault();
+                        trigger.focus();
+                    }
+                }
+            }}
             onClose={onClose}
             title={`Alert ${alertRef}`}
             description={`${titleCase(a.alert_type)} — ${d.client?.name ?? d.alert.asset?.name ?? titleCase(a.source)}`}
@@ -934,7 +970,12 @@ export function AlertWorkspaceDialog({
                     {section === 'evidence' ? <EvidenceSection d={d} /> : null}
                     {section === 'tasks' ? <TasksSection d={d} /> : null}
                     {section === 'activity' ? <ActivitySection d={d} /> : null}
-                    {section === 'linked' ? <LinkedSection d={d} /> : null}
+                    {section === 'linked' ? (
+                        <LinkedSection
+                            d={d}
+                            onHandoff={() => setHandoffOpen(true)}
+                        />
+                    ) : null}
                 </>
             ) : null}
         </WizardShell>
@@ -2992,11 +3033,13 @@ function MonitoringRecoveryNotice({ d }: { d: AlertWorkspaceDetail }) {
 
     return (
         <div className="rounded-lg border border-border bg-muted/30 p-3">
-            <StatusBadge variant="info">Monitoring recovery recorded</StatusBadge>
+            <StatusBadge variant="info">
+                Monitoring recovery recorded
+            </StatusBadge>
             <p className="text-caption mt-2 text-muted-foreground">
-                {formatDateTime(d.monitoring_recovery.observed_at)}. The monitoring
-                check recovered. This does not resolve the operational alert or
-                complete linked IT work.
+                {formatDateTime(d.monitoring_recovery.observed_at)}. The
+                monitoring check recovered. This does not resolve the
+                operational alert or complete linked IT work.
                 {OPEN_STATES.includes(d.alert.status)
                     ? ' Review the recovery before resolving this alert.'
                     : ''}
@@ -3153,9 +3196,12 @@ function EvidencePackCard({
     };
 
     const removeItem = (itemId: number) => {
-        router.delete(`/control-room/alerts/${alertId}/evidence/${pack.id}/items/${itemId}`, {
-            preserveScroll: true,
-        });
+        router.delete(
+            `/control-room/alerts/${alertId}/evidence/${pack.id}/items/${itemId}`,
+            {
+                preserveScroll: true,
+            },
+        );
     };
 
     return (
@@ -3329,10 +3375,13 @@ function CompletePackReview({
 }) {
     const form = useForm({});
     const submit = () => {
-        form.post(`/control-room/alerts/${alertId}/evidence/${pack.id}/complete`, {
-            preserveScroll: true,
-            onSuccess: onPaneSuccess(onCancel),
-        });
+        form.post(
+            `/control-room/alerts/${alertId}/evidence/${pack.id}/complete`,
+            {
+                preserveScroll: true,
+                onSuccess: onPaneSuccess(onCancel),
+            },
+        );
     };
     return (
         <div className="flex flex-col gap-3 p-3">
@@ -3708,9 +3757,12 @@ function TaskRow({
                             icon={Trash2}
                             destructive
                             onConfirm={() =>
-                                router.delete(`/control-room/alerts/${d.alert.id}/tasks/${t.id}`, {
-                                    preserveScroll: true,
-                                })
+                                router.delete(
+                                    `/control-room/alerts/${d.alert.id}/tasks/${t.id}`,
+                                    {
+                                        preserveScroll: true,
+                                    },
+                                )
                             }
                         />
                     </div>
@@ -4639,7 +4691,14 @@ function DiscussionEntry({
 
 /* --- Linked records --------------------------------------------------- */
 
-export function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
+export function LinkedSection({
+    d,
+    onHandoff,
+}: {
+    d: AlertWorkspaceDetail;
+    onHandoff?: () => void;
+}) {
+    const [handoffOpen, setHandoffOpen] = useState(false);
     const a = d.alert;
     const can = d.can ?? {
         manage: false,
@@ -4805,6 +4864,30 @@ export function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
 
     return (
         <div className="flex flex-col gap-2">
+            {d.it_handoff?.can_open ? (
+                <Button
+                    variant="outline"
+                    data-it-handoff-trigger
+                    onClick={() =>
+                        onHandoff ? onHandoff() : setHandoffOpen(true)
+                    }
+                >
+                    <LinkIcon className="mr-2 h-4 w-4" />
+                    Prepare IT handoff
+                </Button>
+            ) : null}
+            {handoffOpen && d.it_handoff ? (
+                <ControlRoomItHandoffDialog
+                    actorId={d.it_handoff.viewer_user_id}
+                    alertId={a.id}
+                    alertReference={a.reference_number ?? `Alert ${a.id}`}
+                    allowed={d.it_handoff.can_open}
+                    onClose={() => {
+                        setHandoffOpen(false);
+                        router.reload({ preserveScroll: true });
+                    }}
+                />
+            ) : null}
             {rows.length ? (
                 rows
             ) : (

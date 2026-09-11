@@ -22,9 +22,11 @@ use App\Jobs\DispatchFleetSignalOutbox;
 use App\Models\Asset;
 use App\Models\ControlRoom\SignalRule;
 use App\Models\ControlRoom\SignalSource;
+use App\Models\ControlRoomAlert;
 use App\Models\FleetSignal;
 use App\Models\FleetSignalOutbox;
 use App\Models\ItQueue;
+use App\Models\ItService;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
 use App\Models\Permission;
@@ -221,6 +223,28 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
             Carbon::setTestNow($previousTestNow);
         }
 
-        return ['synthetic_only' => true, 'queue_id' => $queue->id, 'team_id' => $team->id, 'cases' => $cases];
+        $handoffGrant = Permission::query()->firstOrCreate(['key' => 'controlRoom.alerts.manage'], [
+            'description' => 'Manage Control Room alerts', 'group' => 'controlRoom', 'module' => 'Operations',
+        ]);
+        Role::query()->where('name', 'w06-browser-tech')->sole()->permissions()->syncWithoutDetaching([$handoffGrant->id]);
+        $handoffService = ItService::query()->create(['key' => 'w14-handoff-network',
+            'name' => 'W14 synthetic network service', 'is_active' => true]);
+        $handoffs = [];
+        foreach (['create', 'link', 'cancel', 'stale', 'other_site', 'private'] as $case) {
+            $siteId = (int) $fixtures['sites'][$case === 'other_site' ? 'c' : 'a'];
+            $alert = ControlRoomAlert::factory()->create(['site_id' => $siteId, 'source' => 'manual',
+                'alert_type' => 'other', 'severity' => 'high', 'status' => 'open',
+                'notes' => 'W14 '.$context['token'].' synthetic '.$case.' handoff. No operational action.',
+                'context' => $case === 'private' ? ['normalized_data' => ['controlled_drug' => true]] : []]);
+            $target = in_array($case, ['link', 'stale'], true) ? ItTicket::factory()->create([
+                'site_id' => $siteId, 'is_organisation_wide' => false, 'source' => 'agent',
+                'work_type' => 'incident', 'status' => 'open', 'requester_user_id' => $tech->id,
+                'title' => 'W14 synthetic '.$case.' handoff target',
+            ]) : null;
+            $handoffs[$case] = ['alert_id' => $alert->id, 'site_id' => $siteId, 'ticket_id' => $target?->id];
+        }
+
+        return ['synthetic_only' => true, 'queue_id' => $queue->id, 'team_id' => $team->id, 'cases' => $cases,
+            'handoffs' => $handoffs, 'handoff_service_id' => $handoffService->id];
     });
 }
