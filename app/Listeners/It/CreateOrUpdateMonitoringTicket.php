@@ -77,6 +77,14 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                 throw new DomainException('source_scope_changed');
             }
             $ticket = $this->ticketForAlert($event->device, $lockedAlert, $siteId, $episode['key'] ?? null, (int) $event->deviceEvent->id);
+            if ($ticket === null && $lockedAlert !== null) {
+                $ticket = $this->links->unboundHumanMonitoringTicket($lockedAlert);
+                if ($ticket !== null) {
+                    ItTicketEvent::record($ticket, 'monitoring_handoff_bound', null, [
+                        ...$this->eventEvidence($event, $lockedAlert), 'control_room_alert_id' => (int) $lockedAlert->id,
+                    ]);
+                }
+            }
 
             if ($ticket) {
                 $this->links->linkMonitoringEvidence($ticket, $event->device, $lockedAlert, [
@@ -178,8 +186,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                 return ['outcome' => 'recovery_unmatched', 'ticket_ids' => []];
             }
 
-            $ticketsQuery = ItTicket::query()
-                ->where('source', 'system')
+            $ticketsQuery = $this->links->monitoringTickets()
                 ->where('work_type', 'incident')
                 ->where('site_id', $siteId)
                 ->where('is_organisation_wide', false)
@@ -194,31 +201,31 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                 })
                 ->whereHas('events', function ($events): void {
                     $events
-                        ->where('type', 'created_from_monitoring')
+                        ->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)
                         ->where('payload->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
                         ->where('payload->operation', ItTicketLinkService::MONITORING_OPERATION);
                 });
 
             if ($nativeEpisode) {
-                $ticketsQuery->whereHas('events', fn ($events) => $events->where('type', 'created_from_monitoring')
+                $ticketsQuery->whereHas('events', fn ($events) => $events->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)
                     ->where('payload->availability_episode_key', $episode['key']));
             } elseif ($correlationKey !== null) {
                 $ticketsQuery->whereHas('events', function ($events) use ($correlationKey): void {
                     $events
-                        ->where('type', 'created_from_monitoring')
+                        ->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)
                         ->where('payload->monitor_correlation_key', $correlationKey);
                 });
             } else {
                 $ticketsQuery->whereHas('events', function ($events): void {
                     $events
-                        ->where('type', 'created_from_monitoring')
+                        ->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)
                         ->whereNull('payload->monitor_correlation_key');
                 });
             }
             if (! $nativeEpisode) {
-                $ticketsQuery->whereHas('events', fn ($events) => $events->where('type', 'created_from_monitoring')
+                $ticketsQuery->whereHas('events', fn ($events) => $events->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)
                     ->whereNull('payload->availability_episode_key'))
-                    ->whereHas('events', fn ($events) => $events->whereIn('type', ['created_from_monitoring', 'monitoring_evidence_added'])
+                    ->whereHas('events', fn ($events) => $events->whereIn('type', [...ItTicketLinkService::MONITORING_ORIGIN_EVENTS, 'monitoring_evidence_added'])
                         ->where('payload->device_event_id', $legacyFailure->id));
             }
 
@@ -252,8 +259,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
 
     private function ticketForAlert(Device $device, ?ControlRoomAlert $alert, int $siteId, ?string $episodeKey, int $sourceEventId): ?ItTicket
     {
-        return ItTicket::query()
-            ->where('source', 'system')
+        return $this->links->monitoringTickets()
             ->where('work_type', 'incident')
             ->when($episodeKey === null && $alert !== null, fn ($tickets) => $tickets->whereIn('status', ItTicket::OPEN_STATUSES))
             ->where('site_id', $siteId)
@@ -267,9 +273,9 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                     ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION);
             }))
             ->when($episodeKey === null && $alert === null, fn ($tickets) => $tickets->whereHas('events', fn ($events) => $events
-                ->where('type', 'created_from_monitoring')->where('payload->device_event_id', $sourceEventId)))
+                ->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)->where('payload->device_event_id', $sourceEventId)))
             ->when($episodeKey !== null, fn ($tickets) => $tickets->whereHas('events', fn ($events) => $events
-                ->where('type', 'created_from_monitoring')->where('payload->availability_episode_key', $episodeKey)))
+                ->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)->where('payload->availability_episode_key', $episodeKey)))
             ->whereHas('links', function ($query) use ($device): void {
                 $query
                     ->where('relationship', 'affected_device')
@@ -280,7 +286,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             })
             ->whereHas('events', function ($events): void {
                 $events
-                    ->where('type', 'created_from_monitoring')
+                    ->whereIn('type', ItTicketLinkService::MONITORING_ORIGIN_EVENTS)
                     ->where('payload->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
                     ->where('payload->operation', ItTicketLinkService::MONITORING_OPERATION);
             })
@@ -291,7 +297,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
     private function hasMonitoringEvidence(ItTicket $ticket, int $deviceEventId): bool
     {
         return $ticket->events()
-            ->whereIn('type', ['created_from_monitoring', 'monitoring_evidence_added'])
+            ->whereIn('type', [...ItTicketLinkService::MONITORING_ORIGIN_EVENTS, 'monitoring_evidence_added'])
             ->where('payload->device_event_id', $deviceEventId)
             ->exists();
     }
@@ -317,7 +323,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
 
     private function isLatestMonitoringFailure(ItTicket $ticket, DeviceEvent $failure): bool
     {
-        $eventIds = $ticket->events()->whereIn('type', ['created_from_monitoring', 'monitoring_evidence_added'])
+        $eventIds = $ticket->events()->whereIn('type', [...ItTicketLinkService::MONITORING_ORIGIN_EVENTS, 'monitoring_evidence_added'])
             ->get(['payload'])->map(fn (ItTicketEvent $event) => data_get($event->payload, 'device_event_id'))
             ->filter(fn ($id): bool => is_int($id))->all();
         $latest = DeviceEvent::query()->whereIn('id', $eventIds)->where('device_id', $failure->device_id)

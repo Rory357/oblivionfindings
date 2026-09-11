@@ -8,19 +8,31 @@ use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Services\MonitoringObservationIngestor;
+use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceEventSignalOutbox;
+use App\Jobs\DetectFleetOfflineDevices;
 use App\Jobs\DispatchDeviceEventSignalOutbox;
 use App\Jobs\DispatchDeviceMonitoringTicket;
+use App\Jobs\DispatchFleetMonitoringTicket;
+use App\Jobs\DispatchFleetSignalOutbox;
+use App\Models\Asset;
 use App\Models\ControlRoom\SignalRule;
+use App\Models\ControlRoom\SignalSource;
+use App\Models\FleetSignal;
+use App\Models\FleetSignalOutbox;
 use App\Models\ItQueue;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Fleet\FleetSignalService;
+use App\Services\Fleet\FleetTelemetryIngestService;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Database\Seeders\SecurityDevicesSignalSeeder;
@@ -51,6 +63,12 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
             $permissions = Permission::query()->whereIn('key', $keys)->pluck('id');
             w06BrowserRequire($permissions->count() === count($keys), 'Canonical source permissions are missing.');
             $role->permissions()->syncWithoutDetaching($permissions);
+        }
+        $assetPermission = Permission::query()->firstOrCreate(['key' => 'assets.viewAny'], [
+            'description' => 'View canonical assets', 'group' => 'assets', 'module' => 'Operations',
+        ]);
+        foreach (['tech', 'cover'] as $key) {
+            Role::query()->where('name', 'w06-browser-'.$key)->sole()->permissions()->syncWithoutDetaching([$assetPermission->id]);
         }
         $tech = User::query()->findOrFail($fixtures['actors']['tech']['id']);
         $cover = User::query()->findOrFail($fixtures['actors']['cover']['id']);
@@ -138,6 +156,69 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
             $cases[$case] = ['ticket_id' => $ticket->id, 'reference' => $ticket->reference, 'device_id' => $device->id,
                 'alert_id' => $snapshot->control_room_alert_id, 'site_id' => $siteId, 'outbox_id' => $outbox->id,
                 'status' => $ticket->status, 'status_reason' => $ticket->status_reason, 'evidence_version' => $snapshot->evidence_version];
+        }
+
+        SignalSource::query()->updateOrCreate(['slug' => 'queclink_fleet'], [
+            'name' => 'Synthetic Fleet source', 'vendor' => 'queclink', 'status' => 'active',
+        ]);
+        $fleetDeliver = function (FleetSignal $source): FleetSignalOutbox {
+            $outbox = FleetSignalOutbox::query()->where('fleet_signal_id', $source->id)->sole();
+            app()->call([new DispatchFleetSignalOutbox($outbox->id), 'handle']);
+            app()->call([new DispatchFleetMonitoringTicket($outbox->id), 'handle']);
+            w06BrowserRequire($outbox->fresh()->status === 'sent' && $outbox->fresh()->it_status === 'applied', 'Synthetic Fleet delivery did not complete.');
+
+            return $outbox->fresh();
+        };
+        $anchor = CarbonImmutable::now()->startOfSecond();
+        $previousTestNow = Carbon::getTestNow();
+        try {
+            foreach (['fleet_direct', 'fleet_recovered', 'fleet_urgent'] as $case) {
+                SignalRule::query()->updateOrCreate(['name' => 'W14 synthetic Fleet availability'], [
+                    'signal_type_code' => 'fleet_device_offline', 'priority' => 1, 'is_active' => true,
+                    'output_severity' => $case === 'fleet_urgent' ? 'high' : 'medium',
+                    'output_tier' => 2, 'output_escalation_level' => 1, 'deduplicate' => true,
+                ]);
+                $siteId = (int) $fixtures['sites']['a'];
+                $asset = Asset::factory()->vehicle()->create(['site_id' => $siteId, 'home_site_id' => null,
+                    'client_id' => null, 'name' => 'W14 synthetic '.$case.' vehicle']);
+                $uid = 'W14-'.$context['token'].'-'.$case;
+                $device = Device::factory()->tracking()->create(['name' => 'W14 synthetic '.$case.' tracker',
+                    'provider' => 'queclink', 'imei' => $uid, 'device_uid' => $uid]);
+                DeviceAssetLink::query()->create([
+                    'device_id' => $device->id, 'asset_id' => $asset->id,
+                    'link_type' => LinkType::InstalledIn, 'linked_at' => $anchor->subHour(),
+                ]);
+                $ingest = function () use ($uid, $device): void {
+                    $result = app(FleetTelemetryIngestService::class)->ingest('queclink', [
+                        'imei' => $uid, 'gps_time' => now()->toISOString(), 'event_type' => 'heartbeat',
+                    ], (int) $device->id);
+                    w06BrowserRequire(($result['ok'] ?? false) === true, 'Synthetic Fleet heartbeat was rejected.');
+                };
+                Carbon::setTestNow($anchor->subMinutes(20));
+                $ingest();
+                Carbon::setTestNow($anchor->subMinute());
+                (new DetectFleetOfflineDevices)->handle(app(FleetSignalService::class));
+                $offline = FleetSignal::query()->where('asset_id', $asset->id)->where('signal_type', 'device.offline')->sole();
+                $outbox = $fleetDeliver($offline);
+                if ($case === 'fleet_recovered') {
+                    Carbon::setTestNow($anchor);
+                    $ingest();
+                    $fleetDeliver(FleetSignal::query()->where('asset_id', $asset->id)->where('signal_type', 'device.online')->sole());
+                }
+                $ticket = ItTicket::query()->findOrFail($outbox->it_ticket_ids[0]);
+                $snapshot = MonitoringIncidentEvidenceSnapshot::query()->where('it_ticket_id', $ticket->id)->sole();
+                w06BrowserRequire($snapshot->hasValidChecksum() && $snapshot->evidence_version === 3
+                    && $snapshot->device_event_id === null && (int) $snapshot->fleet_signal_id === (int) $offline->id
+                    && $ticket->queue_id === $queue->id && $ticket->status === 'open'
+                    && ($case === 'fleet_urgent' ? $snapshot->control_room_alert_id !== null : $snapshot->control_room_alert_id === null)
+                    && ($case !== 'fleet_recovered' || $ticket->monitoring_recovered_at !== null),
+                    'Synthetic Fleet ticket ownership, recovery or canonical evidence differs from its declared case.');
+                $cases[$case] = ['ticket_id' => $ticket->id, 'reference' => $ticket->reference, 'device_id' => $device->id,
+                    'asset_id' => $asset->id, 'alert_id' => $snapshot->control_room_alert_id, 'site_id' => $siteId,
+                    'outbox_id' => $outbox->id, 'status' => $ticket->status, 'status_reason' => $ticket->status_reason, 'evidence_version' => 3];
+            }
+        } finally {
+            Carbon::setTestNow($previousTestNow);
         }
 
         return ['synthetic_only' => true, 'queue_id' => $queue->id, 'team_id' => $team->id, 'cases' => $cases];

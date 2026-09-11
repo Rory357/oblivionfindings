@@ -30,11 +30,14 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\It\VerifiesMonitoringHandoffConcurrency;
 use Tests\TestCase;
 
 /** Standalone real commits, independent workers and interruption in one wrapper-owned schema. */
 final class ItMonitoringDeliveryConcurrencyTest extends TestCase
 {
+    use VerifiesMonitoringHandoffConcurrency;
+
     public function createApplication()
     {
         if (getenv('APP_ENV') !== 'testing' || getenv('DB_DATABASE') !== 'oblivion_it_support_test'
@@ -121,6 +124,9 @@ final class ItMonitoringDeliveryConcurrencyTest extends TestCase
                 $this->cleanup($workers, $barrier);
             }
             $this->assertDistinctOutboxesShareOneTicket($severity);
+            if ($severity === 'high') {
+                $this->assertHumanHandoffRaces('device');
+            }
         }
     }
 

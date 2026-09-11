@@ -3,6 +3,7 @@
 namespace App\Services\ControlRoom;
 
 use App\Domain\Governance\Models\NotifiableIncident;
+use App\Domain\It\Services\ItFleetDeliveryService;
 use App\Domain\It\Services\ItMonitoringDeliveryService;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceEventSignalOutbox;
@@ -38,6 +39,7 @@ class SafetySignalDeliveryRecoveryService
     public function __construct(
         private readonly IncidentAlertLifecycleSignalService $incidentLifecycleSignals,
         private readonly ItMonitoringDeliveryService $monitoringIt,
+        private readonly ItFleetDeliveryService $fleetIt,
     ) {}
 
     /**
@@ -94,6 +96,7 @@ class SafetySignalDeliveryRecoveryService
         }
 
         $monitoringIt = $this->monitoringIt->recover($limit, $reportOnly);
+        $fleetIt = $this->fleetIt->recover($limit, $reportOnly);
 
         return [
             'reconciled' => $reconciled,
@@ -105,13 +108,19 @@ class SafetySignalDeliveryRecoveryService
                 'incident' => $this->failureCount(IncidentLifecycleSignalOutbox::class),
                 'facility' => $this->failureCount(FacilitySignalOutbox::class),
             ],
-            'failure_rows' => [...$this->failureRows($limit), ...$monitoringIt['failure_rows']],
+            'failure_rows' => [...$this->failureRows($limit), ...$monitoringIt['failure_rows'], ...$fleetIt['failure_rows']],
             'device_it' => $monitoringIt,
+            'fleet_it' => $fleetIt,
         ];
     }
 
     public function retry(string $source, int $outboxId): void
     {
+        if ($source === 'fleet_it') {
+            $this->fleetIt->retry($outboxId);
+
+            return;
+        }
         if ($source === 'device_it') {
             $this->monitoringIt->retry($outboxId);
 

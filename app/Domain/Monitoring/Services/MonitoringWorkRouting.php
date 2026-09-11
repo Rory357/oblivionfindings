@@ -5,11 +5,58 @@ namespace App\Domain\Monitoring\Services;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalRule;
+use App\Models\FleetSignal;
+use App\Services\Fleet\FleetSignalService;
 use DomainException;
 
 /** A persisted operational decision on the canonical signal, shared by both destinations. */
 final class MonitoringWorkRouting
 {
+    public static function decideFleet(Signal $signal, FleetSignal $event): array
+    {
+        $sources = app(FleetSignalService::class);
+        if (! $sources->offlineScopeIsCurrent($event)) {
+            throw new DomainException('source_scope_changed');
+        }
+        $rule = SignalRule::findMatchingRules($signal)->first();
+        $recovery = $sources->recoveryFor($event);
+        $nonurgent = in_array($rule?->output_severity, ['info', 'low', 'medium'], true);
+
+        return [
+            'version' => 3, 'source' => 'fleet',
+            'destination' => ($recovery !== null || $nonurgent) ? 'it' : 'control_room',
+            'reason' => $recovery !== null ? 'recovered_before_delivery' : ($nonurgent ? 'nonurgent_technical' : 'operational_coordination'),
+            'severity' => $rule?->output_severity, 'rule_id' => $rule?->id,
+            'episode_key' => $event->idempotency_key,
+            'recovery_signal_id' => $recovery?->id,
+            'recovery_identity' => $recovery ? self::fleetRecoveryIdentity($recovery) : null,
+        ];
+    }
+
+    public static function directFleetDecision(Signal $signal, FleetSignal $event): ?array
+    {
+        $decision = data_get($signal->normalized_data, 'it_work_routing');
+        if (! is_array($decision) || ($decision['version'] ?? null) !== 3 || ($decision['source'] ?? null) !== 'fleet'
+            || ($decision['destination'] ?? null) !== 'it' || ($decision['episode_key'] ?? null) !== $event->idempotency_key
+            || ! app(FleetSignalService::class)->offlineScopeIsCurrent($event)) {
+            return null;
+        }
+        if (($decision['reason'] ?? null) === 'nonurgent_technical') {
+            return in_array($decision['severity'] ?? null, ['info', 'low', 'medium'], true) ? $decision : null;
+        }
+        $recovery = app(FleetSignalService::class)->recoveryFor($event);
+
+        return ($decision['reason'] ?? null) === 'recovered_before_delivery' && $recovery !== null
+            && ($decision['recovery_signal_id'] ?? null) === (int) $recovery->id
+            && ($decision['recovery_identity'] ?? null) === self::fleetRecoveryIdentity($recovery) ? $decision : null;
+    }
+
+    private static function fleetRecoveryIdentity(FleetSignal $recovery): string
+    {
+        return hash('sha256', json_encode([$recovery->id, $recovery->device_id, $recovery->asset_id,
+            $recovery->idempotency_key, $recovery->occurred_at?->toIso8601String()], JSON_THROW_ON_ERROR));
+    }
+
     public static function decide(Signal $signal, DeviceEvent $event, bool $recovered): ?array
     {
         if ($event->device?->domain !== 'it_infrastructure') {

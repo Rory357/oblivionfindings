@@ -1,0 +1,70 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_d76e5e9a691147ee",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Concurrency\It\ItFleetDeliveryConcurrencyTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mcompeting deliveries interruption and retry preserve one canonical result[39m[90m                                 [39m [90m186.84s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Concurrency\It\ItFleetDeliveryConcurrencyTest[22m [90m>[39m competing deliveries interruption and retry preserv…   
+[39;1m  Monitoring delivery worker failed: Illuminate\Database\UniqueConstraintViolationException
+
+Failed asserting that false is true.[39;22m
+
+  at [32mtests\Concurrency\It\ItFleetDeliveryConcurrencyTest.php[39m:[32m277[39m
+    273▕ 
+    274▕     private function workerResult(Process $worker): array
+    275▕     {
+    276▕         $worker->wait();
+  ➜ 277▕         $this->assertTrue($worker->isSuccessful(), $worker->getErrorOutput());
+    278▕         $result = json_decode(trim($worker->getOutput()), true, flags: JSON_THROW_ON_ERROR);
+    279▕         $this->assertSame(0, $result['transaction_level']);
+    280▕ 
+    281▕         return $result;
+
+  [33m1   [39m[39;1mtests\Concurrency\It\ItFleetDeliveryConcurrencyTest.php[39;22m:[39;1m277[39;22m
+  [33m2   [39m[39;1mtests\Support\It\VerifiesMonitoringHandoffConcurrency.php[39;22m:[39;1m53[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m (177 assertions)[39m
+  [90mDuration:[39m [39m187.07s[39m
+
+{"exit_code":1,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_d76e5e9a691147ee",
+    "database_mutations_performed": false
+}

@@ -8,11 +8,13 @@ use App\Domain\It\Services\ItWorkTaskReadinessService;
 use App\Domain\Monitoring\Presenters\MonitoringIncidentEvidencePresenter;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\Asset;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\ItTicketLink;
 use App\Models\ItWorkTask;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\UserSiteAccessService;
 use BackedEnum;
 use Illuminate\Support\Facades\Gate;
@@ -35,6 +37,7 @@ final class ItTicketContextPresenter
         if (! $this->workAccess->canView($viewer, $ticket)) {
             return [
                 'devices' => [],
+                'assets' => [],
                 'alerts' => [],
                 'incident_evidence' => [],
                 'tasks' => [],
@@ -61,7 +64,7 @@ final class ItTicketContextPresenter
             ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'source_alert'
                 && $link->linkable instanceof ControlRoomAlert
                 && $this->alertWithinViewerScope($link->linkable, $viewer));
-        $alerts = ($viewer->canDo('controlRoom.alerts.view')
+        $alerts = (app(ControlRoomAlertAccessService::class)->canRead($viewer)
             ? $alertLinks->map(fn (ItTicketLink $link): array => $this->presentAlert($link->linkable))
             : ($alertLinks->isNotEmpty() ? collect([$this->restrictedAlert()]) : collect()))
             ->values()
@@ -69,6 +72,17 @@ final class ItTicketContextPresenter
 
         return [
             'devices' => $devices,
+            'assets' => $ticket->links->filter(fn (ItTicketLink $link): bool => $link->relationship === 'affected_asset'
+                && $link->linkable instanceof Asset)->map(function (ItTicketLink $link) use ($viewer): array {
+                    $asset = $link->linkable;
+                    if (! $this->deviceAccess->canAccessAsset($viewer, $asset)) {
+                        return ['id' => null, 'name' => null, 'asset_tag' => null, 'href' => null,
+                            'access' => ['state' => 'restricted', 'message' => 'Asset access is required to view this source record.']];
+                    }
+
+                    return ['id' => (int) $asset->id, 'name' => $asset->name, 'asset_tag' => $asset->asset_tag,
+                        'href' => route('fleet-assets.assets.show', $asset), 'access' => ['state' => 'available', 'message' => null]];
+                })->values()->all(),
             'alerts' => $alerts,
             'incident_evidence' => $this->incidentEvidence->forTicket($ticket, $viewer),
             'tasks' => $this->presentTasks($ticket, $viewer),
@@ -249,6 +263,7 @@ final class ItTicketContextPresenter
     {
         $query = ControlRoomAlert::query()->whereKey($alert->getKey());
         $this->siteAccess->applyAlertScope($query, $viewer);
+        app(ControlRoomAlertAccessService::class)->applyControlledMedicationContentScope($query, $viewer);
 
         return $query->exists();
     }

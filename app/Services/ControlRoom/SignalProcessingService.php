@@ -294,14 +294,19 @@ class SignalProcessingService
                     || (int) data_get($fleet->payload, 'availability.scope.site_id') !== (int) $signal->site_id) {
                     throw new SafetySignalUnroutable('Fleet offline episode lacks current canonical device and Site evidence.');
                 }
-                $recoveries = FleetSignal::query()->where('asset_id', $fleet->asset_id)->where('signal_type', 'device.online')
-                    ->where('payload->availability->offline_signal_id', $fleet->id)->orderBy('id')->get();
-                foreach ($recoveries as $recovery) {
-                    if ($sources->matchedOfflineForRecovery($recovery)?->id === $fleet->id) {
-                        $signal->markProcessed(null, 'Recovery preceded offline delivery; technical verification is required.');
+                if ($this->isInMaintenanceWindow($signal)) {
+                    $signal->markSuppressed('In maintenance window');
 
-                        return;
-                    }
+                    return;
+                }
+                $decision = MonitoringWorkRouting::decideFleet($signal, $fleet);
+                $signal->update(['normalized_data' => [...($signal->normalized_data ?? []), 'it_work_routing' => $decision]]);
+                if ($decision['destination'] === 'it') {
+                    $signal->markProcessed(null, $decision['reason'] === 'recovered_before_delivery'
+                        ? 'Recovery preceded offline delivery; technical verification is required.'
+                        : 'Nonurgent technical availability work is routed directly to IT.');
+
+                    return;
                 }
                 $this->process($signal);
 
@@ -331,7 +336,7 @@ class SignalProcessingService
             ];
             $alert->update(['context' => $context]);
             $signal->markCorrelated($alert);
-            AuditLogger::log('fleet.availability.recovery_recorded', $alert, [
+            AuditLogger::logOrFail('fleet.availability.recovery_recorded', $alert, [
                 'recovery_signal_id' => $signal->id, 'offline_fleet_signal_id' => $offline->id,
             ]);
         }, self::TRANSACTION_ATTEMPTS);

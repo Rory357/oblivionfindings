@@ -95,8 +95,8 @@ test('linked context includes only canonical device alert and related work visib
     assignIngressDeviceToSite($allowedDevice, $allowedSite, $viewer);
     assignIngressDeviceToSite($hiddenDevice, $hiddenSite, $viewer);
 
-    $allowedAlert = ControlRoomAlert::factory()->create(['site_id' => $allowedSite->id]);
-    $hiddenAlert = ControlRoomAlert::factory()->create(['site_id' => $hiddenSite->id]);
+    $allowedAlert = ControlRoomAlert::factory()->create(['site_id' => $allowedSite->id, 'source' => 'manual', 'alert_type' => 'Device Offline']);
+    $hiddenAlert = ControlRoomAlert::factory()->create(['site_id' => $hiddenSite->id, 'source' => 'manual', 'alert_type' => 'Device Offline']);
 
     $allowedChange = ItChange::factory()->create();
     $allowedChange->ticket()->update(['site_id' => $allowedSite->id]);
@@ -296,8 +296,8 @@ test('ticket links require a current responsible actor and canonical target visi
     $hiddenDevice = Device::factory()->itInfrastructure()->create();
     assignIngressDeviceToSite($allowedDevice, $site, $actor);
     assignIngressDeviceToSite($hiddenDevice, $hiddenSite, $actor);
-    $allowedAlert = ControlRoomAlert::factory()->create(['site_id' => $site->id]);
-    $hiddenAlert = ControlRoomAlert::factory()->create(['site_id' => $hiddenSite->id]);
+    $allowedAlert = ControlRoomAlert::factory()->create(['site_id' => $site->id, 'source' => 'manual', 'alert_type' => 'Device Offline']);
+    $hiddenAlert = ControlRoomAlert::factory()->create(['site_id' => $hiddenSite->id, 'source' => 'manual', 'alert_type' => 'Device Offline']);
     $allowedRelated = ItTicket::factory()->create([
         'site_id' => $site->id,
         'work_type' => 'change',

@@ -75,7 +75,10 @@ final class ItTicketActivityPresenter
     private function projectEvent(ItTicketEvent $event, bool $canWork, User $viewer): array
     {
         $payload = $canWork ? $event->payload : $this->publicPayload($event);
-        if (in_array($event->type, ['created_from_monitoring', 'monitoring_evidence_added', 'monitoring_recovered'], true)) {
+        if ($event->type === 'control_room_handoff') {
+            $payload = ['message' => 'Technical work linked from Control Room. Operational response remains in Control Room.'];
+        }
+        if (in_array($event->type, ['created_from_monitoring', 'monitoring_handoff_bound', 'monitoring_evidence_added', 'monitoring_recovered'], true)) {
             // Source IDs and diagnostics remain behind the context presenter's
             // current Device/Control Room permissions, including in hub feeds.
             $payload = ['message' => MonitoringTechnicalSummary::activity($event->type)];

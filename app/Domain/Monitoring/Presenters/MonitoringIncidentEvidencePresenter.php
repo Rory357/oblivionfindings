@@ -2,6 +2,7 @@
 
 namespace App\Domain\Monitoring\Presenters;
 
+use App\Domain\It\Services\ItControlRoomHandoffService;
 use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
@@ -13,6 +14,8 @@ use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
+use App\Services\Fleet\FleetSignalService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Collection;
 
@@ -99,14 +102,23 @@ final class MonitoringIncidentEvidencePresenter
                     ->where('relationship', 'source_alert')
                     ->where('linkable_type', $alert->getMorphClass())
                     ->where('linkable_id', $alert->id)
-                    ->where('context->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
-                    ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION);
+                    ->where(function ($origins): void {
+                        $origins->where(fn ($automatic) => $automatic->where('context->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
+                            ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION))
+                            ->orWhere(fn ($human) => $human->where('context->source', ItControlRoomHandoffService::SOURCE)
+                                ->where('context->operation', ItControlRoomHandoffService::OPERATION)
+                                ->whereNotNull('created_by_user_id'));
+                    });
             })
             ->with('assignee:id,name')
             ->latest('id')
             ->limit(20)
             ->get()
-            ->filter(fn (ItTicket $ticket): bool => $this->ticketMatchesAlertSite($ticket, $alert));
+            ->filter(fn (ItTicket $ticket): bool => $this->ticketMatchesAlertSite($ticket, $alert)
+                && ($ticket->links()->where('relationship', 'source_alert')->where('linkable_type', $alert->getMorphClass())
+                    ->where('linkable_id', $alert->id)->where('context->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
+                    ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION)->exists()
+                    || app(ItTicketLinkService::class)->hasHumanHandoff($ticket, $alert)));
 
         $ticket = $this->preferredTicket(
             $tickets->filter(fn (ItTicket $candidate): bool => $this->workAccess->canView($viewer, $candidate)),
@@ -194,12 +206,23 @@ final class MonitoringIncidentEvidencePresenter
     /** @return array<string, mixed>|null */
     private function presentEvidence(MonitoringIncidentEvidenceSnapshot $snapshot, User $viewer): ?array
     {
+        $fleetEvidence = $snapshot->evidence_version === 3;
+        if ($fleetEvidence && (! $snapshot->asset || ! $snapshot->fleetSignal
+            || $snapshot->device_event_id !== null
+            || (int) $snapshot->fleetSignal->device_id !== (int) $snapshot->device_id
+            || (int) $snapshot->fleetSignal->asset_id !== (int) $snapshot->asset_id
+            || data_get($snapshot->fleetSignal->payload, 'availability.scope.site_id') !== (int) $snapshot->site_id
+            || ! app(FleetSignalService::class)->offlineScopeIsCurrent($snapshot->fleetSignal)
+            || ! $this->deviceAccess->canAccessAsset($viewer, $snapshot->asset)
+            || ($snapshot->alert && (int) $snapshot->alert->site_id !== (int) $snapshot->site_id))) {
+            return null;
+        }
         if (! $snapshot->hasValidChecksum()
             || ! $snapshot->device
             || ! $viewer->canDo('securityDevices.devices.view')
             || ($snapshot->control_room_alert_id !== null && (! $snapshot->alert
-                || ! $viewer->canDo('controlRoom.alerts.view') || ! $this->canViewAlert($snapshot->alert, $viewer)))
-            || ($snapshot->control_room_alert_id === null && ($snapshot->evidence_version !== 2
+                || ! $this->canViewAlert($snapshot->alert, $viewer)))
+            || (! $fleetEvidence && $snapshot->control_room_alert_id === null && ($snapshot->evidence_version !== 2
                 || app(ItTicketLinkService::class)->canonicalDeviceSiteId($snapshot->device) !== (int) $snapshot->site_id))
             || ! $this->deviceAccess->visibleDevices($viewer)->whereKey($snapshot->device_id)->exists()) {
             return null;
@@ -217,6 +240,7 @@ final class MonitoringIncidentEvidencePresenter
             'alert' => $snapshot->control_room_alert_id === null ? null : $this->allow($source['alert'] ?? [], ['id', 'reference', 'type', 'severity', 'source', 'triggered_at']),
             'ticket' => $this->allow($source['ticket'] ?? [], ['id', 'reference', 'title']),
             'device' => $this->allow($source['device'] ?? [], ['id', 'uid', 'name', 'domain', 'category', 'subcategory', 'status', 'health_status', 'last_seen_at']),
+            ...($fleetEvidence ? ['asset' => $this->allow($source['asset'] ?? [], ['id', 'name', 'asset_tag'])] : []),
             'observation' => [
                 ...$this->allow($source['observation'] ?? [], ['id', 'event_type', 'severity', 'source', 'occurred_at', 'monitor_correlation_key']),
                 // Older immutable snapshots may contain copied diagnostics. Their
@@ -230,10 +254,7 @@ final class MonitoringIncidentEvidencePresenter
 
     private function canViewAlert(ControlRoomAlert $alert, User $viewer): bool
     {
-        $query = ControlRoomAlert::query()->whereKey($alert->id);
-        $this->siteAccess->applyAlertScope($query, $viewer);
-
-        return $query->exists();
+        return app(ControlRoomAlertAccessService::class)->canView($alert, $viewer);
     }
 
     /** @param array<int, string> $keys

@@ -85,7 +85,7 @@ class FleetSignalService
         $asset = Asset::query()->whereKey($event->asset_id)->when($lock, fn ($q) => $q->lockForUpdate())->first();
         $site = $asset ? Site::query()->whereKey($asset->home_site_id ?: $asset->site_id)
             ->when($lock, fn ($q) => $q->lockForUpdate())->first() : null;
-        if ($site === null || ! $site->is_active || $site->archived) {
+        if ($site === null || ! $site->is_active || $site->archived || $site->archived_at !== null) {
             return null;
         }
 
@@ -137,11 +137,20 @@ class FleetSignalService
             || (int) $offline->device_id !== (int) $priorEvent->device_id
             || (int) $recovery->device_id !== (int) $event->device_id
             || $event->received_at === null || $event->received_at->lt($offline->occurred_at)
+            || $recovery->occurred_at === null || ! $event->received_at->equalTo($recovery->occurred_at)
             || ! $this->sameAvailabilityScope($this->availabilityScope($event, lock: true), $data['scope'])) {
             return null;
         }
 
         return $offline;
+    }
+
+    public function recoveryFor(FleetSignal $offline): ?FleetSignal
+    {
+        $recoveries = FleetSignal::query()->where('asset_id', $offline->asset_id)->where('signal_type', 'device.online')
+            ->where('payload->availability->offline_signal_id', $offline->id)->orderBy('occurred_at')->orderBy('id')->get();
+
+        return $recoveries->first(fn (FleetSignal $recovery): bool => $this->matchedOfflineForRecovery($recovery)?->id === $offline->id);
     }
 
     private function validOfflineEpisodeKey(FleetSignal $offline, array $data): bool

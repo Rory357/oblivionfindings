@@ -25,6 +25,7 @@ export interface MonitoringIncidentEvidence {
         triggered_at?: string | null;
     } | null;
     ticket: { id?: number; reference?: string | null; title?: string | null };
+    asset?: { id?: number; name?: string | null; asset_tag?: string | null };
     device: {
         id?: number;
         uid?: string | null;
@@ -50,7 +51,7 @@ export interface MonitoringIncidentEvidence {
 const label = (value: string | null | undefined) =>
     value
         ? value
-              .replace(/[_-]/g, ' ')
+              .replace(/[_.-]/g, ' ')
               .replace(/^\w/, (character) => character.toUpperCase())
         : 'Not recorded';
 
@@ -141,8 +142,11 @@ export function MonitoringIncidentEvidenceCard({
                                 Direct to IT
                             </dd>
                             <dd className="mt-1 text-[11px] text-muted-foreground">
-                                Recorded from device monitoring. This evidence
-                                has no Control Room alert.
+                                Recorded from{' '}
+                                {evidence.observation.source === 'fleet'
+                                    ? 'Fleet availability monitoring'
+                                    : 'device monitoring'}
+                                . This evidence has no Control Room alert.
                             </dd>
                         </>
                     )}
@@ -164,6 +168,14 @@ export function MonitoringIncidentEvidenceCard({
                             .filter(Boolean)
                             .join(' · ')}
                     </dd>
+                    {evidence.asset ? (
+                        <dd className="mt-1 text-[11px] text-muted-foreground">
+                            Asset at capture:{' '}
+                            {[evidence.asset.name, evidence.asset.asset_tag]
+                                .filter(Boolean)
+                                .join(' · ') || 'Recorded asset'}
+                        </dd>
+                    ) : null}
                     <dd className="mt-1 flex flex-wrap gap-1.5">
                         <StatusBadge variant="neutral" size="sm">
                             Device status: {label(evidence.device.status)}

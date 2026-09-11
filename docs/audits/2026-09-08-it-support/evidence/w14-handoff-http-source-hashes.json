@@ -1,0 +1,74 @@
+[
+  {
+    "sha256": "c8ea9a065a798c1da9db766a4d8258b612982257ace8428ebf670a8172d698c1",
+    "path": "app/Domain/It/Services/ItTicketLinkService.php"
+  },
+  {
+    "sha256": "03c52492d7d77343d10428d7c908469ea924b6cf5a247f8748daf0d768c15bbb",
+    "path": "app/Domain/It/Services/ItControlRoomHandoffService.php"
+  },
+  {
+    "sha256": "255bc8963bc76cb78d778a3d04aa7071640a5432ba872f86874dcd90f53cd260",
+    "path": "app/Domain/It/Presenters/ItTicketActivityPresenter.php"
+  },
+  {
+    "sha256": "b0f2e4173fb9d160a9ea255661fb4f96aea555208229570b5af373584d26a6ac",
+    "path": "app/Domain/Monitoring/Services/MonitoringIncidentEvidenceService.php"
+  },
+  {
+    "sha256": "7e0f6cd9217ff0b5d1453eadfef5d6f4b659cbc983f77cb023abb6847da5779b",
+    "path": "app/Domain/Monitoring/Presenters/MonitoringIncidentEvidencePresenter.php"
+  },
+  {
+    "sha256": "a6f18a9ac682e5bd18d055e90eb89e05d9fd8b24aecaec9dcd8b17b7d7f73b20",
+    "path": "app/Listeners/It/CreateOrUpdateMonitoringTicket.php"
+  },
+  {
+    "sha256": "bad3cfd7b7334bdc6c12eeed2b61fdb5cdfbe6c4c24234fa0de0b4a7da3b3398",
+    "path": "app/Listeners/It/CreateOrUpdateFleetMonitoringTicket.php"
+  },
+  {
+    "sha256": "1120c03e2af9ea1a903ede92519a5d7d7da7a11b535399527b1656c3a01083f3",
+    "path": "tests/Feature/It/ItControlRoomHandoffTest.php"
+  },
+  {
+    "sha256": "b7acd0c536b2d48068da885defd4ad3ff56675fe94c2d1d8b12eea768a685bb0",
+    "path": "tests/Concurrency/It/ItMonitoringDeliveryConcurrencyTest.php"
+  },
+  {
+    "sha256": "50f3d32afe5adffc55b14c5a6c51b6457c2ce04460f97ea0b0263d87a5e52d45",
+    "path": "tests/Concurrency/It/ItFleetDeliveryConcurrencyTest.php"
+  },
+  {
+    "sha256": "6d7982d4fcc76e23491138e3badfd37a52746b3cd3aa831316a97e722fa40a8a",
+    "path": "tests/Support/It/monitoring-delivery-concurrency-worker.php"
+  },
+  {
+    "sha256": "2a6e6d5d87cf846be005d9b858b45f6cc2045af82f8e565d416930d387e86dd9",
+    "path": "tests/Support/It/VerifiesMonitoringHandoffConcurrency.php"
+  },
+  {
+    "sha256": "f87ac6fa6fc5461f0339916ffe58e260d3f30c2bbaa388ec5522a8cdee189565",
+    "path": "app/Http/Requests/It/ControlRoomHandoffRequest.php"
+  },
+  {
+    "sha256": "be6bf31cd218ff74a25cb27e50b089462e0a04f53fcde6903f8b2dda08f61512",
+    "path": "app/Http/Controllers/It/ItControlRoomHandoffController.php"
+  },
+  {
+    "sha256": "db4fb8aeed86e385b18a390b17039ee2c3e33e6f2774b8efffdf570933ff34ca",
+    "path": "app/Http/Middleware/ProtectItDraftResponses.php"
+  },
+  {
+    "sha256": "32e2d2dc5d4293ce73578aae0b7e7ce8398909f344c5a6a414d50711a8b95d07",
+    "path": "routes/web.php"
+  },
+  {
+    "sha256": "a1b6ee9148665b16d32799a8ec1464411aae16ad5e0cd026242b3e75bd5407c2",
+    "path": "resources/js/hooks/it-control-room-handoff-contract.ts"
+  },
+  {
+    "sha256": "0e97feb894acc64d5dd578f4040a578cf8f76694ded3f06d63343996c6566c14",
+    "path": "resources/js/hooks/it-control-room-handoff-contract.test.ts"
+  }
+]

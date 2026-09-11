@@ -6,6 +6,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\It\ItCatalogController;
 use App\Http\Controllers\It\ItChangeController;
+use App\Http\Controllers\It\ItControlRoomHandoffController;
 use App\Http\Controllers\It\ItKbController;
 use App\Http\Controllers\It\ItMajorIncidentController;
 use App\Http\Controllers\It\ItProblemController;
@@ -296,6 +297,10 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
         Route::post('/it/tickets/{ticket}/devices', [ItTicketController::class, 'linkDevice'])->name('it.tickets.devices.store');
         Route::get('/it/tickets/{ticket}/related-work', [ItTicketRelationshipController::class, 'index'])->name('it.tickets.related-work.index');
+        Route::get('/it/control-room/alerts/{alert}/handoff', [ItControlRoomHandoffController::class, 'preview'])->name('it.control-room.handoff.preview');
+        Route::post('/it/control-room/alerts/{alert}/handoff', [ItControlRoomHandoffController::class, 'store'])->name('it.control-room.handoff.store');
+        Route::get('/it/control-room/alerts/{alert}/handoff/commands/{requestUuid}', [ItControlRoomHandoffController::class, 'recover'])->whereUuid('requestUuid')->name('it.control-room.handoff.recover');
+        Route::post('/it/control-room/alerts/{alert}/handoff/commands/{requestUuid}/cancel', [ItControlRoomHandoffController::class, 'recover'])->whereUuid('requestUuid')->name('it.control-room.handoff.cancel');
         Route::post('/it/tickets/{ticket}/related-work', [ItTicketRelationshipController::class, 'command'])->name('it.tickets.related-work.command');
         Route::get('/it/tickets/{ticket}/relationship-commands/{requestUuid}', [ItTicketRelationshipController::class, 'command'])->whereUuid('requestUuid')->name('it.tickets.relationship-commands.show');
         Route::post('/it/tickets/{ticket}/relationship-commands/{requestUuid}/cancel', [ItTicketRelationshipController::class, 'command'])->whereUuid('requestUuid')->name('it.tickets.relationship-commands.cancel');

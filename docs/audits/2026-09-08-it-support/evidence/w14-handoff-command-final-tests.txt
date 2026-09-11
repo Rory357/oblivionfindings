@@ -1,0 +1,119 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_9af36c52d8474229",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItControlRoomHandoffTest[39m
+  [32;1m✓[39;22m[90m [39m[90mhuman creation uses canonical intake and one recoverable audited handoff without changing the alert[39m[90m       [39m [90m176.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexisting ticket selection creates a canonical actor link and rejects another destination[39m[90m                    [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic work already linked to the alert is reused rather than copied by human creation[39m[90m                   [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcancellation tombstone prevents late creation and does not expose another alert receipt[39m[90m                     [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mchanged intent cannot replay a committed command[39m[90m                                                            [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstale source and target versions fail before writes[39m[90m                                                         [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmandatory handoff audit failure rolls back intake links and receipts and a retry succeeds[39m[90m                   [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90msource permissions Site and controlled content are checked before preview or receipt disclosure with ('gran[39m[90m…[39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90msource permissions Site and controlled content are checked before preview or receipt disclosure with ('site[39m[90m…[39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90msource permissions Site and controlled content are checked before preview or receipt disclosure with ('priv[39m[90m…[39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross Site settled and merged candidates cannot be linked and are absent from search with ('site')[39m[90m          [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross Site settled and merged candidates cannot be linked and are absent from search with ('closed')[39m[90m        [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross Site settled and merged candidates cannot be linked and are absent from search with ('merged')[39m[90m        [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcontrolled source metadata remains concealed in existing IT context and human link service[39m[90m                  [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclassification and original actor are validated before a handoff can create work with ('category')[39m[90m          [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclassification and original actor are validated before a handoff can create work with ('impact')[39m[90m            [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclassification and original actor are validated before a handoff can create work with ('urgency')[39m[90m           [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclassification and original actor are validated before a handoff can create work with ('viewer_user_id')[39m[90m    [39m [90m0.14s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItIngressContextAccessTest[39m
+  [32;1m✓[39;22m[90m [39m[90mlinked context includes only canonical device alert and related work visible to the viewer[39m[90m                  [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90minbound replies quarantine unknown inactive sensitive and unrelated senders without comments[39m[90m                [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90minbound replies accept participants responsible staff watcher and explicit mailbox principal only through c[39m[90m…[39m [90m0.28s[39m  
+  [32;1m✓[39;22m[90m [39m[90minbound message ids are idempotent and new email tickets require a current approved site[39m[90m                    [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mticket links require a current responsible actor and canonical target visibility[39m[90m                            [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmonitoring creates site scoped work only from agreeing canonical device and alert evidence[39m[90m                  [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmonitoring fails closed when device site evidence is absent or contradicts the alert projection with ('unas[39m[90m…[39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmonitoring fails closed when device site evidence is absent or contradicts the alert projection with ('cont[39m[90m…[39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90memail delivery retry conceals ticket backed deliveries outside current work access[39m[90m                          [39m [90m0.55s[39m  
+  [32;1m✓[39;22m[90m [39m[90memail delivery retry rechecks current ticket scope and fails closed for unowned provisioning work[39m[90m           [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90memail retry and setup metadata recheck the current recipient and manager Site boundaries[39m[90m                    [39m [90m2.32s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItControlRoomMonitoringContextTest[39m
+  [32;1m✓[39;22m[90m [39m[90mone immutable incident snapshot preserves original evidence while both workspaces show live canonical state[39m[90m [39m [90m0.33s[39m  
+  [32;1m✓[39;22m[90m [39m[90msource permissions Site access and checksum integrity fail closed on both projections[39m[90m                       [39m [90m0.36s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistorical monitoring diagnostics stay protected without changing stored evidence or human authored descrip[39m[90m…[39m [90m0.59s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItFleetDeliveryContractTest[39m
+  [32;1m✓[39;22m[90m [39m[90mFleet IT delivery commits once and retains the independent acknowledged operational alert[39m[90m                   [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet consumer failure rolls back writes and exhausts only IT attempts[39m[90m                                      [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet audit failure rolls back the consumer and permits a subsequent successful attempt[39m[90m                     [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('site')[39m[90m                            [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('inactive_site')[39m[90m                   [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('archived_site')[39m[90m                   [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('pairing')[39m[90m                         [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('provider')[39m[90m                        [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('source')[39m[90m                          [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('episode')[39m[90m                         [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('occurrence')[39m[90m                      [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('signal')[39m[90m                          [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('routing')[39m[90m                         [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('suppressed')[39m[90m                      [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet recovered episode passes its true paired offline identity even when delivered first[39m[90m                   [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet pre-contract acknowledgements stay unknown and suppressed sources have no IT intent[39m[90m                   [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet rollback refuses to discard recorded IT outcomes[39m[90m                                                      [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet recovery occurrence must agree with the persisted heartbeat before intent preparation[39m[90m                 [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet IT cannot run before acknowledgement or overwrite an already prepared source identity[39m[90m                 [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet driver-safety events remain outside automatic IT intake[39m[90m                                               [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreal Fleet source and IT jobs create one canonical direct ticket and a sealed Fleet snapshot[39m[90m                [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90murgent Fleet work keeps its operational alert and exact recovery never closes either record[39m[90m                 [39m [90m0.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreordered Fleet recovery creates open verification work without a stale alert and a later episode gets new[39m[90m… [39m [90m0.32s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet IT retry recovers a failed real ticket write without resending the source alert[39m[90m                       [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet source evidence requires current asset and device grants while ticket access remains usable[39m[90m           [39m [90m0.35s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet maintenance suppresses both direct work and operational alert creation[39m[90m                                [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet queued IT work preserves the already recorded rule assessment[39m[90m                                         [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet operational recovery audit failure rolls back recovery and can be retried[39m[90m                             [39m [90m0.25s[39m  
+
+  [90mTests:[39m    [32;1m64 passed[39;22m[90m (482 assertions)[39m
+  [90mDuration:[39m [39m192.11s[39m
+
+{"exit_code":0,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_9af36c52d8474229",
+    "database_mutations_performed": false
+}

@@ -20,6 +20,7 @@ import {
     TicketLinkedContext,
     type TicketDeviceOption,
     type TicketLinkedAlert,
+    type TicketLinkedAsset,
     type TicketLinkedChange,
     type TicketLinkedDevice,
     type TicketLinkedMajorIncident,
@@ -209,6 +210,7 @@ interface Props {
     mergeTargets: MergeTarget[];
     linked_context: {
         devices: TicketLinkedDevice[];
+        assets?: TicketLinkedAsset[];
         alerts: TicketLinkedAlert[];
         incident_evidence: MonitoringIncidentEvidence[];
         changes: TicketLinkedChange[];
@@ -2158,6 +2160,7 @@ export default function ItTicketShow({
                                     deviceOptions={deviceOptions}
                                     recoveredAt={ticket.monitoring_recovered_at}
                                     devices={linked_context.devices}
+                                    assets={linked_context.assets}
                                     alerts={linked_context.alerts}
                                     incidentEvidence={
                                         linked_context.incident_evidence

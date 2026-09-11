@@ -1,0 +1,71 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_5f29b16d2daf4d6b",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Concurrency\It\ItFleetDeliveryConcurrencyTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcompeting deliveries interruption and retry preserve one canonical result[39m[90m                                 [39m [90m189.27s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Concurrency\It\ItMonitoringDeliveryConcurrencyTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mcompeting deliveries interruption and retry preserve one canonical result[39m
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Concurrency\It\ItMonitoringDeliveryConcurrencyTest[22m [90m>[39m competing deliveries interru… [41;1m RuntimeException [49;22m  
+[39;1m  Use the isolated IT wrapper for monitoring concurrency verification.[39;22m
+
+  at [32mtests\Concurrency\It\ItMonitoringDeliveryConcurrencyTest.php[39m:[32m43[39m
+     39▕     {
+     40▕         if (getenv('APP_ENV') !== 'testing' || getenv('DB_DATABASE') !== 'oblivion_it_support_test'
+     41▕             || getenv('DB_HOST') !== '127.0.0.1'
+     42▕             || preg_match('/^it_[a-f0-9]{16}$/D', (string) getenv('TEST_TOKEN')) !== 1) {
+  ➜  43▕             throw new RuntimeException('Use the isolated IT wrapper for monitoring concurrency verification.');
+     44▕         }
+     45▕ 
+     46▕         return parent::createApplication();
+     47▕     }
+
+  [33m1   [39m[39;1mtests\Concurrency\It\ItMonitoringDeliveryConcurrencyTest.php[39;22m:[39;1m43[39;22m
+  [33m2   [39m[39;1mtests\TestCase.php[39;22m:[39;1m51[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m1 passed[39;22m[90m (330 assertions)[39m
+  [90mDuration:[39m [39m189.53s[39m
+
+{"phase":"focused_tests_finished","exit_code":2}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_5f29b16d2daf4d6b",
+    "database_mutations_performed": false
+}

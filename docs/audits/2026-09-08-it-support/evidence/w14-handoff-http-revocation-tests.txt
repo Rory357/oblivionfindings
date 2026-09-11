@@ -1,0 +1,53 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_5a496a5c765d4045",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItControlRoomHandoffTest[39m
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP denies source or actor changes on every operation without exposing receipts with ('grant')[39m[90m   [39m [90m178.55s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP denies source or actor changes on every operation without exposing receipts with ('site')[39m[90m      [39m [90m0.27s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP denies source or actor changes on every operation without exposing receipts with ('privacy')[39m[90m   [39m [90m0.26s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP denies source or actor changes on every operation without exposing receipts with ('unapproved'[39m[90m…[39m [90m0.19s[39m  
+
+  [90mTests:[39m    [32;1m4 passed[39;22m[90m (85 assertions)[39m
+  [90mDuration:[39m [39m179.55s[39m
+
+{"exit_code":0,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_5a496a5c765d4045",
+    "database_mutations_performed": false
+}

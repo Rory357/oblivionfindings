@@ -1,0 +1,114 @@
+[
+  {
+    "path": "app/Console/Commands/RecoverSafetySignalDeliveries.php",
+    "sha256": "b615a59b431b6629e352b5a1ca23943e6e02d581fed8f2a14e5638dfe147fc17"
+  },
+  {
+    "path": "app/Console/Commands/RetrySafetySignalDelivery.php",
+    "sha256": "5aa5c01a398982d794842f36c138cecba87e6c70c66956a5ebadd17860d03a68"
+  },
+  {
+    "path": "app/Domain/It/Presenters/ItTicketContextPresenter.php",
+    "sha256": "7290897ac012588cdfbcbc294395ce6bec6e404ed0ae5832ce04446a35205dc2"
+  },
+  {
+    "path": "app/Domain/It/Services/ItFleetAvailability.php",
+    "sha256": "2934b5d34deea242459ec98ba3bc59b17469457787127e495ccb64803538a9d3"
+  },
+  {
+    "path": "app/Domain/It/Services/ItFleetDeliveryService.php",
+    "sha256": "c46fedbd96d6b2fe9c7155bcf870ba5b5f6edeaf86a758fcba4f544bc5f35875"
+  },
+  {
+    "path": "app/Domain/It/Services/ItMonitoringDeliveryService.php",
+    "sha256": "1290caa8b6fae64d873838ba763dd92972021b400673bff1b60abf577bd10c37"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTechnicalDeliveryService.php",
+    "sha256": "1bc6611445dc3db4587e8a2bff4956a2c56d30893fd06172d7d14b3e3635761d"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketLinkService.php",
+    "sha256": "3c330268149da060265c51fa0333e0721b52d5a12aafd945da5b71ff32e337b2"
+  },
+  {
+    "path": "app/Domain/Monitoring/Models/MonitoringIncidentEvidenceSnapshot.php",
+    "sha256": "40f05596bcf0685ace2c74ebde8ea477c079175580e87d5a108e89f19695aac6"
+  },
+  {
+    "path": "app/Domain/Monitoring/Presenters/MonitoringIncidentEvidencePresenter.php",
+    "sha256": "80d0a35903fd49ec4644df891ce9096b4017c0a26a193fb3304673f55d05749b"
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringIncidentEvidenceService.php",
+    "sha256": "c388c15da8cc163479b5a316ece80a6db7e38c4619b74da7204a6b8f3056a49f"
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringTechnicalSummary.php",
+    "sha256": "c692e2bf2cc55e96d8f3a3f7e7f13417b1a7c9f7d8b861b5c099b683811b598b"
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringWorkRouting.php",
+    "sha256": "f1e42c1b53804de79b62c3321b59d3e53ee9033cf60a99b64c2a6b8d0ef61451"
+  },
+  {
+    "path": "app/Jobs/DispatchFleetMonitoringTicket.php",
+    "sha256": "bb36f44217e1d74982142bd2340c3908c789005ff122b2e08945084cc51fc875"
+  },
+  {
+    "path": "app/Jobs/DispatchFleetSignalOutbox.php",
+    "sha256": "4cae065a407d5e70719093c79cfea770704921f50b45e4143e761372203c6244"
+  },
+  {
+    "path": "app/Listeners/It/CreateOrUpdateFleetMonitoringTicket.php",
+    "sha256": "97a1e66ab92ec75f3998c22cd19409908e8207429d7e31b419fb66996cc03272"
+  },
+  {
+    "path": "app/Models/FleetSignalOutbox.php",
+    "sha256": "ad85625bdfc82d2a1f5f6eea83539e4095944f0da80091b843cfd6b4f80b220d"
+  },
+  {
+    "path": "app/Services/ControlRoom/SafetySignalDeliveryRecoveryService.php",
+    "sha256": "af5fb7b32c8ae63c3facc0b5ec74753ed4362748d4d70ba26d6ddc1f67572ff7"
+  },
+  {
+    "path": "app/Services/ControlRoom/SignalProcessingService.php",
+    "sha256": "e37f181a8e5c94c4b401b118144b3d7c313c76a76aaf22a943e0dc9770e43d47"
+  },
+  {
+    "path": "app/Services/Fleet/FleetSignalService.php",
+    "sha256": "050ca1112b9e74ee51c8247229342ea549ebf9ffd1985ad2192e5e54e026c314"
+  },
+  {
+    "path": "database/migrations/2026_09_12_000028_add_fleet_it_delivery.php",
+    "sha256": "c151830ae0cdf7ffc801d2d7ff3ad5f3870a9c9431241bd359af5ad2fd204007"
+  },
+  {
+    "path": "database/migrations/2026_09_12_000029_add_fleet_monitoring_evidence_source.php",
+    "sha256": "6617455181199371b0227e02b81b32006cc79d6beebd2850b1faa006dadb9d23"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w14-monitoring-browser-fixture.php",
+    "sha256": "603fc05c2713d70db4e3127bf6f98af5bf135100ed0ea48479ee4be79549c082"
+  },
+  {
+    "path": "resources/js/components/it/__tests__/ticket-linked-context.test.tsx",
+    "sha256": "f09056a71d9617ab0a89fc5f7ddf07c76e1c8ce18883063970a495fe510a6526"
+  },
+  {
+    "path": "resources/js/components/it/ticket-linked-context.tsx",
+    "sha256": "c4424413344436fc0765b383f2d2d3c0b7973df9995ea859e5f5bec9c227ad5b"
+  },
+  {
+    "path": "resources/js/components/monitoring/monitoring-incident-evidence-card.tsx",
+    "sha256": "7ad1dab17bc1f9d3b391b23fc9825f02fd72da87f1df9888235efb4da446f113"
+  },
+  {
+    "path": "resources/js/pages/it/tickets/show.tsx",
+    "sha256": "54a350efc62f4ae67356bde14961ad058d842053b7431cc179313a83be42b608"
+  },
+  {
+    "path": "tests/Feature/It/ItFleetDeliveryContractTest.php",
+    "sha256": "fdb90b552597db5220ae43c36639da98b9f0ebdc6a60ed2fa8643497a3827bb1"
+  }
+]

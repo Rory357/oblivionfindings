@@ -1,0 +1,34 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItTechnicalDeliveryService.php",
+    "sha256": "b6b5928e897200d9d9996db4ec6ed2b9bf6c3f022cb9082235f095238254fc02"
+  },
+  {
+    "path": "app/Domain/It/Services/ItMonitoringDeliveryService.php",
+    "sha256": "5d27f85e7a7bd0cbc305698dbb58ebffb5d01aad905735a53676f875ed3f950d"
+  },
+  {
+    "path": "app/Domain/It/Services/ItFleetDeliveryService.php",
+    "sha256": "5ecb887543602f4d60eb18f9c3c45f26a667504c2a745380e17263b24d87227c"
+  },
+  {
+    "path": "app/Domain/It/Services/ItFleetAvailability.php",
+    "sha256": "2934b5d34deea242459ec98ba3bc59b17469457787127e495ccb64803538a9d3"
+  },
+  {
+    "path": "app/Models/FleetSignalOutbox.php",
+    "sha256": "ad85625bdfc82d2a1f5f6eea83539e4095944f0da80091b843cfd6b4f80b220d"
+  },
+  {
+    "path": "app/Services/Fleet/FleetSignalService.php",
+    "sha256": "9f744f90d21c778eb6758af5fce1261c43d6541c27098d4ef2e4bfe26c454430"
+  },
+  {
+    "path": "database/migrations/2026_09_12_000028_add_fleet_it_delivery.php",
+    "sha256": "c151830ae0cdf7ffc801d2d7ff3ad5f3870a9c9431241bd359af5ad2fd204007"
+  },
+  {
+    "path": "tests/Feature/It/ItFleetDeliveryContractTest.php",
+    "sha256": "4c2f8750d7a70ee60a22bdfe82aee47ee7acf9003bf3b12766731b319e235395"
+  }
+]

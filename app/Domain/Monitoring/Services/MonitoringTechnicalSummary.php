@@ -10,6 +10,8 @@ final class MonitoringTechnicalSummary
     public static function observation(?string $eventType): string
     {
         return match ($eventType) {
+            'device.offline' => 'Fleet monitoring confirmed a device availability problem. Technical verification is required.',
+            'device.online' => 'Fleet monitoring reported recovery. Technical verification is still required.',
             'offline' => 'Monitoring confirmed an infrastructure outage. Technical verification is required.',
             'online' => 'Monitoring reported recovery. Technical verification is still required.',
             default => 'Monitoring recorded technical evidence. Review the authorised source record.',

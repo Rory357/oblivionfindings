@@ -9,7 +9,10 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\Asset;
+use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
+use App\Models\FleetSignal;
 use App\Models\ItService;
 use App\Models\ItTicket;
 use App\Models\ItTicketCommandReceipt;
@@ -19,7 +22,9 @@ use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
+use App\Services\Fleet\FleetSignalService;
 use App\Services\UserSiteAccessService;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,6 +42,8 @@ final class ItTicketLinkService
     public const MONITORING_PRINCIPAL = 'oblivion_monitoring_ticketing';
 
     public const MONITORING_OPERATION = 'work:create-monitoring';
+
+    public const MONITORING_ORIGIN_EVENTS = ['created_from_monitoring', 'monitoring_handoff_bound'];
 
     public function __construct(
         private readonly ItWorkAccessService $workAccess,
@@ -329,7 +336,7 @@ final class ItTicketLinkService
             $requiresAlert = $alert !== null;
             $alert = $alert ? ControlRoomAlert::query()->whereKey($alert->getKey())->lockForUpdate()->first() : null;
             if (! $ticket || ! $device || ($requiresAlert && ! $alert)
-                || $ticket->source !== 'system'
+                || ! $this->isMonitoringWork($ticket, $alert)
                 || $ticket->work_type !== 'incident'
                 || $ticket->site_id === null
                 || $ticket->is_organisation_wide
@@ -398,6 +405,51 @@ final class ItTicketLinkService
         return $site ? $siteId : null;
     }
 
+    public function canonicalFleetSiteId(FleetSignal $offline, ?ControlRoomAlert $alert): ?int
+    {
+        if (! app(FleetSignalService::class)->offlineScopeIsCurrent($offline)) {
+            return null;
+        }
+        $siteId = data_get($offline->payload, 'availability.scope.site_id');
+        $signal = Signal::query()->where('external_ref', 'fleet_signal_'.$offline->id)
+            ->where('signal_type_code', 'fleet_device_offline')->where('site_id', $siteId)
+            ->where('asset_id', $offline->asset_id)
+            ->whereHas('signalSource', fn ($query) => $query->where('slug', 'queclink_fleet'))
+            ->lockForUpdate()->first();
+        if (! $signal || data_get($signal->normalized_data, 'fleet_signal_id') !== (int) $offline->id
+            || ($alert !== null && ((int) $alert->site_id !== $siteId || (int) $alert->asset_id !== (int) $offline->asset_id
+                || (int) ($signal->alert_id ?? $signal->correlated_alert_id) !== (int) $alert->id))
+            || ($alert === null && MonitoringWorkRouting::directFleetDecision($signal, $offline) === null)) {
+            return null;
+        }
+
+        return $siteId;
+    }
+
+    public function linkFleetMonitoringEvidence(ItTicket $ticket, FleetSignal $offline, ?ControlRoomAlert $alert): void
+    {
+        DB::transaction(function () use ($ticket, $offline, $alert): void {
+            $ticket = ItTicket::query()->whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+            $offline = FleetSignal::query()->whereKey($offline->id)->lockForUpdate()->firstOrFail();
+            $alert = $alert ? ControlRoomAlert::query()->whereKey($alert->id)->lockForUpdate()->firstOrFail() : null;
+            $siteId = $this->canonicalFleetSiteId($offline, $alert);
+            if ($siteId === null || ! $this->isMonitoringWork($ticket, $alert) || $ticket->work_type !== 'incident'
+                || $ticket->is_organisation_wide || (int) $ticket->site_id !== $siteId) {
+                throw new DomainException('source_scope_changed');
+            }
+            $device = Device::query()->whereKey($offline->device_id)->lockForUpdate()->firstOrFail();
+            $asset = Asset::query()->whereKey($offline->asset_id)->lockForUpdate()->firstOrFail();
+            $context = ['source' => 'fleet', 'system_principal' => self::MONITORING_PRINCIPAL,
+                'operation' => self::MONITORING_OPERATION, 'site_id' => $siteId,
+                'fleet_signal_id' => (int) $offline->id, 'availability_episode_key' => $offline->idempotency_key];
+            $this->persistMonitoring($ticket, $device, 'affected_device', $context);
+            $this->persistMonitoring($ticket, $asset, 'affected_asset', $context);
+            if ($alert !== null) {
+                $this->persistMonitoring($ticket, $alert, 'source_alert', $context);
+            }
+        });
+    }
+
     public function canonicalMonitoringSiteId(
         Device $device,
         ControlRoomAlert $alert,
@@ -412,6 +464,62 @@ final class ItTicketLinkService
             && $alertDeviceId === (int) $device->id
                 ? $siteId
                 : null;
+    }
+
+    /** System attachment may extend a real handoff, but cannot invent a human selection. */
+    public function isMonitoringWork(ItTicket $ticket, ?ControlRoomAlert $alert): bool
+    {
+        return $ticket->source === 'system' || ($alert !== null && $this->hasHumanHandoff($ticket, $alert));
+    }
+
+    public function hasHumanHandoff(ItTicket $ticket, ControlRoomAlert $alert): bool
+    {
+        $link = $ticket->links()->where('relationship', 'source_alert')
+            ->where('linkable_type', $alert->getMorphClass())->where('linkable_id', $alert->id)
+            ->when(DB::transactionLevel() > 0, fn ($query) => $query->lockForUpdate())->first();
+        if (! $link || $link->created_by_user_id === null) {
+            return false;
+        }
+        $context = ($link->context['source'] ?? null) === ItControlRoomHandoffService::SOURCE
+            ? $link->context : ($link->context['handoff'] ?? []);
+
+        return ($context['source'] ?? null) === ItControlRoomHandoffService::SOURCE
+            && ($context['operation'] ?? null) === ItControlRoomHandoffService::OPERATION
+            && ($context['site_id'] ?? null) === (int) $alert->site_id
+            && ItTicketCommandReceipt::query()->where('operation', ItControlRoomHandoffService::OPERATION)
+                ->where('channel', 'browser')->where('actor_user_id', $link->created_by_user_id)
+                ->where('it_ticket_id', $ticket->id)->whereNotNull('committed_at')
+                ->where('result_metadata->state', 'committed')->where('result_metadata->alert_id', $alert->id)
+                ->whereIn('result_metadata->outcome', ['created', 'linked'])
+                ->when(DB::transactionLevel() > 0, fn ($query) => $query->lockForUpdate())->exists();
+    }
+
+    /** Caller owns the source alert lock. A handoff binds once per alert, not to every later episode. */
+    public function unboundHumanMonitoringTicket(ControlRoomAlert $alert): ?ItTicket
+    {
+        $ticket = ItTicket::query()->where('site_id', $alert->site_id)->where('is_organisation_wide', false)
+            ->where('work_type', 'incident')
+            ->whereHas('links', fn ($links) => $links->where('relationship', 'source_alert')
+                ->where('linkable_type', $alert->getMorphClass())->where('linkable_id', $alert->id)
+                ->whereNotNull('created_by_user_id')->lockForUpdate())
+            ->whereDoesntHave('events', fn ($events) => $events->where('type', 'monitoring_handoff_bound')
+                ->where('payload->control_room_alert_id', $alert->id)->lockForUpdate())
+            ->orderBy('id')->lockForUpdate()->get()
+            ->first(fn (ItTicket $ticket): bool => $this->hasHumanHandoff($ticket, $alert));
+        if ($ticket?->isMerged()) {
+            throw new DomainException('technical_routing_unavailable');
+        }
+
+        return $ticket;
+    }
+
+    /** Shared query boundary; human origin stays distinct from unattended creation. */
+    public function monitoringTickets(): Builder
+    {
+        return ItTicket::query()->where(fn ($tickets) => $tickets->where('source', 'system')
+            ->orWhereHas('events', fn ($events) => $events->where('type', 'monitoring_handoff_bound')
+                ->where('payload->system_principal', self::MONITORING_PRINCIPAL)
+                ->where('payload->operation', self::MONITORING_OPERATION)));
     }
 
     private function responsibleActor(?int $actorUserId): User
@@ -485,13 +593,8 @@ final class ItTicketLinkService
         }
 
         if ($target instanceof ControlRoomAlert) {
-            if ($relationship !== 'source_alert' || ! $actor->canDo('controlRoom.alerts.view')) {
-                return false;
-            }
-            $query = ControlRoomAlert::query()->whereKey($target->getKey());
-            $this->siteAccess->applyAlertScope($query, $actor);
-
-            return $query->exists();
+            return $relationship === 'source_alert'
+                && app(ControlRoomAlertAccessService::class)->canView($target, $actor);
         }
 
         if ($target instanceof ItTicket) {
@@ -540,13 +643,24 @@ final class ItTicketLinkService
         string $relationship,
         array $context,
     ): ItTicketLink {
-        return $ticket->links()->updateOrCreate([
+        $identity = [
             'relationship' => $relationship,
             'linkable_type' => $target->getMorphClass(),
             'linkable_id' => $target->getKey(),
-        ], [
-            'context' => $context,
-            'created_by_user_id' => null,
-        ]);
+        ];
+        // Fleet may have established a snapshot before waiting for the alert.
+        // Read the committed human link instead of attempting a duplicate insert.
+        $link = $ticket->links()->where($identity)->lockForUpdate()->first()
+            ?? $ticket->links()->make($identity);
+        $previous = $link->context ?? [];
+        if (($previous['source'] ?? null) === ItControlRoomHandoffService::SOURCE) {
+            $context['handoff'] = $previous;
+        } elseif (is_array($previous['handoff'] ?? null)) {
+            $context['handoff'] = $previous['handoff'];
+        }
+        $link->context = [...$previous, ...$context];
+        $link->save();
+
+        return $link;
     }
 }
