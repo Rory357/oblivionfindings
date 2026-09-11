@@ -2,6 +2,8 @@
 
 namespace App\Services\ControlRoom;
 
+use App\Domain\Governance\Models\NotifiableIncident;
+use App\Domain\It\Services\ItMonitoringDeliveryService;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceEventSignalOutbox;
 use App\Jobs\DispatchDeviceEventSignalOutbox;
@@ -9,15 +11,20 @@ use App\Jobs\DispatchFacilitySignalOutbox;
 use App\Jobs\DispatchFleetSignalOutbox;
 use App\Jobs\DispatchIncidentLifecycleSignalOutbox;
 use App\Jobs\DispatchShiftSignalOutbox;
+use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ControlRoomAlert;
 use App\Models\FacilitySignal;
 use App\Models\FacilitySignalOutbox;
 use App\Models\FleetSignal;
 use App\Models\FleetSignalOutbox;
+use App\Models\HsEvent;
 use App\Models\IncidentLifecycleSignal;
 use App\Models\IncidentLifecycleSignalOutbox;
+use App\Models\SafeguardingConcern;
 use App\Models\ShiftSignal;
 use App\Models\ShiftSignalOutbox;
+use App\Services\HealthSafety\HsEventService;
 use App\Services\Incidents\IncidentAlertLifecycleSignalService;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
@@ -30,6 +37,7 @@ class SafetySignalDeliveryRecoveryService
 {
     public function __construct(
         private readonly IncidentAlertLifecycleSignalService $incidentLifecycleSignals,
+        private readonly ItMonitoringDeliveryService $monitoringIt,
     ) {}
 
     /**
@@ -85,6 +93,8 @@ class SafetySignalDeliveryRecoveryService
             );
         }
 
+        $monitoringIt = $this->monitoringIt->recover($limit, $reportOnly);
+
         return [
             'reconciled' => $reconciled,
             'queued' => $queued,
@@ -95,12 +105,18 @@ class SafetySignalDeliveryRecoveryService
                 'incident' => $this->failureCount(IncidentLifecycleSignalOutbox::class),
                 'facility' => $this->failureCount(FacilitySignalOutbox::class),
             ],
-            'failure_rows' => $this->failureRows($limit),
+            'failure_rows' => [...$this->failureRows($limit), ...$monitoringIt['failure_rows']],
+            'device_it' => $monitoringIt,
         ];
     }
 
     public function retry(string $source, int $outboxId): void
     {
+        if ($source === 'device_it') {
+            $this->monitoringIt->retry($outboxId);
+
+            return;
+        }
         [$modelClass, $dispatch] = match ($source) {
             'fleet' => [FleetSignalOutbox::class, fn (int $id) => DispatchFleetSignalOutbox::dispatch($id)],
             'shift' => [ShiftSignalOutbox::class, fn (int $id) => DispatchShiftSignalOutbox::dispatch($id)],
@@ -300,7 +316,7 @@ class SafetySignalDeliveryRecoveryService
         $limit = max(1, min($limit, 1000));
         $count = 0;
 
-        $concerns = \App\Models\SafeguardingConcern::query()
+        $concerns = SafeguardingConcern::query()
             ->whereNull('deleted_at')
             ->where(function ($query): void {
                 $query->whereNull('concern_type')
@@ -311,31 +327,31 @@ class SafetySignalDeliveryRecoveryService
             ->limit($limit)
             ->get();
 
-        $bridge = app(\App\Services\ControlRoom\ComprehensiveAlertBridgeService::class);
-        $hsEventService = app(\App\Services\HealthSafety\HsEventService::class);
+        $bridge = app(ComprehensiveAlertBridgeService::class);
+        $hsEventService = app(HsEventService::class);
 
         foreach ($concerns as $concern) {
             $recoveredSomething = false;
 
             // 1. Reconcile HsEvent if missing
-            $key = \App\Models\HsEvent::buildIdempotencyKey(
+            $key = HsEvent::buildIdempotencyKey(
                 get_class($concern),
                 $concern->getKey(),
-                \App\Models\HsEvent::CATEGORY_SAFEGUARDING,
+                HsEvent::CATEGORY_SAFEGUARDING,
             );
 
-            $hsEvent = \App\Models\HsEvent::where('idempotency_key', $key)->first();
+            $hsEvent = HsEvent::where('idempotency_key', $key)->first();
             if (! $hsEvent) {
                 try {
                     $severity = $concern->severity === 'critical' ? 'critical' : 'high';
                     $hsEvent = $hsEventService->recordEvent([
                         'source' => $concern,
-                        'event_category' => \App\Models\HsEvent::CATEGORY_SAFEGUARDING,
+                        'event_category' => HsEvent::CATEGORY_SAFEGUARDING,
                         'severity' => $severity,
                         'occurred_at' => $concern->occurred_at ?? now(),
                         'reported_at' => $concern->reported_at ?? now(),
                         'site_id' => $concern->site_id,
-                        'client_id' => in_array($concern->subject_type, ['client', \App\Models\Client::class], true) ? $concern->subject_id : null,
+                        'client_id' => in_array($concern->subject_type, ['client', Client::class], true) ? $concern->subject_id : null,
                         'staff_id' => $concern->reported_by_user_id,
                         'created_by' => $concern->reported_by_user_id,
                     ]);
@@ -349,7 +365,7 @@ class SafetySignalDeliveryRecoveryService
             }
 
             // 2. Reconcile ControlRoomAlert if missing
-            $existingAlert = \App\Models\ControlRoomAlert::query()
+            $existingAlert = ControlRoomAlert::query()
                 ->where('context->concern_id', $concern->id)
                 ->first();
 
@@ -372,17 +388,17 @@ class SafetySignalDeliveryRecoveryService
 
             // 3. Reconcile NotifiableIncident if critical
             if ($concern->severity === 'critical') {
-                $notifiable = \App\Domain\Governance\Models\NotifiableIncident::query()
+                $notifiable = NotifiableIncident::query()
                     ->where('related_incident_id', $concern->id)
                     ->where('incident_type', 'safeguarding')
                     ->first();
 
                 if (! $notifiable) {
                     try {
-                        \App\Domain\Governance\Models\NotifiableIncident::create([
+                        NotifiableIncident::create([
                             'incident_type' => 'safeguarding',
                             'notification_authority' => 'health_nz',
-                            'title' => 'Auto-generated from safeguarding concern #' . $concern->id,
+                            'title' => 'Auto-generated from safeguarding concern #'.$concern->id,
                             'description' => $concern->description ?? 'Critical safeguarding concern requiring authority notification.',
                             'occurred_at' => $concern->occurred_at ?? now(),
                             'severity' => 'critical',

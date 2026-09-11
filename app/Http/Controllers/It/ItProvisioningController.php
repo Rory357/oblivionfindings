@@ -29,6 +29,7 @@ use App\Domain\It\Services\ItTicketRequestTrace;
 use App\Domain\It\Services\ItTicketTriageService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\It\Services\ItWorkTransitionService;
+use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\It\ApproveProvisioningRequestRequest;
 use App\Http\Requests\It\AssignProvisioningRequestRequest;
@@ -1111,7 +1112,7 @@ class ItProvisioningController extends Controller
                     'reference' => $t->reference,
                     'lock_version' => (int) $t->lock_version,
                     'title' => $t->title,
-                    'description' => $t->description,
+                    'description' => MonitoringTechnicalSummary::ticketDescription($t),
                     'work_type' => $t->work_type,
                     'service' => $t->service ? ['id' => $t->service->id, 'name' => $t->service->name] : null,
                     'category' => $t->category,
@@ -1179,7 +1180,7 @@ class ItProvisioningController extends Controller
                 'reference' => $t->reference,
                 'lock_version' => (int) $t->lock_version,
                 'title' => $t->title,
-                'description' => $t->description,
+                'description' => MonitoringTechnicalSummary::ticketDescription($t),
                 'category' => $t->category,
                 'priority' => $t->priority,
                 'status' => $t->status,

@@ -76,6 +76,7 @@ class SecurityDevicesSignalSeeder extends Seeder
 
             $payload = [
                 'signal_type_id' => $signalTypeId,
+                'signal_type_code' => $rule['signal_type_code'],
                 'signal_source_id' => $source->id,
                 'priority' => $rule['priority'],
                 'output_severity' => $rule['output_severity'],

@@ -424,9 +424,10 @@ export function TicketLinkedContext({
                         />
                     ))}
                     <p className="rounded-lg border border-dashed border-border px-2.5 py-2 text-[11px] text-muted-foreground">
-                        The Device and Control Room records below are live now.
-                        IT owns this ticket; Control Room continues to own
-                        operational response.
+                        Linked records show their current details. The sealed
+                        evidence above stays unchanged. IT owns this ticket; any
+                        linked Control Room alert retains its own operational
+                        response.
                     </p>
                 </div>
             ) : null}

@@ -1,0 +1,69 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_9c9b8127bbb64a10",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\Fleet\FleetAvailabilityRecoveryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mrecovery records one safe episode without closing the alert[39m[90m                                               [39m [90m179.66s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mrecovery delivered first does not raise a stale offline or recovery alarm[39m
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Fleet\FleetAvailabilityRecoveryTest[22m [90m>[39m recovery delivere… [41;1m UniqueConstraintViolationException [49;22m  
+[39;1m  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry 'IT-FLEET-RECOVERY' for key 'devices.devices_device_uid_unique' (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_it_support_test_it_9c9b8127bbb64a10, SQL: insert into `devices` (`tenant_id`, `name`, `domain`, `category`, `subcategory`, `manufacturer`, `model`, `serial_number`, `mac_address`, `status`, `health_status`, `last_seen_at`, `provider`, `imei`, `device_uid`, `updated_at`, `created_at`) values (1, ut est omnis, tracking, personal_tracker, wearable_gps, Harber-Littel, sed, SN-14460090, 82:2A:4F:5A:1B:B6, active, healthy, 2026-09-11 11:16:53, queclink, IT-FLEET-RECOVERY, IT-FLEET-RECOVERY, 2026-09-11 11:16:53, 2026-09-11 11:16:53))[39;22m
+
+  at [32mvendor\laravel\framework\src\Illuminate\Database\MySqlConnection.php[39m:[32m53[39m
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+  [33m1   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\MySqlConnection.php[39;22m:[39;1m53[39;22m
+  [33m2   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\Connection.php[39;22m:[39;1m830[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m1 passed[39;22m[90m,[39m[39m [2m72 pending[22m[39m[90m (22 assertions)[39m
+  [90mDuration:[39m [39m180.14s[39m
+
+{"exit_code":2,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_9c9b8127bbb64a10",
+    "database_mutations_performed": false
+}

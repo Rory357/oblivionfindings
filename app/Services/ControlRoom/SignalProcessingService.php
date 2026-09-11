@@ -2,6 +2,9 @@
 
 namespace App\Services\ControlRoom;
 
+use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
+use App\Domain\Monitoring\Services\MonitoringWorkRouting;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Enums\AlertSeverity;
 use App\Exceptions\SafetySignalUnroutable;
 use App\Jobs\Notifications\DeliverControlRoomAlertNotificationJob;
@@ -32,6 +35,7 @@ use App\Models\FleetVehicleStateSnapshot;
 use App\Models\ShiftSignal;
 use App\Models\Site;
 use App\Services\AuditLogger;
+use App\Services\Fleet\FleetSignalService;
 use App\Services\HealthSafety\LoneWorkerSignalService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\ShiftSignalService;
@@ -168,11 +172,38 @@ class SignalProcessingService
 
             $this->assertSignalRelationshipsAreCanonical($signal);
 
-            // Check if in maintenance window
+            // Maintenance suppression applies to both operational and technical destinations.
             if ($this->isInMaintenanceWindow($signal)) {
                 $signal->markSuppressed('In maintenance window');
 
                 return null;
+            }
+
+            if ($signal->signal_type_code === 'device_offline'
+                && data_get($signal->normalized_data, 'availability_episode_version') === 1) {
+                $sourceEvent = $this->nativeAvailabilityEvent($signal);
+                if ($sourceEvent === null) {
+                    throw new SafetySignalUnroutable('Native monitoring outage has no valid episode evidence.');
+                }
+                $recovered = MonitoringAvailabilityEpisode::recoveryFor($sourceEvent, (int) $signal->site_id) !== null;
+                try {
+                    $routing = MonitoringWorkRouting::decide($signal, $sourceEvent, $recovered);
+                } catch (\DomainException $exception) {
+                    throw new SafetySignalUnroutable('Native technical work has no canonical observation evidence.', previous: $exception);
+                }
+                if ($routing !== null) {
+                    $signal->update(['normalized_data' => [...($signal->normalized_data ?? []), 'it_work_routing' => $routing]]);
+                }
+                if ($recovered) {
+                    $signal->markProcessed(null, 'Recovery preceded outage delivery; technical verification is required.');
+
+                    return null;
+                }
+                if (($routing['destination'] ?? null) === 'it') {
+                    $signal->markProcessed(null, 'Confirmed nonurgent technical fault routed directly to IT.');
+
+                    return null;
+                }
             }
 
             $incident = $this->trustedIncidentForSignal($signal);
@@ -226,6 +257,73 @@ class SignalProcessingService
     /**
      * Resolve canonical device-offline alerts when monitoring confirms recovery.
      */
+    public function processFleetAvailability(Signal $signal): void
+    {
+        if (! in_array($signal->signal_type_code, ['fleet_device_offline', 'fleet_device_online'], true)) {
+            throw new InvalidArgumentException('Only Fleet availability signals can use this processor.');
+        }
+        DB::transaction(function () use ($signal): void {
+            $signal = Signal::query()->whereKey($signal->id)->lockForUpdate()->firstOrFail();
+            if ($signal->status !== 'pending') {
+                return;
+            }
+            $fleetId = data_get($signal->normalized_data, 'fleet_signal_id');
+            $fleet = is_int($fleetId) ? FleetSignal::query()->whereKey($fleetId)->lockForUpdate()->first() : null;
+            if ($fleet === null || $signal->external_ref !== 'fleet_signal_'.$fleet->id
+                || $signal->signal_type_code !== 'fleet_'.str_replace('.', '_', $fleet->signal_type)
+                || (int) $signal->asset_id !== (int) $fleet->asset_id) {
+                throw new SafetySignalUnroutable('Fleet availability source identity does not match.');
+            }
+            $this->assertSignalRelationshipsAreCanonical($signal);
+            $sources = app(FleetSignalService::class);
+            if ($fleet->signal_type === 'device.offline') {
+                if (! $sources->offlineScopeIsCurrent($fleet)
+                    || (int) data_get($fleet->payload, 'availability.scope.site_id') !== (int) $signal->site_id) {
+                    throw new SafetySignalUnroutable('Fleet offline episode lacks current canonical device and Site evidence.');
+                }
+                $recoveries = FleetSignal::query()->where('asset_id', $fleet->asset_id)->where('signal_type', 'device.online')
+                    ->where('payload->availability->offline_signal_id', $fleet->id)->orderBy('id')->get();
+                foreach ($recoveries as $recovery) {
+                    if ($sources->matchedOfflineForRecovery($recovery)?->id === $fleet->id) {
+                        $signal->markProcessed(null, 'Recovery preceded offline delivery; technical verification is required.');
+
+                        return;
+                    }
+                }
+                $this->process($signal);
+
+                return;
+            }
+            $offline = $sources->matchedOfflineForRecovery($fleet);
+            if ($offline === null || (int) data_get($fleet->payload, 'availability.scope.site_id') !== (int) $signal->site_id) {
+                $signal->markProcessed(null, 'Recovery episode or current scope could not be verified; manual verification is required.');
+
+                return;
+            }
+            $original = Signal::query()->where('external_ref', 'fleet_signal_'.$offline->id)
+                ->where('signal_type_code', 'fleet_device_offline')->where('site_id', $signal->site_id)
+                ->where('signal_source_id', $signal->signal_source_id)->lockForUpdate()->first();
+            $alertId = $original?->alert_id ?? $original?->correlated_alert_id;
+            $alert = $alertId ? ControlRoomAlert::query()->whereKey($alertId)
+                ->where('site_id', $signal->site_id)->where('asset_id', $fleet->asset_id)->lockForUpdate()->first() : null;
+            if ($alert === null) {
+                $signal->markProcessed(null, 'Recovery evidence recorded without a matching delivered offline alert; technical verification is required.');
+
+                return;
+            }
+            $context = $alert->context ?? [];
+            $context['fleet_recoveries'][(string) $offline->id] = [
+                'recovery_signal_id' => $signal->id, 'offline_fleet_signal_id' => $offline->id,
+                'observed_at' => $fleet->occurred_at->toISOString(), 'verification_required' => true,
+            ];
+            $alert->update(['context' => $context]);
+            $signal->markCorrelated($alert);
+            AuditLogger::log('fleet.availability.recovery_recorded', $alert, [
+                'recovery_signal_id' => $signal->id, 'offline_fleet_signal_id' => $offline->id,
+            ]);
+        }, self::TRANSACTION_ATTEMPTS);
+    }
+
     public function processDeviceRecovery(Signal $signal): int
     {
         if ($signal->signal_type_code !== 'device_online') {
@@ -246,6 +344,15 @@ class SignalProcessingService
             $canonicalDeviceId = (int) data_get($signal->normalized_data, 'canonical_device_id');
             $correlationKey = $this->monitorCorrelationKey($signal);
             $legacyRecovery = data_get($signal->normalized_data, 'legacy_monitoring_recovery') === true;
+            $nativeEpisode = data_get($signal->normalized_data, 'availability_episode_version') === 1;
+            $episodeKey = $this->nativeAvailabilityKey($signal);
+            $nativeEvent = $nativeEpisode ? $this->nativeAvailabilityEvent($signal) : null;
+            if ($nativeEpisode && ($episodeKey === null || $nativeEvent === null
+                || ! MonitoringAvailabilityEpisode::hasCanonicalObservations($nativeEvent, (int) $signal->site_id))) {
+                $signal->markProcessed(null, 'Recovery has no matching outage episode; technical verification is required.');
+
+                return 0;
+            }
 
             if (! $signal->device_id && $canonicalDeviceId <= 0) {
                 $signal->markProcessed(null, 'No device identity was available for recovery matching.');
@@ -253,15 +360,16 @@ class SignalProcessingService
                 return 0;
             }
 
-            if ($correlationKey === null && ! $legacyRecovery) {
+            if ($correlationKey === null && ! $legacyRecovery && ! $nativeEpisode) {
                 $signal->markProcessed(null, 'Recovery did not include an exact monitoring correlation key.');
 
                 return 0;
             }
 
             $alertsQuery = ControlRoomAlert::query()
-                ->unresolved()
+                ->when(! $nativeEpisode, fn ($query) => $query->unresolved())
                 ->where('source', 'security_devices')
+                ->where('site_id', $signal->site_id)
                 ->where(function ($query) use ($signal, $canonicalDeviceId): void {
                     if ($signal->device_id) {
                         $query->where('device_id', $signal->device_id);
@@ -274,15 +382,36 @@ class SignalProcessingService
                 })
                 ->whereHas('signals', fn ($query) => $query->where('signal_type_code', 'device_offline'));
 
-            if ($correlationKey !== null) {
+            if ($nativeEpisode) {
+                $alertsQuery->where('context->normalized_data->availability_episode_key', $episodeKey);
+            } elseif ($correlationKey !== null) {
                 $alertsQuery->where('context->normalized_data->monitor_correlation_key', $correlationKey);
             } else {
                 $alertsQuery->whereNull('context->normalized_data->monitor_correlation_key');
+            }
+            if (! $nativeEpisode) {
+                $alertsQuery->whereNull('context->normalized_data->availability_episode_key');
             }
 
             $alerts = $alertsQuery->lockForUpdate()->get();
 
             foreach ($alerts as $alert) {
+                if ($nativeEpisode) {
+                    $context = $alert->context ?? [];
+                    $context['monitoring_recoveries'][$episodeKey] = [
+                        'recovery_signal_id' => (int) $signal->id,
+                        'device_event_id' => (int) $nativeEvent->id,
+                        'observed_at' => $nativeEvent->occurred_at->toIso8601String(),
+                        'verification_required' => true,
+                    ];
+                    $alert->update(['context' => $context]);
+                    AuditLogger::logOrFail('control_room.monitoring.recovery_recorded', $alert, [
+                        'fields' => ['status', 'state'],
+                        'after' => ['status' => $alert->status, 'state' => 'verification_required'],
+                    ], systemActor: true);
+
+                    continue;
+                }
                 $this->resolveAlert(
                     $alert,
                     'Monitoring confirmed that the device recovered.',
@@ -290,11 +419,14 @@ class SignalProcessingService
                     [
                         'recovery_signal_id' => $signal->id,
                         'monitor_correlation_key' => $correlationKey,
+                        'availability_episode_key' => $episodeKey,
                     ],
                 );
             }
 
-            $signal->markProcessed(null, 'Resolved matching device-offline alerts.');
+            $signal->markProcessed(null, $nativeEpisode
+                ? 'Monitoring recovery evidence recorded; operational verification is required.'
+                : 'Resolved matching device-offline alerts.');
 
             return $alerts->count();
         }, self::TRANSACTION_ATTEMPTS);
@@ -881,10 +1013,15 @@ class SignalProcessingService
         $windowMinutes = $rule->dedup_window_minutes ?? 30;
         $normalizedData = $signal->normalized_data ?? [];
         $canonicalDeviceId = $this->canonicalPositiveId($normalizedData['canonical_device_id'] ?? null);
+        $episodeKey = $this->nativeAvailabilityKey($signal);
 
         $query = ControlRoomAlert::query()
             ->unresolved()
-            ->where('triggered_at', '>=', now()->subMinutes($windowMinutes));
+            ->when($episodeKey === null, fn ($alerts) => $alerts->where('triggered_at', '>=', now()->subMinutes($windowMinutes)));
+
+        if ($signal->signal_type_code === 'device_offline') {
+            $query->where('context->normalized_data->availability_episode_key', $episodeKey);
+        }
 
         $query->whereIn('alert_type', $this->correlationAlertTypes($signal, $rule));
 
@@ -1001,6 +1138,29 @@ class SignalProcessingService
         return $candidate && $this->loneWorkerCandidateMatchesSignal($candidate, $signal, $rule)
             ? $candidate
             : null;
+    }
+
+    private function nativeAvailabilityKey(Signal $signal): ?string
+    {
+        $key = data_get($signal->normalized_data, 'availability_episode_key');
+
+        return data_get($signal->normalized_data, 'availability_episode_version') === 1
+            && is_string($key) && preg_match('/\A[a-f0-9]{64}\z/', $key) === 1 ? $key : null;
+    }
+
+    private function nativeAvailabilityEvent(Signal $signal): ?DeviceEvent
+    {
+        $key = $this->nativeAvailabilityKey($signal);
+        $eventId = data_get($signal->normalized_data, 'device_event_id');
+        if ($key === null || ! is_int($eventId) || $signal->signalSource?->slug !== 'security_devices') {
+            return null;
+        }
+        $event = DeviceEvent::query()->find($eventId);
+
+        return $event && $signal->signal_type_code === 'device_'.$event->event_type
+            && (int) data_get($signal->normalized_data, 'canonical_device_id') === (int) $event->device_id
+            && (MonitoringAvailabilityEpisode::fromEvent($event, (int) $signal->site_id)['key'] ?? null) === $key
+                ? $event : null;
     }
 
     private function monitorCorrelationKey(Signal $signal): ?string
@@ -1448,6 +1608,13 @@ class SignalProcessingService
      */
     public function ingestFromFleetSignal(FleetSignal $fleetSignal): Signal
     {
+        // The canonical outbox worker owns the surrounding transaction. Keep the
+        // source configuration stable until signal and alert publication finish.
+        $fleetSource = SignalSource::query()->where('slug', 'queclink_fleet')->lockForUpdate()->first();
+        if ($fleetSource === null || $fleetSource->status !== 'active') {
+            throw new SafetySignalUnroutable('Fleet safety signal has no active signal source.');
+        }
+
         // Eager-load relationships for context enrichment
         $fleetSignal->loadMissing([
             'asset:id,name,asset_tag,registration_number,site_id,home_site_id',
@@ -1461,14 +1628,21 @@ class SignalProcessingService
         ]);
 
         // Build fleet context for the alert
-        $fleetContext = $this->buildFleetContext($fleetSignal);
+        $isAvailability = in_array($fleetSignal->signal_type, ['device.offline', 'device.online'], true);
+        $siteId = $fleetSignal->asset?->home_site_id ?: $fleetSignal->asset?->site_id;
+        $recordedSiteId = data_get($fleetSignal->payload, 'availability.scope.site_id');
+        if ($isAvailability && is_int($recordedSiteId)) {
+            $site = Site::query()->find($recordedSiteId);
+            if ((int) $siteId !== $recordedSiteId || $site === null || ! $site->is_active || $site->archived) {
+                throw new SafetySignalUnroutable('Fleet availability source Site changed or is unavailable; manual verification is required.');
+            }
+            $siteId = $recordedSiteId;
+        }
+        $fleetContext = $isAvailability ? [] : $this->buildFleetContext($fleetSignal);
         $privacyBlocked = (bool) data_get($fleetSignal->payload, 'privacy_blocked', false);
         if ($privacyBlocked) {
             $fleetContext = $this->privacySafeFleetContext($fleetContext);
         }
-
-        // Map fleet source to control room signal source
-        $fleetSource = SignalSource::where('slug', 'queclink_fleet')->first();
 
         $signalTypeCode = 'fleet_'.str_replace('.', '_', $fleetSignal->signal_type);
 
@@ -1480,17 +1654,17 @@ class SignalProcessingService
                 'safety-signal|fleet|'.$fleetSignal->idempotency_key,
             ),
             'asset_id' => $fleetSignal->asset_id,
-            'site_id' => $fleetSignal->asset?->home_site_id ?: $fleetSignal->asset?->site_id,
+            'site_id' => $siteId,
             'external_ref' => 'fleet_signal_'.$fleetSignal->id,
             'severity_hint' => $fleetSignal->severity_hint ?? 'medium',
             'occurred_at' => $fleetSignal->occurred_at,
-            'payload' => array_merge($fleetSignal->payload ?? [], [
+            'payload' => array_merge($isAvailability ? [] : ($fleetSignal->payload ?? []), [
                 'fleet_context' => $fleetContext,
             ]),
             'normalized_data' => [
                 'fleet_signal_id' => $fleetSignal->id,
-                'trip_id' => $privacyBlocked ? null : $fleetSignal->trip_id,
-                'driver_session_id' => $privacyBlocked ? null : $fleetSignal->driver_session_id,
+                'trip_id' => $privacyBlocked || $isAvailability ? null : $fleetSignal->trip_id,
+                'driver_session_id' => $privacyBlocked || $isAvailability ? null : $fleetSignal->driver_session_id,
                 'privacy_blocked' => $privacyBlocked,
                 'fleet_context' => $fleetContext,
             ],

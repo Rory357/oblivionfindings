@@ -173,6 +173,9 @@ class ControlRoomAlertProvenanceService
     public function sanitiseContextForRead(ControlRoomAlert $alert): array
     {
         $context = is_array($alert->context) ? $alert->context : [];
+        // Recovery observation references are exposed only through the
+        // source-authorised monitoring presenter, never the generic context.
+        unset($context['monitoring_recoveries']);
         $authoritativeClientId = $this->authoritativeClientId($alert);
         $hasClientContext = collect([
             data_get($context, 'client_id'),

@@ -1,0 +1,74 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItMonitoringDeliveryService.php",
+    "sha256": "3fb994634d72708eb1b3b633a21cacfc0995dbd8587bb5ef518f125ccb6d0566"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketLinkService.php",
+    "sha256": "c2ecd0a91a6fe3205b46eaee7a7ddb443a630750b14adf5fe707ffba64c851c6"
+  },
+  {
+    "path": "app/Domain/Monitoring/Presenters/MonitoringIncidentEvidencePresenter.php",
+    "sha256": "4a11f3aa144022086f6754a1ae14fa18b619555df6728c9d33fce2728c7cbf0f"
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringAvailabilityEpisode.php",
+    "sha256": "6dd9484a656efa401431855a56a9b8430fa13b1e791762b3f2ab3cc143aeefb8"
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringIncidentEvidenceService.php",
+    "sha256": "d1cba7aa38167fed9f36237c5c7a275059d0c73957bf36b68fa495830dcbcaa8"
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringWorkRouting.php",
+    "sha256": "80b366e9b1c4cac845f025b612dedc8573d91951f97d0eec32275c78052a4798"
+  },
+  {
+    "path": "app/Listeners/It/CreateOrUpdateMonitoringTicket.php",
+    "sha256": "76ec065b797b78b3f6bdeeb284b7e11a24dbee0dd23f1442df4b11d717c6383d"
+  },
+  {
+    "path": "app/Models/ControlRoom/SignalRule.php",
+    "sha256": "a92ea49978bc14a6ecaa7280da6ff3be19325c2b76dce201a40c6c00cea54b48"
+  },
+  {
+    "path": "app/Services/ControlRoom/SignalProcessingService.php",
+    "sha256": "95a8d50df369a62a0121426b4cec79efd532885627420ffeb8e92043fe85bfd1"
+  },
+  {
+    "path": "database/migrations/2026_09_12_000027_allow_direct_monitoring_incident_evidence.php",
+    "sha256": "23791b5080881e14868bbb58068adf9ee1b995a3380c71b7787de175ac822c87"
+  },
+  {
+    "path": "database/seeders/SecurityDevicesSignalSeeder.php",
+    "sha256": "00595d35e3348f5002e6529c5ca8b8d30136b940ca57d4ea4b989883bbb0c115"
+  },
+  {
+    "path": "resources/js/components/it/ticket-linked-context.tsx",
+    "sha256": "f0484cc57b0a07def2d841f4255f561b8400205336ebda5cf89dd3d6dfec4da3"
+  },
+  {
+    "path": "resources/js/components/monitoring/monitoring-incident-evidence-card.test.tsx",
+    "sha256": "9d14d7c0c3770855e5b795251c17e291c8d01cb53707fea394b603f11f78e8ad"
+  },
+  {
+    "path": "resources/js/components/monitoring/monitoring-incident-evidence-card.tsx",
+    "sha256": "902e95f1a16116ef986597fc2602d69a7fa6c1e8489a2216542a06cca7f47f8f"
+  },
+  {
+    "path": "resources/js/pages/it/tickets/show.tsx",
+    "sha256": "636480100708788a45f6af58d43884ec53b31ec13be5fde9263f2eaa1ad68104"
+  },
+  {
+    "path": "tests/Concurrency/It/ItMonitoringDeliveryConcurrencyTest.php",
+    "sha256": "f29413fc202c3f510300d9d2a4778a2b92fa49c495a38ca5ec7b837b66f1242c"
+  },
+  {
+    "path": "tests/Feature/Monitoring/DependencySuppressionTest.php",
+    "sha256": "c68164b46511f6016d056b640c0926ef7563cdc92816b18612bb9c9bfd71bd82"
+  },
+  {
+    "path": "tests/Feature/Monitoring/MonitoringAvailabilityEpisodeTest.php",
+    "sha256": "0921ac8d7714e99ec754e7f28b52c6c6dcc4270d33dd15e25766d436bb3d2e02"
+  }
+]

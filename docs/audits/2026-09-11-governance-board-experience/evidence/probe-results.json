@@ -1,0 +1,280 @@
+{
+    "database": "oblivion_gov_audit_20260911_9888",
+    "role_permissions": {
+        "member": {
+            "board_role": "member",
+            "can_vote_model": true,
+            "permissions": {
+                "governance.view": true,
+                "governance.meetings.view": true,
+                "governance.meetings.manage": false,
+                "governance.packs.view": true,
+                "governance.packs.manage": false,
+                "governance.resolutions.view": true,
+                "governance.resolutions.vote": true,
+                "governance.resolutions.manage": false,
+                "governance.performance.view": true,
+                "governance.performance.manage": false,
+                "governance.executive.view": false,
+                "governance.budgets.view": true,
+                "governance.budgets.manage": false,
+                "governance.actions.manage": false
+            }
+        },
+        "chair": {
+            "board_role": "chair",
+            "can_vote_model": true,
+            "permissions": {
+                "governance.view": true,
+                "governance.meetings.view": true,
+                "governance.meetings.manage": true,
+                "governance.packs.view": true,
+                "governance.packs.manage": true,
+                "governance.resolutions.view": true,
+                "governance.resolutions.vote": true,
+                "governance.resolutions.manage": true,
+                "governance.performance.view": true,
+                "governance.performance.manage": true,
+                "governance.executive.view": true,
+                "governance.budgets.view": true,
+                "governance.budgets.manage": false,
+                "governance.actions.manage": true
+            }
+        },
+        "secretary": {
+            "board_role": "secretary",
+            "can_vote_model": true,
+            "permissions": {
+                "governance.view": true,
+                "governance.meetings.view": true,
+                "governance.meetings.manage": true,
+                "governance.packs.view": true,
+                "governance.packs.manage": true,
+                "governance.resolutions.view": true,
+                "governance.resolutions.vote": false,
+                "governance.resolutions.manage": true,
+                "governance.performance.view": false,
+                "governance.performance.manage": false,
+                "governance.executive.view": false,
+                "governance.budgets.view": true,
+                "governance.budgets.manage": false,
+                "governance.actions.manage": true
+            }
+        },
+        "treasurer": {
+            "board_role": "treasurer",
+            "can_vote_model": false,
+            "permissions": {
+                "governance.view": true,
+                "governance.meetings.view": true,
+                "governance.meetings.manage": false,
+                "governance.packs.view": true,
+                "governance.packs.manage": false,
+                "governance.resolutions.view": true,
+                "governance.resolutions.vote": true,
+                "governance.resolutions.manage": false,
+                "governance.performance.view": true,
+                "governance.performance.manage": false,
+                "governance.executive.view": false,
+                "governance.budgets.view": true,
+                "governance.budgets.manage": false,
+                "governance.actions.manage": false
+            }
+        },
+        "ceo": {
+            "board_role": null,
+            "can_vote_model": null,
+            "permissions": {
+                "governance.view": false,
+                "governance.meetings.view": false,
+                "governance.meetings.manage": false,
+                "governance.packs.view": false,
+                "governance.packs.manage": false,
+                "governance.resolutions.view": false,
+                "governance.resolutions.vote": false,
+                "governance.resolutions.manage": false,
+                "governance.performance.view": false,
+                "governance.performance.manage": false,
+                "governance.executive.view": false,
+                "governance.budgets.view": false,
+                "governance.budgets.manage": false,
+                "governance.actions.manage": false
+            }
+        },
+        "observer": {
+            "board_role": "observer",
+            "can_vote_model": false,
+            "permissions": {
+                "governance.view": true,
+                "governance.meetings.view": true,
+                "governance.meetings.manage": false,
+                "governance.packs.view": true,
+                "governance.packs.manage": false,
+                "governance.resolutions.view": true,
+                "governance.resolutions.vote": false,
+                "governance.resolutions.manage": false,
+                "governance.performance.view": true,
+                "governance.performance.manage": false,
+                "governance.executive.view": false,
+                "governance.budgets.view": true,
+                "governance.budgets.manage": false,
+                "governance.actions.manage": false
+            }
+        },
+        "duplicate": {
+            "board_role": "member",
+            "can_vote_model": true,
+            "permissions": {
+                "governance.view": true,
+                "governance.meetings.view": true,
+                "governance.meetings.manage": false,
+                "governance.packs.view": true,
+                "governance.packs.manage": false,
+                "governance.resolutions.view": true,
+                "governance.resolutions.vote": true,
+                "governance.resolutions.manage": false,
+                "governance.performance.view": true,
+                "governance.performance.manage": false,
+                "governance.executive.view": false,
+                "governance.budgets.view": true,
+                "governance.budgets.manage": false,
+                "governance.actions.manage": false
+            }
+        }
+    },
+    "risks": {
+        "canonical": 12,
+        "above_appetite": 12,
+        "aggregate": {
+            "count": 10,
+            "critical": 10,
+            "high": 0,
+            "medium": 0,
+            "above_appetite": 10,
+            "items": [
+                {
+                    "id": 12,
+                    "reference": "R-RYVM2K",
+                    "title": "Audit above-appetite risk 12",
+                    "category": "financial",
+                    "score": 20,
+                    "color": "red",
+                    "owner": "Audit Chair"
+                },
+                {
+                    "id": 11,
+                    "reference": "R-6JQZEX",
+                    "title": "Audit above-appetite risk 11",
+                    "category": "financial",
+                    "score": 20,
+                    "color": "red",
+                    "owner": "Audit Chair"
+                },
+                {
+                    "id": 10,
+                    "reference": "R-GOA4MC",
+                    "title": "Audit above-appetite risk 10",
+                    "category": "financial",
+                    "score": 20,
+                    "color": "red",
+                    "owner": "Audit Chair"
+                },
+                {
+                    "id": 9,
+                    "reference": "R-WISTAF",
+                    "title": "Audit above-appetite risk 9",
+                    "category": "financial",
+                    "score": 20,
+                    "color": "red",
+                    "owner": "Audit Chair"
+                },
+                {
+                    "id": 8,
+                    "reference": "R-VOL89Q",
+                    "title": "Audit above-appetite risk 8",
+                    "category": "financial",
+                    "score": 20,
+                    "color": "red",
+                    "owner": "Audit Chair"
+                },
+                {
+                    "id": 7,
+                    "reference": "R-EUYQOV",
+                    "title": "Audit above-appetite risk 7",
+                    "category": "financial",
+                    "score": 20,
+                    "color": "red",
+                    "owner": "Audit Chair"
+                },
+                {
+                    "id": 6,
+                    "reference": "R-AFDUTA",
+                    "title": "Audit above-appetite risk 6",
+                    "category": "financial",
+                    "score": 20,
+                    "color": "red",
+                    "owner": "Audit Chair"
+                },
+                {
+                    "id": 5,
+                    "reference": "R-82W6UD",
+                    "title": "Audit above-appetite risk 5",
+                    "category": "financial",
+                    "score": 20,
+                    "color": "red",
+                    "owner": "Audit Chair"
+                },
+                {
+                    "id": 4,
+                    "reference": "R-DPXZ04",
+                    "title": "Audit above-appetite risk 4",
+                    "category": "financial",
+                    "score": 20,
+                    "color": "red",
+                    "owner": "Audit Chair"
+                },
+                {
+                    "id": 3,
+                    "reference": "R-RNLB5Y",
+                    "title": "Audit above-appetite risk 3",
+                    "category": "financial",
+                    "score": 20,
+                    "color": "red",
+                    "owner": "Audit Chair"
+                }
+            ]
+        }
+    },
+    "minutes_sign": {
+        "status": "signed",
+        "signed_by": null,
+        "signed_at": null,
+        "version_number": 1
+    },
+    "minutes_approved_update_controller": {
+        "status": "approved",
+        "content_blocks": [
+            {
+                "heading": "Audit replaced approved minutes"
+            }
+        ],
+        "version_number": 2,
+        "version_history": [
+            {
+                "version": 1,
+                "updated_at": "2026-09-11T10:48:54+00:00",
+                "content_hash": "65226bd07f0f45aff934a466f499c420a7e618a44287cf0f76bc2ba71f829527"
+            }
+        ]
+    },
+    "resolution_follow_up": {
+        "error": "Illuminate\\Database\\QueryException",
+        "message": "SQLSTATE[HY000]: General error: 1364 Field 'source_type' doesn't have a default value (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_gov_audit_20260911_9888, SQL: insert into `action_items` (`description`, `assigned_to`, `due_date`, `priority`, `status`, `action_reference`, `updated_at`, `created_at`) values (Do audit action, 2, 2026-09-25 10:48:54, medium, open, ACT-2026-0001, 2026-09-11 10:48:54, 2026-09-11 10:48:54))"
+    },
+    "strategy_approve_draft_resolution": {
+        "status": "approved",
+        "approval_resolution_id": 2
+    },
+    "recurrence": "2026-12-31",
+    "executive_access_member": false
+}

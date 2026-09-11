@@ -1,0 +1,1 @@
+{"tool":"pint","result":"fixed","files":[{"path":"tests\\Feature\\Monitoring\\DependencySuppressionTest.php","fixers":["fully_qualified_strict_types","ordered_imports"]},{"path":"tests\\Feature\\Monitoring\\MonitoringAvailabilityEpisodeTest.php","fixers":["fully_qualified_strict_types","ordered_imports"]}]}

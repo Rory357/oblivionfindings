@@ -1,0 +1,22 @@
+[
+  {
+    "sha256": "886dccd2b55df010149ab564e0db97b7a2d7a1f56bc44fca8438136de8f2ffd9",
+    "path": "app/Domain/It/Services/ItApiOperationsPresenter.php"
+  },
+  {
+    "sha256": "e364b9f079720c00aaa8128c8c0bb2a2269e4b5f72483f9f04f29323ee0fd56f",
+    "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php"
+  },
+  {
+    "sha256": "42489c7e54b30c9c52cecf7353f146c8eb70ad566fba08c1bb9195ce64cf861b",
+    "path": "tests/Feature/It/ItApiOperationsScopeTest.php"
+  },
+  {
+    "sha256": "8bb378896da411b8de76d278899d494b42057323b72011074afbed4c3f7abd20",
+    "path": "resources/js/components/it/it-api-operations.tsx"
+  },
+  {
+    "sha256": "097a52f6b0567838b129970f6685cbd63d94bf238098e205473e23b391aa653e",
+    "path": "resources/js/components/it/it-api-operations.test.tsx"
+  }
+]

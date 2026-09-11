@@ -1,0 +1,71 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_0b15272d9fd14e62",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\Monitoring\MonitoringAvailabilityEpisodeTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdelayed recovery affects only its original episode even when the same monitor fails again[39m[90m                 [39m [90m177.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery delivered before IT creation is retained as verification evidence without closing the later ticket[39m[90m [39m [90m0.28s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma recovered episode delivered late does not create a stale Control Room alarm or falsely complete technical[39m[90m…[39m [90m0.21s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mmaintenance suppression retains the episode and a confirmed healthy observation emits its recovery[39m[90m          [39m [90m0.21s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Monitoring\MonitoringAvailabilityEpisodeTest[22m [90m>[39m maintenance suppression reta… [41;1m QueryException [49;22m  
+[39;1m  SQLSTATE[HY000]: General error: 1364 Field 'reason' doesn't have a default value (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_it_support_test_it_0b15272d9fd14e62, SQL: insert into `monitoring_maintenance_windows` (`site_id`, `monitor_id`, `name`, `starts_at`, `ends_at`, `timezone`, `policy`, `status`, `updated_at`, `created_at`) values (4, 4, Isolated maintenance, 2026-09-12 01:00:02, 2026-09-12 02:00:00, UTC, suppress_notifications_and_ticketing, active, 2026-09-12 01:00:00, 2026-09-12 01:00:00))[39;22m
+
+  at [32mvendor\laravel\framework\src\Illuminate\Database\MySqlConnection.php[39m:[32m53[39m
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+  [33m1   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\MySqlConnection.php[39;22m:[39;1m53[39;22m
+  [33m2   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\Connection.php[39;22m:[39;1m830[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m3 passed[39;22m[90m,[39m[39m [2m60 pending[22m[39m[90m (21 assertions)[39m
+  [90mDuration:[39m [39m178.63s[39m
+
+{"phase":"focused_tests_finished","exit_code":2}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_0b15272d9fd14e62",
+    "database_mutations_performed": false
+}

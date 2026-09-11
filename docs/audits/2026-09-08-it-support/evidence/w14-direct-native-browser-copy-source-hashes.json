@@ -1,0 +1,14 @@
+[
+  {
+    "path": "resources/js/pages/it/tickets/show.tsx",
+    "sha256": "636480100708788a45f6af58d43884ec53b31ec13be5fde9263f2eaa1ad68104"
+  },
+  {
+    "path": "resources/js/components/it/ticket-linked-context.tsx",
+    "sha256": "f0484cc57b0a07def2d841f4255f561b8400205336ebda5cf89dd3d6dfec4da3"
+  },
+  {
+    "path": "resources/js/components/monitoring/monitoring-incident-evidence-card.tsx",
+    "sha256": "902e95f1a16116ef986597fc2602d69a7fa6c1e8489a2216542a06cca7f47f8f"
+  }
+]

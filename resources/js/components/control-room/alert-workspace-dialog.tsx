@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
@@ -337,6 +338,10 @@ export type AlertWorkspaceDetail = {
         };
     } | null;
     monitoring_incident_evidence?: MonitoringIncidentEvidence | null;
+    monitoring_recovery?: {
+        observed_at: string;
+        verification_required: boolean;
+    } | null;
     resolve_gate: JourneyGateData;
     close_gate: JourneyGateData;
     journey_state: string;
@@ -670,7 +675,9 @@ export function AlertWorkspaceDialog({
         {
             key: 'evidence',
             label: 'Evidence',
-            blurb: d.monitoring_incident_evidence
+            blurb: d.monitoring_recovery
+                ? 'recovery recorded'
+                : d.monitoring_incident_evidence
                 ? d.evidence_packs.length
                     ? `sealed snapshot · ${d.evidence_packs.length} pack${d.evidence_packs.length === 1 ? '' : 's'}`
                     : 'sealed monitoring snapshot'
@@ -2437,6 +2444,11 @@ function OverviewSection({
             <div className="sm:col-span-2">
                 <StatusFlow a={a} />
             </div>
+            {d.monitoring_recovery ? (
+                <div className="sm:col-span-2">
+                    <MonitoringRecoveryNotice d={d} />
+                </div>
+            ) : null}
 
             <div className="sm:col-span-2">
                 <LinkedJourney
@@ -2975,11 +2987,30 @@ function PlaybookSection({
 
 /* --- Evidence ------------------------------------------------------ */
 
-function EvidenceSection({ d }: { d: AlertWorkspaceDetail }) {
+function MonitoringRecoveryNotice({ d }: { d: AlertWorkspaceDetail }) {
+    if (!d.monitoring_recovery) return null;
+
+    return (
+        <div className="rounded-lg border border-border bg-muted/30 p-3">
+            <StatusBadge variant="info">Monitoring recovery recorded</StatusBadge>
+            <p className="text-caption mt-2 text-muted-foreground">
+                {formatDateTime(d.monitoring_recovery.observed_at)}. The monitoring
+                check recovered. This does not resolve the operational alert or
+                complete linked IT work.
+                {OPEN_STATES.includes(d.alert.status)
+                    ? ' Review the recovery before resolving this alert.'
+                    : ''}
+            </p>
+        </div>
+    );
+}
+
+export function EvidenceSection({ d }: { d: AlertWorkspaceDetail }) {
     const [creating, setCreating] = useState(false);
     const canManage = d.can.manage;
     return (
         <div className="flex flex-col gap-4">
+            <MonitoringRecoveryNotice d={d} />
             {d.monitoring_incident_evidence ? (
                 <div className="space-y-2">
                     <MonitoringIncidentEvidenceCard

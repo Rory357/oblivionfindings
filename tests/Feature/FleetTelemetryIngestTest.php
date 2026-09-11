@@ -15,8 +15,8 @@ use App\Models\AssetTracker;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
-use App\Models\ConsentTypeVersion;
 use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetSignal;
 use App\Models\FleetSignalOutbox;
@@ -36,9 +36,12 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class FleetTelemetryIngestTest extends TestCase
@@ -149,7 +152,7 @@ class FleetTelemetryIngestTest extends TestCase
         config(['services.telemetry.ingest_token' => 'test-token']);
 
         $site = Site::create(['name' => 'Test Site']);
-        $client = Client::create(['first_name' => 'Ava', 'last_name' => 'Smith']);
+        $client = Client::create(['site_id' => $site->id, 'first_name' => 'Ava', 'last_name' => 'Smith']);
         $consentType = ConsentType::create([
             'name' => 'Fleet Tracking',
             'category' => 'essential',
@@ -159,22 +162,11 @@ class FleetTelemetryIngestTest extends TestCase
             'version' => 1,
             'active' => true,
         ]);
-        $consentVersion = ConsentTypeVersion::create([
-            'consent_type_id' => $consentType->id,
-            'version' => 1,
-            'description' => 'Fleet tracking v1',
-            'purpose' => 'Fleet tracking',
-            'legal_basis' => 'Privacy Act 2020 IPP basis',
-            'effective_from' => now()->subDay(),
-        ]);
-        $consent = ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => $consentType->id,
-            'consent_type_version_id' => $consentVersion->id,
-            'status' => 'given',
+        $consent = AuthoritativeConsentFixture::manualSelf($client, $consentType, User::factory()->create(), [
             'given_at' => now()->subDay(),
             'expires_at' => now()->addDays(30),
         ]);
+        $this->assertTrue($consent->isValid(), 'The initial tracker consent must satisfy the current decision contract.');
 
         $asset = Asset::create([
             'site_id' => $site->id,
@@ -227,7 +219,7 @@ class FleetTelemetryIngestTest extends TestCase
         config(['services.telemetry.ingest_token' => 'test-token']);
 
         $site = Site::create(['name' => 'Test Site']);
-        $client = Client::create(['first_name' => 'Noah', 'last_name' => 'Lee']);
+        $client = Client::create(['site_id' => $site->id, 'first_name' => 'Noah', 'last_name' => 'Lee']);
         $consentType = ConsentType::create([
             'name' => 'Fleet Tracking',
             'category' => 'essential',
@@ -237,22 +229,11 @@ class FleetTelemetryIngestTest extends TestCase
             'version' => 1,
             'active' => true,
         ]);
-        $consentVersion = ConsentTypeVersion::create([
-            'consent_type_id' => $consentType->id,
-            'version' => 1,
-            'description' => 'Fleet tracking v1',
-            'purpose' => 'Fleet tracking',
-            'legal_basis' => 'Privacy Act 2020 IPP basis',
-            'effective_from' => now()->subDay(),
-        ]);
-        $consent = ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => $consentType->id,
-            'consent_type_version_id' => $consentVersion->id,
-            'status' => 'given',
+        $consent = AuthoritativeConsentFixture::manualSelf($client, $consentType, User::factory()->create(), [
             'given_at' => now()->subDay(),
             'expires_at' => now()->addDays(30),
         ]);
+        $this->assertTrue($consent->isValid(), 'The initial tracker consent must satisfy the current decision contract.');
 
         $asset = Asset::create([
             'site_id' => $site->id,
@@ -399,22 +380,11 @@ class FleetTelemetryIngestTest extends TestCase
             'version' => 1,
             'active' => true,
         ]);
-        $consentVersion = ConsentTypeVersion::create([
-            'consent_type_id' => $consentType->id,
-            'version' => 1,
-            'description' => 'Fleet tracking v1',
-            'purpose' => 'Fleet tracking',
-            'legal_basis' => 'Privacy Act 2020 IPP basis',
-            'effective_from' => now()->subDay(),
-        ]);
-        $consent = ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => $consentType->id,
-            'consent_type_version_id' => $consentVersion->id,
-            'status' => 'given',
+        $consent = AuthoritativeConsentFixture::manualSelf($client, $consentType, User::factory()->create(), [
             'given_at' => now()->subDay(),
             'expires_at' => now()->addDays(30),
         ]);
+        $this->assertTrue($consent->isValid(), 'The initial tracker consent must satisfy the current decision contract.');
 
         $asset = Asset::create([
             'site_id' => $site->id,
@@ -472,7 +442,7 @@ class FleetTelemetryIngestTest extends TestCase
         config(['services.telemetry.ingest_token' => 'test-token']);
 
         $site = Site::create(['name' => 'Harbour Respite']);
-        $client = Client::create(['first_name' => 'Amelia', 'last_name' => 'Wilson']);
+        $client = Client::create(['site_id' => $site->id, 'first_name' => 'Amelia', 'last_name' => 'Wilson']);
         $consentType = ConsentType::create([
             'name' => 'Personal Tracker (Wandering Risk)',
             'category' => 'safety',
@@ -482,22 +452,11 @@ class FleetTelemetryIngestTest extends TestCase
             'version' => 1,
             'active' => true,
         ]);
-        $consentVersion = ConsentTypeVersion::create([
-            'consent_type_id' => $consentType->id,
-            'version' => 1,
-            'description' => 'Personal tracker consent v1',
-            'purpose' => 'Resident safety tracking',
-            'legal_basis' => 'Consent',
-            'effective_from' => now()->subDay(),
-        ]);
-        $consent = ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => $consentType->id,
-            'consent_type_version_id' => $consentVersion->id,
-            'status' => 'given',
+        $consent = AuthoritativeConsentFixture::manualSelf($client, $consentType, User::factory()->create(), [
             'given_at' => now()->subDay(),
             'expires_at' => now()->addDays(30),
         ]);
+        $this->assertTrue($consent->isValid(), 'The initial tracker consent must satisfy the current decision contract.');
         $this->assertTrue($consent->isValid());
 
         $asset = Asset::create([
@@ -1185,6 +1144,7 @@ class FleetTelemetryIngestTest extends TestCase
     public function test_task7_final_telemetry_late_worker_consent_withdrawal_masks_location_but_preserves_the_emergency(): void
     {
         config(['services.telemetry.ingest_token' => 'test-token']);
+        $this->prepareFleetSignalDelivery();
 
         $tenantId = 643;
         $worker = User::factory()->create(['organization_id' => $tenantId]);
@@ -1203,6 +1163,7 @@ class FleetTelemetryIngestTest extends TestCase
         });
 
         $this->postStaffSos('QUE-LATE-WORKER-CONSENT');
+        $this->deliverFleetSignals();
 
         $freshSession = $session->fresh();
         $this->assertSame('emergency', $freshSession->status);
@@ -1289,6 +1250,7 @@ class FleetTelemetryIngestTest extends TestCase
     {
         config(['services.telemetry.ingest_token' => 'test-token']);
         Queue::fake();
+        $this->prepareFleetSignalDelivery();
 
         $tenantId = 641;
         ['client' => $client, 'consent' => $consent, 'asset' => $asset, 'tracker' => $tracker, 'device' => $device]
@@ -1332,10 +1294,7 @@ class FleetTelemetryIngestTest extends TestCase
         // Production uses the database queue. Process the outboxes only after
         // the ingest transaction has persisted its privacy decision to prove a
         // delayed worker cannot rebuild the discarded resident/trip context.
-        FleetSignalOutbox::query()
-            ->orderBy('id')
-            ->pluck('id')
-            ->each(fn (int $outboxId) => (new DispatchFleetSignalOutbox($outboxId))->handle());
+        $this->deliverFleetSignals();
 
         $this->assertDatabaseHas('fleet_signals', [
             'asset_id' => $asset->id,
@@ -1410,7 +1369,7 @@ class FleetTelemetryIngestTest extends TestCase
 
         $tenantId = 635;
         $worker = User::factory()->create(['organization_id' => $tenantId]);
-        ['site' => $site] = $this->createStaffTracker(
+        ['site' => $site, 'device' => $device] = $this->createStaffTracker(
             'QUE-FINAL-WORKER-LOCK-ORDER',
             $worker->id,
             $tenantId,
@@ -1468,7 +1427,9 @@ class FleetTelemetryIngestTest extends TestCase
             'shifts',
             'clients',
             'sites',
+            'devices', // Provider field ownership rechecks the already locked device.
         ], $relevantTables->all(), 'Worker routing must follow the shared H&S lock order exactly.');
+        $this->assertDeviceRelockUsesSameRow($locks, $device);
 
         $sessionIndex = $relevantTables->search('lone_worker_sessions');
         $this->assertNotFalse($sessionIndex);
@@ -1487,7 +1448,7 @@ class FleetTelemetryIngestTest extends TestCase
     {
         config(['services.telemetry.ingest_token' => 'test-token']);
 
-        ['asset' => $asset] = $this->createConsentedPersonalTracker(
+        ['asset' => $asset, 'device' => $device] = $this->createConsentedPersonalTracker(
             'QUE-FINAL-RESIDENT-LOCK-ORDER',
             636,
         );
@@ -1522,7 +1483,9 @@ class FleetTelemetryIngestTest extends TestCase
             'asset_trackers',
             'sites',
             'clients',
+            'devices', // Provider field ownership rechecks the already locked device.
         ], $relevantTables->all());
+        $this->assertDeviceRelockUsesSameRow($locks, $device);
         $this->assertFalse($relevantTables->contains('lone_worker_sessions'));
         $this->assertFalse($relevantTables->contains('users'));
         $this->assertFalse($relevantTables->contains('shifts'));
@@ -1949,6 +1912,34 @@ class FleetTelemetryIngestTest extends TestCase
         ];
     }
 
+    private function assertDeviceRelockUsesSameRow(Collection $locks, Device $device): void
+    {
+        $deviceLocks = $locks->filter(fn (array $entry): bool => $this->lockedTable($entry['query']) === 'devices');
+        $this->assertCount(2, $deviceLocks);
+        foreach ($deviceLocks as $entry) {
+            $this->assertSame([(int) $device->id], array_map('intval', $entry['bindings']), 'The later lock must not introduce another device.');
+        }
+    }
+
+    private function prepareFleetSignalDelivery(): void
+    {
+        SignalSource::query()->firstOrCreate(['slug' => 'queclink_fleet'], [
+            'name' => 'Queclink Fleet', 'vendor' => 'queclink', 'status' => 'active',
+        ]);
+        Notification::fake();
+        Http::preventStrayRequests();
+    }
+
+    private function deliverFleetSignals(): void
+    {
+        // RefreshDatabase keeps an outer test transaction open. Exercise the real
+        // outbox worker explicitly; root-commit ordering is covered separately.
+        foreach (FleetSignalOutbox::query()->orderBy('id')->get() as $outbox) {
+            app()->call([new DispatchFleetSignalOutbox($outbox->id), 'handle']);
+            $this->assertSame('sent', $outbox->fresh()->status);
+        }
+    }
+
     private function createLiveLoneWorkerSession(User $worker, Site $site, array $overrides = []): LoneWorkerSession
     {
         $this->makeCurrentWorkerAtSite($worker, $site);
@@ -2362,22 +2353,11 @@ class FleetTelemetryIngestTest extends TestCase
             'version' => 1,
             'active' => true,
         ]);
-        $consentVersion = ConsentTypeVersion::create([
-            'consent_type_id' => $consentType->id,
-            'version' => 1,
-            'description' => 'Personal tracker consent v1',
-            'purpose' => 'Resident safety tracking',
-            'legal_basis' => 'Consent',
-            'effective_from' => now()->subDay(),
-        ]);
-        $consent = ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => $consentType->id,
-            'consent_type_version_id' => $consentVersion->id,
-            'status' => 'given',
+        $consent = AuthoritativeConsentFixture::manualSelf($client, $consentType, User::factory()->create(), [
             'given_at' => now()->subDay(),
             'expires_at' => now()->addDays(30),
         ]);
+        $this->assertTrue($consent->isValid(), 'The initial tracker consent must satisfy the current decision contract.');
 
         $asset = Asset::create([
             'site_id' => $site->id,

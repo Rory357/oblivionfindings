@@ -7,6 +7,7 @@ use App\Domain\It\Services\ItChangeService;
 use App\Domain\It\Services\ItLinkedContextOptions;
 use App\Domain\It\Services\ItSlaReadService;
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\It\StoreItChangeRequest;
@@ -134,7 +135,7 @@ class ItChangeController extends Controller
             ],
             'ticket' => [
                 ...$this->ticketOption($ticket),
-                'description' => $ticket->description,
+                'description' => MonitoringTechnicalSummary::ticketDescription($ticket),
                 'category' => $ticket->category,
                 'next_action' => $ticket->next_action,
                 'requires_approval' => $ticket->requires_approval,

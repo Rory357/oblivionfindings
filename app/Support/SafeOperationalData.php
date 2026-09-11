@@ -40,6 +40,7 @@ final class SafeOperationalData
         'started_at', 'completed_at', 'last_seen_at', 'last_signal_at',
         'last_observation_at', 'last_tested_at', 'last_synced_at', 'rotated_at',
         'assigned_at', 'released_at', 'deleted_at',
+        'it_attempts', 'it_attempt_limit',
     ];
 
     private const SAFE_LOG_FIELDS = [
@@ -65,6 +66,8 @@ final class SafeOperationalData
         return collect($attributes)
             ->only(self::SAFE_VALUE_FIELDS)
             ->reject(fn ($value, string $key): bool => self::sensitiveKey($key) || ! self::safeScalar($value))
+            ->reject(fn ($value, string $key): bool => in_array($key, ['it_attempts', 'it_attempt_limit'], true)
+                && (! is_int($value) || $value < 0 || $value > 4294967295))
             ->map(fn ($value) => $value instanceof \DateTimeInterface ? $value->format(DATE_ATOM) : $value)
             ->all();
     }

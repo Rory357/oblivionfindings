@@ -30,6 +30,12 @@ class RecoverSafetySignalDeliveries extends Command
             ));
         }
 
+        $this->line(sprintf(
+            'device_it: %d queued, %d pending, %d failed/dead-letter/unroutable, %d legacy outcomes unverified',
+            $result['device_it']['queued'], $result['device_it']['pending'],
+            $result['device_it']['failures'], $result['device_it']['legacy_unverified'],
+        ));
+
         if ($result['failure_rows'] !== []) {
             $this->newLine();
             $this->table(

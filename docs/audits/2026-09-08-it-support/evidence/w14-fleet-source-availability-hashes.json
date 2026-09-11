@@ -1,0 +1,38 @@
+[
+  {
+    "path": "app/Jobs/DetectFleetOfflineDevices.php",
+    "sha256": "aa96c3031caeba4fac108e333cc10f542c22884d7ff8010e52f56f38d4effa87"
+  },
+  {
+    "path": "app/Services/Fleet/FleetSignalService.php",
+    "sha256": "6ceaa4a768512885b15eaf270ce4efa487558ad5be538ed13c66f27ae726f397"
+  },
+  {
+    "path": "app/Events/FleetSignalEmitted.php",
+    "sha256": "c375270083c87e6abc82a88ed0125b6429b2a7ffcb84ac7f744f7c29b2f98701"
+  },
+  {
+    "path": "tests/Feature/Fleet/FleetOfflineSignalAtomicityTest.php",
+    "sha256": "923240a11e7a7c4d884af11a1cb5fdf8b4cda9b37605816a0cf02bbde3d93fa7"
+  },
+  {
+    "path": "tests/Concurrency/It/FleetOfflinePublicationConcurrencyTest.php",
+    "sha256": "327c179524eaa3a8abc602859b05d7e132c365cca20a6cb4238768b995a8c722"
+  },
+  {
+    "path": "tests/Support/It/fleet-offline-concurrency-worker.php",
+    "sha256": "7e756ad1b4e033c5974735afec310f7d7c1d02c1b3616962689292e25ba8d5b1"
+  },
+  {
+    "path": "tests/Feature/FleetTelemetryIngestTest.php",
+    "sha256": "aa9d282caae3b0893459c6f659f70c9d831b6d7202cc996fd4d0e9e44a5c6a28"
+  },
+  {
+    "path": "app/Services/ControlRoom/SignalProcessingService.php",
+    "sha256": "440dee246552c9e4a9629238836cef654c5aea40101a06940d52121d6515ba51"
+  },
+  {
+    "path": "tests/Feature/ControlRoom/SafetySignalDeliveryRecoveryTest.php",
+    "sha256": "2c4f015ac2e52b124e4dec4f43ac5fdc0ad357f2de798b85955bb37b19f11c7b"
+  }
+]

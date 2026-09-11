@@ -60,10 +60,11 @@ class SignalRule extends Model
 
     public function scopeForSignalType($query, string $typeCode)
     {
-        return $query->where(function ($q) use ($typeCode) {
-            $q->where('signal_type_code', $typeCode)
-                ->orWhereNull('signal_type_code');
-        });
+        // Each supplied identifier must agree. A retained FK is specific;
+        // only a rule with neither identifier is a wildcard.
+        return $query->where(fn ($q) => $q->where('signal_type_code', $typeCode)->orWhereNull('signal_type_code'))
+            ->where(fn ($q) => $q->whereNull('signal_type_id')
+                ->orWhereHas('signalType', fn ($type) => $type->where('code', $typeCode)));
     }
 
     public function scopeForSource($query, ?int $sourceId)
@@ -76,7 +77,7 @@ class SignalRule extends Model
 
     public function scopeOrdered($query)
     {
-        return $query->orderBy('priority');
+        return $query->orderBy('priority')->orderBy('id');
     }
 
     public static function findMatchingRules(Signal $signal): \Illuminate\Support\Collection

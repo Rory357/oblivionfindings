@@ -28,6 +28,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -130,6 +131,61 @@ class SafetySignalDeliveryRecoveryTest extends TestCase
             hash('sha256', 'safety-signal|fleet|'.$sourceKey),
             Signal::query()->sole()->idempotency_key,
         );
+    }
+
+    #[DataProvider('unavailableFleetSourceProvider')]
+    public function test_fleet_source_configuration_failure_preserves_the_outbox_for_explicit_recovery(string $state): void
+    {
+        $source = SignalSource::query()->where('slug', 'queclink_fleet')->sole();
+        if ($state === 'missing') {
+            $source->delete();
+        } else {
+            $source->update(['status' => 'inactive']);
+        }
+        $asset = Asset::factory()->vehicle()->create([
+            'site_id' => Site::factory()->create()->id, 'home_site_id' => null,
+        ]);
+        $signal = app(FleetSignalService::class)->emit([
+            'asset_id' => $asset->id, 'signal_type' => 'vehicle.sos',
+            'severity_hint' => 'critical', 'occurred_at' => now(),
+            'idempotency_key' => hash('sha256', 'fleet-unavailable-source-'.$state),
+        ]);
+        $outbox = FleetSignalOutbox::query()->where('fleet_signal_id', $signal->id)->sole();
+        $job = new DispatchFleetSignalOutbox($outbox->id);
+        $job->handle(app(SignalProcessingService::class));
+
+        $this->assertSame('unroutable', $outbox->fresh()->status);
+        $this->assertSame('Fleet safety signal has no active signal source.', $outbox->fresh()->last_error);
+        $this->assertDatabaseCount('fleet_signals', 1);
+        $this->assertDatabaseCount('control_room_signals', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $recovery = app(SafetySignalDeliveryRecoveryService::class);
+        $report = $recovery->recover();
+        $this->assertSame(1, $report['failures']['fleet']);
+        $this->assertSame(0, $report['queued']['fleet'], 'Configuration failures must not be silently retried.');
+        $this->assertTrue(collect($report['failure_rows'])->contains(
+            fn (array $row): bool => $row['source'] === 'fleet' && $row['id'] === $outbox->id && $row['status'] === 'unroutable',
+        ));
+
+        SignalSource::query()->updateOrCreate(['slug' => 'queclink_fleet'], [
+            'name' => 'Queclink Fleet', 'vendor' => 'queclink', 'status' => 'active',
+        ]);
+        $recovery->retry('fleet', $outbox->id);
+        $job->handle(app(SignalProcessingService::class));
+        $job->handle(app(SignalProcessingService::class));
+
+        $this->assertSame('sent', $outbox->fresh()->status);
+        $this->assertNull($outbox->fresh()->last_error);
+        $this->assertDatabaseCount('fleet_signals', 1);
+        $this->assertDatabaseCount('fleet_signal_outbox', 1);
+        $this->assertDatabaseCount('control_room_signals', 1);
+        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertSame($asset->id, Signal::query()->sole()->asset_id);
+    }
+
+    public static function unavailableFleetSourceProvider(): array
+    {
+        return ['missing source' => ['missing'], 'inactive source' => ['inactive']];
     }
 
     public function test_shift_null_site_is_visible_unroutable_and_replays_once_after_repair(): void

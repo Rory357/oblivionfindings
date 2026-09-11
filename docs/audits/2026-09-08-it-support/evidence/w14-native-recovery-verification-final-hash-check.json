@@ -1,0 +1,46 @@
+[
+  {
+    "path": "app/Services/ControlRoom/SignalProcessingService.php",
+    "matches": true
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringAvailabilityEpisode.php",
+    "matches": true
+  },
+  {
+    "path": "app/Domain/It/Services/ItMonitoringDeliveryService.php",
+    "matches": true
+  },
+  {
+    "path": "app/Domain/Monitoring/Presenters/MonitoringIncidentEvidencePresenter.php",
+    "matches": true
+  },
+  {
+    "path": "app/Services/ControlRoom/AlertWorkspaceService.php",
+    "matches": true
+  },
+  {
+    "path": "app/Services/ControlRoom/ControlRoomAlertProvenanceService.php",
+    "matches": true
+  },
+  {
+    "path": "resources/js/components/control-room/alert-workspace-dialog.tsx",
+    "matches": true
+  },
+  {
+    "path": "resources/js/components/control-room/alert-workspace-dialog.test.tsx",
+    "matches": true
+  },
+  {
+    "path": "tests/Feature/Monitoring/MonitoringAvailabilityEpisodeTest.php",
+    "matches": true
+  },
+  {
+    "path": "tests/Feature/Monitoring/DependencySuppressionTest.php",
+    "matches": true
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w14-monitoring-browser-fixture.php",
+    "matches": true
+  }
+]

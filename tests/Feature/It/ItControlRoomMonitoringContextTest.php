@@ -1,8 +1,11 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Presenters\ItTicketActivityPresenter;
 use App\Domain\It\Presenters\ItTicketContextPresenter;
+use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
+use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
@@ -11,6 +14,7 @@ use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
+use App\Models\ItTicketEvent;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -18,6 +22,9 @@ use App\Models\User;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use Database\Seeders\SecurityDevicesSignalSeeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
+use Inertia\Testing\AssertableInertia as Assert;
 
 /** @param array<int, string> $permissionKeys */
 function monitoringContextViewer(Site $site, array $permissionKeys): User
@@ -85,6 +92,9 @@ function monitoringContextDevice(): array
 
 beforeEach(function () {
     config()->set('queue.default', 'sync');
+    config()->set('inertia.ssr.enabled', false);
+    Notification::fake();
+    Http::preventStrayRequests();
     $this->seed(SecurityDevicesSignalSeeder::class);
 });
 
@@ -145,7 +155,9 @@ test('one immutable incident snapshot preserves original evidence while both wor
         ->and($snapshot->fresh()->checksum)->toBe($originalChecksum)
         ->and($snapshot->fresh()->hasValidChecksum())->toBeTrue()
         ->and(data_get($snapshot->fresh()->snapshot, 'device.name'))->toBe('Kauri Core Switch')
-        ->and(data_get($snapshot->fresh()->snapshot, 'observation.message'))->toBe('WAN probe failed token=[redacted]')
+        ->and(data_get($snapshot->fresh()->snapshot, 'observation.message'))->toBe(MonitoringTechnicalSummary::observation('offline'))
+        ->and($ticket->description)->toBe(MonitoringTechnicalSummary::observation('offline'))
+        ->and(json_encode($ticket->events()->pluck('payload')->all()))->not->toContain('private-sentinel')
         ->and(json_encode($snapshot->fresh()->snapshot))->not->toContain('must-never-cross-modules')
         ->and(json_encode($snapshot->fresh()->snapshot))->not->toContain('private-community')
         ->and($itContext['devices'][0]['name'])->toBe('Kauri Core Switch — replacement')
@@ -246,4 +258,94 @@ test('source permissions Site access and checksum integrity fail closed on both 
     ]);
     expect(app(ItTicketContextPresenter::class)->present($ticket, $allowed)['incident_evidence'])->toBe([])
         ->and(data_get(app(AlertWorkspaceService::class)->build($allowed, $alert->id), 'monitoring_incident_evidence'))->toBeNull();
+});
+
+test('automatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots', function (mixed $message) {
+    ['site' => $site, 'device' => $device] = monitoringContextDevice();
+    $source = DeviceEvent::query()->create([
+        'device_id' => $device->id,
+        'event_type' => 'offline',
+        'severity' => 'high',
+        'source' => 'oblivion_monitoring',
+        'occurred_at' => now(),
+        'payload' => ['message' => $message],
+    ]);
+
+    $ticket = ItTicket::query()->sole();
+    $viewer = monitoringContextViewer($site, ['it.view', 'it.manage']);
+    $activity = app(ItTicketActivityPresenter::class)->present($ticket, $viewer);
+    $snapshot = MonitoringIncidentEvidenceSnapshot::query()->sole();
+
+    expect($source->fresh()->payload['message'])->toBe($message)
+        ->and($ticket->description)->toBe(MonitoringTechnicalSummary::observation('offline'))
+        ->and(json_encode([$activity, $snapshot->snapshot, $ticket->events()->pluck('payload')->all()]))
+        ->not->toContain('diagnostic-private-sentinel');
+})->with([
+    'unlabelled secret and personal information' => ['diagnostic-private-sentinel; resident details; Bearer unlabelled-secret'],
+    'embedded URL credentials' => ['https://name:diagnostic-private-sentinel@example.invalid/check?auth=opaque'],
+    'multiline diagnostic' => ["Probe failed\nAuthorization: Bearer diagnostic-private-sentinel\nstack trace"],
+    'structured provider diagnostic' => [['nested' => ['password' => 'diagnostic-private-sentinel']]],
+]);
+
+test('historical monitoring diagnostics stay protected without changing stored evidence or human authored descriptions', function () {
+    ['site' => $site, 'device' => $device] = monitoringContextDevice();
+    $raw = 'Historical diagnostic-private-sentinel without a recognisable credential label';
+    $source = DeviceEvent::withoutEvents(fn () => DeviceEvent::query()->create([
+        'device_id' => $device->id, 'event_type' => 'offline', 'severity' => 'high',
+        'source' => 'oblivion_monitoring', 'occurred_at' => now(), 'payload' => ['message' => $raw],
+    ]));
+    $alert = ControlRoomAlert::factory()->create([
+        'site_id' => $site->id,
+        'context' => ['normalized_data' => ['canonical_device_id' => $device->id]],
+    ]);
+    $ticket = ItTicket::factory()->create([
+        'source' => 'system', 'work_type' => 'incident', 'description' => $raw,
+        'site_id' => $site->id, 'is_organisation_wide' => false,
+    ]);
+    app(ItTicketLinkService::class)->linkMonitoringEvidence($ticket, $device, $alert);
+    $payload = [
+        'message' => $raw, 'device_id' => $device->id, 'device_event_id' => $source->id,
+        'alert_id' => $alert->id, 'unexpected_provider_blob' => $raw,
+        'system_principal' => ItTicketLinkService::MONITORING_PRINCIPAL,
+        'operation' => ItTicketLinkService::MONITORING_OPERATION,
+    ];
+    $created = ItTicketEvent::record($ticket, 'created_from_monitoring', null, $payload);
+    ItTicketEvent::record($ticket, 'monitoring_evidence_added', null, $payload);
+    ItTicketEvent::record($ticket, 'monitoring_recovered', null, $payload);
+    $snapshotData = ['observation' => ['event_type' => 'offline', 'message' => $raw]];
+    $snapshot = MonitoringIncidentEvidenceSnapshot::query()->create([
+        'control_room_alert_id' => $alert->id, 'it_ticket_id' => $ticket->id,
+        'device_id' => $device->id, 'device_event_id' => $source->id, 'site_id' => $site->id,
+        'evidence_version' => 1, 'captured_at' => now(), 'snapshot' => $snapshotData,
+        'checksum' => MonitoringIncidentEvidenceSnapshot::checksumFor($snapshotData),
+    ]);
+    $privileged = monitoringContextViewer($site, [
+        'it.view', 'it.manage', 'controlRoom.viewAny', 'controlRoom.alerts.view', 'securityDevices.devices.view',
+    ]);
+    $restricted = monitoringContextViewer($site, ['it.view', 'it.manage']);
+
+    foreach ([$privileged, $restricted] as $viewer) {
+        $activity = app(ItTicketActivityPresenter::class)->present($ticket, $viewer);
+        $hubEvent = app(ItTicketActivityPresenter::class)->presentEvent($created, $viewer);
+        expect($activity)->toHaveCount(3)
+            ->and(json_encode([$activity, $hubEvent]))->not->toContain('diagnostic-private-sentinel')
+            ->and($hubEvent['payload'])->toBe(['message' => MonitoringTechnicalSummary::observation('offline')]);
+        $this->actingAs($viewer)->get(route('it.tickets.show', $ticket))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('ticket.description', MonitoringTechnicalSummary::observation('offline')));
+    }
+
+    $context = app(ItTicketContextPresenter::class)->present($ticket, $privileged);
+    expect(data_get($context, 'incident_evidence.0.observation.message'))->toBe(MonitoringTechnicalSummary::observation('offline'))
+        ->and(data_get($context, 'incident_evidence.0.integrity'))->toBe('verified')
+        ->and(app(ItTicketContextPresenter::class)->present($ticket, $restricted)['incident_evidence'])->toBe([])
+        ->and($snapshot->fresh()->snapshot)->toEqual($snapshotData)
+        ->and($snapshot->fresh()->hasValidChecksum())->toBeTrue()
+        ->and($ticket->fresh()->description)->toBe($raw)
+        ->and($created->fresh()->payload)->toEqual($payload);
+
+    $ticket->update(['description' => 'Technician added a safe repair description.']);
+    expect(MonitoringTechnicalSummary::ticketDescription($ticket->fresh()))->toBe('Technician added a safe repair description.');
+    $ordinary = ItTicket::factory()->create(['source' => 'system', 'description' => 'Ordinary system work.']);
+    expect(MonitoringTechnicalSummary::ticketDescription($ordinary))->toBe('Ordinary system work.');
 });

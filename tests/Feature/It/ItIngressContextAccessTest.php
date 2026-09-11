@@ -5,6 +5,7 @@ use App\Domain\It\InboundEmailIngestor;
 use App\Domain\It\Presenters\ItTicketContextPresenter;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItTicketLinkService;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -140,11 +141,15 @@ test('inbound replies quarantine unknown inactive sensitive and unrelated sender
     ]);
     $ingestor = app(InboundEmailIngestor::class);
 
+    expect(app(ItWorkAccessService::class)->canView($sensitiveAgent, $sensitive))->toBeFalse();
+
     $cases = [
         ['nobody@example.test', 'IT-90001', 'sender_unknown'],
         [$inactive->email, 'IT-90001', 'sender_inactive'],
         [$unrelated->email, 'IT-90001', 'sender_unauthorized'],
-        [$sensitiveAgent->email, 'IT-90002', 'sensitive_work'],
+        // Reference resolution denies inaccessible work before inspecting its
+        // reply policy, so quarantine must not disclose ticket sensitivity.
+        [$sensitiveAgent->email, 'IT-90002', 'sender_unauthorized'],
     ];
 
     foreach ($cases as $index => [$from, $reference, $reason]) {

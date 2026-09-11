@@ -2,7 +2,9 @@
 
 namespace App\Observers;
 
+use App\Domain\It\Services\ItMonitoringDeliveryService;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceEventSignalOutbox;
@@ -147,6 +149,8 @@ class DeviceEventObserver
                 'source' => $event->source,
                 'original_event_type' => $event->event_type,
                 'monitor_correlation_key' => $this->monitorCorrelationKey($event),
+                'availability_episode_version' => data_get($event->payload, 'availability_episode_version') === 1 ? 1 : null,
+                'availability_episode_key' => MonitoringAvailabilityEpisode::fromEvent($event, $siteId)['key'] ?? null,
                 'legacy_monitoring_recovery' => data_get($event->payload, 'legacy_monitoring_recovery') === true
                     ? true
                     : null,
@@ -167,6 +171,10 @@ class DeviceEventObserver
         }
 
         $event->forceFill(['processed_at' => now()])->saveQuietly();
+
+        // Persist the IT destination before the source acknowledgement commits.
+        // Its queued consumer and scheduled retry own a separate outcome.
+        app(ItMonitoringDeliveryService::class)->prepare($event, $signal->fresh() ?? $signal);
 
         // Broadcast the domain event for cross-module consumers (Care,
         // Fleet, etc.). Listeners register via the standard Laravel event

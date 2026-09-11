@@ -365,15 +365,21 @@ final class MonitoringObservationIngestor
             return null;
         }
 
+        $episode = MonitoringAvailabilityEpisode::current($monitor, $siteId);
         $eventType = match (true) {
             $to === MonitorState::Failed && $from !== MonitorState::Failed => 'offline',
-            $from === MonitorState::Failed && $to === MonitorState::Healthy => 'online',
+            $to === MonitorState::Healthy && ($from === MonitorState::Failed || $episode !== null) => 'online',
             default => null,
         };
 
         if ($eventType === null) {
             return null;
         }
+
+        if ($eventType === 'offline') {
+            $episode ??= MonitoringAvailabilityEpisode::begin($monitor, $observation, $siteId);
+        }
+        $monitor->forceFill(['availability_episode' => $eventType === 'offline' ? $episode : null])->save();
 
         $rootMonitorId = $monitor->root_cause_monitor_id ?? $monitor->id;
         $correlationKey = hash(
@@ -392,6 +398,8 @@ final class MonitoringObservationIngestor
                 'observation_id' => $observation->id,
                 'root_cause_monitor_id' => $rootMonitorId,
                 'monitor_correlation_key' => $correlationKey,
+                'availability_episode_version' => 1,
+                'availability_episode' => $episode,
                 'site_id' => $siteId,
                 'from_state' => $from->value,
                 'to_state' => $to->value,

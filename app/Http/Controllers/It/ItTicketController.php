@@ -29,6 +29,7 @@ use App\Domain\It\Services\ItTicketTriageService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\It\Services\ItWorkTaskReadinessService;
 use App\Domain\It\Services\ItWorkTransitionService;
+use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
@@ -288,7 +289,7 @@ class ItTicketController extends Controller
                 'reference' => $ticket->reference,
                 'lock_version' => (int) $ticket->lock_version,
                 'title' => $ticket->title,
-                'description' => $ticket->description,
+                'description' => MonitoringTechnicalSummary::ticketDescription($ticket),
                 'work_type' => $ticket->work_type,
                 'service' => $ticket->service
                     ? ['id' => $ticket->service->id, 'name' => $ticket->service->name]

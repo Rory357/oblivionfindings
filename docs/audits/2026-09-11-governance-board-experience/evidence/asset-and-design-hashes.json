@@ -1,0 +1,54 @@
+[
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\public\\build\\manifest.json",
+    "Hash": "F5BFC0BC81FDC40E7464D7F9C2065D8B0FBC9A63950EC9BD36EE06A6FE3E5826"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\public\\build\\assets\\app-DKNHidxV.js",
+    "Hash": "0B43575DA598202CA8E24DE7BF6069546C40E42B47146FAB63281EE2853B02DE"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\pages\\governance\\Dashboard.tsx",
+    "Hash": "B2053F100143C75E2BFBD87B3058C7B150A4D56FFCDB999718F244D62E9C2A28"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\governance\\MyNextActionsRail.tsx",
+    "Hash": "71C79A2F133FD1E40205FE56DB85C17B33DF0F4EB3330333FA29364FE26CC1FB"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\DESIGN.md",
+    "Hash": "96863E01D924E954255CD61F550396C2F2EEA9778BBAAB7E8570EF9D63279C22"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\APP_SHELL_STYLE_GUIDE.md",
+    "Hash": "62515485265119962773E6015FEFE38BE94434AAE468ACD017C078DA61B20AB5"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\BUTTON_STYLE_GUIDE.md",
+    "Hash": "86259475C987D6E30001604316379EB608AEA9F83E16941B6AA476A94BCA6957"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\DESIGN_TOKENS.md",
+    "Hash": "C3EE6C8ACAA22049084F819E3AD2A33F457E936E467492079F16C15E9A611D2B"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\LIST_STYLE_GUIDE.md",
+    "Hash": "56B59B464FD46917446B482B8E355D47D7341105915F6C016B6195E2A58138AC"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\LOADER_STYLE_GUIDE.md",
+    "Hash": "CC20485E6E42E0A848B8CACC8AC6124E5E5A01206D966DE6EBBBDEC39DBE2A91"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\NAVIGATION_STYLE_GUIDE.md",
+    "Hash": "9295CDB1386322B8A088AE03DE41BC3C75A0FBE3E8FA3331C92C704CCB15895D"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\PAGE_HEADER_STYLE_GUIDE.md",
+    "Hash": "A528A0E863A676FDBBFCB028E532ECE2799E39A7345CA3C1ECA619AC4491D931"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\POPUP_STYLE_GUIDE.md",
+    "Hash": "AEE723E21491E9BE908554A6F200D73204280A63D9028EA78DE6BB9049F4A477"
+  }
+]

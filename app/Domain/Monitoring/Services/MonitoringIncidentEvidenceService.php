@@ -23,14 +23,14 @@ final class MonitoringIncidentEvidenceService
     public function captureIfMissing(
         ItTicket $ticket,
         Device $device,
-        ControlRoomAlert $alert,
+        ?ControlRoomAlert $alert,
         DeviceEvent $event,
         ?string $monitorCorrelationKey,
     ): MonitoringIncidentEvidenceSnapshot {
         return DB::transaction(function () use ($ticket, $device, $alert, $event, $monitorCorrelationKey): MonitoringIncidentEvidenceSnapshot {
             $ticket = ItTicket::query()->whereKey($ticket->getKey())->lockForUpdate()->firstOrFail();
             $device = Device::query()->whereKey($device->getKey())->lockForUpdate()->firstOrFail();
-            $alert = ControlRoomAlert::query()->whereKey($alert->getKey())->lockForUpdate()->firstOrFail();
+            $alert = $alert ? ControlRoomAlert::query()->whereKey($alert->getKey())->lockForUpdate()->firstOrFail() : null;
             $event = DeviceEvent::query()->whereKey($event->getKey())->lockForUpdate()->firstOrFail();
 
             $existing = MonitoringIncidentEvidenceSnapshot::query()
@@ -40,7 +40,8 @@ final class MonitoringIncidentEvidenceService
                 return $existing;
             }
 
-            $siteId = $this->links->canonicalMonitoringSiteId($device, $alert, true);
+            $siteId = $alert ? $this->links->canonicalMonitoringSiteId($device, $alert, true)
+                : $this->links->canonicalDeviceSiteId($device, true);
             $canonicalLinks = $ticket->links()
                 ->where('context->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
                 ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION)
@@ -52,12 +53,12 @@ final class MonitoringIncidentEvidenceService
                                 ->where('linkable_type', $device->getMorphClass())
                                 ->where('linkable_id', $device->id);
                         })
-                        ->orWhere(function ($alertLink) use ($alert): void {
+                        ->when($alert !== null, fn ($links) => $links->orWhere(function ($alertLink) use ($alert): void {
                             $alertLink
                                 ->where('relationship', 'source_alert')
                                 ->where('linkable_type', $alert->getMorphClass())
                                 ->where('linkable_id', $alert->id);
-                        });
+                        }));
                 })
                 ->count();
 
@@ -67,7 +68,9 @@ final class MonitoringIncidentEvidenceService
                 || $siteId === null
                 || (int) $ticket->site_id !== $siteId
                 || (int) $event->device_id !== (int) $device->id
-                || $canonicalLinks !== 2) {
+                || $canonicalLinks !== ($alert === null ? 1 : 2)
+                || ($alert === null && ($event->event_type !== 'offline'
+                    || ! MonitoringAvailabilityEpisode::hasCanonicalObservations($event, $siteId)))) {
                 throw new DomainException('Monitoring incident evidence is not canonical.');
             }
 
@@ -84,12 +87,12 @@ final class MonitoringIncidentEvidenceService
             );
 
             return MonitoringIncidentEvidenceSnapshot::query()->create([
-                'control_room_alert_id' => $alert->id,
+                'control_room_alert_id' => $alert?->id,
                 'it_ticket_id' => $ticket->id,
                 'device_id' => $device->id,
                 'device_event_id' => $event->id,
                 'site_id' => $siteId,
-                'evidence_version' => 1,
+                'evidence_version' => $alert === null ? 2 : 1,
                 'captured_at' => $capturedAt,
                 'snapshot' => $snapshot,
                 'checksum' => MonitoringIncidentEvidenceSnapshot::checksumFor($snapshot),
@@ -101,7 +104,7 @@ final class MonitoringIncidentEvidenceService
     private function snapshot(
         ItTicket $ticket,
         Device $device,
-        ControlRoomAlert $alert,
+        ?ControlRoomAlert $alert,
         DeviceEvent $event,
         Site $site,
         string $capturedAt,
@@ -113,14 +116,14 @@ final class MonitoringIncidentEvidenceService
                 'id' => $site->id,
                 'name' => $this->safe($site->name),
             ],
-            'alert' => [
+            'alert' => $alert ? [
                 'id' => $alert->id,
                 'reference' => $this->safe($alert->reference_number),
                 'type' => $this->safe($alert->alert_type),
                 'severity' => $this->safe($alert->severity),
                 'source' => $this->safe($alert->source),
                 'triggered_at' => $alert->triggered_at?->toIso8601String(),
-            ],
+            ] : null,
             'ticket' => [
                 'id' => $ticket->id,
                 'reference' => $this->safe($ticket->reference),
@@ -143,8 +146,9 @@ final class MonitoringIncidentEvidenceService
                 'severity' => $this->safe($event->severity),
                 'source' => $this->safe($event->source),
                 'occurred_at' => $event->occurred_at?->toIso8601String(),
-                'message' => $this->safe(data_get($event->payload, 'message'), 500),
+                'message' => MonitoringTechnicalSummary::observation($event->event_type),
                 'monitor_correlation_key' => $monitorCorrelationKey,
+                'availability_episode_key' => MonitoringAvailabilityEpisode::fromEvent($event, (int) $site->id)['key'] ?? null,
             ],
         ];
     }

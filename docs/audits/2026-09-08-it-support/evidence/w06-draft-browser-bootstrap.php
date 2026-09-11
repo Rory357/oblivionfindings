@@ -90,6 +90,10 @@ try {
         require_once __DIR__.'/w13-api-browser-fixture.php';
         $ready['api_fixtures'] = w13BrowserCreateApiFixtures($context, $fixtures);
     }
+    if ($context['monitoring_fixtures'] ?? false) {
+        require_once __DIR__.'/w14-monitoring-browser-fixture.php';
+        $ready['monitoring_fixtures'] = w14BrowserCreateMonitoringFixtures($context, $fixtures);
+    }
     w06BrowserSaveNew($context['root'].'/ready.json', $ready);
     echo json_encode($ready, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
 } catch (Throwable) {

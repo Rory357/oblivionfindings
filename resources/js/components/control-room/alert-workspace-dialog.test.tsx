@@ -94,6 +94,7 @@ import {
     AddNoteForm,
     ClosePane,
     CreateIncidentPane,
+    EvidenceSection,
     LinkedSection,
     ResolvePane,
     SensorConfirmPane,
@@ -133,6 +134,48 @@ afterEach(cleanup);
 
 beforeEach(() => {
     inertia.post.mockReset();
+});
+
+describe('Monitoring recovery evidence', () => {
+    it('shows recorded recovery without offering automatic resolution to a read-only operator', () => {
+        const d = {
+            alert: { id: 1, status: 'open' },
+            can: { manage: false },
+            evidence_packs: [],
+            monitoring_recovery: {
+                observed_at: '2026-09-12T01:00:00Z',
+                verification_required: true,
+            },
+        } as unknown as AlertWorkspaceDetail;
+        render(<EvidenceSection d={d} />);
+        expect(
+            screen.getByText('Monitoring recovery recorded'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                /does not resolve the operational alert or complete linked IT work/,
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', {
+                name: /resolve|New evidence pack/i,
+            }),
+        ).not.toBeInTheDocument();
+        expect(inertia.post).not.toHaveBeenCalled();
+    });
+
+    it('does not infer recovery when the authorised projection omits it', () => {
+        const d = {
+            alert: { id: 1, status: 'open' },
+            can: { manage: false },
+            evidence_packs: [],
+            monitoring_recovery: null,
+        } as unknown as AlertWorkspaceDetail;
+        render(<EvidenceSection d={d} />);
+        expect(
+            screen.queryByText('Monitoring recovery recorded'),
+        ).not.toBeInTheDocument();
+    });
 });
 
 describe('Control Room linked H&S handover', () => {

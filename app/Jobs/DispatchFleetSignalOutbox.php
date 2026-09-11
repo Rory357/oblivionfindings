@@ -66,7 +66,11 @@ class DispatchFleetSignalOutbox implements ShouldBeUnique, ShouldQueue
                         'Fleet safety signal has no canonical Site or active signal source.',
                     );
                 }
-                $processor->process($controlSignal);
+                if (in_array($signal->signal_type, ['device.offline', 'device.online'], true)) {
+                    $processor->processFleetAvailability($controlSignal);
+                } else {
+                    $processor->process($controlSignal);
+                }
 
                 $outbox->forceFill([
                     'status' => 'sent',

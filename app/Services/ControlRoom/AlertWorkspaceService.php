@@ -405,6 +405,7 @@ class AlertWorkspaceService
             'linked_it_work' => $monitoringContext['linked_it_work'],
             'linked_device' => $linkedCanonicalDevice,
             'monitoring_incident_evidence' => $monitoringContext['incident_evidence'],
+            'monitoring_recovery' => $this->monitoringIncidentEvidence->recoveryForAlert($alert, $user),
             'linked_operational_evidence' => $linkedOperationalEvidence,
             'resolve_gate' => $resolveGate,
             'close_gate' => $closeGate,

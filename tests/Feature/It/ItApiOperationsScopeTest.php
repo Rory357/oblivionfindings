@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
 function apiOperationsManager(): User
@@ -188,11 +189,11 @@ test('API diagnostic aggregates include older pages and absent outcome columns r
     }
     $this->actingAs($manager)->get('/it/setup?tab=operations')->assertInertia(fn ($page) => $page
         ->where('operationsAudit.api_health.total', 27)->has('operationsAudit.api_health.rows', 25)
-        ->where('operationsAudit.api_health.next_url', '/it/setup?tab=operations&api_request_page=2#it-api-request-history'));
+        ->where('operationsAudit.api_health.next_url', '/it/setup?api_request_page=2&tab=operations#it-api-request-history'));
     $this->get('/it/setup?tab=operations&api_request_page=999')->assertInertia(fn ($page) => $page
         ->where('operationsAudit.api_health.total', 27)->where('operationsAudit.api_health.page', 2)
         ->has('operationsAudit.api_health.rows', 2)->where('operationsAudit.api_health.next_url', null)
-        ->where('operationsAudit.api_health.previous_url', '/it/setup?tab=operations&api_request_page=1#it-api-request-history'));
+        ->where('operationsAudit.api_health.previous_url', '/it/setup?api_request_page=1&tab=operations#it-api-request-history'));
     $schema = Schema::getFacadeRoot();
     $schemaProxy = Mockery::mock($schema);
     $schemaProxy->shouldReceive('hasColumns')->once()->with('it_api_requests',
@@ -228,7 +229,9 @@ test('API search pages the matching history without hiding global failures or pe
     $success = apiSearchReceipt($other);
     $pending = apiSearchReceipt($other, ['completed_at' => null, 'response_status' => 500, 'created_at' => now()->subDays(2)]);
     $query = 'tab=operations&automation_from=2026-09-11&automation_to=2026-09-11&q=Repair%20connector';
-    $next = '/it/setup?tab=operations&automation_from=2026-09-11&automation_to=2026-09-11&q=Repair+connector&api_request_page=2#it-api-request-history';
+    $next = '/it/setup?api_request_page=2&automation_from=2026-09-11&automation_to=2026-09-11&q=Repair%20connector&tab=operations#it-api-request-history';
+    $request = Request::create($next);
+    expect('/it/setup?'.$request->getQueryString().'#it-api-request-history')->toBe($next);
     $this->actingAs($manager)->get('/it/setup?'.$query)->assertInertia(fn ($page) => $page
         ->where('operationsAudit.api_health.search_query', 'Repair connector')
         ->where('operationsAudit.api_health.total', 29)->where('operationsAudit.api_health.history_total', 27)

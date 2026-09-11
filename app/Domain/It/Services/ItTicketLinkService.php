@@ -4,8 +4,10 @@ namespace App\Domain\It\Services;
 
 use App\Domain\It\Enums\ItTicketCommandChannel;
 use App\Domain\It\Exceptions\ItTicketCommandConflict;
+use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\ControlRoomAlert;
 use App\Models\ItService;
@@ -317,14 +319,16 @@ final class ItTicketLinkService
     public function linkMonitoringEvidence(
         ItTicket $ticket,
         Device $device,
-        ControlRoomAlert $alert,
+        ?ControlRoomAlert $alert,
         array $context = [],
+        ?DeviceEvent $sourceEvent = null,
     ): void {
-        DB::transaction(function () use ($ticket, $device, $alert, $context): void {
+        DB::transaction(function () use ($ticket, $device, $alert, $context, $sourceEvent): void {
             $ticket = ItTicket::query()->whereKey($ticket->getKey())->lockForUpdate()->first();
             $device = Device::query()->whereKey($device->getKey())->lockForUpdate()->first();
-            $alert = ControlRoomAlert::query()->whereKey($alert->getKey())->lockForUpdate()->first();
-            if (! $ticket || ! $device || ! $alert
+            $requiresAlert = $alert !== null;
+            $alert = $alert ? ControlRoomAlert::query()->whereKey($alert->getKey())->lockForUpdate()->first() : null;
+            if (! $ticket || ! $device || ($requiresAlert && ! $alert)
                 || $ticket->source !== 'system'
                 || $ticket->work_type !== 'incident'
                 || $ticket->site_id === null
@@ -333,9 +337,17 @@ final class ItTicketLinkService
                 throw new DomainException('Monitoring ticket context is not canonical.');
             }
 
-            $siteId = $this->canonicalMonitoringSiteId($device, $alert, true);
+            $siteId = $alert ? $this->canonicalMonitoringSiteId($device, $alert, true) : $this->canonicalDeviceSiteId($device, true);
             if ($siteId === null || $siteId !== (int) $ticket->site_id) {
                 throw new DomainException('Monitoring Device, Site, and alert evidence do not agree.');
+            }
+            if ($alert === null) {
+                $sourceEvent = $sourceEvent ? DeviceEvent::query()->whereKey($sourceEvent->id)->lockForUpdate()->first() : null;
+                if ($sourceEvent === null || (int) $sourceEvent->device_id !== (int) $device->id
+                    || $sourceEvent->event_type !== 'offline'
+                    || ! MonitoringAvailabilityEpisode::hasCanonicalObservations($sourceEvent, $siteId)) {
+                    throw new DomainException('Direct monitoring work requires canonical source observation evidence.');
+                }
             }
 
             $principalContext = [
@@ -345,7 +357,9 @@ final class ItTicketLinkService
                 'site_id' => $siteId,
             ];
             $this->persistMonitoring($ticket, $device, 'affected_device', $principalContext);
-            $this->persistMonitoring($ticket, $alert, 'source_alert', $principalContext);
+            if ($alert !== null) {
+                $this->persistMonitoring($ticket, $alert, 'source_alert', $principalContext);
+            }
         });
     }
 

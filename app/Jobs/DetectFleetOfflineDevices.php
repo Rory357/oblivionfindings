@@ -9,40 +9,47 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class DetectFleetOfflineDevices implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
+
     public $timeout = 120;
 
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     public function handle(FleetSignalService $signals): void
     {
-        $offlineMinutes = (int) config('fleet.signals.offline_after_minutes', 15);
+        $configuredMinutes = config('fleet.signals.offline_after_minutes', 15);
+        $offlineMinutes = is_int($configuredMinutes) || is_string($configuredMinutes)
+            ? filter_var($configuredMinutes, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+            : false;
+        if ($offlineMinutes === false) {
+            throw new InvalidArgumentException('Fleet offline timeout must be a positive whole number of minutes.');
+        }
         $threshold = now()->subMinutes($offlineMinutes);
 
         FleetVehicleStateSnapshot::query()
             ->where('status', 'online')
             ->whereNotNull('last_seen_at')
             ->where('last_seen_at', '<', $threshold)
-            ->chunkById(200, function ($rows) use ($signals) {
+            ->chunkById(200, function ($rows) use ($signals, $threshold) {
                 foreach ($rows as $state) {
-                    $state->update(['status' => 'offline']);
-
-                    $signals->emit([
-                        'asset_id' => $state->asset_id,
-                        'signal_type' => 'device.offline',
-                        'severity_hint' => 'medium',
-                        'occurred_at' => now(),
-                        'payload' => [
-                            'last_seen_at' => optional($state->last_seen_at)->toISOString(),
-                        ],
-                    ]);
+                    DB::transaction(function () use ($state, $signals, $threshold): void {
+                        // A heartbeat or another detector may have changed this candidate.
+                        $current = FleetVehicleStateSnapshot::query()->whereKey($state->asset_id)
+                            ->where('status', 'online')->whereNotNull('last_seen_at')
+                            ->where('last_seen_at', '<', $threshold)->lockForUpdate()->first();
+                        if ($current === null) {
+                            return;
+                        }
+                        $signals->emitOffline($current);
+                        $current->update(['status' => 'offline']);
+                    }, 3);
                 }
             });
     }

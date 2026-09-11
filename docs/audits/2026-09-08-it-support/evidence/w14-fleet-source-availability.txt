@@ -1,0 +1,100 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_e55c4f6308594bbe",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\ControlRoom\SafetySignalDeliveryRecoveryTest[39m
+  [32;1m✓[39;22m[90m [39m[90msource and outbox intent roll back together when outbox persistence fails[39m[90m                                 [39m [90m179.58s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery reconciles a missing outbox and retry converges on one fleet alert[39m[90m                                 [39m [90m0.28s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfleet source configuration failure preserves the outbox for explicit recovery with data set "missing source[39m[90m…[39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfleet source configuration failure preserves the outbox for explicit recovery with data set "inactive sourc[39m[90m…[39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mshift null site is visible unroutable and replays once after repair[39m[90m                                         [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mduplicate and reordered device event jobs produce one correlated final alert[39m[90m                                [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdevice event without site is unroutable then replays without duplicate alert[39m[90m                                [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdevice dead letter is visible and safe replay creates one final alert[39m[90m                                       [39m [90m0.17s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetTelemetryIngestTest[39m
+  [32;1m✓[39;22m[90m [39m[90mingest creates fleet event and signal[39m[90m                                                                       [39m [90m0.43s[39m  
+  [32;1m✓[39;22m[90m [39m[90mingest is idempotent[39m[90m                                                                                        [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgeofence signal emitted when outside[39m[90m                                                                        [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtrip start and stop[39m[90m                                                                                         [39m [90m0.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconsent masking blocks location for client linked tracker[39m[90m                                                   [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfleet vehicle without consent stores coordinates[39m[90m                                                            [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconsented client tracker updates canonical device location[39m[90m                                                  [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclient tracker fails closed when assignment and tracker lack consent id[39m[90m                                     [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgl30 battery low updates device health and event without location change[39m[90m                                    [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgl30 sos emits resident safety signal and updates device meta[39m[90m                                               [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstaff tracker sos routes to lone worker emergency not resident[39m[90m                                              [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90msos person routing rejects a staff assignment from another site[39m[90m                                             [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90msos person routing revalidates assignment released and reassigned after device resolution[39m[90m                   [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90msos person routing rejects a primary driver from another site[39m[90m                                               [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90msos person routing rejects device changed before locked revalidation with data set "device domain changed"[39m[90m  [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90msos person routing rejects device changed before locked revalidation with data set "device provider changed[39m[90m…[39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal sos acceptance treats released staff history as person intent[39m[90m                                         [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal telemetry acceptance released staff history suppresses same site primary driver fallback[39m[90m              [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal telemetry acceptance invalid person attribution sanitizes every persisted surface with data set "acti[39m[90m…[39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal telemetry acceptance invalid person attribution sanitizes every persisted surface with data set "clie[39m[90m…[39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask7 final telemetry consent blocked payload uses a safe operational envelope[39m[90m                              [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask7 final telemetry worker route rechecks assignment after vehicle sos before side effects[39m[90m                [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask7 final telemetry late worker consent withdrawal masks location but preserves the emergency[39m[90m             [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask7 final telemetry resident route rechecks lineage after vehicle sos with data set "active client assign[39m[90m…[39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask7 final telemetry resident route rechecks lineage after vehicle sos with data set "asset client changed[39m[90m…[39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask7 final telemetry resident route rechecks lineage after vehicle sos with data set "client moved to anot[39m[90m…[39m [90m0.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask7 final telemetry late consent withdrawal masks every surface but preserves the safety alarm[39m[90m            [39m [90m0.43s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask7 final telemetry released staff history suppresses an otherwise valid resident route[39m[90m                   [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal telemetry acceptance worker route locks every provenance row in shared order[39m[90m                          [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal telemetry acceptance resident route keeps its separate lock path[39m[90m                                      [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal sos acceptance rejects invalid resident device and site provenance with data set "client moved to ano[39m[90m…[39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal sos acceptance rejects invalid resident device and site provenance with data set "asset moved away fr[39m[90m…[39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal sos acceptance rechecks session relationships changed before lock with data set "session site changed[39m[90m…[39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal sos acceptance rechecks session relationships changed before lock with data set "session client chang[39m[90m…[39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal sos acceptance rechecks session relationships changed before lock with data set "session shift change[39m[90m…[39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal sos acceptance rechecks session relationships changed before lock with data set "shift client changed[39m[90m…[39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal sos acceptance locks session provenance in hs order[39m[90m                                                   [39m [90m0.24s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstaff sos locks assignment device and session in the shared order[39m[90m                                           [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mingest retries a simulated deadlock without duplicate side effects[39m[90m                                          [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgl30 charging state updates device health without battery percentage or location[39m[90m                            [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgl30 location health report does not clear last known charging state[39m[90m                                        [39m [90m0.23s[39m  
+
+  [90mTests:[39m    [32;1m49 passed[39;22m[90m (3239 assertions)[39m
+  [90mDuration:[39m [39m189.16s[39m
+
+{"phase":"focused_tests_finished","exit_code":0}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_e55c4f6308594bbe",
+    "database_mutations_performed": false
+}

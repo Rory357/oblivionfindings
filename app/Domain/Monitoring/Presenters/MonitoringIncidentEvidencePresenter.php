@@ -5,6 +5,9 @@ namespace App\Domain\Monitoring\Presenters;
 use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
+use App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode;
+use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
@@ -35,6 +38,33 @@ final class MonitoringIncidentEvidencePresenter
             ->filter()
             ->values()
             ->all();
+    }
+
+    /** @return array{observed_at: string, verification_required: bool}|null */
+    public function recoveryForAlert(ControlRoomAlert $alert, User $viewer): ?array
+    {
+        $episodeKey = data_get($alert->context, 'normalized_data.availability_episode_key');
+        $deviceId = data_get($alert->context, 'normalized_data.canonical_device_id');
+        if (! $viewer->canDo('controlRoom.alerts.view') || ! $viewer->canDo('securityDevices.devices.view')
+            || ! $this->canViewAlert($alert, $viewer) || ! is_string($episodeKey)
+            || ! is_int($deviceId) || ! $this->deviceAccess->visibleDevices($viewer)->whereKey($deviceId)->exists()) {
+            return null;
+        }
+        $recovery = $alert->context['monitoring_recoveries'][$episodeKey] ?? null;
+        if (! is_array($recovery) || ! is_int($recovery['device_event_id'] ?? null)
+            || ($recovery['verification_required'] ?? null) !== true) {
+            return null;
+        }
+        $event = DeviceEvent::query()->find($recovery['device_event_id']);
+        if (! $event || $event->event_type !== 'online' || (int) $event->device_id !== $deviceId
+            || ! MonitoringAvailabilityEpisode::hasCanonicalObservations($event, (int) $alert->site_id)
+            || (MonitoringAvailabilityEpisode::fromEvent($event, (int) $alert->site_id)['key'] ?? null) !== $episodeKey
+            || $event->occurred_at?->toIso8601String() !== ($recovery['observed_at'] ?? null)
+            || app(ItTicketLinkService::class)->canonicalDeviceSiteId($event->device) !== (int) $alert->site_id) {
+            return null;
+        }
+
+        return ['observed_at' => $recovery['observed_at'], 'verification_required' => true];
     }
 
     /** @return array{linked_it_work: array<string, mixed>|null, incident_evidence: array<string, mixed>|null} */
@@ -146,11 +176,12 @@ final class MonitoringIncidentEvidencePresenter
     private function presentEvidence(MonitoringIncidentEvidenceSnapshot $snapshot, User $viewer): ?array
     {
         if (! $snapshot->hasValidChecksum()
-            || ! $snapshot->alert
             || ! $snapshot->device
-            || ! $viewer->canDo('controlRoom.alerts.view')
             || ! $viewer->canDo('securityDevices.devices.view')
-            || ! $this->canViewAlert($snapshot->alert, $viewer)
+            || ($snapshot->control_room_alert_id !== null && (! $snapshot->alert
+                || ! $viewer->canDo('controlRoom.alerts.view') || ! $this->canViewAlert($snapshot->alert, $viewer)))
+            || ($snapshot->control_room_alert_id === null && ($snapshot->evidence_version !== 2
+                || app(ItTicketLinkService::class)->canonicalDeviceSiteId($snapshot->device) !== (int) $snapshot->site_id))
             || ! $this->deviceAccess->visibleDevices($viewer)->whereKey($snapshot->device_id)->exists()) {
             return null;
         }
@@ -164,10 +195,17 @@ final class MonitoringIncidentEvidencePresenter
             'checksum' => $snapshot->checksum,
             'integrity' => 'verified',
             'site' => $this->allow($source['site'] ?? [], ['id', 'name']),
-            'alert' => $this->allow($source['alert'] ?? [], ['id', 'reference', 'type', 'severity', 'source', 'triggered_at']),
+            'alert' => $snapshot->control_room_alert_id === null ? null : $this->allow($source['alert'] ?? [], ['id', 'reference', 'type', 'severity', 'source', 'triggered_at']),
             'ticket' => $this->allow($source['ticket'] ?? [], ['id', 'reference', 'title']),
             'device' => $this->allow($source['device'] ?? [], ['id', 'uid', 'name', 'domain', 'category', 'subcategory', 'status', 'health_status', 'last_seen_at']),
-            'observation' => $this->allow($source['observation'] ?? [], ['id', 'event_type', 'severity', 'source', 'occurred_at', 'message', 'monitor_correlation_key']),
+            'observation' => [
+                ...$this->allow($source['observation'] ?? [], ['id', 'event_type', 'severity', 'source', 'occurred_at', 'monitor_correlation_key']),
+                // Older immutable snapshots may contain copied diagnostics. Their
+                // checksum remains verifiable while the workspace uses safe copy.
+                'message' => MonitoringTechnicalSummary::observation(
+                    is_string(data_get($source, 'observation.event_type')) ? data_get($source, 'observation.event_type') : null,
+                ),
+            ],
         ];
     }
 

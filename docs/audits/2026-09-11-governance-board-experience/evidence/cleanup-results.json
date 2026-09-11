@@ -1,0 +1,10 @@
+{
+    "database": "oblivion_gov_audit_20260911_9888",
+    "checked_ownership": true,
+    "database_present_before": 1,
+    "checked_at": "2026-09-11T11:33:02+00:00",
+    "synthetic_user_count": 7,
+    "database_present_after": 0,
+    "synthetic_private_pack_present_after": false,
+    "evidence_pdf_retained": true
+}

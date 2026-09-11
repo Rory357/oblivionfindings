@@ -31,7 +31,7 @@ function w06BrowserPath(string $path): string
 function w06BrowserSources(): array
 {
     $files = ['w06-draft-browser-environment.ps1', 'w06-draft-browser-runtime.php', 'w06-draft-browser-bootstrap.php',
-        'w06-draft-browser-router.php', 'w06-draft-browser-fixtures.php', 'w06-draft-browser-teardown.php', 'w11-mailbox-browser-fixture.php', 'w11-merge-browser-scenario.php', 'w12-delivery-browser-fixture.php', 'w13-api-browser-fixture.php'];
+        'w06-draft-browser-router.php', 'w06-draft-browser-fixtures.php', 'w06-draft-browser-teardown.php', 'w11-mailbox-browser-fixture.php', 'w11-merge-browser-scenario.php', 'w12-delivery-browser-fixture.php', 'w13-api-browser-fixture.php', 'w14-monitoring-browser-fixture.php'];
     $hashes = [];
     foreach ($files as $name) {
         w06BrowserRequire(is_file(__DIR__.'/'.$name), 'A required verification source is missing.');
@@ -62,6 +62,7 @@ function w06BrowserGuard(bool $requireReady = false): array
     $manifest = json_decode(file_get_contents($manifestPath), true, flags: JSON_THROW_ON_ERROR);
     w06BrowserRequire(w06BrowserEnv('IT_MAILBOX_BROWSER_FIXTURES') === (($manifest['mailbox_fixtures'] ?? false) ? 'true' : 'false'), 'Mailbox fixture mode differs from its reviewed owner.');
     w06BrowserRequire(w06BrowserEnv('IT_API_BROWSER_FIXTURES') === (($manifest['api_fixtures'] ?? false) ? 'true' : 'false'), 'API fixture mode differs from its reviewed owner.');
+    w06BrowserRequire(w06BrowserEnv('IT_MONITORING_BROWSER_FIXTURES') === (($manifest['monitoring_fixtures'] ?? false) ? 'true' : 'false'), 'Monitoring fixture mode differs from its reviewed owner.');
     $database = W06_BROWSER_DATABASE_PREFIX.$token;
     w06BrowserRequire(($manifest['token'] ?? null) === $token && ($manifest['database'] ?? null) === $database
         && ($manifest['source_hashes'] ?? null) === w06BrowserSources()

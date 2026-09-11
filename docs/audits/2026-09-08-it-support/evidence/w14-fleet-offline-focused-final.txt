@@ -1,0 +1,63 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_1b2520ca4de24107",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Fleet\FleetOfflineSignalAtomicityTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit commits one offline source and outbox before dispatch and ignores repeat sweeps[39m[90m                        [39m [90m181.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rolls back the offline transition if the durable outbox cannot be saved and permits retry[39m[90m                [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not dispatch source work when the enclosing caller rolls back[39m[90m                                       [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit waits for the enclosing caller commit before dispatching the signal and outbox job[39m[90m                       [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rechecks a candidate after a fresh heartbeat arrives during the scan[39m[90m                                     [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit retains the configured cutoff and creates a new source only after a later heartbeat episode[39m[90m              [39m [90m0.12s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\ControlRoom\SafetySignalDeliveryRecoveryTest[39m
+  [32;1m✓[39;22m[90m [39m[90msource and outbox intent roll back together when outbox persistence fails[39m[90m                                   [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery reconciles a missing outbox and retry converges on one fleet alert[39m[90m                                 [39m [90m0.24s[39m  
+  [32;1m✓[39;22m[90m [39m[90mshift null site is visible unroutable and replays once after repair[39m[90m                                         [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mduplicate and reordered device event jobs produce one correlated final alert[39m[90m                                [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdevice event without site is unroutable then replays without duplicate alert[39m[90m                                [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdevice dead letter is visible and safe replay creates one final alert[39m[90m                                       [39m [90m0.15s[39m  
+
+  [90mTests:[39m    [32;1m12 passed[39;22m[90m (77 assertions)[39m
+  [90mDuration:[39m [39m183.07s[39m
+
+{"phase":"focused_tests_finished","exit_code":0}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_1b2520ca4de24107",
+    "database_mutations_performed": false
+}

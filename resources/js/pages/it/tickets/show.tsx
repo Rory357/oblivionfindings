@@ -760,16 +760,21 @@ export default function ItTicketShow({
                             }
                             subline={
                                 <>
-                                    Raised by{' '}
-                                    {ticket.requester.href ? (
-                                        <Link
-                                            href={ticket.requester.href}
-                                            className="rounded-sm underline underline-offset-2 focus-visible:ring-2"
-                                        >
-                                            {ticket.requester.name}
-                                        </Link>
+                                    {ticket.source === 'system' &&
+                                    ticket.requester.id === null ? (
+                                        'Raised automatically'
+                                    ) : ticket.requester.href ? (
+                                        <>
+                                            Raised by{' '}
+                                            <Link
+                                                href={ticket.requester.href}
+                                                className="rounded-sm underline underline-offset-2 focus-visible:ring-2"
+                                            >
+                                                {ticket.requester.name}
+                                            </Link>
+                                        </>
                                     ) : (
-                                        ticket.requester.name
+                                        <>Raised by {ticket.requester.name}</>
                                     )}
                                     {ticket.created_human
                                         ? ' · ' + ticket.created_human

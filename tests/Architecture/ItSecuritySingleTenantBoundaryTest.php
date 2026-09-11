@@ -288,12 +288,11 @@ it('keeps ticket approvals serialized and centrally audited', function () {
         ->toContain('it.ticket.approval.approved')
         ->toContain('it.ticket.approval.rejected')
         ->and($ticketPageNormalized)
-        ->toContain('Back to IT &amp; Support')
+        ->toContain('<TicketApprovalControls')
         ->not->toContain('Back to IT &amp; Provisioning')
         ->and($approvalControls)
-        ->toContain('Request manager approval')
-        ->toContain('Reason for rejection')
-        ->toContain('min-h-11');
+        ->toContain('Request approval')
+        ->toContain('<TicketApprovalDialog');
 });
 
 it('keeps ticket merges private serialized and centrally audited', function () {
@@ -305,10 +304,12 @@ it('keeps ticket merges private serialized and centrally audited', function () {
 
     expect($controller)
         ->not->toContain('$ticket->comments()->update(')
-        ->toContain("where('requester_user_id', \$ticket->requester_user_id)")
+        ->toContain('$this->mergeService->candidates($ticket, $user)')
         ->and($request)
         ->toContain("'reason' => ['required'")
         ->and($service)
+        ->toContain("where('requester_user_id', \$source->requester_user_id)")
+        ->toContain('sharesConversationAudience($source, $candidate)')
         ->toContain("orderBy('id')")
         ->toContain('lockForUpdate()')
         ->toContain('Tickets with different requesters cannot be merged')
@@ -404,6 +405,7 @@ it('keeps ticket intake resolution and lifecycle evidence centrally governed', f
     $intake = is_file($intakePath) ? file_get_contents($intakePath) : '';
     $attachmentsPath = $root.'/app/Domain/It/Services/ItAttachmentStorageService.php';
     $attachments = is_file($attachmentsPath) ? file_get_contents($attachmentsPath) : '';
+    $storageIntents = file_get_contents($root.'/app/Domain/It/Services/ItAttachmentStorageIntentService.php');
     $interaction = file_get_contents($root.'/app/Domain/It/Services/ItTicketInteractionService.php');
     $transitions = file_get_contents($root.'/app/Domain/It/Services/ItWorkTransitionService.php');
     $requestPath = $root.'/app/Http/Requests/It/StoreItTicketRequest.php';
@@ -418,15 +420,22 @@ it('keeps ticket intake resolution and lifecycle evidence centrally governed', f
         ->toContain('lockForUpdate()')
         ->toContain('it.ticket.created')
         ->and($attachments)
-        ->toContain('Storage::disk(ItAttachment::DISK)->delete')
+        ->toContain('ItAttachmentStorageIntentService::class)->requestRollbackCleanup($reservations)')
+        ->and($storageIntents)
+        ->toContain('lockForUpdate()')
+        ->toContain('! $disk->delete($intent->path)')
         ->and($interaction)
         ->toContain('resolveWithPublicNote')
-        ->toContain('it.ticket.resolved')
+        ->toContain('$this->transitionService->transition(')
         ->and($transitions)
+        ->toContain('it.ticket.resolved')
         ->toContain('it.work.transitioned')
         ->and($request)
         ->toContain("'attachments.*'")
-        ->toContain('ItAttachment::ALLOWED_MIMES');
+        ->toContain('ItAttachment::uploadRules()')
+        ->and(file_get_contents($root.'/app/Models/ItAttachment.php'))
+        ->toContain("'mimes:'.self::ALLOWED_MIMES")
+        ->toContain("'extensions:'.self::ALLOWED_MIMES");
 });
 
 it('keeps ordinary ticket intake linked to canonical Security and Devices records', function () {
@@ -472,7 +481,7 @@ it('keeps ordinary ticket intake linked to canonical Security and Devices record
         ->toContain("name('it.tickets.devices.destroy')")
         ->and($wizard)
         ->toContain('Affected Device')
-        ->toContain('Ticket Site')
+        ->toContain('<TicketSiteField')
         ->toContain('site_id')
         ->toContain('candidate.site_id === Number(form.data.site_id)')
         ->toContain('form.data.site_id !== UNASSIGNED')
@@ -498,6 +507,8 @@ it('keeps ticket work tasks visible and governed from the canonical workspace', 
     $presenter = file_get_contents($root.'/app/Domain/It/Presenters/ItTicketContextPresenter.php');
     $workspace = file_get_contents($root.'/resources/js/pages/it/tickets/show.tsx');
     $tasks = file_get_contents($root.'/resources/js/components/it/ticket-work-tasks.tsx');
+    $taskRecovery = file_get_contents($root.'/resources/js/components/it/ticket-work-task-recovery.tsx');
+    $taskActions = file_get_contents($root.'/resources/js/components/it/ticket-work-task-action-dialog.tsx');
 
     expect($routes)
         ->toContain("name('it.tickets.tasks.store')")
@@ -525,9 +536,14 @@ it('keeps ticket work tasks visible and governed from the canonical workspace', 
         ->toContain('tasks={linked_context.tasks}')
         ->and($tasks)
         ->toContain('Work tasks')
+        ->toContain('<TicketWorkTaskActionDialog')
+        ->toContain('<TicketWorkTaskWizard')
+        ->and($taskActions)
+        ->toContain('<TicketWorkTaskRecovery')
+        ->and($taskRecovery)
         ->toContain('Required before settlement')
         ->toContain('Evidence references')
-        ->toContain('/it/tickets/${ticketId}/tasks')
+        ->and($tasks)
         ->not->toContain('window.confirm(')
         ->not->toContain('window.alert(');
 });
@@ -582,6 +598,7 @@ it('keeps waiting ownership explicit governed and requester safe', function () {
     $updateRequest = file_get_contents($root.'/app/Http/Requests/It/UpdateTicketRequest.php');
     $workspace = file_get_contents($root.'/resources/js/pages/it/tickets/show.tsx');
     $queue = file_get_contents($root.'/resources/js/pages/it/index.tsx');
+    $views = file_get_contents($root.'/resources/js/components/it/ticket-view-options.ts');
     $drawer = file_get_contents($root.'/resources/js/components/it/ticket-drawer.tsx');
     $dialog = file_get_contents($root.'/resources/js/components/it/ticket-waiting-dialog.tsx');
 
@@ -590,7 +607,7 @@ it('keeps waiting ownership explicit governed and requester safe', function () {
         ->toContain('private function waitingPayload(ItTicket $ticket, bool $canManage): ?array')
         ->toContain("\$ticket->waiting_party === 'requester' ? 'requester' : 'other'")
         ->and($queueController)
-        ->toContain("'waiting_party' => \$t->waiting_party")
+        ->toContain("'waiting_party' => \$canWork ? \$t->waiting_party")
         ->toContain("\$t->waiting_party === 'requester' ? 'requester' : 'other'")
         ->and($transition)
         ->toContain("ItTicketEvent::record(\$ticket, 'waiting_updated'")
@@ -609,10 +626,11 @@ it('keeps waiting ownership explicit governed and requester safe', function () {
         ->toContain('Edit waiting details')
         ->not->toContain("? 'Waiting on requester'")
         ->and($queue)
-        ->toContain('All waiting work')
         ->toContain('<TicketWaitingDialog')
         ->not->toContain("{ key: 'waiting', label: 'Waiting on requester' }")
         ->not->toContain("? 'Waiting on you'")
+        ->and($views)
+        ->toContain('All waiting work')
         ->and($drawer)
         ->toContain('waitingStatusLabel')
         ->not->toContain("? 'Waiting on requester'")
@@ -635,11 +653,15 @@ it('keeps canonical routed ownership visible to technicians and private from req
     $workspace = file_get_contents($root.'/resources/js/pages/it/tickets/show.tsx');
     $drawer = file_get_contents($root.'/resources/js/components/it/ticket-drawer.tsx');
     $summary = file_get_contents($root.'/resources/js/components/it/ticket-routing-summary.tsx');
+    $ticketList = file_get_contents($root.'/resources/js/components/it/it-ticket-list.tsx');
+    $views = file_get_contents($root.'/resources/js/components/it/ticket-view-options.ts');
 
     expect($routing)
         ->toContain('$ticket->queue_id = $queue?->id')
         ->toContain('$ticket->team_id = $queue?->team_id')
-        ->toContain('$ticket->owner_user_id = null')
+        ->toContain("\$ticket->owner_user_id = \$owner['owner_user_id']")
+        ->toContain('$this->eligibility->agent($primary, $ticket)')
+        ->toContain("'owner_user_id' => \$cover?->id")
         ->and($savedFilters)
         ->toContain("'owned_by_me' => 'Owned by me'")
         ->toContain("'my_team' => \"My team's work\"")
@@ -651,9 +673,12 @@ it('keeps canonical routed ownership visible to technicians and private from req
         ->toContain("'queue:id,name'")
         ->toContain("'team:id,name'")
         ->toContain("'owner:id,name'")
+        ->and($views)
+        ->toContain("key: 'owned_by_me', label: 'Owned by me'")
+        ->toContain("key: 'my_team', label: \"My team's work\"")
         ->and($queue)
-        ->toContain("{ key: 'owned_by_me', label: 'Owned by me' }")
-        ->toContain("{ key: 'my_team', label: \"My team's work\" }")
+        ->toContain('<ItTicketList')
+        ->and($ticketList)
         ->toContain('<TicketRoutingSummary')
         ->and($workspace)
         ->toContain('Routed ownership')
@@ -691,7 +716,7 @@ it('keeps ordinary ticket classification connected to service routing and the wo
         ->toContain("'it_service_id' => ['sometimes'")
         ->and($triage)
         ->toContain('ItTicketRoutingService $routing')
-        ->toContain("['work_type', 'it_service_id', 'category', 'site_id', 'is_organisation_wide']")
+        ->toContain("['work_type', 'it_service_id', 'category', 'site_id', 'is_organisation_wide', 'priority']")
         ->toContain('releaseIneligibleAssigneeAfterScopeChange')
         ->toContain('Remove or change the linked Asset before changing the ticket Site.')
         ->toContain('$this->routing->route($locked, $actor->id)')
@@ -734,7 +759,7 @@ it('keeps every server-backed ticket queue filter visible in the desktop queue',
 
     expect($page)
         ->toContain('<TicketAdvancedFilters')
-        ->toContain('onClear={clearAdvancedTicketFilters}')
+        ->toMatch('/onClear=\{\s*clearAdvancedTicketFilters\s*\}/')
         ->and($advancedFilters)
         ->toContain('Classification')
         ->toContain('Queue health')
@@ -961,6 +986,19 @@ it('detects plain product terminology and tenant shaped runtime contracts', func
         ->toContain('tenant_query_or_bypass');
 });
 
+it('distinguishes the canonical Microsoft OAuth authority setting from application tenancy', function () {
+    $provider = 'app/Services/Integration/MailboxProviderHttp.php';
+    $fixture = 'tests/Feature/It/ItMailboxProviderFailureTest.php';
+    $setting = "config('services.microsoft.tenant')";
+
+    expect(itSecurityScanTenantSource($provider, $setting))->toBe([])
+        ->and(itSecurityScanTenantSource($fixture, "['services.microsoft.tenant' => 'organizations']"))->toBe([])
+        ->and(itSecurityScanTenantSource('app/Domain/It/Injected.php', $setting))->toHaveKey('tenant_product_word')
+        ->and(itSecurityScanTenantSource($provider, $setting."; Ticket::where('tenant_id', 2);"))->toHaveKey('tenant_storage_or_usage')
+        ->and(itSecurityScanTenantSource($provider, $setting."; echo 'Switch tenant';"))->toHaveKey('tenant_product_word')
+        ->and(itSecurityScanTenantSource($provider, "config('services.microsoft.tenant.other')"))->toHaveKey('tenant_product_word');
+});
+
 it('changes the debt fingerprint when equal-count tenant shortcut semantics change', function () {
     $before = itSecurityScanTenantSource(
         'app/Domain/It/Services/ExistingShortcut.php',
@@ -1171,20 +1209,22 @@ it('keeps visible IT and Security Devices copy on application and Site language'
             'required' => ['No active Sites are available within your approved Site access.'],
             'rejected' => ['No active sites are available within your current organisation and site access.'],
         ],
-        'resources/js/components/it/it-api-identities.tsx' => [
+        'resources/js/components/it/it-api-identity-contract.ts' => [
             'required' => [
                 'Access explicit application-wide work',
                 'Application-wide scope marker',
-                'Explicit application-wide work also needs its separate operation and scope marker.',
             ],
             'rejected' => [
                 'Access explicit organisation-wide work',
                 'Organisation-wide scope marker',
-                'Explicit organisation-wide work also needs its separate operation and scope marker.',
             ],
         ],
-        'resources/js/pages/it/setup/index.tsx' => [
-            'required' => ['Managers and members must be approved IT agents in this application.'],
+        'resources/js/components/it/it-api-identities.tsx' => [
+            'required' => ['Sensitive and application-wide access remain explicit.'],
+            'rejected' => ['Explicit organisation-wide work also needs its separate operation and scope marker.'],
+        ],
+        'resources/js/pages/it/setup/_dialogs.tsx' => [
+            'required' => ['Choose eligible people and the current operating status.'],
             'rejected' => ['Managers and members must be IT agents in this organisation.'],
         ],
         'app/Domain/SecurityDevices/Config/CategoryPageConfig.php' => [
@@ -1263,6 +1303,13 @@ it('rejects a new tenant partition migration while excluding exact historical mi
         'database/migrations/2026_07_22_000002_remove_legacy_tenant_partition.php',
         $removal,
     ))->toBeFalse();
+
+    $positionOnly = "Schema::table('hr_payroll_runs', fn (Blueprint \$table) => \$table->char('command_key_sha256', 64)->nullable()->after('tenant_id'));";
+    expect(itSecurityScanTenantMigration('database/migrations/position_only.php', $positionOnly))->toBeFalse()
+        ->and(itSecurityScanTenantMigration(
+            'database/migrations/position_and_partition.php',
+            $positionOnly."Schema::table('it_tickets', fn (Blueprint \$table) => \$table->unsignedBigInteger('tenant_id'));",
+        ))->toBeTrue();
 
     $additionalPartitionForms = [
         "Schema::table('it_tickets', fn (Blueprint \$table) => \$table->foreignUuid('tenant_id'));",
@@ -1423,6 +1470,12 @@ function itSecurityScanTenantSource(string $relativePath, string $contents): arr
         $tokens = [];
 
         foreach ($rawMatches[0] ?? [] as [$token, $offset]) {
+            if ($rule === 'tenant_product_word'
+                && itSecurityIsMicrosoftAuthoritySetting($relativePath, $contents, (int) $offset)
+            ) {
+                continue;
+            }
+
             if ($rule === 'tenant_storage_or_usage'
                 && itSecurityIsAllowedLegacyStorageOccurrence($relativePath, $contents, (int) $offset)
             ) {
@@ -1457,6 +1510,26 @@ function itSecurityScanTenantSource(string $relativePath, string $contents): arr
     ksort($violations, SORT_STRING);
 
     return $violations;
+}
+
+function itSecurityIsMicrosoftAuthoritySetting(string $relativePath, string $contents, int $offset): bool
+{
+    $pattern = match ($relativePath) {
+        'app/Services/Integration/MailboxProviderHttp.php' => '/\bconfig\(\s*([\'\"])services\.microsoft\.tenant\1\s*\)/u',
+        'tests/Feature/It/ItMailboxProviderFailureTest.php' => '/([\'\"])services\.microsoft\.tenant\1\s*=>/u',
+        default => null,
+    };
+    if ($pattern === null) {
+        return false;
+    }
+    preg_match_all($pattern, $contents, $matches, PREG_OFFSET_CAPTURE);
+    foreach ($matches[0] as [$match, $start]) {
+        if ($offset >= $start && $offset < $start + strlen($match)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /** @param list<string> $matches */
@@ -1770,7 +1843,7 @@ function itSecurityScanTenantMigration(string $relativePath, string $contents): 
         ) === 1;
     $partitionField = '(?:tenant_id|organization_id|organisation_id)';
     $addsPartition = preg_match(
-        '/->(?!(?:drop[A-Za-z0-9_]*|renameColumn)\b)[A-Za-z_][A-Za-z0-9_]*\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*:\s*)?[\'\"]'.$partitionField.'[\'\"]/',
+        '/->(?!(?:drop[A-Za-z0-9_]*|renameColumn|after)\b)[A-Za-z_][A-Za-z0-9_]*\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*:\s*)?[\'\"]'.$partitionField.'[\'\"]/',
         $contents,
     ) === 1
         || preg_match(
