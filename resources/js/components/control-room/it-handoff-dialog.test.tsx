@@ -1,4 +1,5 @@
 import {
+    act,
     cleanup,
     fireEvent,
     render,
@@ -6,6 +7,8 @@ import {
     waitFor,
 } from '@testing-library/react';
 
+import type { GlobalEvent, PendingVisit } from '@inertiajs/core';
+import { router } from '@inertiajs/react';
 import axios from 'axios';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ControlRoomItHandoffDialog } from './it-handoff-dialog';
@@ -42,6 +45,7 @@ const props = {
 const key = 'it.pending-control-room-handoff.v1.7:11';
 beforeEach(() => {
     sessionStorage.clear();
+    vi.mocked(router.on).mockClear();
     props.onClose.mockReset();
     vi.spyOn(axios, 'get').mockResolvedValue({ data: { data: discovery } });
 });
@@ -331,6 +335,75 @@ it('requires an explicit discard and retains technical text when closing is canc
     await user.click(screen.getByRole('button', { name: 'Discard draft' }));
     expect(props.onClose).toHaveBeenCalledOnce();
 });
+
+function visitEvent(overrides: Partial<PendingVisit> = {}) {
+    return new CustomEvent('inertia:before', {
+        cancelable: true,
+        detail: {
+            visit: {
+                url: new URL(window.location.href),
+                method: 'get',
+                async: true,
+                only: ['alerts', 'stats'],
+                ...overrides,
+            },
+        },
+    }) as GlobalEvent<'before'>;
+}
+
+function emitVisit(event: GlobalEvent<'before'>) {
+    const listener = vi
+        .mocked(router.on)
+        .mock.calls.findLast(([name]) => name === 'before')?.[1];
+    expect(listener).toBeDefined();
+    act(() => {
+        listener?.(event);
+    });
+}
+
+it('pauses repeated worklist polls without reopening discard or losing the reviewed draft', async () => {
+    render(<ControlRoomItHandoffDialog {...props} />);
+    await chooseLink();
+    for (let poll = 0; poll < 3; poll++) {
+        const event = visitEvent();
+        emitVisit(event);
+        expect(event.defaultPrevented).toBe(true);
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    }
+    expect(screen.getByText('Restore the site network.')).toBeInTheDocument();
+    expect(
+        screen.getByRole('button', { name: 'Link selected ticket' }),
+    ).toBeEnabled();
+    expect(props.onClose).not.toHaveBeenCalled();
+});
+
+it.each([
+    ['another location', { url: new URL('/it', window.location.origin) }],
+    ['a full reload', { only: [] }],
+    ['a foreground visit', { async: false }],
+    ['a write', { method: 'post' }],
+] as const)(
+    'still guards %s while a handoff draft is dirty',
+    async (_name, overrides) => {
+        render(<ControlRoomItHandoffDialog {...props} />);
+        await chooseLink();
+        const event = visitEvent(overrides as Partial<PendingVisit>);
+        emitVisit(event);
+        expect(event.defaultPrevented).toBe(true);
+        expect(
+            await screen.findByRole('alertdialog', {
+                name: 'Discard this handoff draft?',
+            }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(
+            screen.getByText('Restore the site network.'),
+        ).toBeInTheDocument();
+        emitVisit(visitEvent());
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        expect(props.onClose).not.toHaveBeenCalled();
+    },
+);
 
 it('blocks duplicate handoffs and offers canonical existing work without creating another ticket', async () => {
     vi.mocked(axios.get).mockResolvedValue({

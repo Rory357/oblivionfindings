@@ -29,6 +29,7 @@ import {
     type DeskActivity,
     type FreshnessState,
 } from '@/components/control-room/dashboard/service-health-panel';
+import { useAlertWorkspaceFocusReturn } from '@/components/control-room/use-alert-workspace-focus-return';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
@@ -151,7 +152,9 @@ export function ControlRoomDashboardView({
         });
     };
 
+    const workspaceFocus = useAlertWorkspaceFocusReturn();
     const openWorkspace = (id: number) => {
+        workspaceFocus.rememberOpen(id);
         const params = new URLSearchParams(window.location.search);
         params.set('alert', String(id));
         router.get(
@@ -166,6 +169,7 @@ export function ControlRoomDashboardView({
     };
 
     const closeWorkspace = () => {
+        workspaceFocus.beginClose();
         const params = new URLSearchParams(window.location.search);
         params.delete('alert');
         router.get(
@@ -291,6 +295,7 @@ export function ControlRoomDashboardView({
                     detail={detail}
                     open
                     onClose={closeWorkspace}
+                    onCloseAutoFocus={workspaceFocus.onCloseAutoFocus}
                 />
             ) : null}
         </div>

@@ -85,6 +85,7 @@ import {
 import {
     useRef,
     useState,
+    type ComponentProps,
     type ComponentType,
     type FormEvent,
     type ReactNode,
@@ -627,10 +628,12 @@ export function AlertWorkspaceDialog({
     detail,
     open,
     onClose,
+    onCloseAutoFocus,
 }: {
     detail: AlertWorkspaceDetail;
     open: boolean;
     onClose: () => void;
+    onCloseAutoFocus?: ComponentProps<typeof WizardShell>['onCloseAutoFocus'];
 }) {
     const [section, setSection] = useState<SectionKey>('overview');
     const [action, setAction] = useState<ActionKey | null>(null);
@@ -878,6 +881,7 @@ export function AlertWorkspaceDialog({
     return (
         <WizardShell
             open={open}
+            onCloseAutoFocus={onCloseAutoFocus}
             onOpenAutoFocus={(event) => {
                 if (handoffReturnFocus.current) {
                     handoffReturnFocus.current = false;

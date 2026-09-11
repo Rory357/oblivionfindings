@@ -1,0 +1,61 @@
+{
+    "token": "d716ac905348a2f9",
+    "mutations_performed": false,
+    "cases": {
+        "create": {
+            "alert": {
+                "id": 6,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "link": {
+            "alert": {
+                "id": 7,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "cancel": {
+            "alert": {
+                "id": 8,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "stale": {
+            "alert": {
+                "id": 9,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "other_site": {
+            "alert": {
+                "id": 10,
+                "site_id": 3,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "private": {
+            "alert": {
+                "id": 11,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        }
+    },
+    "ticket_count": 23
+}

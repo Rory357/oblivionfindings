@@ -1,0 +1,404 @@
+{
+    "ready": true,
+    "created_at": "2026-09-11T23:50:30+00:00",
+    "database": "oblivion_it_draft_browser_4caa257ede23b718",
+    "registry_count": 1026,
+    "fixtures": {
+        "sites": {
+            "a": 1,
+            "b": 2,
+            "c": 3
+        },
+        "actors": {
+            "requester": {
+                "id": 1,
+                "login": "w06-requester@demo.test"
+            },
+            "other": {
+                "id": 2,
+                "login": "w06-other@demo.test"
+            },
+            "tech": {
+                "id": 3,
+                "login": "w06-tech@demo.test"
+            },
+            "restricted": {
+                "id": 4,
+                "login": "w06-restricted@demo.test"
+            },
+            "cover": {
+                "id": 5,
+                "login": "w06-cover@demo.test"
+            },
+            "absent": {
+                "id": 6,
+                "login": "w06-absent@demo.test"
+            },
+            "settings": {
+                "id": 7,
+                "login": "w06-settings@demo.test"
+            },
+            "settings_viewer": {
+                "id": 8,
+                "login": "w06-settings_viewer@demo.test"
+            },
+            "audit": {
+                "id": 9,
+                "login": "w06-audit@demo.test"
+            }
+        },
+        "permissions": {
+            "requester": [
+                "it.request"
+            ],
+            "other": [
+                "it.request"
+            ],
+            "tech": [
+                "it.request",
+                "it.view",
+                "it.manage",
+                "it.viewSensitive"
+            ],
+            "restricted": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ],
+            "cover": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ],
+            "absent": [
+                "it.request",
+                "it.view",
+                "it.manage"
+            ],
+            "settings": [
+                "it.request",
+                "settings.access.manage"
+            ],
+            "settings_viewer": [
+                "it.request",
+                "settings.access.manage"
+            ],
+            "audit": [
+                "it.request",
+                "it.view",
+                "it.manage",
+                "audit.viewAny"
+            ]
+        },
+        "tickets": {
+            "public_workspace": {
+                "id": 1,
+                "reference": "IT-000001"
+            },
+            "sensitive_participant": {
+                "id": 2,
+                "reference": "IT-000002"
+            },
+            "unapproved_site": {
+                "id": 3,
+                "reference": "IT-000003"
+            },
+            "resolve_workspace": {
+                "id": 4,
+                "reference": "IT-000004"
+            },
+            "approval_workspace": {
+                "id": 5,
+                "reference": "IT-000005"
+            },
+            "approval_history": {
+                "id": 6,
+                "reference": "IT-000006"
+            },
+            "duplicate_workspace": {
+                "id": 7,
+                "reference": "IT-000007"
+            }
+        },
+        "approval_history_ids": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+        ],
+        "synthetic_approved_leave_id": 1,
+        "retention_is_synthetic_only": true
+    },
+    "drafts_enabled": true,
+    "synthetic_retention_days": [
+        2,
+        3
+    ],
+    "provider_configuration_checks": {
+        "mailboxes_absent": true,
+        "app_settings_absent": true,
+        "service_providers_cleared": true
+    },
+    "monitoring_fixtures": {
+        "synthetic_only": true,
+        "queue_id": 1,
+        "team_id": 1,
+        "cases": {
+            "direct": {
+                "ticket_id": 8,
+                "reference": "IT-000008",
+                "device_id": 1,
+                "alert_id": null,
+                "site_id": 1,
+                "outbox_id": 1,
+                "status": "open",
+                "status_reason": "monitoring_outage",
+                "evidence_version": 2
+            },
+            "recovered": {
+                "ticket_id": 9,
+                "reference": "IT-000009",
+                "device_id": 2,
+                "alert_id": null,
+                "site_id": 1,
+                "outbox_id": 2,
+                "status": "open",
+                "status_reason": "monitoring_recovered",
+                "evidence_version": 2
+            },
+            "urgent": {
+                "ticket_id": 10,
+                "reference": "IT-000010",
+                "device_id": 3,
+                "alert_id": 1,
+                "site_id": 1,
+                "outbox_id": 4,
+                "status": "open",
+                "status_reason": "monitoring_outage",
+                "evidence_version": 1
+            },
+            "other_site": {
+                "ticket_id": 11,
+                "reference": "IT-000011",
+                "device_id": 4,
+                "alert_id": null,
+                "site_id": 3,
+                "outbox_id": 5,
+                "status": "open",
+                "status_reason": "monitoring_outage",
+                "evidence_version": 2
+            },
+            "urgent_recovered": {
+                "ticket_id": 12,
+                "reference": "IT-000012",
+                "device_id": 5,
+                "alert_id": 2,
+                "site_id": 1,
+                "outbox_id": 6,
+                "status": "open",
+                "status_reason": "monitoring_recovered",
+                "evidence_version": 1
+            },
+            "condition_direct": {
+                "ticket_id": 13,
+                "reference": "IT-000013",
+                "device_id": 9,
+                "alert_id": null,
+                "site_id": 1,
+                "outbox_id": 11,
+                "status": "open",
+                "status_reason": "monitoring_fault",
+                "evidence_version": 2
+            },
+            "condition_recovered": {
+                "ticket_id": 14,
+                "reference": "IT-000014",
+                "device_id": 10,
+                "alert_id": null,
+                "site_id": 1,
+                "outbox_id": 12,
+                "status": "open",
+                "status_reason": "monitoring_recovered",
+                "evidence_version": 2
+            },
+            "condition_urgent": {
+                "ticket_id": 15,
+                "reference": "IT-000015",
+                "device_id": 11,
+                "alert_id": 3,
+                "site_id": 1,
+                "outbox_id": 14,
+                "status": "open",
+                "status_reason": "monitoring_fault",
+                "evidence_version": 1
+            },
+            "condition_other_site": {
+                "ticket_id": 16,
+                "reference": "IT-000016",
+                "device_id": 13,
+                "alert_id": null,
+                "site_id": 3,
+                "outbox_id": 16,
+                "status": "open",
+                "status_reason": "monitoring_fault",
+                "evidence_version": 2
+            },
+            "legacy_recovered": {
+                "ticket_id": 17,
+                "reference": "IT-000017",
+                "device_id": 27,
+                "alert_id": 4,
+                "site_id": 1,
+                "outbox_id": 30,
+                "status": "open",
+                "status_reason": "monitoring_recovered",
+                "evidence_version": 1
+            },
+            "legacy_reordered": {
+                "ticket_id": 18,
+                "reference": "IT-000018",
+                "device_id": 28,
+                "alert_id": null,
+                "site_id": 1,
+                "outbox_id": 32,
+                "status": "open",
+                "status_reason": "monitoring_recovered",
+                "evidence_version": 2
+            },
+            "fleet_direct": {
+                "ticket_id": 19,
+                "reference": "IT-000019",
+                "device_id": 29,
+                "asset_id": 1,
+                "alert_id": null,
+                "site_id": 1,
+                "outbox_id": 1,
+                "status": "open",
+                "status_reason": "monitoring_outage",
+                "evidence_version": 3
+            },
+            "fleet_recovered": {
+                "ticket_id": 20,
+                "reference": "IT-000020",
+                "device_id": 30,
+                "asset_id": 2,
+                "alert_id": null,
+                "site_id": 1,
+                "outbox_id": 2,
+                "status": "open",
+                "status_reason": "monitoring_recovered",
+                "evidence_version": 3
+            },
+            "fleet_urgent": {
+                "ticket_id": 21,
+                "reference": "IT-000021",
+                "device_id": 31,
+                "asset_id": 3,
+                "alert_id": 5,
+                "site_id": 1,
+                "outbox_id": 4,
+                "status": "open",
+                "status_reason": "monitoring_outage",
+                "evidence_version": 3
+            }
+        },
+        "handoffs": {
+            "create": {
+                "alert_id": 6,
+                "site_id": 1,
+                "ticket_id": null
+            },
+            "link": {
+                "alert_id": 7,
+                "site_id": 1,
+                "ticket_id": 22
+            },
+            "cancel": {
+                "alert_id": 8,
+                "site_id": 1,
+                "ticket_id": null
+            },
+            "stale": {
+                "alert_id": 9,
+                "site_id": 1,
+                "ticket_id": 23
+            },
+            "other_site": {
+                "alert_id": 10,
+                "site_id": 3,
+                "ticket_id": null
+            },
+            "private": {
+                "alert_id": 11,
+                "site_id": 1,
+                "ticket_id": null
+            }
+        },
+        "handoff_service_id": 1,
+        "retry_cases": {
+            "retry": {
+                "source": "device",
+                "outbox_id": 8,
+                "device_id": 6,
+                "site_id": 1
+            },
+            "retry_stale": {
+                "source": "device",
+                "outbox_id": 9,
+                "device_id": 7,
+                "site_id": 1
+            },
+            "retry_access": {
+                "source": "device",
+                "outbox_id": 10,
+                "device_id": 8,
+                "site_id": 1
+            },
+            "condition_retry": {
+                "source": "device",
+                "outbox_id": 15,
+                "device_id": 12,
+                "site_id": 1
+            },
+            "fleet_retry": {
+                "source": "fleet",
+                "outbox_id": 5,
+                "device_id": 32,
+                "asset_id": 4,
+                "site_id": 1
+            }
+        },
+        "history_pending_outbox_ids": [
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29
+        ]
+    }
+}
+{
+  "started": true,
+  "token": "4caa257ede23b718",
+  "database": "oblivion_it_draft_browser_4caa257ede23b718",
+  "pid": 36816,
+  "url": "http://127.0.0.1:8766",
+  "root": "C:\\Users\\steph\\Herd\\oblivionfindings\\storage\\framework\\testing\\it-draft-browser-4caa257ede23b718",
+  "browser_verified": false
+}

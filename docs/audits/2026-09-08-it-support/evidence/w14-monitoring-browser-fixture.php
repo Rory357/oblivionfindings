@@ -2,6 +2,7 @@
 
 /** Opt-in, fingerprinted fixture for an owned fresh browser schema only. */
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Monitoring\Data\ObservationInput;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\Monitor;
@@ -75,6 +76,27 @@ function w14BrowserCreateMonitoringFixtures(array $context, array $fixtures): ar
         }
         $tech = User::query()->findOrFail($fixtures['actors']['tech']['id']);
         $cover = User::query()->findOrFail($fixtures['actors']['cover']['id']);
+        // Dedicated dashboard actors keep the original technician's grants unchanged.
+        foreach (['monitoring' => ['it.view', 'it.manage', 'securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'controlRoom.alerts.view'],
+            'monitoring_source_only' => ['securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view']] as $key => $keys) {
+            $role = Role::query()->create(['name' => 'w14-browser-'.$key, 'label' => 'W14 synthetic '.$key,
+                'level' => 10, 'type' => 'custom', 'landing_route' => '/security-devices/monitoring']);
+            $permissions = Permission::query()->whereIn('key', $keys)->pluck('id');
+            w06BrowserRequire($permissions->count() === count($keys), 'Canonical dashboard permissions are missing.');
+            $role->permissions()->attach($permissions);
+            $actor = User::factory()->withoutTwoFactor()->create(['name' => 'W14 '.$context['token'].' '.$key,
+                'email' => 'w14-'.$key.'@demo.test', 'password' => $tech->getRawOriginal('password'),
+                'approved_at' => now(), 'email_verified_at' => now(), 'role' => 'support_worker',
+                'landing_route_preference' => '/security-devices/monitoring']);
+            $actor->roles()->attach($role);
+            HrEmployeeProfile::query()->create(['user_id' => $actor->id, 'employee_number' => 'W14-'.$key,
+                'work_email' => $actor->email, 'position_title' => 'Synthetic monitoring verification',
+                'position_role' => 'support_worker', 'employment_type' => 'casual', 'start_date' => today()->subDay(),
+                'is_active' => true, 'primary_site_id' => $fixtures['sites']['a'], 'secondary_site_ids' => [$fixtures['sites']['b']],
+                'created_by' => $tech->id, 'updated_by' => $tech->id]);
+            w06BrowserRequire($actor->fresh()->canDo('it.view') === ($key === 'monitoring')
+                && $actor->fresh()->canDo('securityDevices.events.view'), 'Synthetic dashboard access differs from the intended boundary.');
+        }
         w06BrowserRequire($tech->canDo('controlRoom.alerts.view') && ! $cover->canDo('controlRoom.alerts.view')
             && $cover->canDo('securityDevices.devices.view'), 'Synthetic source access differs from the intended boundary.');
         $team = ItTeam::factory()->create(['name' => 'W14 '.$context['token'].' synthetic service desk', 'manager_user_id' => $tech->id]);

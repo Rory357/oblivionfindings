@@ -37,6 +37,8 @@ export function AlertWorklist<Row extends AlertWorklistRowType>({
     return (
         <section
             aria-labelledby={headingId}
+            data-alert-workspace-list
+            data-focus-return-owner
             className="overflow-hidden rounded-xl border border-border bg-card"
         >
             <div className="sticky top-0 z-10 flex flex-col gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">

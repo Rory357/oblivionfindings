@@ -1,0 +1,35 @@
+{
+  "captured_at": "2026-09-11T23:36:55.6364042Z",
+  "source": [
+    {
+      "path": "resources/js/components/control-room/use-alert-workspace-focus-return.ts",
+      "sha256": "61291b53e23856a6be486dad5a723771989cdf19ac127378bf5b4de3e774a15d"
+    },
+    {
+      "path": "resources/js/components/control-room/alert-worklist/alert-worklist.tsx",
+      "sha256": "11e790dd7af680d71206688bb2ecacf991c25a9b7d52d09aee6d394395d1e0c4"
+    },
+    {
+      "path": "resources/js/components/control-room/alert-worklist/alert-worklist-row.tsx",
+      "sha256": "a563b3b298dc5e94111b9ce9f89708eddc4918b36112475444649c364acf6f61"
+    },
+    {
+      "path": "resources/js/components/control-room/alert-worklist/alert-worklist.test.tsx",
+      "sha256": "d1c16064e376ad9eb0aa21bb18a463ff960fefa4544dce5130d795f82e2abab7"
+    },
+    {
+      "path": "resources/js/components/control-room/alert-workspace-dialog.tsx",
+      "sha256": "8bc77c64799a9f285e48981acf42c008037ac1d783f9867c0e9007dddcf17dd8"
+    },
+    {
+      "path": "resources/js/pages/control-room/alerts/index.tsx",
+      "sha256": "574cdb03be1881e31d12ae62131ba737225123f4d27d4aa0c254423627e31252"
+    },
+    {
+      "path": "resources/js/pages/control-room/index.tsx",
+      "sha256": "9c10c6f297de6f89c1bd935f0551be2bcea0a2c0ebcea0afe4cc7fef2807f4ea"
+    }
+  ],
+  "browser_verified": false,
+  "active_browser_asset": "app-B9HhmhJS.js"
+}

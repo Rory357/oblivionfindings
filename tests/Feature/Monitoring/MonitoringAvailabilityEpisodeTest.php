@@ -16,6 +16,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceEventSignalOutbox;
+use App\Domain\SecurityDevices\Presenters\MonitoringOperationsPresenter;
 use App\Jobs\DispatchDeviceEventSignalOutbox;
 use App\Jobs\DispatchDeviceMonitoringTicket;
 use App\Models\AuditLog;
@@ -34,6 +35,7 @@ use App\Models\User;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\SecurityDevicesSignalSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
@@ -570,6 +572,125 @@ function episodeViewer(Site $site, array $permissions = ['it.view', 'it.manage',
 
     return $viewer;
 }
+
+function episodeDashboardLink(Monitor $monitor, User $viewer): ?array
+{
+    return collect(app(MonitoringOperationsPresenter::class)->present($viewer)['monitors'])
+        ->firstWhere('id', $monitor->id)['correlation'] ?? null;
+}
+
+test('the monitoring dashboard links the exact native issue to permitted direct or urgent IT work', function (bool $technical, string $severity) {
+    config()->set('inertia.ssr.enabled', false);
+    [$monitor, $site] = $technical ? technicalEpisodeMonitor('tls', $severity) : episodeMonitor();
+    if (! $technical) {
+        SignalRule::query()->where('signal_type_code', 'device_offline')->update(['output_severity' => $severity]);
+    }
+    deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent);
+    $ticket = ItTicket::query()->sole();
+    $viewer = episodeViewer($site, ['it.view', 'it.manage', 'securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.events.view', 'controlRoom.alerts.view']);
+    $link = episodeDashboardLink($monitor, $viewer);
+    expect(data_get($link, 'it_incident.id'))->toBe($ticket->id)
+        ->and(data_get($link, 'it_incident.href'))->toBe('/it/tickets/'.$ticket->id)
+        ->and(data_get($link, 'control_room.id'))->toBe($severity === 'high' ? ControlRoomAlert::query()->sole()->id : null);
+    $this->actingAs($viewer)->get('/security-devices/monitoring')->assertOk()->assertInertia(fn ($page) => $page
+        ->where('workspace.monitors.0.correlation.it_incident.id', $ticket->id));
+})->with([[false, 'medium'], [false, 'high'], [true, 'medium'], [true, 'high']]);
+
+test('monitoring history retains recovered work but never attributes an older ticket to a later undelivered issue', function () {
+    [$monitor, $site] = technicalEpisodeMonitor();
+    $viewer = episodeViewer($site);
+    $first = episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent;
+    deliverEpisodeSource($first);
+    $firstTicket = ItTicket::query()->sole();
+    deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Healthy, 2)->deviceEvent);
+    expect(data_get(episodeDashboardLink($monitor, $viewer), 'it_incident.id'))->toBe($firstTicket->id)
+        ->and(data_get(episodeDashboardLink($monitor, $viewer), 'it_incident.monitoring_recovered_at'))->not->toBeNull();
+    $later = episodeObservation($monitor, $site, MonitorState::Failed, 3)->deviceEvent;
+    expect(data_get(episodeDashboardLink($monitor, $viewer), 'it_incident'))->toBeNull();
+    deliverEpisodeSource($later);
+    $laterTicket = ItTicket::query()->latest('id')->firstOrFail();
+    deliverEpisodeSource($first);
+    expect($laterTicket->id)->not->toBe($firstTicket->id)
+        ->and(data_get(episodeDashboardLink($monitor, $viewer), 'it_incident.id'))->toBe($laterTicket->id);
+});
+
+test('monitoring dashboard ticket links require current IT source Site and sealed evidence boundaries', function () {
+    [$monitor, $site] = technicalEpisodeMonitor();
+    deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent);
+    $viewer = episodeViewer($site);
+    expect(data_get(episodeDashboardLink($monitor, $viewer), 'it_incident.id'))->toBe(ItTicket::query()->sole()->id)
+        ->and(data_get(episodeDashboardLink($monitor, episodeViewer($site, ['securityDevices.devices.view'])), 'it_incident'))->toBeNull()
+        ->and(data_get(episodeDashboardLink($monitor, episodeViewer($site, ['it.view', 'it.manage'])), 'it_incident'))->toBeNull()
+        ->and(episodeDashboardLink($monitor, episodeViewer(Site::factory()->create())))->toBeNull();
+    $snapshot = MonitoringIncidentEvidenceSnapshot::query()->sole();
+    // Deliberate isolated corruption must not be presented as a canonical link.
+    DB::table('monitoring_incident_evidence_snapshots')->where('id', $snapshot->id)->update(['checksum' => str_repeat('0', 64)]);
+    expect(data_get(episodeDashboardLink($monitor, $viewer), 'it_incident'))->toBeNull();
+});
+
+test('monitoring dashboard keeps independent technical checks on one device attached to their own work', function () {
+    [$first, $site] = technicalEpisodeMonitor();
+    $second = Monitor::factory()->create(['device_id' => $first->device_id, 'profile_id' => $first->profile_id,
+        'collector_id' => null, 'kind' => 'http', 'affects_availability' => false,
+        'current_state' => MonitorState::Healthy, 'effective_state' => MonitorState::Healthy]);
+    $firstDelivery = deliverEpisodeSource(episodeObservation($first, $site, MonitorState::Failed, 1)->deviceEvent);
+    $secondDelivery = deliverEpisodeSource(episodeObservation($second, $site, MonitorState::Failed, 2)->deviceEvent);
+    $viewer = episodeViewer($site);
+    expect($firstDelivery->it_ticket_ids[0])->not->toBe($secondDelivery->it_ticket_ids[0])
+        ->and(data_get(episodeDashboardLink($first, $viewer), 'it_incident.id'))->toBe($firstDelivery->it_ticket_ids[0])
+        ->and(data_get(episodeDashboardLink($second, $viewer), 'it_incident.id'))->toBe($secondDelivery->it_ticket_ids[0]);
+});
+
+test('moving a monitored device cannot relabel its old Site work even for a viewer allowed at both Sites', function () {
+    [$monitor, $site] = technicalEpisodeMonitor();
+    $otherSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+    $viewer = episodeViewer($site);
+    HrEmployeeProfile::query()->where('user_id', $viewer->id)->sole()->update(['secondary_site_ids' => [$otherSite->id]]);
+    deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent);
+    expect(data_get(episodeDashboardLink($monitor, $viewer), 'it_incident.id'))->toBe(ItTicket::query()->sole()->id);
+    $this->travel(2)->seconds();
+    DeviceAssignment::query()->where('device_id', $monitor->device_id)->sole()->update([
+        'released_at' => now(), 'released_by_user_id' => $viewer->id,
+    ]);
+    DeviceAssignment::query()->create(['device_id' => $monitor->device_id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $otherSite->id,
+        'assignment_type' => 'permanent', 'assigned_at' => now(), 'assigned_by_user_id' => $viewer->id]);
+    $row = collect(app(MonitoringOperationsPresenter::class)->present($viewer->fresh())['monitors'])->firstWhere('id', $monitor->id);
+    expect(data_get($row, 'site.id'))->toBe($otherSite->id)
+        ->and(data_get($row, 'correlation.it_incident'))->toBeNull()
+        ->and(data_get($row, 'correlation.control_room'))->toBeNull();
+});
+
+test('non IT monitoring retains its owning operational correlation without automatic IT work', function () {
+    [$monitor, $site] = episodeMonitor();
+    $monitor->device->update(['domain' => 'security', 'category' => 'cctv', 'subcategory' => 'dome_camera']);
+    deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent, false);
+    $viewer = episodeViewer($site, ['securityDevices.devices.view', 'controlRoom.alerts.view']);
+    expect(data_get(episodeDashboardLink($monitor, $viewer), 'control_room.id'))->toBe(ControlRoomAlert::query()->sole()->id)
+        ->and(data_get(episodeDashboardLink($monitor, $viewer), 'it_incident'))->toBeNull()
+        ->and(ItTicket::query()->count())->toBe(0);
+});
+
+test('monitoring dashboard rejects mismatched source identity and snapshot record bindings', function (string $mutation) {
+    [$monitor, $site] = technicalEpisodeMonitor();
+    $outbox = deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent);
+    $signal = Signal::query()->findOrFail($outbox->it_signal_id);
+    $snapshot = MonitoringIncidentEvidenceSnapshot::query()->sole();
+    if ($mutation === 'snapshot_ticket') {
+        $unrelated = ItTicket::factory()->create(['site_id' => $site->id, 'is_organisation_wide' => false]);
+        // A valid JSON checksum alone does not prove a subsequently changed foreign key.
+        DB::table($snapshot->getTable())->where('id', $snapshot->id)->update(['it_ticket_id' => $unrelated->id]);
+    } else {
+        $changes = match ($mutation) {
+            'external_reference' => ['external_ref' => 'unrelated-source-'.$signal->id],
+            'signal_type' => ['signal_type_code' => 'device_offline'],
+            'episode_version' => ['normalized_data' => [...$signal->normalized_data, 'condition_episode_version' => 2]],
+        };
+        $signal->forceFill($changes)->saveQuietly();
+    }
+    $link = episodeDashboardLink($monitor, episodeViewer($site));
+    expect(data_get($link, 'it_incident'))->toBeNull()->and(data_get($link, 'control_room'))->toBeNull();
+})->with(['external_reference', 'signal_type', 'episode_version', 'snapshot_ticket']);
 
 test('configured nonurgent faults create one direct ticket and sealed source evidence despite a high transport hint', function (string $severity, string $priority) {
     SignalRule::query()->where('signal_type_code', 'device_offline')->update(['output_severity' => $severity]);

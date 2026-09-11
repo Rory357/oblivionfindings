@@ -208,6 +208,17 @@ function HandoffBody({
         const unsubscribe = router.on('before', (event) => {
             if (permittedNavigation.current) return;
             event.preventDefault();
+            const visit = event.detail.visit;
+            // The underlying worklist polls while its workspace is open. Pause
+            // same-page partial refreshes without treating them as draft exits.
+            if (
+                visit.async &&
+                visit.method === 'get' &&
+                visit.url.href === window.location.href &&
+                visit.only.length > 0
+            ) {
+                return;
+            }
             setLeave(() => () => {
                 permittedNavigation.current = true;
                 router.visit(event.detail.visit.url, event.detail.visit);
