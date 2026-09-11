@@ -98,7 +98,9 @@ it('links a reviewed permitted ticket and shows success only for its committed r
         screen.getByRole('button', { name: 'Link selected ticket' }),
     );
     expect(await screen.findByText('IT handoff saved')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open IT ticket' })).toHaveFocus();
+    expect(
+        screen.getByRole('button', { name: 'Open IT ticket' }),
+    ).toHaveFocus();
     expect(post.mock.calls[0][0]).toBe('/it/control-room/alerts/11/handoff');
     expect(post.mock.calls[0][1]).toMatchObject({
         action: 'link',
@@ -177,12 +179,10 @@ it('requires complete technical classification and sends the reviewed creation f
 });
 
 it('retains the draft after a stale ticket and requires a fresh explicit selection before retrying', async () => {
-    const post = vi
-        .spyOn(axios, 'post')
-        .mockRejectedValue({
-            isAxiosError: true,
-            response: { status: 409, data: { code: 'stale_ticket' } },
-        });
+    const post = vi.spyOn(axios, 'post').mockRejectedValue({
+        isAxiosError: true,
+        response: { status: 409, data: { code: 'stale_ticket' } },
+    });
     render(<ControlRoomItHandoffDialog {...props} />);
     const user = await chooseLink();
     await user.click(
@@ -223,6 +223,41 @@ it('retains the draft after a stale ticket and requires a fresh explicit selecti
     expect(
         screen.getByLabelText(/Why is this technical handoff needed/),
     ).toHaveValue('Restore the site network.');
+});
+
+it('explains server validation failures that have no field on the review step', async () => {
+    vi.spyOn(axios, 'post').mockRejectedValue({
+        isAxiosError: true,
+        response: {
+            status: 422,
+            data: {
+                message: 'Review the IT handoff fields.',
+                errors: {
+                    alert_version: [
+                        'The operational alert changed. Refresh the handoff before submitting again.',
+                    ],
+                },
+            },
+        },
+    });
+    const view = render(<ControlRoomItHandoffDialog {...props} />);
+    const user = await chooseLink();
+    await user.click(
+        screen.getByRole('button', { name: 'Link selected ticket' }),
+    );
+    expect(
+        await screen.findByRole('list', { name: 'Handoff validation errors' }),
+    ).toHaveTextContent(
+        'The operational alert changed. Refresh the handoff before submitting again.',
+    );
+    expect(screen.getByText('Restore the site network.')).toBeInTheDocument();
+    expect(
+        screen.getByRole('button', { name: 'Link selected ticket' }),
+    ).toBeDisabled();
+    view.rerender(<ControlRoomItHandoffDialog {...props} allowed={false} />);
+    expect(
+        screen.queryByRole('list', { name: 'Handoff validation errors' }),
+    ).not.toBeInTheDocument();
 });
 
 it('preserves the submitted identity on failure and distinguishes server cancellation from success', async () => {

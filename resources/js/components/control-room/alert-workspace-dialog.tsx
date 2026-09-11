@@ -864,6 +864,7 @@ export function AlertWorkspaceDialog({
                 alertId={a.id}
                 alertReference={alertRef}
                 allowed={d.it_handoff.can_open}
+                onCloseAutoFocus={(event) => event.preventDefault()}
                 onClose={() => {
                     setHandoffOpen(false);
                     setSection('linked');

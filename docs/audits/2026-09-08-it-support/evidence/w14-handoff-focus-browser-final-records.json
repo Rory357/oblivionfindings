@@ -1,0 +1,87 @@
+{
+    "token": "b3093c8c6f734216",
+    "mutations_performed": false,
+    "cases": {
+        "create": {
+            "alert": {
+                "id": 5,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "link": {
+            "alert": {
+                "id": 6,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "cancel": {
+            "alert": {
+                "id": 7,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [
+                {
+                    "ticket_id": 18,
+                    "created_by_user_id": 3
+                }
+            ],
+            "receipts": [
+                {
+                    "actor_user_id": 3,
+                    "request_uuid": "061b9960-9698-4c33-a230-1268f8b86468",
+                    "it_ticket_id": 18,
+                    "committed_ticket_version": 2,
+                    "result_metadata": "{\"state\": \"committed\", \"changed\": true, \"outcome\": \"linked\", \"alert_id\": 7}"
+                }
+            ]
+        },
+        "stale": {
+            "alert": {
+                "id": 8,
+                "site_id": 1,
+                "status": "ack"
+            },
+            "links": [
+                {
+                    "ticket_id": 19,
+                    "created_by_user_id": 3
+                }
+            ],
+            "receipts": [
+                {
+                    "actor_user_id": 3,
+                    "request_uuid": "b0d57050-bc76-4753-8d01-c60942230de8",
+                    "it_ticket_id": 19,
+                    "committed_ticket_version": 3,
+                    "result_metadata": "{\"state\": \"committed\", \"changed\": true, \"outcome\": \"linked\", \"alert_id\": 8}"
+                }
+            ]
+        },
+        "other_site": {
+            "alert": {
+                "id": 9,
+                "site_id": 3,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "private": {
+            "alert": {
+                "id": 10,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        }
+    },
+    "ticket_count": 19
+}

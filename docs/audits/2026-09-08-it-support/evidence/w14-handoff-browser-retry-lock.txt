@@ -1,0 +1,2 @@
+{"token":"74a3f446003f4ad8","alert_id":7,"lock_held":true,"maximum_hold_seconds":25,"record_mutations":false}
+{"token":"74a3f446003f4ad8","lock_released":true,"record_mutations":false}

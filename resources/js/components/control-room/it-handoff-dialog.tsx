@@ -43,6 +43,7 @@ import {
     useLayoutEffect,
     useRef,
     useState,
+    type ComponentProps,
 } from 'react';
 
 interface Props {
@@ -51,6 +52,7 @@ interface Props {
     alertReference: string;
     allowed: boolean;
     onClose: () => void;
+    onCloseAutoFocus?: ComponentProps<typeof WizardShell>['onCloseAutoFocus'];
 }
 type Creation = Extract<HandoffSelection, { action: 'create' }>;
 const steps = [
@@ -84,6 +86,7 @@ function HandoffBody({
     alertReference,
     allowed,
     onClose,
+    onCloseAutoFocus,
 }: Props) {
     const command = useItControlRoomHandoffCommand(actorId, alertId);
     const commandRef = useRef(command);
@@ -336,6 +339,7 @@ function HandoffBody({
     return (
         <>
             <WizardShell
+                onCloseAutoFocus={onCloseAutoFocus}
                 open
                 onClose={close}
                 title="IT handoff"
@@ -408,6 +412,20 @@ function HandoffBody({
                                 {command.message}
                             </p>
                         ) : null}
+                        {!concealed &&
+                            command.stage === 'rejected' &&
+                            command.errors && (
+                                <ul
+                                    aria-label="Handoff validation errors"
+                                    className="text-caption mb-3 list-disc space-y-1 pl-4 text-status-critical"
+                                >
+                                    {Object.entries(command.errors).map(
+                                        ([field, message]) => (
+                                            <li key={field}>{message}</li>
+                                        ),
+                                    )}
+                                </ul>
+                            )}
                     </div>
                     {concealed ? (
                         <ErrorState

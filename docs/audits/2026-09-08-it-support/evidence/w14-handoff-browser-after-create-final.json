@@ -1,0 +1,74 @@
+{
+    "token": "140c194b52f045c0",
+    "mutations_performed": false,
+    "cases": {
+        "create": {
+            "alert": {
+                "id": 5,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [
+                {
+                    "ticket_id": 20,
+                    "created_by_user_id": 3
+                }
+            ],
+            "receipts": [
+                {
+                    "actor_user_id": 3,
+                    "request_uuid": "5d66d3a1-e317-492c-a14a-7b562bac5e72",
+                    "it_ticket_id": 20,
+                    "committed_ticket_version": 4,
+                    "result_metadata": "{\"state\": \"committed\", \"changed\": true, \"outcome\": \"created\", \"alert_id\": 5}"
+                }
+            ]
+        },
+        "link": {
+            "alert": {
+                "id": 6,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "cancel": {
+            "alert": {
+                "id": 7,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "stale": {
+            "alert": {
+                "id": 8,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "other_site": {
+            "alert": {
+                "id": 9,
+                "site_id": 3,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        },
+        "private": {
+            "alert": {
+                "id": 10,
+                "site_id": 1,
+                "status": "open"
+            },
+            "links": [],
+            "receipts": []
+        }
+    },
+    "ticket_count": 20
+}

@@ -28,6 +28,7 @@ export function WizardShell({
     open,
     onClose,
     onOpenAutoFocus,
+    onCloseAutoFocus,
     title,
     description,
     railIcon: RailIcon,
@@ -51,6 +52,8 @@ export function WizardShell({
     onClose: () => void;
     /** Optional initial focus after the shared Dialog captures its opener. */
     onOpenAutoFocus?: ComponentProps<typeof DialogContent>['onOpenAutoFocus'];
+    /** A replacement workspace may own focus after this dialog unmounts. */
+    onCloseAutoFocus?: ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
     /** Screen-reader dialog title/description (visually hidden). */
     title: string;
     description: string;
@@ -84,6 +87,7 @@ export function WizardShell({
                 className="overflow-hidden p-0 [&>button]:hidden"
                 style={{ maxWidth, width: maxWidth }}
                 onOpenAutoFocus={onOpenAutoFocus}
+                onCloseAutoFocus={onCloseAutoFocus}
             >
                 <DialogTitle className="sr-only">{title}</DialogTitle>
                 <DialogDescription className="sr-only">
