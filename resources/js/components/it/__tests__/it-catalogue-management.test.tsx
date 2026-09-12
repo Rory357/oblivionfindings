@@ -518,6 +518,7 @@ it('lets an author remove an unavailable saved Site without concealing its restr
 it('shows approved request Sites and submits the staff-selected Site with the request', () => {
     render(
         <ItServiceCatalogue
+            actorId={3}
             items={[
                 {
                     ...item,

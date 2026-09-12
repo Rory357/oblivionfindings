@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItCatalogFieldOptionService;
 use App\Domain\It\Services\ItCatalogSubmissionService;
 use App\Domain\It\Services\ItProvisioningAccessService;
 use App\Models\Asset;
@@ -718,6 +719,119 @@ test('catalogue entity fields expose only canonical choices and reject forged di
         ->and($ticket->description)->toContain('Assigned laptop')
         ->and($ticket->description)->toContain('LT-001')
         ->and($ticket->description)->not->toContain("Equipment: {$assignedAsset->id}");
+});
+
+test('catalogue entity submissions resolve current permitted records beyond the first 200 choices', function () {
+    HrEmployeeProfile::factory()->count(200)->create([
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'created_by' => $this->agent->id,
+        'updated_by' => $this->agent->id,
+    ]);
+    $person = User::factory()->create(['name' => 'Last permitted catalogue person']);
+    $profile = HrEmployeeProfile::factory()->create([
+        'user_id' => $person->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'created_by' => $this->agent->id,
+        'updated_by' => $this->agent->id,
+    ]);
+    Asset::factory()->count(200)->forSite($this->site)->create([
+        'name' => 'Earlier equipment',
+        'created_by_user_id' => $this->agent->id,
+        'updated_by_user_id' => $this->agent->id,
+    ]);
+    $asset = Asset::factory()->forSite($this->site)->create([
+        'name' => 'Z last permitted equipment',
+        'created_by_user_id' => $this->agent->id,
+        'updated_by_user_id' => $this->agent->id,
+    ]);
+    $options = app(ItCatalogFieldOptionService::class);
+    $firstPage = $options->forTypes($this->agent);
+    foreach (['employee' => $profile->id, 'user' => $person->id, 'asset' => $asset->id] as $type => $id) {
+        expect($firstPage[$type])->toHaveCount(200)
+            ->and(collect($firstPage[$type])->pluck('id')->all())->not->toContain($id)
+            ->and($options->find($this->agent, $type, $id)['id'])->toBe($id)
+            ->and($options->find($this->worker, $type, $id))->toBeNull();
+    }
+
+    $item = ItCatalogItem::factory()->create([
+        'form_schema' => ['fields' => [
+            ['key' => 'employee', 'label' => 'Employee', 'type' => 'employee', 'required' => true],
+            ['key' => 'user', 'label' => 'User', 'type' => 'user', 'required' => true],
+            ['key' => 'asset', 'label' => 'Equipment', 'type' => 'asset', 'required' => true],
+        ]],
+    ]);
+    $payload = [
+        'schema_version' => 1, 'idempotency_key' => (string) Str::uuid(),
+        'values' => ['employee' => $profile->id, 'user' => $person->id, 'asset' => $asset->id],
+    ];
+    $this->actingAs($this->agent);
+    foreach (['employee' => $profile->id, 'user' => $person->id, 'asset' => $asset->id] as $type => $id) {
+        $search = [
+            'actor_user_id' => $this->agent->id, 'schema_version' => 1,
+            'query_uuid' => (string) Str::uuid(), 'query' => 'last permitted', 'selected_id' => $id,
+        ];
+        $response = $this->postJson("/it/catalog/{$item->id}/fields/{$type}/options", $search)
+            ->assertOk()->assertJsonPath('viewer_user_id', $this->agent->id)
+            ->assertJsonPath('query_uuid', $search['query_uuid'])->assertJsonPath('field_key', $type)
+            ->assertJsonPath('catalog_item_id', $item->id)->assertJsonPath('schema_version', 1)
+            ->assertJsonCount(1, 'options')->assertJsonPath('options.0.id', $id)
+            ->assertJsonPath('selected.id', $id)->assertJsonPath('next_cursor', null);
+        expect($response->headers->get('Cache-Control'))->toContain('no-store');
+    }
+    $seen = [];
+    $after = null;
+    do {
+        $page = $this->postJson("/it/catalog/{$item->id}/fields/asset/options", [
+            'actor_user_id' => $this->agent->id, 'schema_version' => 1,
+            'query_uuid' => (string) Str::uuid(), 'after' => $after,
+        ])->assertOk()->json();
+        expect(count($page['options']))->toBeLessThanOrEqual(50);
+        $seen = [...$seen, ...array_column($page['options'], 'id')];
+        $after = $page['next_cursor'];
+    } while ($after !== null && count($seen) <= 250);
+    expect($seen)->toHaveCount(201)->and(array_unique($seen))->toHaveCount(201)
+        ->and($seen)->toContain($asset->id)->and($after)->toBeNull();
+    $this->actingAs($this->agent)->post("/it/catalog/{$item->id}/submissions", $payload)
+        ->assertRedirect()->assertSessionDoesntHaveErrors();
+    expect(ItTicket::query()->sole()->description)->toContain($person->name, $asset->name)
+        ->and(ItCatalogSubmission::query()->count())->toBe(1);
+
+    // Previously discovered records are rechecked at submission, without retaining a grant.
+    $profile->update(['is_active' => false]);
+    $asset->update(['status' => 'retired']);
+    $payload['idempotency_key'] = (string) Str::uuid();
+    $this->post("/it/catalog/{$item->id}/submissions", $payload)
+        ->assertSessionHasErrors(['values.employee', 'values.user', 'values.asset']);
+    expect(ItTicket::query()->count())->toBe(1)
+        ->and(ItCatalogSubmission::query()->count())->toBe(1);
+});
+
+test('catalogue field search requires the current actor and visible published field version', function () {
+    $item = ItCatalogItem::factory()->create(['form_schema' => ['fields' => [
+        ['key' => 'person', 'label' => 'Person', 'type' => 'employee'],
+        ['key' => 'private_person', 'label' => 'Private person', 'type' => 'employee', 'visibility' => 'internal'],
+        ['key' => 'details', 'label' => 'Details', 'type' => 'text'],
+    ]]]);
+    $base = "/it/catalog/{$item->id}/fields";
+    $input = ['actor_user_id' => $this->worker->id, 'query_uuid' => (string) Str::uuid(), 'schema_version' => 1];
+    $this->actingAs($this->worker)->postJson("{$base}/person/options", $input)
+        ->assertOk()->assertJsonCount(1, 'options')->assertJsonPath('options.0.id', $this->workerProfile->id);
+    foreach (['private_person', 'details', 'missing', 'asset'] as $field) {
+        $this->postJson("{$base}/{$field}/options", $input)->assertNotFound();
+    }
+    $this->postJson("{$base}/person/options", [...$input, 'actor_user_id' => $this->agent->id])->assertForbidden();
+    $this->postJson("{$base}/person/options", [...$input, 'schema_version' => 2])->assertConflict();
+    $this->postJson("{$base}/person/options", [...$input, 'query' => str_repeat('x', 101)])->assertUnprocessable();
+    $this->postJson("{$base}/person/options", [...$input, 'query' => '%'])->assertOk()->assertJsonCount(0, 'options');
+    $this->postJson("{$base}/person/options", [...$input, 'selected_id' => $this->agent->hrEmployeeProfile->id])
+        ->assertOk()->assertJsonPath('selected', null);
+    $this->workerProfile->update(['is_active' => false]);
+    $this->postJson("{$base}/person/options", [...$input, 'selected_id' => $this->workerProfile->id])
+        ->assertOk()->assertJsonCount(0, 'options')->assertJsonPath('selected', null);
+    $item->update(['is_published' => false]);
+    $this->postJson("{$base}/person/options", $input)->assertNotFound();
 });
 
 function catalogueCreateCommand(User $actor, ?string $uuid = null): array

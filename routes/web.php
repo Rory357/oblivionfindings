@@ -201,6 +201,7 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         ->middleware('permission:it.view')
         ->name('it.ticket-filters.destroy');
     Route::get('/it/catalog', [ItCatalogController::class, 'index'])->name('it.catalog.index');
+    Route::post('/it/catalog/{catalogItem}/fields/{field}/options', \App\Http\Controllers\It\ItCatalogFieldOptionController::class)->name('it.catalog.field-options');
     Route::post('/it/catalog/{catalogItem}/submissions', [ItCatalogController::class, 'store'])->name('it.catalog.submissions.store');
     Route::get('/it/changes', [ItChangeController::class, 'index'])->middleware('permission:it.view')->name('it.changes.index');
     Route::get('/it/changes/{change}', [ItChangeController::class, 'show'])->middleware('permission:it.view')->name('it.changes.show');

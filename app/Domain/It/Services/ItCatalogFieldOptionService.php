@@ -5,6 +5,7 @@ namespace App\Domain\It\Services;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -70,20 +71,104 @@ final class ItCatalogFieldOptionService
         return $options;
     }
 
-    /** @return Collection<int, HrEmployeeProfile> */
-    private function profiles(User $actor): Collection
+    /**
+     * Resolve current access independently of the discovery page limit.
+     *
+     * @return array{id: int, name: string, detail: string|null}|null
+     */
+    public function find(User $actor, string $type, int $id): ?array
+    {
+        if ($actor->approved_at === null || ! in_array($type, self::TYPES, true) || $id < 1) {
+            return null;
+        }
+
+        if ($type === 'asset') {
+            $asset = $this->assetQuery($actor)->whereKey($id)->first(['id', 'site_id', 'name', 'asset_tag']);
+
+            return $asset ? [
+                'id' => (int) $asset->id,
+                'name' => $asset->name,
+                'detail' => $asset->asset_tag ? 'Tag '.$asset->asset_tag : $asset->site?->name,
+            ] : null;
+        }
+
+        $profile = $this->profileQuery($actor)
+            ->where($type === 'user' ? 'user_id' : 'id', $id)
+            ->first(['id', 'user_id', 'primary_site_id']);
+        if (! $profile || ($type === 'user' && ! $profile->user)) {
+            return null;
+        }
+
+        return [
+            'id' => $type === 'user' ? (int) $profile->user->id : (int) $profile->id,
+            'name' => $profile->user?->name ?: 'Employee profile '.$profile->id,
+            'detail' => $profile->primarySite?->name,
+        ];
+    }
+
+    /**
+     * Bounded keyset discovery. The controller derives the type from a visible
+     * published field; this method supplies the canonical current access scope.
+     *
+     * @return array{options: list<array{id: int, name: string, detail: string|null}>, next_cursor: int|null}
+     */
+    public function search(User $actor, string $type, string $search, ?int $after = null): array
+    {
+        if ($actor->approved_at === null || ! in_array($type, self::TYPES, true)) {
+            return ['options' => [], 'next_cursor' => null];
+        }
+
+        $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
+        $query = $type === 'asset' ? $this->assetQuery($actor) : $this->profileQuery($actor);
+        if ($type === 'user') {
+            $query->whereHas('user');
+        }
+        if ($search !== '') {
+            if ($type === 'asset') {
+                $query->where(fn (Builder $match) => $match
+                    ->whereRaw("name LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("asset_tag LIKE ? ESCAPE '!'", [$pattern]));
+            } else {
+                $query->whereHas('user', fn (Builder $users) => $users->whereRaw("name LIKE ? ESCAPE '!'", [$pattern]));
+            }
+        }
+        $rows = $query->when($after !== null, fn (Builder $page) => $page->where('id', '>', $after))
+            ->reorder('id')->limit(51)
+            ->get($type === 'asset' ? ['id', 'site_id', 'name', 'asset_tag'] : ['id', 'user_id', 'primary_site_id']);
+        $page = $rows->take(50);
+
+        return [
+            'options' => $page->map(fn ($record): array => $type === 'asset' ? [
+                'id' => (int) $record->id,
+                'name' => $record->name,
+                'detail' => $record->asset_tag ? 'Tag '.$record->asset_tag : $record->site?->name,
+            ] : [
+                'id' => $type === 'user' ? (int) $record->user->id : (int) $record->id,
+                'name' => $record->user?->name ?: 'Employee profile '.$record->id,
+                'detail' => $record->primarySite?->name,
+            ])->values()->all(),
+            'next_cursor' => $rows->count() > 50 ? (int) $page->last()->id : null,
+        ];
+    }
+
+    /** @return Builder<HrEmployeeProfile> */
+    private function profileQuery(User $actor): Builder
     {
         return $this->provisioningAccess
             ->selectableProfiles($actor)
             ->when(! $actor->canDo('it.manage'), fn ($query) => $query->where('user_id', $actor->id))
             ->with(['user:id,name', 'primarySite:id,name'])
-            ->orderBy('id')
-            ->limit(200)
-            ->get(['id', 'user_id', 'primary_site_id']);
+            ->orderBy('id');
     }
 
-    /** @return Collection<int, Asset> */
-    private function assets(User $actor): Collection
+    /** @return Collection<int, HrEmployeeProfile> */
+    private function profiles(User $actor): Collection
+    {
+        return $this->profileQuery($actor)->limit(200)->get(['id', 'user_id', 'primary_site_id']);
+    }
+
+    /** @return Builder<Asset> */
+    private function assetQuery(User $actor): Builder
     {
         $siteIds = $this->workAccess->approvedSiteIds($actor);
 
@@ -110,8 +195,12 @@ final class ItCatalogFieldOptionService
                     : $query->whereIn('site_id', $siteIds),
             )
             ->with('site:id,name')
-            ->orderBy('name')
-            ->limit(200)
-            ->get(['id', 'site_id', 'name', 'asset_tag']);
+            ->orderBy('name')->orderBy('id');
+    }
+
+    /** @return Collection<int, Asset> */
+    private function assets(User $actor): Collection
+    {
+        return $this->assetQuery($actor)->limit(200)->get(['id', 'site_id', 'name', 'asset_tag']);
     }
 }

@@ -2937,6 +2937,8 @@ export default function ItIndex({
                     {/* ── Service catalogue (everyone with it.request) ── */}
                     {can.request && tab === 'catalog' ? (
                         <ItServiceCatalogue
+                            key={actorId}
+                            actorId={actorId ?? 0}
                             items={catalogItems}
                             fieldOptions={catalogFieldOptions}
                             query={catalogQuery}

@@ -1,0 +1,101 @@
+{
+  "captured_at": "2026-09-12T18:20:21.6344131+12:00",
+  "source": [
+    {
+      "path": "app/Domain/It/Services/ItCatalogFieldOptionService.php",
+      "sha256": "db4d960330c24e78743f867850a1b5420f292b63bc871347dee89ffff80de90f"
+    },
+    {
+      "path": "app/Domain/It/Services/ItCatalogSubmissionService.php",
+      "sha256": "b69f42d2eb1990d8fd937bdc08485dd207d671b32cc57f704f2e198a2d75a777"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItCatalogFieldOptionController.php",
+      "sha256": "a9284d908847b27df865de42402b86895febe432d13301dd2d4b7255822d8f31"
+    },
+    {
+      "path": "app/Http/Requests/It/SearchItCatalogFieldOptionsRequest.php",
+      "sha256": "5ff6f6429f897f4d62f329caa1a0a2518e998c985940f377b4f5d8f5d515eea2"
+    },
+    {
+      "path": "routes/web.php",
+      "sha256": "3eb7b47db51f7fd855db955f6c84ae57e421d23fd625dbd3976e721d8f8df32c"
+    },
+    {
+      "path": "resources/js/components/it/catalogue-entity-picker.tsx",
+      "sha256": "f06b08396bd24a68995cc94c6f022aa768b4a141fcbed239b8d33723c997a77f"
+    },
+    {
+      "path": "resources/js/components/it/it-service-catalogue.tsx",
+      "sha256": "f36470c0ff48ea60cae882a9f7dbf06b8d1f0d7720fe37db5bb967c40a1a1259"
+    },
+    {
+      "path": "resources/js/pages/it/index.tsx",
+      "sha256": "71afe5b4ce1b05d6a170b83742b02b1b081e44733056884f62065e24271c827c"
+    },
+    {
+      "path": "resources/js/components/it/__tests__/catalogue-entity-picker.test.tsx",
+      "sha256": "93ed2e2281843fb06a6b64a5764bafcddf15739ed093b75e93113a0e6876d3c4"
+    },
+    {
+      "path": "resources/js/components/it/__tests__/it-module-navigation.test.tsx",
+      "sha256": "00c8e203c2b7234a1e8c02844cc65a24e3dab4eac635557b04e575429a216303"
+    },
+    {
+      "path": "resources/js/components/it/__tests__/it-catalogue-management.test.tsx",
+      "sha256": "0afad719d047f57fe0ef1d07986284aeff2a894fdffcd8a26ee53db122f63564"
+    },
+    {
+      "path": "tests/Feature/It/ItServiceCatalogTest.php",
+      "sha256": "544e65f8f7427097fa0455fad8c3cc90276dcbac9c974d4c4b45bb1268cc85c9"
+    },
+    {
+      "path": "docs/audits/2026-09-08-it-support/evidence/w15-catalogue-browser-fixture.php",
+      "sha256": "2e9d98bf01148768cd39478ba8931a4f7842967bca2f0f4292190957df23e5a5"
+    }
+  ],
+  "design": [
+    {
+      "sha256": "96863e01d924e954255cd61f550396c2f2eea9778bbaab7e8570ef9d63279c22",
+      "path": "DESIGN.md"
+    },
+    {
+      "sha256": "62515485265119962773e6015fefe38be94434aae468acd017c078da61b20ab5",
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "86259475c987d6e30001604316379eb608aea9f83e16941b6aa476a94bca6957",
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "c3ee6c8acaa22049084f819e3ad2a33f457e936e467492079f16c15e9a611d2b",
+      "path": "design_styles/DESIGN_TOKENS.md"
+    },
+    {
+      "sha256": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac",
+      "path": "design_styles/LIST_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "cc20485e6e42e0a848b8cacc8ac6124e5e5a01206d966de6ebbbdec39dbe2a91",
+      "path": "design_styles/LOADER_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "9295cdb1386322b8a088ae03de41bc3c75a0fbe3e8fa3331c92c704ccb15895d",
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "748c94c030984d16c1a78f3b70855d1cf8f22461ab017e4ac8287ab9e8809cdf",
+      "path": "design_styles/oblivion-loader-01-demo.html"
+    },
+    {
+      "sha256": "a528a0e863a676fdbbfcb028e532ece2799e39a7345ca3c1eca619ac4491d931",
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "aee723e21491e9be908554a6f200d73204280a63d9028ea78de6bb9049f4a477",
+      "path": "design_styles/POPUP_STYLE_GUIDE.md"
+    }
+  ],
+  "build": "Session1225 exit0; final TypeScript then Vite; built in 5m25s",
+  "manifest_sha256": "dc8ec99cc733e646a8f892001bdb744c9791b06c1c2bcedab09b186daf544c32"
+}

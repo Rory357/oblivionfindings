@@ -185,15 +185,6 @@ class ItCatalogSubmissionService
         $clean = collect($validated['values'] ?? [])
             ->only($fields->keys()->all())
             ->all();
-        $entityTypes = $fields
-            ->pluck('type')
-            ->filter(fn (mixed $type): bool => in_array($type, ItCatalogFieldOptionService::TYPES, true))
-            ->unique()
-            ->values()
-            ->all();
-        $options = $entityTypes !== []
-            ? $this->fieldOptions->forTypes($actor, $entityTypes)
-            : ['employee' => [], 'user' => [], 'asset' => []];
         $displayValues = $clean;
         $errors = [];
         foreach ($fields as $key => $field) {
@@ -205,7 +196,7 @@ class ItCatalogSubmissionService
                 continue;
             }
 
-            $option = collect($options[$type] ?? [])->firstWhere('id', (int) $clean[$key]);
+            $option = $this->fieldOptions->find($actor, $type, (int) $clean[$key]);
             if (! is_array($option)) {
                 $errors["values.{$key}"] = 'This choice is no longer available to you.';
 

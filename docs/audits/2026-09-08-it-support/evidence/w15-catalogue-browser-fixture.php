@@ -4,6 +4,8 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItCatalogManagementService;
 use App\Domain\It\Services\ItProvisioningTemplateService;
 use App\Domain\It\Services\ItProvisioningWorkflowService;
+use App\Models\Asset;
+use App\Models\AssetAssignment;
 use App\Models\ItCatalogItem;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +21,7 @@ function w15BrowserCreateCatalogueFixtures(array $context, array $fixtures): arr
         w06BrowserRequire($actor->email === 'w06-tech@demo.test' && $actor->canDo('it.manage'), 'Expected synthetic catalogue author unavailable.');
         $management = app(ItCatalogManagementService::class);
         $items = [];
-        foreach (['approval', 'service', 'draft', 'versioned'] as $case) {
+        foreach (['approval', 'service', 'draft', 'versioned', 'entities'] as $case) {
             $data = [
                 'it_service_id' => null,
                 'name' => 'W15 '.$context['token'].' synthetic '.$case.' request',
@@ -33,6 +35,13 @@ function w15BrowserCreateCatalogueFixtures(array $context, array $fixtures): arr
                     'required' => true, 'visibility' => 'requester', 'max' => 2000,
                 ]]],
             ];
+            if ($case === 'entities') {
+                $data['form_schema']['fields'] = [
+                    ['key' => 'employee', 'label' => 'Employee', 'type' => 'employee', 'required' => true, 'visibility' => 'requester'],
+                    ['key' => 'user', 'label' => 'User', 'type' => 'user', 'required' => true, 'visibility' => 'requester'],
+                    ['key' => 'asset', 'label' => 'Equipment', 'type' => 'asset', 'required' => true, 'visibility' => 'requester'],
+                ];
+            }
             $item = $management->create($actor, $data);
             if ($case !== 'draft') {
                 $item = $management->publish($item, $actor, $item->lock_version);
@@ -47,7 +56,24 @@ function w15BrowserCreateCatalogueFixtures(array $context, array $fixtures): arr
                 'draft_version' => $item->form_schema_version, 'published_version' => $item->publishedVersion?->version,
                 'lock_version' => $item->lock_version, 'published' => $item->is_published];
         }
-        w06BrowserRequire(ItCatalogItem::query()->count() === 4, 'Unexpected existing catalogue items in the synthetic schema.');
+        w06BrowserRequire(ItCatalogItem::query()->count() === 5, 'Unexpected existing catalogue items in the synthetic schema.');
+        $entityAssets = [];
+        for ($number = 1; $number <= 202; $number++) {
+            $asset = Asset::query()->create([
+                'site_id' => $fixtures['sites'][$number === 202 ? 'c' : 'a'],
+                'name' => 'W15 '.$context['token'].' synthetic equipment '.str_pad((string) $number, 3, '0', STR_PAD_LEFT),
+                'asset_tag' => 'W15-'.$context['token'].'-'.$number,
+                'status' => 'active', 'category' => 'IT Equipment', 'risk_level' => 'low',
+                'created_by_user_id' => $actor->id, 'updated_by_user_id' => $actor->id,
+            ]);
+            AssetAssignment::query()->create([
+                'asset_id' => $asset->id, 'assignee_type' => 'staff', 'assignee_id' => $fixtures['actors']['requester']['id'],
+                'purpose' => 'Isolated catalogue search verification only', 'assigned_at' => now(),
+            ]);
+            if ($number >= 201) {
+                $entityAssets[$number === 201 ? 'last_permitted' : 'unapproved_site'] = ['id' => $asset->id, 'name' => $asset->name];
+            }
+        }
 
         $template = app(ItProvisioningTemplateService::class)->create($actor, [
             'name' => 'W15 '.$context['token'].' synthetic joiner template',
@@ -67,7 +93,7 @@ function w15BrowserCreateCatalogueFixtures(array $context, array $fixtures): arr
         $workflow = app(ItProvisioningWorkflowService::class)->launch($profile, 'joiner', 'synthetic_browser',
             (int) $profile->id, 'w15:'.$context['token'].':version-history', (int) $actor->id);
 
-        return ['items' => $items, 'template' => ['id' => $template->id, 'name' => $template->name],
+        return ['items' => $items, 'entity_assets' => $entityAssets, 'template' => ['id' => $template->id, 'name' => $template->name],
             'workflow' => ['id' => $workflow->id, 'template_version_id' => $workflow->template_version_id], 'synthetic_only' => true];
     });
 }
