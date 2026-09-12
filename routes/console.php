@@ -77,6 +77,8 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 
+app(Schedule::class)->job(new \App\Jobs\SyncWorkCalendarsJob)->everyFifteenMinutes()->withoutOverlapping();
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

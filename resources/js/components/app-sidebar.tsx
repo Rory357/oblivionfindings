@@ -1073,10 +1073,10 @@ function buildOperationsSubPanelGroups({
             href: '/operations/family-portal',
             icon: Users,
         });
-    if (can?.rostering?.viewAny || can?.shifts?.viewAny)
+    if (can?.integrations?.manageSecrets)
         tools.push({
             title: 'Calendar Sync',
-            href: '/operations/calendar-sync',
+            href: '/settings/calendar-sync',
             icon: CalendarDays,
         });
     if (can?.qualifications?.viewAny)

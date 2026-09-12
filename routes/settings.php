@@ -327,6 +327,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:integrations.manage_secrets')->group(function () {
         Route::get('settings/calendar-sync', [CalendarSyncSettingsController::class, 'index'])
             ->name('settings.calendar-sync');
+        Route::put('settings/calendar-sync/work-calendar', [\App\Http\Controllers\Settings\WorkCalendarSettingsController::class, 'update'])->name('settings.work-calendar.update');
+        Route::post('settings/calendar-sync/work-calendar/check', [\App\Http\Controllers\Settings\WorkCalendarSettingsController::class, 'check'])->middleware('throttle:10,1')->name('settings.work-calendar.check');
+        Route::post('settings/calendar-sync/work-calendar/sync', [\App\Http\Controllers\Settings\WorkCalendarSettingsController::class, 'sync'])->middleware('throttle:5,1')->name('settings.work-calendar.sync');
         Route::put('settings/calendar-sync/mapping', [CalendarSyncSettingsController::class, 'updateMapping'])
             ->name('settings.calendar-sync.mapping');
         Route::put('settings/calendar-sync/settings', [CalendarSyncSettingsController::class, 'updateGlobal'])

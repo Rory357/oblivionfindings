@@ -8,9 +8,12 @@ use App\Models\AppSetting;
 use App\Models\CalendarSyncConnection;
 use App\Models\CalendarSyncMapping;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\Sites\Calendar\CalendarSources;
 use App\Services\Sites\Calendar\CalendarSyncService;
 use App\Services\UserSiteAccessService;
+use App\Services\WorkCalendar\WorkCalendarProvider;
+use App\Services\WorkCalendar\WorkCalendarSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -110,7 +113,25 @@ class CalendarSyncSettingsController extends Controller
             ],
             'settings' => $this->loadSettings(),
             'anyConnected' => collect($providers)->contains('connected', true),
+            'workCalendar' => $this->workCalendarPayload(),
         ]);
+    }
+
+    private function workCalendarPayload(): array
+    {
+        $settings = app(WorkCalendarSettings::class);
+        $provider = app(WorkCalendarProvider::class);
+        $data = $settings->load();
+        unset($data['checked_fingerprint']);
+        $recipients = $settings->recipients($data['domain']);
+
+        return [
+            'settings' => $data,
+            'providers' => collect(['microsoft' => 'Microsoft 365', 'google' => 'Google Workspace'])
+                ->map(fn ($label, $key) => ['key' => $key, 'label' => $label, 'configured' => $provider->configured($key)])->values()->all(),
+            'staff' => User::whereIn('id', $recipients->keys())->orderBy('name')->get(['id', 'name'])
+                ->map(fn ($user) => ['id' => $user->id, 'name' => $user->name, 'email' => $recipients[$user->id]])->all(),
+        ];
     }
 
     /**

@@ -33,6 +33,9 @@ import {
     RotateCcw,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import WorkCalendarSettings, {
+    type WorkCalendarProps,
+} from './work-calendar-settings';
 
 type ProviderKey = 'google' | 'microsoft';
 
@@ -85,11 +88,13 @@ type PageProps = {
     directions: Direction[];
     settings: SyncSettings;
     anyConnected: boolean;
+    workCalendar: WorkCalendarProps;
 };
 
 type ResourceOption = { id: string; name: string };
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Settings', href: '/settings' },
     { title: 'Calendar Sync' },
 ];
@@ -115,8 +120,15 @@ function csrfToken(): string {
 }
 
 export default function CalendarSyncSettings() {
-    const { providers, sites, sources, directions, settings, anyConnected } =
-        usePage<PageProps>().props;
+    const {
+        providers,
+        sites,
+        sources,
+        directions,
+        settings,
+        anyConnected,
+        workCalendar,
+    } = usePage<PageProps>().props;
     const page = usePage<{
         flash?: { success?: string; error?: string };
         errors?: Record<string, string>;
@@ -181,12 +193,8 @@ export default function CalendarSyncSettings() {
                             Calendar Sync
                         </h1>
                         <p className="max-w-3xl text-sm text-muted-foreground">
-                            Connect Google Workspace or Microsoft 365 and map
-                            each house to its <strong>resource calendar</strong>{' '}
-                            (a Google resource calendar or an Outlook room
-                            mailbox). Approved house events push out to the
-                            resource calendar; staff keep their own “add to my
-                            calendar” options on the calendar page.
+                            Manage staff work calendars and shared site
+                            calendars for the organisation in one place.
                         </p>
                     </header>
 
@@ -208,10 +216,12 @@ export default function CalendarSyncSettings() {
                         </div>
                     )}
 
+                    <WorkCalendarSettings {...workCalendar} />
+
                     {/* Provider connections */}
                     <section className="space-y-3">
                         <h2 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-                            Providers
+                            Shared site calendar connections
                         </h2>
                         <div className="grid gap-4 sm:grid-cols-2">
                             {providers.map((p) => (
