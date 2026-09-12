@@ -135,6 +135,11 @@ class ItProvisioningRequest extends Model
         return $this->morphMany(ItTicketEvent::class, 'subject');
     }
 
+    public function catalogSubmissions(): MorphMany
+    {
+        return $this->morphMany(ItCatalogSubmission::class, 'result');
+    }
+
     /** Helpdesk tickets raised from this request (broken laptop etc.). */
     public function linkedTickets(): HasMany
     {

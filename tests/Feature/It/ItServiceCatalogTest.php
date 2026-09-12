@@ -1,6 +1,8 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItCatalogSubmissionService;
+use App\Domain\It\Services\ItProvisioningAccessService;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
 use App\Models\AuditLog;
@@ -11,6 +13,7 @@ use App\Models\ItProvisioningRequest;
 use App\Models\ItService;
 use App\Models\ItSetupCommandReceipt;
 use App\Models\ItTicket;
+use App\Models\ItTicketEvent;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -84,6 +87,91 @@ beforeEach(function () {
         'created_by' => $this->agent->id,
         'updated_by' => $this->agent->id,
     ]);
+});
+
+test('requesters track their canonical catalogue work without technician or HR details', function () {
+    $item = ItCatalogItem::factory()->create([
+        'outcome_type' => 'provisioning', 'provisioning_type' => 'equipment', 'form_schema' => catalogSchema(),
+    ]);
+    $this->actingAs($this->worker)->post("/it/catalog/{$item->id}/submissions", [
+        'schema_version' => 1, 'idempotency_key' => (string) Str::uuid(),
+        'values' => ['details' => 'A headset please', 'system_name' => 'VPN'],
+    ])->assertRedirect();
+    $work = ItProvisioningRequest::query()->sole();
+    $work->update(['notes' => 'PRIVATE work notes', 'failure_reason' => 'PRIVATE provider failure', 'fulfiller_context' => ['secret' => 'PRIVATE token']]);
+    ItTicketEvent::record($work, 'failed', $this->agent->id, ['reason' => 'PRIVATE event payload']);
+    $response = $this->get('/it/provisioning/'.$work->id)->assertOk()
+        ->assertInertia(fn ($page) => $page->component('it/provisioning/show')
+            ->where('request.id', $work->id)->where('request.catalogue_version', 1)
+            ->where('request.answers.0.value', 'A headset please')->has('request.answers', 2)
+            ->has('request.events', 2)->missing('request.notes')->missing('request.employee_profile_id')
+            ->missing('request.fulfillment_context')->missing('request.events.1.payload'));
+    expect($response->headers->get('Cache-Control'))->toContain('no-store');
+    expect($response->getContent())->not->toContain('PRIVATE');
+    $this->get('/it?tab=my-tickets')->assertOk()->assertInertia(fn ($page) => $page
+        ->where('myProvisioning.total', 1)->where('myProvisioning.data.0.id', $work->id));
+    $item->update(['name' => 'Later revision', 'is_published' => false]);
+    $this->get('/it/provisioning/'.$work->id)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('request.title', $work->item)->where('request.catalogue_version', 1));
+    $stranger = catalogUser('support_worker');
+    $this->actingAs($stranger)->get('/it/provisioning/'.$work->id)->assertNotFound();
+    $this->actingAs($this->worker);
+    $this->workerProfile->update(['is_active' => false]);
+    $this->get('/it/provisioning/'.$work->id)->assertNotFound();
+    $this->get('/it?tab=my-tickets')->assertOk()->assertInertia(fn ($page) => $page->where('myProvisioning.total', 0));
+});
+
+test('tracking requires catalogue provenance and current Site and approval access', function () {
+    $work = ItProvisioningRequest::query()->create([
+        'employee_profile_id' => $this->workerProfile->id, 'created_by' => $this->worker->id,
+        'type' => 'account', 'item' => 'Private HR task', 'status' => 'pending', 'priority' => 'normal',
+    ]);
+    $this->actingAs($this->worker)->get('/it/provisioning/'.$work->id)->assertNotFound();
+    $item = ItCatalogItem::factory()->create(['outcome_type' => 'provisioning', 'provisioning_type' => 'equipment', 'form_schema' => ['fields' => []]]);
+    $result = app(ItCatalogSubmissionService::class)->submit($item, $this->worker, [
+        'schema_version' => 1, 'idempotency_key' => (string) Str::uuid(), 'values' => [],
+    ])['result'];
+    $this->site->update(['is_active' => false]);
+    $this->get('/it/provisioning/'.$result->id)->assertNotFound();
+    $this->site->update(['is_active' => true]);
+    $this->worker->update(['approved_at' => null]);
+    expect(app(ItProvisioningAccessService::class)->canTrack($this->worker->fresh(), $result))->toBeFalse();
+});
+
+test('tracking hides an internal request after its author loses IT management', function () {
+    $item = ItCatalogItem::factory()->create(['internal_only' => true, 'outcome_type' => 'provisioning', 'provisioning_type' => 'account', 'form_schema' => ['fields' => []]]);
+    $result = app(ItCatalogSubmissionService::class)->submit($item, $this->agent, [
+        'schema_version' => 1, 'idempotency_key' => (string) Str::uuid(), 'values' => [],
+    ])['result'];
+    $this->actingAs($this->agent)->get('/it/provisioning/'.$result->id)->assertOk();
+    $this->agent->roles()->sync([Role::query()->where('name', 'support_worker')->value('id')]);
+    $this->agent->update(['role' => 'support_worker']);
+    $this->actingAs($this->agent->fresh())->get('/it/provisioning/'.$result->id)->assertNotFound();
+    expect(app(ItProvisioningAccessService::class)->canTrack($this->agent->fresh(), $result))->toBeFalse();
+});
+
+test('requester tracking paginates and applies literal search and status to the complete owned set', function () {
+    $item = ItCatalogItem::factory()->create(['outcome_type' => 'provisioning', 'provisioning_type' => 'equipment', 'form_schema' => ['fields' => []]]);
+    $firstId = null;
+    foreach (range(1, 21) as $number) {
+        $work = app(ItCatalogSubmissionService::class)->submit($item, $this->worker, [
+            'schema_version' => 1, 'idempotency_key' => (string) Str::uuid(), 'values' => [],
+        ])['result'];
+        $firstId ??= $work->id;
+        $work->update(['item' => $number === 21 ? 'Tracking 100% request' : 'Tracking request '.$number,
+            'status' => $number <= 5 ? 'done' : 'pending']);
+    }
+    $this->actingAs($this->worker)->get('/it?tab=my-tickets')->assertOk()->assertInertia(fn ($page) => $page
+        ->where('myProvisioning.total', 21)->where('myProvisioning.matched', 21)
+        ->has('myProvisioning.data', 20)->where('myProvisioning.last_page', 2));
+    $this->get('/it?tab=my-tickets&my_provisioning_page=2')->assertOk()->assertInertia(fn ($page) => $page
+        ->has('myProvisioning.data', 1)->where('myProvisioning.data.0.id', $firstId));
+    $this->get('/it?tab=my-tickets&my_status=pending')->assertOk()->assertInertia(fn ($page) => $page
+        ->where('myProvisioning.total', 21)->where('myProvisioning.matched', 16)->has('myProvisioning.data', 16));
+    $this->get('/it?tab=my-tickets&my_q=%25')->assertOk()->assertInertia(fn ($page) => $page
+        ->where('myProvisioning.matched', 1)->where('myProvisioning.data.0.title', 'Tracking 100% request'));
+    $this->get('/it?tab=my-tickets&my_q=IT-P'.str_pad((string) $firstId, 6, '0', STR_PAD_LEFT))->assertOk()->assertInertia(fn ($page) => $page
+        ->where('myProvisioning.matched', 1)->where('myProvisioning.data.0.id', $firstId));
 });
 
 test('published catalogue discovery is application-wide and strips internal fields for requesters', function () {

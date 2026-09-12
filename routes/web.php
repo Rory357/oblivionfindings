@@ -239,6 +239,8 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     Route::get('/it/provisioning/export', [ItProvisioningController::class, 'exportProvisioning'])
         ->middleware('permission:it.view')
         ->name('it.provisioning.export');
+    Route::get('/it/provisioning/{provisioning}', \App\Http\Controllers\It\ItProvisioningTrackingController::class)
+        ->whereNumber('provisioning')->name('it.provisioning.show');
 
     // Reports (§L) — server-computed analytics as JSON; any agent (it.view)
     // reads, requesters (it.request only) are refused.

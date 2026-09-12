@@ -53,8 +53,14 @@ vi.mock('@inertiajs/react', async () => {
                 errors: { ...state.errors, ...errors },
                 processing: state.processing,
                 clearErrors: () => setErrors({}),
-                setError: (key: string, message: string) =>
-                    setErrors((previous) => ({ ...previous, [key]: message })),
+                setError: (
+                    key: string | Record<string, string>,
+                    message: string,
+                ) =>
+                    setErrors((previous) => ({
+                        ...previous,
+                        ...(typeof key === 'string' ? { [key]: message } : key),
+                    })),
                 reset: vi.fn(),
                 transform: vi.fn(),
                 patch: submit,
@@ -102,7 +108,8 @@ it('recovers an uncertain catalogue create without sending a second draft', asyn
         .spyOn(axios, 'post')
         .mockImplementation(async (url, data) => {
             if (url === '/it/setup/catalogue-items') {
-                originalIdentity = (data as { request_uuid: string }).request_uuid;
+                originalIdentity = (data as { request_uuid: string })
+                    .request_uuid;
                 throw new Error('Synthetic lost response');
             }
             return {
@@ -161,6 +168,67 @@ it('recovers an uncertain catalogue create without sending a second draft', asyn
         ),
     ).toBeNull();
 });
+
+it.each([
+    {
+        field: 'name',
+        message: 'Use a shorter request name.',
+        step: 'Request details',
+    },
+    {
+        field: 'form_schema.fields.0.options',
+        message: 'Use distinct choices.',
+        step: 'Form fields',
+    },
+])(
+    'returns server validation to the affected step: $field',
+    async ({ field, message, step }) => {
+        const transport = vi.spyOn(axios, 'post').mockResolvedValue({
+            status: 422,
+            data: { errors: { [field]: [message] } },
+        });
+        render(<ItCatalogueManagement actorId={3} items={[]} services={[]} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'New request form' }),
+        );
+        fireEvent.change(screen.getByLabelText('Request name'), {
+            target: { value: 'Equipment request' },
+        });
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: /Review draft.*Check before saving/,
+            }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+        await waitFor(() =>
+            expect(screen.getByRole('heading', { name: step })).toBeVisible(),
+        );
+        expect(screen.getAllByText(message)).toHaveLength(1);
+        expect(screen.getByRole('alert')).toHaveTextContent(message);
+        if (field === 'name')
+            expect(
+                screen.getByRole('textbox', {
+                    name: 'Request name',
+                }),
+            ).toHaveValue('Equipment request');
+        expect(
+            screen.queryByRole('heading', { name: 'Draft saved' }),
+        ).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+        expect(transport).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        expect(
+            within(
+                screen.getByRole('form', {
+                    name:
+                        step === 'Request details'
+                            ? 'Form fields'
+                            : 'Review draft',
+                }),
+            ).queryByRole('alert'),
+        ).not.toBeInTheDocument();
+    },
+);
 
 it('keeps the live version visible while requiring review of a revised publication', () => {
     render(<ItCatalogueManagement actorId={3} items={[item]} services={[]} />);

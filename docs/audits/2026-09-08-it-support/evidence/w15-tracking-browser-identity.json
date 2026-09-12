@@ -1,0 +1,23 @@
+{
+  "checkout": "C:/Users/steph/Herd/oblivionfindings",
+  "database": "oblivion_it_draft_browser_96cdb831e547a20f",
+  "token": "96cdb831e547a20f",
+  "storage_root": "C:\\Users\\steph\\Herd\\oblivionfindings\\storage\\framework\\testing\\it-draft-browser-96cdb831e547a20f\\storage",
+  "app_environment": "local",
+  "csrf_testing_bypass": false,
+  "asset_manifest_sha256": "e1ad64495d528392724ec1a01af8d0e48ceec6df1428ed63887c6861fd3a9e2a",
+  "draft_recovery_enabled": true,
+  "retention_values_are_synthetic": true,
+  "mail_driver": "array",
+  "queue_driver": "sync",
+  "session_cookie": "it_draft_browser_96cdb831e547a20f",
+  "mailbox_provider_fixtures": false,
+  "synthetic_delivery_outcomes": false,
+  "synthetic_api_fixtures": false,
+  "ssr_enabled": false,
+  "php_upload_limits": {
+    "upload_max_filesize": "16M",
+    "post_max_size": "64M",
+    "max_file_uploads": 20
+  }
+}

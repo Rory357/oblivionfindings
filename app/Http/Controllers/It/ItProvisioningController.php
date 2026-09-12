@@ -247,6 +247,7 @@ class ItProvisioningController extends Controller
                 'priority_matrix' => ItTicketPriorityService::MATRIX,
             ],
             'myTickets' => $canRequest ? $this->myTicketRows($user) : [],
+            'myProvisioning' => $canRequest ? app(\App\Domain\It\Services\ItProvisioningTrackingService::class)->listing($user, $request) : null,
             'catalogItems' => $catalogItems->all(),
             'catalogFieldOptions' => $canRequest
                 ? $this->catalogFieldOptions->forTypes($user, $catalogEntityTypes)

@@ -75,6 +75,50 @@ final class ItProvisioningAccessService
                     || $canonical->responsibleTeam->members->contains('id', $actor->id)));
     }
 
+    /** Requester tracking is separate from access to the technician/HR workspace. */
+    public function canTrack(User $actor, ItProvisioningRequest $request): bool
+    {
+        return $this->applyTrackingScope(ItProvisioningRequest::query(), $actor)
+            ->whereKey($request->getKey())->exists();
+    }
+
+    /** Only catalogue work submitted by this actor, within their current approved Sites. */
+    public function applyTrackingScope(Builder $query, User $actor): Builder
+    {
+        if ($actor->approved_at === null || (! $actor->canDo('it.request') && ! $actor->canDo('it.manage'))) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where('created_by', $actor->id)
+            ->whereHas('catalogSubmissions', function (Builder $submissions) use ($actor): void {
+                $submissions->where('requester_user_id', $actor->id);
+                if (! $actor->canDo('it.manage')) {
+                    $submissions->where(function (Builder $public): void {
+                        $public->where('contract_snapshot->internal_only', false)
+                            ->orWhere(function (Builder $legacy): void {
+                                $legacy->whereNull('contract_snapshot')
+                                    ->whereHas('catalogItem', fn (Builder $items) => $items->withTrashed()->where('internal_only', false));
+                            });
+                    });
+                }
+            })
+            ->whereHas('employeeProfile', function (Builder $profiles) use ($actor): void {
+                $profiles->where('is_active', true)
+                    ->where(function (Builder $eligible) use ($actor): void {
+                        $siteIds = $this->workAccess->approvedSiteIds($actor);
+                        $eligible->where(function (Builder $site) use ($actor, $siteIds): void {
+                            $site->whereIn('primary_site_id', $siteIds);
+                            if (! $actor->canDo('it.manage')) {
+                                $site->where('user_id', $actor->id);
+                            }
+                        });
+                        if ($actor->canDo('it.manage') && $actor->canDo('it.organisationWide')) {
+                            $eligible->orWhereNull('primary_site_id');
+                        }
+                    });
+            });
+    }
+
     /** @param Builder<ItProvisioningRequest> $query */
     public function applyRequestScope(Builder $query, User $actor): Builder
     {

@@ -353,6 +353,7 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
     const save = async (event: FormEvent) => {
         event.preventDefault();
         if (editorBlocked || saved || concealEditor) return;
+        form.clearErrors();
         if (!validateDetails()) {
             setEditorStep(0);
             return;
@@ -372,6 +373,17 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
                     search_terms: form.data.search_terms.filter(Boolean),
                 }),
             );
+            const result = createCommand.getSnapshot();
+            if (result.state === 'validation') {
+                form.setError(result.errors as typeof form.errors);
+                setEditorStep(
+                    Object.keys(result.errors).some((key) =>
+                        key.startsWith('form_schema'),
+                    )
+                        ? 1
+                        : 0,
+                );
+            }
             return;
         }
         form.transform((data) => ({
@@ -691,7 +703,10 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
                                             setEditorOpen(false);
                                             allowNavigation.current = true;
                                             router.reload({
-                                                only: ['catalogItems', 'stats'],
+                                                only: [
+                                                    'catalogItems',
+                                                    'generatedAt',
+                                                ],
                                                 onFinish: () => {
                                                     allowNavigation.current = false;
                                                 },
@@ -715,7 +730,9 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
                 }
             >
                 <WizardStepPane key={editorStep}>
-                    {!editing ? (
+                    {!editing &&
+                    (createCommand.state !== 'validation' ||
+                        Object.keys(createCommand.errors).length === 0) ? (
                         <SetupCreateRecovery
                             command={createCommand}
                             onOutcome={handleCreateOutcome}
@@ -740,8 +757,18 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
                                 disabled={editorBlocked}
                                 className="min-w-0 space-y-4"
                             >
-                                {Object.entries(form.errors).map(
-                                    ([key, message]) => (
+                                {Object.entries(form.errors)
+                                    .filter(
+                                        ([key]) =>
+                                            editorStep !== 0 ||
+                                            ![
+                                                'name',
+                                                'it_service_id',
+                                                'provisioning_type',
+                                                'description',
+                                            ].includes(key),
+                                    )
+                                    .map(([key, message]) => (
                                         <p
                                             key={key}
                                             role="alert"
@@ -749,8 +776,7 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
                                         >
                                             {message}
                                         </p>
-                                    ),
-                                )}
+                                    ))}
                                 {editorStep === 0 ? (
                                     <>
                                         <h2 className="text-lg font-semibold">
@@ -1597,13 +1623,17 @@ function Field({
     children: React.ReactNode;
 }) {
     return (
-        <label className={`space-y-1.5 text-sm font-medium ${className}`}>
-            <span>{label}</span>
-            {children}
+        <div className={`space-y-1.5 text-sm font-medium ${className}`}>
+            <label className="block space-y-1.5">
+                <span>{label}</span>
+                {children}
+            </label>
             {error ? (
-                <span className="block text-xs text-destructive">{error}</span>
+                <p role="alert" className="text-xs text-destructive">
+                    {error}
+                </p>
             ) : null}
-        </label>
+        </div>
     );
 }
 

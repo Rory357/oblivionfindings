@@ -45,6 +45,10 @@ import {
 } from '@/components/it/it-wizards';
 import { KnowledgeDraftDeleteDialog } from '@/components/it/knowledge-draft-delete-dialog';
 import {
+    MyProvisioningList,
+    type MyProvisioningPage,
+} from '@/components/it/my-provisioning-list';
+import {
     MyTicketsList,
     type MyTicketRow,
 } from '@/components/it/my-tickets-list';
@@ -243,6 +247,7 @@ interface Props {
     slaCalendar?: SlaCalendar | null;
     /** The viewer's own tickets — present for anyone with it.request. */
     myTickets: MyTicketRow[];
+    myProvisioning?: MyProvisioningPage | null;
     /** Permission-safe, published service requests for the catalogue workspace. */
     catalogItems: CatalogItem[];
     catalogFieldOptions?: CatalogFieldOptions;
@@ -384,6 +389,7 @@ export default function ItIndex({
     slaPolicies,
     slaCalendar,
     myTickets,
+    myProvisioning = null,
     catalogItems = [],
     catalogFieldOptions = { employee: [], user: [], asset: [] },
     kbPublished = [],
@@ -520,7 +526,9 @@ export default function ItIndex({
                       label: 'My requests',
                       icon: Inbox,
                       tone: 'success',
-                      badge: summary?.my.total ?? myTickets.length,
+                      badge:
+                          (summary?.my.total ?? myTickets.length) +
+                          (myProvisioning?.total ?? 0),
                   },
                   // Requester-only Knowledge browse — agents get the manage
                   // version in their own (can.view) Knowledge tab above.
@@ -606,6 +614,7 @@ export default function ItIndex({
         if (!Object.keys(patch).every((key) => key === 'list_view')) {
             query.delete('tickets_page');
             query.delete('requests_page');
+            query.delete('my_provisioning_page');
         }
         Object.entries(patch).forEach(([key, value]) =>
             value === undefined || value === ''
@@ -2311,9 +2320,20 @@ export default function ItIndex({
                                         value={myStatus}
                                         allValue={ALL}
                                         options={[
-                                            ...new Set(
-                                                myTickets.map((t) => t.status),
-                                            ),
+                                            ...new Set([
+                                                ...myTickets.map(
+                                                    (t) => t.status,
+                                                ),
+                                                ...(myProvisioning?.total
+                                                    ? [
+                                                          'pending',
+                                                          'in_progress',
+                                                          'failed',
+                                                          'done',
+                                                          'cancelled',
+                                                      ]
+                                                    : []),
+                                            ]),
                                         ].map((v) => ({
                                             value: v,
                                             label: label(v),
@@ -2988,7 +3008,7 @@ export default function ItIndex({
                             ) : null}
 
                             <ListCaption
-                                title="My requests"
+                                title="Helpdesk requests"
                                 caption={`${filteredMyTickets.length} of ${myTickets.length} shown`}
                             />
                             <MyTicketsList
@@ -3012,6 +3032,12 @@ export default function ItIndex({
                                     />
                                 }
                             />
+                            {myProvisioning ? (
+                                <MyProvisioningList
+                                    page={myProvisioning}
+                                    view={listView}
+                                />
+                            ) : null}
                         </>
                     )}
 

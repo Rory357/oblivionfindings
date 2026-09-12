@@ -44,8 +44,7 @@ class ItCatalogSubmissionService
                 $visible = $result instanceof ItTicket
                     ? $this->workAccess->canView($actor, $result)
                     : ($result instanceof ItProvisioningRequest && ($this->provisioningAccess->canView($actor, $result)
-                        || ((int) $result->created_by === (int) $actor->id && $result->employeeProfile
-                            && $this->provisioningAccess->canRequestForProfile($actor, $result->employeeProfile))));
+                        || $this->provisioningAccess->canTrack($actor, $result)));
                 abort_unless($visible, 404);
                 $matches = $existing->input_sha256 !== null
                     ? hash_equals($existing->input_sha256, $this->inputHash($catalogItem->id, $input))

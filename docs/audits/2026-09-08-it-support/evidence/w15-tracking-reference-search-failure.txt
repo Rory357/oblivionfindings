@@ -1,0 +1,1 @@
+[2026-09-12 02:17:07] local.ERROR: Call to undefined method Illuminate\Database\Eloquent\Builder::orWhereKey() {"userId":1,"exception":{"exception_class":"BadMethodCallException","exception_message":"Call to undefined method Illuminate\\Database\\Eloquent\\Builder::orWhereKey()","exception_code":0,"trace_hash":"f824e7601f90f165114f049fbb477b0cc45a767a81fabdd5456d082671036e38"}} 

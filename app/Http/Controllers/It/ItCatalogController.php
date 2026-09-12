@@ -79,7 +79,7 @@ class ItCatalogController extends Controller
             'created' => $outcome['created'],
         ];
 
-        return redirect()->back()
+        return redirect()->to($result instanceof ItTicket ? '/it/tickets/'.$result->id : '/it/provisioning/'.$result->id)
             ->with('success', $result instanceof ItTicket
                 ? "Request logged — {$result->reference}."
                 : 'Provisioning request logged.')
