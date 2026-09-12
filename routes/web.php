@@ -373,6 +373,13 @@ Route::middleware(['auth'])->group(function () {
 
 Route::get('/my-calendar', [MyCalendarController::class, 'index'])->middleware('auth')->name('my-calendar');
 Route::get('/my-calendar/events', [MyCalendarController::class, 'events'])->middleware('auth')->name('my-calendar.events');
+Route::middleware(['auth', 'throttle:60,1'])->prefix('my-calendar/entries')->group(function () {
+    Route::post('/', [\App\Http\Controllers\PersonalCalendarEntryController::class, 'store'])->name('my-calendar.entries.store');
+    Route::get('/{entry}', [\App\Http\Controllers\PersonalCalendarEntryController::class, 'show'])->whereNumber('entry')->name('my-calendar.entries.show');
+    Route::put('/{entry}', [\App\Http\Controllers\PersonalCalendarEntryController::class, 'update'])->whereNumber('entry')->name('my-calendar.entries.update');
+    Route::delete('/{entry}', [\App\Http\Controllers\PersonalCalendarEntryController::class, 'destroy'])->whereNumber('entry')->name('my-calendar.entries.destroy');
+    Route::post('/{entry}/restore', [\App\Http\Controllers\PersonalCalendarEntryController::class, 'restore'])->whereNumber('entry')->name('my-calendar.entries.restore');
+});
 
 // ── Operations module ────────────────────────────────────────────────
 require __DIR__.'/operations.php';

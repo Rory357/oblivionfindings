@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\ControlRoom\AlertTask;
 use App\Models\MedicationRound;
+use App\Models\PersonalCalendarEntry;
 use App\Models\Shift;
+use App\Services\WorkCalendar\WorkCalendarSettings;
 use App\Support\ShiftTaskSupport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -17,7 +19,10 @@ class MyCalendarController extends Controller
     {
         abort_unless($request->user(), 403);
 
-        return Inertia::render('my-calendar', []);
+        return Inertia::render('my-calendar', [
+            'workCalendarStatus' => app(WorkCalendarSettings::class)->workerStatus($request->user()),
+            'canManagePersonalCalendar' => PersonalCalendarEntry::canUse($request->user()),
+        ]);
     }
 
     public function events(Request $request)
@@ -35,6 +40,7 @@ class MyCalendarController extends Controller
         }
 
         $events = [];
+        $unavailable = [];
 
         // 1. Shifts
         $shifts = Shift::where('user_id', $userId)
@@ -47,7 +53,7 @@ class MyCalendarController extends Controller
         foreach ($shifts as $shift) {
             $events[] = [
                 'id' => 'shift-'.$shift->id,
-                'title' => trim($shift->client->first_name.' '.$shift->client->last_name),
+                'title' => $shift->client ? trim($shift->client->first_name.' '.$shift->client->last_name) : 'Work shift',
                 'start' => $shift->starts_at->toIso8601String(),
                 'end' => $shift->ends_at->toIso8601String(),
                 'backgroundColor' => $shift->status === 'in_progress' ? '#bbf7d0' : ($shift->status === 'completed' ? '#e2e8f0' : '#bfdbfe'),
@@ -55,6 +61,7 @@ class MyCalendarController extends Controller
                 'borderColor' => 'transparent',
                 'extendedProps' => [
                     'type' => 'shift',
+                    'link' => '/my-day?shift='.$shift->id,
                     'client_id' => $shift->client_id,
                     'status' => $shift->status,
                     'location' => $shift->location,
@@ -85,12 +92,14 @@ class MyCalendarController extends Controller
                     'borderColor' => 'transparent',
                     'extendedProps' => [
                         'type' => 'medication_round',
+                        'link' => '/meds/today',
                         'status' => $round->status ?? null,
                     ],
                 ];
             }
         } catch (\Throwable $e) {
-            // Table may not exist yet
+            report($e);
+            $unavailable['medication_round'] = 'unavailable';
         }
 
         // 3. Leave Requests
@@ -113,12 +122,14 @@ class MyCalendarController extends Controller
                     'borderColor' => 'transparent',
                     'extendedProps' => [
                         'type' => 'leave',
+                        'link' => '/hr/my/leave',
                         'leave_type' => $leave->leave_type ?? null,
                     ],
                 ];
             }
         } catch (\Throwable $e) {
-            // Table may not exist yet
+            report($e);
+            $unavailable['leave'] = 'unavailable';
         }
 
         // 4. Alert Tasks
@@ -141,16 +152,34 @@ class MyCalendarController extends Controller
                     'borderColor' => 'transparent',
                     'extendedProps' => [
                         'type' => 'alert_task',
+                        'link' => '/tasks',
                         'status' => $task->status,
                         'priority' => $task->priority ?? null,
                     ],
                 ];
             }
         } catch (\Throwable $e) {
-            // Table may not exist yet
+            report($e);
+            $unavailable['alert_task'] = 'unavailable';
         }
 
-        return response()->json($events);
+        if (PersonalCalendarEntry::canUse($request->user())) {
+            $personalStart = $start->copy()->utc();
+            $personalEnd = $end->copy()->utc();
+            $personal = PersonalCalendarEntry::where('user_id', $userId)
+                ->where('start_at', '<', $personalEnd)
+                ->where(function ($query) use ($personalStart) {
+                    $query->where('end_at', '>', $personalStart)
+                        ->orWhere(fn ($instant) => $instant->whereNull('end_at')->where('start_at', '>=', $personalStart));
+                })->orderBy('start_at')->get();
+            foreach ($personal as $entry) {
+                $events[] = $entry->calendarEvent();
+            }
+        }
+
+        return response()->json($events)
+            ->header('X-Calendar-Unavailable', json_encode((object) $unavailable))
+            ->header('Cache-Control', 'no-store, private');
     }
 
     private function parseCalendarBoundary(mixed $value, Carbon $fallback): Carbon

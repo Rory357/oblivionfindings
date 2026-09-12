@@ -422,6 +422,7 @@ export function PageHeaderMeterBlock({
     preserveScroll,
     onClick,
     ariaLabel,
+    className,
     children,
 }: {
     label: string;
@@ -435,6 +436,7 @@ export function PageHeaderMeterBlock({
     onClick?: () => void;
     /** Accessible name; defaults to "View <label>". */
     ariaLabel?: string;
+    className?: string;
     children?: ReactNode;
 }) {
     const body = (
@@ -458,6 +460,7 @@ export function PageHeaderMeterBlock({
         className: cn(
             'eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70',
             tone !== 'brand' && `eh-meter--${tone}`,
+            className,
         ),
     };
     return href ? (
