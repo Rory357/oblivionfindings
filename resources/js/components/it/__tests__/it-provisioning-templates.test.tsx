@@ -1,5 +1,13 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, expect, it, vi } from 'vitest';
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within,
+} from '@testing-library/react';
+import axios from 'axios';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
     ItProvisioningTemplates,
     type ProvisioningTemplate,
@@ -111,6 +119,7 @@ const template: ProvisioningTemplate = {
 const mount = () =>
     render(
         <ItProvisioningTemplates
+            actorId={8}
             templates={[template]}
             teams={[{ id: 5, name: 'Service desk' }]}
             sites={[{ id: 21, name: 'Approved house' }]}
@@ -131,11 +140,252 @@ const review = () =>
     );
 
 beforeEach(() => {
+    sessionStorage.clear();
     state.post.mockClear();
     state.reload.mockClear();
     state.visit.mockClear();
     state.errors = {};
     state.flash = { success: 'Template saved.' };
+});
+afterEach(() => vi.restoreAllMocks());
+
+const newDraft = () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'New template' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Template name' }), {
+        target: { value: 'Recoverable private template' },
+    });
+    fireEvent.click(
+        screen.getByRole('button', { name: /Workflow steps.*Ownership/ }),
+    );
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), {
+        target: { value: 'Manual account verification' },
+    });
+    review();
+};
+
+it('recovers an uncertain template create without posting a duplicate or retaining private fields in storage', async () => {
+    let originalIdentity = '';
+    const transport = vi
+        .spyOn(axios, 'post')
+        .mockImplementation(async (url, data) => {
+            if (url === '/it/setup/provisioning-templates') {
+                originalIdentity = (data as { request_uuid: string })
+                    .request_uuid;
+                throw new Error('Synthetic lost response');
+            }
+            return {
+                status: 200,
+                data: {
+                    status: 'committed',
+                    data: {
+                        viewer_user_id: 8,
+                        resource: 'provisioning-templates',
+                        request_uuid: originalIdentity,
+                        id: 25,
+                        configuration_version: 'a'.repeat(64),
+                        committed_configuration_version: 'a'.repeat(64),
+                        replayed: true,
+                    },
+                },
+            };
+        });
+    newDraft();
+    fireEvent.click(screen.getByRole('button', { name: 'Save template' }));
+    await waitFor(() =>
+        expect(
+            screen.getByRole('button', { name: 'Check saved result' }),
+        ).toBeVisible(),
+    );
+    expect(
+        screen.getByRole('button', { name: 'Save template' }),
+    ).toBeDisabled();
+    expect(
+        screen.queryByRole('heading', { name: 'Template saved' }),
+    ).not.toBeInTheDocument();
+    expect(
+        sessionStorage.getItem(
+            'it.setup.pending-command.v1.actor.8.provisioning-templates',
+        ),
+    ).toBe(originalIdentity);
+    expect(JSON.stringify(sessionStorage)).not.toContain(
+        'Recoverable private template',
+    );
+    expect(JSON.stringify(sessionStorage)).not.toContain(
+        'Manual account verification',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Check saved result' }));
+    await waitFor(() =>
+        expect(
+            screen.getByRole('heading', { name: 'Template saved' }),
+        ).toBeVisible(),
+    );
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(transport.mock.calls[1][0]).toBe(
+        `/it/setup/commands/${originalIdentity}/recover`,
+    );
+    expect(transport.mock.calls[1][1]).toEqual({
+        actor_user_id: 8,
+        resource: 'provisioning-templates',
+    });
+    expect(state.post).not.toHaveBeenCalled();
+    expect(
+        sessionStorage.getItem(
+            'it.setup.pending-command.v1.actor.8.provisioning-templates',
+        ),
+    ).toBeNull();
+});
+
+it.each(['footer', 'escape'] as const)(
+    'conceals denied context and exits through refreshed permissions (%s)',
+    async (exit) => {
+        vi.spyOn(axios, 'post')
+            .mockRejectedValueOnce(new Error('Synthetic lost response'))
+            .mockResolvedValueOnce({ status: 404, data: {} });
+        newDraft();
+        fireEvent.click(screen.getByRole('button', { name: 'Save template' }));
+        await waitFor(() =>
+            expect(
+                screen.getByRole('button', { name: 'Check saved result' }),
+            ).toBeVisible(),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check saved result' }),
+        );
+        await waitFor(() =>
+            expect(screen.getByText(/This draft is concealed/)).toBeVisible(),
+        );
+        expect(
+            screen.queryByText('Recoverable private template'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('heading', { name: 'Template saved' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('heading', { name: 'Support worker joiner' }),
+        ).not.toBeInTheDocument();
+        if (exit === 'footer') {
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Return to service desk' }),
+            );
+        } else {
+            fireEvent.keyDown(document, { key: 'Escape' });
+        }
+        await waitFor(() => expect(state.visit).toHaveBeenCalledWith('/it'));
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    },
+);
+
+it('keeps expired private context concealed while a recovery check is pending', async () => {
+    let finish!: (value: {
+        status: number;
+        data: Record<string, unknown>;
+    }) => void;
+    vi.spyOn(axios, 'post')
+        .mockResolvedValueOnce({ status: 419, data: {} })
+        .mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    finish = resolve;
+                }),
+        );
+    newDraft();
+    fireEvent.click(screen.getByRole('button', { name: 'Save template' }));
+    await waitFor(() =>
+        expect(screen.getByText(/This draft is concealed/)).toBeVisible(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Check saved result' }));
+    await waitFor(() =>
+        expect(
+            screen.getByRole('button', { name: 'Cancel wait' }),
+        ).toBeVisible(),
+    );
+    expect(
+        screen.queryByText('Recoverable private template'),
+    ).not.toBeInTheDocument();
+    expect(
+        screen.queryByRole('heading', { name: 'Support worker joiner' }),
+    ).not.toBeInTheDocument();
+    await act(async () => finish({ status: 404, data: {} }));
+    expect(screen.getByText(/This draft is concealed/)).toBeVisible();
+});
+
+it('requires explicit cancellation of an uncertain create before another save is enabled', async () => {
+    let originalIdentity = '';
+    const transport = vi
+        .spyOn(axios, 'post')
+        .mockImplementation(async (url, data) => {
+            if (url === '/it/setup/provisioning-templates') {
+                originalIdentity = (data as { request_uuid: string })
+                    .request_uuid;
+                throw new Error('Synthetic lost response');
+            }
+            return {
+                status: 200,
+                data: {
+                    status: 'cancelled',
+                    data: {
+                        viewer_user_id: 8,
+                        resource: 'provisioning-templates',
+                        request_uuid: originalIdentity,
+                        cancelled: true,
+                    },
+                },
+            };
+        });
+    newDraft();
+    fireEvent.click(screen.getByRole('button', { name: 'Save template' }));
+    await waitFor(() =>
+        expect(
+            screen.getByRole('button', { name: 'Cancel earlier create' }),
+        ).toBeVisible(),
+    );
+    fireEvent.click(
+        screen.getByRole('button', { name: 'Cancel earlier create' }),
+    );
+    expect(transport).toHaveBeenCalledTimes(1);
+    fireEvent.click(
+        screen.getByRole('button', { name: 'Check and cancel create' }),
+    );
+    await waitFor(() =>
+        expect(
+            screen.getByRole('button', { name: 'Save template' }),
+        ).toBeEnabled(),
+    );
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(transport.mock.calls[1][0]).toBe(
+        `/it/setup/commands/${originalIdentity}/cancel`,
+    );
+    expect(screen.getByText('Recoverable private template')).toBeVisible();
+    expect(
+        screen.queryByRole('heading', { name: 'Template saved' }),
+    ).not.toBeInTheDocument();
+    expect(
+        sessionStorage.getItem(
+            'it.setup.pending-command.v1.actor.8.provisioning-templates',
+        ),
+    ).toBeNull();
+});
+
+it('places create validation errors on the editable workflow step', async () => {
+    vi.spyOn(axios, 'post').mockResolvedValue({
+        status: 422,
+        data: { errors: { 'tasks.0.title': ['Review this step title.'] } },
+    });
+    newDraft();
+    fireEvent.click(screen.getByRole('button', { name: 'Save template' }));
+    await waitFor(() =>
+        expect(
+            screen.getByRole('form', { name: 'Workflow steps' }),
+        ).toHaveFocus(),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+        'Review this step title.',
+    );
+    expect(screen.getByRole('textbox', { name: 'Title' })).toBeEnabled();
+    expect(
+        screen.queryByRole('heading', { name: 'Template saved' }),
+    ).not.toBeInTheDocument();
 });
 
 it('reviews matching rules and task evidence then saves with the original edit version', () => {

@@ -902,6 +902,7 @@ export default function ItSetupIndex({
                     {tab === 'provisioning' ? (
                         <ItProvisioningTemplates
                             key={actorId}
+                            actorId={actorId}
                             templates={provisioningTemplates.filter((item) =>
                                 match(
                                     [

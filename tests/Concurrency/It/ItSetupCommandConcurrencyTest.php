@@ -4,6 +4,8 @@ namespace Tests\Concurrency\It;
 
 use App\Domain\It\Services\ItSetupCommandService;
 use App\Models\AuditLog;
+use App\Models\ItProvisioningTemplate;
+use App\Models\ItProvisioningTemplateVersion;
 use App\Models\ItQueue;
 use App\Models\ItService;
 use App\Models\ItSetupCommandReceipt;
@@ -37,10 +39,12 @@ final class ItSetupCommandConcurrencyTest extends TestCase
         $this->seed(RbacSeeder::class);
         $actor = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $actor->roles()->sync(Role::where('name', 'admin')->pluck('id'));
-        foreach (['teams' => ItTeam::class, 'queues' => ItQueue::class, 'services' => ItService::class] as $resource => $model) {
+        foreach (['teams' => ItTeam::class, 'queues' => ItQueue::class, 'services' => ItService::class,
+            'provisioning-templates' => ItProvisioningTemplate::class] as $resource => $model) {
             $uuid = (string) Str::uuid();
             $before = $model::count();
-            $action = 'it.setup.'.['teams' => 'team', 'queues' => 'queue', 'services' => 'service'][$resource].'.created';
+            $action = $resource === 'provisioning-templates' ? 'it.provisioning.template.created'
+                : 'it.setup.'.['teams' => 'team', 'queues' => 'queue', 'services' => 'service'][$resource].'.created';
             $audits = AuditLog::where('action', $action)->count();
             $race = $this->race($actor, $resource, $uuid, ['create', 'create']);
             $this->assertSame(['committed', 'committed'], array_column($race, 'status'));
@@ -51,11 +55,15 @@ final class ItSetupCommandConcurrencyTest extends TestCase
             $this->assertSame($before + 1, $model::count());
             $this->assertSame($audits + 1, AuditLog::where('action', $action)->count());
             $this->assertSame(1, ItSetupCommandReceipt::where('request_uuid', $uuid)->count());
+            if ($resource === 'provisioning-templates') {
+                $this->assertSame(1, ItProvisioningTemplateVersion::where('provisioning_template_id', $race[0]['data']['id'])->count());
+            }
 
             $uuid = (string) Str::uuid();
             $before = $model::count();
             $audits = AuditLog::where('action', $action)->count();
             $cancelAudits = AuditLog::where('action', 'it.setup.create.cancelled')->count();
+            $versions = ItProvisioningTemplateVersion::count();
             $race = $this->race($actor, $resource, $uuid, ['create', 'cancel']);
             $this->assertSame($race[0]['status'], $race[1]['status']);
             $this->assertContains($race[0]['status'], ['committed', 'cancelled']);
@@ -67,6 +75,7 @@ final class ItSetupCommandConcurrencyTest extends TestCase
             $this->assertSame($audits + (int) $committed, AuditLog::where('action', $action)->count());
             $this->assertSame($cancelAudits + (int) ! $committed, AuditLog::where('action', 'it.setup.create.cancelled')->count());
             $this->assertSame(1, ItSetupCommandReceipt::where('request_uuid', $uuid)->count());
+            $this->assertSame($versions + (int) ($committed && $resource === 'provisioning-templates'), ItProvisioningTemplateVersion::count());
             $recovered = app(ItSetupCommandService::class)->recover($actor, $resource, $uuid, (int) $actor->id);
             $this->assertSame($race[0]['status'], $recovered['status']);
         }

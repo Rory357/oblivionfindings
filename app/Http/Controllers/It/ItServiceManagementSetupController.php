@@ -627,6 +627,10 @@ class ItServiceManagementSetupController extends Controller
 
     public function storeProvisioningTemplate(StoreItProvisioningTemplateRequest $request)
     {
+        if ($request->filled('request_uuid')) {
+            return $this->createCommand($request, 'provisioning-templates');
+        }
+
         try {
             $this->provisioningTemplates->create($request->user(), $request->validated());
         } catch (DomainException $exception) {

@@ -3,6 +3,7 @@
 namespace App\Domain\It\Services;
 
 use App\Models\ItCatalogItem;
+use App\Models\ItProvisioningTemplate;
 use App\Models\ItQueue;
 use App\Models\ItService;
 use App\Models\ItSetupCommandReceipt;
@@ -22,6 +23,8 @@ final class ItSetupCommandService
     public function __construct(
         private readonly ItServiceManagementSetupService $setup,
         private readonly ItCatalogManagementService $catalogue,
+        private readonly ItProvisioningTemplateService $templates,
+        private readonly ItWorkAccessService $workAccess,
     ) {}
 
     /** @param array<string, mixed> $data @return array<string, mixed> */
@@ -31,7 +34,8 @@ final class ItSetupCommandService
         abort_unless(Str::isUuid($uuid), 422, 'A valid create command identity is required.');
         $payload = Arr::except($data, ['actor_user_id', 'request_uuid', 'configuration_version']);
         $hash = hash('sha256', json_encode(
-            $resource === 'catalogue-items' ? $this->orderedContract($payload) : Arr::sortRecursive($payload),
+            in_array($resource, ['catalogue-items', 'provisioning-templates'], true)
+                ? $this->orderedContract($payload) : Arr::sortRecursive($payload),
             JSON_THROW_ON_ERROR,
         ));
 
@@ -54,7 +58,7 @@ final class ItSetupCommandService
                 'teams' => ['it_teams', 'name'],
                 'queues' => ['it_queues', 'key'],
                 'services' => ['it_services', 'key'],
-                'catalogue-items' => [null, null],
+                'catalogue-items', 'provisioning-templates' => [null, null],
             };
             // Replay must be checked before the original name/key becomes a
             // duplicate. A new command still receives normal validation.
@@ -70,6 +74,7 @@ final class ItSetupCommandService
                 'queues' => $this->setup->createQueue($actor, $payload),
                 'services' => $this->setup->createService($actor, $payload),
                 'catalogue-items' => $this->catalogue->create($actor, $payload),
+                'provisioning-templates' => $this->templates->create($actor, $payload),
             };
             $receipt->forceFill([
                 $this->recordColumn($resource) => $record->id,
@@ -144,6 +149,7 @@ final class ItSetupCommandService
         return match ($resource) {
             'teams' => 'it_team_id', 'queues' => 'it_queue_id', 'services' => 'it_service_id',
             'catalogue-items' => 'it_catalog_item_id',
+            'provisioning-templates' => 'it_provisioning_template_id',
         };
     }
 
@@ -154,6 +160,7 @@ final class ItSetupCommandService
             $record instanceof ItQueue => $this->setup->queueVersion($record),
             $record instanceof ItService => $this->setup->serviceVersion($record),
             $record instanceof ItCatalogItem => hash('sha256', 'catalogue:'.$record->id.':'.$record->lock_version),
+            $record instanceof ItProvisioningTemplate => hash('sha256', 'provisioning-template:'.$record->id.':'.$record->lock_version),
         };
     }
 
@@ -164,8 +171,16 @@ final class ItSetupCommandService
         $model = match ($receipt->resource) {
             'teams' => ItTeam::class, 'queues' => ItQueue::class, 'services' => ItService::class,
             'catalogue-items' => ItCatalogItem::class,
+            'provisioning-templates' => ItProvisioningTemplate::class,
         };
         $record = $model::query()->findOrFail($receipt->{$this->recordColumn($receipt->resource)});
+        if ($record instanceof ItProvisioningTemplate) {
+            // Receipt ownership never bypasses the current canonical Site boundary.
+            abort_unless($record->site_id === null || $actor->canDo('it.organisationWide')
+                || in_array((int) $record->site_id, $this->workAccess->approvedSiteIds($actor), true), 404);
+
+            return $this->result($actor, $receipt, $record, $replayed);
+        }
         // Catalogue authoring uses the current approved IT manager boundary.
         // lockedActor revalidates it for every create, recovery and cancellation;
         // receipt ownership alone never grants access to an archived record.

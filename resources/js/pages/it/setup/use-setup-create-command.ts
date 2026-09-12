@@ -2,7 +2,10 @@ import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import type { SetupFields, SetupResource } from './use-setup-memory';
 
-export type SetupCreateResource = SetupResource | 'catalogue-items';
+export type SetupCreateResource =
+    | SetupResource
+    | 'catalogue-items'
+    | 'provisioning-templates';
 
 export type SetupCreated = {
     id: number;
