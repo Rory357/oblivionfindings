@@ -896,6 +896,7 @@ export default function ItSetupIndex({
                                 ),
                             )}
                             services={services}
+                            sites={sites}
                         />
                     ) : null}
                     {tab === 'provisioning' ? (

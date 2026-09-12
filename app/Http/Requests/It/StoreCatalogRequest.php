@@ -22,6 +22,7 @@ class StoreCatalogRequest extends FormRequest
             'schema_version' => ['required', 'integer', 'min:1'],
             'idempotency_key' => ['required', 'string', 'max:100'],
             'values' => ['present', 'array'],
+            'site_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ];
     }
 }

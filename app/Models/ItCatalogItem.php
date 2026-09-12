@@ -16,7 +16,7 @@ class ItCatalogItem extends Model
 
     public const OUTCOME_TYPES = ['service_request', 'security_request', 'provisioning'];
 
-    public const CONTRACT_FIELDS = ['it_service_id', 'name', 'slug', 'description', 'outcome_type', 'category', 'provisioning_type', 'default_priority', 'requires_approval', 'internal_only', 'form_schema_version', 'form_schema', 'search_terms', 'sort_order'];
+    public const CONTRACT_FIELDS = ['it_service_id', 'name', 'slug', 'description', 'outcome_type', 'category', 'provisioning_type', 'default_priority', 'requires_approval', 'internal_only', 'site_scope', 'form_schema_version', 'form_schema', 'search_terms', 'sort_order'];
 
     protected $fillable = [
         'it_service_id',
@@ -30,6 +30,7 @@ class ItCatalogItem extends Model
         'requires_approval',
         'is_published',
         'internal_only',
+        'site_scope',
         'form_schema_version',
         'form_schema',
         'search_terms',
@@ -44,6 +45,7 @@ class ItCatalogItem extends Model
         'requires_approval' => 'boolean',
         'is_published' => 'boolean',
         'internal_only' => 'boolean',
+        'site_scope' => 'array',
         'form_schema_version' => 'integer',
         'form_schema' => 'array',
         'search_terms' => 'array',
@@ -86,7 +88,9 @@ class ItCatalogItem extends Model
         $version = $this->publishedVersion;
         abort_unless($this->is_published && $version && (int) $version->catalog_item_id === (int) $this->id, 404);
         $copy = clone $this;
-        $copy->forceFill($version->contract);
+        // Older immutable versions predate Site restrictions. Never inherit
+        // a newer draft's restrictions while reading that original contract.
+        $copy->forceFill(['site_scope' => null, ...$version->contract]);
 
         return $copy;
     }

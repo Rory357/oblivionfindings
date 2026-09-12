@@ -1,0 +1,23 @@
+{
+    "token": "f03a9b56c701428d",
+    "database_matches": true,
+    "mutations_performed": false,
+    "counts": {
+        "users": 0,
+        "sites": 0,
+        "it_tickets": 0,
+        "it_teams": 0,
+        "devices": 0,
+        "monitors": 0,
+        "device_event_signal_outbox": 0,
+        "control_room_signals": 0,
+        "monitoring_incident_evidence_snapshots": 0
+    },
+    "latest_migrations": [
+        "2026_08_30_000200_create_facility_signal_delivery_outbox",
+        "2026_08_30_000110_govern_monitoring_metric_projection_cutover",
+        "2026_08_30_000100_govern_monitoring_metric_projection_replays",
+        "2026_08_28_000400_add_retirement_to_medication_round_templates"
+    ],
+    "source_permissions": []
+}

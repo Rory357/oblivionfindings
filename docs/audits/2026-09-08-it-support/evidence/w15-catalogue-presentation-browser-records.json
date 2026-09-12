@@ -1,0 +1,112 @@
+{
+    "token": "f2e6ca18fe2d44d1",
+    "mutations_performed": false,
+    "items": [
+        {
+            "id": 1,
+            "name": "W15 f2e6ca18fe2d44d1 synthetic approval request",
+            "outcome_type": "provisioning",
+            "provisioning_type": "equipment",
+            "requires_approval": 1,
+            "internal_only": 0,
+            "site_scope": null,
+            "is_published": 1,
+            "form_schema_version": 1,
+            "published_version_id": 1,
+            "lock_version": 2
+        },
+        {
+            "id": 2,
+            "name": "W15 f2e6ca18fe2d44d1 synthetic service request",
+            "outcome_type": "service_request",
+            "provisioning_type": null,
+            "requires_approval": 0,
+            "internal_only": 0,
+            "site_scope": null,
+            "is_published": 1,
+            "form_schema_version": 1,
+            "published_version_id": 2,
+            "lock_version": 2
+        },
+        {
+            "id": 3,
+            "name": "W15 f2e6ca18fe2d44d1 synthetic draft request",
+            "outcome_type": "service_request",
+            "provisioning_type": null,
+            "requires_approval": 0,
+            "internal_only": 0,
+            "site_scope": null,
+            "is_published": 0,
+            "form_schema_version": 1,
+            "published_version_id": null,
+            "lock_version": 1
+        },
+        {
+            "id": 4,
+            "name": "W15 f2e6ca18fe2d44d1 synthetic confidential revised draft",
+            "outcome_type": "service_request",
+            "provisioning_type": null,
+            "requires_approval": 0,
+            "internal_only": 1,
+            "site_scope": null,
+            "is_published": 1,
+            "form_schema_version": 2,
+            "published_version_id": 3,
+            "lock_version": 3
+        },
+        {
+            "id": 5,
+            "name": "W15 full Site names review",
+            "outcome_type": "service_request",
+            "provisioning_type": null,
+            "requires_approval": 0,
+            "internal_only": 0,
+            "site_scope": "[1, 2]",
+            "is_published": 0,
+            "form_schema_version": 2,
+            "published_version_id": null,
+            "lock_version": 2
+        }
+    ],
+    "create_receipts": [
+        {
+            "id": 1,
+            "actor_user_id": 3,
+            "resource": "catalogue-items",
+            "request_uuid": "14b011b4-182c-499c-9704-d75da407f0c2",
+            "it_catalog_item_id": 5,
+            "committed_at": "2026-09-12 15:53:24",
+            "cancelled_at": null
+        }
+    ],
+    "versions": [
+        {
+            "id": 1,
+            "catalog_item_id": 1,
+            "version": 1,
+            "provenance": "reviewed_publication",
+            "published_by": 3,
+            "contract": "{\"name\": \"W15 f2e6ca18fe2d44d1 synthetic approval request\", \"slug\": \"w15-f2e6ca18fe2d44d1-synthetic-approval-request\", \"category\": \"hardware\", \"site_scope\": null, \"sort_order\": 0, \"description\": \"Isolated catalogue verification only. No external fulfilment or communication.\", \"form_schema\": {\"fields\": [{\"key\": \"details\", \"max\": 2000, \"type\": \"textarea\", \"label\": \"What do you need?\", \"required\": true, \"visibility\": \"requester\"}]}, \"outcome_type\": \"provisioning\", \"search_terms\": [\"synthetic\", \"approval\"], \"internal_only\": false, \"it_service_id\": null, \"default_priority\": \"normal\", \"provisioning_type\": \"equipment\", \"requires_approval\": true, \"form_schema_version\": 1}"
+        },
+        {
+            "id": 2,
+            "catalog_item_id": 2,
+            "version": 1,
+            "provenance": "reviewed_publication",
+            "published_by": 3,
+            "contract": "{\"name\": \"W15 f2e6ca18fe2d44d1 synthetic service request\", \"slug\": \"w15-f2e6ca18fe2d44d1-synthetic-service-request\", \"category\": \"hardware\", \"site_scope\": null, \"sort_order\": 0, \"description\": \"Isolated catalogue verification only. No external fulfilment or communication.\", \"form_schema\": {\"fields\": [{\"key\": \"details\", \"max\": 2000, \"type\": \"textarea\", \"label\": \"What do you need?\", \"required\": true, \"visibility\": \"requester\"}]}, \"outcome_type\": \"service_request\", \"search_terms\": [\"synthetic\", \"service\"], \"internal_only\": false, \"it_service_id\": null, \"default_priority\": \"normal\", \"provisioning_type\": null, \"requires_approval\": false, \"form_schema_version\": 1}"
+        },
+        {
+            "id": 3,
+            "catalog_item_id": 4,
+            "version": 1,
+            "provenance": "reviewed_publication",
+            "published_by": 3,
+            "contract": "{\"name\": \"W15 f2e6ca18fe2d44d1 synthetic versioned request\", \"slug\": \"w15-f2e6ca18fe2d44d1-synthetic-versioned-request\", \"category\": \"hardware\", \"site_scope\": null, \"sort_order\": 0, \"description\": \"Isolated catalogue verification only. No external fulfilment or communication.\", \"form_schema\": {\"fields\": [{\"key\": \"details\", \"max\": 2000, \"type\": \"textarea\", \"label\": \"What do you need?\", \"required\": true, \"visibility\": \"requester\"}]}, \"outcome_type\": \"service_request\", \"search_terms\": [\"synthetic\", \"versioned\"], \"internal_only\": false, \"it_service_id\": null, \"default_priority\": \"normal\", \"provisioning_type\": null, \"requires_approval\": false, \"form_schema_version\": 1}"
+        }
+    ],
+    "submissions": [],
+    "provisioning": [],
+    "catalogue_tickets": [],
+    "events": []
+}

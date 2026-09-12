@@ -59,6 +59,8 @@ class SaveItCatalogItemRequest extends FormRequest
             'default_priority' => ['required', Rule::in(ItTicket::PRIORITIES)],
             'requires_approval' => ['required', 'boolean'],
             'internal_only' => ['required', 'boolean'],
+            'site_scope' => ['sometimes', 'nullable', 'array', 'min:1', 'max:100'],
+            'site_scope.*' => ['integer', 'min:1', 'distinct'],
             'search_terms' => ['present', 'array', 'max:20'],
             'search_terms.*' => ['string', 'max:100', 'distinct:strict'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:100000'],

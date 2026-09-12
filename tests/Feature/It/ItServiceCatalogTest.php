@@ -735,6 +735,71 @@ function catalogueCreateCommand(User $actor, ?string $uuid = null): array
     ];
 }
 
+test('catalogue Site discovery and direct submission use the published audience and current approved access', function () {
+    $otherSite = Site::factory()->create();
+    $item = ItCatalogItem::factory()->create(['site_scope' => [$otherSite->id], 'form_schema' => catalogSchema()]);
+    $input = ['schema_version' => 1, 'idempotency_key' => (string) Str::uuid(),
+        'site_id' => $otherSite->id, 'values' => ['details' => 'Site scoped work', 'system_name' => 'VPN']];
+    $this->actingAs($this->worker)->getJson('/it/catalog')->assertOk()->assertJsonCount(0, 'data');
+    $this->get('/it?tab=catalog')->assertInertia(fn ($page) => $page->has('catalogItems', 0));
+    $this->post("/it/catalog/{$item->id}/submissions", $input)->assertNotFound();
+    expect(ItCatalogSubmission::query()->count())->toBe(0);
+
+    $this->workerProfile->update(['secondary_site_ids' => [$otherSite->id]]);
+    $this->getJson('/it/catalog')->assertOk()->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.site_options.0.id', $otherSite->id);
+    $this->post("/it/catalog/{$item->id}/submissions", [...$input, 'site_id' => $this->site->id])
+        ->assertSessionHasErrors('catalog_item');
+    $this->post("/it/catalog/{$item->id}/submissions", $input)->assertRedirect();
+    expect(ItTicket::query()->sole()->site_id)->toBe($otherSite->id)
+        ->and(ItCatalogSubmission::query()->sole()->contract_snapshot['site_scope'])->toBe([$otherSite->id]);
+    $this->post("/it/catalog/{$item->id}/submissions", [...$input, 'site_id' => $this->site->id])
+        ->assertSessionHasErrors('idempotency_key');
+    expect(ItTicket::query()->count())->toBe(1);
+
+    $otherSite->update(['is_active' => false]);
+    $this->getJson('/it/catalog')->assertOk()->assertJsonCount(0, 'data');
+    $this->post("/it/catalog/{$item->id}/submissions", [...$input, 'idempotency_key' => (string) Str::uuid()])->assertNotFound();
+});
+
+test('catalogue Site authoring rejects empty or unavailable scopes and preserves published versions until reviewed', function () {
+    $payload = [...catalogueCreateCommand($this->agent), 'site_scope' => []];
+    $this->actingAs($this->agent)->postJson('/it/setup/catalogue-items', $payload)->assertUnprocessable()->assertJsonValidationErrors('site_scope');
+    $inactive = Site::factory()->create(['is_active' => false]);
+    $this->postJson('/it/setup/catalogue-items', [...$payload, 'site_scope' => [$inactive->id]])
+        ->assertUnprocessable()->assertJsonValidationErrors('site_scope');
+    expect(ItCatalogItem::query()->count())->toBe(0)->and(ItSetupCommandReceipt::query()->count())->toBe(0);
+    $payload['site_scope'] = [$this->site->id];
+    $this->postJson('/it/setup/catalogue-items', $payload)->assertOk();
+    $item = ItCatalogItem::query()->sole();
+    $this->post("/it/setup/catalogue-items/{$item->id}/publish", ['expected_version' => $item->lock_version])->assertRedirect();
+    $draft = $payload;
+    unset($draft['request_uuid']);
+    $draft['site_scope'] = null;
+    $draft['expected_version'] = $item->fresh()->lock_version;
+    $this->patch("/it/setup/catalogue-items/{$item->id}", $draft)->assertRedirect();
+    expect($item->fresh()->site_scope)->toBeNull()
+        ->and($item->fresh()->publishedContract()->site_scope)->toBe([$this->site->id]);
+    $this->post("/it/setup/catalogue-items/{$item->id}/publish", ['expected_version' => $item->fresh()->lock_version])->assertRedirect();
+    expect($item->fresh()->publishedContract()->site_scope)->toBeNull()
+        ->and(ItCatalogVersion::query()->where('catalog_item_id', $item->id)->where('version', 1)->sole()->contract['site_scope'])->toBe([$this->site->id]);
+});
+
+test('site-limited provisioning cannot be requested for an employee at another approved Site', function () {
+    $otherSite = Site::factory()->create();
+    $agentProfile = HrEmployeeProfile::query()->where('user_id', $this->agent->id)->sole();
+    $agentProfile->update(['secondary_site_ids' => [$otherSite->id]]);
+    $otherProfile = HrEmployeeProfile::factory()->create(['primary_site_id' => $otherSite->id, 'is_active' => true]);
+    $item = ItCatalogItem::factory()->create([
+        'site_scope' => [$this->site->id], 'outcome_type' => 'provisioning', 'provisioning_type' => 'equipment',
+        'form_schema' => ['fields' => [['key' => 'employee_profile_id', 'label' => 'Requested for', 'type' => 'employee', 'required' => true]]],
+    ]);
+    $this->actingAs($this->agent)->post("/it/catalog/{$item->id}/submissions", [
+        'schema_version' => 1, 'idempotency_key' => (string) Str::uuid(), 'values' => ['employee_profile_id' => $otherProfile->id],
+    ])->assertSessionHasErrors('values.employee_profile_id');
+    expect(ItProvisioningRequest::query()->count())->toBe(0)->and(ItCatalogSubmission::query()->count())->toBe(0);
+});
+
 test('catalogue create recovery binds the original payload actor and immutable command outcome', function () {
     $payload = catalogueCreateCommand($this->agent);
     $response = $this->actingAs($this->agent)->postJson('/it/setup/catalogue-items', $payload)
@@ -784,4 +849,32 @@ test('catalogue cancellation wins before creation and failed audit leaves a safe
         ->and(ItSetupCommandReceipt::query()->where('request_uuid', $retry['request_uuid'])->exists())->toBeFalse();
     $this->postJson('/it/setup/catalogue-items', $retry)->assertOk()->assertJsonPath('status', 'committed');
     expect(ItCatalogItem::query()->count())->toBe(1);
+});
+
+test('legacy publication without a Site field cannot inherit a newer draft restriction', function () {
+    $otherSite = Site::factory()->create();
+    $item = ItCatalogItem::factory()->create(['is_published' => false, 'site_scope' => [$otherSite->id]]);
+    $legacyContract = $item->only(ItCatalogItem::CONTRACT_FIELDS);
+    unset($legacyContract['site_scope']);
+    $version = ItCatalogVersion::query()->create([
+        'catalog_item_id' => $item->id, 'version' => 1, 'contract' => $legacyContract, 'provenance' => 'legacy_current',
+    ]);
+    $item->update(['is_published' => true, 'published_version_id' => $version->id]);
+    $this->actingAs($this->worker)->getJson('/it/catalog')->assertOk()->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.site_options.0.id', $this->site->id);
+    expect($item->fresh()->publishedContract()->site_scope)->toBeNull()
+        ->and($item->fresh()->site_scope)->toBe([$otherSite->id])
+        ->and(array_key_exists('site_scope', $version->fresh()->contract))->toBeFalse();
+});
+
+test('publication rechecks Site availability instead of releasing a stale audience', function () {
+    $payload = [...catalogueCreateCommand($this->agent), 'site_scope' => [$this->site->id]];
+    $this->actingAs($this->agent)->postJson('/it/setup/catalogue-items', $payload)->assertOk();
+    $item = ItCatalogItem::query()->sole();
+    $this->site->update(['is_active' => false]);
+    $this->post("/it/setup/catalogue-items/{$item->id}/publish", ['expected_version' => $item->lock_version])
+        ->assertSessionHasErrors('site_scope');
+    expect($item->fresh()->is_published)->toBeFalse()
+        ->and(ItCatalogVersion::query()->count())->toBe(0)
+        ->and(AuditLog::query()->where('action', 'it.catalogue.item.published')->count())->toBe(0);
 });

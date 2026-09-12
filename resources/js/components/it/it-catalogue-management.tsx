@@ -65,6 +65,7 @@ export interface CatalogManagementItem {
     requires_approval: boolean;
     is_published: boolean;
     internal_only: boolean;
+    site_scope?: number[] | null;
     form_schema_version: number;
     lock_version: number;
     published_version: number | null;
@@ -83,6 +84,7 @@ interface Props {
     actorId?: number;
     items: CatalogManagementItem[];
     services: CatalogServiceOption[];
+    sites?: CatalogServiceOption[];
 }
 
 const FIELD_TYPES = [
@@ -171,7 +173,12 @@ const normaliseFields = (
         max: field.max ?? '',
     }));
 
-export function ItCatalogueManagement({ items, services, actorId }: Props) {
+export function ItCatalogueManagement({
+    items,
+    services,
+    sites = [],
+    actorId,
+}: Props) {
     const [editing, setEditing] = useState<CatalogManagementItem | null>(null);
     const [editorOpen, setEditorOpen] = useState(false);
     const [editorStep, setEditorStep] = useState(0);
@@ -202,6 +209,7 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
         default_priority: 'normal',
         requires_approval: false,
         internal_only: false,
+        site_scope: null as number[] | null,
         search_terms: [] as string[],
         sort_order: 0,
         form_schema: { fields: [] as CatalogManagementField[] },
@@ -274,7 +282,19 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
         else setEditorOpen(false);
     };
 
+    const changeSiteScope = (scope: number[] | null) => {
+        form.setData('site_scope', scope);
+        form.clearErrors('site_scope');
+    };
+
     const validateDetails = () => {
+        if (
+            form.data.site_scope !== null &&
+            form.data.site_scope.length === 0
+        ) {
+            form.setError('site_scope', 'Choose at least one approved site.');
+            return false;
+        }
         if (!form.data.name.trim()) {
             form.setError('name', 'Enter a request name.');
             return false;
@@ -336,6 +356,7 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
             default_priority: item?.default_priority ?? 'normal',
             requires_approval: item?.requires_approval ?? false,
             internal_only: item?.internal_only ?? false,
+            site_scope: item?.site_scope ?? null,
             search_terms: item?.search_terms ?? [],
             sort_order: item?.sort_order ?? 0,
             form_schema: {
@@ -766,6 +787,7 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
                                                 'it_service_id',
                                                 'provisioning_type',
                                                 'description',
+                                                'site_scope',
                                             ].includes(key),
                                     )
                                     .map(([key, message]) => (
@@ -1011,6 +1033,147 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
                                                     )
                                                 }
                                             />
+                                        </div>
+                                        <div className="mt-5 space-y-3">
+                                            <Field
+                                                label="Available at"
+                                                error={form.errors.site_scope}
+                                            >
+                                                <select
+                                                    className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                                    value={
+                                                        form.data.site_scope ===
+                                                        null
+                                                            ? 'all'
+                                                            : 'selected'
+                                                    }
+                                                    onChange={(event) =>
+                                                        changeSiteScope(
+                                                            event.target
+                                                                .value === 'all'
+                                                                ? null
+                                                                : [],
+                                                        )
+                                                    }
+                                                >
+                                                    <option value="all">
+                                                        All approved sites
+                                                    </option>
+                                                    <option value="selected">
+                                                        Selected sites
+                                                    </option>
+                                                </select>
+                                            </Field>
+                                            {form.data.site_scope !== null ? (
+                                                <fieldset className="space-y-2 rounded-xl border border-border p-3">
+                                                    <legend className="px-1 text-sm font-medium">
+                                                        Sites for this request
+                                                        form
+                                                    </legend>
+                                                    {sites.map((site) => (
+                                                        <Checkbox
+                                                            key={site.id}
+                                                            label={site.name}
+                                                            checked={
+                                                                form.data.site_scope?.includes(
+                                                                    site.id,
+                                                                ) ?? false
+                                                            }
+                                                            onChange={(
+                                                                checked,
+                                                            ) =>
+                                                                changeSiteScope(
+                                                                    checked
+                                                                        ? [
+                                                                              ...(form
+                                                                                  .data
+                                                                                  .site_scope ??
+                                                                                  []),
+                                                                              site.id,
+                                                                          ]
+                                                                        : (
+                                                                              form
+                                                                                  .data
+                                                                                  .site_scope ??
+                                                                              []
+                                                                          ).filter(
+                                                                              (
+                                                                                  id,
+                                                                              ) =>
+                                                                                  id !==
+                                                                                  site.id,
+                                                                          ),
+                                                                )
+                                                            }
+                                                        />
+                                                    ))}
+                                                    {sites.length === 0 ? (
+                                                        <p className="text-sm text-muted-foreground">
+                                                            No approved sites
+                                                            are available to
+                                                            your access.
+                                                        </p>
+                                                    ) : null}
+                                                    {form.data.site_scope.filter(
+                                                        (id) =>
+                                                            !sites.some(
+                                                                (site) =>
+                                                                    site.id ===
+                                                                    id,
+                                                            ),
+                                                    ).length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            <p className="text-sm text-status-critical">
+                                                                A saved site is
+                                                                no longer
+                                                                available.
+                                                                Remove it before
+                                                                saving.
+                                                            </p>
+                                                            {form.data.site_scope
+                                                                .filter(
+                                                                    (id) =>
+                                                                        !sites.some(
+                                                                            (
+                                                                                site,
+                                                                            ) =>
+                                                                                site.id ===
+                                                                                id,
+                                                                        ),
+                                                                )
+                                                                .map((id) => (
+                                                                    <Checkbox
+                                                                        key={id}
+                                                                        label="Unavailable saved site"
+                                                                        checked
+                                                                        onChange={() =>
+                                                                            changeSiteScope(
+                                                                                (
+                                                                                    form
+                                                                                        .data
+                                                                                        .site_scope ??
+                                                                                    []
+                                                                                ).filter(
+                                                                                    (
+                                                                                        savedId,
+                                                                                    ) =>
+                                                                                        savedId !==
+                                                                                        id,
+                                                                                ),
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                ))}
+                                                        </div>
+                                                    ) : null}
+                                                </fieldset>
+                                            ) : null}
+                                            <p className="text-sm text-muted-foreground">
+                                                Staff still need approved access
+                                                to the request site. Changes
+                                                take effect when this version is
+                                                published.
+                                            </p>
                                         </div>
                                     </>
                                 ) : null}
@@ -1386,6 +1549,28 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
                                                 }
                                             />
                                             <ReviewRow
+                                                label="Available at"
+                                                value={
+                                                    form.data.site_scope ===
+                                                    null
+                                                        ? 'All approved sites'
+                                                        : form.data.site_scope
+                                                              .map(
+                                                                  (id) =>
+                                                                      sites.find(
+                                                                          (
+                                                                              site,
+                                                                          ) =>
+                                                                              site.id ===
+                                                                              id,
+                                                                      )?.name ??
+                                                                      'Unavailable site',
+                                                              )
+                                                              .join(', ') ||
+                                                          'No sites selected'
+                                                }
+                                            />
+                                            <ReviewRow
                                                 label="Priority"
                                                 value={humanize(
                                                     form.data.default_priority,
@@ -1489,6 +1674,22 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
                             value={String(
                                 publishing?.form_schema.fields?.length ?? 0,
                             )}
+                        />
+                        <Metric
+                            label="Available at"
+                            wrap
+                            value={
+                                publishing?.site_scope == null
+                                    ? 'All approved sites'
+                                    : publishing.site_scope
+                                          .map(
+                                              (id) =>
+                                                  sites.find(
+                                                      (site) => site.id === id,
+                                                  )?.name ?? 'Unavailable site',
+                                          )
+                                          .join(', ') || 'No sites selected'
+                            }
                         />
                     </dl>
                     {Object.entries(publishForm.errors).map(
@@ -1600,11 +1801,22 @@ export function ItCatalogueManagement({ items, services, actorId }: Props) {
     );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+    label,
+    value,
+    wrap = false,
+}: {
+    label: string;
+    value: string;
+    wrap?: boolean;
+}) {
     return (
-        <div>
+        <div className={wrap ? 'col-span-2 min-w-0' : undefined}>
             <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="mt-0.5 truncate font-medium" title={value}>
+            <dd
+                className={`mt-0.5 font-medium ${wrap ? 'break-words whitespace-normal' : 'truncate'}`}
+                title={value}
+            >
                 {value}
             </dd>
         </div>

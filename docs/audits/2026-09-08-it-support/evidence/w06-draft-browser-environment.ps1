@@ -114,6 +114,15 @@ if ($Mode -eq 'CreateAndStart') {
     if ($itOriginalLauncher -and $itOriginalLauncher.StartTime.ToUniversalTime().Ticks -eq $itOwner.launcher_start_ticks) {
         throw 'The creating launcher is still active; wait until schema/server setup has settled.'
     }
+    $itBootstrapStartedPath = Join-Path $itBrowserRoot 'bootstrap-started.json'
+    if (Test-Path -LiteralPath $itBootstrapStartedPath) {
+        $itBootstrapStarted = Get-Content -LiteralPath $itBootstrapStartedPath -Raw | ConvertFrom-Json
+        if ($itBootstrapStarted.token -ne $Token -or $itBootstrapStarted.script -ine (Join-Path $PSScriptRoot 'w06-draft-browser-bootstrap.php')) { throw 'Bootstrap ownership record differs.' }
+        $itLiveBootstrap = Get-Process -Id $itBootstrapStarted.pid -ErrorAction SilentlyContinue
+        if ($itLiveBootstrap -and $itLiveBootstrap.StartTime.ToUniversalTime().Ticks -eq $itBootstrapStarted.start_ticks) {
+            throw 'The owned bootstrap child is still active; inspect its exact process before cleanup.'
+        }
+    }
 }
 
 # Resolve only existing local test database access; never print credential values.
@@ -153,8 +162,18 @@ try {
     }
     Set-Location -LiteralPath $itBrowserRepo
     if ($Mode -eq 'CreateAndStart') {
-        & $itBrowserPhp (Join-Path $PSScriptRoot 'w06-draft-browser-bootstrap.php') --create-owned-schema
-        if ($LASTEXITCODE -ne 0) { throw 'Isolated bootstrap failed; retained token data requires inspection, never an automatic reset.' }
+        $itBootstrapArgument = '"' + (Join-Path $PSScriptRoot 'w06-draft-browser-bootstrap.php') + '"'
+        $itBootstrap = Start-Process -FilePath $itBrowserPhp -ArgumentList @($itBootstrapArgument, '--create-owned-schema') -WorkingDirectory $itBrowserRepo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $itBrowserRoot 'bootstrap-stdout.log') -RedirectStandardError (Join-Path $itBrowserRoot 'bootstrap-stderr.log')
+        $null = $itBootstrap.Handle
+        Write-ItBrowserNewJson (Join-Path $itBrowserRoot 'bootstrap-started.json') ([ordered] @{
+            token = $Token; pid = $itBootstrap.Id; start_ticks = $itBootstrap.StartTime.ToUniversalTime().Ticks
+            executable = $itBrowserPhp; script = (Join-Path $PSScriptRoot 'w06-draft-browser-bootstrap.php')
+        })
+        $itBootstrap.WaitForExit()
+        Write-ItBrowserNewJson (Join-Path $itBrowserRoot 'bootstrap-exited.json') ([ordered] @{
+            token = $Token; pid = $itBootstrap.Id; exit_code = $itBootstrap.ExitCode; exited_at = [DateTime]::UtcNow.ToString('o')
+        })
+        if ($itBootstrap.ExitCode -ne 0) { throw 'Isolated bootstrap failed; inspect its owned process logs and phase evidence, never reset automatically.' }
         if (Get-NetTCPConnection -LocalPort 8766 -State Listen -ErrorAction SilentlyContinue) { throw 'Port became occupied during bootstrap; do not replace that listener.' }
         $itPublicArgument = '"' + (Join-Path $itBrowserRepo 'public') + '"'
         $itRouterArgument = '"' + (Join-Path $PSScriptRoot 'w06-draft-browser-router.php') + '"'

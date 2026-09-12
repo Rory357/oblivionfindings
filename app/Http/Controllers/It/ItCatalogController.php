@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItCatalogAccessService;
 use App\Domain\It\Services\ItCatalogFieldOptionService;
 use App\Domain\It\Services\ItCatalogSubmissionService;
 use App\Domain\It\Services\ItEmailDeliveryService;
@@ -26,7 +27,6 @@ class ItCatalogController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $includeInternal = $user->canDo('it.manage');
         $search = trim((string) $request->query('q', ''));
 
         $items = ItCatalogItem::query()
@@ -34,10 +34,10 @@ class ItCatalogController extends Controller
             ->with('publishedVersion')
             ->get()
             ->map(fn (ItCatalogItem $item) => $item->publishedContract())
-            ->filter(fn (ItCatalogItem $item) => ($includeInternal || ! $item->internal_only)
+            ->filter(fn (ItCatalogItem $item) => app(ItCatalogAccessService::class)->canDiscover($user, $item)
                 && ($search === '' || str_contains(mb_strtolower($item->name.' '.$item->description.' '.implode(' ', $item->search_terms ?? [])), mb_strtolower($search))))
             ->sortBy([['sort_order', 'asc'], ['name', 'asc']])
-            ->map(fn (ItCatalogItem $item) => $item->discoveryPayload($includeInternal))
+            ->map(fn (ItCatalogItem $item) => app(ItCatalogAccessService::class)->discoveryPayload($user, $item))
             ->values();
 
         $types = $items->flatMap(fn (array $item) => collect($item['form_schema']['fields'] ?? [])->pluck('type'))

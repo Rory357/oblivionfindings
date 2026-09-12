@@ -14,12 +14,14 @@ use App\Domain\It\Presenters\ItTicketActivityPresenter;
 use App\Domain\It\Presenters\ItTicketConversationPresenter;
 use App\Domain\It\Presenters\ItTicketRoutingPresenter;
 use App\Domain\It\Services\ItAutomationScheduleCatalog;
+use App\Domain\It\Services\ItCatalogAccessService;
 use App\Domain\It\Services\ItCatalogFieldOptionService;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItKbAccessService;
 use App\Domain\It\Services\ItLinkedContextOptions;
 use App\Domain\It\Services\ItProvisioningAccessService;
 use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
+use App\Domain\It\Services\ItProvisioningTrackingService;
 use App\Domain\It\Services\ItSavedTicketFilterService;
 use App\Domain\It\Services\ItSlaReadService;
 use App\Domain\It\Services\ItTicketIntakeService;
@@ -225,9 +227,9 @@ class ItProvisioningController extends Controller
             ->with('publishedVersion')
             ->get()
             ->map(fn (ItCatalogItem $item) => $item->publishedContract())
-            ->filter(fn (ItCatalogItem $item) => $canManage || ! $item->internal_only)
+            ->filter(fn (ItCatalogItem $item) => app(ItCatalogAccessService::class)->canDiscover($user, $item))
             ->sortBy([['sort_order', 'asc'], ['name', 'asc']])
-            ->map(fn (ItCatalogItem $item) => $item->discoveryPayload($canManage))
+            ->map(fn (ItCatalogItem $item) => app(ItCatalogAccessService::class)->discoveryPayload($user, $item))
             ->values() : collect();
         $catalogEntityTypes = $catalogItems
             ->flatMap(fn (array $item) => collect($item['form_schema']['fields'] ?? [])->pluck('type'))
@@ -247,7 +249,7 @@ class ItProvisioningController extends Controller
                 'priority_matrix' => ItTicketPriorityService::MATRIX,
             ],
             'myTickets' => $canRequest ? $this->myTicketRows($user) : [],
-            'myProvisioning' => $canRequest ? app(\App\Domain\It\Services\ItProvisioningTrackingService::class)->listing($user, $request) : null,
+            'myProvisioning' => $canRequest ? app(ItProvisioningTrackingService::class)->listing($user, $request) : null,
             'catalogItems' => $catalogItems->all(),
             'catalogFieldOptions' => $canRequest
                 ? $this->catalogFieldOptions->forTypes($user, $catalogEntityTypes)

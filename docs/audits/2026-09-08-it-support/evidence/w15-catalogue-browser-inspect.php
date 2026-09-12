@@ -56,11 +56,12 @@ try {
     }
     $report = ['token' => $token, 'mutations_performed' => false];
     $queries = [
-        'items' => 'SELECT id, name, outcome_type, provisioning_type, requires_approval, internal_only, is_published, form_schema_version, published_version_id, lock_version FROM it_catalog_items ORDER BY id',
+        'items' => 'SELECT id, name, outcome_type, provisioning_type, requires_approval, internal_only, site_scope, is_published, form_schema_version, published_version_id, lock_version FROM it_catalog_items ORDER BY id',
         'create_receipts' => "SELECT id, actor_user_id, resource, request_uuid, it_catalog_item_id, committed_at, cancelled_at FROM it_setup_command_receipts WHERE resource = 'catalogue-items' ORDER BY id",
         'versions' => 'SELECT id, catalog_item_id, version, provenance, published_by, contract FROM it_catalog_versions ORDER BY id',
         'submissions' => 'SELECT id, catalog_item_id, requester_user_id, schema_version, catalog_version_id, contract_snapshot, input_sha256, result_type, result_id FROM it_catalog_submissions ORDER BY id',
         'provisioning' => 'SELECT id, employee_profile_id, created_by, type, status, approval_required, approval_status, approved_by_user_id, fulfilled_by, evidence_summary FROM it_provisioning_requests ORDER BY id',
+        'catalogue_tickets' => "SELECT t.id, t.reference, t.site_id, t.requester_user_id, t.requested_for_user_id, t.status FROM it_tickets t WHERE EXISTS (SELECT 1 FROM it_catalog_submissions s WHERE s.result_id = t.id AND (s.result_type LIKE '%ItTicket' OR s.result_type = 'it_ticket')) ORDER BY t.id",
         'events' => "SELECT id, subject_type, subject_id, actor_user_id, type, payload FROM it_ticket_events WHERE subject_type LIKE '%Provisioning%' OR subject_type = 'it_provisioning_request' ORDER BY id",
     ];
     foreach ($queries as $key => $sql) {

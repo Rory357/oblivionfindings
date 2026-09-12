@@ -11,6 +11,7 @@ import {
     ItCatalogueManagement,
     type CatalogManagementItem,
 } from '../it-catalogue-management';
+import { ItServiceCatalogue } from '../it-service-catalogue';
 
 const state = vi.hoisted(() => ({
     post: vi.fn(),
@@ -52,7 +53,16 @@ vi.mock('@inertiajs/react', async () => {
                     ),
                 errors: { ...state.errors, ...errors },
                 processing: state.processing,
-                clearErrors: () => setErrors({}),
+                clearErrors: (...fields: string[]) =>
+                    setErrors((previous) =>
+                        fields.length === 0
+                            ? {}
+                            : Object.fromEntries(
+                                  Object.entries(previous).filter(
+                                      ([key]) => !fields.includes(key),
+                                  ),
+                              ),
+                    ),
                 setError: (
                     key: string | Record<string, string>,
                     message: string,
@@ -392,3 +402,173 @@ it.each([
         }
     },
 );
+
+it('requires an explicit selected Site and includes the audience in draft review and save', () => {
+    render(
+        <ItCatalogueManagement
+            actorId={3}
+            items={[item]}
+            services={[]}
+            sites={[{ id: 21, name: 'Approved house' }]}
+        />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Available at' }), {
+        target: { value: 'selected' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+        'Choose at least one approved site.',
+    );
+    expect(state.post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Approved house' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'IT staff only' }));
+    fireEvent.click(
+        screen.getByRole('button', {
+            name: /Review draft.*Check before saving/,
+        }),
+    );
+    expect(screen.getByText('Approved house')).toBeVisible();
+    expect(screen.getByText('IT staff')).toBeVisible();
+    expect(
+        screen.queryByText('Choose at least one approved site.'),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(state.post).toHaveBeenCalledWith(
+        '/it/setup/catalogue-items/12',
+        expect.objectContaining({ site_scope: [21], internal_only: true }),
+    );
+});
+
+it.each(['selected', 'all'])(
+    'clears corrected Site errors while preserving unrelated validation (%s)',
+    (scope) => {
+        render(
+            <ItCatalogueManagement
+                actorId={3}
+                items={[item]}
+                services={[]}
+                sites={[{ id: 21, name: 'Approved house' }]}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+        fireEvent.change(screen.getByLabelText('Request name'), {
+            target: { value: '' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        expect(screen.getByText('Enter a request name.')).toBeVisible();
+        fireEvent.change(
+            screen.getByRole('combobox', { name: 'Available at' }),
+            {
+                target: { value: 'selected' },
+            },
+        );
+        expect(screen.getByText('Enter a request name.')).toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        expect(
+            screen.getByText('Choose at least one approved site.'),
+        ).toBeVisible();
+        if (scope === 'selected') {
+            fireEvent.click(
+                screen.getByRole('checkbox', { name: 'Approved house' }),
+            );
+        } else {
+            fireEvent.change(
+                screen.getByRole('combobox', { name: 'Available at' }),
+                {
+                    target: { value: 'all' },
+                },
+            );
+        }
+        expect(
+            screen.queryByText('Choose at least one approved site.'),
+        ).not.toBeInTheDocument();
+        expect(state.post).not.toHaveBeenCalled();
+    },
+);
+
+it('lets an author remove an unavailable saved Site without concealing its restriction', () => {
+    render(
+        <ItCatalogueManagement
+            actorId={3}
+            items={[{ ...item, site_scope: [99, 21] }]}
+            services={[]}
+            sites={[{ id: 21, name: 'Approved house' }]}
+        />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(
+        screen.getByRole('checkbox', { name: 'Unavailable saved site' }),
+    );
+    expect(
+        screen.queryByRole('checkbox', { name: 'Unavailable saved site' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+        screen.getByRole('button', {
+            name: /Review draft.*Check before saving/,
+        }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(state.post).toHaveBeenCalledWith(
+        '/it/setup/catalogue-items/12',
+        expect.objectContaining({ site_scope: [21] }),
+    );
+});
+
+it('shows approved request Sites and submits the staff-selected Site with the request', () => {
+    render(
+        <ItServiceCatalogue
+            items={[
+                {
+                    ...item,
+                    outcome_type: 'service_request',
+                    site_options: [
+                        { id: 21, name: 'Primary house' },
+                        { id: 22, name: 'Cover house' },
+                    ],
+                    form_schema: { fields: [] },
+                },
+            ]}
+            fieldOptions={{ employee: [], user: [], asset: [] }}
+            query=""
+            category={null}
+        />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Equipment request' }));
+    expect(screen.getByRole('combobox', { name: 'Request site' })).toHaveValue(
+        '21',
+    );
+    fireEvent.change(screen.getByRole('combobox', { name: 'Request site' }), {
+        target: { value: '22' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    expect(state.post).toHaveBeenCalledWith(
+        '/it/catalog/12/submissions',
+        expect.objectContaining({
+            site_id: 22,
+            schema_version: item.form_schema_version,
+        }),
+    );
+});
+
+it('shows complete long Site names on a full publication-review row', () => {
+    const siteName =
+        'Approved residential support location with a long shared name — Site B';
+    render(
+        <ItCatalogueManagement
+            actorId={3}
+            items={[{ ...item, is_published: false, site_scope: [21] }]}
+            services={[]}
+            sites={[{ id: 21, name: siteName }]}
+        />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+    const publication = screen.getByRole('dialog', { name: 'Publish request' });
+    expect(within(publication).getByText('Available at')).toBeVisible();
+    const siteValue = within(publication).getByText(siteName);
+    expect(siteValue).toBeVisible();
+    expect(siteValue).not.toHaveClass('truncate');
+    expect(siteValue).toHaveClass('whitespace-normal', 'break-words');
+    expect(siteValue.parentElement).toHaveClass('col-span-2');
+    expect(state.post).not.toHaveBeenCalled();
+});

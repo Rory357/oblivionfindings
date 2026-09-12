@@ -389,6 +389,7 @@ class ItServiceManagementSetupController extends Controller
                 'requires_approval' => $item->requires_approval,
                 'is_published' => $item->is_published,
                 'internal_only' => $item->internal_only,
+                'site_scope' => $item->site_scope,
                 'form_schema_version' => $item->form_schema_version,
                 'lock_version' => $item->lock_version,
                 'published_version' => $item->publishedVersion?->version,

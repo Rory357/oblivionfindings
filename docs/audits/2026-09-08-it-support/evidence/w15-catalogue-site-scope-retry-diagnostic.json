@@ -1,0 +1,30 @@
+{
+    "token": "5d18cf8a42be7906",
+    "database_matches": true,
+    "mutations_performed": false,
+    "imported_table_count": 784,
+    "last_table_names": [
+        "votes",
+        "work_capacity_assessments",
+        "workplace_injuries",
+        "workplace_injury_attachments"
+    ],
+    "counts": {
+        "users": 0,
+        "sites": 0,
+        "it_tickets": 0,
+        "it_teams": 0,
+        "devices": 0,
+        "monitors": 0,
+        "device_event_signal_outbox": null,
+        "control_room_signals": 0,
+        "monitoring_incident_evidence_snapshots": 0
+    },
+    "latest_migrations": [
+        "2026_07_21_100005_create_monitoring_flow_exporter_states",
+        "2026_07_21_100004_create_monitoring_snmp_runtime_tables",
+        "2026_07_21_100004_add_monitoring_policy_and_dependency_records",
+        "2026_07_21_100004_01_create_monitoring_snmp_engine_states"
+    ],
+    "source_permissions": []
+}

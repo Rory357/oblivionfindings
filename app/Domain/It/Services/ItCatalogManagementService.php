@@ -25,6 +25,7 @@ final class ItCatalogManagementService
         'default_priority',
         'requires_approval',
         'internal_only',
+        'site_scope',
         'form_schema',
         'search_terms',
         'sort_order',
@@ -35,6 +36,7 @@ final class ItCatalogManagementService
     {
         return DB::transaction(function () use ($actor, $data): ItCatalogItem {
             $this->guardActor($actor);
+            $data['site_scope'] = app(ItCatalogAccessService::class)->validateSiteScope($actor, $data['site_scope'] ?? null);
             $item = ItCatalogItem::query()->create([
                 ...Arr::only($this->normalise($data), self::EDITABLE),
                 'slug' => $this->uniqueSlug((string) $data['name']),
@@ -60,6 +62,7 @@ final class ItCatalogManagementService
         return DB::transaction(function () use ($item, $actor, $data): ItCatalogItem {
             $item = $this->lock($item, $actor);
             $this->expectVersion($item, (int) ($data['expected_version'] ?? 0));
+            $data['site_scope'] = app(ItCatalogAccessService::class)->validateSiteScope($actor, array_key_exists('site_scope', $data) ? $data['site_scope'] : $item->site_scope);
             $before = $item->only(self::EDITABLE);
             $item->fill(Arr::only($this->normalise($data), self::EDITABLE));
             $changedFields = array_keys($item->getDirty());
@@ -90,6 +93,7 @@ final class ItCatalogManagementService
             if ($item->is_published && $item->publishedVersion?->version === $item->form_schema_version) {
                 return $item;
             }
+            app(ItCatalogAccessService::class)->validateSiteScope($actor, $item->site_scope);
             if ($item->it_service_id !== null && ! $item->service()->where('is_active', true)->exists()) {
                 throw new DomainException('Choose an active service before publishing this request.');
             }
@@ -105,7 +109,7 @@ final class ItCatalogManagementService
                 'provenance' => 'reviewed_publication',
                 'published_by' => $actor->id,
             ]);
-            if ($version->contract != $item->only(ItCatalogItem::CONTRACT_FIELDS)) {
+            if (['site_scope' => null, ...$version->contract] != $item->only(ItCatalogItem::CONTRACT_FIELDS)) {
                 throw new DomainException('This draft differs from its recorded version. Save a new revision before publishing.');
             }
             $item->forceFill([

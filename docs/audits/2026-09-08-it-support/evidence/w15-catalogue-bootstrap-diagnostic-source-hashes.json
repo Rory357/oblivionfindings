@@ -1,0 +1,18 @@
+[
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-environment.ps1",
+    "sha256": "16a86bc8a52127ad3a0884735f2bee65a8762d623abfd8c3d98a32e395c2557a"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w06-draft-browser-bootstrap.php",
+    "sha256": "c8124396606156b57b0b744b5234c0023feac0dbf5855128fe68b2a96c03e5dd"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w14-browser-bootstrap-inspect.php",
+    "sha256": "8c252628844a16a12dca299a2e2118ce7db9d174a302cb99ba6719395ada57c0"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w15-catalogue-bootstrap-diagnostic.php",
+    "sha256": "a5ce66b841e873624a68dcdb968e7941752527ffd405d60c738652380bd970be"
+  }
+]

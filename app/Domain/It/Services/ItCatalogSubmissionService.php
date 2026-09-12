@@ -64,7 +64,7 @@ class ItCatalogSubmissionService
             }
 
             $item = ItCatalogItem::query()->whereKey($catalogItem->id)->published()->lockForUpdate()->firstOrFail()->publishedContract();
-            abort_if($item->internal_only && ! $actor->canDo('it.manage'), 404);
+            abort_unless(app(ItCatalogAccessService::class)->canDiscover($actor, $item), 404);
 
             if ((int) $input['schema_version'] !== (int) $item->form_schema_version) {
                 throw ValidationException::withMessages([
@@ -84,6 +84,7 @@ class ItCatalogSubmissionService
                     $actor,
                     $values,
                     $validated['display_values'],
+                    isset($input['site_id']) ? (int) $input['site_id'] : null,
                 ),
                 'provisioning' => $this->createProvisioning(
                     $item,
@@ -121,6 +122,7 @@ class ItCatalogSubmissionService
             'catalog_item_id' => $itemId,
             'schema_version' => (int) $input['schema_version'],
             'values' => $input['values'] ?? [],
+            ...(array_key_exists('site_id', $input) ? ['site_id' => isset($input['site_id']) ? (int) $input['site_id'] : null] : []),
         ]));
     }
 
@@ -276,8 +278,12 @@ class ItCatalogSubmissionService
         User $actor,
         array $values,
         array $displayValues,
+        ?int $requestedSiteId = null,
     ): ItTicket {
-        $siteId = $this->workAccess->defaultSiteId($actor);
+        $siteId = $requestedSiteId ?? $this->workAccess->defaultSiteId($actor);
+        if (! app(ItCatalogAccessService::class)->allowsSite($item, $siteId)) {
+            throw ValidationException::withMessages(['catalog_item' => 'This form is not available for the request Site. Choose a form available at that Site.']);
+        }
         if (! $this->workAccess->canAssignScope($actor, $siteId, false)) {
             throw ValidationException::withMessages([
                 'catalog_item' => 'An active approved Site is required before this request can be submitted.',
@@ -346,6 +352,10 @@ class ItCatalogSubmissionService
             throw ValidationException::withMessages([
                 'values.employee_profile_id' => 'Choose an active employee profile within your approved Site scope.',
             ]);
+        }
+
+        if (! app(ItCatalogAccessService::class)->allowsSite($item, $profile->primary_site_id)) {
+            throw ValidationException::withMessages(['values.employee_profile_id' => 'This form is not available at the selected employee’s Site.']);
         }
 
         $provisioning = ItProvisioningRequest::query()->create([

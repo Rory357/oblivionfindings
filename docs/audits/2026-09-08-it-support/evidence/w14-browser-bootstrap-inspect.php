@@ -17,13 +17,20 @@ try {
     $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname='.$database, $access['DB_USERNAME'], $access['DB_PASSWORD'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     unset($access);
     $report = ['token' => $token, 'database_matches' => $pdo->query('SELECT DATABASE()')->fetchColumn() === $database, 'mutations_performed' => false];
+    $tables = $pdo->prepare('SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME');
+    $tables->execute([$database]);
+    $tableNames = $tables->fetchAll(PDO::FETCH_COLUMN);
+    $report['imported_table_count'] = count($tableNames);
+    $report['last_table_names'] = array_slice($tableNames, -4);
     foreach (['users', 'sites', 'it_tickets', 'it_teams', 'devices', 'monitors', 'device_event_signal_outbox', 'control_room_signals', 'monitoring_incident_evidence_snapshots'] as $table) {
-        $report['counts'][$table] = (int) $pdo->query('SELECT COUNT(*) FROM '.$table)->fetchColumn();
+        $report['counts'][$table] = in_array($table, $tableNames, true) ? (int) $pdo->query('SELECT COUNT(*) FROM '.$table)->fetchColumn() : null;
     }
-    $report['latest_migrations'] = $pdo->query('SELECT migration FROM migrations ORDER BY id DESC LIMIT 4')->fetchAll(PDO::FETCH_COLUMN);
-    $report['source_permissions'] = $pdo->query("SELECT `key` FROM permissions WHERE `key` IN ('securityDevices.devices.view', 'controlRoom.alerts.view') ORDER BY `key`")->fetchAll(PDO::FETCH_COLUMN);
+    $report['latest_migrations'] = in_array('migrations', $tableNames, true) ? $pdo->query('SELECT migration FROM migrations ORDER BY id DESC LIMIT 4')->fetchAll(PDO::FETCH_COLUMN) : null;
+    $report['source_permissions'] = in_array('permissions', $tableNames, true) ? $pdo->query("SELECT `key` FROM permissions WHERE `key` IN ('securityDevices.devices.view', 'controlRoom.alerts.view') ORDER BY `key`")->fetchAll(PDO::FETCH_COLUMN) : null;
     echo json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR).PHP_EOL;
 } catch (Throwable $exception) {
-    echo json_encode(['token' => $token, 'error_class' => $exception::class, 'mutations_performed' => false]).PHP_EOL;
+    echo json_encode(['token' => $token, 'error_class' => $exception::class,
+        'driver_code' => $exception instanceof PDOException ? ($exception->errorInfo[1] ?? null) : null,
+        'mutations_performed' => false]).PHP_EOL;
     exit(1);
 }

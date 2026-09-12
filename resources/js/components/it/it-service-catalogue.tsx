@@ -41,6 +41,7 @@ export interface CatalogItem {
     requires_approval: boolean;
     form_schema_version: number;
     form_schema: { fields?: CatalogField[] };
+    site_options?: { id: number; name: string }[];
 }
 
 export interface CatalogFieldOption {
@@ -97,10 +98,12 @@ export function ItServiceCatalogue({
         schema_version: number;
         idempotency_key: string;
         values: Record<string, CatalogValue>;
+        site_id: number | null;
     }>({
         schema_version: 1,
         idempotency_key: '',
         values: {},
+        site_id: null,
     });
 
     const filtered = useMemo(() => {
@@ -129,6 +132,10 @@ export function ItServiceCatalogue({
             schema_version: item.form_schema_version,
             idempotency_key: submissionKey(),
             values: initialValues(item),
+            site_id:
+                item.outcome_type === 'provisioning'
+                    ? null
+                    : (item.site_options?.[0]?.id ?? null),
         });
     };
 
@@ -255,6 +262,41 @@ export function ItServiceCatalogue({
                             ) : null}
 
                             <div className="mt-5 space-y-4">
+                                {selected.outcome_type !== 'provisioning' ? (
+                                    <label className="block space-y-1 text-sm font-medium">
+                                        <span>Request site</span>
+                                        <select
+                                            required
+                                            className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                            value={form.data.site_id ?? ''}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'site_id',
+                                                    event.target.value
+                                                        ? Number(
+                                                              event.target
+                                                                  .value,
+                                                          )
+                                                        : null,
+                                                )
+                                            }
+                                        >
+                                            <option value="">
+                                                Choose an approved site
+                                            </option>
+                                            {(selected.site_options ?? []).map(
+                                                (site) => (
+                                                    <option
+                                                        key={site.id}
+                                                        value={site.id}
+                                                    >
+                                                        {site.name}
+                                                    </option>
+                                                ),
+                                            )}
+                                        </select>
+                                    </label>
+                                ) : null}
                                 {(selected.form_schema.fields ?? []).map(
                                     (field) => (
                                         <CatalogFieldControl
