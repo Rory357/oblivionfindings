@@ -21,6 +21,7 @@ class StoreItProvisioningTemplateRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'expected_version' => [$this->isMethod('PATCH') ? 'required' : 'nullable', 'integer', 'min:1'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'lifecycle_type' => ['required', Rule::in(ItProvisioningTemplate::LIFECYCLE_TYPES)],

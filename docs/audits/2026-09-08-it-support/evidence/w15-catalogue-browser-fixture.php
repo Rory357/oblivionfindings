@@ -1,6 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItCatalogManagementService;
+use App\Domain\It\Services\ItProvisioningTemplateService;
+use App\Domain\It\Services\ItProvisioningWorkflowService;
 use App\Models\ItCatalogItem;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +49,25 @@ function w15BrowserCreateCatalogueFixtures(array $context, array $fixtures): arr
         }
         w06BrowserRequire(ItCatalogItem::query()->count() === 4, 'Unexpected existing catalogue items in the synthetic schema.');
 
-        return ['items' => $items, 'synthetic_only' => true];
+        $template = app(ItProvisioningTemplateService::class)->create($actor, [
+            'name' => 'W15 '.$context['token'].' synthetic joiner template',
+            'description' => 'Synthetic manual-verification instructions; no external account is created.',
+            'lifecycle_type' => 'joiner', 'position_role' => null, 'site_id' => $fixtures['sites']['a'],
+            'employment_type' => null, 'selection_priority' => 0, 'is_active' => true,
+            'tasks' => [[
+                'task_key' => 'account', 'title' => 'Record synthetic account verification',
+                'description' => 'Original version: retain these manual verification instructions.',
+                'category' => 'account', 'action' => 'verify', 'request_type' => 'account',
+                'responsible_team_id' => null, 'stage' => 1, 'sort_order' => 0,
+                'dependency_task_keys' => [], 'trigger_fields' => [], 'approval_required' => true,
+                'evidence_required' => true, 'due_offset_days' => 0, 'fulfiller_fields' => ['work_email'],
+            ]],
+        ]);
+        $profile = HrEmployeeProfile::query()->where('user_id', $fixtures['actors']['requester']['id'])->firstOrFail();
+        $workflow = app(ItProvisioningWorkflowService::class)->launch($profile, 'joiner', 'synthetic_browser',
+            (int) $profile->id, 'w15:'.$context['token'].':version-history', (int) $actor->id);
+
+        return ['items' => $items, 'template' => ['id' => $template->id, 'name' => $template->name],
+            'workflow' => ['id' => $workflow->id, 'template_version_id' => $workflow->template_version_id], 'synthetic_only' => true];
     });
 }

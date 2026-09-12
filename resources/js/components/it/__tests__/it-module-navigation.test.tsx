@@ -29,6 +29,7 @@ vi.mock('@inertiajs/react', async () => {
             </a>
         ),
         router: {
+            on: vi.fn(() => () => {}),
             post: vi.fn(),
             patch: vi.fn(),
             get: vi.fn((path: string, params: Record<string, string>) => {
@@ -310,6 +311,7 @@ describe('IT & Support grouped navigation', () => {
                 provisioningTemplates={[
                     {
                         id: 4,
+                        lock_version: 1,
                         name: 'Clinical joiner',
                         description: 'Approved access for clinical staff.',
                         lifecycle_type: 'joiner',
@@ -364,6 +366,11 @@ describe('IT & Support grouped navigation', () => {
         const dialog = screen.getByRole('dialog');
         expect(dialog).toHaveTextContent('New lifecycle template');
         expect(dialog).toHaveTextContent('Workflow steps');
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: /Workflow steps.*Ownership, dependencies and evidence/,
+            }),
+        );
         expect(dialog).toHaveTextContent('Minimum employee details shown');
         expect(dialog).toHaveTextContent('Approval required');
         expect(dialog).toHaveTextContent('Evidence required');

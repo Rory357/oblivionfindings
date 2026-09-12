@@ -271,6 +271,8 @@ interface ProvisioningWorkflowRow {
     effective_at: string | null;
     source_type: string;
     template: string | null;
+    template_version: number | null;
+    template_provenance: string;
     employee: { id: number; name: string; role: string | null };
     progress: { total: number; completed: number; failed: number };
 }
@@ -2489,6 +2491,11 @@ export default function ItIndex({
                                                                         .role ??
                                                                         workflow.template ??
                                                                         'IT workflow'}
+                                                                </p>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    {workflow.template_version
+                                                                        ? `Template v${workflow.template_version}${workflow.template_provenance === 'legacy_current' ? ' · captured legacy configuration' : ''}`
+                                                                        : 'Historical template version not recorded'}
                                                                 </p>
                                                             </div>
                                                             <StatusBadge

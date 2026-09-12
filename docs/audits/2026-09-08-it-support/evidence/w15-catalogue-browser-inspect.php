@@ -61,6 +61,10 @@ try {
         'versions' => 'SELECT id, catalog_item_id, version, provenance, published_by, contract FROM it_catalog_versions ORDER BY id',
         'submissions' => 'SELECT id, catalog_item_id, requester_user_id, schema_version, catalog_version_id, contract_snapshot, input_sha256, result_type, result_id FROM it_catalog_submissions ORDER BY id',
         'provisioning' => 'SELECT id, employee_profile_id, created_by, type, status, approval_required, approval_status, approved_by_user_id, fulfilled_by, evidence_summary FROM it_provisioning_requests ORDER BY id',
+        'templates' => 'SELECT id, name, site_id, lock_version, current_version_id FROM it_provisioning_templates ORDER BY id',
+        'template_versions' => 'SELECT id, provisioning_template_id, version, provenance, contract FROM it_provisioning_template_versions ORDER BY id',
+        'workflows' => 'SELECT id, provisioning_template_id, template_version_id, employee_profile_id, status FROM it_provisioning_workflows ORDER BY id',
+        'workflow_instructions' => 'SELECT id, provisioning_workflow_id, task_key, item, notes, approval_required, evidence_required FROM it_provisioning_requests WHERE provisioning_workflow_id IS NOT NULL ORDER BY id',
         'catalogue_tickets' => "SELECT t.id, t.reference, t.site_id, t.requester_user_id, t.requested_for_user_id, t.status FROM it_tickets t WHERE EXISTS (SELECT 1 FROM it_catalog_submissions s WHERE s.result_id = t.id AND (s.result_type LIKE '%ItTicket' OR s.result_type = 'it_ticket')) ORDER BY t.id",
         'events' => "SELECT id, subject_type, subject_id, actor_user_id, type, payload FROM it_ticket_events WHERE subject_type LIKE '%Provisioning%' OR subject_type = 'it_provisioning_request' ORDER BY id",
     ];

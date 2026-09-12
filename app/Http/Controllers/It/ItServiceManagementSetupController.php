@@ -236,6 +236,7 @@ class ItServiceManagementSetupController extends Controller
             ->get()
             ->map(fn (ItProvisioningTemplate $template) => [
                 'id' => $template->id,
+                'lock_version' => $template->lock_version,
                 'name' => $template->name,
                 'description' => $template->description,
                 'lifecycle_type' => $template->lifecycle_type,
@@ -632,7 +633,7 @@ class ItServiceManagementSetupController extends Controller
             return redirect()->back()->with('error', $exception->getMessage());
         }
 
-        return redirect()->route('it.setup.index')
+        return redirect()->route('it.setup.index', ['tab' => 'provisioning'])
             ->with('success', 'Provisioning template created.');
     }
 
@@ -650,7 +651,7 @@ class ItServiceManagementSetupController extends Controller
             return redirect()->back()->with('error', $exception->getMessage());
         }
 
-        return redirect()->route('it.setup.index')
+        return redirect()->route('it.setup.index', ['tab' => 'provisioning'])
             ->with('success', 'Provisioning template updated.');
     }
 

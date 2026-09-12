@@ -1028,7 +1028,7 @@ class ItProvisioningController extends Controller
         }
 
         return $this->provisioningAccess->applyWorkflowScope(ItProvisioningWorkflow::query(), $user)
-            ->with(['employeeProfile:id,user_id,position_title', 'employeeProfile.user:id,name', 'template:id,name'])
+            ->with(['employeeProfile:id,user_id,position_title', 'employeeProfile.user:id,name', 'template:id,name', 'templateVersion'])
             ->withCount([
                 'requests',
                 'requests as completed_requests_count' => fn ($query) => $query->where('status', 'done'),
@@ -1043,7 +1043,9 @@ class ItProvisioningController extends Controller
                 'status' => $workflow->status,
                 'effective_at' => $workflow->effective_at?->toIso8601String(),
                 'source_type' => $workflow->source_type,
-                'template' => $workflow->template?->name,
+                'template' => $workflow->templateVersion?->contract['name'] ?? $workflow->template?->name,
+                'template_version' => $workflow->templateVersion?->version,
+                'template_provenance' => $workflow->templateVersion?->provenance ?? 'legacy_unrecorded',
                 'employee' => [
                     'id' => $workflow->employee_profile_id,
                     'name' => $workflow->employeeProfile?->user?->name ?? 'Unknown',

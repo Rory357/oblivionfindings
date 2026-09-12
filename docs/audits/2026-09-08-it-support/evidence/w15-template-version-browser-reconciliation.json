@@ -1,0 +1,11 @@
+{
+  "source": "w15-template-version-browser-records.json",
+  "template_count": 1,
+  "immutable_version_count": 3,
+  "current_version": 3,
+  "original_workflow_version": 1,
+  "original_notes_preserved": true,
+  "later_contract_differs": true,
+  "stale_and_discarded_names_absent": true,
+  "approval_and_evidence_preserved": true
+}

@@ -4,6 +4,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTask;
+use App\Domain\It\Services\ItProvisioningTemplateService;
 use App\Domain\It\Services\ItProvisioningWorkflowService;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Models\Device;
@@ -13,6 +14,7 @@ use App\Models\AssetAssignment;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItProvisioningTemplate;
 use App\Models\ItProvisioningTemplateTask;
+use App\Models\ItProvisioningTemplateVersion;
 use App\Models\ItProvisioningWorkflow;
 use App\Models\ItTeam;
 use App\Models\Role;
@@ -134,6 +136,115 @@ beforeEach(function () {
     $this->manager = jmlManager();
     jmlAssignSite($this->manager, $this->site);
     $this->service = app(ItProvisioningWorkflowService::class);
+});
+
+function jmlTemplateEditData(ItProvisioningTemplate $template): array
+{
+    return [
+        ...$template->only(['name', 'description', 'lifecycle_type', 'position_role', 'site_id',
+            'employment_type', 'selection_priority', 'is_active']),
+        'expected_version' => $template->fresh()->lock_version,
+        'tasks' => $template->tasks()->get()->map(fn ($task) => $task->only(array_diff($task->getFillable(), ['provisioning_template_id'])))->all(),
+    ];
+}
+
+test('template edits preserve original workflow instructions and new launches use the saved version', function () {
+    $template = jmlTemplate('joiner', [['title' => 'Original account instructions', 'description' => 'Verify identity before granting access']]);
+    $profile = jmlProfile();
+    $first = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:before', $this->manager->id);
+    $versionOne = $first->templateVersion;
+    expect($versionOne->version)->toBe(1)->and($versionOne->provenance)->toBe('legacy_current');
+    $data = jmlTemplateEditData($template);
+    $data['name'] = 'Revised joiner instructions';
+    $data['tasks'][0]['title'] = 'New account instructions';
+    $data['tasks'][0]['description'] = 'Require the new identity verification';
+    $this->actingAs($this->manager)->patchJson("/it/setup/provisioning-templates/{$template->id}", $data)->assertRedirect();
+    $second = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:after', $this->manager->id);
+    expect($first->fresh()->template_version_id)->toBe($versionOne->id)
+        ->and($versionOne->fresh()->contract['tasks'][0]['title'])->toBe('Original account instructions')
+        ->and($first->requests()->sole()->item)->toBe('Original account instructions')
+        ->and($first->requests()->sole()->notes)->toBe('Verify identity before granting access')
+        ->and($second->templateVersion->version)->toBe(2)
+        ->and($second->templateVersion->provenance)->toBe('author_saved')
+        ->and($second->requests()->sole()->item)->toBe('New account instructions')
+        ->and(ItProvisioningTemplateVersion::query()->count())->toBe(2);
+    $replay = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:before', $this->manager->id);
+    expect($replay->id)->toBe($first->id)->and($replay->templateVersion->id)->toBe($versionOne->id);
+    $this->actingAs($this->manager)->get('/it?tab=provisioning')->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('provisioningWorkflows.0.template_version', 2)
+            ->where('provisioningWorkflows.1.template', 'Joiner default')
+            ->where('provisioningWorkflows.1.template_version', 1));
+});
+
+test('stale or missing template edit tokens cannot overwrite saved tasks', function () {
+    $template = jmlTemplate('joiner', [['title' => 'Original']]);
+    $stale = jmlTemplateEditData($template);
+    $updated = $stale;
+    $updated['tasks'][0]['title'] = 'Saved by another editor';
+    app(ItProvisioningTemplateService::class)->update($template, $this->manager, $updated);
+    $this->actingAs($this->manager)->patchJson("/it/setup/provisioning-templates/{$template->id}", $stale)
+        ->assertUnprocessable()->assertJsonValidationErrors('expected_version');
+    unset($stale['expected_version']);
+    $this->patchJson("/it/setup/provisioning-templates/{$template->id}", $stale)
+        ->assertUnprocessable()->assertJsonValidationErrors('expected_version');
+    expect($template->tasks()->sole()->title)->toBe('Saved by another editor')
+        ->and($template->fresh()->lock_version)->toBe(2)
+        ->and(ItProvisioningTemplateVersion::query()->count())->toBe(2);
+});
+
+test('a manager cannot take over another Site template by changing its Site in the request', function () {
+    expect($this->manager->canDo('it.organisationWide'))->toBeFalse();
+    $otherSite = Site::factory()->create();
+    $template = jmlTemplate('joiner', [['title' => 'Other Site instructions']], ['site_id' => $otherSite->id]);
+    $data = jmlTemplateEditData($template);
+    $data['site_id'] = $this->site->id;
+    $this->actingAs($this->manager)->patchJson("/it/setup/provisioning-templates/{$template->id}", $data)->assertNotFound();
+    expect($template->fresh()->site_id)->toBe($otherSite->id)
+        ->and($template->fresh()->lock_version)->toBe(1)
+        ->and(ItProvisioningTemplateVersion::query()->count())->toBe(0);
+});
+
+test('launch rejects a mutable task changed outside its recorded template contract', function () {
+    $template = jmlTemplate('joiner', [['title' => 'Recorded instructions']]);
+    $profile = jmlProfile();
+    $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:recorded', $this->manager->id);
+    $template->tasks()->update(['title' => 'Unreviewed mutation']);
+    expect(fn () => $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:unreviewed', $this->manager->id))
+        ->toThrow(DomainException::class, 'outside its saved version');
+    expect(ItProvisioningWorkflow::query()->count())->toBe(1)
+        ->and(ItProvisioningRequest::query()->count())->toBe(1);
+    $reviewed = jmlTemplateEditData($template);
+    $reviewed['tasks'][0]['title'] = 'Reviewed replacement instructions';
+    app(ItProvisioningTemplateService::class)->update($template, $this->manager, $reviewed);
+    $recovered = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:repaired', $this->manager->id);
+    expect($recovered->templateVersion->version)->toBe(2)
+        ->and($recovered->requests()->sole()->item)->toBe('Reviewed replacement instructions')
+        ->and(ItProvisioningTemplateVersion::query()->where('version', 1)->sole()->contract['tasks'][0]['title'])->toBe('Recorded instructions');
+});
+
+test('saved template versions cannot be rewritten deleted or removed by rollback', function () {
+    $template = jmlTemplate('joiner', [['title' => 'Preserve these instructions']]);
+    $profile = jmlProfile();
+    $workflow = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:immutable', $this->manager->id);
+    $version = $workflow->templateVersion;
+    expect(fn () => $version->update(['contract' => ['name' => 'Changed']]))->toThrow(LogicException::class);
+    expect(fn () => $version->fresh()->delete())->toThrow(LogicException::class);
+    $migration = require database_path('migrations/2026_09_12_000038_version_it_provisioning_templates.php');
+    expect(fn () => $migration->down())->toThrow(RuntimeException::class, 'Preserve provisioning template history');
+    expect($workflow->fresh()->templateVersion->contract['tasks'][0]['title'])->toBe('Preserve these instructions');
+});
+
+test('old workflows without version evidence are labelled rather than assigned current instructions', function () {
+    $template = jmlTemplate('joiner', [['title' => 'Current instructions']]);
+    $profile = jmlProfile();
+    $workflow = $this->service->launch($profile, 'joiner', 'synthetic', $profile->id, 'version:legacy-work', $this->manager->id);
+    // Explicitly model a pre-migration workflow with no historical version.
+    $workflow->update(['template_version_id' => null]);
+    $this->actingAs($this->manager)->get('/it?tab=provisioning')->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('provisioningWorkflows.0.template_version', null)
+            ->where('provisioningWorkflows.0.template_provenance', 'legacy_unrecorded'));
 });
 
 test('JML persistence carries templates workflows and governed provisioning task state', function () {
@@ -554,6 +665,8 @@ test('template administration is application-wide and the IT workspace exposes J
 
     $template = ItProvisioningTemplate::query()->firstWhere('name', 'Support worker joiner');
     expect($template)->not->toBeNull()
+        ->and($template->currentVersion->provenance)->toBe('author_saved')
+        ->and($template->currentVersion->version)->toBe(1)
         ->and($template->tasks)->toHaveCount(1)
         ->and($template->tasks->first()->responsible_team_id)->toBe($team->id);
 
