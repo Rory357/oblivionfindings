@@ -19,7 +19,7 @@ final class RecoverItSetupCommandRequest extends FormRequest
     {
         return [
             'actor_user_id' => ['required', 'integer', 'min:1'],
-            'resource' => ['required', Rule::in(['teams', 'queues', 'services'])],
+            'resource' => ['required', Rule::in(['teams', 'queues', 'services', 'catalogue-items'])],
         ];
     }
 }

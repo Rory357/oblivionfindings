@@ -1,0 +1,68 @@
+{
+  "captured_at": "2026-09-12T00:19:05.7028415Z",
+  "source": [
+    {
+      "path": "app/Models/ItCatalogItem.php",
+      "sha256": "0af86f931099defe60bd65b75d8b6b82587b492a73e4cf495a88d40689a8b7c4"
+    },
+    {
+      "path": "app/Models/ItCatalogVersion.php",
+      "sha256": "997460ab4edc1465d09e09ffae9956f4114864e8035fff825f8ea8e673bf84e0"
+    },
+    {
+      "path": "app/Models/ItCatalogSubmission.php",
+      "sha256": "439403d03f837d1535a37f8865d45806da07ae90006b352b63d9b69f218ee4bf"
+    },
+    {
+      "path": "app/Domain/It/Services/ItCatalogManagementService.php",
+      "sha256": "b24ea940a56b7f2b827011e7145f2d043b33de512b1407ccbc2ec276937fccf5"
+    },
+    {
+      "path": "app/Domain/It/Services/ItCatalogSubmissionService.php",
+      "sha256": "515ab01cc053dfa21d03a90a8725601d1ec5c85ae4e4d611f2512a29f2ce5a66"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItCatalogController.php",
+      "sha256": "8b82f1f4aada571d2314003ece3cf60a67c72ddf00268d46b048a1b183502cb1"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItProvisioningController.php",
+      "sha256": "59462c3b6efa477757e28294d5d2911f8a93da2226a33ee86c97a47f4216ad94"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+      "sha256": "d471ea106af38e8e38475e3b23fe54401742ea74fd026abe80b642d011dc344b"
+    },
+    {
+      "path": "app/Http/Requests/It/SaveItCatalogItemRequest.php",
+      "sha256": "076aee70da755cafa046f9d38174a21079ca61e9586aa2330345cd8be26ea0f0"
+    },
+    {
+      "path": "app/Http/Requests/It/UnpublishItCatalogItemRequest.php",
+      "sha256": "154f240a3eef84ec52b0ebb29f7694ee99681d5db3a7f65e91008041162d0860"
+    },
+    {
+      "path": "database/migrations/2026_09_12_000035_version_it_catalogue_publications.php",
+      "sha256": "9a4d8e565e793edd4857803d47f2b16cc88a745752a8f9bac065682ad9c59eb0"
+    },
+    {
+      "path": "database/seeders/ItServiceCatalogSeeder.php",
+      "sha256": "6a74372e9f92bc9c484b54f78edd9ffd8eba71c2b299753a2e6048040465e611"
+    },
+    {
+      "path": "tests/Feature/It/ItServiceCatalogTest.php",
+      "sha256": "2a70ff79ed5677ead0637c77d5a59ac2e85b400f7f440916f1f1448d98613d62"
+    },
+    {
+      "path": "resources/js/components/it/it-catalogue-management.tsx",
+      "sha256": "c3bf9fa8a53bd5778597876a06832d1d48ae19387e9e1e139e22564a6c5ec08d"
+    },
+    {
+      "path": "resources/js/components/it/__tests__/it-catalogue-management.test.tsx",
+      "sha256": "f16724fe7b6df89b5ad312046399176b9db3482011eed5a7e46e230d94627a03"
+    }
+  ],
+  "backend_run": "21191",
+  "backend_token": "it_e55abe5c09fe4c1a",
+  "browser_verified": false
+}

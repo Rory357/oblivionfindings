@@ -1,0 +1,1 @@
+resources/js/components/it/__tests__/it-catalogue-management.test.tsx(105,36): error TS18046: 'data' is of type 'unknown'.

@@ -222,10 +222,11 @@ class ItProvisioningController extends Controller
 
         $catalogItems = $canRequest ? ItCatalogItem::query()
             ->published()
-            ->when(! $canManage, fn ($query) => $query->where('internal_only', false))
-            ->orderBy('sort_order')
-            ->orderBy('name')
+            ->with('publishedVersion')
             ->get()
+            ->map(fn (ItCatalogItem $item) => $item->publishedContract())
+            ->filter(fn (ItCatalogItem $item) => $canManage || ! $item->internal_only)
+            ->sortBy([['sort_order', 'asc'], ['name', 'asc']])
             ->map(fn (ItCatalogItem $item) => $item->discoveryPayload($canManage))
             ->values() : collect();
         $catalogEntityTypes = $catalogItems

@@ -31,34 +31,41 @@ class ItCatalogSubmissionService
     public function submit(ItCatalogItem $catalogItem, User $actor, array $input): array
     {
         return DB::transaction(function () use ($catalogItem, $actor, $input): array {
-            $item = ItCatalogItem::query()
-                ->whereKey($catalogItem->id)
-                ->where('is_published', true)
-                ->lockForUpdate()
-                ->firstOrFail();
-            if ($item->internal_only && ! $actor->canDo('it.manage')) {
-                throw ValidationException::withMessages([
-                    'catalog_item' => 'This request is available only to IT staff.',
-                ]);
-            }
-
+            // Serialize the actor's global submission key, including competing
+            // submissions for different catalogue items.
+            $actor = User::query()->lockForUpdate()->findOrFail($actor->id);
+            abort_unless($actor->approved_at !== null && ($actor->canDo('it.request') || $actor->canDo('it.manage')), 403);
             $existing = ItCatalogSubmission::query()
                 ->where('requester_user_id', $actor->id)
                 ->where('idempotency_key', (string) $input['idempotency_key'])
                 ->first();
             if ($existing) {
-                if ((int) $existing->catalog_item_id !== (int) $item->id) {
+                $result = $existing->result()->firstOrFail();
+                $visible = $result instanceof ItTicket
+                    ? $this->workAccess->canView($actor, $result)
+                    : ($result instanceof ItProvisioningRequest && ($this->provisioningAccess->canView($actor, $result)
+                        || ((int) $result->created_by === (int) $actor->id && $result->employeeProfile
+                            && $this->provisioningAccess->canRequestForProfile($actor, $result->employeeProfile))));
+                abort_unless($visible, 404);
+                $matches = $existing->input_sha256 !== null
+                    ? hash_equals($existing->input_sha256, $this->inputHash($catalogItem->id, $input))
+                    : ((int) $existing->schema_version === (int) $input['schema_version']
+                        && $this->canonicalJson($existing->submitted_values) === $this->canonicalJson($input['values'] ?? []));
+                if ((int) $existing->catalog_item_id !== (int) $catalogItem->id || ! $matches) {
                     throw ValidationException::withMessages([
-                        'idempotency_key' => 'That submission key has already been used for another request.',
+                        'idempotency_key' => 'That submission key has already been used with different request details. Restore the original request or start a new one.',
                     ]);
                 }
 
                 return [
                     'submission' => $existing,
-                    'result' => $existing->result()->firstOrFail(),
+                    'result' => $result,
                     'created' => false,
                 ];
             }
+
+            $item = ItCatalogItem::query()->whereKey($catalogItem->id)->published()->lockForUpdate()->firstOrFail()->publishedContract();
+            abort_if($item->internal_only && ! $actor->canDo('it.manage'), 404);
 
             if ((int) $input['schema_version'] !== (int) $item->form_schema_version) {
                 throw ValidationException::withMessages([
@@ -100,10 +107,38 @@ class ItCatalogSubmissionService
                 'result_type' => $result->getMorphClass(),
                 'result_id' => $result->getKey(),
                 'submitted_at' => now(),
+                'catalog_version_id' => $item->published_version_id,
+                'contract_snapshot' => $item->only(ItCatalogItem::CONTRACT_FIELDS),
+                'input_sha256' => $this->inputHash($item->id, $input),
             ]);
 
             return ['submission' => $submission, 'result' => $result, 'created' => true];
         });
+    }
+
+    private function inputHash(int $itemId, array $input): string
+    {
+        return hash('sha256', $this->canonicalJson([
+            'catalog_item_id' => $itemId,
+            'schema_version' => (int) $input['schema_version'],
+            'values' => $input['values'] ?? [],
+        ]));
+    }
+
+    private function canonicalJson(mixed $value): string
+    {
+        $normalise = function (mixed $value) use (&$normalise): mixed {
+            if (! is_array($value)) {
+                return $value;
+            }
+            if (! array_is_list($value)) {
+                ksort($value);
+            }
+
+            return array_map($normalise, $value);
+        };
+
+        return json_encode($normalise($value), JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
     }
 
     /**
@@ -320,6 +355,8 @@ class ItCatalogSubmissionService
             'item' => $item->name,
             'status' => 'pending',
             'priority' => $item->default_priority,
+            'approval_required' => $item->requires_approval,
+            'approval_status' => $item->requires_approval ? 'pending' : 'not_required',
             'notes' => $this->description($item, $displayValues),
             'created_by' => $actor->id,
         ]);
@@ -328,6 +365,7 @@ class ItCatalogSubmissionService
             'source' => 'catalog',
             'catalog_item_id' => $item->id,
             'form_schema_version' => $item->form_schema_version,
+            'approval_required' => $provisioning->approval_required,
         ]);
 
         return $provisioning;

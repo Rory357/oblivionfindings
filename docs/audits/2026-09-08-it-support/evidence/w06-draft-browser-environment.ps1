@@ -7,7 +7,8 @@ param(
     [string] $ExpectedFingerprint,
     [switch] $MailboxFixtures,
     [switch] $ApiFixtures,
-    [switch] $MonitoringFixtures
+    [switch] $MonitoringFixtures,
+    [switch] $CatalogueFixtures
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,7 +17,7 @@ $itBrowserPhp = 'C:\Users\steph\.config\herd\bin\php84\php.exe'
 if ($itBrowserRepo -ine 'C:\Users\steph\Herd\oblivionfindings') { throw 'Unexpected checkout.' }
 $itBrowserTesting = Join-Path $itBrowserRepo 'storage/framework/testing'
 $itBrowserFiles = @('w06-draft-browser-environment.ps1', 'w06-draft-browser-runtime.php', 'w06-draft-browser-bootstrap.php',
-    'w06-draft-browser-router.php', 'w06-draft-browser-fixtures.php', 'w06-draft-browser-teardown.php', 'w11-mailbox-browser-fixture.php', 'w11-merge-browser-scenario.php', 'w12-delivery-browser-fixture.php', 'w13-api-browser-fixture.php', 'w14-monitoring-browser-fixture.php')
+    'w06-draft-browser-router.php', 'w06-draft-browser-fixtures.php', 'w06-draft-browser-teardown.php', 'w11-mailbox-browser-fixture.php', 'w11-merge-browser-scenario.php', 'w12-delivery-browser-fixture.php', 'w13-api-browser-fixture.php', 'w14-monitoring-browser-fixture.php', 'w15-catalogue-browser-fixture.php')
 $itBrowserSources = [ordered] @{}
 foreach ($itBrowserFile in $itBrowserFiles) {
     $itBrowserSources[$itBrowserFile] = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $itBrowserFile) -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -37,6 +38,7 @@ $itBrowserReview = [ordered] @{
     mailbox_fixtures = [bool] $MailboxFixtures
     api_fixtures = [bool] $ApiFixtures
     monitoring_fixtures = [bool] $MonitoringFixtures
+    catalogue_fixtures = [bool] $CatalogueFixtures
 }
 $itBrowserReviewBytes = [Text.Encoding]::UTF8.GetBytes(($itBrowserReview | ConvertTo-Json -Depth 8 -Compress))
 $itBrowserSha = [Security.Cryptography.SHA256]::Create()
@@ -94,6 +96,7 @@ if ($Mode -eq 'CreateAndStart') {
         mailbox_fixtures = [bool] $MailboxFixtures
         api_fixtures = [bool] $ApiFixtures
         monitoring_fixtures = [bool] $MonitoringFixtures
+        catalogue_fixtures = [bool] $CatalogueFixtures
     }
     Write-ItBrowserNewJson $itBrowserOwnerPath $itOwner
 } else {
@@ -135,6 +138,7 @@ $itBrowserEnv = @{
     IT_MAILBOX_BROWSER_FIXTURES = $(if ($itOwner.mailbox_fixtures) { 'true' } else { 'false' })
     IT_API_BROWSER_FIXTURES = $(if ($itOwner.api_fixtures) { 'true' } else { 'false' })
     IT_MONITORING_BROWSER_FIXTURES = $(if ($itOwner.monitoring_fixtures) { 'true' } else { 'false' })
+    IT_CATALOGUE_BROWSER_FIXTURES = $(if ($itOwner.catalogue_fixtures) { 'true' } else { 'false' })
     TEST_TOKEN = ''; PARALLEL_PROCESS = ''; PROCESS_TOKEN = ''
 }
 foreach ($itCacheName in @('CONFIG', 'ROUTES', 'EVENTS', 'SERVICES', 'PACKAGES')) {

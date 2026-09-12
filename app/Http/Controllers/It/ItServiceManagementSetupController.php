@@ -50,6 +50,7 @@ use DomainException;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ItServiceManagementSetupController extends Controller
@@ -302,7 +303,7 @@ class ItServiceManagementSetupController extends Controller
             : collect();
         $catalogItems = Schema::hasTable('it_catalog_items')
             ? ItCatalogItem::query()
-                ->with('service:id,name')
+                ->with(['service:id,name', 'publishedVersion'])
                 ->withCount('submissions')
                 ->orderBy('sort_order')
                 ->orderBy('name')
@@ -389,6 +390,8 @@ class ItServiceManagementSetupController extends Controller
                 'is_published' => $item->is_published,
                 'internal_only' => $item->internal_only,
                 'form_schema_version' => $item->form_schema_version,
+                'lock_version' => $item->lock_version,
+                'published_version' => $item->publishedVersion?->version,
                 'form_schema' => $item->form_schema,
                 'search_terms' => $item->search_terms,
                 'sort_order' => $item->sort_order,
@@ -573,6 +576,10 @@ class ItServiceManagementSetupController extends Controller
 
     public function storeCatalogItem(SaveItCatalogItemRequest $request)
     {
+        if ($request->filled('request_uuid')) {
+            return $this->createCommand($request, 'catalogue-items');
+        }
+
         return $this->run(
             fn () => $this->catalogueManagement->create($request->user(), $request->validated()),
             'Catalogue request saved as a draft.',
@@ -589,8 +596,16 @@ class ItServiceManagementSetupController extends Controller
 
     public function publishCatalogItem(Request $request, ItCatalogItem $catalogItem)
     {
+        $data = $request->validate(['expected_version' => ['required', 'integer', 'min:1']]);
+
         return $this->run(
-            fn () => $this->catalogueManagement->publish($catalogItem, $request->user()),
+            function () use ($catalogItem, $request, $data) {
+                try {
+                    return $this->catalogueManagement->publish($catalogItem, $request->user(), (int) $data['expected_version']);
+                } catch (DomainException $exception) {
+                    throw ValidationException::withMessages(['publication' => $exception->getMessage()]);
+                }
+            },
             'Catalogue request published.',
         );
     }
@@ -602,6 +617,7 @@ class ItServiceManagementSetupController extends Controller
                 $catalogItem,
                 $request->user(),
                 $request->validated('reason'),
+                (int) $request->validated('expected_version'),
             ),
             'Catalogue request unpublished.',
         );

@@ -3,6 +3,7 @@
 namespace App\Domain\It\Services;
 
 use App\Models\ItCatalogItem;
+use App\Models\ItCatalogVersion;
 use App\Models\ItProvisioningRequest;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -10,6 +11,7 @@ use DomainException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 final class ItCatalogManagementService
 {
@@ -57,17 +59,16 @@ final class ItCatalogManagementService
     {
         return DB::transaction(function () use ($item, $actor, $data): ItCatalogItem {
             $item = $this->lock($item, $actor);
+            $this->expectVersion($item, (int) ($data['expected_version'] ?? 0));
             $before = $item->only(self::EDITABLE);
-            $wasSchema = $item->form_schema;
             $item->fill(Arr::only($this->normalise($data), self::EDITABLE));
-            if ($item->form_schema !== $wasSchema) {
-                $item->form_schema_version = (int) $item->form_schema_version + 1;
-            }
-            $item->updated_by = $actor->id;
             $changedFields = array_keys($item->getDirty());
             if ($changedFields === []) {
                 return $item;
             }
+            $item->form_schema_version = (int) $item->form_schema_version + 1;
+            $item->lock_version++;
+            $item->updated_by = $actor->id;
             $item->save();
             AuditLogger::logOrFail('it.catalogue.item.updated', $item, [
                 'application_scope' => 'single_application',
@@ -81,11 +82,12 @@ final class ItCatalogManagementService
         });
     }
 
-    public function publish(ItCatalogItem $item, User $actor): ItCatalogItem
+    public function publish(ItCatalogItem $item, User $actor, int $expectedVersion): ItCatalogItem
     {
-        return DB::transaction(function () use ($item, $actor): ItCatalogItem {
+        return DB::transaction(function () use ($item, $actor, $expectedVersion): ItCatalogItem {
             $item = $this->lock($item, $actor);
-            if ($item->is_published) {
+            $this->expectVersion($item, $expectedVersion);
+            if ($item->is_published && $item->publishedVersion?->version === $item->form_schema_version) {
                 return $item;
             }
             if ($item->it_service_id !== null && ! $item->service()->where('is_active', true)->exists()) {
@@ -95,8 +97,21 @@ final class ItCatalogManagementService
                 throw new DomainException('Choose a supported provisioning type before publishing this request.');
             }
 
+            $version = ItCatalogVersion::query()->firstOrCreate([
+                'catalog_item_id' => $item->id,
+                'version' => $item->form_schema_version,
+            ], [
+                'contract' => $item->only(ItCatalogItem::CONTRACT_FIELDS),
+                'provenance' => 'reviewed_publication',
+                'published_by' => $actor->id,
+            ]);
+            if ($version->contract != $item->only(ItCatalogItem::CONTRACT_FIELDS)) {
+                throw new DomainException('This draft differs from its recorded version. Save a new revision before publishing.');
+            }
             $item->forceFill([
                 'is_published' => true,
+                'published_version_id' => $version->id,
+                'lock_version' => $item->lock_version + 1,
                 'updated_by' => $actor->id,
             ])->save();
             AuditLogger::logOrFail('it.catalogue.item.published', $item, [
@@ -109,10 +124,11 @@ final class ItCatalogManagementService
         });
     }
 
-    public function unpublish(ItCatalogItem $item, User $actor, string $reason): ItCatalogItem
+    public function unpublish(ItCatalogItem $item, User $actor, string $reason, int $expectedVersion): ItCatalogItem
     {
-        return DB::transaction(function () use ($item, $actor, $reason): ItCatalogItem {
+        return DB::transaction(function () use ($item, $actor, $reason, $expectedVersion): ItCatalogItem {
             $item = $this->lock($item, $actor);
+            $this->expectVersion($item, $expectedVersion);
             $reason = trim($reason);
             if ($reason === '') {
                 throw new DomainException('Record why this request is being unpublished.');
@@ -123,6 +139,7 @@ final class ItCatalogManagementService
 
             $item->forceFill([
                 'is_published' => false,
+                'lock_version' => $item->lock_version + 1,
                 'updated_by' => $actor->id,
             ])->save();
             AuditLogger::logOrFail('it.catalogue.item.unpublished', $item, [
@@ -141,6 +158,13 @@ final class ItCatalogManagementService
         $this->guardActor($actor);
 
         return ItCatalogItem::query()->lockForUpdate()->findOrFail($item->getKey());
+    }
+
+    private function expectVersion(ItCatalogItem $item, int $version): void
+    {
+        if ($item->lock_version !== $version) {
+            throw ValidationException::withMessages(['expected_version' => 'This request changed in another window. Reload and review the current draft before saving or publishing.']);
+        }
     }
 
     private function guardActor(User $actor): void

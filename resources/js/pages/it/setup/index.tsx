@@ -883,6 +883,8 @@ export default function ItSetupIndex({
                     )}
                     {tab === 'catalogue' ? (
                         <ItCatalogueManagement
+                            key={actorId}
+                            actorId={actorId}
                             items={catalogItems.filter((item) =>
                                 match(
                                     [

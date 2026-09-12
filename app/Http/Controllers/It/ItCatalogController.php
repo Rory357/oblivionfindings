@@ -31,17 +31,12 @@ class ItCatalogController extends Controller
 
         $items = ItCatalogItem::query()
             ->published()
-            ->when(! $includeInternal, fn ($query) => $query->where('internal_only', false))
-            ->when($search !== '', function ($query) use ($search) {
-                $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
-                $query->where(fn ($nested) => $nested
-                    ->where('name', 'like', $like)
-                    ->orWhere('description', 'like', $like)
-                    ->orWhere('search_terms', 'like', $like));
-            })
-            ->orderBy('sort_order')
-            ->orderBy('name')
+            ->with('publishedVersion')
             ->get()
+            ->map(fn (ItCatalogItem $item) => $item->publishedContract())
+            ->filter(fn (ItCatalogItem $item) => ($includeInternal || ! $item->internal_only)
+                && ($search === '' || str_contains(mb_strtolower($item->name.' '.$item->description.' '.implode(' ', $item->search_terms ?? [])), mb_strtolower($search))))
+            ->sortBy([['sort_order', 'asc'], ['name', 'asc']])
             ->map(fn (ItCatalogItem $item) => $item->discoveryPayload($includeInternal))
             ->values();
 
@@ -61,8 +56,7 @@ class ItCatalogController extends Controller
     {
         $user = $request->user();
         $item = ItCatalogItem::query()
-            ->published()
-            ->when(! $user->canDo('it.manage'), fn ($query) => $query->where('internal_only', false))
+            ->withTrashed()
             ->findOrFail($catalogItem);
 
         $outcome = $this->submissionService->submit($item, $user, $request->validated());
