@@ -283,6 +283,7 @@ class ItTicketController extends Controller
 
         return [
             'viewer_user_id' => (int) $user->id,
+            'work' => app(ItTicketWorkController::class)->payload($ticket, $user),
             'conversation_ready' => ItTicket::hasConversationEvidence(),
             'ticket' => [
                 'id' => $ticket->id,

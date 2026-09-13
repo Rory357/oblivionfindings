@@ -221,6 +221,11 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     // The workspace: agents see every ticket, requesters their own
     // (ItTicketPolicy; internal notes stripped server-side).
     Route::get('/it/tickets/{ticket}', [ItTicketController::class, 'show'])->name('it.tickets.show');
+    Route::post('/it/tickets/{ticket}/work', [\App\Http\Controllers\It\ItTicketWorkController::class, 'store'])->name('it.tickets.work.store');
+    Route::get('/it/tickets/{ticket}/work/commands/{requestUuid}', [\App\Http\Controllers\It\ItTicketWorkController::class, 'recover'])->whereUuid('requestUuid')->name('it.tickets.work.recover');
+    Route::post('/it/tickets/{ticket}/work/commands/{requestUuid}/cancel', [\App\Http\Controllers\It\ItTicketWorkController::class, 'cancel'])->whereUuid('requestUuid')->name('it.tickets.work.cancel');
+    Route::get('/it/tickets/{ticket}/work/people', [\App\Http\Controllers\It\ItTicketWorkController::class, 'people'])->name('it.tickets.work.people');
+    Route::post('/it/tickets/{ticket}/work/split', [\App\Http\Controllers\It\ItTicketWorkController::class, 'split'])->name('it.tickets.work.split');
     Route::get('/it/tickets/{ticket}/original', [ItTicketController::class, 'original'])->name('it.tickets.original');
     Route::get('/it/tickets/{ticket}/tasks/{task}/history', ItWorkTaskHistoryController::class)->name('it.tickets.tasks.history');
     Route::post('/it/tickets/{ticket}/comments', [ItTicketController::class, 'storeComment'])->name('it.tickets.comments.store');

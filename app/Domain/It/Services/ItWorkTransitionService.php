@@ -462,6 +462,7 @@ final class ItWorkTransitionService
 
     private function guardRequiredWork(ItTicket $ticket, ?User $actor = null): void
     {
+        app(ItTicketWorkService::class)->guardSettlement($ticket);
         if ($ticket->requires_approval && $ticket->approvalState() !== 'approved') {
             throw new ItSettlementBlocked('Required approval must be approved before settlement.', (int) $ticket->id, 'approval', $ticket->approvals()->latest('id')->value('id'));
         }

@@ -32,4 +32,12 @@ final class ItTicketVersionService
             throw new ItTicketVersionConflict($ticket);
         }
     }
+
+    /** Advance linked/profile work under the already-authorized canonical lock. */
+    public function advance(ItTicket $ticket): void
+    {
+        // touch() alone can be a no-op within the timestamp's same second.
+        // Dirty the version so the model allocates its next persisted version.
+        $ticket->forceFill(['lock_version' => (int) $ticket->lock_version + 1])->saveOrFail();
+    }
 }

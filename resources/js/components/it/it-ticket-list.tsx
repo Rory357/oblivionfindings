@@ -21,6 +21,7 @@ import { SlaChip } from './sla-chip';
 import { TicketConversationSummary } from './ticket-conversation-summary';
 import { TicketRoutingSummary } from './ticket-routing-summary';
 import { waitingStatusLabel } from './ticket-waiting-dialog';
+import { PRIORITY_LABELS } from './ticket-work-types';
 
 const label = (value: string) =>
     value.replace(/_/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase());
@@ -108,7 +109,7 @@ export function ItTicketList({
                 <EntityStatusChip
                     variant={priorityTone[row.priority] ?? 'neutral'}
                 >
-                    {label(row.priority)}
+                    {PRIORITY_LABELS[row.priority] ?? label(row.priority)}
                 </EntityStatusChip>
             ),
         },
@@ -233,7 +234,8 @@ export function ItTicketList({
                                             'neutral'
                                         }
                                     >
-                                        {label(row.priority)}
+                                        {PRIORITY_LABELS[row.priority] ??
+                                            label(row.priority)}
                                     </EntityStatusChip>
                                     <EntityChip>
                                         {row.age ?? 'Raised time unavailable'}

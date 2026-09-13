@@ -11,6 +11,7 @@ export interface ItCommentIntent {
     expectedVersion: number;
     isInternal: boolean;
     body: string;
+    workPayload?: string;
     files: readonly File[];
     draft?: Readonly<ItDraftCommitReference>;
 }
@@ -295,6 +296,8 @@ export function itCommentFormData(intent: Readonly<ItCommentIntent>): FormData {
     form.set('request_uuid', intent.requestUuid);
     form.set('expected_version', String(intent.expectedVersion));
     form.set('body', intent.body);
+    if (intent.workPayload !== undefined)
+        form.set('work_payload', intent.workPayload);
     form.set('is_internal', intent.isInternal ? '1' : '0');
     intent.files.forEach((file) =>
         form.append('attachments[]', file, file.name),

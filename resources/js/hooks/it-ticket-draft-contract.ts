@@ -9,6 +9,7 @@ export type ItDraftPurpose =
     | 'internal_note'
     | 'ticket_edit'
     | 'public_resolution'
+    | 'ticket_work'
     | 'task_work'
     | 'approval_work'
     | 'merge_work';
@@ -24,6 +25,7 @@ export type ItDraftContext =
               | 'internal_note'
               | 'ticket_edit'
               | 'public_resolution'
+              | 'ticket_work'
               | 'merge_work';
           ticketId: number;
           requestUuid?: never;
@@ -72,6 +74,8 @@ export type ItDraftFields = Partial<{
     provisioning_request_id: number | null;
     watchers: number[] | null;
     body: string | null;
+    work_payload: string | null;
+    work_form: string | null;
     note: string | null;
     notify_requester: boolean;
     status: string | null;
@@ -183,6 +187,7 @@ export function draftAudience(purpose: ItDraftPurpose): 'public' | 'internal' {
         'technician_intake',
         'internal_note',
         'ticket_edit',
+        'ticket_work',
         'task_work',
         'approval_work',
         'merge_work',
@@ -409,8 +414,9 @@ const fieldsByPurpose: Record<ItDraftPurpose, string[]> = {
         'provisioning_request_id',
         'watchers',
     ],
-    public_reply: ['body'],
-    internal_note: ['body'],
+    public_reply: ['body', 'work_payload'],
+    ticket_work: ['work_form'],
+    internal_note: ['body', 'work_payload'],
     public_resolution: [
         'note',
         'resolution_code',
@@ -493,7 +499,11 @@ export function readDraftPayload(
                         new Set(field).size === field.length
                       : key.endsWith('_id') || key === 'target_version'
                         ? positive(field)
-                        : typeof field === 'string' && field.length <= 5000);
+                        : typeof field === 'string' &&
+                          field.length <=
+                              (['work_payload', 'work_form'].includes(key)
+                                  ? 60000
+                                  : 5000));
         if (!valid) return null;
         fields[key] = field as ItDraftFieldValue;
     }

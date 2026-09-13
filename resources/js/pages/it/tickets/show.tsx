@@ -61,6 +61,15 @@ import {
     type TicketWorkTask,
 } from '@/components/it/ticket-work-tasks';
 import {
+    PRIORITY_LABELS,
+    type TicketWork,
+} from '@/components/it/ticket-work-types';
+import {
+    TicketDiagnosticSummary,
+    TicketWorkContext,
+    TicketWorkWorkspace,
+} from '@/components/it/ticket-work-workspace';
+import {
     TicketWorkspaceHeader,
     ticketWorkspaceTab,
 } from '@/components/it/ticket-workspace-header';
@@ -186,6 +195,7 @@ interface TicketPayload {
 }
 
 interface Props {
+    work?: TicketWork | null;
     viewer_user_id: number;
     conversation_ready?: boolean;
     ticket: TicketPayload;
@@ -265,6 +275,7 @@ const label = (raw: string) =>
     raw.replace(/[_-]/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
 export default function ItTicketShow({
+    work,
     viewer_user_id,
     ticket,
     comments,
@@ -440,11 +451,17 @@ export default function ItTicketShow({
         acceptedFields: ['subcategory'],
         onAccessLost: () => setSubcategoryState(null),
     });
+    const [workDraftState, setWorkDraftState] = useState({
+        dirty: false,
+        busy: false,
+    });
     const pageLeave = useItTicketPageLeave({
         ticketId: ticket.id,
         actorId: myId,
         additionalDirty:
-            can.manage && !propertyMutation.hasPending && subcategoryDirty,
+            (can.manage && !propertyMutation.hasPending && subcategoryDirty) ||
+            workDraftState.dirty ||
+            workDraftState.busy,
     });
     const clearClassification = useRef(classificationMemory.clearBrowserWork);
     useLayoutEffect(() => {
@@ -474,11 +491,18 @@ export default function ItTicketShow({
     const activeTab = ticketWorkspaceTab(
         new URL(page.url, 'https://local.invalid').searchParams.get('tab'),
         canViewWork,
+        !!work?.ready && can.manage,
     );
     const visitTab = (tab: string, after?: () => void) =>
         router.get(
             `/it/tickets/${ticket.id}${ticket.is_merged ? '/original' : ''}`,
-            { tab: ticketWorkspaceTab(tab, canViewWork) },
+            {
+                tab: ticketWorkspaceTab(
+                    tab,
+                    canViewWork,
+                    !!work?.ready && can.manage,
+                ),
+            },
             {
                 preserveState: true,
                 preserveScroll: true,
@@ -487,13 +511,28 @@ export default function ItTicketShow({
                 },
             },
         );
-    const focusReply = () => {
-        const focus = () =>
+    const openNote = (audience: 'public' | 'internal') => {
+        const open = () =>
             conversationRef.current
-                ?.querySelector<HTMLTextAreaElement>('textarea')
-                ?.focus();
-        if (activeTab === 'messages') focus();
-        else visitTab('messages', focus);
+                ?.querySelector('[data-ticket-composer]')
+                ?.dispatchEvent(
+                    new CustomEvent('ticket-open-note', { detail: audience }),
+                );
+        if (activeTab === 'messages') open();
+        else visitTab('messages', open);
+    };
+    const focusReply = () => openNote('public');
+    const focusWorkNote = () => openNote('internal');
+    const showWorkNote = (id?: number) => {
+        if (!id) {
+            focusWorkNote();
+            return;
+        }
+        visitTab('messages', () => {
+            const note = document.getElementById(`ticket-comment-${id}`);
+            note?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            note?.focus();
+        });
     };
     const requiredTasks = linked_context.tasks.filter(
         (task) => task.is_required,
@@ -787,6 +826,8 @@ export default function ItTicketShow({
                             onTab={visitTab}
                             original={ticket.is_merged}
                             sla={ticket.sla}
+                            work={!concealed && can.manage ? work : null}
+                            priority={ticket.priority}
                             replies={comments.length}
                             files={fileEntries.length}
                             tasks={
@@ -805,9 +846,13 @@ export default function ItTicketShow({
                                       }
                                     : can.comment
                                       ? {
-                                            label: 'Write a reply',
+                                            label: can.manage
+                                                ? 'Add note'
+                                                : 'Write a reply',
                                             icon: MessageSquare,
-                                            run: focusReply,
+                                            run: can.manage
+                                                ? focusWorkNote
+                                                : focusReply,
                                         }
                                       : can.reopen &&
                                           ['resolved', 'closed'].includes(
@@ -1081,7 +1126,23 @@ export default function ItTicketShow({
                                                     }
                                                 />
                                             )}
+                                        {!concealed &&
+                                            can.manage &&
+                                            work?.ready &&
+                                            activeTab === 'messages' && (
+                                                <TicketDiagnosticSummary
+                                                    work={work}
+                                                    onDetails={() =>
+                                                        visitTab('people')
+                                                    }
+                                                />
+                                            )}
                                         <TicketThread
+                                            ticketWork={
+                                                !concealed && can.manage
+                                                    ? work
+                                                    : null
+                                            }
                                             key={
                                                 thread.ticket.id +
                                                 ':' +
@@ -1137,6 +1198,16 @@ export default function ItTicketShow({
                                         aria-label="Ticket at a glance"
                                         className="flex min-w-0 flex-col gap-5"
                                     >
+                                        {!concealed &&
+                                            can.manage &&
+                                            work?.ready && (
+                                                <TicketWorkContext
+                                                    work={work}
+                                                    onDetails={() =>
+                                                        visitTab('people')
+                                                    }
+                                                />
+                                            )}
                                         <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
                                             <div className="flex items-center justify-between gap-3">
                                                 <h2 className="text-sm font-semibold">
@@ -1149,7 +1220,9 @@ export default function ItTicketShow({
                                                         ] ?? 'neutral'
                                                     }
                                                 >
-                                                    {label(ticket.priority)}
+                                                    {PRIORITY_LABELS[
+                                                        ticket.priority
+                                                    ] ?? label(ticket.priority)}
                                                 </StatusBadge>
                                             </div>
                                             <p className="text-sm font-medium break-words">
@@ -1407,7 +1480,9 @@ export default function ItTicketShow({
                                                                 key={p}
                                                                 value={p}
                                                             >
-                                                                {label(p)}
+                                                                {PRIORITY_LABELS[
+                                                                    p
+                                                                ] ?? label(p)}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>
@@ -1980,7 +2055,11 @@ export default function ItTicketShow({
                                             />
                                             <RailRow
                                                 k="Priority"
-                                                v={label(ticket.priority)}
+                                                v={
+                                                    PRIORITY_LABELS[
+                                                        ticket.priority
+                                                    ] ?? label(ticket.priority)
+                                                }
                                             />
                                             <RailRow
                                                 k="Work type"
@@ -2048,6 +2127,27 @@ export default function ItTicketShow({
                                     )}
                                 </div>
                             </section>
+                            {!concealed &&
+                                can.manage &&
+                                work &&
+                                myId !== null && (
+                                    <TicketWorkWorkspace
+                                        draftsEnabled={draftRecovery.enabled}
+                                        key={`${ticket.id}:${myId}`}
+                                        work={work}
+                                        ticketId={ticket.id}
+                                        actorId={myId}
+                                        version={ticket.lock_version}
+                                        tab={activeTab}
+                                        editable={
+                                            isWorking && !ticket.is_merged
+                                        }
+                                        onRefresh={deliveryRefresh.refresh}
+                                        onNote={showWorkNote}
+                                        notes={comments}
+                                        onDirtyChange={setWorkDraftState}
+                                    />
+                                )}
                             <section
                                 hidden={activeTab !== 'tasks'}
                                 className="rounded-2xl border border-border bg-card p-5"

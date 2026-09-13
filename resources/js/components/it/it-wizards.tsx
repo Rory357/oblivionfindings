@@ -505,12 +505,12 @@ const CATEGORY_OPTIONS = [
 ] as const;
 
 const PRIORITY_OPTIONS = [
-    { key: 'low', label: 'Low', description: 'When time allows' },
-    { key: 'normal', label: 'Normal', description: 'Business as usual' },
-    { key: 'high', label: 'High', description: 'Blocking someone’s work' },
+    { key: 'low', label: 'P4 · Low', description: 'When time allows' },
+    { key: 'normal', label: 'P3 · Medium', description: 'Business as usual' },
+    { key: 'high', label: 'P2 · High', description: 'Blocking someone’s work' },
     {
         key: 'urgent',
-        label: 'Urgent',
+        label: 'P1 · Critical',
         description: 'Site-wide / safety impact',
     },
 ] as const;

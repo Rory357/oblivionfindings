@@ -54,6 +54,7 @@ final class ItTicketInteractionService
             'expected_version' => ['required', 'integer', 'min:1'],
             'body' => ['required', 'string', 'max:'.($channel === ItTicketCommandChannel::Email ? 100000 : 5000)],
             'is_internal' => $channel !== ItTicketCommandChannel::Browser ? ['sometimes', 'boolean', 'declined'] : ['sometimes', 'boolean'],
+            'work_payload' => $channel !== ItTicketCommandChannel::Browser ? ['prohibited'] : ['sometimes', 'string', 'max:60000', 'json'],
             'draft_uuid' => $channel !== ItTicketCommandChannel::Browser ? ['prohibited'] : ['required_with:draft_revision,draft_actor_user_id', 'uuid'],
             'draft_revision' => $channel !== ItTicketCommandChannel::Browser ? ['prohibited'] : ['required_with:draft_uuid', 'integer', 'min:0'],
             'draft_actor_user_id' => $channel !== ItTicketCommandChannel::Browser ? ['prohibited'] : ['required_with:draft_uuid', 'integer', 'min:1'],
@@ -111,10 +112,16 @@ final class ItTicketInteractionService
                 $result = $this->addComment($locked, $current, $input['body'], $internal, $attachments, $input, $paths, $attachmentReservations, $channel, $attachmentContext);
                 $locked = $result['ticket'];
                 $comment = $result['comment'];
+                if (isset($input['work_payload'])) {
+                    app(ItTicketWorkService::class)->addToComment($locked, $current, $comment, $input['work_payload']);
+                }
                 if (! $internal) {
                     $recipients = $result['is_requester']
                         ? $locked->watchers->when($locked->assignee, fn ($users) => $users->push($locked->assignee))
                         : collect([$locked->requester])->filter();
+                    if (isset($input['work_payload'])) {
+                        $recipients = app(ItTicketWorkService::class)->recipients($locked, $current, $input['work_payload']) ?? $recipients;
+                    }
                     app(ItEmailDeliveryService::class)->prepare(
                         $recipients->unique('id')->reject(fn ($user) => (int) $user->id === (int) $current->id),
                         new TicketRepliedNotification($locked, $result['is_requester'] ? 'agent_side' : 'requester', $comment->id),
@@ -323,6 +330,8 @@ final class ItTicketInteractionService
             ], $attachments),
         ];
 
+        // Preserve old receipt fingerprints when the optional workflow was absent.
+        if (array_key_exists('work_payload', $input)) $payload['work_payload'] = $input['work_payload'];
         return hash_hmac('sha256', json_encode($payload, JSON_THROW_ON_ERROR), (string) config('app.key'));
     }
 
@@ -406,6 +415,9 @@ final class ItTicketInteractionService
                         }
                         if (trim((string) ($saved['payload']['fields']['body'] ?? '')) !== $body) {
                             throw new ItTicketDraftException('draft_content_changed', 409, 'Save this exact reply to its draft before submitting it. The current draft was not consumed.');
+                        }
+                        if (($saved['payload']['fields']['work_payload'] ?? null) !== ($command['work_payload'] ?? null)) {
+                            throw new ItTicketDraftException('draft_content_changed', 409, 'Save these exact work fields to the draft before submitting. Your work has been retained.');
                         }
                     }
                     $drafts->consumeFromInput($actor, $command, $purpose, (int) $locked->id, attachmentTarget: $comment);

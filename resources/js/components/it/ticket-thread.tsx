@@ -9,6 +9,7 @@ import {
 } from '@/components/it/ticket-comment-delivery';
 import { TicketReplyComposer } from '@/components/it/ticket-reply-composer';
 import { ticketWatcherActivity } from '@/components/it/ticket-watcher-activity';
+import type { TicketWork } from '@/components/it/ticket-work-types';
 import { Button } from '@/components/ui/button';
 import { formatFileSize, StagedFileCard } from '@/components/ui/file-dropzone';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -345,6 +346,7 @@ function eventIcon(type: string) {
 }
 
 export function TicketThread({
+    ticketWork,
     ticketId,
     requesterName,
     description,
@@ -367,6 +369,7 @@ export function TicketThread({
     conversationReady = false,
     draftsEnabled = false,
 }: {
+    ticketWork?: TicketWork | null;
     ticketId: number;
     actorId?: number;
     expectedVersion?: number;
@@ -572,6 +575,8 @@ export function TicketThread({
                                 {visibleComments.map((c) => (
                                     <div
                                         key={c.id}
+                                        id={`ticket-comment-${c.id}`}
+                                        tabIndex={-1}
                                         className={
                                             c.is_internal
                                                 ? 'rounded-xl border border-border/60 bg-accent/50 px-3.5 py-2.5'
@@ -869,6 +874,8 @@ export function TicketThread({
                 expectedVersion !== undefined && (
                     <div hidden={lane !== 'conversation'}>
                         <TicketReplyComposer
+                            modal
+                            ticketWork={canInternal ? ticketWork : null}
                             actorId={actorId}
                             ticketId={ticketId}
                             expectedVersion={expectedVersion}

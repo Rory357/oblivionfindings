@@ -51,7 +51,8 @@ final class ItTicketDraftPayload
                 'device_id' => $id, 'provisioning_request_id' => $id,
                 'watchers' => ['sometimes', 'nullable', 'array', 'max:100'],
             ],
-            Purpose::PublicReply, Purpose::InternalNote => ['body' => $text(5000)],
+            Purpose::PublicReply, Purpose::InternalNote => ['body' => $text(5000), 'work_payload' => ['sometimes', 'nullable', 'string', 'max:60000', 'json']],
+            Purpose::TicketWork => ['work_form' => ['sometimes', 'nullable', 'string', 'max:60000', 'json']],
             Purpose::PublicResolution => [...ItTicketResolutionInput::rules(partial: true), 'notify_requester' => $boolean],
             Purpose::TicketEdit => [
                 ...$triage, 'status' => $enum(ItTicket::OPEN_STATUSES), 'queue_id' => $id, 'owner_user_id' => $id,
@@ -86,6 +87,9 @@ final class ItTicketDraftPayload
     {
         $this->assertScope($actor, $ticket, $old);
         $scope = $old;
+        if (isset($fields['work_payload']) || isset($fields['work_form'])) {
+            $scope['ticket_work'] = true;
+        }
         foreach (['site_id', 'is_organisation_wide', 'assigned_to_user_id', 'owner_user_id', 'requester_user_id', 'asset_id', 'device_id', 'it_service_id', 'provisioning_request_id', 'queue_id', 'watchers'] as $field) {
             if (array_key_exists($field, $fields) && $fields[$field] !== null && $fields[$field] !== '' && $fields[$field] !== []) {
                 $scope[$field] = $fields[$field];
@@ -109,7 +113,8 @@ final class ItTicketDraftPayload
     public function validateScope(array $scope): array
     {
         $ids = ['site_id', 'assigned_to_user_id', 'owner_user_id', 'requester_user_id', 'asset_id', 'device_id', 'it_service_id', 'provisioning_request_id', 'queue_id'];
-        $rules = ['scope' => ['present', 'array:'.implode(',', [...$ids, 'is_organisation_wide', 'watchers'])],
+        $rules = ['scope' => ['present', 'array:'.implode(',', [...$ids, 'is_organisation_wide', 'watchers', 'ticket_work'])],
+            'scope.ticket_work' => ['sometimes', 'boolean'],
             'scope.is_organisation_wide' => ['sometimes', 'boolean'],
             'scope.watchers' => ['sometimes', 'nullable', 'array', 'max:100'],
             'scope.watchers.*' => ['integer', 'min:1', 'distinct']];
@@ -122,6 +127,9 @@ final class ItTicketDraftPayload
 
     public function assertScope(User $actor, ?ItTicket $ticket, array $scope): void
     {
+        if (! empty($scope['ticket_work']) && (! $ticket || ! $this->access->canWork($actor, $ticket))) {
+            throw ItTicketDraftException::unavailable();
+        }
         if (array_key_exists('site_id', $scope) || ! empty($scope['is_organisation_wide'])) {
             if (! $this->access->canAssignScope($actor, isset($scope['site_id']) ? (int) $scope['site_id'] : null, (bool) ($scope['is_organisation_wide'] ?? false))) {
                 throw ItTicketDraftException::unavailable();

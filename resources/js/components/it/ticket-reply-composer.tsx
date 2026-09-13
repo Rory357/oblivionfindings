@@ -6,7 +6,19 @@ import type {
     ThreadKbHint,
 } from '@/components/it/ticket-thread';
 import { TicketVersionConflict } from '@/components/it/ticket-version-conflict';
+import { TicketWorkFields } from '@/components/it/ticket-work-fields';
+import {
+    readWorkNote,
+    type TicketWork,
+} from '@/components/it/ticket-work-types';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { StagedFileCard } from '@/components/ui/file-dropzone';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -35,10 +47,13 @@ import {
     useMemo,
     useRef,
     useState,
+    type ReactNode,
 } from 'react';
 import { toast } from 'sonner';
 
 interface Props {
+    modal?: boolean;
+    ticketWork?: TicketWork | null;
     actorId: number;
     ticketId: number;
     expectedVersion: number;
@@ -53,7 +68,32 @@ interface Props {
 
 /** Each audience owns its own fields, files, draft revision and command identity. */
 export function TicketReplyComposer(props: Props) {
-    const [audience, setAudience] = useState<'public' | 'internal'>('public');
+    const [audience, setAudience] = useState<'public' | 'internal'>(
+        props.modal && props.canInternal ? 'internal' : 'public',
+    );
+    const [open, setOpen] = useState(false);
+    const composerRoot = useRef<HTMLElement>(null);
+    const trigger = useRef<HTMLButtonElement>(null);
+    const returnFocus = useCallback(() => {
+        const button = trigger.current;
+        if (button && !button.closest('[hidden], [inert], [aria-hidden="true"]')) {
+            button.focus();
+        }
+    }, []);
+    useEffect(() => {
+        const root = composerRoot.current;
+        const openNote = (event: Event) => {
+            const requested = (event as CustomEvent).detail;
+            setAudience(
+                requested === 'internal' && props.canInternal
+                    ? 'internal'
+                    : 'public',
+            );
+            setOpen(true);
+        };
+        root?.addEventListener('ticket-open-note', openNote);
+        return () => root?.removeEventListener('ticket-open-note', openNote);
+    }, [props.canInternal]);
     const [revokedEpoch, setRevokedEpoch] = useState(0);
     const revokeAccess = useCallback(
         () => setRevokedEpoch((current) => current + 1),
@@ -89,38 +129,66 @@ export function TicketReplyComposer(props: Props) {
     useEffect(() => {
         report?.({ dirty, busy });
     }, [dirty, busy, report]);
+    const audienceControls = props.canInternal && (
+        <div className="flex flex-wrap gap-2" aria-label="Message audience">
+            <Button
+                type="button"
+                size="sm"
+                variant={active === 'public' ? 'default' : 'outline'}
+                aria-pressed={active === 'public'}
+                onClick={() => setAudience('public')}
+            >
+                <MessageSquare className="size-4" />{' '}
+                {props.modal ? 'Public reply' : 'Reply'}
+                {work.public.dirty ? ' · draft' : ''}
+            </Button>
+            <Button
+                type="button"
+                size="sm"
+                variant={active === 'internal' ? 'default' : 'outline'}
+                aria-pressed={active === 'internal'}
+                onClick={() => setAudience('internal')}
+            >
+                <Lock className="size-4" /> Internal note
+                {work.internal.dirty ? ' · draft' : ''}
+            </Button>
+        </div>
+    );
+    const dialog = {
+        open,
+        switching: open,
+        controls: audienceControls,
+        onOpenChange: (next: boolean) => {
+            if (next || !busy) setOpen(next);
+        },
+        onSaved: () => setOpen(false),
+        returnFocus,
+    };
     return (
         <section
+            ref={composerRoot}
+            data-ticket-composer
             aria-label="Write a ticket message"
             hidden={!!props.accessState}
             className="space-y-4 border-t border-border p-5"
         >
-            {props.canInternal && (
-                <div
-                    className="flex flex-wrap gap-2"
-                    aria-label="Message audience"
+            {props.modal ? (
+                <Button
+                    ref={trigger}
+                    className="min-h-11"
+                    onClick={() => {
+                        if (!work[active].dirty && dirty)
+                            setAudience(
+                                active === 'public' ? 'internal' : 'public',
+                            );
+                        setOpen(true);
+                    }}
                 >
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant={active === 'public' ? 'default' : 'outline'}
-                        aria-pressed={active === 'public'}
-                        onClick={() => setAudience('public')}
-                    >
-                        <MessageSquare className="size-4" /> Reply
-                        {work.public.dirty ? ' · draft' : ''}
-                    </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant={active === 'internal' ? 'default' : 'outline'}
-                        aria-pressed={active === 'internal'}
-                        onClick={() => setAudience('internal')}
-                    >
-                        <Lock className="size-4" /> Internal note
-                        {work.internal.dirty ? ' · draft' : ''}
-                    </Button>
-                </div>
+                    <MessageSquare className="size-4" />
+                    {dirty ? 'Continue note' : 'Add note'}
+                </Button>
+            ) : (
+                audienceControls
             )}
             <div hidden={active !== 'public'}>
                 <AudienceComposer
@@ -128,6 +196,11 @@ export function TicketReplyComposer(props: Props) {
                     {...props}
                     revokedEpoch={revokedEpoch}
                     onAccessRevoked={revokeAccess}
+                    dialog={
+                        props.modal
+                            ? { ...dialog, open: open && active === 'public' }
+                            : undefined
+                    }
                     isInternal={false}
                     visible={active === 'public'}
                     onDraftStateChange={reportPublic}
@@ -140,6 +213,14 @@ export function TicketReplyComposer(props: Props) {
                         {...props}
                         revokedEpoch={revokedEpoch}
                         onAccessRevoked={revokeAccess}
+                        dialog={
+                            props.modal
+                                ? {
+                                      ...dialog,
+                                      open: open && active === 'internal',
+                                  }
+                                : undefined
+                        }
                         isInternal
                         visible={active === 'internal'}
                         onDraftStateChange={reportInternal}
@@ -150,9 +231,10 @@ export function TicketReplyComposer(props: Props) {
     );
 }
 
-const acceptedFields = ['body'] as const;
+const acceptedFields = ['body', 'work_payload'] as const;
 
 function AudienceComposer({
+    ticketWork,
     actorId,
     ticketId,
     expectedVersion,
@@ -166,7 +248,16 @@ function AudienceComposer({
     revokedEpoch,
     onAccessRevoked,
     accessState,
+    dialog,
 }: Props & {
+    dialog?: {
+        open: boolean;
+        switching: boolean;
+        controls: ReactNode;
+        onOpenChange: (open: boolean) => void;
+        onSaved: () => void;
+        returnFocus: () => void;
+    };
     isInternal: boolean;
     visible: boolean;
     revokedEpoch: number;
@@ -174,6 +265,7 @@ function AudienceComposer({
 }) {
     const inputId = useId();
     const [body, setBody] = useState('');
+    const [workPayload, setWorkPayload] = useState('');
     const [files, setFiles] = useState<File[]>([]);
     const [baseVersion, setBaseVersion] = useState(expectedVersion);
     const [confirmedVersion, setConfirmedVersion] = useState(expectedVersion);
@@ -215,11 +307,14 @@ function AudienceComposer({
     });
     const snapshot = useMemo<ItDraftSnapshot>(
         () => ({
-            fields: { body },
+            fields: {
+                body,
+                ...(workPayload ? { work_payload: workPayload } : {}),
+            },
             step_index: 0,
             base_ticket_version: baseVersion,
         }),
-        [body, baseVersion],
+        [body, baseVersion, workPayload],
     );
     const draft = useItTicketDraft({
         enabled: draftsEnabled,
@@ -229,7 +324,8 @@ function AudienceComposer({
             ticketId,
         },
         workingSnapshot: snapshot,
-        workingDirty: body.length > 0 || files.length > 0,
+        workingDirty:
+            body.length > 0 || files.length > 0 || workPayload.length > 0,
         workingFiles: files,
         acceptSelectedFiles: true,
         acceptedFields,
@@ -246,6 +342,7 @@ function AudienceComposer({
         command.denyCurrentAccess();
         setAccessHidden(true);
         setBody('');
+        setWorkPayload('');
         setFiles([]);
         setPendingRestore(null);
         submitted.current = null;
@@ -275,6 +372,7 @@ function AudienceComposer({
         command.concealed ||
         ['session_expired', 'access_denied'].includes(draft.state);
     const dirty =
+        workPayload.length > 0 ||
         body.length > 0 ||
         files.length > 0 ||
         draft.attachments.length > 0 ||
@@ -332,6 +430,7 @@ function AudienceComposer({
         setNextDraft(undefined);
         draft.clearOwnedBrowserWork();
         setBody('');
+        setWorkPayload('');
         setFiles([]);
         setMessage(null);
         submitted.current = null;
@@ -377,6 +476,7 @@ function AudienceComposer({
         if (sameWork) {
             current.draft.clearOwnedBrowserWork();
             setBody('');
+            setWorkPayload('');
             setFiles([]);
             setBaseVersion(result.lock_version);
             submitted.current = null;
@@ -403,6 +503,8 @@ function AudienceComposer({
         setLastCommit(result);
         setMessage(null);
         toast.success(itCommentCommitMessage(result));
+        if (sameWork && result.canonical_ticket_id === ticketId)
+            dialog?.onSaved();
         try {
             onPosted?.();
         } catch {
@@ -439,6 +541,7 @@ function AudienceComposer({
             !current.command.accessBlocker &&
             submitted.current === null &&
             current.snapshot.fields.body === '' &&
+            !current.snapshot.fields.work_payload &&
             current.files.length === 0 &&
             current.draft.attachments.length === 0 &&
             !current.draft.memoryBlocked &&
@@ -558,6 +661,7 @@ function AudienceComposer({
                 : '',
         );
         setFiles(restored.files);
+        setWorkPayload(restored.snapshot.fields.work_payload ?? '');
         setBaseVersion(restored.snapshot.base_ticket_version ?? baseVersion);
         revealAuthorizedWork();
         setPendingRestore(null);
@@ -576,6 +680,14 @@ function AudienceComposer({
         setPreparing(true);
         setMessage(null);
         const frozenSnapshot = snapshot;
+        if (workPayload && readWorkNote(workPayload).timer) {
+            setMessage(
+                'Stop the timer and review the actual time before saving this note.',
+            );
+            preparation.current = false;
+            setPreparing(false);
+            return;
+        }
         const frozenFiles = [...files];
         try {
             let reference;
@@ -600,6 +712,7 @@ function AudienceComposer({
             if (
                 !current.command.submit({
                     body,
+                    ...(workPayload ? { workPayload } : {}),
                     expectedVersion: baseVersion,
                     files: frozenFiles,
                     ...(reference ? { draft: reference } : {}),
@@ -729,7 +842,7 @@ function AudienceComposer({
 
     if (accessState) return null;
 
-    return (
+    const content = (
         <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
                 {isInternal
@@ -952,6 +1065,9 @@ function AudienceComposer({
                             }
                             onResume={(saved) => {
                                 setBody(saved.payload.fields.body ?? '');
+                                setWorkPayload(
+                                    saved.payload.fields.work_payload ?? '',
+                                );
                                 setFiles([]);
                                 setBaseVersion(
                                     resumedDraftBaseVersion(saved) ??
@@ -1023,6 +1139,17 @@ function AudienceComposer({
                             }
                         />
                     </div>
+                    {ticketWork?.ready && (
+                        <TicketWorkFields
+                            ticketId={ticketId}
+                            actorId={actorId}
+                            value={workPayload}
+                            onChange={setWorkPayload}
+                            disabled={!editable}
+                            work={ticketWork}
+                            internal={isInternal}
+                        />
+                    )}
                     {hints.length > 0 && (
                         <div
                             className="flex flex-wrap items-center gap-2"
@@ -1124,8 +1251,12 @@ function AudienceComposer({
                             {preparing
                                 ? 'Preparing reply…'
                                 : isInternal
-                                  ? 'Add note'
-                                  : 'Add reply'}
+                                  ? readWorkNote(workPayload).periods?.length
+                                      ? 'Save note & time'
+                                      : 'Add note'
+                                  : readWorkNote(workPayload).periods?.length
+                                    ? 'Save reply & time'
+                                    : 'Add reply'}
                         </Button>
                     </div>
                 </>
@@ -1154,5 +1285,34 @@ function AudienceComposer({
                 }}
             />
         </div>
+    );
+    if (!dialog) return content;
+    return (
+        <Dialog open={dialog.open} onOpenChange={dialog.onOpenChange}>
+            <DialogContent
+                className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl"
+                onOpenAutoFocus={(event) => {
+                    if (editable) {
+                        event.preventDefault();
+                        document.getElementById(inputId)?.focus();
+                    }
+                }}
+                onCloseAutoFocus={(event) => {
+                    event.preventDefault();
+                    if (!dialog.switching) dialog.returnFocus();
+                }}
+            >
+                <DialogHeader>
+                    <DialogTitle>Add note</DialogTitle>
+                    <DialogDescription>
+                        Write a public reply or internal note and record the
+                        time spent. Closing keeps your entered work on this
+                        ticket.
+                    </DialogDescription>
+                </DialogHeader>
+                {dialog.controls}
+                {content}
+            </DialogContent>
+        </Dialog>
     );
 }
