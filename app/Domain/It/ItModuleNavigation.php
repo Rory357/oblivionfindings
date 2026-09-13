@@ -77,8 +77,8 @@ final class ItModuleNavigation
         $groups[] = [
             'label' => 'Vendors & access',
             'items' => array_values(array_filter([
-                $registers['vendors'] || $registers['credentials']
-                    ? self::item('Vendors & Credentials', $registers['vendors'] ? '/vendors?tab=vendors' : '/vendors?tab=credentials', 'package')
+                $registers['vendors'] || $registers['credentials'] || $registers['contracts']
+                    ? self::item('Vendors & Credentials', $registers['vendors'] ? '/vendors?tab=vendors' : ($registers['credentials'] ? '/vendors?tab=credentials' : '/vendors'), 'package')
                     : null,
             ])),
         ];
@@ -91,6 +91,7 @@ final class ItModuleNavigation
     {
         return [
             'vendors' => $user->isApproved() && $user->canDo('vendors.view'),
+            'contracts' => app(\App\Services\Sites\VendorCommercialAccess::class)->capable($user),
             'credentials' => $user->isApproved() && ($user->canDo('credentials.view')
                 || app(SiteCredentialAccess::class)->query($user, 'view')->exists()),
         ];

@@ -45,18 +45,67 @@ function commercialAgreement($test, array $replace = []): VendorAgreement {
 
 test('only the explicit Finance and Management roles can read commercial data even with unrelated broad grants', function () {
     $agreement = commercialAgreement($this);
-    foreach (['finance', 'ceo', 'coo', 'cfo', 'provider_manager', 'house_manager', 'site_manager'] as $role) {
+    foreach (['finance', 'ceo', 'coo', 'cfo', 'provider_manager', 'manager', 'coordinator', 'team_lead', 'admin'] as $role) {
         $actor = commercialActor($role, $this->commercialSite);
         $this->seed(VendorVaultPermissionsSeeder::class);
         $this->actingAs($actor->fresh())->getJson('/vendor-agreements/'.$agreement->id.'/files')->assertOk();
     }
-    foreach (['auditor', 'it_manager', 'facilities_manager', 'roadmap_manager', 'support_worker', 'admin'] as $role) {
+    foreach (['auditor', 'it_manager', 'facilities_manager', 'roadmap_manager', 'support_worker', 'house_manager', 'site_manager'] as $role) {
         $actor = commercialActor($role, $this->commercialSite);
         $actor->permissionOverrides()->attach(Permission::whereIn('key', ['vendors.contracts.view', 'vendors.contracts.manage', 'finance.ap.view'])->pluck('id'), ['allowed' => true]);
         $this->actingAs($actor->fresh())->getJson('/vendor-agreements/'.$agreement->id.'/files')->assertNotFound();
         $this->actingAs($actor->fresh())->patchJson('/vendor-agreements/'.$agreement->id, commercialData($this->commercialActor, ['lock_version' => 1]))->assertNotFound();
     }
 });
+
+test('approved site leadership roles retain site and action boundaries without gaining vault permissions', function (string $roleName) {
+    $agreement = commercialAgreement($this);
+    $actor = commercialActor($roleName, $this->commercialSite);
+    $role = Role::where('name', $roleName)->firstOrFail();
+    $otherPermissions = fn () => $role->permissions()->whereNotIn('key', ['vendors.contracts.view', 'vendors.contracts.manage'])->orderBy('key')->pluck('key')->all();
+    $before = $otherPermissions();
+    $this->seed(VendorVaultPermissionsSeeder::class);
+    expect($otherPermissions())->toBe($before);
+
+    $actor = $actor->fresh();
+    $navigation = collect(App\Domain\It\ItModuleNavigation::forUser($actor))->pluck('items')->flatten(1);
+    expect($navigation->where('label', 'Vendors & Credentials'))->toHaveCount(1);
+    if (! $actor->canDo('vendors.view') && ! $actor->canDo('credentials.view')) {
+        expect($navigation->where('label', 'Vendors & Credentials')->first()['href'])->toBe('/vendors');
+        $this->actingAs($actor)->get('/vendors')->assertRedirect('/vendors/renewals');
+        $this->get('/vendors/renewals')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('auth.can.vendors.view', false)->where('auth.can.credentials.view', false)->where('auth.can.vendors.contracts_view', true));
+    }
+
+    // An existing all-site entitlement is independently revocable, including for administrators.
+    $actor->permissionOverrides()->attach(Permission::where('key', 'sites.viewAll')->firstOrFail(), ['allowed' => false]);
+    $actor = $actor->fresh();
+    $this->actingAs($actor)->getJson('/vendor-agreements/'.$agreement->id.'/files')->assertOk();
+    $this->patchJson('/vendor-agreements/'.$agreement->id, commercialData($this->commercialActor, ['lock_version' => 1, 'title' => 'Approved site contract update']))->assertOk();
+
+    Storage::fake('private');
+    $content = "%PDF-1.4\nSynthetic approved-site contract\n%%EOF";
+    $file = VendorAgreementFile::create(['agreement_id' => $agreement->id, 'series_id' => (string) str()->uuid(), 'version' => 1,
+        'name' => 'approved-site.pdf', 'path' => 'vendor_agreements/approved-site.pdf', 'mime' => 'application/pdf',
+        'size' => strlen($content), 'sha256' => hash('sha256', $content), 'state' => 'ready',
+        'uploaded_by_user_id' => $this->commercialActor->id, 'created_at' => now()]);
+    Storage::disk('private')->put($file->path, $content);
+    $this->get('/vendor-agreements/'.$agreement->id.'/files/'.$file->id.'/open')->assertOk();
+
+    $otherOwner = commercialActor('finance', $this->otherCommercialSite);
+    $otherVendor = SiteVendor::create(['site_id' => $this->otherCommercialSite->id, 'service_type' => 'software',
+        'company_name' => 'Unapproved-site vendor', 'preferred_contact_method' => 'email', 'is_active' => true]);
+    $otherAgreement = app(VendorAgreements::class)->save($otherOwner, $otherVendor, commercialData($otherOwner));
+    $this->getJson('/vendor-agreements/'.$otherAgreement->id.'/files')->assertNotFound();
+    $this->patchJson('/vendor-agreements/'.$otherAgreement->id, commercialData($otherOwner, ['lock_version' => 1]))->assertNotFound();
+    $this->get('/vendor-agreements/'.$otherAgreement->id.'/files/'.$file->id.'/open')->assertNotFound();
+
+    $actor->permissionOverrides()->attach(Permission::where('key', 'vendors.contracts.manage')->firstOrFail(), ['allowed' => false]);
+    $this->actingAs($actor->fresh())->getJson('/vendor-agreements/'.$agreement->id.'/files')->assertOk();
+    $this->patchJson('/vendor-agreements/'.$agreement->id, commercialData($this->commercialActor, ['lock_version' => 2]))->assertNotFound();
+    $actor->permissionOverrides()->attach(Permission::where('key', 'vendors.contracts.view')->firstOrFail(), ['allowed' => false]);
+    $this->actingAs($actor->fresh())->get('/vendor-agreements/'.$agreement->id.'/files/'.$file->id.'/open')->assertNotFound();
+})->with(['manager', 'coordinator', 'team_lead', 'admin']);
 
 test('commercial view and maintenance stay independent and unapproved sites conceal direct identifiers', function () {
     $agreement = commercialAgreement($this);

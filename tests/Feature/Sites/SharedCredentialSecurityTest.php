@@ -73,10 +73,10 @@ test('only explicit house staff opt-in grants assigned staff reveal and copy and
     $this->vaultRole->permissions()->sync(Permission::where('key', 'sites.viewAny')->pluck('id'));
     $this->vaultCredential->update(['is_shareable' => true]);
     $actor = $this->vaultActor->fresh();
-    expect(\App\Domain\It\ItModuleNavigation::registerCapabilities($actor))->toBe(['vendors' => false, 'credentials' => false]);
+    expect(\App\Domain\It\ItModuleNavigation::registerCapabilities($actor))->toBe(['vendors' => false, 'contracts' => false, 'credentials' => false]);
     $this->actingAs($actor)->postJson(vaultUrl($this->vaultCredential, 'reveal'), ['password' => 'password'])->assertNotFound();
     $this->vaultCredential->update(['house_staff_access' => true]);
-    expect(\App\Domain\It\ItModuleNavigation::registerCapabilities($actor))->toBe(['vendors' => false, 'credentials' => true]);
+    expect(\App\Domain\It\ItModuleNavigation::registerCapabilities($actor))->toBe(['vendors' => false, 'contracts' => false, 'credentials' => true]);
     $this->actingAs($actor)->get('/vendors?tab=credentials')->assertOk()
         ->assertInertia(fn ($page) => $page->where('auth.can.credentials.view', true)->where('auth.can.vendors.view', false));
     $this->actingAs($actor)->getJson(vaultUrl($this->vaultCredential, 'status'))->assertOk()
@@ -85,7 +85,7 @@ test('only explicit house staff opt-in grants assigned staff reveal and copy and
     $this->actingAs($actor)->postJson(vaultUrl($this->vaultCredential, 'reveal'))->assertUnprocessable();
     $this->actingAs($actor)->postJson(vaultUrl($this->vaultCredential, 'copy'), ['password' => 'password'])->assertOk();
     $this->vaultProfile->update(['end_date' => today()->subDay()]);
-    expect(\App\Domain\It\ItModuleNavigation::registerCapabilities($actor->fresh()))->toBe(['vendors' => false, 'credentials' => false]);
+    expect(\App\Domain\It\ItModuleNavigation::registerCapabilities($actor->fresh()))->toBe(['vendors' => false, 'contracts' => false, 'credentials' => false]);
     $this->actingAs($actor->fresh())->postJson(vaultUrl($this->vaultCredential, 'reveal'))->assertNotFound();
 });
 

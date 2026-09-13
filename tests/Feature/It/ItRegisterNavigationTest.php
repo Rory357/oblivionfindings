@@ -18,7 +18,7 @@ test('register-only actors discover their canonical destination without unrelate
     $this->actingAs($actor)->get($destination)->assertOk()
         ->assertInertia(fn ($page) => $page->where('auth.can.'.str_replace('.view', '', $permission).'.view', true));
     $actor->update(['approved_at' => null]);
-    expect(ItModuleNavigation::registerCapabilities($actor->fresh()))->toBe(['vendors' => false, 'credentials' => false]);
+    expect(ItModuleNavigation::registerCapabilities($actor->fresh()))->toBe(['vendors' => false, 'contracts' => false, 'credentials' => false]);
 })->with([
     ['vendors.view', '/vendors?tab=vendors'],
     ['credentials.view', '/vendors?tab=credentials'],

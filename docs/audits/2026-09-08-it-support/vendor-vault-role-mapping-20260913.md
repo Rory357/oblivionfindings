@@ -1,0 +1,15 @@
+# Vendor commercial role mapping — 13 September 2026
+
+The user selected the existing Manager (`manager`), Coordinator (`coordinator`), Team Lead (`team_lead`) and Administrator (`admin`) roles to complete site/house-manager contract access. These replace the earlier nonexistent `house_manager`/`site_manager` placeholders. Finance, CEO, COO, CFO and Provider Manager retain their approved contract access.
+
+All nine named roles require the separate `vendors.contracts.view` or `vendors.contracts.manage` permission and an approved user. Existing approved-site, site-type, record-sharing and per-user denial checks continue to apply to contract metadata, maintenance and private downloads. This change adds no site-access bypass, credential permission, user assignment or new role.
+
+Manager and Coordinator lacked vendor/credential directory permissions in the local catalogue. A separate, freshly evaluated `vendors.contracts_view` discovery flag now exposes the existing single Vendors & Credentials navigation destination for contract-only users. `/vendors` already redirects those users to `/vendors/renewals`. The existing vendor-directory and credential view flags remain false unless independently permitted.
+
+The opt-in VendorVaultPermissionsSeeder consumes this exact role mapping. Local activation added only eight contract grants to the four selected roles; no definitions, user permissions or other role grants were added. A fresh preview returned zero remaining changes. The operation verified an encrypted backup before writing and confirmed preservation of existing permissions, role grants, roles, user assignments, personal overrides and the migration registry. The working database was not reset. Pushing source does not apply permissions to a remote environment.
+
+Validation: eight focused backend cases passed (the full role matrix, four new leadership-role journeys, independent view/manage boundaries and two existing register-navigation cases). They cover permitted contract edits/downloads, denied other-site reads/writes/downloads, explicit permission revocation and contract-only navigation without vault grants. All 14 isolation postflight checks passed; an independent check found zero tables/connections in the exact disposable schema. All 8,849 source-baseline files were unchanged during that run.
+
+Three focused sidebar tests passed using the prepared commit contents and committed dependencies. Scoped navigation lint and PHP syntax checks passed. Three existing credential-test capability-array expectations were also updated for the new false commercial-discovery flag; credential authorization logic was unchanged. The shared Knowledge owner was notified to include this small navigation condition in its next normal frontend build.
+
+The Vendor test/runtime window is released, with no owned server, browser tab or background test left running. This completes the requested role-mapping follow-up; broader Knowledge work and full W23/W24 release acceptance remain separately tracked.

@@ -71,14 +71,16 @@ describe('inline application navigation', () => {
     it('discovers register-only access in IT and selects filtered credential deep links without activating Sites', async () => {
         const original = usePage<SharedData>();
         try {
-            for (const [canVendors, canCredentials, currentUrl] of [
+            for (const [canVendors, canCredentials, currentUrl, canContracts] of [
                 [
                     false,
                     true,
                     '/vendors?tab=credentials&credential_id=17&site_id=3',
+                    false,
                 ],
-                [true, false, '/vendors/17?return_to=%2Fit'],
-                [true, true, '/vendors?tab=credentials&site_id=3'],
+                [true, false, '/vendors/17?return_to=%2Fit', false],
+                [true, true, '/vendors?tab=credentials&site_id=3', false],
+                [false, false, '/vendors/renewals', true],
             ] as const) {
                 vi.mocked(usePage).mockReturnValue({
                     ...original,
@@ -89,7 +91,7 @@ describe('inline application navigation', () => {
                             ...original.props.auth,
                             can: {
                                 sites: { viewAny: true },
-                                vendors: { view: canVendors },
+                                vendors: { view: canVendors, contracts_view: canContracts },
                                 credentials: { view: canCredentials },
                             },
                         },
@@ -115,7 +117,9 @@ describe('inline application navigation', () => {
                     'href',
                     canVendors
                         ? '/vendors?tab=vendors'
-                        : '/vendors?tab=credentials',
+                        : canCredentials
+                          ? '/vendors?tab=credentials'
+                          : '/vendors',
                 );
                 expect(group.getAllByRole('link')).toHaveLength(1);
                 expect(

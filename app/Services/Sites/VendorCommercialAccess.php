@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Schema;
 
 final class VendorCommercialAccess
 {
-    public const ROLES = ['finance', 'ceo', 'coo', 'cfo', 'provider_manager', 'house_manager', 'site_manager'];
+    // Site/house leadership uses these existing roles, as confirmed by the organisation.
+    public const ROLES = ['finance', 'ceo', 'coo', 'cfo', 'provider_manager', 'manager', 'coordinator', 'team_lead', 'admin'];
 
     public function capable(User $actor, string $action = 'view'): bool
     {

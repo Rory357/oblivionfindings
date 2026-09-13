@@ -664,6 +664,7 @@ function buildIconNavItems({
         can?.it?.knowledge_author ||
         can?.it?.knowledge_review ||
         can?.vendors?.view ||
+        can?.vendors?.contracts_view ||
         can?.credentials?.view
     ) {
         items.push({
@@ -807,6 +808,7 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         !can?.it?.knowledge_author &&
         !can?.it?.knowledge_review &&
         !can?.vendors?.view &&
+        !can?.vendors?.contracts_view &&
         !can?.credentials?.view
     )
         return [];
@@ -866,13 +868,15 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                 ...(can?.it?.manage
                     ? [{ title: 'Setup', href: '/it/setup', icon: Settings }]
                     : []),
-                ...(can?.vendors?.view || can?.credentials?.view
+                ...(can?.vendors?.view || can?.credentials?.view || can?.vendors?.contracts_view
                     ? [
                           {
                               title: 'Vendors & Credentials',
                               href: can?.vendors?.view
                                   ? '/vendors?tab=vendors'
-                                  : '/vendors?tab=credentials',
+                                  : can?.credentials?.view
+                                      ? '/vendors?tab=credentials'
+                                      : '/vendors',
                               icon: Package,
                           },
                       ]
@@ -924,12 +928,14 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/sites/reports',
             icon: BarChart3,
         });
-    if (can?.vendors?.view || can?.credentials?.view)
+    if (can?.vendors?.view || can?.credentials?.view || can?.vendors?.contracts_view)
         items.push({
             title: 'Vendors & Credentials',
             href: can?.vendors?.view
                 ? '/vendors?tab=vendors'
-                : '/vendors?tab=credentials',
+                : can?.credentials?.view
+                    ? '/vendors?tab=credentials'
+                    : '/vendors',
             icon: Package,
         });
     items.push({

@@ -499,6 +499,7 @@ class HandleInertiaRequests extends Middleware
         ));
         $registers = ItModuleNavigation::registerCapabilities($user);
         $permissions['vendors']['view'] = $registers['vendors'];
+        $permissions['vendors']['contracts_view'] = $registers['contracts'];
         $permissions['credentials']['view'] = $registers['credentials'];
 
         return $permissions;
