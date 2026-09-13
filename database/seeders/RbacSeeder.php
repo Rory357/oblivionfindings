@@ -217,6 +217,7 @@ class RbacSeeder extends Seeder
             ['key' => 'shifts.manageAny', 'description' => 'Manage any staff shifts', 'group' => 'shifts', 'module' => 'Operations'],
             ['key' => 'shifts.overrideEligibility', 'description' => 'Override eligibility warnings for shift assignment', 'group' => 'shifts', 'module' => 'Operations'],
             ['key' => 'shifts.tasks.updateSelf', 'description' => 'Complete tasks on own shifts', 'group' => 'shifts', 'module' => 'Operations'],
+            ['key' => 'shifts.tasks.createSelf', 'description' => 'Add support tasks to own current shifts', 'group' => 'shifts', 'module' => 'Operations'],
 
             // Job Board (open positions / replacements)
             ['key' => 'job_board.viewAny', 'description' => 'View the Job Board', 'group' => 'job_board', 'module' => 'Operations'],
@@ -745,7 +746,7 @@ class RbacSeeder extends Seeder
         $syncPermissions($supportWorker, [
             'clients.viewAssigned', 'medications.view', 'timeline.create',
             'progress_notes.viewAny', 'progress_notes.create',
-            'shifts.viewAssigned', 'shifts.tasks.updateSelf',
+            'shifts.viewAssigned', 'shifts.tasks.updateSelf', 'shifts.tasks.createSelf',
             'job_board.viewAny', 'job_board.claim',
             'timesheets.viewAssigned', 'timesheets.create', 'timesheets.update', 'timesheets.submit',
             'incidents.viewAssigned', 'incidents.create', 'incidents.update', 'incidents.submit',

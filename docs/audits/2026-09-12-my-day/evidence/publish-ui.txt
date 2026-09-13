@@ -1,0 +1,29 @@
+RUN  v4.1.5 C:/Users/steph/.codex/visualizations/2026/09/12/01a094e0-dd40-7b73-b7c8-d0216a4a0e5c/myday-publish
+
+ ❯ resources/js/components/wizard/shell.test.tsx (7 tests | 1 failed) 886ms
+     × uses visible labels and semantic default action tokens 84ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/wizard/shell.test.tsx > ConfirmDialog > uses visible labels and semantic default action tokens
+Error: expect(element).toHaveClass("bg-primary text-primary-foreground")
+
+Expected the element to have class:
+  bg-primary text-primary-foreground
+Received:
+  inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-primary text-primary-foreground h-9 px-4 py-2 has-[>svg]:px-3
+ ❯ resources/js/components/wizard/shell.test.tsx:204:68
+    202|
+    203|         expect(screen.getByRole('button', { name: 'Cancel' })).toBeVis…
+    204|         expect(screen.getByRole('button', { name: 'Close trip' })).toH…
+       |                                                                    ^
+    205|             'bg-primary',
+    206|             'text-primary-foreground',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 21 passed (22)
+      Tests  1 failed | 79 passed (80)
+   Start at  12:02:39
+   Duration  10.81s (transform 5.67s, setup 4.63s, import 54.01s, tests 12.59s, environment 56.36s)

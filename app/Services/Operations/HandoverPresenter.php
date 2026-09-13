@@ -8,6 +8,7 @@ use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\HandoverWorkerNotes;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
@@ -56,6 +57,7 @@ class HandoverPresenter
             'id' => $handover->id,
             'status' => $handover->status,
             'handover_notes' => $handover->handover_notes,
+            'worker_notes' => app(HandoverWorkerNotes::class)->present($handover, $auth),
             'client_mood' => $handover->client_mood,
             'medications_due' => $includeControlledMedication
                 ? $this->listToDisplayStrings($handover->medications_due)
@@ -148,7 +150,7 @@ class HandoverPresenter
     public function mapEagerLoads(): array
     {
         return [
-            'outgoingShift:id,starts_at,ends_at,client_id,user_id,shift_type,status',
+            'outgoingShift:id,starts_at,ends_at,client_id,site_id,user_id,shift_type,status',
             'incomingShift:id,starts_at,ends_at,client_id,user_id,shift_type,status',
             'incomingShift.staff:id,name,role',
             'client:id,first_name,last_name,site_id',

@@ -1,0 +1,31 @@
+...........⨯........................................
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\MyDayPersonHandoverTest > it records an explicit unsupported person and presents privacy-fi…
+  Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+-    0 => 'not_supported',
++    0 => 'not_started',
+     1 => 'recorded',
+-    2 => 'not_started',
++    2 => 'not_supported',
+ ]
+
+  at tests\Feature\MyDayPersonHandoverTest.php:204
+    200▕     array_pop($this->input['worker_notes']['people']);
+    201▕     $saved = $this->postJson('/attendance/handover', $this->input)->assertOk();
+    202▕     expect(ShiftHandover::findOrFail($saved->json('handover_id'))->handover_notes)->toBe('Did not support this person this shift.');
+    203▕     $summary = app(HandoverWorkerNotes::class)->shiftSummary($this->shift, $this->worker);
+  ➜ 204▕     expect(array_column($summary['people'], 'state'))->toBe(['not_supported', 'recorded', 'not_started'])
+    205▕         ->and(json_encode($summary))->not->toContain('James individual note.');
+    206▕     $this->people[1]->supportWorkers()->detach($this->worker->id);
+    207▕     $summary = app(HandoverWorkerNotes::class)->shiftSummary($this->shift, $this->worker->fresh());
+    208▕     expect(array_column($summary['people'], 'id'))->not->toContain($this->people[1]->id);
+
+  1   tests\Feature\MyDayPersonHandoverTest.php:204
+
+
+  Tests:    1 failed, 51 passed (291 assertions)
+  Duration: 599.61s

@@ -1,0 +1,450 @@
+[
+  {
+    "path": "app/Domain/Hr/Services/AttendanceService.php",
+    "sha256": "42f954c0735a4c7515b570c07b5bfe3e33950f81c4e12f13c8c48828bcc58e7c"
+  },
+  {
+    "path": "app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php",
+    "sha256": "9fa8332a6b3304325f00cb18f59605699299020e6c71d0349825751ff4e54b60"
+  },
+  {
+    "path": "app/Domain/Shifts/Timesheets/TimesheetAllocationService.php",
+    "sha256": "827f0cb293675010c748589346ee9fc3f40dab73c01190c2fc3cdd036ca8b454"
+  },
+  {
+    "path": "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php",
+    "sha256": "ad7492bff4253094465c5455ba5c9b151db0343f4f4e7e195dfed6efd5e217fc"
+  },
+  {
+    "path": "app/Http/Controllers/AttendanceController.php",
+    "sha256": "7a1cffdeb99b2ef8b808604a97cd58be97c376511d65df495cd5d0b9f80c3732"
+  },
+  {
+    "path": "app/Http/Controllers/MyDayActionsController.php",
+    "sha256": "d1de8313e31c89b42dbb2c06ba6f48ec360d72c950899eec3beeb28ad3a3edbf"
+  },
+  {
+    "path": "app/Http/Controllers/MyDayTaskController.php",
+    "sha256": "4e888718aba516dbdb027f94a21ef2e02075928db1879617b709ce34cee9e187"
+  },
+  {
+    "path": "app/Http/Controllers/MyDayTaskDraftController.php",
+    "sha256": "06cb5280e1389b91b03719cdb69b8a47469722e84d5e8bc809f1af1b4261e2b6"
+  },
+  {
+    "path": "app/Http/Controllers/MyTasksController.php",
+    "sha256": "7646be012b9333a43511ddb8e906ae2e50b9c8dd47d95d41b5bf1691d50e4d16"
+  },
+  {
+    "path": "app/Http/Controllers/ShiftTaskController.php",
+    "sha256": "d273fba5e9a644edeedda932d02c2f127b5e83ff118571f1225915671dfffa55"
+  },
+  {
+    "path": "app/Http/Controllers/TimesheetController.php",
+    "sha256": "f14cf4b837a18d4a7db5af5f51daae25fe4854812d5433d48610294b86c7bca0"
+  },
+  {
+    "path": "app/Http/Resources/MyShiftResource.php",
+    "sha256": "d9321de343e2b6a8494037ea3988bb2ffe28085cca91f27414718c037ee40727"
+  },
+  {
+    "path": "app/Models/ShiftHandover.php",
+    "sha256": "8dbdcc0b9bea5a3158093aac3f68493fbb074b47320c3006e70116efd8f3dabe"
+  },
+  {
+    "path": "app/Models/ShiftTask.php",
+    "sha256": "c3088a9fb44d33619cb031c0fbaa9b10c60e34fee9f07d68e575546366226cca"
+  },
+  {
+    "path": "app/Models/ShiftTaskDraft.php",
+    "sha256": "f9b60365fd44e5ca142b0ac48819981ad62a46d0d4b9bf38b902d22d595e69b9"
+  },
+  {
+    "path": "app/Services/HandoverWorkerNotes.php",
+    "sha256": "d160f1f69613d810b1cee5596737c051ce3eddc63f3ca90053bec6b7e35ea7ee"
+  },
+  {
+    "path": "app/Services/MyDay/ShiftTaskHelpService.php",
+    "sha256": "f6dfadce296dfca76a1f7137a5a54e7c5791867d5e38d29a2a1a696b90cec72f"
+  },
+  {
+    "path": "app/Services/MyDay/ShiftTaskWorkService.php",
+    "sha256": "f5b05c68a596e81507910f6311e636c88a24603c912dc003cdcf110fea9d85c5"
+  },
+  {
+    "path": "app/Services/Operations/HandoverPresenter.php",
+    "sha256": "33d0fcec1f9c649f35731be7cc08ae7d3b91cfb64484def11b48c333ae10d1b1"
+  },
+  {
+    "path": "app/Services/ShiftHandoverService.php",
+    "sha256": "4fe2393e329dc3fb38276c9c313d3ae7c61e5f210785f4e26dc9317a21b9f7a5"
+  },
+  {
+    "path": "app/Services/Tasks/Providers/ShiftTaskProvider.php",
+    "sha256": "6607ee45b16f0813ae4c3290f010a85385c624e59421afbe45c2a07bb1a062a9"
+  },
+  {
+    "path": "app/Support/ShiftTaskSupport.php",
+    "sha256": "1f02f166f2a9c9e79f5b5adbace78e61f7ee42ebe1a6f2855c863b0367852864"
+  },
+  {
+    "path": "database/migrations/2026_09_12_000060_add_my_day_shift_task_context.php",
+    "sha256": "9f2a3510c5eba6d9abd8f6b7853acc8e48289842799d0d663ee49317955987d6"
+  },
+  {
+    "path": "database/migrations/2026_09_12_000061_create_shift_task_drafts.php",
+    "sha256": "cbb8b4a787f6ca8b13172d805629ff301ed7186f3fdd815ac8742126dbfc256a"
+  },
+  {
+    "path": "database/migrations/2026_09_12_000062_add_shift_task_follow_through.php",
+    "sha256": "8b0d0ea918a902926b4bee01ca03dc898c9ca937bdcd64aeb49b05e3639cf375"
+  },
+  {
+    "path": "database/migrations/2026_09_13_160000_add_worker_notes_to_shift_handovers.php",
+    "sha256": "35f3e2c69a7a44e7f4250344576cfda9c16c5bcff3131723401ef8c0b6a6958b"
+  },
+  {
+    "path": "database/seeders/MyDayTaskPermissionSeeder.php",
+    "sha256": "27a71d230e5fa395fece8edd3ab446daee676066cb04ec2e5620a8c0df729b7e"
+  },
+  {
+    "path": "database/seeders/RbacSeeder.php",
+    "sha256": "48b46e586a9ce3aa6ed66bd5a13e8ec0aa8b4edb3f84fc18e6e5dfb6abd4705c"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/agenda-and-private-note-implementation.md",
+    "sha256": "0e29bbbfffffd71dbce7384d04c3e6782e071423b150ef9eaa47c3f1e47ae91d"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/current-page-and-calendar-direction.md",
+    "sha256": "8663fb3c86646a095c43c450b36162f9fbd1db9872df6b25942937e44505e1f8"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/desktop-corrections-and-person-notes.md",
+    "sha256": "e1660cdf0fc335aebcd9ba870b0553901f72348e2e79a343ec703b55d03d8aa4"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/evidence/agenda-final-build.txt",
+    "sha256": "42764103a1683cd4ac421a2ae2383ddd187f0b63f84b799e5472c5f87bf4ad19"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/evidence/agenda-person-progress-retest.txt",
+    "sha256": "d8a27bc52ce667adabaccb8727d24aff6e345142597876747c26990bd48a0743"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/evidence/agenda-pest.txt",
+    "sha256": "e55defb6318fee13b5f4c28ec9a1eb270e6e0b5cc02d48acb90cb24a3bb165d0"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/evidence/agenda-types-final.txt",
+    "sha256": "b524491b7779570ce8bc41b30b8a5592ca7d869372f632475f87bd75b507849d"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/evidence/agenda-vitest-final.txt",
+    "sha256": "22051b770722810eea93a0b6018290f8fd2a27d2f00e6bdd53ea9c7aa1cd6a99"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/evidence/backend-clock-out-d6.txt",
+    "sha256": "0446c17b6be0468c126ba70859e62c02f4bdf411daef2866288515918531eef6"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/evidence/backend-follow-through-d5.txt",
+    "sha256": "ac42c8d5e80f506404705f04d81cb947e74ac5faee376664ab4b92d29bf912bc"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/evidence/backend-timesheet-recovery-d7.txt",
+    "sha256": "298c1d9c9deb8d04c29d8d41191818abc2f3440dceb784d4a6790297a3954cd1"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/evidence/person-handover-modal-backend.txt",
+    "sha256": "2403502d70f5f0f93612f0e35103159e6e13cef1e95856fc5c722c36db3372c8"
+  },
+  {
+    "path": "docs/audits/2026-09-12-my-day/implementation-progress.md",
+    "sha256": "7c7ced7fc6ca0a2ff9a7682e36d15c396502e76726153a7592ea45007726d22c"
+  },
+  {
+    "path": "docs/my-day-desktop-redesign-review-2026-09-12.md",
+    "sha256": "52aa6702897c9a0ae85e8e1c870abf7203e40a9f46117418105b1599e8b3f9fc"
+  },
+  {
+    "path": "resources/css/app.css",
+    "sha256": "9bdd5b72256683924f1aa71846ed5e03e6bd659f7b05ea1d0f5af67a0bc9cf31"
+  },
+  {
+    "path": "resources/js/components/app-header.tsx",
+    "sha256": "5b93e36ec80cb054b240eaf6580d32859a1b26b534ae0147983eff64a0c76d9d"
+  },
+  {
+    "path": "resources/js/components/end-of-shift-checklist.test.tsx",
+    "sha256": "1c8414587f464f922e57665e336e8ad80ed3545d2447bef7771a37083d2c1a33"
+  },
+  {
+    "path": "resources/js/components/end-of-shift-checklist.tsx",
+    "sha256": "15f991202ef49e424c0e755b14658bb549ef9a648150287ecdd9b30480e9ce0e"
+  },
+  {
+    "path": "resources/js/components/handover-person-notes.test.tsx",
+    "sha256": "d2633485b8f791fcb26027a3ba73b9884ce658bc09ad28e97af4da609b61cf10"
+  },
+  {
+    "path": "resources/js/components/handover-person-notes.tsx",
+    "sha256": "43e830a6b536d3476cd23e5dac00d3839a497fa61c228f9d7f884140ea8ea117"
+  },
+  {
+    "path": "resources/js/components/handover-read-card.tsx",
+    "sha256": "734f6d2733310e0081252c525832e693387162ab1871eb9599c9ff32ea1ba65e"
+  },
+  {
+    "path": "resources/js/components/handover-write-form.tsx",
+    "sha256": "5d1a7bf4d222eab2332181d39939b2c850febbf428f55e4fdfabd6bae4594eb9"
+  },
+  {
+    "path": "resources/js/components/handover-write-sheet.tsx",
+    "sha256": "c901b222599d82b29d61ece011d7b548e75120b6727fa0f27667030efd573cf4"
+  },
+  {
+    "path": "resources/js/components/page/page-header.tsx",
+    "sha256": "e7815be2f2b954db845ba53704230b1e86dca76ade44b807b5b56693aae24903"
+  },
+  {
+    "path": "resources/js/components/shift-task-list.tsx",
+    "sha256": "4a3c62f4e831ce5f390529855262405b25b17c2141537aafcff712b662cc04e3"
+  },
+  {
+    "path": "resources/js/components/ui/button.tsx",
+    "sha256": "e8ae39c3616c4aaf689014c4eb9de6235e5e4ff16e581c2be2e970cd36191cc1"
+  },
+  {
+    "path": "resources/js/hooks/use-handover-draft-save.test.tsx",
+    "sha256": "eb399e4b4af57e76c01a9700fe41bebb846f14c62a6789df7ce66ca5267ee17f"
+  },
+  {
+    "path": "resources/js/hooks/use-handover-draft-save.ts",
+    "sha256": "46a93db24a4c51acba37e7752b734b19e36f98ebbc6f1c9d362d1ac17fd2c84e"
+  },
+  {
+    "path": "resources/js/hooks/use-handover-editor.ts",
+    "sha256": "f9f5c0cf755fff5f3553e130a54dec515efb95ec9a48bd02b4ef6333285dbe10"
+  },
+  {
+    "path": "resources/js/hooks/use-live-refresh.test.ts",
+    "sha256": "f57b4d1586e26bf584f8f65022ec7d0a6ff3de71591fdb025af8b476ba7a66ab"
+  },
+  {
+    "path": "resources/js/hooks/use-live-refresh.ts",
+    "sha256": "5ca1927c72f7f3cb6ee997241a1a4521cf1fc74b7f7d6b83f6cc52f4b890347a"
+  },
+  {
+    "path": "resources/js/lib/datetime.ts",
+    "sha256": "d558321f11b5e545c6b8e1eff6347e1c088cf725a32d0ee38438a3b219baec60"
+  },
+  {
+    "path": "resources/js/pages/my-day/_dialogs.tsx",
+    "sha256": "899a511082b907749fa396761845dd43d5d5c1cbbf508b9b48d1bd39ba0f2623"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/before-you-finish.tsx",
+    "sha256": "992a0ed526a6286a580dce6d455d7397533139b028c087e11345122b999cab15"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/day-work-list.tsx",
+    "sha256": "d504238bd5fa1d455e40f358b693dc93ce9cb5ecfd9454fba342f1fa66f69c25"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/desktop-presentation.test.tsx",
+    "sha256": "aa809c6fc16858a21e028810cad768cb55d6ecc033f9a0348b53e24433a3de86"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/digest-panel.tsx",
+    "sha256": "7e02117ecf323ed388cf77bc1200fbd68b83166763ea6b3fa2b7267b7f5173e4"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/handover-follow-ups.test.tsx",
+    "sha256": "11f9e57a851524e3d2530310769151977d0112976055ca6057ef387dc6f33e91"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/handover-follow-ups.tsx",
+    "sha256": "ba517dc4a41cb7f94b16452828926fe55a023bd92548f91b1938d8df57477d6b"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/my-day-header.tsx",
+    "sha256": "66bc7cd847e1d3b0be3e0fedf83888dd339766c6fb8982f1ff4190a6c511ac09"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/paperwork-panel.tsx",
+    "sha256": "b40ede3a12d03252a7fe3f10c3574d40909310b42b9b64852735c171ee3ff969"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/quick-add-task.test.tsx",
+    "sha256": "78a04ffe3867b851ac76906c0b330b51a9b4f11090d933e7e87898e3a8b69165"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/quick-add-task.tsx",
+    "sha256": "e8f7b74c37a7d9c3dc98721d690f0a31cc5f8937add0a8661a53fd9907c644b4"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/record-care-actions.tsx",
+    "sha256": "5a962c372d9898e8a82944b88139a9de6ecc1d6e0975a81342d8d6b66e6d6167"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/shift-notes-dialog.test.tsx",
+    "sha256": "3d4a5c7660e8a98d1dea329bf3571dee1c5b74cdbd134e629963d562d405f778"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/shift-notes-dialog.tsx",
+    "sha256": "3aae9358e02b841c2ab7345ef91b9641b0e90cb0bc7500ca6f20a1feb4b2f852"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/shift-summary.tsx",
+    "sha256": "c5f3552cc3e45b92a91223563fefca237c986ba17ce046fd175841c372817630"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/task-detail-dialog.test.tsx",
+    "sha256": "c368a22cd31ce27b8809cce452381d353ebddde984688fc03cf2d98310b675db"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/task-detail-dialog.tsx",
+    "sha256": "93ddfe1eb36004f754028baada1bab6764a93046a48619fa1a7958f1afd28ca0"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/task-help-inbox.tsx",
+    "sha256": "3faa55e607f838c1a94a68a8377c47d5f41e311958a058f8cedd426c8e4abfee"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/task-help.test.tsx",
+    "sha256": "99f5cccb6819e5603ea4073c3e8003cbee10b357fed59944576bf8e987f14a08"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/task-help.tsx",
+    "sha256": "7c8673bacb9bd4a8bdde0dd31b0486ff77a88cf75b45b207e3a02c7989441e98"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/task-step-draft.tsx",
+    "sha256": "0876cc19d82b5af5d8271f13c8d29738bdabdebc78f4d3d0ad38f1b716c2354b"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/task-steps.tsx",
+    "sha256": "03014dbedaae058b9fee664320b36fa866145d33d13fea3c65f21afe69910554"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/timesheet-review.test.tsx",
+    "sha256": "779b81de8c20b17adfc891e09ff789dbf381e9b753c80a03a1e9c11c23d4c3fb"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/timesheet-review.tsx",
+    "sha256": "8218a7a31a13ea08e3231e8b8fd8da377ee3cfbc6dd89e3c5fae13bfe7239798"
+  },
+  {
+    "path": "resources/js/pages/my-day/components/tomorrow-panel.tsx",
+    "sha256": "70440a91ff20d1b231e7658ca535286900670a1495b686fa0d7925f1fa95fad9"
+  },
+  {
+    "path": "resources/js/pages/my-day/index-audit-fixes.test.tsx",
+    "sha256": "d10381998b7e1f67749686c1901517b3ae5840b7e0e525c9be38e6c748fb7d8f"
+  },
+  {
+    "path": "resources/js/pages/my-day/index.tsx",
+    "sha256": "0861ca1b028a409776efa9bc95bcf59fd129f3e3e08a010c8d0d60fb75e9cb79"
+  },
+  {
+    "path": "resources/js/pages/my-day/lib/stream-grouping.ts",
+    "sha256": "b9527924674c75e01dd2dce5995be00f1475b0e6588f7e9c620df178f7767b1c"
+  },
+  {
+    "path": "resources/js/pages/my-day/lib/task-api.ts",
+    "sha256": "d79c29ec7e4064b19d41d4117d94e223597b55626365e17861014c49cb0a0cf9"
+  },
+  {
+    "path": "resources/js/pages/my-day/lib/timesheet-allocation.test.ts",
+    "sha256": "2f5c6ac1ef62ae07e0d6fe8362132efc61e123f4efcd63b488c39eaed1770285"
+  },
+  {
+    "path": "resources/js/pages/my-day/lib/timesheet-allocation.ts",
+    "sha256": "634cfcc4360bfe82f8d739e0da4cdf525f1865ce8470e17a14a096b1064d3022"
+  },
+  {
+    "path": "resources/js/pages/my-day/lib/types.ts",
+    "sha256": "32ab5387d2d219f34ee8c8fb1a1e56279cd22156493759879ca3e6384893ee17"
+  },
+  {
+    "path": "resources/js/pages/my-day/lib/work-priority.test.ts",
+    "sha256": "646e3217d9cf95641f70f7396e44742b9425bc5162509ad592813ea80c076860"
+  },
+  {
+    "path": "resources/js/pages/my-day/lib/work-priority.ts",
+    "sha256": "39fa6f38be44d96046e7d8973f5ec58d739eb20c8db7039addcc08a32436b3a3"
+  },
+  {
+    "path": "resources/js/pages/operations/handovers/Index.tsx",
+    "sha256": "23d5469f90d6f3cb2b5de5973c1e8114c0cf5b570d4c2945bc445dbd16d39102"
+  },
+  {
+    "path": "resources/js/pages/operations/handovers/Show.tsx",
+    "sha256": "b49674db2ab9833c7b58d4eb4d562c78b179e5ee6f769cdf94676ce2adf10378"
+  },
+  {
+    "path": "resources/js/pages/operations/handovers/components/handover-detail-dialog.test.tsx",
+    "sha256": "ce025162fdc26653db5d5ab0e5490f34a1080a44d5b693e2f589d761698cb64b"
+  },
+  {
+    "path": "resources/js/pages/operations/handovers/components/handover-detail-dialog.tsx",
+    "sha256": "2cfd2dfde503fe0e16459dba01064570c1d40bd5e2f8f1c95fda8f8d5cfcc9e4"
+  },
+  {
+    "path": "resources/js/pages/operations/handovers/components/handover-wizard.tsx",
+    "sha256": "3aa718928f32565ea5e4e9285ed6cbe82a658d8e131228793b31986d7ec44856"
+  },
+  {
+    "path": "resources/js/pages/operations/handovers/components/shared.tsx",
+    "sha256": "9c3282cf545cecee176fe83849ebda4824a27cf1a872d4be5b314e51f93a6c37"
+  },
+  {
+    "path": "resources/js/pages/sites/calendar/_parts.tsx",
+    "sha256": "598b199758c1ad2ea8342f55149388864ef34c658526731b1648ce94a3465542"
+  },
+  {
+    "path": "resources/js/pages/sites/calendar/work-schedule.test.tsx",
+    "sha256": "4a74868fff66de25c346d9d87e5e3401fbb3573694ff64dee912f3e4836fd526"
+  },
+  {
+    "path": "resources/js/pages/sites/calendar/work-schedule.tsx",
+    "sha256": "7a14ac16252861925f7cf05a1aac6e266ad39374c4ecb359e381270e77ae48cc"
+  },
+  {
+    "path": "routes/shifts.php",
+    "sha256": "42a708c134f4036a4c535964b9f11c3149d0aabe488c69665ff4ce9adbd15864"
+  },
+  {
+    "path": "tests/Feature/MyDayHandoverDigestTest.php",
+    "sha256": "fee2c268e1d198ba8b063f0b762279f96739571949adbcebb1833f64343a3a2b"
+  },
+  {
+    "path": "tests/Feature/MyDayHandoverFollowUpTest.php",
+    "sha256": "79a894396cd69f0b44e3b9513f9c1a3f0486e4bbfc2a7c6d83d2795f132530dd"
+  },
+  {
+    "path": "tests/Feature/MyDayPersonHandoverTest.php",
+    "sha256": "7c273af60f5a280b4aa2101e690cf5747fec6de608856583995fbd5c3b8ffd7d"
+  },
+  {
+    "path": "tests/Feature/MyDayTaskHelpTest.php",
+    "sha256": "6c1f785e4c11693bcad4632db285f583c572f6f7b178b07ca0171cb40e5cefff"
+  },
+  {
+    "path": "tests/Feature/MyDayTaskWorkTest.php",
+    "sha256": "6878d8b4cefc5059db0b6e395f255f79c8dc7210917d593e9ec646ce05575659"
+  },
+  {
+    "path": "tests/Feature/MyDayTimesheetAllocationTest.php",
+    "sha256": "e015ae3dd9b942aa50783257e4a7aebae6fa364c018add7bcc170f05f5326439"
+  },
+  {
+    "path": "tests/Feature/MyDayTimesheetReviewAuditTest.php",
+    "sha256": "4fa92c5670e0d1374056a248a000ce68a0c0643b200950a25885c1c79a72da9d"
+  },
+  {
+    "path": "tests/Feature/Tasks/ShiftTaskProviderTest.php",
+    "sha256": "2bba30cd0b2a0b37fe240fe2244e41e5328248e981787f8b8958104b8a50967a"
+  }
+]

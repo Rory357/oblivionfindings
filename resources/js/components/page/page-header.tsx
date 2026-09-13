@@ -76,6 +76,8 @@ export interface PageHeaderProps {
     /** Profile variant only: the glass back chip destination. */
     backHref?: string;
     title: string;
+    /** Dusk attribute for the title heading. */
+    titleDusk?: string;
     /** Let record titles wrap and reflow actions when their combined width is constrained. */
     wrapTitle?: boolean;
     /** One status chip beside the title — use <PageHeaderStatusChip>. */
@@ -108,6 +110,7 @@ export function PageHeader({
     mark,
     backHref,
     title,
+    titleDusk,
     wrapTitle = false,
     titleChip,
     subline,
@@ -152,6 +155,7 @@ export function PageHeader({
                             <div className="flex min-w-0 flex-col">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <h1
+                                        dusk={titleDusk}
                                         className={cn(
                                             'text-[22px] leading-tight font-bold tracking-tight',
                                             wrapTitle
@@ -254,11 +258,13 @@ export function PageHeaderStatusChip({
 export function PageHeaderSearch({
     value,
     onChange,
+    onKeyDown,
     placeholder,
     className,
 }: {
     value: string;
     onChange: (value: string) => void;
+    onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     placeholder: string;
     className?: string;
 }) {
@@ -297,6 +303,7 @@ export function PageHeaderSearch({
                 type="search"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
+                onKeyDown={onKeyDown}
                 placeholder={placeholder}
                 className="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
             />

@@ -8,16 +8,20 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
+use App\Models\ShiftTask;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\MyDay\ShiftTaskWorkService;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ShiftHandoverService
@@ -39,6 +43,9 @@ class ShiftHandoverService
     /** @var array<int, string> */
     private const MUTATION_AUTHORIZATION_EVIDENCE = [
         'handovers.create',
+        'shifts.tasks.createSelf',
+        'clients.viewAssigned',
+        'clients.viewAny',
         'handovers.viewAny',
         'shifts.manageAny',
         'shifts.update',
@@ -279,6 +286,8 @@ class ShiftHandoverService
                 'tasks_pending' => $this->normalizeStructuredItems($data['tasks_pending'] ?? null)
                     ?? $outgoingShift->tasks
                         ->where('is_completed', false)
+                        ->filter(fn ($task) => $task->task_scope === 'site'
+                            || (int) ($task->client_id ?? $client->id) === (int) $client->id)
                         ->map(fn ($task) => ['id' => $task->id, 'label' => $task->label])
                         ->values()
                         ->all(),
@@ -305,6 +314,20 @@ class ShiftHandoverService
                 'locked_at' => null,
                 'status' => self::STATUS_DRAFT,
             ];
+            if (array_key_exists('worker_notes', $data)) {
+                $workerNotes = app(HandoverWorkerNotes::class)->normalize($outgoingShift, $actor, $data['worker_notes'], $existing?->worker_notes);
+                // Legacy client-specific surfaces only receive the primary person's
+                // note. Other people's content is never concatenated into it.
+                $primaryNote = collect($workerNotes['people'])->firstWhere('client_id', (int) $client->id);
+                $attributes['handover_notes'] = ($primaryNote['notes'] ?? '') !== ''
+                    ? $primaryNote['notes'] : (($primaryNote['not_supported'] ?? false) ? 'Did not support this person this shift.' : (($primaryNote['no_updates'] ?? false) ? 'No updates to pass on.' : 'No note recorded for this person.'));
+                $attributes['client_mood'] = $existing?->client_mood;
+                $attributes['follow_up_items'] = ($primaryNote['follow_up_needed'] ?? false)
+                    ? [['label' => 'Follow-up flagged by outgoing worker', 'priority' => 'medium']] : null;
+                $attributes['worker_notes'] = $workerNotes;
+            } elseif ($existing?->worker_notes !== null) {
+                $attributes['worker_notes'] = $existing->worker_notes;
+            }
             if ($existing !== null) {
                 if ($existing->status === self::STATUS_ACKNOWLEDGED) {
                     throw ValidationException::withMessages([
@@ -511,6 +534,102 @@ class ShiftHandoverService
 
             return $fresh;
         });
+    }
+
+    /** Linked follow-ups reuse the immutable submitted handover and its exact incoming Shift. */
+    public function myDayFollowUps(ShiftHandover $handover, User $actor): array
+    {
+        $incoming = $handover->incomingShift;
+        if (! in_array($handover->status, [self::STATUS_SUBMITTED, self::STATUS_ACKNOWLEDGED], true)
+            || ! $incoming || (int) $incoming->user_id !== (int) $actor->id
+            || $incoming->status === 'cancelled') {
+            return [];
+        }
+        $this->siteAccess->assertCanAccessHandover($actor, $handover);
+        $this->siteAccess->assertCanAccessShift($actor, $incoming);
+        Gate::forUser($actor)->authorize('view', $handover->client);
+        $canAdd = app(ShiftTaskWorkService::class)->canCreate($actor, $incoming);
+        $existing = $incoming->tasks()->where('source_handover_id', $handover->id)->get()->keyBy('source_item_key');
+
+        return array_map(fn ($item) => [
+            'key' => $item['key'], 'label' => $item['label'],
+            'task_id' => $existing->get($item['key'])?->id,
+            'is_completed' => (bool) $existing->get($item['key'])?->is_completed,
+            'source_completed' => $item['source_completed'],
+            'can_add' => $canAdd && ! $item['source_completed'],
+        ], $this->myDayFollowUpSourceItems($handover));
+    }
+
+    public function addMyDayFollowUp(ShiftHandover $snapshot, User $actor, string $itemKey): ShiftTask
+    {
+        return DB::transaction(function () use ($snapshot, $actor, $itemKey) {
+            [$client, $outgoing, $handover] = $this->lockCanonicalHandoverAggregate((int) $snapshot->id);
+            abort_unless(in_array($handover->status, [self::STATUS_SUBMITTED, self::STATUS_ACKNOWLEDGED], true), 422);
+            $incoming = $this->resolveIncomingShift($outgoing, $handover->incoming_shift_id, true);
+            abort_unless($incoming && (int) $incoming->user_id === (int) $actor->id, 403);
+            [$actor] = $this->lockCurrentHandoverAuthority($client, $outgoing, $actor,
+                ['shifts.tasks.createSelf', 'shifts.update', 'shifts.manageAny'],
+                [(int) $incoming->user_id], [(int) $incoming->user_id], requireWriteAuthority: false, siteBypassPermissions: []);
+            Gate::forUser($actor)->authorize('view', $client);
+            $work = app(ShiftTaskWorkService::class);
+            $work->authorize($actor, $incoming, create: true);
+            $item = collect($this->myDayFollowUpSourceItems($handover))->firstWhere('key', $itemKey);
+            abort_unless($item, 404);
+            $existing = $incoming->tasks()->where('source_handover_id', $handover->id)->where('source_item_key', $itemKey)->first();
+            if ($existing) {
+                return $existing->setRelation('shift', $incoming);
+            }
+            abort_unless($work->canCreate($actor, $incoming), 422, 'This shift no longer accepts new tasks.');
+            if ($item['source_completed']) {
+                throw ValidationException::withMessages(['task' => 'The original task has already been completed. Refresh to check the handover.']);
+            }
+            $source = $item['source_task_id'] ? $outgoing->tasks()->findOrFail($item['source_task_id']) : null;
+            $steps = collect($source?->steps ?? [])->where('is_completed', false)->map(fn ($step) => [
+                'id' => (string) Str::uuid(), 'label' => $step['label'], 'is_completed' => false, 'completed_at' => null, 'completed_by' => null,
+            ])->values()->all();
+            $task = $incoming->tasks()->create([
+                'label' => Str::limit($item['label'], 180, '…'), 'task_scope' => $item['task_scope'],
+                'client_id' => $item['task_scope'] === 'site' ? null : $client->id,
+                'created_by' => $actor->id, 'source_handover_id' => $handover->id,
+                'source_item_key' => $itemKey, 'source_task_id' => $item['source_task_id'],
+                'is_completed' => false, 'version' => 0, 'steps' => $steps,
+                'sort_order' => ((int) $incoming->tasks()->max('sort_order')) + 1,
+            ]);
+            AuditLogger::logOrFail('shift-task.handover-follow-up-created', $task, ['actor_id' => $actor->id, 'handover_id' => $handover->id]);
+
+            return $task->setRelation('shift', $incoming);
+        }, attempts: 3);
+    }
+
+    private function myDayFollowUpSourceItems(ShiftHandover $handover): array
+    {
+        $items = [];
+        foreach (['tasks_pending', 'follow_up_items'] as $kind) {
+            foreach (($handover->{$kind} ?? []) as $index => $row) {
+                if (! is_string($row) && ! is_array($row)) {
+                    continue;
+                }
+                $label = trim(is_string($row) ? $row : (string) ($row['label'] ?? $row['title'] ?? ''));
+                if ($label === '') {
+                    continue;
+                }
+                $source = $kind === 'tasks_pending' && is_array($row) && is_numeric($row['id'] ?? null)
+                    ? ShiftTask::where('shift_id', $handover->outgoing_shift_id)->find((int) $row['id']) : null;
+                if ($kind === 'tasks_pending' && is_array($row) && isset($row['id']) && ! $source) {
+                    continue;
+                }
+                // A client handover cannot grant access to another resident's task.
+                if ($source && $source->task_scope !== 'site'
+                    && (int) ($source->client_id ?? $handover->client_id) !== (int) $handover->client_id) {
+                    continue;
+                }
+                $items[] = ['key' => hash('sha256', $kind.':'.$index), 'label' => $label,
+                    'source_task_id' => $source?->id, 'source_completed' => (bool) $source?->is_completed,
+                    'task_scope' => $source?->task_scope === 'site' ? 'site' : 'client'];
+            }
+        }
+
+        return $items;
     }
 
     public function acknowledge(ShiftHandover $handover, User $actor): ShiftHandover
@@ -1059,7 +1178,7 @@ class ShiftHandoverService
                 ! $actor->canDo('shifts.manageAny'),
                 fn (Builder $shift): Builder => $shift->where('user_id', $actor->id),
             )
-            ->with(['tasks:id,shift_id,label,is_completed', 'incidents:id,shift_id,type,severity,status,occurred_at'])
+            ->with(['tasks:id,shift_id,client_id,task_scope,label,is_completed', 'incidents:id,shift_id,type,severity,status,occurred_at'])
             ->firstOrFail();
     }
 
@@ -1270,6 +1389,16 @@ class ShiftHandoverService
                     $attributes[$listKey] = $this->normalizeStructuredItems($data[$listKey]);
                 }
             }
+            if (is_array($handover->worker_notes) && $handover->handover_notes !== $attributes['handover_notes']) {
+                $notes = $handover->worker_notes;
+                $primary = collect($notes['people'])->firstWhere('client_id', (int) $client->id);
+                $notes['people'] = collect($notes['people'])->reject(fn ($entry) => (int) $entry['client_id'] === (int) $client->id)->values()->all();
+                $notes['people'][] = [
+                    'client_id' => (int) $client->id, 'notes' => $attributes['handover_notes'],
+                    'no_updates' => false, 'follow_up_needed' => $primary['follow_up_needed'] ?? false,
+                ];
+                $attributes['worker_notes'] = $notes;
+            }
             $handover->fill($attributes)->save();
 
             $fresh = $handover->fresh([
@@ -1417,7 +1546,7 @@ class ShiftHandoverService
             404,
         );
         $outgoingShift->loadMissing([
-            'tasks:id,shift_id,label,is_completed',
+            'tasks:id,shift_id,client_id,task_scope,label,is_completed',
             'incidents:id,shift_id,type,severity,status,occurred_at',
             'client:id,first_name,last_name,site_id',
             'site:id,name,type',
@@ -1473,7 +1602,7 @@ class ShiftHandoverService
         abort_unless($lockedHandover !== null, 404);
 
         $outgoingShift->loadMissing([
-            'tasks:id,shift_id,label,is_completed',
+            'tasks:id,shift_id,client_id,task_scope,label,is_completed',
             'incidents:id,shift_id,type,severity,status,occurred_at',
             'client:id,first_name,last_name,site_id',
             'site:id,name,type',
@@ -2213,6 +2342,7 @@ class ShiftHandoverService
             'outgoing_staff_id',
             'incoming_staff_id',
             'handover_notes',
+            'worker_notes',
             'client_mood',
             'tasks_pending',
             'medications_due',

@@ -53,6 +53,8 @@ use App\Http\Controllers\LegacyRouteRedirectController;
 use App\Http\Controllers\MyCalendarController;
 use App\Http\Controllers\MyDayActionsController;
 use App\Http\Controllers\MyDayMedicationsController;
+use App\Http\Controllers\MyDayTaskController;
+use App\Http\Controllers\MyDayTaskDraftController;
 use App\Http\Controllers\MyTasksController;
 use App\Http\Controllers\QualityChecklistController;
 use App\Http\Controllers\RosterController;
@@ -352,6 +354,16 @@ Route::redirect('/my-tasks', '/my-day')
 // which goes through AttendanceService and writes a real HrAttendanceSession and
 // draft Timesheet. Do not re-add quick-clock endpoints here.
 Route::middleware(['auth'])->group(function () {
+    Route::post('/my-day/shifts/{shift}/tasks', [MyDayTaskController::class, 'store'])->name('my-day.tasks.store');
+    Route::put('/my-day/tasks/{task}/completion', [MyDayTaskController::class, 'complete'])->name('my-day.tasks.completion');
+    Route::put('/my-day/tasks/{task}/steps', [MyDayTaskController::class, 'step'])->name('my-day.tasks.steps');
+    Route::get('/my-day/tasks/{task}/help-recipients', [MyDayTaskController::class, 'helpRecipients'])->name('my-day.tasks.help-recipients');
+    Route::put('/my-day/tasks/{task}/help', [MyDayTaskController::class, 'requestHelp'])->name('my-day.tasks.help');
+    Route::put('/my-day/tasks/{task}/help-response', [MyDayTaskController::class, 'respondHelp'])->name('my-day.tasks.help-response');
+    Route::post('/my-day/handovers/{handover}/follow-ups', [MyDayTaskController::class, 'followUp'])->name('my-day.handover.follow-ups');
+    Route::get('/my-day/shifts/{shift}/task-draft', [MyDayTaskDraftController::class, 'show'])->name('my-day.task-draft.show');
+    Route::put('/my-day/shifts/{shift}/task-draft', [MyDayTaskDraftController::class, 'update'])->name('my-day.task-draft.update');
+    Route::put('/my-day/timesheets/{timesheet}/allocations', [MyDayActionsController::class, 'saveTimesheetAllocations'])->name('my-day.timesheet.allocations');
     Route::post('/my-tasks/shift-task/{task}/complete', [MyDayActionsController::class, 'completeShiftTask'])->name('my-day.shift-task.complete');
     Route::post('/my-tasks/timesheet/ensure-today', [MyDayActionsController::class, 'ensureTodayTimesheet'])->name('my-day.timesheet.ensure-today');
     Route::post('/my-tasks/timesheet/{timesheet}/submit', [MyDayActionsController::class, 'submitTimesheet'])->name('my-day.timesheet.submit');

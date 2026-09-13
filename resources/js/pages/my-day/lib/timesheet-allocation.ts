@@ -1,3 +1,4 @@
+import { toDatetimeLocal } from '@/lib/datetime';
 import type { TimesheetAllocationMethod } from './types';
 
 export function splitHoursEvenly(
@@ -25,9 +26,30 @@ export function isAllocationBalanced(
     _method: TimesheetAllocationMethod,
     allocatedHours: number,
     totalHours: number,
-    tolerance = 0.02,
 ): boolean {
-    return Math.abs(totalHours - allocatedHours) <= tolerance;
+    return (
+        Number.isFinite(allocatedHours) &&
+        Number.isFinite(totalHours) &&
+        Math.round(totalHours * 100) === Math.round(allocatedHours * 100)
+    );
+}
+
+/** Resolve NZ wall time without using the desktop's configured timezone.
+ * Two results mean the clock repeats; the worker must choose the occurrence. */
+export function allocationTimeChoices(wall: string): string[] {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(wall)) return [];
+    const nominal = Date.parse(`${wall}:00Z`);
+    if (!Number.isFinite(nominal)) return [];
+    const offsets = new Set(
+        [-2, -1, 0, 1, 2].map((days) => {
+            const at = nominal + days * 86_400_000;
+            return Date.parse(`${toDatetimeLocal(at)}:00Z`) - at;
+        }),
+    );
+    return [...offsets]
+        .map((offset) => new Date(nominal - offset).toISOString())
+        .filter((iso) => toDatetimeLocal(iso) === wall)
+        .sort();
 }
 
 export function allocationErrorForRow(

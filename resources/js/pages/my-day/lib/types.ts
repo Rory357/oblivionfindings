@@ -1,3 +1,4 @@
+import type { HandoverWorkerNotes } from '@/components/handover-person-notes';
 /* -------------------------------------------------------------------------- */
 /*  TypeScript types for the /my-day Inertia payload                          */
 /* -------------------------------------------------------------------------- */
@@ -38,14 +39,45 @@ export interface MyDayShiftClient {
 }
 
 export interface MyDayShiftTask {
+    follow_through?: 'accepted_help' | null;
+    steps?: MyDayTaskStep[];
+    help?: {
+        status: 'requested' | 'accepted' | 'declined';
+        recipient_id: number;
+        recipient_name: string;
+        reason: string;
+        requested_at: string;
+        responded_at: string | null;
+    } | null;
+    source_handover_id?: number | null;
     id: number;
     label: string;
     scheduled_time?: string | null;
     scheduled_for?: string | null;
     is_completed: boolean;
     completed_at: string | null;
-    /** Resident this task belongs to (derived from shift.client_id for now). */
-    client_id?: number;
+    client_id?: number | null;
+    task_scope?: 'client' | 'site';
+    shift_id?: number;
+    assigned_to?: number;
+    created_by?: number | null;
+    completed_by?: number | null;
+    source_label?: string;
+    version?: number;
+    can_complete?: boolean;
+}
+
+export interface MyDayTaskStep {
+    id: string;
+    label: string;
+    is_completed: boolean;
+    completed_at?: string | null;
+    completed_by?: number | null;
+}
+
+export interface MyDayHelpTask extends MyDayShiftTask {
+    requested_by_name: string;
+    person_name: string;
 }
 
 export interface MyDayShift {
@@ -58,7 +90,7 @@ export interface MyDayShift {
     status_state?: string;
     location: string | null;
     service_type: string | null;
-    client: MyDayShiftClient;
+    client: MyDayShiftClient | null;
     tasks: MyDayShiftTask[];
     task_progress: number;
     is_today: boolean;
@@ -117,6 +149,13 @@ export interface MyDayTimesheetClientCandidate {
 }
 
 export interface MyDayTimesheet {
+    paid_minutes?: number;
+    shift_id?: number | null;
+    site_name?: string | null;
+    allocation_revision?: string;
+    can_save_allocation?: boolean;
+    can_submit?: boolean;
+    clock_running?: boolean;
     id: number;
     work_date: string;
     work_date_iso: string | null;
@@ -209,6 +248,8 @@ export interface MyDayEndOfShiftBlocker {
 }
 
 export interface MyDayClockSessionTask {
+    version?: number;
+    can_complete?: boolean;
     id: number;
     label: string;
     scheduled_time?: string | null;
@@ -252,6 +293,16 @@ export interface MyDayClockState {
 }
 
 export interface MyDayHandover {
+    worker_notes?: HandoverWorkerNotes | null;
+    follow_ups?: {
+        key: string;
+        label: string;
+        task_id: number | null;
+        is_completed: boolean;
+        source_completed?: boolean;
+        can_add: boolean;
+    }[];
+    can_acknowledge?: boolean;
     id?: number;
     from?: { name: string; initials: string; hue: number; role?: string };
     summary?: string;
@@ -430,6 +481,13 @@ export interface MyDayChecklistConfig {
 }
 
 export interface MyDayPageProps {
+    help_requests?: MyDayHelpTask[];
+    data_unavailable?: string[];
+    task_creation?: {
+        can_create: boolean;
+        shift_id: number | null;
+        clients: { id: number; name: string }[];
+    };
     today: string;
     today_iso?: string;
     shifts: MyDayShift[];
@@ -452,6 +510,18 @@ export interface MyDayPageProps {
     next_shift_briefing?: MyDayPreShiftBriefing | null;
     previous_shift?: MyDayShift | null;
     handover?: MyDayHandover | null;
+    handover_draft?: { id: number; review_url: string } | null;
+    outgoing_handover?: {
+        shift_id: number;
+        id: number | null;
+        status: string | null;
+        review_url: string | null;
+        people: {
+            id: number;
+            name: string;
+            state: 'recorded' | 'not_supported' | 'not_started';
+        }[];
+    } | null;
     hr_tasks?: MyDayHrTask[];
     notifications?: MyDayNotification[];
     can_view_medications?: boolean;

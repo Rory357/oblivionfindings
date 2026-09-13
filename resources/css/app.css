@@ -525,6 +525,44 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 /* ──────────────────────────────────────────────────────────────────────────
  * Typography hierarchy — use these instead of ad-hoc text-2xl/text-xl/etc.
  * ────────────────────────────────────────────────────────────────────────── */
+/* Approved soft-depth Button variants; sizes still follow the shared size prop. */
+.btn-soft-primary,
+.btn-soft-secondary {
+    border-radius: calc(var(--radius) - 2px);
+    font-weight: 550;
+    transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.btn-soft-primary {
+    background: linear-gradient(180deg, color-mix(in oklch, var(--primary) 82%, var(--primary-foreground)), var(--primary) 55%);
+    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--primary-foreground) 25%, transparent), 0 1px 2px color-mix(in oklch, var(--primary) 50%, transparent), 0 4px 14px -4px color-mix(in oklch, var(--primary) 60%, transparent);
+}
+.btn-soft-primary:hover:not(:disabled) {
+    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--primary-foreground) 25%, transparent), 0 2px 4px color-mix(in oklch, var(--primary) 50%, transparent), 0 8px 20px -4px color-mix(in oklch, var(--primary) 65%, transparent);
+}
+.btn-soft-secondary {
+    box-shadow: 0 1px 2px color-mix(in oklch, var(--foreground) 5%, transparent), inset 0 -1px 0 color-mix(in oklch, var(--foreground) 4%, transparent);
+}
+.btn-soft-secondary:hover:not(:disabled) {
+    border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+    box-shadow: 0 3px 8px color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .btn-soft-primary:hover:not(:disabled), .btn-soft-secondary:hover:not(:disabled) { transform: translateY(-1px); }
+    .btn-soft-primary:active:not(:disabled), .btn-soft-secondary:active:not(:disabled) { transform: translateY(.5px); }
+}
+
+/* Frontline actions retain a readable target even when a compact shared size is used. */
+    /* Clip decorative overflow without making the hero a hidden scroll area.
+       Focusing a tab must not scroll the title out of its own banner. */
+    .my-day-desktop .eh-header {
+        overflow: clip;
+    }
+
+    .my-day-desktop [data-slot='button'],
+.my-day-desktop [role='tab'] {
+    min-height: 44px;
+}
+
 .text-page-title {
     @apply text-2xl font-semibold tracking-tight text-foreground;
 }

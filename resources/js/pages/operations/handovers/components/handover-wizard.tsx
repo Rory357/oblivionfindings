@@ -5,6 +5,7 @@
  * new-shift chain, on the shared WizardShell chrome (the Add Client modal
  * contract): 248px stepper rail, "Step x of y" header, 3px progress strip and
  * muted footer band. Flow, validation and submit payloads are unchanged. */
+import HandoverPersonNotes from '@/components/handover-person-notes';
 import { startOfWeek } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import { router } from '@inertiajs/react';
@@ -1140,12 +1141,21 @@ export function HandoverWizard({
                     <div className="space-y-4">
                         <StepHead
                             icon={FileText}
-                            title="How did the shift go?"
+                            title={
+                                editing?.worker_notes
+                                    ? 'Review the notes for each person'
+                                    : 'How did the shift go?'
+                            }
                             blurb="A clear narrative the incoming worker can read in under a minute."
                         />
+                        {editing?.worker_notes && (
+                            <HandoverPersonNotes notes={editing.worker_notes} />
+                        )}
                         <div className="space-y-1.5">
                             <label className="flex flex-wrap items-center gap-2 text-[13px] font-semibold">
-                                Handover narrative
+                                {editing?.worker_notes
+                                    ? 'Primary person note'
+                                    : 'Handover narrative'}
                                 <span className="text-status-critical">*</span>
                                 <span className="text-[11.5px] font-normal text-muted-foreground">
                                     mood, sleep, meals, activities, anything to

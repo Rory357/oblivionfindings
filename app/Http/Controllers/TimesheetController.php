@@ -78,42 +78,7 @@ class TimesheetController extends Controller
      */
     protected function buildAllocationCandidates(Timesheet $timesheet): array
     {
-        $candidatesById = [];
-
-        if ($timesheet->client) {
-            $candidatesById[$timesheet->client->id] = [
-                'id' => (int) $timesheet->client->id,
-                'name' => trim($timesheet->client->first_name.' '.$timesheet->client->last_name),
-                'is_primary' => true,
-            ];
-        }
-
-        $siteClients = $timesheet->shift?->site?->clients ?? collect();
-        foreach ($siteClients as $sc) {
-            if (! isset($candidatesById[$sc->id])) {
-                $candidatesById[$sc->id] = [
-                    'id' => (int) $sc->id,
-                    'name' => trim($sc->first_name.' '.$sc->last_name),
-                    'is_primary' => false,
-                ];
-            }
-        }
-
-        // Defensive: include any allocation-row clients that aren't in the
-        // candidate set (e.g. site changed after the rows were written).
-        if ($timesheet->relationLoaded('clientAllocations')) {
-            foreach ($timesheet->clientAllocations as $a) {
-                if (! isset($candidatesById[$a->client_id]) && $a->client) {
-                    $candidatesById[$a->client_id] = [
-                        'id' => (int) $a->client_id,
-                        'name' => trim($a->client->first_name.' '.$a->client->last_name),
-                        'is_primary' => false,
-                    ];
-                }
-            }
-        }
-
-        return array_values($candidatesById);
+        return app(\App\Domain\Shifts\Timesheets\TimesheetAllocationService::class)->candidates($timesheet, auth()->user());
     }
 
     public function bulkApprove(Request $request)

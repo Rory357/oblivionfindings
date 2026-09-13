@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Shift;
 use App\Models\ShiftTask;
+use App\Services\MyDay\ShiftTaskWorkService;
+use App\Support\ShiftTaskSupport;
 use Illuminate\Http\Request;
 
 class ShiftTaskController extends Controller
@@ -13,37 +15,16 @@ class ShiftTaskController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('shifts.update') || $auth->canDo('shifts.tasks.updateSelf') || $auth->canDo('shifts.manageAny')), 403);
 
-        // Staff can update only their own shifts unless manageAny
-        if (! $auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
-            abort(403);
-        }
-
-        // Lock tasks once shift is completed (audit integrity).
-        if ($shift->status === 'completed') {
-            return response()->json(['ok' => false, 'message' => 'This shift has been completed and is now locked.'], 422);
-        }
-
         abort_unless($task->shift_id === $shift->id, 404);
 
         $data = $request->validate([
             'is_completed' => ['required', 'boolean'],
+            'expected_version' => ['sometimes', 'integer', 'min:0'],
         ]);
 
-        if ($data['is_completed']) {
-            $task->update([
-                'is_completed' => true,
-                'completed_at' => now(),
-                'completed_by' => $auth->id,
-            ]);
-        } else {
-            $task->update([
-                'is_completed' => false,
-                'completed_at' => null,
-                'completed_by' => null,
-                'reminder_sent_at' => null,
-            ]);
-        }
+        $saved = app(ShiftTaskWorkService::class)->complete($auth, $task, (bool) $data['is_completed'],
+            (int) ($data['expected_version'] ?? $task->version ?? 0), allowManageAny: true);
 
-        return response()->json(['ok' => true, 'task' => $task->fresh()]);
+        return response()->json(['ok' => true, 'task' => ShiftTaskSupport::workPayload($saved)]);
     }
 }

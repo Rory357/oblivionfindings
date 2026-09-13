@@ -23,6 +23,20 @@
 export const WORKER_LOCALE = 'en-NZ';
 export const WORKER_TIMEZONE = 'Pacific/Auckland';
 
+/** Readable duration from authoritative minutes, without payroll decimal notation. */
+export function formatDurationMinutes(value: number): string {
+    if (!Number.isFinite(value) || value < 0) return '—';
+    const minutes = Math.round(value);
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return [
+        hours ? `${hours} hr` : '',
+        remainder || !hours ? `${remainder} min` : '',
+    ]
+        .filter(Boolean)
+        .join(' ');
+}
+
 const DEFAULT_FALLBACK = '—';
 
 type DateInput = string | number | Date | null | undefined;

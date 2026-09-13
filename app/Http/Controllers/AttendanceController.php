@@ -9,6 +9,7 @@ use App\Domain\Hr\Services\AttendanceService;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\User;
+use App\Services\HandoverWorkerNotes;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Operations\HandoverPresenter;
 use App\Services\ShiftHandoverService;
@@ -388,12 +389,15 @@ class AttendanceController extends Controller
             'handover.meds_completed' => ['required_with:handover', 'boolean'],
             'handover.shift_rating' => ['nullable', 'string', 'in:calm,mixed,challenging'],
             'handover.handover_notes' => ['nullable', 'string', 'max:2000'],
+            ...HandoverWorkerNotes::rules('handover.'),
+            'handover.expected_version' => ['nullable', 'integer', 'min:0'],
             'handover.follow_up_needed' => ['required_with:handover', 'boolean'],
             'handover.tasks_pending' => ['nullable', 'array', 'max:20'],
             'handover.tasks_pending.*' => ['string', 'max:255'],
             'task_updates' => ['nullable', 'array'],
             'task_updates.*.id' => ['required', 'integer', 'min:1', 'distinct'],
             'task_updates.*.is_completed' => ['required', 'boolean'],
+            'task_updates.*.expected_version' => ['sometimes', 'integer', 'min:0'],
         ]);
         $data['session_id'] = $session?->id;
 
@@ -569,6 +573,8 @@ class AttendanceController extends Controller
             'shift_rating' => ['nullable', 'string', 'in:calm,mixed,challenging'],
             'handover_notes' => ['nullable', 'string', 'max:2000'],
             'follow_up_needed' => ['required', 'boolean'],
+            ...HandoverWorkerNotes::rules(),
+            'expected_version' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $notes = trim((string) ($data['handover_notes'] ?? ''));
@@ -588,10 +594,15 @@ class AttendanceController extends Controller
                 ]]
                 : null,
             'submit' => false,
+            'expected_version' => $data['expected_version'] ?? null,
         ];
+        if (array_key_exists('worker_notes', $data)) {
+            $payload['worker_notes'] = $data['worker_notes'];
+        }
 
         if (
-            $auth->canDo('medications.controlled.view')
+            ! array_key_exists('worker_notes', $data)
+            && $auth->canDo('medications.controlled.view')
             && $auth->canDo('medications.controlled.record')
         ) {
             $payload['medications_due'] = $data['meds_completed']
@@ -603,16 +614,49 @@ class AttendanceController extends Controller
         }
 
         try {
-            $this->handoverService->save($shift, $auth, $payload);
+            $saved = $this->handoverService->save($shift, $auth, $payload);
         } catch (ValidationException $exception) {
+            if ($request->expectsJson()) {
+                throw $exception;
+            }
+
             return redirect()->back()->withErrors($exception->errors());
         } catch (\DomainException) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'The handover draft could not be saved. Review it and try again.'], 409);
+            }
+
             return redirect()->back()->withErrors([
                 'handover' => 'The handover draft could not be saved. Review it and try again.',
             ]);
         }
 
+        if ($request->expectsJson()) {
+            $handover = $saved['handover'];
+
+            return response()->json([
+                'handover_id' => $handover->id,
+                'expected_version' => (int) $handover->version,
+                'status' => $handover->status,
+                'saved_at' => $handover->updated_at->toIso8601String(),
+                'review_url' => '/operations/handovers?'.http_build_query([
+                    'week' => $shift->starts_at->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
+                    'handover' => $handover->id,
+                ]),
+            ])->header('Cache-Control', 'no-store, private');
+        }
+
         return redirect()->back()->with('success', 'Handover draft saved. Assign the incoming shift before submitting.');
+    }
+
+    public function handoverDraft(Request $request, int $shift)
+    {
+        $actor = $request->user();
+        abort_unless($this->canClock($actor), 403);
+        $outgoing = $this->handoverService->writableOutgoingShift($actor, $shift);
+
+        return response()->json(app(HandoverWorkerNotes::class)->editor($outgoing, $actor))
+            ->header('Cache-Control', 'no-store, private');
     }
 
     /**

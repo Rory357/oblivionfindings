@@ -21,6 +21,7 @@ use App\Services\CoverageReservationService;
 use App\Services\Eligibility\AssignmentEligibilityDecision;
 use App\Services\Eligibility\AssignmentEligibilityGateway;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\MyDay\ShiftTaskHelpService;
 use App\Services\ShiftCancellationService;
 use App\Services\ShiftHandoverService;
 use App\Services\ShiftReplacementService;
@@ -332,6 +333,11 @@ class ShiftLifecycleService
                 ->lockForUpdate()
                 ->get();
             $incompleteTasks = $tasks->where('is_completed', false)->values();
+            // Accepted help is an explicit unfinished-work outcome. Recheck
+            // the named colleague's current eligibility just as attendance does.
+            $unownedIncompleteTasks = $incompleteTasks->reject(
+                fn (ShiftTask $task) => app(ShiftTaskHelpService::class)->accepted($task),
+            );
 
             if ($data->createSummaryNote && $finalBody === '') {
                 $existingNotes = ClientNote::query()
@@ -348,13 +354,13 @@ class ShiftLifecycleService
                 }
             }
 
-            if ($incompleteTasks->isNotEmpty() && ! $data->allowIncompleteTasks) {
+            if ($unownedIncompleteTasks->isNotEmpty() && ! $data->allowIncompleteTasks) {
                 throw ValidationException::withMessages([
                     'allow_incomplete_tasks' => 'This shift still has incomplete tasks. Complete all tasks or allow completion with a reason.',
                 ]);
             }
 
-            if ($incompleteTasks->isNotEmpty()
+            if ($unownedIncompleteTasks->isNotEmpty()
                 && $data->allowIncompleteTasks
                 && trim((string) $data->incompleteTasksReason) === '') {
                 throw ValidationException::withMessages([

@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Shift;
 use App\Models\ShiftTask;
+use App\Services\MyDay\ShiftTaskHelpService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -60,14 +61,19 @@ class ShiftTaskSupport
 
         $keepIds = $incoming->pluck('id')->filter()->all();
         if ($keepIds === []) {
-            $shift->tasks()->delete();
+            $shift->tasks()->whereNull('creation_key')->whereNull('source_handover_id')->delete();
         } else {
-            $shift->tasks()->whereNotIn('id', $keepIds)->delete();
+            $shift->tasks()->whereNull('creation_key')->whereNull('source_handover_id')->whereNotIn('id', $keepIds)->delete();
         }
 
         foreach ($incoming as $task) {
             if ($task['id'] && $existing->has($task['id'])) {
                 $existingTask = $existing[$task['id']];
+                // Worker-added work has its own audited outcome/edit path. A stale
+                // roster form must neither delete it nor overwrite its timing.
+                if ($existingTask->creation_key || $existingTask->source_handover_id) {
+                    continue;
+                }
                 $previousTime = self::normalizeTime($existingTask->scheduled_time);
                 $nextTime = $task['scheduled_time'];
 
@@ -122,6 +128,36 @@ class ShiftTaskSupport
             'label' => $task->label,
             'scheduled_time' => self::normalizeTime($task->scheduled_time),
             'is_completed' => (bool) $task->is_completed,
+        ];
+    }
+
+    public static function workPayload(ShiftTask $task): array
+    {
+        $shift = $task->shift;
+
+        return [
+            ...self::payload($task),
+            'shift_id' => $task->shift_id,
+            'client_id' => $task->task_scope === 'site' ? null : ($task->client_id ?? $shift?->client_id),
+            'task_scope' => $task->task_scope ?? ($shift?->client_id ? 'client' : 'site'),
+            'scheduled_for' => $task->scheduledFor()?->toIso8601String(),
+            'completed_at' => $task->completed_at?->toIso8601String(),
+            'completed_by' => $task->completed_by,
+            'created_by' => $task->created_by,
+            'assigned_to' => $shift?->user_id,
+            'source_label' => $task->source_handover_id ? 'Handover follow-up' : ($task->creation_key ? 'Added during shift' : 'Shift task'),
+            'steps' => $task->steps ?? [],
+            'help' => $task->help_status ? [
+                'status' => $task->help_status,
+                'recipient_id' => $task->help_requested_to,
+                'recipient_name' => $task->helpRecipient?->name,
+                'reason' => $task->help_reason,
+                'requested_at' => $task->help_requested_at?->toIso8601String(),
+                'responded_at' => $task->help_responded_at?->toIso8601String(),
+            ] : null,
+            'source_handover_id' => $task->source_handover_id,
+            'follow_through' => ! $task->is_completed && app(ShiftTaskHelpService::class)->accepted($task) ? 'accepted_help' : null,
+            'version' => (int) ($task->version ?? 0),
         ];
     }
 

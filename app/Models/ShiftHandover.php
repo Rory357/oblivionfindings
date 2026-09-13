@@ -19,6 +19,7 @@ class ShiftHandover extends Model
         'incoming_staff_id',
         'status',
         'handover_notes',
+        'worker_notes',
         'client_mood',
         'tasks_pending',
         'medications_due',
@@ -37,6 +38,7 @@ class ShiftHandover extends Model
     ];
 
     protected $casts = [
+        'worker_notes' => 'encrypted:array',
         'tasks_pending' => 'array',
         'medications_due' => 'array',
         'incidents_to_note' => 'array',
@@ -49,6 +51,10 @@ class ShiftHandover extends Model
         'submitted_at' => 'datetime',
         'acknowledged_at' => 'datetime',
     ];
+
+    // Multi-person notes must only leave the model through the per-client
+    // privacy presenter, never through implicit JSON or timeline snapshots.
+    protected $hidden = ['worker_notes'];
 
     protected static function booted(): void
     {

@@ -5,6 +5,7 @@ import HandoverReadCard from '@/components/handover-read-card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
+import { formatDate, formatTime } from '@/lib/datetime';
 
 import { residentHue, residentInitials } from '../lib/resident-hue';
 import type { MyDayPreShiftBriefing } from '../lib/types';
@@ -22,9 +23,7 @@ export function TomorrowPanel({ briefing, heading }: TomorrowPanelProps) {
 
     const start = formatTime(briefing.starts_at);
     const end = formatTime(briefing.ends_at);
-    const dayLabel = new Date(briefing.starts_at).toLocaleDateString([], {
-        weekday: 'short',
-    });
+    const dayLabel = formatDate(briefing.starts_at);
     const client = briefing.client;
 
     // The MyShiftResource client payload only carries `name` + `photo_url`. We
@@ -41,13 +40,11 @@ export function TomorrowPanel({ briefing, heading }: TomorrowPanelProps) {
     return (
         <div
             data-test="my-day-tomorrow"
-            className="rounded-2xl border border-border bg-gradient-to-b from-card to-background p-4"
+            className="rounded-2xl border border-border bg-card p-5 shadow-sm"
         >
             <div className="mb-2.5 flex items-center gap-2">
-                <div className="text-[10.5px] font-bold tracking-[0.12em] text-text-faint uppercase">
-                    {resolvedHeading}
-                </div>
-                <span className="text-[11px] text-muted-foreground">
+                <div className="text-section-title">{resolvedHeading}</div>
+                <span className="text-subtle">
                     {dayLabel} · {start} start
                 </span>
             </div>
@@ -77,7 +74,7 @@ export function TomorrowPanel({ briefing, heading }: TomorrowPanelProps) {
                 </div>
             </div>
             {briefingLines.length > 0 ? (
-                <ul className="ml-4 list-disc text-[12.5px] leading-[1.6] text-foreground marker:text-muted-foreground">
+                <ul className="ml-4 list-disc text-sm leading-relaxed text-foreground marker:text-muted-foreground">
                     {briefingLines.map((line, i) => (
                         <li key={i}>{line}</li>
                     ))}
@@ -88,7 +85,7 @@ export function TomorrowPanel({ briefing, heading }: TomorrowPanelProps) {
                     <HandoverReadCard handover={briefing.incoming_handover} />
                 </div>
             ) : null}
-            <Button asChild variant="ghost" size="sm" className="mt-2">
+            <Button asChild variant="outline" className="frontline-tap mt-4">
                 <Link href="/my-roster">
                     {t('read_full_briefing')}
                     <ArrowRight className="ml-1 h-3 w-3" />
@@ -126,15 +123,6 @@ function collectBriefingLines(briefing: MyDayPreShiftBriefing): string[] {
         }
     }
     return lines;
-}
-
-function formatTime(iso: string): string {
-    const d = new Date(iso);
-    return d.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    });
 }
 
 export default TomorrowPanel;
