@@ -51,6 +51,9 @@ import {
     type CSSProperties,
     type ReactNode,
 } from 'react';
+import { CalendarDayHeading } from './work-schedule';
+export { CalendarWorkRows, WorkSchedule } from './work-schedule';
+export type { CalendarWorkEntry } from './work-schedule';
 
 export type Density = 'comfortable' | 'compact';
 
@@ -1272,7 +1275,6 @@ export function DayView({
     const { onContext } = useCalUI();
     const scrollRef = useGridAutoScroll(navDate);
     const sbw = useScrollbarWidth(scrollRef);
-    const TODAY = new Date();
     const day = navDate;
     const dayEvents = events.filter((e) => occursOnDay(e, day));
     const packed = packDay(dayEvents, day);
@@ -1293,27 +1295,10 @@ export function DayView({
             unstyled
             className="flex h-full flex-col overflow-hidden rounded-xl border bg-card"
         >
-            <div className="flex items-center gap-3 border-b px-4 py-3">
-                <span
-                    className={`tnum flex h-11 w-11 flex-col items-center justify-center rounded-xl ${sameDay(day, TODAY) ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}
-                >
-                    <span className="text-[9px] leading-none font-semibold uppercase">
-                        {WD[day.getDay()]}
-                    </span>
-                    <span className="text-lg leading-tight font-bold">
-                        {day.getDate()}
-                    </span>
-                </span>
-                <div>
-                    <div className="text-sm font-semibold">
-                        {WD_FULL[day.getDay()]}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                        {dayEvents.length}{' '}
-                        {dayEvents.length === 1 ? 'entry' : 'entries'} scheduled
-                    </div>
-                </div>
-            </div>
+            <CalendarDayHeading
+                date={Date.UTC(day.getFullYear(), day.getMonth(), day.getDate())}
+                caption={`${dayEvents.length} ${dayEvents.length === 1 ? 'entry' : 'entries'} scheduled`}
+            />
             <AllDayRow days={[day]} events={events} padRight={sbw} />
             <div
                 ref={scrollRef}

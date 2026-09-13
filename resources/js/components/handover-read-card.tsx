@@ -9,6 +9,9 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
+import HandoverPersonNotes, {
+    type HandoverWorkerNotes,
+} from '@/components/handover-person-notes';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { formatRelative } from '@/lib/datetime';
@@ -42,6 +45,7 @@ export type HandoverReadItem = {
 };
 
 export type HandoverReadPayload = {
+    worker_notes?: HandoverWorkerNotes | null;
     id: number;
     handover_notes: string | null;
     client_mood: string | null;
@@ -152,6 +156,7 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
 
             {!collapsed && (
                 <div className="mt-3 space-y-3">
+                    <HandoverPersonNotes notes={handover.worker_notes} />
                     {/* Meds */}
                     <Card className="gap-0 rounded-lg border-status-info/30 bg-background/70 p-3 shadow-none dark:border-status-info/50">
                         <div className="flex items-center gap-2 text-sm font-medium">
@@ -180,7 +185,8 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                             </ul>
                         ) : (
                             <p className="mt-1 text-sm text-muted-foreground">
-                                All scheduled meds given on the last shift.
+                                No medication follow-up recorded here. Check the
+                                medication record for dose outcomes.
                             </p>
                         )}
                     </Card>

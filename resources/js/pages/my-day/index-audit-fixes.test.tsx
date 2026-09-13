@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Button as GuardrailButton } from '@/components/ui/button';
 import MyDay from './index';
 
 const mocks = vi.hoisted(() => ({
@@ -14,6 +13,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@inertiajs/react', () => ({
+    Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
+        <a href={href}>{children}</a>
+    ),
     Head: ({ title }: { title: string }) => <title>{title}</title>,
     router: {
         post: mocks.routerPost,
@@ -72,16 +74,12 @@ vi.mock('@/components/checklists/run-modal', () => ({
     RunModal: () => null,
 }));
 
-vi.mock('./components/my-day-hero', () => ({
-    MyDayHero: ({ onOpenTimesheet }: { onOpenTimesheet: () => void }) => (
-        <GuardrailButton unstyled type="button" onClick={onOpenTimesheet}>
-            Today&apos;s timesheet
-        </GuardrailButton>
-    ),
+vi.mock('./components/my-day-header', () => ({
+    MyDayHeader: () => <header data-testid="my-day-header" />,
 }));
 
-vi.mock('./components/whats-next-rail', () => ({
-    WhatsNextRail: () => <section data-testid="whats-next" />,
+vi.mock('./components/day-work-list', () => ({
+    DayWorkList: () => <section data-testid="day-work" />,
 }));
 
 vi.mock('./components/digest-panel', () => ({
@@ -168,7 +166,10 @@ const baseProps = () => ({
     previous_shift: null,
     handover: null,
     notifications: [],
-    auth: { user: { id: 9, name: 'Sheila Worker', first_name: 'Sheila' } },
+    auth: {
+        user: { id: 9, name: 'Sheila Worker', first_name: 'Sheila' },
+        can: { timesheets: { create: true } },
+    },
     can_record_observation: true,
     can_record_clinical: true,
 });
@@ -182,16 +183,64 @@ describe('My Day audit wiring', () => {
         mocks.props = baseProps();
     });
 
+    it('keeps an ordinary due task in the work list without a duplicate warning banner', () => {
+        const base = baseProps();
+        mocks.props = {
+            ...base,
+            active_shift: {
+                ...base.active_shift,
+                tasks: [
+                    {
+                        id: 5,
+                        label: 'Prepare lunch',
+                        client_id: 10,
+                        is_completed: false,
+                        scheduled_for: '2026-06-08T09:00:00+12:00',
+                    },
+                ],
+            },
+        };
+        render(<MyDay />);
+        expect(screen.getByTestId('day-work')).toBeVisible();
+        expect(
+            screen.queryByRole('button', { name: 'Review attention items' }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('keeps medication and other alerts prominent despite the simpler layout', () => {
+        mocks.props = {
+            ...baseProps(),
+            medications_due: [
+                {
+                    id: 8,
+                    client_id: 10,
+                    client_name: 'Mere',
+                    medication_name: 'Scheduled medication',
+                    dose: '1',
+                    scheduled_for: '2026-06-08T09:00:00+12:00',
+                    status: 'overdue',
+                },
+            ],
+        };
+        render(<MyDay />);
+        expect(
+            screen.getByRole('button', { name: 'Review attention items' }),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('button', { name: 'Open medication list' }),
+        ).toBeVisible();
+    });
+
     it('routes Today timesheet through the ensure-today endpoint when no draft exists', () => {
         render(<MyDay />);
 
         fireEvent.click(
-            screen.getByRole('button', { name: /today's timesheet/i }),
+            screen.getByRole('button', { name: /review my timesheet/i }),
         );
 
         expect(mocks.routerPost).toHaveBeenCalledWith(
             '/my-tasks/timesheet/ensure-today',
-            {},
+            { shift_id: 44 },
             // F2 — now carries an onError handler so a "no shift today" response
             // surfaces a toast instead of looking like a dead button.
             expect.objectContaining({
@@ -207,10 +256,10 @@ describe('My Day audit wiring', () => {
     it('allows both My Day body columns to shrink below the desktop breakpoint', () => {
         render(<MyDay />);
 
-        expect(screen.getByTestId('whats-next').parentElement).toHaveClass(
+        expect(screen.getByTestId('day-work').parentElement).toHaveClass(
             'min-w-0',
         );
-        expect(screen.getByTestId('digest').closest('aside')).toHaveClass(
+        expect(screen.getByText('Your shift').closest('aside')).toHaveClass(
             'min-w-0',
         );
     });
@@ -219,7 +268,7 @@ describe('My Day audit wiring', () => {
         render(<MyDay />);
 
         fireEvent.click(
-            screen.getByRole('button', { name: /today's timesheet/i }),
+            screen.getByRole('button', { name: /review my timesheet/i }),
         );
 
         // Replay the backend's `back()->withErrors(['timesheet' => …])` through
@@ -300,7 +349,7 @@ describe('My Day audit wiring', () => {
 
         expect(screen.getByText('Checklists due this shift')).toBeVisible();
         expect(screen.getByText('Kitchen reset')).toBeVisible();
-        expect(screen.getByRole('button', { name: /view/i })).toBeVisible();
+        expect(screen.getByRole('button', { name: 'View' })).toBeVisible();
         expect(
             screen.queryByRole('button', { name: /complete/i }),
         ).not.toBeInTheDocument();

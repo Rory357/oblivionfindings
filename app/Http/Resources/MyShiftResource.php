@@ -52,14 +52,7 @@ class MyShiftResource extends JsonResource
             'service_type' => $shift->serviceContext?->name,
             'required_licence_class' => $shift->required_licence_class,
             'required_licence_endorsements' => $shift->required_licence_endorsements ?? [],
-            'tasks' => $tasks->map(fn ($task) => [
-                'id' => $task->id,
-                'label' => $task->label,
-                'scheduled_time' => ShiftTaskSupport::normalizeTime($task->scheduled_time),
-                'scheduled_for' => $task->setRelation('shift', $shift)->scheduledFor()?->toIso8601String(),
-                'is_completed' => (bool) $task->is_completed,
-                'completed_at' => $task->completed_at?->toIso8601String(),
-            ])->values()->all(),
+            'tasks' => $tasks->map(fn ($task) => ShiftTaskSupport::workPayload($task->setRelation('shift', $shift)))->values()->all(),
             'task_progress' => $totalTasks > 0
                 ? round(($completedTasks / $totalTasks) * 100)
                 : 100,

@@ -1,3 +1,5 @@
+import type { HandoverWorkerNotes } from '@/components/handover-person-notes';
+import HandoverPersonNotes from '@/components/handover-person-notes';
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +31,7 @@ type ShiftSummary = {
 } | null;
 
 type Handover = {
+    worker_notes?: HandoverWorkerNotes | null;
     id: number;
     status: string;
     handover_notes: string;
@@ -210,10 +213,15 @@ export default function HandoversShow({ handover }: Props) {
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <p className="text-sm leading-6 whitespace-pre-wrap">
-                                    {handover.handover_notes ||
-                                        'No handover notes recorded.'}
-                                </p>
+                                <HandoverPersonNotes
+                                    notes={handover.worker_notes}
+                                />
+                                {!handover.worker_notes && (
+                                    <p className="text-sm leading-6 whitespace-pre-wrap">
+                                        {handover.handover_notes ||
+                                            'No handover notes recorded.'}
+                                    </p>
+                                )}
                                 <div className="grid gap-3 sm:grid-cols-3">
                                     <div className="rounded-md border bg-muted/20 p-3">
                                         <div className="text-xs tracking-wide text-muted-foreground uppercase">

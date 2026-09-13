@@ -22,6 +22,8 @@ export type WizardStep = {
     label: string;
     blurb: string;
     icon: ComponentType<{ className?: string }>;
+    /** Temporarily unavailable while a command or recovery owns the form. */
+    disabled?: boolean;
 };
 
 export function WizardShell({
@@ -128,9 +130,10 @@ export function WizardShell({
                                     <button
                                         key={s.key}
                                         type="button"
+                                        disabled={s.disabled}
                                         onClick={() => onStepClick(i)}
                                         className={cn(
-                                            'flex items-center gap-2.5 rounded-md p-2 text-left transition-colors',
+                                            'flex items-center gap-2.5 rounded-md p-2 text-left transition-colors disabled:pointer-events-none',
                                             active
                                                 ? 'bg-primary/10'
                                                 : 'hover:bg-accent',

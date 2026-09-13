@@ -29,6 +29,11 @@ it('populates the My Day digest handover prop for the incoming worker', function
         'first_name' => 'Mere',
         'last_name' => 'Wilson',
     ]);
+    $client->supportWorkers()->attach($worker->id);
+    foreach (['clients.viewAssigned', 'medications.controlled.view'] as $key) {
+        $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key]);
+        $worker->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+    }
     $incomingShift = Shift::factory()
         ->assignedToday($worker, Carbon::parse('2026-06-08 10:00:00', 'Pacific/Auckland'))
         ->published()
@@ -157,7 +162,7 @@ it('does not let a worker claim an unassigned handover for a foreign resident', 
 
     $this->actingAs($worker)
         ->patch("/attendance/handover/{$handover->id}/acknowledge")
-        ->assertForbidden();
+        ->assertNotFound();
 
     $this->assertDatabaseHas('shift_handovers', [
         'id' => $handover->id,

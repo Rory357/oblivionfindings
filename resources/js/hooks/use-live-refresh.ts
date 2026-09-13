@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  *   - Auto-refresh fires on an interval (default 60s) but is *guarded* —
  *     the tick is skipped whenever a refresh would be disruptive.
  *   - `refreshNow()` is always available for a manual user-driven refresh.
- *   - `lastUpdatedAt` advances every time a refresh finishes so the
+ *   - `lastUpdatedAt` advances only after a successful refresh so the
  *     RefreshPill can show freshness honestly.
  *
  * Guards (the "no-mutate-while-focused" rule):
@@ -26,7 +26,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * refreshes the page, so freshness catches up as soon as the user is idle.
  */
 
-type RefreshDoneFn = () => void;
+type RefreshDoneFn = (succeeded?: boolean) => void;
 
 export interface UseLiveRefreshOptions {
     /** Poll interval in ms. Default 60s. */
@@ -47,6 +47,7 @@ export interface UseLiveRefreshResult {
     lastUpdatedAt: Date;
     isRefreshing: boolean;
     refreshNow: () => void;
+    hasError: boolean;
 }
 
 function isSafeToRefresh(): boolean {
@@ -82,6 +83,7 @@ export function useLiveRefresh(
 
     const [lastUpdatedAt, setLastUpdatedAt] = useState<Date>(() => new Date());
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [hasError, setHasError] = useState(false);
     const isRefreshingRef = useRef(false);
 
     const refreshNow = useCallback(() => {
@@ -89,19 +91,24 @@ export function useLiveRefresh(
         isRefreshingRef.current = true;
         setIsRefreshing(true);
 
-        const done: RefreshDoneFn = () => {
+        const done: RefreshDoneFn = (succeeded = true) => {
             isRefreshingRef.current = false;
             setIsRefreshing(false);
-            setLastUpdatedAt(new Date());
+            setHasError(!succeeded);
+            if (succeeded) setLastUpdatedAt(new Date());
         };
 
         if (onRefresh) {
             onRefresh(done);
         } else {
+            let succeeded = false;
             router.reload({
                 preserveScroll: true,
                 preserveState: true,
-                onFinish: done,
+                onSuccess: () => {
+                    succeeded = true;
+                },
+                onFinish: () => done(succeeded),
             });
         }
     }, [onRefresh]);
@@ -124,7 +131,7 @@ export function useLiveRefresh(
         return () => window.clearInterval(id);
     }, [enabled, intervalMs]);
 
-    return { lastUpdatedAt, isRefreshing, refreshNow };
+    return { lastUpdatedAt, isRefreshing, refreshNow, hasError };
 }
 
 export default useLiveRefresh;

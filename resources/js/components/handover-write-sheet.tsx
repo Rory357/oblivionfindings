@@ -4,7 +4,6 @@ import { useState } from 'react';
 
 import HandoverWriteForm, {
     emptyHandoverWriteValue,
-    type HandoverWriteValue,
 } from '@/components/handover-write-form';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,6 +14,7 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
+import { useHandoverEditor } from '@/hooks/use-handover-editor';
 
 export default function HandoverWriteSheet({
     shiftId,
@@ -27,9 +27,8 @@ export default function HandoverWriteSheet({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
-    const [value, setValue] = useState<HandoverWriteValue>(
-        emptyHandoverWriteValue,
-    );
+    const { editor, value, setValue, loading, error, retry } =
+        useHandoverEditor(shiftId, open);
     const [submitting, setSubmitting] = useState(false);
 
     const submit = () => {
@@ -47,6 +46,8 @@ export default function HandoverWriteSheet({
                 shift_rating: value.shift_rating,
                 handover_notes: value.handover_notes,
                 follow_up_needed: value.follow_up_needed,
+                worker_notes: value.worker_notes,
+                expected_version: value.expected_version,
             },
             {
                 preserveScroll: true,
@@ -68,29 +69,52 @@ export default function HandoverWriteSheet({
                 <SheetHeader className="pr-12">
                     <SheetTitle className="flex items-center gap-2">
                         <FileText className="h-4 w-4" />
-                        Shift note
+                        Shift notes
                     </SheetTitle>
                     <SheetDescription>
-                        Capture what the next support worker should know.
+                        A separate note for each person you supported. Save a
+                        draft, then review and send the handover.
                     </SheetDescription>
                 </SheetHeader>
 
                 <div className="px-4">
-                    <HandoverWriteForm
-                        value={value}
-                        onChange={setValue}
-                        disabled={submitting}
-                        alreadySubmitted={alreadySubmitted}
-                    />
+                    {loading ? (
+                        <p role="status">Loading saved notes…</p>
+                    ) : error ? (
+                        <div role="alert">
+                            <p>{error}</p>
+                            <Button onClick={retry}>Retry</Button>
+                        </div>
+                    ) : (
+                        <HandoverWriteForm
+                            value={value}
+                            onChange={setValue}
+                            disabled={submitting}
+                            people={editor?.people}
+                            alreadySubmitted={
+                                alreadySubmitted ||
+                                editor?.status === 'submitted' ||
+                                editor?.status === 'acknowledged'
+                            }
+                        />
+                    )}
                 </div>
 
                 <SheetFooter>
                     <Button
                         type="button"
                         onClick={submit}
-                        disabled={submitting || !shiftId}
+                        disabled={
+                            submitting ||
+                            !shiftId ||
+                            loading ||
+                            !!error ||
+                            alreadySubmitted ||
+                            editor?.status === 'submitted' ||
+                            editor?.status === 'acknowledged'
+                        }
                     >
-                        {submitting ? 'Saving...' : 'Save note'}
+                        {submitting ? 'Saving...' : 'Save draft'}
                     </Button>
                 </SheetFooter>
             </SheetContent>

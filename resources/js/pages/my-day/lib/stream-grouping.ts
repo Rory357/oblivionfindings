@@ -49,6 +49,7 @@ interface BuildStreamArgs {
     residentFilter?: number | string | null;
     /** Optional fallback when a task has no client_id (single-resident shifts). */
     fallbackClientId?: number | null;
+    includeSiteTasks?: boolean;
 }
 
 export function buildStream({
@@ -56,6 +57,7 @@ export function buildStream({
     meds,
     residentFilter,
     fallbackClientId = null,
+    includeSiteTasks = false,
 }: BuildStreamArgs): StreamItem[] {
     const filterId =
         residentFilter === 'all' || residentFilter == null
@@ -64,7 +66,10 @@ export function buildStream({
 
     const taskItems: StreamTaskItem[] = tasks
         .map((task) => {
-            const clientId = task.client_id ?? fallbackClientId;
+            const clientId =
+                task.task_scope === 'site'
+                    ? null
+                    : (task.client_id ?? fallbackClientId);
             const at = inferTaskTime(task);
             return {
                 kind: 'task' as const,
@@ -75,7 +80,10 @@ export function buildStream({
             };
         })
         .filter((item) =>
-            filterId == null ? true : item.clientId === filterId,
+            filterId == null
+                ? true
+                : item.clientId === filterId ||
+                  (includeSiteTasks && item.data.task_scope === 'site'),
         );
 
     const medItems: StreamMedItem[] = meds

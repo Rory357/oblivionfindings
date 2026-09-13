@@ -1,3 +1,4 @@
+import type { HandoverWorkerNotes } from '@/components/handover-person-notes';
 /* Shared types, helpers and small UI primitives for the Shift Handovers page. */
 import { avatarHueStyle } from '@/components/rostering/avatar-hue';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,7 @@ export type CdVerification = {
 };
 
 export type Handover = {
+    worker_notes?: HandoverWorkerNotes | null;
     id: number;
     status: HandoverStatus | string;
     handover_notes: string;

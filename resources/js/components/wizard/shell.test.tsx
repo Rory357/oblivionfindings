@@ -72,6 +72,26 @@ function renderWizard(
 }
 
 describe('WizardShell', () => {
+    it('disables only explicitly unavailable steps while retaining normal navigation', () => {
+        const onStepClick = vi.fn();
+        renderWizard({
+            steps: [{ ...twoSteps[0], disabled: true }, twoSteps[1]],
+            onStepClick,
+        });
+        const unavailable = screen.getByRole('button', {
+            name: /Details\s*Add the core information/,
+        });
+        expect(unavailable).toBeDisabled();
+        fireEvent.click(unavailable);
+        expect(onStepClick).not.toHaveBeenCalled();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: /Review\s*Confirm before saving/,
+            }),
+        );
+        expect(onStepClick).toHaveBeenCalledWith(1);
+    });
+
     it('lets a replacement workspace retain focus after the outgoing dialog unmounts', async () => {
         function ReplacementWorkflow() {
             const [handoff, setHandoff] = useState(false);
@@ -245,7 +265,7 @@ describe('ConfirmDialog', () => {
 
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeVisible();
         expect(screen.getByRole('button', { name: 'Close trip' })).toHaveClass(
-            'bg-primary',
+            'btn-soft-primary',
             'text-primary-foreground',
         );
     });

@@ -1,4 +1,7 @@
-import { EventHorizonWordmark, resolveWordmarkName } from '@/components/event-horizon-wordmark';
+import {
+    EventHorizonWordmark,
+    resolveWordmarkName,
+} from '@/components/event-horizon-wordmark';
 import GlobalNavSearch from '@/components/global-nav-search';
 import GlobalQueryBar from '@/components/global-query-bar';
 import InboxMenus from '@/components/inbox-menus';
@@ -12,10 +15,17 @@ import {
 import { SheetTrigger } from '@/components/ui/sheet';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { useInitials } from '@/hooks/use-initials';
+import { WORKER_TIMEZONE } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, Clock, Menu, MessageSquareText, ShieldAlert } from 'lucide-react';
+import {
+    AlertTriangle,
+    Clock,
+    Menu,
+    MessageSquareText,
+    ShieldAlert,
+} from 'lucide-react';
 
 /**
  * The Event Horizon command header (APP_SHELL_STYLE_GUIDE.md §2).
@@ -64,14 +74,22 @@ export function AppHeader({
     };
 
     const today = new Date();
-    const longDay = today.toLocaleDateString('en-GB', { weekday: 'long' });
+    const longDay = today.toLocaleDateString('en-GB', {
+        weekday: 'long',
+        timeZone: WORKER_TIMEZONE,
+    });
     const longDate = today.toLocaleDateString('en-GB', {
+        timeZone: WORKER_TIMEZONE,
         day: 'numeric',
         month: 'long',
         year: 'numeric',
     });
-    const shortDay = today.toLocaleDateString('en-GB', { weekday: 'short' });
+    const shortDay = today.toLocaleDateString('en-GB', {
+        weekday: 'short',
+        timeZone: WORKER_TIMEZONE,
+    });
     const shortDate = today.toLocaleDateString('en-GB', {
+        timeZone: WORKER_TIMEZONE,
         day: 'numeric',
         month: 'short',
     });
@@ -136,7 +154,7 @@ export function AppHeader({
                         href="/dashboard"
                         prefetch
                         aria-label={`${resolveWordmarkName(branding?.name)} — home`}
-                        className="flex min-w-0 items-center rounded-lg px-1.5 py-1.5 outline-none transition-colors hover:bg-sidebar-accent/50 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                        className="flex min-w-0 items-center rounded-lg px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/50 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
                     >
                         <EventHorizonWordmark
                             name={branding?.name}
@@ -153,7 +171,11 @@ export function AppHeader({
                 {/* Right cluster */}
                 <div className="flex items-center justify-end gap-1.5">
                     {canReportIncident && (
-                        <Button asChild size="sm" className="hidden lg:inline-flex">
+                        <Button
+                            asChild
+                            size="sm"
+                            className="hidden lg:inline-flex"
+                        >
                             <Link href="/incidents/create" prefetch>
                                 <AlertTriangle className="size-4" />
                                 Report incident
@@ -199,7 +221,7 @@ export function AppHeader({
                                 <button
                                     type="button"
                                     aria-label={`Open user menu for ${auth.user.name}`}
-                                    className="ml-0.5 flex size-9 shrink-0 items-center justify-center rounded-full outline-none transition-shadow hover:ring-2 hover:ring-sidebar-border focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                                    className="ml-0.5 flex size-9 shrink-0 items-center justify-center rounded-full transition-shadow outline-none hover:ring-2 hover:ring-sidebar-border focus-visible:ring-2 focus-visible:ring-sidebar-ring"
                                 >
                                     <Avatar className="size-8 overflow-hidden rounded-full">
                                         <AvatarImage

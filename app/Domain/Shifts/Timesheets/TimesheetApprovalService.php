@@ -11,6 +11,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Operations\BillingService;
 use App\Services\Operations\TimesheetHrSyncService;
@@ -35,6 +36,39 @@ class TimesheetApprovalService
         private readonly UserSiteAccessService $siteAccess,
     ) {}
 
+    /** Save allocation work without altering clock evidence, or submit it atomically. */
+    public function reviewAllocations(Timesheet $timesheet, User $actor, array $rows, string $expectedRevision, bool $submit): TimesheetWorkflowResult
+    {
+        try {
+            return DB::transaction(function () use ($timesheet, $actor, $rows, $expectedRevision, $submit) {
+                $this->lockApplicationPayrollMutex();
+                $locked = $this->lock($timesheet);
+                $actor = $this->lockCurrentWriterAuthority($actor, $locked, $submit ? 'submit' : 'update', [
+                    'allocation_client_ids' => array_column($rows, 'client_id'),
+                ]);
+                abort_unless((int) $locked->user_id === (int) $actor->id, 403);
+                $this->lockPayrollRunsForWorkDates([$locked->work_date], $submit ? 'submitted' : 'updated');
+                $this->assertSubmittable($locked, $submit ? 'submitted' : 'updated');
+                $allocationService = app(TimesheetAllocationService::class);
+                $allocationService->assertRevision($locked, $expectedRevision);
+                $normal = $allocationService->validate($locked, $actor, $rows, $submit);
+                $allocationService->persist($locked, $normal);
+                if ($submit) {
+                    $this->reconciliation->assertWorkflowAllowed($locked, 'submitted');
+                    $locked->forceFill($this->submittedFields($actor))->save();
+                }
+                AuditLogger::logOrFail($submit ? 'timesheet.submit' : 'timesheet.allocations-saved', $locked, [
+                    'actor_id' => $actor->id, 'allocation_count' => count($normal),
+                ]);
+
+                return new TimesheetWorkflowResult($locked->fresh() ?? $locked, true);
+            }, attempts: 3);
+        } catch (ValidationException $exception) {
+            $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
+            throw $exception;
+        }
+    }
+
     public function submit(Timesheet $timesheet, User $actor): TimesheetWorkflowResult
     {
         try {
@@ -45,6 +79,7 @@ class TimesheetApprovalService
                 $this->lockPayrollRunsForWorkDates([$locked->work_date], 'submitted');
 
                 $this->assertSubmittable($locked, 'submitted');
+                app(TimesheetAllocationService::class)->assertSavedSplitComplete($locked, $actor);
                 $this->reconciliation->assertWorkflowAllowed($locked, 'submitted');
 
                 $locked->forceFill($this->submittedFields($actor))->save();
@@ -131,6 +166,7 @@ class TimesheetApprovalService
 
                 $this->invalidateChangedManualAllocations($locked, $originalClientId);
 
+                app(TimesheetAllocationService::class)->assertSavedSplitComplete($locked, $actor);
                 $this->reconciliation->assertWorkflowAllowed($locked->fresh() ?? $locked, 'submitted');
 
                 $locked->forceFill($this->submittedFields($actor));
@@ -514,6 +550,7 @@ class TimesheetApprovalService
             $this->clientId($timesheet),
             $requestedClientId,
             $shiftSnapshot?->client_id,
+            ...($updates['allocation_client_ids'] ?? []),
         ])
             ->filter(fn (mixed $clientId): bool => is_numeric($clientId) && (int) $clientId > 0)
             ->map(fn (mixed $clientId): int => (int) $clientId)
@@ -657,6 +694,7 @@ class TimesheetApprovalService
         if ((int) $timesheet->user_id === (int) $actor->id) {
             abort(403, 'You cannot approve your own timesheet.');
         }
+        app(TimesheetAllocationService::class)->assertSavedSplitComplete($timesheet, $actor);
 
         if ($timesheet->linkedShiftIsCancelled()) {
             abort(422, 'Timesheets linked to cancelled shifts cannot be approved.');
