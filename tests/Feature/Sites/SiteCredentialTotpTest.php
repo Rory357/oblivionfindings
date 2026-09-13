@@ -41,7 +41,7 @@ test('credential store accepts a pasted Base32 TOTP secret and persists it encry
             'value' => 'pw',
             'totp_secret' => $secret,
         ])
-        ->assertRedirect("/sites/{$this->site->id}");
+        ->assertCreated();
 
     $credential = SiteCredential::query()->where('site_id', $this->site->id)->firstOrFail();
     expect($credential->totp_secret_encrypted)->not->toBeNull();
@@ -85,6 +85,7 @@ test('credential update with totp_secret rotates the secret; leaving it blank ke
     // Blank totp_secret in payload — existing secret must be preserved.
     $this->actingAs($this->admin)
         ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'lock_version' => $credential->fresh()->lock_version,
             'label' => 'still keeps old totp',
             'credential_type' => 'password',
             'value' => '',
@@ -97,6 +98,7 @@ test('credential update with totp_secret rotates the secret; leaving it blank ke
     $replacement = $google2fa->generateSecretKey();
     $this->actingAs($this->admin)
         ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'lock_version' => $credential->fresh()->lock_version,
             'label' => 'rotated',
             'credential_type' => 'password',
             'value' => '',
@@ -121,7 +123,7 @@ test('totp code endpoint returns a valid 6-digit code for a pasted secret + audi
     $credential = SiteCredential::query()->where('site_id', $this->site->id)->firstOrFail();
 
     $response = $this->actingAs($this->admin)
-        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code")
+        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code", ['password' => 'password'])
         ->assertOk();
 
     $body = $response->json();
@@ -154,13 +156,13 @@ test('totp code endpoint requires re-auth when the credential requires reauth', 
     $this->actingAs($this->admin)
         ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code")
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['password']);
+        ->assertJsonValidationErrors(['verification_code']);
 
     $this->actingAs($this->admin)
         ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code", [
             'password' => 'definitely-wrong',
         ])
-        ->assertStatus(403);
+        ->assertUnprocessable();
 
     expect(
         SiteCredentialAuditLog::query()
@@ -192,7 +194,7 @@ test('totp code endpoint returns 404 when no secret is stored', function () {
     ]);
 
     $this->actingAs($this->admin)
-        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code")
+        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code", ['password' => 'password'])
         ->assertNotFound();
 });
 
@@ -209,8 +211,8 @@ test('removing TOTP clears the columns and audits totp_remove', function () {
 
     $this->actingAs($this->admin)
         ->from("/sites/{$this->site->id}")
-        ->delete("/sites/{$this->site->id}/credentials/{$credential->id}/totp")
-        ->assertRedirect("/sites/{$this->site->id}");
+        ->deleteJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp", ['lock_version' => 1, 'password' => 'password'])
+        ->assertOk();
 
     $credential->refresh();
     expect($credential->totp_secret_encrypted)->toBeNull();

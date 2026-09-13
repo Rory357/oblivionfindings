@@ -909,3 +909,6 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:45')
     ->withoutOverlapping();
+
+// Canonical commercial follow-ups; no generic notification or external send.
+app(Schedule::class)->command('vendors:check-renewals')->dailyAt('00:05')->timezone(config('app.worker_timezone'))->withoutOverlapping();

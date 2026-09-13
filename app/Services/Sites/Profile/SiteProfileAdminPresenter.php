@@ -117,12 +117,15 @@ class SiteProfileAdminPresenter
     {
         $this->primePermissions($user);
         $canViewVendors = $user->canDo('vendors.view');
-        $canViewCredentials = $user->canDo('credentials.view');
+        $vault = app(\App\Services\Sites\SiteCredentialAccess::class);
+        $canViewCredentials = $user->canDo('credentials.view') || $vault->query($user)->where('site_id', $site->id)->exists();
 
         $vendors = $canViewVendors
-            ? SiteVendor::query()->where('site_id', $site->id)->orderBy('service_type')->orderBy('company_name')->get()
+            ? app(\App\Services\SiteVendorAccessService::class)->query($user)->where('site_id', $site->id)->orderBy('service_type')->orderBy('company_name')->get()
                 ->map(fn (SiteVendor $vendor) => [
                     'id' => $vendor->id,
+                    'lock_version' => $vendor->lock_version ?? 1,
+                    'visibility' => $vendor->visibility ?? 'site',
                     'site_id' => $site->id,
                     'site_name' => $site->name,
                     'site_type' => $site->type,
@@ -151,26 +154,7 @@ class SiteProfileAdminPresenter
                 ])->values()
             : collect();
         $credentials = $canViewCredentials
-            ? SiteCredential::query()->where('site_id', $site->id)->with('vendor:id,company_name,service_type')->orderBy('label')->get()
-                ->map(fn (SiteCredential $credential) => [
-                    'id' => $credential->id,
-                    'site_id' => $site->id,
-                    'site_name' => $site->name,
-                    'site_type' => $site->type,
-                    'label' => $credential->label,
-                    'credential_type' => $credential->credential_type,
-                    'username' => $credential->username,
-                    'url' => $credential->url,
-                    'notes' => $credential->notes,
-                    'vendor_id' => $credential->vendor_id,
-                    'vendor_name' => $credential->vendor?->company_name,
-                    'vendor_service_type' => $credential->vendor?->service_type,
-                    'requires_reauth' => (bool) $credential->requires_reauth,
-                    'is_shareable' => (bool) $credential->is_shareable,
-                    'password_strength' => $credential->password_strength,
-                    'has_totp' => $credential->hasTotp(),
-                    'last_rotated_at' => $credential->last_rotated_at?->toDateTimeString(),
-                ])->values()
+            ? $vault->presentMany($user, $vault->query($user)->where('site_id', $site->id)->orderBy('label')->get())
             : collect();
 
         return [
@@ -184,7 +168,7 @@ class SiteProfileAdminPresenter
                 'credentials' => $canViewCredentials,
                 'vendorsManage' => ! $site->archived && $user->can('update', $site) && $user->canDo('vendors.manage'),
                 'credentialsManage' => ! $site->archived && $user->can('update', $site) && $user->canDo('credentials.manage'),
-                'credentialsReveal' => $user->canDo('credentials.reveal'),
+                'credentialsReveal' => $credentials->contains(fn ($credential) => $credential['can_reveal']),
             ],
             'href' => $canViewVendors || $canViewCredentials ? route('sites.vendors.global', ['site_id' => $site->id]) : null,
         ];

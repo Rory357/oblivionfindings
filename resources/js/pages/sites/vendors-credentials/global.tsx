@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Building2,
     CheckCircle2,
@@ -100,6 +100,8 @@ type CredentialRow = CredentialRecord & {
 };
 
 type Props = {
+    selectedCredential?: CredentialRow | null;
+    returnTo?: string | null;
     vendors: VendorRow[];
     credentials: CredentialRow[];
     sites: SiteOption[];
@@ -116,6 +118,7 @@ type Props = {
         tab?: 'vendors' | 'credentials';
     };
     can: {
+        contracts?: boolean;
         vendors: boolean;
         credentials: boolean;
         vendorsManage: boolean;
@@ -164,6 +167,8 @@ function downloadCsv(
 }
 
 export default function GlobalVendorsCredentials({
+    selectedCredential,
+    returnTo,
     vendors,
     credentials,
     sites,
@@ -173,7 +178,8 @@ export default function GlobalVendorsCredentials({
     filters,
     can,
 }: Props) {
-    const [tab, setTab] = useState<'vendors' | 'credentials'>(() => {
+    const { url: pageUrl } = usePage();
+    const [tab, setActiveTab] = useState<'vendors' | 'credentials'>(() => {
         // Deep-links (e.g. the Site Calendar credential/vendor reminders) can
         // request a starting tab via ?tab=; honour it only when the viewer can
         // actually see that tab, otherwise fall back to the permission default.
@@ -209,14 +215,33 @@ export default function GlobalVendorsCredentials({
         target: null,
     });
     const [credentialDialog, setCredentialDialog] = useState<CredentialDialog>({
-        mode: null,
-        target: null,
+        mode: selectedCredential ? 'show' : null,
+        target: selectedCredential ?? null,
     });
     const [auditOpen, setAuditOpen] = useState<{ focusLabel?: string } | null>(
         null,
     );
     const [typesOpen, setTypesOpen] = useState(false);
     const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
+
+    const setTab = (next: 'vendors' | 'credentials') => {
+        if (!can[next]) return;
+        setActiveTab(next);
+        const destination = new URL(pageUrl, 'http://local.invalid');
+        destination.searchParams.set('tab', next);
+        if (next === 'vendors')
+            destination.searchParams.delete('credential_id');
+        router.replace<Props>({
+            url: '/vendors' + destination.search + destination.hash,
+            preserveState: true,
+            preserveScroll: true,
+            props: (current) => ({
+                ...current,
+                filters: { ...current.filters, tab: next },
+                ...(next === 'vendors' ? { selectedCredential: null } : {}),
+            }),
+        });
+    };
 
     const matchSearch = useCallback(
         (fields: (string | null | undefined)[]) => {
@@ -361,13 +386,15 @@ export default function GlobalVendorsCredentials({
     });
 
     // ── quick actions (context menu) ───────────────────────────────────────
-    const copyText = (text: string, label: string) => {
+    const copyText = async (text: string, label: string) => {
         try {
-            void navigator.clipboard.writeText(text);
+            await navigator.clipboard.writeText(text);
+            toast.success(`${label} copied`);
         } catch {
-            // clipboard may be blocked
+            toast.error(
+                `Could not copy ${label.toLowerCase()}. Clipboard access is unavailable.`,
+            );
         }
-        toast.success(`${label} copied`);
     };
 
     const toggleVendorFlag = (
@@ -383,26 +410,11 @@ export default function GlobalVendorsCredentials({
             },
         );
     };
-    const markRotated = (credential: CredentialRow) => {
-        router.post(
-            `/sites/${credential.site_id}/credentials/${credential.id}/rotate`,
-            {},
-            { preserveScroll: true, preserveState: true },
-        );
-    };
-    const toggleReauth = (credential: CredentialRow) => {
-        router.patch(
-            `/sites/${credential.site_id}/credentials/${credential.id}/reauth`,
-            { requires_reauth: !credential.requires_reauth },
-            { preserveScroll: true, preserveState: true },
-        );
-    };
-
     const vendorMenuItems = (v: VendorRow): ContextMenuItem[] => [
         {
             icon: Eye,
             label: 'View details',
-            onClick: () => setVendorDialog({ mode: 'show', target: v }),
+            onClick: () => router.visit('/vendors/' + v.id),
         },
         ...(can.vendorsManage
             ? [
@@ -518,7 +530,7 @@ export default function GlobalVendorsCredentials({
     const credentialMenuItems = (c: CredentialRow): ContextMenuItem[] => {
         const word = c.credential_type === 'pin' ? 'code' : 'password';
         return [
-            ...(can.credentialsReveal
+            ...((c.can_reveal ?? can.credentialsReveal)
                 ? [
                       {
                           icon: Eye,
@@ -557,7 +569,7 @@ export default function GlobalVendorsCredentials({
                   ]
                 : []),
             { sep: true } as ContextMenuItem,
-            ...(can.credentialsManage
+            ...((c.can_manage ?? can.credentialsManage)
                 ? [
                       {
                           icon: Pencil,
@@ -567,19 +579,13 @@ export default function GlobalVendorsCredentials({
                       },
                       {
                           icon: RefreshCcw,
-                          label: 'Mark rotated now',
-                          onClick: () => markRotated(c),
-                      },
-                      {
-                          icon: ShieldCheck,
-                          label: c.requires_reauth
-                              ? 'Drop re-auth requirement'
-                              : 'Require re-auth to reveal',
-                          onClick: () => toggleReauth(c),
+                          label: 'Record external rotation',
+                          onClick: () =>
+                              setCredentialDialog({ mode: 'show', target: c }),
                       },
                   ]
                 : []),
-            ...(can.credentialsAudit
+            ...((c.can_audit ?? can.credentialsAudit)
                 ? [
                       {
                           icon: History,
@@ -588,12 +594,14 @@ export default function GlobalVendorsCredentials({
                       },
                   ]
                 : []),
-            ...(can.credentialsManage
+            ...((c.can_manage ?? can.credentialsManage)
                 ? [
                       { sep: true } as ContextMenuItem,
                       {
                           icon: Trash2,
-                          label: 'Delete credential',
+                          label: c.retired_at
+                              ? 'Restore credential'
+                              : 'Retire credential',
                           danger: true,
                           onClick: () =>
                               setCredentialDialog({
@@ -747,7 +755,6 @@ export default function GlobalVendorsCredentials({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Sites', href: '/sites' },
                 { title: 'Vendors & Credentials', href: '/vendors' },
             ]}
         >
@@ -782,6 +789,20 @@ export default function GlobalVendorsCredentials({
                         subline={sublineParts.join(' · ')}
                         actions={
                             <>
+                                {returnTo && (
+                                    <Button asChild variant="outline">
+                                        <Link href={returnTo}>
+                                            Return to source
+                                        </Link>
+                                    </Button>
+                                )}
+                                {can.contracts && (
+                                    <Button asChild variant="outline">
+                                        <Link href="/vendors/renewals">
+                                            Agreements and renewals
+                                        </Link>
+                                    </Button>
+                                )}
                                 <PageHeaderSearch
                                     value={search}
                                     onChange={setSearch}
@@ -1170,9 +1191,7 @@ export default function GlobalVendorsCredentials({
                     <VendorTable
                         rows={filteredVendors}
                         hasFilters={hasFilters}
-                        onOpen={(v) =>
-                            setVendorDialog({ mode: 'show', target: v })
-                        }
+                        onOpen={(v) => router.visit('/vendors/' + v.id)}
                         onContext={openVendorMenu}
                         menuItems={vendorMenuItems}
                     />

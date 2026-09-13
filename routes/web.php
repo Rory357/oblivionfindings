@@ -482,3 +482,5 @@ Route::middleware(['auth'])->group(function () {
     Route::redirect('/medications/{any}', '/emar/{any}')->where('any', '.*');
     Route::redirect('/emergency-access', '/emar/emergency-access');
 });
+
+require __DIR__.'/vendor-vault.php';

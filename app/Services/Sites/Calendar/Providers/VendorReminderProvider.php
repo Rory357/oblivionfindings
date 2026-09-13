@@ -7,8 +7,8 @@ use App\Services\Sites\Calendar\CalendarItem;
 use Illuminate\Support\Carbon;
 
 /**
- * Surfaces the dated vendor obligations: insurance expiry, contract renewal and
- * the next scheduled visit (active vendors only). Insurance / contract are
+ * Surfaces operational insurance expiry and the next scheduled visit (active
+ * vendors only). Restricted commercial renewals use their dedicated task provider. Insurance is
  * overdue-able (a past date is a problem); a next visit is a forward booking.
  */
 class VendorReminderProvider extends ObligationProvider
@@ -20,11 +20,12 @@ class VendorReminderProvider extends ObligationProvider
 
     public function obligations(array $siteIds, Carbon $start, Carbon $end): array
     {
-        if ($siteIds === []) {
+        $actor = auth()->user()?->fresh();
+        if ($siteIds === [] || ! $actor instanceof \App\Models\User) {
             return [];
         }
 
-        $vendors = SiteVendor::query()
+        $vendors = app(\App\Services\SiteVendorAccessService::class)->query($actor)
             ->whereIn('site_id', $siteIds)
             ->where('is_active', true)
             ->with('site:id,name,type')
@@ -36,7 +37,6 @@ class VendorReminderProvider extends ObligationProvider
             // [date, id-suffix, title-suffix, is-a-booking (never "overdue")]
             $obligations = [
                 [$vendor->insurance_expiry, '', 'insurance expiry', false],
-                [$vendor->contract_renewal_date, '-contract', 'contract renewal', false],
                 [$vendor->next_visit_date, '-visit', 'scheduled visit', true],
             ];
 

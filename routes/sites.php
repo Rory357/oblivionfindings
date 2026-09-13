@@ -178,17 +178,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Credentials
         Route::get('/credentials', [SiteCredentialController::class, 'index'])
-            ->name('sites.credentials.index')
-            ->middleware('permission:credentials.view');
+            ->name('sites.credentials.index');
         Route::post('/credentials', [SiteCredentialController::class, 'store'])
             ->name('sites.credentials.store')
             ->middleware('permission:credentials.manage');
         Route::post('/credentials/{credential}/reveal', [SiteCredentialController::class, 'reveal'])
-            ->name('sites.credentials.reveal')
-            ->middleware('permission:credentials.reveal');
+            ->name('sites.credentials.reveal')->middleware('throttle:20,1');
         Route::post('/credentials/{credential}/copy', [SiteCredentialController::class, 'copy'])
-            ->name('sites.credentials.copy')
-            ->middleware('permission:credentials.reveal');
+            ->name('sites.credentials.copy')->middleware('throttle:20,1');
+        Route::get('/credentials/{credential}/status', [SiteCredentialController::class, 'status']);
+        Route::post('/credentials/{credential}/copy-result', [SiteCredentialController::class, 'copyResult']);
+        Route::post('/credentials/{credential}/restore', [SiteCredentialController::class, 'restore'])->middleware('permission:credentials.manage');
+        Route::post('/credentials/{credential}/recover', [SiteCredentialController::class, 'recover'])->middleware('permission:credentials.manage');
+        Route::get('/credentials/{credential}/versions', [SiteCredentialController::class, 'versions'])->middleware('permission:credentials.manage');
         Route::put('/credentials/{credential}', [SiteCredentialController::class, 'update'])
             ->name('sites.credentials.update')
             ->middleware('permission:credentials.manage');
@@ -211,8 +213,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // store/update); these endpoints expose the live code and the
         // removal action. No server-side secret generation.
         Route::post('/credentials/{credential}/totp/code', [SiteCredentialController::class, 'totpCode'])
-            ->name('sites.credentials.totp.code')
-            ->middleware('permission:credentials.reveal');
+            ->name('sites.credentials.totp.code')->middleware('throttle:20,1');
         Route::delete('/credentials/{credential}/totp', [SiteCredentialController::class, 'removeTotp'])
             ->name('sites.credentials.totp.remove')
             ->middleware('permission:credentials.manage');
@@ -550,8 +551,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Global Vendors & Credentials — cross-site dashboard.
     // Pipe-OR matches the controller's view check: either permission grants access.
     Route::get('/vendors', [SiteVendorController::class, 'globalIndex'])
-        ->name('sites.vendors.global')
-        ->middleware('permission:vendors.view|credentials.view');
+        ->name('sites.vendors.global');
 
     // Cross-site reveal & audit feed (JSON) for the Vendors & Credentials page.
     // Audit access is independent from disclosure of credential values.

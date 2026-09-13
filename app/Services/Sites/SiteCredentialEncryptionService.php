@@ -42,37 +42,34 @@ class SiteCredentialEncryptionService
     }
 
     /**
-     * Re-encrypt all credentials (for key rotation)
+     * Explicit storage-key maintenance. This never attests an external change.
+     * Previous application keys must remain available until backups expire.
      */
-    public function rotateAllCredentials(): int
+    public function rotateAllCredentials(\App\Models\User $actor): int
     {
-        $count = 0;
-
-        \App\Models\SiteCredential::chunk(100, function ($credentials) use (&$count) {
-            \Illuminate\Support\Facades\DB::transaction(function () use ($credentials, &$count) {
-                foreach ($credentials as $credential) {
-                    try {
-                        $decrypted = $this->decrypt($credential->encrypted_value);
-                        $newEncrypted = $this->encrypt($decrypted);
-
-                        $credential->update([
-                            'encrypted_value' => $newEncrypted['value'],
-                            'last_rotated_at' => now(),
-                        ]);
-
-                        $count++;
-                    } catch (\Exception $e) {
-                        \Log::error('Failed to rotate credential', [
-                            'credential_id' => $credential->id,
-                            'error' => $e->getMessage(),
-                        ]);
-                        throw $e; // Re-throw to rollback the chunk transaction
-                    }
-                }
-            });
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($actor) {
+            $actor = \App\Models\User::findOrFail($actor->id);
+            $access = app(SiteCredentialAccess::class);
+            $count = 0;
+            foreach (\App\Models\SiteCredential::orderBy('id')->lockForUpdate()->get() as $credential) {
+                $access->authorize($actor, $credential, 'manage', true);
+                app(SiteCredentialHistory::class)->retain($credential, $actor, 'before_key_maintenance');
+                $credential->encrypted_value = $this->encrypt($this->decrypt($credential->encrypted_value))['value'];
+                if ($credential->totp_secret_encrypted) $credential->totp_secret_encrypted = Crypt::encryptString(Crypt::decryptString($credential->totp_secret_encrypted));
+                $credential->iv = null;
+                $credential->storage_key_maintained_at = now();
+                $credential->lock_version++;
+                $credential->save();
+                app(SiteCredentialHistory::class)->retain($credential, $actor, 'storage_key_maintenance');
+                \App\Models\SiteCredentialAuditLog::create([
+                    'credential_id' => $credential->id, 'site_id' => $credential->site_id,
+                    'credential_label' => $credential->label, 'credential_type' => $credential->credential_type,
+                    'user_id' => $actor->id, 'action' => 'storage_key_maintenance', 'created_at' => now(),
+                ]);
+                $count++;
+            }
+            return $count;
         });
-
-        return $count;
     }
 
     /**

@@ -14,7 +14,16 @@ class SiteCredential extends Model
     use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
+        'creation_key',
+        'creation_digest',
         'site_id',
+        'visibility',
+        'house_staff_access',
+        'lock_version',
+        'retired_at',
+        'rotation_kind',
+        'rotation_evidence',
+        'storage_key_maintained_at',
         'tenant_id',
         'vendor_id',
         'label',
@@ -35,6 +44,10 @@ class SiteCredential extends Model
     ];
 
     protected $casts = [
+        'house_staff_access' => 'boolean',
+        'lock_version' => 'integer',
+        'retired_at' => 'datetime',
+        'storage_key_maintained_at' => 'datetime',
         'last_rotated_at' => 'datetime',
         'requires_reauth' => 'boolean',
         'is_shareable' => 'boolean',
@@ -42,10 +55,17 @@ class SiteCredential extends Model
     ];
 
     protected $hidden = [
+        'creation_key',
+        'creation_digest',
+        'rotation_evidence',
         'encrypted_value',
         'iv',
         'totp_secret_encrypted',
     ];
+
+    // Generic application audit must never receive reusable ciphertext, secret
+    // notes or usernames. Vault history is encrypted and separately authorized.
+    protected array $auditExcludedAttributes = ['creation_key', 'creation_digest', 'encrypted_value', 'iv', 'totp_secret_encrypted', 'notes', 'username', 'url', 'totp_account', 'rotation_evidence'];
 
     public function hasTotp(): bool
     {

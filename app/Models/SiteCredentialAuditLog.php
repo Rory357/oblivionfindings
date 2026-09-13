@@ -13,6 +13,7 @@ class SiteCredentialAuditLog extends Model
 
     protected $fillable = [
         'credential_id',
+        'copy_intent_id',
         'tenant_id',
         'site_id',
         'credential_label',

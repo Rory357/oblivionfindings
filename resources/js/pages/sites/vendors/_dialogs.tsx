@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,6 +13,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+} from '@/components/wizard/shell';
 import { router, useForm } from '@inertiajs/react';
 import {
     ClipboardCheck,
@@ -116,260 +124,481 @@ function FieldError({ message }: { message?: string }) {
     return <p className="mt-1 text-xs text-status-critical">{message}</p>;
 }
 
-// ── Add ───────────────────────────────────────────────────────────────────
-
-export function AddVendorDialog({
-    siteId,
-    lockedSite,
-    sites,
-    isOpen,
-    onClose,
-}: {
-    /** When set, the vendor is locked to this site (site-context add). */
+// ── Add / edit — shared entity wizard ────────────────────────────────────
+type VendorEditorProps = {
     siteId?: number;
-    /** Optional richer locked-site card (name + type). */
     lockedSite?: SiteOption | null;
-    /** Required when adding from the global view (no siteId): show a picker. */
     sites?: SiteOption[];
-    isOpen: boolean;
     onClose: () => void;
-}) {
-    return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent style={{ maxWidth: 'min(92vw, 680px)' }}>
-                {isOpen && (
-                    <AddVendorBody
-                        siteId={siteId}
-                        lockedSite={lockedSite}
-                        sites={sites}
-                        onClose={onClose}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-    );
+    vendor?: VendorRecord;
+};
+const VENDOR_STEPS = [
+    { key: 'vendor', label: 'Vendor', blurb: 'Site and service', icon: Truck },
+    {
+        key: 'contact',
+        label: 'Contact',
+        blurb: 'How to reach them',
+        icon: Phone,
+    },
+    {
+        key: 'compliance',
+        label: 'Compliance',
+        blurb: 'Checks and site notes',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Check before saving',
+        icon: ClipboardCheck,
+    },
+];
+const CONTACT_FIELDS = [
+    'contact_name',
+    'phone',
+    'after_hours_phone',
+    'email',
+    'account_number',
+    'preferred_contact_method',
+    'is_preferred',
+];
+function vendorErrorStep(field: string) {
+    if (['site_id', 'company_name', 'service_type'].includes(field)) return 0;
+    return CONTACT_FIELDS.includes(field) ? 1 : 2;
 }
-
-function AddVendorBody({
+export function AddVendorDialog({
+    isOpen,
+    ...props
+}: VendorEditorProps & { isOpen: boolean }) {
+    return isOpen ? <VendorEditor {...props} /> : null;
+}
+export function EditVendorDialog({
+    isOpen,
+    vendor,
+    ...props
+}: Omit<VendorEditorProps, 'vendor'> & {
+    siteId: number;
+    isOpen: boolean;
+    vendor: VendorRecord | null;
+}) {
+    return isOpen && vendor ? (
+        <VendorEditor {...props} vendor={vendor} />
+    ) : null;
+}
+function VendorEditor({
     siteId,
+    vendor,
     lockedSite,
     sites,
     onClose,
-}: {
-    siteId?: number;
-    lockedSite?: SiteOption | null;
-    sites?: SiteOption[];
-    onClose: () => void;
-}) {
+}: VendorEditorProps) {
     const [pickedSiteId, setPickedSiteId] = useState<number | ''>('');
+    const [siteError, setSiteError] = useState('');
+    const [step, setStep] = useState(0);
+    const [discard, setDiscard] = useState(false);
+    const [saved, setSaved] = useState(false);
     const targetSiteId =
         siteId ?? (pickedSiteId === '' ? undefined : pickedSiteId);
-
     const form = useForm<VendorFormValues>({
-        service_type: '',
-        company_name: '',
-        contact_name: '',
-        phone: '',
-        after_hours_phone: '',
-        email: '',
-        account_number: '',
-        notes: '',
-        preferred_contact_method: 'phone',
-        is_preferred: false,
-        hs_induction_completed: false,
-        hs_induction_date: '',
-        qualifications_verified: false,
-        qualifications_notes: '',
-        insurance_verified: false,
-        insurance_expiry: '',
-        insurance_provider: '',
-        insurance_policy_number: '',
-        site_specific_hs_plan: '',
-        hs_performance_rating: '',
-        hs_last_reviewed_at: '',
+        service_type: vendor?.service_type ?? '',
+        company_name: vendor?.company_name ?? '',
+        contact_name: vendor?.contact_name ?? '',
+        phone: vendor?.phone ?? '',
+        after_hours_phone: vendor?.after_hours_phone ?? '',
+        email: vendor?.email ?? '',
+        account_number: vendor?.account_number ?? '',
+        notes: vendor?.notes ?? '',
+        preferred_contact_method: vendor?.preferred_contact_method ?? 'phone',
+        is_preferred: !!vendor?.is_preferred,
+        hs_induction_completed: !!vendor?.hs_induction_completed,
+        hs_induction_date: vendor?.hs_induction_date ?? '',
+        qualifications_verified: !!vendor?.qualifications_verified,
+        qualifications_notes: vendor?.qualifications_notes ?? '',
+        insurance_verified: !!vendor?.insurance_verified,
+        insurance_expiry: vendor?.insurance_expiry ?? '',
+        insurance_provider: vendor?.insurance_provider ?? '',
+        insurance_policy_number: vendor?.insurance_policy_number ?? '',
+        site_specific_hs_plan: vendor?.site_specific_hs_plan ?? '',
+        hs_performance_rating: vendor?.hs_performance_rating ?? '',
+        hs_last_reviewed_at: vendor?.hs_last_reviewed_at ?? '',
     });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!targetSiteId) return;
-        form.post(`/sites/${targetSiteId}/vendors`, {
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: () => onClose(),
-        });
-    };
-
-    return (
-        <form onSubmit={handleSubmit}>
-            <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                    <Truck className="h-4 w-4 text-primary" />
-                    Add vendor
-                </DialogTitle>
-                <DialogDescription>
-                    Vendor will be associated with the selected site only.
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                    {siteId ? (
-                        lockedSite ? (
-                            <LockedSiteCard
-                                site={lockedSite}
-                                note="Vendor is scoped to this site."
-                            />
-                        ) : null
-                    ) : (
-                        <SitePickerField
-                            sites={sites ?? []}
-                            value={pickedSiteId}
-                            onChange={setPickedSiteId}
-                        />
-                    )}
-                </div>
-                <VendorFields form={form} />
-            </div>
-
-            <DialogFooter className="mt-4">
-                <Button type="button" variant="outline" onClick={onClose}>
-                    Cancel
-                </Button>
-                <Button
-                    type="submit"
-                    disabled={form.processing || !targetSiteId}
-                >
-                    {form.processing && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Save vendor
-                </Button>
-            </DialogFooter>
-        </form>
-    );
-}
-
-// ── Edit ──────────────────────────────────────────────────────────────────
-
-export function EditVendorDialog({
-    siteId,
-    vendor,
-    lockedSite,
-    isOpen,
-    onClose,
-}: {
-    siteId: number;
-    vendor: VendorRecord | null;
-    lockedSite?: SiteOption | null;
-    isOpen: boolean;
-    onClose: () => void;
-}) {
-    return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent style={{ maxWidth: 'min(92vw, 680px)' }}>
-                {isOpen && vendor && (
-                    <EditVendorBody
-                        siteId={siteId}
-                        vendor={vendor}
-                        lockedSite={lockedSite}
-                        onClose={onClose}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function EditVendorBody({
-    siteId,
-    vendor,
-    lockedSite,
-    onClose,
-}: {
-    siteId: number;
-    vendor: VendorRecord;
-    lockedSite?: SiteOption | null;
-    onClose: () => void;
-}) {
-    const form = useForm<VendorFormValues>({
-        service_type: vendor.service_type ?? '',
-        company_name: vendor.company_name ?? '',
-        contact_name: vendor.contact_name ?? '',
-        phone: vendor.phone ?? '',
-        after_hours_phone: vendor.after_hours_phone ?? '',
-        email: vendor.email ?? '',
-        account_number: vendor.account_number ?? '',
-        notes: vendor.notes ?? '',
-        preferred_contact_method: vendor.preferred_contact_method ?? 'phone',
-        is_preferred: !!vendor.is_preferred,
-        hs_induction_completed: !!vendor.hs_induction_completed,
-        hs_induction_date: vendor.hs_induction_date ?? '',
-        qualifications_verified: !!vendor.qualifications_verified,
-        qualifications_notes: vendor.qualifications_notes ?? '',
-        insurance_verified: !!vendor.insurance_verified,
-        insurance_expiry: vendor.insurance_expiry ?? '',
-        insurance_provider: vendor.insurance_provider ?? '',
-        insurance_policy_number: vendor.insurance_policy_number ?? '',
-        site_specific_hs_plan: vendor.site_specific_hs_plan ?? '',
-        hs_performance_rating: vendor.hs_performance_rating ?? '',
-        hs_last_reviewed_at: vendor.hs_last_reviewed_at ?? '',
-    });
-
-    const effectiveLockedSite =
+    const selectedSite =
         lockedSite ??
-        (vendor.site_name
+        sites?.find((site) => site.id === targetSiteId) ??
+        (vendor?.site_name
             ? {
-                  id: vendor.site_id ?? siteId,
+                  id: targetSiteId!,
                   name: vendor.site_name,
                   type: vendor.site_type ?? '',
               }
             : null);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        form.put(`/sites/${siteId}/vendors/${vendor.id}`, {
+    const dirty = !saved && (form.isDirty || pickedSiteId !== '');
+    const close = () => {
+        if (form.processing) return;
+        if (dirty) setDiscard(true);
+        else onClose();
+    };
+    const validateIdentity = () => {
+        form.clearErrors('company_name', 'service_type');
+        setSiteError(targetSiteId ? '' : 'Select a site for this vendor.');
+        if (!form.data.company_name.trim())
+            form.setError('company_name', 'Enter the company name.');
+        if (!form.data.service_type.trim())
+            form.setError('service_type', 'Enter the service type.');
+        return (
+            !!targetSiteId &&
+            !!form.data.company_name.trim() &&
+            !!form.data.service_type.trim()
+        );
+    };
+    const save = () => {
+        if (form.processing) return;
+        if (!validateIdentity()) {
+            setStep(0);
+            return;
+        }
+        const options = {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => onClose(),
-        });
+            onSuccess: () => (vendor ? onClose() : setSaved(true)),
+            onError: (errors: Record<string, string>) => {
+                const firstStep = Math.min(
+                    ...Object.keys(errors).map(vendorErrorStep),
+                );
+                setStep(Number.isFinite(firstStep) ? firstStep : 0);
+            },
+        };
+        if (vendor)
+            form.put(
+                '/sites/' + targetSiteId + '/vendors/' + vendor.id,
+                options,
+            );
+        else form.post('/sites/' + targetSiteId + '/vendors', options);
     };
-
+    const filled = [
+        targetSiteId,
+        form.data.company_name.trim(),
+        form.data.service_type.trim(),
+        form.data.contact_name.trim(),
+        form.data.phone.trim() ||
+            form.data.email.trim() ||
+            form.data.after_hours_phone.trim(),
+        form.data.hs_induction_completed,
+        form.data.qualifications_verified,
+        form.data.insurance_verified,
+    ].filter(Boolean).length;
     return (
-        <form onSubmit={handleSubmit}>
-            <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                    <Pencil className="h-4 w-4 text-primary" />
-                    Edit vendor
-                </DialogTitle>
-                <DialogDescription>
-                    Update this service provider's contact details.
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {effectiveLockedSite ? (
-                    <div className="sm:col-span-2">
-                        <LockedSiteCard
-                            site={effectiveLockedSite}
-                            note="A vendor stays with its site — create a new one to move it."
+        <>
+            <WizardShell
+                open
+                onClose={close}
+                title={vendor ? 'Edit vendor' : 'Add vendor'}
+                description="Record the vendor, contact details and site compliance checks."
+                railIcon={Truck}
+                railTitle={vendor ? 'Edit vendor' : 'Add vendor'}
+                railSub={selectedSite?.name ?? 'New service provider'}
+                steps={VENDOR_STEPS}
+                stepIndex={step}
+                onStepClick={(index) => {
+                    if (!form.processing) setStep(index);
+                }}
+                pct={Math.round((filled / 8) * 100)}
+                footerStart={
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={close}
+                            disabled={form.processing}
+                        >
+                            Cancel
+                        </Button>
+                        {step > 0 && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setStep(step - 1)}
+                                disabled={form.processing}
+                            >
+                                Back
+                            </Button>
+                        )}
+                    </>
+                }
+                footerEnd={
+                    step < 3 ? (
+                        <Button
+                            type="submit"
+                            form="vendor-editor-form"
+                            disabled={form.processing}
+                        >
+                            Continue
+                        </Button>
+                    ) : (
+                        <Button
+                            type="submit"
+                            form="vendor-editor-form"
+                            disabled={form.processing}
+                        >
+                            {form.processing && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            {vendor ? 'Save changes' : 'Add vendor'}
+                        </Button>
+                    )
+                }
+                success={
+                    saved ? (
+                        <WizardSuccessPane
+                            title="Vendor added"
+                            blurb={
+                                <>
+                                    {form.data.company_name} is now available
+                                    for{' '}
+                                    {selectedSite?.name ?? 'the selected site'}.
+                                    Contracts and private files can be added
+                                    from the vendor record by someone with
+                                    contract access.
+                                </>
+                            }
+                            actions={
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            form.reset();
+                                            form.clearErrors();
+                                            setPickedSiteId('');
+                                            setSiteError('');
+                                            setStep(0);
+                                            setSaved(false);
+                                        }}
+                                    >
+                                        Add another
+                                    </Button>
+                                    <Button type="button" onClick={onClose}>
+                                        Done
+                                    </Button>
+                                </>
+                            }
                         />
-                    </div>
-                ) : null}
-                <VendorFields form={form} />
-            </div>
-
-            <DialogFooter className="mt-4">
-                <Button type="button" variant="outline" onClick={onClose}>
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={form.processing}>
-                    {form.processing && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Save changes
-                </Button>
-            </DialogFooter>
-        </form>
+                    ) : undefined
+                }
+            >
+                <form
+                    id="vendor-editor-form"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        if (step === 3) save();
+                        else if (step !== 0 || validateIdentity())
+                            setStep(step + 1);
+                    }}
+                >
+                    <WizardStepPane key={step}>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {step === 0 && (
+                                <div className="sm:col-span-2">
+                                    {siteId ? (
+                                        selectedSite ? (
+                                            <LockedSiteCard
+                                                site={selectedSite}
+                                                note="This vendor belongs to this site."
+                                            />
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground">
+                                                This vendor belongs to the
+                                                current site.
+                                            </p>
+                                        )
+                                    ) : (
+                                        <SitePickerField
+                                            sites={sites ?? []}
+                                            value={pickedSiteId}
+                                            onChange={(id) => {
+                                                setPickedSiteId(id);
+                                                setSiteError('');
+                                            }}
+                                            error={siteError}
+                                            hint="Choose the site that owns this vendor record. Sharing can be managed from the vendor record."
+                                        />
+                                    )}
+                                </div>
+                            )}
+                            {step < 3 && (
+                                <VendorFields form={form} section={step} />
+                            )}
+                            {step === 3 && (
+                                <>
+                                    <ReviewCard
+                                        icon={Truck}
+                                        title="Vendor"
+                                        onEdit={() => setStep(0)}
+                                        span
+                                    >
+                                        <ReviewRow
+                                            label="Site"
+                                            value={
+                                                selectedSite?.name ??
+                                                (targetSiteId
+                                                    ? 'Current site'
+                                                    : 'Select a site')
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Company"
+                                            value={form.data.company_name}
+                                        />
+                                        <ReviewRow
+                                            label="Service"
+                                            value={form.data.service_type}
+                                        />
+                                    </ReviewCard>
+                                    <ReviewCard
+                                        icon={Phone}
+                                        title="Contact"
+                                        onEdit={() => setStep(1)}
+                                        span
+                                    >
+                                        <ReviewRow
+                                            label="Contact"
+                                            value={form.data.contact_name}
+                                        />
+                                        <ReviewRow
+                                            label="Phone"
+                                            value={form.data.phone}
+                                        />
+                                        <ReviewRow
+                                            label="After hours"
+                                            value={form.data.after_hours_phone}
+                                        />
+                                        <ReviewRow
+                                            label="Email"
+                                            value={form.data.email}
+                                        />
+                                        <ReviewRow
+                                            label="Account number"
+                                            value={form.data.account_number}
+                                        />
+                                        <ReviewRow
+                                            label="Preferred contact"
+                                            value={
+                                                CONTACT_METHOD_LABEL[
+                                                    form.data
+                                                        .preferred_contact_method
+                                                ]
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Preferred vendor"
+                                            value={
+                                                form.data.is_preferred
+                                                    ? 'Yes'
+                                                    : 'No'
+                                            }
+                                        />
+                                    </ReviewCard>
+                                    <ReviewCard
+                                        icon={ShieldCheck}
+                                        title="Compliance"
+                                        onEdit={() => setStep(2)}
+                                        span
+                                    >
+                                        <ReviewRow
+                                            label="Site induction"
+                                            value={
+                                                form.data.hs_induction_completed
+                                                    ? 'Completed'
+                                                    : 'Not recorded'
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Induction date"
+                                            value={formatDate(
+                                                form.data.hs_induction_date,
+                                            )}
+                                        />
+                                        <ReviewRow
+                                            label="Qualifications"
+                                            value={
+                                                form.data
+                                                    .qualifications_verified
+                                                    ? 'Verified'
+                                                    : 'Not recorded'
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Qualification notes"
+                                            value={
+                                                form.data.qualifications_notes
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Insurance"
+                                            value={
+                                                form.data.insurance_verified
+                                                    ? 'Verified'
+                                                    : 'Not recorded'
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Provider"
+                                            value={form.data.insurance_provider}
+                                        />
+                                        <ReviewRow
+                                            label="Policy number"
+                                            value={
+                                                form.data
+                                                    .insurance_policy_number
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Insurance expiry"
+                                            value={formatDate(
+                                                form.data.insurance_expiry,
+                                            )}
+                                        />
+                                        <ReviewRow
+                                            label="H&S performance"
+                                            value={
+                                                HS_RATING_LABEL[
+                                                    form.data
+                                                        .hs_performance_rating
+                                                ]
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Last H&S review"
+                                            value={formatDate(
+                                                form.data.hs_last_reviewed_at,
+                                            )}
+                                        />
+                                        <ReviewRow
+                                            label="Site H&S plan"
+                                            value={
+                                                form.data.site_specific_hs_plan
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Notes"
+                                            value={form.data.notes}
+                                        />
+                                    </ReviewCard>
+                                </>
+                            )}
+                        </div>
+                    </WizardStepPane>
+                </form>
+            </WizardShell>
+            <ConfirmDialog
+                open={discard}
+                onClose={() => setDiscard(false)}
+                onConfirm={onClose}
+                title="Discard this draft?"
+                description="Your unsaved vendor changes will be lost."
+                confirmText="Discard draft"
+            />
+        </>
     );
 }
 
@@ -814,286 +1043,360 @@ export function DeleteVendorDialog({
 
 function VendorFields({
     form,
+    section,
 }: {
+    section: number;
     form: ReturnType<typeof useForm<VendorFormValues>>;
 }) {
     return (
         <>
-            <div className="sm:col-span-2">
-                <Label htmlFor="v-company">
-                    Company name <span className="text-status-critical">*</span>
-                </Label>
-                <Input
-                    id="v-company"
-                    value={form.data.company_name}
-                    onChange={(e) =>
-                        form.setData('company_name', e.target.value)
-                    }
-                    placeholder="e.g. Capital Plumbing & Gas"
-                    required
-                />
-                <FieldError message={form.errors.company_name} />
-            </div>
-            <div>
-                <Label htmlFor="v-service">
-                    Category / Service type{' '}
-                    <span className="text-status-critical">*</span>
-                </Label>
-                <Input
-                    id="v-service"
-                    value={form.data.service_type}
-                    onChange={(e) =>
-                        form.setData('service_type', e.target.value)
-                    }
-                    placeholder="e.g. Plumbing"
-                    required
-                />
-                <FieldError message={form.errors.service_type} />
-            </div>
-            <div>
-                <Label htmlFor="v-contact">Contact name</Label>
-                <Input
-                    id="v-contact"
-                    value={form.data.contact_name}
-                    onChange={(e) =>
-                        form.setData('contact_name', e.target.value)
-                    }
-                    placeholder="Primary contact"
-                />
-                <FieldError message={form.errors.contact_name} />
-            </div>
-            <div>
-                <Label htmlFor="v-phone">Phone</Label>
-                <Input
-                    id="v-phone"
-                    value={form.data.phone}
-                    onChange={(e) => form.setData('phone', e.target.value)}
-                    placeholder="+64 21 …"
-                />
-                <FieldError message={form.errors.phone} />
-            </div>
-            <div>
-                <Label htmlFor="v-after">After-hours phone</Label>
-                <Input
-                    id="v-after"
-                    value={form.data.after_hours_phone}
-                    onChange={(e) =>
-                        form.setData('after_hours_phone', e.target.value)
-                    }
-                    placeholder="+64 27 …"
-                />
-                <FieldError message={form.errors.after_hours_phone} />
-            </div>
-            <div className="sm:col-span-2">
-                <Label htmlFor="v-email">Email</Label>
-                <Input
-                    id="v-email"
-                    type="email"
-                    value={form.data.email}
-                    onChange={(e) => form.setData('email', e.target.value)}
-                    placeholder="jobs@company.co.nz"
-                />
-                <FieldError message={form.errors.email} />
-            </div>
-            <div>
-                <Label htmlFor="v-acct">Account number</Label>
-                <Input
-                    id="v-acct"
-                    value={form.data.account_number}
-                    onChange={(e) =>
-                        form.setData('account_number', e.target.value)
-                    }
-                />
-                <FieldError message={form.errors.account_number} />
-            </div>
-            <div className="sm:col-span-2">
-                <Label>Preferred contact method</Label>
-                <div className="mt-1">
-                    <TilePicker
-                        options={CONTACT_TILES}
-                        value={form.data.preferred_contact_method}
-                        onChange={(v) =>
-                            form.setData(
-                                'preferred_contact_method',
-                                v as VendorFormValues['preferred_contact_method'],
-                            )
-                        }
-                    />
-                </div>
-                <FieldError message={form.errors.preferred_contact_method} />
-            </div>
-            <div className="flex items-center gap-2 sm:col-span-2">
-                <Checkbox
-                    id="v-preferred-flag"
-                    checked={form.data.is_preferred}
-                    onCheckedChange={(checked) =>
-                        form.setData('is_preferred', !!checked)
-                    }
-                />
-                <Label
-                    htmlFor="v-preferred-flag"
-                    className="text-sm font-normal"
-                >
-                    Mark as preferred vendor for this service
-                </Label>
-            </div>
-            <div className="mt-1 border-t border-border pt-3 sm:col-span-2">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                    <ShieldCheck className="h-4 w-4 text-primary" />
-                    Compliance
-                </div>
-            </div>
-            <div className="flex items-center gap-2">
-                <Checkbox
-                    id="v-hs-induction"
-                    checked={form.data.hs_induction_completed}
-                    onCheckedChange={(checked) =>
-                        form.setData('hs_induction_completed', !!checked)
-                    }
-                />
-                <Label htmlFor="v-hs-induction" className="text-sm font-normal">
-                    Site induction completed
-                </Label>
-            </div>
-            <div>
-                <Label htmlFor="v-hs-induction-date">Induction date</Label>
-                <Input
-                    id="v-hs-induction-date"
-                    type="date"
-                    value={form.data.hs_induction_date}
-                    onChange={(e) =>
-                        form.setData('hs_induction_date', e.target.value)
-                    }
-                />
-                <FieldError message={form.errors.hs_induction_date} />
-            </div>
-            <div className="flex items-center gap-2">
-                <Checkbox
-                    id="v-qualifications"
-                    checked={form.data.qualifications_verified}
-                    onCheckedChange={(checked) =>
-                        form.setData('qualifications_verified', !!checked)
-                    }
-                />
-                <Label
-                    htmlFor="v-qualifications"
-                    className="text-sm font-normal"
-                >
-                    Qualifications verified
-                </Label>
-            </div>
-            <div className="flex items-center gap-2">
-                <Checkbox
-                    id="v-insurance"
-                    checked={form.data.insurance_verified}
-                    onCheckedChange={(checked) =>
-                        form.setData('insurance_verified', !!checked)
-                    }
-                />
-                <Label htmlFor="v-insurance" className="text-sm font-normal">
-                    Insurance verified
-                </Label>
-            </div>
-            <div>
-                <Label htmlFor="v-insurance-provider">Insurance provider</Label>
-                <Input
-                    id="v-insurance-provider"
-                    value={form.data.insurance_provider}
-                    onChange={(e) =>
-                        form.setData('insurance_provider', e.target.value)
-                    }
-                />
-                <FieldError message={form.errors.insurance_provider} />
-            </div>
-            <div>
-                <Label htmlFor="v-insurance-expiry">Insurance expiry</Label>
-                <Input
-                    id="v-insurance-expiry"
-                    type="date"
-                    value={form.data.insurance_expiry}
-                    onChange={(e) =>
-                        form.setData('insurance_expiry', e.target.value)
-                    }
-                />
-                <FieldError message={form.errors.insurance_expiry} />
-            </div>
-            <div>
-                <Label htmlFor="v-insurance-policy">Policy number</Label>
-                <Input
-                    id="v-insurance-policy"
-                    value={form.data.insurance_policy_number}
-                    onChange={(e) =>
-                        form.setData('insurance_policy_number', e.target.value)
-                    }
-                />
-                <FieldError message={form.errors.insurance_policy_number} />
-            </div>
-            <div>
-                <Label>H&S performance</Label>
-                <div className="mt-1">
-                    <FilterSelect
-                        value={form.data.hs_performance_rating}
-                        onChange={(value) =>
-                            form.setData('hs_performance_rating', value)
-                        }
-                        options={HS_RATING_OPTIONS}
-                        widthClass="w-full"
-                        aria-label="H&S performance rating"
-                    />
-                </div>
-                <FieldError message={form.errors.hs_performance_rating} />
-            </div>
-            <div>
-                <Label htmlFor="v-hs-reviewed">Last H&S review</Label>
-                <Input
-                    id="v-hs-reviewed"
-                    type="date"
-                    value={form.data.hs_last_reviewed_at}
-                    onChange={(e) =>
-                        form.setData('hs_last_reviewed_at', e.target.value)
-                    }
-                />
-                <FieldError message={form.errors.hs_last_reviewed_at} />
-            </div>
-            <div className="sm:col-span-2">
-                <Label htmlFor="v-site-hs-plan">Site-specific H&S plan</Label>
-                <Textarea
-                    id="v-site-hs-plan"
-                    rows={2}
-                    value={form.data.site_specific_hs_plan}
-                    onChange={(e) =>
-                        form.setData('site_specific_hs_plan', e.target.value)
-                    }
-                    placeholder="Access controls, lockout process, site risks..."
-                />
-                <FieldError message={form.errors.site_specific_hs_plan} />
-            </div>
-            <div className="sm:col-span-2">
-                <Label htmlFor="v-qualification-notes">
-                    Qualification notes
-                </Label>
-                <Textarea
-                    id="v-qualification-notes"
-                    rows={2}
-                    value={form.data.qualifications_notes}
-                    onChange={(e) =>
-                        form.setData('qualifications_notes', e.target.value)
-                    }
-                    placeholder="Licences sighted, expiry notes, restrictions..."
-                />
-                <FieldError message={form.errors.qualifications_notes} />
-            </div>
-            <div className="sm:col-span-2">
-                <Label htmlFor="v-notes">Notes</Label>
-                <Textarea
-                    id="v-notes"
-                    rows={2}
-                    value={form.data.notes}
-                    onChange={(e) => form.setData('notes', e.target.value)}
-                    placeholder="Account number, SLA, access notes…"
-                />
-                <FieldError message={form.errors.notes} />
-            </div>
+            {section === 0 && (
+                <>
+                    <div className="sm:col-span-2">
+                        <Label htmlFor="v-company">
+                            Company name{' '}
+                            <span className="text-status-critical">*</span>
+                        </Label>
+                        <Input
+                            id="v-company"
+                            value={form.data.company_name}
+                            onChange={(e) =>
+                                form.setData('company_name', e.target.value)
+                            }
+                            placeholder="e.g. Capital Plumbing & Gas"
+                            required
+                        />
+                        <FieldError message={form.errors.company_name} />
+                    </div>
+                    <div>
+                        <Label htmlFor="v-service">
+                            Category / Service type{' '}
+                            <span className="text-status-critical">*</span>
+                        </Label>
+                        <Input
+                            id="v-service"
+                            value={form.data.service_type}
+                            onChange={(e) =>
+                                form.setData('service_type', e.target.value)
+                            }
+                            placeholder="e.g. Plumbing"
+                            required
+                        />
+                        <FieldError message={form.errors.service_type} />
+                    </div>
+                </>
+            )}
+            {section === 1 && (
+                <>
+                    <div>
+                        <Label htmlFor="v-contact">Contact name</Label>
+                        <Input
+                            id="v-contact"
+                            value={form.data.contact_name}
+                            onChange={(e) =>
+                                form.setData('contact_name', e.target.value)
+                            }
+                            placeholder="Primary contact"
+                        />
+                        <FieldError message={form.errors.contact_name} />
+                    </div>
+                    <div>
+                        <Label htmlFor="v-phone">Phone</Label>
+                        <Input
+                            id="v-phone"
+                            value={form.data.phone}
+                            onChange={(e) =>
+                                form.setData('phone', e.target.value)
+                            }
+                            placeholder="+64 21 …"
+                        />
+                        <FieldError message={form.errors.phone} />
+                    </div>
+                    <div>
+                        <Label htmlFor="v-after">After-hours phone</Label>
+                        <Input
+                            id="v-after"
+                            value={form.data.after_hours_phone}
+                            onChange={(e) =>
+                                form.setData(
+                                    'after_hours_phone',
+                                    e.target.value,
+                                )
+                            }
+                            placeholder="+64 27 …"
+                        />
+                        <FieldError message={form.errors.after_hours_phone} />
+                    </div>
+                    <div className="sm:col-span-2">
+                        <Label htmlFor="v-email">Email</Label>
+                        <Input
+                            id="v-email"
+                            type="email"
+                            value={form.data.email}
+                            onChange={(e) =>
+                                form.setData('email', e.target.value)
+                            }
+                            placeholder="jobs@company.co.nz"
+                        />
+                        <FieldError message={form.errors.email} />
+                    </div>
+                    <div>
+                        <Label htmlFor="v-acct">Account number</Label>
+                        <Input
+                            id="v-acct"
+                            value={form.data.account_number}
+                            onChange={(e) =>
+                                form.setData('account_number', e.target.value)
+                            }
+                        />
+                        <FieldError message={form.errors.account_number} />
+                    </div>
+                    <div className="sm:col-span-2">
+                        <Label>Preferred contact method</Label>
+                        <div className="mt-1">
+                            <TilePicker
+                                options={CONTACT_TILES}
+                                value={form.data.preferred_contact_method}
+                                onChange={(v) =>
+                                    form.setData(
+                                        'preferred_contact_method',
+                                        v as VendorFormValues['preferred_contact_method'],
+                                    )
+                                }
+                            />
+                        </div>
+                        <FieldError
+                            message={form.errors.preferred_contact_method}
+                        />
+                    </div>
+                    <div className="flex items-center gap-2 sm:col-span-2">
+                        <Checkbox
+                            id="v-preferred-flag"
+                            checked={form.data.is_preferred}
+                            onCheckedChange={(checked) =>
+                                form.setData('is_preferred', !!checked)
+                            }
+                        />
+                        <Label
+                            htmlFor="v-preferred-flag"
+                            className="text-sm font-normal"
+                        >
+                            Mark as preferred vendor for this service
+                        </Label>
+                    </div>
+                </>
+            )}
+            {section === 2 && (
+                <>
+                    <div className="sm:col-span-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                            Compliance
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Checkbox
+                            id="v-hs-induction"
+                            checked={form.data.hs_induction_completed}
+                            onCheckedChange={(checked) =>
+                                form.setData(
+                                    'hs_induction_completed',
+                                    !!checked,
+                                )
+                            }
+                        />
+                        <Label
+                            htmlFor="v-hs-induction"
+                            className="text-sm font-normal"
+                        >
+                            Site induction completed
+                        </Label>
+                    </div>
+                    <div>
+                        <Label htmlFor="v-hs-induction-date">
+                            Induction date
+                        </Label>
+                        <Input
+                            id="v-hs-induction-date"
+                            type="date"
+                            value={form.data.hs_induction_date}
+                            onChange={(e) =>
+                                form.setData(
+                                    'hs_induction_date',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                        <FieldError message={form.errors.hs_induction_date} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Checkbox
+                            id="v-qualifications"
+                            checked={form.data.qualifications_verified}
+                            onCheckedChange={(checked) =>
+                                form.setData(
+                                    'qualifications_verified',
+                                    !!checked,
+                                )
+                            }
+                        />
+                        <Label
+                            htmlFor="v-qualifications"
+                            className="text-sm font-normal"
+                        >
+                            Qualifications verified
+                        </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Checkbox
+                            id="v-insurance"
+                            checked={form.data.insurance_verified}
+                            onCheckedChange={(checked) =>
+                                form.setData('insurance_verified', !!checked)
+                            }
+                        />
+                        <Label
+                            htmlFor="v-insurance"
+                            className="text-sm font-normal"
+                        >
+                            Insurance verified
+                        </Label>
+                    </div>
+                    <div>
+                        <Label htmlFor="v-insurance-provider">
+                            Insurance provider
+                        </Label>
+                        <Input
+                            id="v-insurance-provider"
+                            value={form.data.insurance_provider}
+                            onChange={(e) =>
+                                form.setData(
+                                    'insurance_provider',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                        <FieldError message={form.errors.insurance_provider} />
+                    </div>
+                    <div>
+                        <Label htmlFor="v-insurance-expiry">
+                            Insurance expiry
+                        </Label>
+                        <Input
+                            id="v-insurance-expiry"
+                            type="date"
+                            value={form.data.insurance_expiry}
+                            onChange={(e) =>
+                                form.setData('insurance_expiry', e.target.value)
+                            }
+                        />
+                        <FieldError message={form.errors.insurance_expiry} />
+                    </div>
+                    <div>
+                        <Label htmlFor="v-insurance-policy">
+                            Policy number
+                        </Label>
+                        <Input
+                            id="v-insurance-policy"
+                            value={form.data.insurance_policy_number}
+                            onChange={(e) =>
+                                form.setData(
+                                    'insurance_policy_number',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                        <FieldError
+                            message={form.errors.insurance_policy_number}
+                        />
+                    </div>
+                    <div>
+                        <Label>H&S performance</Label>
+                        <div className="mt-1">
+                            <FilterSelect
+                                value={form.data.hs_performance_rating}
+                                onChange={(value) =>
+                                    form.setData('hs_performance_rating', value)
+                                }
+                                options={HS_RATING_OPTIONS}
+                                widthClass="w-full"
+                                aria-label="H&S performance rating"
+                            />
+                        </div>
+                        <FieldError
+                            message={form.errors.hs_performance_rating}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="v-hs-reviewed">Last H&S review</Label>
+                        <Input
+                            id="v-hs-reviewed"
+                            type="date"
+                            value={form.data.hs_last_reviewed_at}
+                            onChange={(e) =>
+                                form.setData(
+                                    'hs_last_reviewed_at',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                        <FieldError message={form.errors.hs_last_reviewed_at} />
+                    </div>
+                    <div className="sm:col-span-2">
+                        <Label htmlFor="v-site-hs-plan">
+                            Site-specific H&S plan
+                        </Label>
+                        <Textarea
+                            id="v-site-hs-plan"
+                            rows={2}
+                            value={form.data.site_specific_hs_plan}
+                            onChange={(e) =>
+                                form.setData(
+                                    'site_specific_hs_plan',
+                                    e.target.value,
+                                )
+                            }
+                            placeholder="Access controls, lockout process, site risks..."
+                        />
+                        <FieldError
+                            message={form.errors.site_specific_hs_plan}
+                        />
+                    </div>
+                    <div className="sm:col-span-2">
+                        <Label htmlFor="v-qualification-notes">
+                            Qualification notes
+                        </Label>
+                        <Textarea
+                            id="v-qualification-notes"
+                            rows={2}
+                            value={form.data.qualifications_notes}
+                            onChange={(e) =>
+                                form.setData(
+                                    'qualifications_notes',
+                                    e.target.value,
+                                )
+                            }
+                            placeholder="Licences sighted, expiry notes, restrictions..."
+                        />
+                        <FieldError
+                            message={form.errors.qualifications_notes}
+                        />
+                    </div>
+                    <div className="sm:col-span-2">
+                        <Label htmlFor="v-notes">Notes</Label>
+                        <Textarea
+                            id="v-notes"
+                            rows={2}
+                            value={form.data.notes}
+                            onChange={(e) =>
+                                form.setData('notes', e.target.value)
+                            }
+                            placeholder="Non-sensitive site or service notes…"
+                        />
+                        <FieldError message={form.errors.notes} />
+                    </div>
+                </>
+            )}
         </>
     );
 }

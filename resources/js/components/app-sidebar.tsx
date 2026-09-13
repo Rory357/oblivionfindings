@@ -14,6 +14,7 @@ import {
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useStableValue } from '@/hooks/use-stable-value';
 import { cn, resolveUrl } from '@/lib/utils';
+import { vendorRegisterTab } from '@/lib/vendor-navigation';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
@@ -248,6 +249,11 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     const normalizedCurrentPath = normalizePath(currentPath);
     const normalizedItemPath = normalizePath(itemPath);
 
+    if (normalizedItemPath === '/vendors') {
+        const selected = vendorRegisterTab(current);
+        return selected ? 3000 + item.length : -1;
+    }
+
     if (itemQuery.length > 0) {
         return normalizedCurrentPath === normalizedItemPath &&
             currentQuery === itemQuery
@@ -293,6 +299,7 @@ export function isIconActive(
     if (item.href) {
         return matchScore(currentUrl, item.href) > 0;
     }
+    if (item.id === 'sites' && vendorRegisterTab(currentUrl)) return false;
     if (item.id === 'operations' && isWorkforceUrl(currentUrl)) {
         return false;
     }
@@ -655,7 +662,9 @@ function buildIconNavItems({
         can?.it?.view ||
         can?.it?.request ||
         can?.it?.knowledge_author ||
-        can?.it?.knowledge_review
+        can?.it?.knowledge_review ||
+        can?.vendors?.view ||
+        can?.credentials?.view
     ) {
         items.push({
             id: 'it-provisioning',
@@ -796,7 +805,9 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         !can?.it?.view &&
         !can?.it?.request &&
         !can?.it?.knowledge_author &&
-        !can?.it?.knowledge_review
+        !can?.it?.knowledge_review &&
+        !can?.vendors?.view &&
+        !can?.credentials?.view
     )
         return [];
     return [
@@ -806,16 +817,23 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                 ...(can?.it?.view || can?.it?.request
                     ? [{ title: 'Service desk', href: '/it', icon: Server }]
                     : []),
-                {
-                    title:
-                        can?.it?.view ||
-                        can?.it?.knowledge_author ||
-                        can?.it?.knowledge_review
-                            ? 'Knowledge & Documentation'
-                            : 'Guides',
-                    href: '/it/knowledge',
-                    icon: BookOpen,
-                },
+                ...(can?.it?.view ||
+                can?.it?.request ||
+                can?.it?.knowledge_author ||
+                can?.it?.knowledge_review
+                    ? [
+                          {
+                              title:
+                                  can?.it?.view ||
+                                  can?.it?.knowledge_author ||
+                                  can?.it?.knowledge_review
+                                      ? 'Knowledge & Documentation'
+                                      : 'Guides',
+                              href: '/it/knowledge',
+                              icon: BookOpen,
+                          },
+                      ]
+                    : []),
                 ...(can?.it?.view
                     ? [
                           {
@@ -847,6 +865,17 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                     : []),
                 ...(can?.it?.manage
                     ? [{ title: 'Setup', href: '/it/setup', icon: Settings }]
+                    : []),
+                ...(can?.vendors?.view || can?.credentials?.view
+                    ? [
+                          {
+                              title: 'Vendors & Credentials',
+                              href: can?.vendors?.view
+                                  ? '/vendors?tab=vendors'
+                                  : '/vendors?tab=credentials',
+                              icon: Package,
+                          },
+                      ]
                     : []),
             ],
         },
@@ -898,7 +927,9 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.vendors?.view || can?.credentials?.view)
         items.push({
             title: 'Vendors & Credentials',
-            href: '/vendors',
+            href: can?.vendors?.view
+                ? '/vendors?tab=vendors'
+                : '/vendors?tab=credentials',
             icon: Package,
         });
     items.push({

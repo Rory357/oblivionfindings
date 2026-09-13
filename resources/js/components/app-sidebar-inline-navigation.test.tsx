@@ -1,3 +1,5 @@
+import type { SharedData } from '@/types';
+import { usePage } from '@inertiajs/react';
 import {
     fireEvent,
     render,
@@ -53,7 +55,7 @@ vi.mock('@inertiajs/react', async () => {
                 {children}
             </a>
         )),
-        usePage: () => page,
+        usePage: vi.fn(() => page),
     };
 });
 
@@ -66,6 +68,72 @@ vi.mock('@/hooks/use-initials', () => ({
 }));
 
 describe('inline application navigation', () => {
+    it('discovers register-only access in IT and selects filtered credential deep links without activating Sites', async () => {
+        const original = usePage<SharedData>();
+        try {
+            for (const [canVendors, canCredentials, currentUrl] of [
+                [
+                    false,
+                    true,
+                    '/vendors?tab=credentials&credential_id=17&site_id=3',
+                ],
+                [true, false, '/vendors/17?return_to=%2Fit'],
+                [true, true, '/vendors?tab=credentials&site_id=3'],
+            ] as const) {
+                vi.mocked(usePage).mockReturnValue({
+                    ...original,
+                    url: currentUrl,
+                    props: {
+                        ...original.props,
+                        auth: {
+                            ...original.props.auth,
+                            can: {
+                                sites: { viewAny: true },
+                                vendors: { view: canVendors },
+                                credentials: { view: canCredentials },
+                            },
+                        },
+                    },
+                } as never);
+                const view = render(<AppSidebar collapsed={false} />);
+                const trigger = screen.getByRole('button', {
+                    name: 'IT & Support menu',
+                });
+                await waitFor(() =>
+                    expect(trigger).toHaveAttribute('aria-expanded', 'true'),
+                );
+                const group = within(
+                    screen.getByRole('group', {
+                        name: 'IT & Support navigation',
+                    }),
+                );
+                const registerLink = group.getByRole('link', {
+                    name: 'Vendors & Credentials',
+                });
+                expect(registerLink).toHaveAttribute('aria-current', 'page');
+                expect(registerLink).toHaveAttribute(
+                    'href',
+                    canVendors
+                        ? '/vendors?tab=vendors'
+                        : '/vendors?tab=credentials',
+                );
+                expect(group.getAllByRole('link')).toHaveLength(1);
+                expect(
+                    group.queryByRole('link', {
+                        name: /Knowledge|Guides|Service desk/,
+                    }),
+                ).toBeNull();
+                expect(
+                    screen.getByRole('button', {
+                        name: 'Sites & Locations menu',
+                    }),
+                ).toHaveAttribute('aria-expanded', 'false');
+                view.unmount();
+            }
+        } finally {
+            vi.mocked(usePage).mockReturnValue(original);
+        }
+    });
     it('keeps the active Security & Devices tree inside the expanded primary sidebar', async () => {
         render(<AppSidebar collapsed={false} />);
 

@@ -1,3 +1,4 @@
+import { vendorRegisterTab } from '@/lib/vendor-navigation';
 import { Link } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -8,9 +9,11 @@ import {
     ChartNoAxesColumn,
     CircleUserRound,
     Inbox,
+    KeyRound,
     LayoutDashboard,
     Library,
     LifeBuoy,
+    Package,
     PackageCheck,
     Plug,
     Settings2,
@@ -42,6 +45,8 @@ const icons: Record<string, LucideIcon> = {
     'chart-no-axes-column': ChartNoAxesColumn,
     'circle-user-round': CircleUserRound,
     inbox: Inbox,
+    'key-round': KeyRound,
+    package: Package,
     'layout-dashboard': LayoutDashboard,
     library: Library,
     'life-buoy': LifeBuoy,
@@ -57,6 +62,9 @@ function isActive(currentUrl: string, href: string): boolean {
     const target = new URL(href, 'https://oblivion.local');
     const currentPath = current.pathname.replace(/\/$/, '');
     const targetPath = target.pathname.replace(/\/$/, '');
+
+    if (targetPath === '/vendors')
+        return vendorRegisterTab(currentUrl) !== null;
 
     if (target.searchParams.size > 0) {
         if (currentPath !== targetPath) {

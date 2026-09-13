@@ -53,8 +53,8 @@ test('credential auditors read scoped activity without receiving reveal copy TOT
         ->where('credential.id', $credential->id)->has('logs.data', 1)->missing('credential.encrypted_value'))
         ->assertDontSee('synthetic-secret-auditor-must-never-see');
     foreach (['reveal', 'copy', 'totp/code', 'rotate'] as $action) {
-        $this->actingAs($this->auditActor)->postJson("/sites/{$credential->site_id}/credentials/{$credential->id}/{$action}")
-            ->assertForbidden();
+        $response = $this->actingAs($this->auditActor)->postJson("/sites/{$credential->site_id}/credentials/{$credential->id}/{$action}");
+        $action === 'rotate' ? $response->assertForbidden() : $response->assertNotFound();
     }
     expect(SiteCredentialAuditLog::query()->where('credential_id', $credential->id)->count())->toBe(1);
 });
@@ -79,6 +79,6 @@ test('a reveal grant does not imply audit rights and revoked audit access return
         ->assertInertia(fn ($page) => $page->where('can.credentialsAudit', false)->where('can.credentialsReveal', true));
     $this->actingAs($actor)->getJson('/vendors/audit')->assertForbidden();
     $this->actingAs($actor)->get("/sites/{$credential->site_id}/credentials/{$credential->id}/audit")->assertForbidden();
-    $this->actingAs($actor)->postJson("/sites/{$credential->site_id}/credentials/{$credential->id}/reveal")
+    $this->actingAs($actor)->postJson("/sites/{$credential->site_id}/credentials/{$credential->id}/reveal", ['password' => 'password'])
         ->assertOk()->assertJsonPath('value', 'synthetic-secret-auditor-must-never-see');
 });

@@ -111,6 +111,34 @@ const navigation = [
 ];
 
 describe('IT & Support grouped navigation', () => {
+    it.each([
+        '/vendors?tab=vendors',
+        '/vendors?tab=credentials&credential_id=17',
+        '/vendors/17?return_to=%2Fit',
+    ])('keeps one register destination selected at %s', (currentUrl) => {
+        render(
+            <ItSideNavigation
+                groups={[
+                    {
+                        label: 'Vendors & access',
+                        items: [
+                            {
+                                label: 'Vendors & Credentials',
+                                href: '/vendors?tab=vendors',
+                                icon: 'package',
+                            },
+                        ],
+                    },
+                ]}
+                currentUrl={currentUrl}
+            />,
+        );
+        expect(screen.getAllByRole('link')).toHaveLength(1);
+        expect(
+            screen.getByRole('link', { name: 'Vendors & Credentials' }),
+        ).toHaveAttribute('aria-current', 'page');
+    });
+
     it('shows the four understandable groups with icon and text links', () => {
         render(<ItSideNavigation groups={navigation} currentUrl="/it/setup" />);
 

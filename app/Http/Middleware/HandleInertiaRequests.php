@@ -188,7 +188,7 @@ class HandleInertiaRequests extends Middleware
                 ? fn () => app(FinanceHubCountsService::class)->forApplication()
                 : null,
 
-            'itNavigation' => $user && str_starts_with((string) $request->route()?->getName(), 'it.')
+            'itNavigation' => $user && (str_starts_with((string) $request->route()?->getName(), 'it.') || $request->is('vendors', 'vendors/*'))
                 ? fn () => ItModuleNavigation::forUser($user)
                 : null,
 
@@ -492,11 +492,16 @@ class HandleInertiaRequests extends Middleware
      */
     protected function getUserPermissions($user): array
     {
-        return once(fn () => Cache::remember(
+        $permissions = once(fn () => Cache::remember(
             sprintf('user:%d:capabilities:%s', $user->id, self::PERMISSIONS_CACHE_VERSION),
             300,
             fn () => $this->buildUserPermissions($this->preparePermissionLookup($user)),
         ));
+        $registers = ItModuleNavigation::registerCapabilities($user);
+        $permissions['vendors']['view'] = $registers['vendors'];
+        $permissions['credentials']['view'] = $registers['credentials'];
+
+        return $permissions;
     }
 
     protected function preparePermissionLookup(User $user): User
