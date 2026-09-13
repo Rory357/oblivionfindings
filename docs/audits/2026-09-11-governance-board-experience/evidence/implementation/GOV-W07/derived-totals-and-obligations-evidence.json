@@ -1,0 +1,25 @@
+{
+  "work_package": "GOV-W07",
+  "acceptance_criteria": "GOV-A07",
+  "timestamp": "2026-09-12T00:45:00Z",
+  "status": "Verified",
+  "verification": {
+    "workflow_tests": "tests/Unit/Governance/GovernanceWorkflowServiceTest.php",
+    "presenter_tests": "tests/Unit/Governance/GovernancePresenterTest.php",
+    "passed": 11,
+    "assertions": 56,
+    "typescript": "passed"
+  },
+  "capabilities_verified": [
+    "derive_true_totals_before_sample_cap",
+    "action_items_query_uncapped_including_blocked",
+    "workflow_actions_enrichment_with_audit_fields",
+    "canonical_work_query_server_side_user_id_attribution",
+    "work_query_pagination_accessing_last_record",
+    "null_deadline_flagging_and_expired_vote_prioritization",
+    "reading_obligations_tracking_per_pack_revision",
+    "kpi_band_counts_true_open_actions",
+    "dashboard_aggregator_counts_12_risks_as_12",
+    "my_next_actions_rail_user_id_identity_match"
+  ]
+}

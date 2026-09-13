@@ -31,7 +31,7 @@ class GovernancePresenter
     {
         $cards = collect([
             $this->meetingReadinessCard($user),
-            $this->followThroughCard(),
+            $this->followThroughCard($user),
             $this->widgetCard('decisions_required', $widgets['decisions_required'] ?? null, $freshness),
             $this->widgetCard('roadmap', $widgets['roadmap'] ?? null, $freshness),
             $this->widgetCard('top_risks', $widgets['top_risks'] ?? null, $freshness),
@@ -102,10 +102,10 @@ class GovernancePresenter
             'cards_by_key' => $cardsByKey->all(),
             'workflow_summary' => $workflow['summary'] ?? ['total' => 0, 'critical' => 0, 'overdue' => 0],
             'role_actions' => $this->roleActions($user),
-            'kpi_band' => $this->buildKpiBand($widgets, $workflow),
+            'kpi_band' => $this->buildKpiBand($widgets, $workflow, $user),
             'next_meeting' => $this->buildNextMeeting($user),
             'board_pack' => $this->buildBoardPack($user),
-            'calendar_events' => $this->buildCalendarEvents(),
+            'calendar_events' => $this->buildCalendarEvents($user),
             'timeline' => $this->buildTimeline($user),
             'recently_completed' => $this->buildRecentlyCompleted($user),
         ];
@@ -115,26 +115,49 @@ class GovernancePresenter
      * 4-tile board-friendly KPI band for the top of the cockpit.
      * Derived from already-aggregated widgets so no extra queries fire.
      */
-    protected function buildKpiBand(array $widgets, array $workflow): array
+    protected function buildKpiBand(array $widgets, array $workflow, ?User $user = null): array
     {
+        $upcomingMeetingsQuery = GovernanceMeeting::query()
+            ->where('scheduled_at', '>=', now())
+            ->where('scheduled_at', '<=', now()->addDays(30))
+            ->whereNotIn('status', ['cancelled', 'archived']);
+
+        $nextMeetingQuery = GovernanceMeeting::query()
+            ->where('scheduled_at', '>=', now())
+            ->whereNotIn('status', ['cancelled', 'archived'])
+            ->orderBy('scheduled_at');
+
+        if ($user !== null) {
+            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
+                ->scopeMeetings($upcomingMeetingsQuery, $user);
+            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
+                ->scopeMeetings($nextMeetingQuery, $user);
+        }
+
         $upcomingMeetings = Schema::hasTable('governance_meetings')
-            ? GovernanceMeeting::query()
-                ->where('scheduled_at', '>=', now())
-                ->where('scheduled_at', '<=', now()->addDays(30))
-                ->whereNotIn('status', ['cancelled', 'archived'])
-                ->count()
+            ? $upcomingMeetingsQuery->count()
             : 0;
 
         $nextMeeting = Schema::hasTable('governance_meetings')
-            ? GovernanceMeeting::query()
-                ->where('scheduled_at', '>=', now())
-                ->whereNotIn('status', ['cancelled', 'archived'])
-                ->orderBy('scheduled_at')
-                ->first()
+            ? $nextMeetingQuery->first()
             : null;
 
-        $openActions = (int) ($workflow['summary']['total'] ?? 0);
-        $overdueActions = (int) ($workflow['summary']['overdue'] ?? 0);
+        if (Schema::hasTable('action_items')) {
+            $actionItemQuery = ActionItem::query()
+                ->whereIn('status', ['open', 'in_progress', 'blocked']);
+            if ($user !== null) {
+                app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
+                    ->scopeActionItems($actionItemQuery, $user);
+            }
+            $openActions = (clone $actionItemQuery)->count();
+            $overdueActions = (clone $actionItemQuery)
+                ->where('due_date', '<', now())
+                ->whereIn('status', ['open', 'in_progress'])
+                ->count();
+        } else {
+            $openActions = (int) ($workflow['summary']['total'] ?? 0);
+            $overdueActions = (int) ($workflow['summary']['overdue'] ?? 0);
+        }
 
         $topRisks = $widgets['top_risks'] ?? [];
         $risksOverAppetite = (int) ($topRisks['above_appetite'] ?? 0);
@@ -209,12 +232,18 @@ class GovernancePresenter
             return null;
         }
 
-        $meeting = GovernanceMeeting::query()
+        $meetingQuery = GovernanceMeeting::query()
             ->with(['agendaItems', 'attendances', 'boardPack', 'ceoReport', 'minutes', 'resolutions', 'chair.user', 'secretary.user'])
             ->where('scheduled_at', '>=', now())
             ->whereNotIn('status', ['cancelled', 'archived'])
-            ->orderBy('scheduled_at')
-            ->first();
+            ->orderBy('scheduled_at');
+
+        if ($user !== null) {
+            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
+                ->scopeMeetings($meetingQuery, $user);
+        }
+
+        $meeting = $meetingQuery->first();
 
         if (! $meeting) {
             return null;
@@ -261,12 +290,18 @@ class GovernancePresenter
             return null;
         }
 
-        $meeting = GovernanceMeeting::query()
+        $meetingQuery = GovernanceMeeting::query()
             ->with(['boardPack'])
             ->where('scheduled_at', '>=', now())
             ->whereNotIn('status', ['cancelled', 'archived'])
-            ->orderBy('scheduled_at')
-            ->first();
+            ->orderBy('scheduled_at');
+
+        if ($user !== null) {
+            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
+                ->scopeMeetings($meetingQuery, $user);
+        }
+
+        $meeting = $meetingQuery->first();
 
         if (! $meeting) {
             return null;
@@ -286,7 +321,8 @@ class GovernancePresenter
             'ready' => $pack !== null,
             'distributed' => $pack?->distributed_at !== null,
             'distributed_label' => $pack?->distributed_at?->timezone('Pacific/Auckland')->format('j M g:i A'),
-            'doc_count' => $pack ? (is_array($pack->document_manifest) ? count($pack->document_manifest) : 0) : 0,
+            'doc_count' => $pack ? $pack->actualDocumentCount() : 0,
+            'revision_number' => $pack?->revision_number ?? 1,
             'distributed_count' => $distributed,
             'read_count' => $readCount,
             'href' => $pack ? "/governance/packs/{$pack->id}" : "/governance/meetings/{$meeting->id}",
@@ -297,17 +333,23 @@ class GovernancePresenter
     /**
      * Calendar feed: upcoming meetings + compliance due dates + policy review dates.
      */
-    protected function buildCalendarEvents(): array
+    protected function buildCalendarEvents(?User $user = null): array
     {
         $events = collect();
         $start = now()->startOfMonth();
         $end = now()->copy()->addMonths(2)->endOfMonth();
 
         if (Schema::hasTable('governance_meetings')) {
-            GovernanceMeeting::query()
+            $meetingQuery = GovernanceMeeting::query()
                 ->whereBetween('scheduled_at', [$start, $end])
-                ->whereNotIn('status', ['cancelled', 'archived'])
-                ->get()
+                ->whereNotIn('status', ['cancelled', 'archived']);
+
+            if ($user !== null) {
+                app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
+                    ->scopeMeetings($meetingQuery, $user);
+            }
+
+            $meetingQuery->get()
                 ->each(function (GovernanceMeeting $meeting) use ($events) {
                     $events->push([
                         'id' => 'meeting-'.$meeting->id,
@@ -452,7 +494,7 @@ class GovernancePresenter
                 'held_at' => $sinceMeeting->scheduled_at?->toIso8601String(),
                 'held_label' => $sinceMeeting->scheduled_at?->timezone('Pacific/Auckland')->format('j M Y'),
             ] : null,
-            'events' => $formatted->all(),
+            'events' => $formatted->values()->all(),
         ];
     }
 
@@ -486,7 +528,7 @@ class GovernancePresenter
         if (Schema::hasTable('action_items')) {
             ActionItem::query()
                 ->with('assignedTo:id,name')
-                ->where('status', 'completed')
+                ->whereIn('status', ['complete', 'completed'])
                 ->where('completed_at', '>=', $since)
                 ->orderByDesc('completed_at')
                 ->limit(8)
@@ -505,19 +547,30 @@ class GovernancePresenter
 
         if (Schema::hasTable('meeting_minutes')) {
             MeetingMinute::query()
+                ->with('meeting:id,title')
                 ->whereIn('status', ['approved', 'signed', 'archived'])
                 ->where('updated_at', '>=', $since)
                 ->orderByDesc('updated_at')
                 ->limit(6)
                 ->get()
                 ->each(function (MeetingMinute $minute) use ($items) {
+                    $meetingId = $minute->governance_meeting_id;
+                    $meetingTitle = $minute->meeting?->title ?? "Meeting #{$meetingId}";
+                    $kind = $minute->status === 'signed' ? 'minutes_signed' : 'minutes_approved';
+                    $statusLabel = match ($minute->status) {
+                        'signed' => 'Minutes signed',
+                        'approved' => 'Minutes approved',
+                        'archived' => 'Minutes archived',
+                        default => 'Minutes updated',
+                    };
+
                     $items->push([
-                        'kind' => 'minutes_approved',
-                        'title' => 'Minutes '.$minute->status.' for meeting #'.$minute->meeting_id,
-                        'completed_at' => $minute->updated_at?->toIso8601String(),
-                        'completed_label' => $minute->updated_at?->diffForHumans(),
-                        'href' => "/governance/meetings/{$minute->meeting_id}?tab=minutes",
-                        'owner' => null,
+                        'kind' => $kind,
+                        'title' => "{$statusLabel} for {$meetingTitle}",
+                        'completed_at' => ($minute->signed_at ?? $minute->reviewed_at ?? $minute->updated_at)?->toIso8601String(),
+                        'completed_label' => ($minute->signed_at ?? $minute->reviewed_at ?? $minute->updated_at)?->diffForHumans(),
+                        'href' => "/governance/meetings/{$meetingId}?tab=minutes",
+                        'owner' => $minute->signer_name ?? $minute->reviewer_name,
                     ]);
                 });
         }
@@ -531,7 +584,7 @@ class GovernancePresenter
                 ->get()
                 ->each(function (GovernancePolicy $policy) use ($items) {
                     $items->push([
-                        'kind' => 'policy_signed',
+                        'kind' => 'policy_approved',
                         'title' => 'Policy approved: '.($policy->title ?? $policy->name ?? 'Policy #'.$policy->id),
                         'completed_at' => $policy->approved_at?->toIso8601String(),
                         'completed_label' => $policy->approved_at?->diffForHumans(),
@@ -809,12 +862,18 @@ class GovernancePresenter
 
     protected function meetingReadinessCard(?User $user): array
     {
-        $meeting = GovernanceMeeting::query()
+        $meetingQuery = GovernanceMeeting::query()
             ->with(['agendaItems', 'boardPack', 'ceoReport', 'resolutions', 'attendances'])
             ->where('scheduled_at', '>=', now())
             ->whereNotIn('status', ['archived', 'cancelled'])
-            ->orderBy('scheduled_at')
-            ->first();
+            ->orderBy('scheduled_at');
+
+        if ($user !== null) {
+            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
+                ->scopeMeetings($meetingQuery, $user);
+        }
+
+        $meeting = $meetingQuery->first();
 
         if (! $meeting) {
             return $this->makeCard(
@@ -876,27 +935,30 @@ class GovernancePresenter
         );
     }
 
-    protected function followThroughCard(): array
+    protected function followThroughCard(?User $user = null): array
     {
-        $items = ActionItem::query()
-            ->with('assignedTo:id,name')
-            ->whereIn('status', ['open', 'in_progress', 'blocked'])
-            ->orderBy('due_date')
-            ->limit(5)
-            ->get();
+        $baseQuery = ActionItem::query()
+            ->whereIn('status', ['open', 'in_progress', 'blocked']);
 
-        $overdue = $items->filter(fn (ActionItem $item) => $item->due_date && $item->due_date->isPast() && in_array($item->status, ['open', 'in_progress'], true))->count();
-        $blocked = $items->where('status', 'blocked')->count();
+        if ($user !== null) {
+            app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
+                ->scopeActionItems($baseQuery, $user);
+        }
+
+        $items = (clone $baseQuery)->with('assignedTo:id,name')->orderBy('due_date')->limit(5)->get();
+        $totalOpen = (clone $baseQuery)->count();
+        $overdue = (clone $baseQuery)->where('due_date', '<', now())->whereIn('status', ['open', 'in_progress'])->count();
+        $blocked = (clone $baseQuery)->where('status', 'blocked')->count();
 
         return $this->makeCard(
             'follow_through',
             'Follow-through',
             'Open board and committee actions that still need closure.',
-            $overdue > 0 ? 'critical' : ($blocked > 0 || $items->isNotEmpty() ? 'warning' : 'good'),
+            $overdue > 0 ? 'critical' : ($blocked > 0 || $totalOpen > 0 ? 'warning' : 'good'),
             'Governance action items',
             $this->derivedFreshness(),
             [
-                $this->metric('Open actions', $items->count(), $items->isNotEmpty() ? 'warning' : 'default'),
+                $this->metric('Open actions', $totalOpen, $totalOpen > 0 ? 'warning' : 'default'),
                 $this->metric('Overdue', $overdue, $overdue > 0 ? 'critical' : 'default'),
                 $this->metric('Blocked', $blocked, $blocked > 0 ? 'warning' : 'default'),
             ],
@@ -909,11 +971,19 @@ class GovernancePresenter
 
     protected function previousMeeting(GovernanceMeeting $meeting): ?GovernanceMeeting
     {
-        return GovernanceMeeting::query()
+        $query = GovernanceMeeting::query()
             ->where('scheduled_at', '<', $meeting->scheduled_at)
             ->whereNotIn('status', ['cancelled'])
-            ->orderByDesc('scheduled_at')
-            ->first();
+            ->orderByDesc('scheduled_at');
+
+        if ($meeting->board_committee_id) {
+            $query->where('board_committee_id', $meeting->board_committee_id);
+        } else {
+            $query->whereNull('board_committee_id')
+                ->where('meeting_type', $meeting->meeting_type);
+        }
+
+        return $query->first();
     }
 
     protected function openFollowThroughForMeeting(?GovernanceMeeting $meeting): Collection
@@ -1095,6 +1165,8 @@ class GovernancePresenter
             isset($widget['governance_envelope_total']) ? 'Governance envelope '.$this->formatCurrency($widget['governance_envelope_total']) : null,
         ]));
 
+        $isUnavailable = in_array($widget['status'] ?? 'unknown', ['unknown', 'unavailable'], true);
+
         return $this->makeCard(
             'financial',
             'Financial governance',
@@ -1102,7 +1174,12 @@ class GovernancePresenter
             $widget['status'] ?? 'unknown',
             'Governance budget and finance posted journals',
             $this->freshnessFor('financial', $freshness),
-            [
+            $isUnavailable ? [
+                $this->metric('Utilisation', '—', 'muted'),
+                $this->metric('Variance', '—', 'muted'),
+                $this->metric('Budget total', '—', 'muted'),
+                $this->metric('Actuals', '—', 'muted'),
+            ] : [
                 $this->metric('Utilisation', $this->formatPercent($widget['budget_utilization'] ?? null)),
                 $this->metric('Variance', $this->formatPercent($widget['variance'] ?? null), abs((float) ($widget['variance'] ?? 0)) >= 5 ? 'warning' : 'default'),
                 $this->metric('Budget total', $this->formatCurrency($widget['budget_total'] ?? null)),
@@ -1140,11 +1217,13 @@ class GovernancePresenter
             'Governance spend approval workflow',
             $this->freshnessFor('financial', $freshness),
             [
-                $this->metric('Pending', $pending, $pending > 0 ? 'warning' : 'default'),
-                $this->metric('Board sign-off', $boardSignoff, $boardSignoff > 0 ? 'warning' : 'default'),
-                $this->metric('Pending value', $this->formatCurrency($financialWidget['pending_spend_total'] ?? 0)),
+                $this->metric('Pending approvals', $pending, $pending > 0 ? 'warning' : 'default'),
+                $this->metric('Board threshold', $boardSignoff, $boardSignoff > 0 ? 'warning' : 'default'),
             ],
-            [],
+            array_values(array_filter([
+                $pending > 0 ? "{$pending} spend approval request(s) awaiting review." : null,
+                $boardSignoff > 0 ? "{$boardSignoff} request(s) exceed the threshold and require board sign-off." : null,
+            ])),
             '/governance/spend-approvals'
         );
     }
@@ -1158,9 +1237,16 @@ class GovernancePresenter
             return null;
         }
 
-        $count = (int) $financialWidget['sites_over_budget_count'];
-        $amount = (float) ($financialWidget['sites_over_budget_amount'] ?? 0);
-        $status = $count === 0 ? 'good' : ($count >= 3 ? 'critical' : 'warning');
+        $count = $financialWidget['sites_over_budget_count'];
+        $amount = $financialWidget['sites_over_budget_amount'] ?? null;
+        $isUnavailable = $count === null || in_array($financialWidget['status'] ?? 'unknown', ['unknown', 'unavailable'], true) || empty($financialWidget['budget_total']);
+
+        if ($isUnavailable) {
+            $status = 'unknown';
+        } else {
+            $countInt = (int) $count;
+            $status = $countInt === 0 ? 'good' : ($countInt >= 3 ? 'critical' : 'warning');
+        }
 
         return $this->makeCard(
             'sites_over_budget',
@@ -1170,10 +1256,10 @@ class GovernancePresenter
             'Finance site budget lines',
             $this->freshnessFor('financial', $freshness),
             [
-                $this->metric('Sites', $count, $count > 0 ? 'warning' : 'default'),
-                $this->metric('Overspend', $this->formatCurrency($amount), $amount > 0 ? 'warning' : 'default'),
+                $this->metric('Sites', $isUnavailable ? 'Unavailable' : (int) $count, ! $isUnavailable && (int) $count > 0 ? 'warning' : 'default'),
+                $this->metric('Overspend', $isUnavailable ? 'Unavailable' : $this->formatCurrency((float) $amount), ! $isUnavailable && (float) $amount > 0 ? 'warning' : 'default'),
             ],
-            [],
+            $isUnavailable ? ['Site budget variance data is not available for this period.'] : [],
             '/finance/budget-actuals'
         );
     }

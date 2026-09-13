@@ -50,8 +50,13 @@ const KIND_META: Record<
     },
     minutes_approved: {
         icon: FileSignature,
-        label: 'Minutes signed',
+        label: 'Minutes approved',
         tone: 'text-primary bg-primary/10',
+    },
+    minutes_signed: {
+        icon: FileSignature,
+        label: 'Minutes signed',
+        tone: 'text-status-success bg-status-success-bg',
     },
     policy_signed: {
         icon: FileSignature,

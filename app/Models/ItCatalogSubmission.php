@@ -23,6 +23,9 @@ class ItCatalogSubmission extends Model
         'result_type',
         'result_id',
         'submitted_at',
+        'catalog_version_id',
+        'contract_snapshot',
+        'input_sha256',
     ];
 
     protected $casts = [
@@ -30,6 +33,7 @@ class ItCatalogSubmission extends Model
         'schema_snapshot' => 'array',
         'submitted_values' => 'array',
         'submitted_at' => 'datetime',
+        'contract_snapshot' => 'array',
     ];
 
     protected static function booted(): void

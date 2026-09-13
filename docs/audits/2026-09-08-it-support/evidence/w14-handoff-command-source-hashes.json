@@ -1,0 +1,30 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItControlRoomHandoffService.php",
+    "sha256": "3fcafdee432587a4c65c8ca6a198003788d1b49254b5cfcd720bf381b4533540"
+  },
+  {
+    "path": "app/Domain/It/Services/ItTicketLinkService.php",
+    "sha256": "a20cf48240fcec8685324426aff4126e3b71a5597f84dc919b0284fedb83c665"
+  },
+  {
+    "path": "app/Domain/It/Presenters/ItTicketActivityPresenter.php",
+    "sha256": "e44a7c7b445d1f041413777744eb9ba5f963a69e70a8d768c541408e7229d657"
+  },
+  {
+    "path": "app/Domain/It/Presenters/ItTicketContextPresenter.php",
+    "sha256": "20ee26e9f3a4b0761420893f3f91a22850576c5eb2d38eff271dfe3863671939"
+  },
+  {
+    "path": "app/Domain/Monitoring/Presenters/MonitoringIncidentEvidencePresenter.php",
+    "sha256": "7887a31bf6387f66b1a8b41a11b1e6765c34c44f67e21f1db5fe0a6495c0bb1f"
+  },
+  {
+    "path": "tests/Feature/It/ItControlRoomHandoffTest.php",
+    "sha256": "1e2059239c5b03d74d742d9b8fd476659db712dbbf047462d546f51a87d34bdc"
+  },
+  {
+    "path": "tests/Feature/It/ItIngressContextAccessTest.php",
+    "sha256": "0446769fb98614ac03b446fa7a3cbb91083cf9fcf9e6d490197b4763492ebb8d"
+  }
+]

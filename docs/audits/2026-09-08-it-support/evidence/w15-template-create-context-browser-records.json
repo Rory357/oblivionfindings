@@ -1,0 +1,166 @@
+{
+    "token": "7848ff84e0354644",
+    "mutations_performed": false,
+    "items": [
+        {
+            "id": 1,
+            "name": "W15 7848ff84e0354644 synthetic approval request",
+            "outcome_type": "provisioning",
+            "provisioning_type": "equipment",
+            "requires_approval": 1,
+            "internal_only": 0,
+            "site_scope": null,
+            "is_published": 1,
+            "form_schema_version": 1,
+            "published_version_id": 1,
+            "lock_version": 2
+        },
+        {
+            "id": 2,
+            "name": "W15 7848ff84e0354644 synthetic service request",
+            "outcome_type": "service_request",
+            "provisioning_type": null,
+            "requires_approval": 0,
+            "internal_only": 0,
+            "site_scope": null,
+            "is_published": 1,
+            "form_schema_version": 1,
+            "published_version_id": 2,
+            "lock_version": 2
+        },
+        {
+            "id": 3,
+            "name": "W15 7848ff84e0354644 synthetic draft request",
+            "outcome_type": "service_request",
+            "provisioning_type": null,
+            "requires_approval": 0,
+            "internal_only": 0,
+            "site_scope": null,
+            "is_published": 0,
+            "form_schema_version": 1,
+            "published_version_id": null,
+            "lock_version": 1
+        },
+        {
+            "id": 4,
+            "name": "W15 7848ff84e0354644 synthetic confidential revised draft",
+            "outcome_type": "service_request",
+            "provisioning_type": null,
+            "requires_approval": 0,
+            "internal_only": 1,
+            "site_scope": null,
+            "is_published": 1,
+            "form_schema_version": 2,
+            "published_version_id": 3,
+            "lock_version": 3
+        }
+    ],
+    "create_receipts": [],
+    "template_create_receipts": [
+        {
+            "id": 1,
+            "actor_user_id": 3,
+            "resource": "provisioning-templates",
+            "request_uuid": "cb8f8ce3-8458-45d6-ab67-f38dd223658a",
+            "it_provisioning_template_id": 2,
+            "committed_configuration_version": "aa8539a633c2b7a098feb27f96d4f5e28fc2d947865d3d0f9d4b023815fae498",
+            "committed_at": "2026-09-12 17:56:19",
+            "cancelled_at": null
+        }
+    ],
+    "versions": [
+        {
+            "id": 1,
+            "catalog_item_id": 1,
+            "version": 1,
+            "provenance": "reviewed_publication",
+            "published_by": 3,
+            "contract": "{\"name\": \"W15 7848ff84e0354644 synthetic approval request\", \"slug\": \"w15-7848ff84e0354644-synthetic-approval-request\", \"category\": \"hardware\", \"site_scope\": null, \"sort_order\": 0, \"description\": \"Isolated catalogue verification only. No external fulfilment or communication.\", \"form_schema\": {\"fields\": [{\"key\": \"details\", \"max\": 2000, \"type\": \"textarea\", \"label\": \"What do you need?\", \"required\": true, \"visibility\": \"requester\"}]}, \"outcome_type\": \"provisioning\", \"search_terms\": [\"synthetic\", \"approval\"], \"internal_only\": false, \"it_service_id\": null, \"default_priority\": \"normal\", \"provisioning_type\": \"equipment\", \"requires_approval\": true, \"form_schema_version\": 1}"
+        },
+        {
+            "id": 2,
+            "catalog_item_id": 2,
+            "version": 1,
+            "provenance": "reviewed_publication",
+            "published_by": 3,
+            "contract": "{\"name\": \"W15 7848ff84e0354644 synthetic service request\", \"slug\": \"w15-7848ff84e0354644-synthetic-service-request\", \"category\": \"hardware\", \"site_scope\": null, \"sort_order\": 0, \"description\": \"Isolated catalogue verification only. No external fulfilment or communication.\", \"form_schema\": {\"fields\": [{\"key\": \"details\", \"max\": 2000, \"type\": \"textarea\", \"label\": \"What do you need?\", \"required\": true, \"visibility\": \"requester\"}]}, \"outcome_type\": \"service_request\", \"search_terms\": [\"synthetic\", \"service\"], \"internal_only\": false, \"it_service_id\": null, \"default_priority\": \"normal\", \"provisioning_type\": null, \"requires_approval\": false, \"form_schema_version\": 1}"
+        },
+        {
+            "id": 3,
+            "catalog_item_id": 4,
+            "version": 1,
+            "provenance": "reviewed_publication",
+            "published_by": 3,
+            "contract": "{\"name\": \"W15 7848ff84e0354644 synthetic versioned request\", \"slug\": \"w15-7848ff84e0354644-synthetic-versioned-request\", \"category\": \"hardware\", \"site_scope\": null, \"sort_order\": 0, \"description\": \"Isolated catalogue verification only. No external fulfilment or communication.\", \"form_schema\": {\"fields\": [{\"key\": \"details\", \"max\": 2000, \"type\": \"textarea\", \"label\": \"What do you need?\", \"required\": true, \"visibility\": \"requester\"}]}, \"outcome_type\": \"service_request\", \"search_terms\": [\"synthetic\", \"versioned\"], \"internal_only\": false, \"it_service_id\": null, \"default_priority\": \"normal\", \"provisioning_type\": null, \"requires_approval\": false, \"form_schema_version\": 1}"
+        }
+    ],
+    "submissions": [],
+    "provisioning": [
+        {
+            "id": 1,
+            "employee_profile_id": 1,
+            "created_by": 3,
+            "type": "account",
+            "status": "pending",
+            "approval_required": 1,
+            "approval_status": "pending",
+            "approved_by_user_id": null,
+            "fulfilled_by": null,
+            "evidence_summary": null
+        }
+    ],
+    "templates": [
+        {
+            "id": 1,
+            "name": "W15 7848ff84e0354644 synthetic joiner template",
+            "site_id": 1,
+            "lock_version": 1,
+            "current_version_id": 1
+        },
+        {
+            "id": 2,
+            "name": "W15 fresh authorised context template",
+            "site_id": null,
+            "lock_version": 1,
+            "current_version_id": 2
+        }
+    ],
+    "template_versions": [
+        {
+            "id": 1,
+            "provisioning_template_id": 1,
+            "version": 1,
+            "provenance": "author_saved",
+            "contract": "{\"name\": \"W15 7848ff84e0354644 synthetic joiner template\", \"tasks\": [{\"stage\": 1, \"title\": \"Record synthetic account verification\", \"action\": \"verify\", \"category\": \"account\", \"task_key\": \"account\", \"sort_order\": 0, \"description\": \"Original version: retain these manual verification instructions.\", \"request_type\": \"account\", \"trigger_fields\": [], \"due_offset_days\": 0, \"fulfiller_fields\": [\"work_email\"], \"approval_required\": true, \"evidence_required\": true, \"responsible_team_id\": null, \"dependency_task_keys\": []}], \"site_id\": 1, \"is_active\": true, \"description\": \"Synthetic manual-verification instructions; no external account is created.\", \"position_role\": null, \"lifecycle_type\": \"joiner\", \"employment_type\": null, \"selection_priority\": 0}"
+        },
+        {
+            "id": 2,
+            "provisioning_template_id": 2,
+            "version": 1,
+            "provenance": "author_saved",
+            "contract": "{\"name\": \"W15 fresh authorised context template\", \"tasks\": [{\"stage\": 1, \"title\": \"Record synthetic manual verification\", \"action\": \"verify\", \"category\": \"account\", \"task_key\": \"step-1\", \"sort_order\": 0, \"description\": \"Synthetic browser verification only; no external account action.\", \"request_type\": \"account\", \"trigger_fields\": [], \"due_offset_days\": 0, \"fulfiller_fields\": [\"employee_number\", \"work_email\", \"position_role\", \"primary_site\"], \"approval_required\": false, \"evidence_required\": false, \"responsible_team_id\": null, \"dependency_task_keys\": []}], \"site_id\": null, \"is_active\": true, \"description\": null, \"position_role\": null, \"lifecycle_type\": \"joiner\", \"employment_type\": null, \"selection_priority\": 0}"
+        }
+    ],
+    "workflows": [
+        {
+            "id": 1,
+            "provisioning_template_id": 1,
+            "template_version_id": 1,
+            "employee_profile_id": 1,
+            "status": "pending"
+        }
+    ],
+    "workflow_instructions": [
+        {
+            "id": 1,
+            "provisioning_workflow_id": 1,
+            "task_key": "account",
+            "item": "Record synthetic account verification",
+            "notes": "Original version: retain these manual verification instructions.",
+            "approval_required": 1,
+            "evidence_required": 1
+        }
+    ],
+    "catalogue_tickets": [],
+    "events": []
+}

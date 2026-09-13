@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\Monitoring\Models\MetricCurrentSummary;
 use App\Domain\Monitoring\Models\MetricSeries;
@@ -10,18 +11,21 @@ use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorDependency;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringDeadLetter;
+use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CapacityProjectionService;
 use App\Domain\Monitoring\Services\CentralSiteMonitoringReadinessService;
 use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
+use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\Monitoring\Services\MonitoringReplayService;
 use App\Domain\Monitoring\Services\MonitoringRuntimeHealthService;
 use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
 use App\Models\Client;
@@ -486,6 +490,131 @@ class MonitoringOperationsPresenter
 
     /** @param Collection<int, Monitor> $monitors @param Collection<int, Site|null> $sitesByDevice @return Collection<int, array<string, mixed>> */
     private function correlations(Collection $monitors, Collection $sitesByDevice, User $viewer): Collection
+    {
+        return $this->legacyCorrelations($monitors, $sitesByDevice, $viewer)
+            ->replace($this->nativeCorrelations($monitors, $sitesByDevice, $viewer));
+    }
+
+    /** Native links follow source occurrence, not delivery order or a shared device's older alert. */
+    private function nativeCorrelations(Collection $monitors, Collection $sitesByDevice, User $viewer): Collection
+    {
+        // Other domains keep their owning operational correlation and source rules.
+        $monitors = $monitors->filter(fn (Monitor $monitor): bool => $monitor->device->domain === 'it_infrastructure');
+        if ($monitors->isEmpty()) {
+            return collect();
+        }
+        $monitorColumn = (new DeviceEvent)->getConnection()->getQueryGrammar()->wrap('payload->monitor_id');
+        $ranked = DeviceEvent::query()->select('id')
+            ->selectRaw("ROW_NUMBER() OVER (PARTITION BY {$monitorColumn} ORDER BY occurred_at DESC, id DESC) AS issue_rank")
+            ->where('source', 'oblivion_monitoring')
+            ->whereIn('device_id', $monitors->pluck('device_id'))
+            ->whereIn('payload->monitor_id', $monitors->pluck('id'))
+            ->whereIn('event_type', MonitoringIssueEpisode::FAILURE_TYPES)
+            ->where(fn ($query) => $query->where('event_type', 'monitor_failed')->orWhereNotNull('payload->availability_episode_version'));
+        $latestIds = DeviceEvent::query()->fromSub($ranked, 'native_failures')->select('id')->where('issue_rank', 1);
+        $failures = DeviceEvent::query()->whereIn('id', $latestIds)->get()
+            ->keyBy(fn (DeviceEvent $event): int => (int) data_get($event->payload, 'monitor_id'));
+        $byId = $monitors->keyBy('id');
+        $empty = ['control_room' => null, 'it_incident' => null];
+        $result = collect();
+        $sources = collect();
+        foreach ($monitors as $monitor) {
+            $sourceMonitor = $monitor->affects_availability && $monitor->root_cause_monitor_id !== null
+                ? $byId->get($monitor->root_cause_monitor_id) : $monitor;
+            $failure = $sourceMonitor ? $failures->get($sourceMonitor->id) : null;
+            if ($failure === null && $monitor->affects_availability && $monitor->availability_episode === null) {
+                continue;
+            }
+            // Even a missing/invalid new issue must suppress the older legacy link.
+            $result->put($monitor->id, $empty);
+            $site = $sourceMonitor ? $sitesByDevice->get($sourceMonitor->device_id) : null;
+            if (! $viewer->canDo('securityDevices.devices.view') || ! $failure || ! $site) {
+                continue;
+            }
+            if (app(ItTicketLinkService::class)->canonicalDeviceSiteId($sourceMonitor->device) !== (int) $site->id) {
+                continue;
+            }
+            $episode = MonitoringIssueEpisode::fromEvent($failure, (int) $site->id);
+            $current = MonitoringIssueEpisode::current($sourceMonitor, (int) $site->id);
+            if ($episode === null || ($current !== null && $current['key'] !== $episode['key'])
+                || ! MonitoringIssueEpisode::hasCanonicalObservations($failure, (int) $site->id)) {
+                continue;
+            }
+            $sources->put($monitor->id, ['event' => $failure, 'episode' => $episode]);
+        }
+        if ($sources->isEmpty()) {
+            return $result;
+        }
+        $eventIds = $sources->pluck('event.id')->unique();
+        $signals = Signal::query()->whereHas('signalSource', fn ($query) => $query->where('slug', 'security_devices'))
+            ->whereIn('normalized_data->device_event_id', $eventIds)->latest('id')->get()
+            ->unique(fn (Signal $signal) => data_get($signal->normalized_data, 'device_event_id'))
+            ->keyBy(fn (Signal $signal) => data_get($signal->normalized_data, 'device_event_id'));
+        $alertIds = $signals->map(fn (Signal $signal) => $signal->alert_id ?? $signal->correlated_alert_id)->filter()->unique();
+        $alerts = ControlRoomAlert::query()->whereKey($alertIds)->get()->keyBy('id');
+        $readableAlertIds = $this->controlRoomAccess->readableIds($alerts, $viewer);
+        $snapshots = MonitoringIncidentEvidenceSnapshot::query()->whereIn('device_event_id', $eventIds)->latest('id')->get();
+        $tickets = ($viewer->canDo('it.view') || $viewer->canDo('it.manage'))
+            ? $this->itAccess->applyViewScope(ItTicket::query(), $viewer)
+                ->where('is_organisation_wide', false)
+                ->where(fn ($query) => $query->whereIn('id', $snapshots->pluck('it_ticket_id'))
+                    ->orWhereHas('links', fn ($links) => $links->where('relationship', 'source_alert')
+                        ->where('linkable_type', (new ControlRoomAlert)->getMorphClass())->whereIn('linkable_id', $alertIds)))
+                ->with(['links' => fn ($links) => $links->where('relationship', 'source_alert')
+                    ->where('linkable_type', (new ControlRoomAlert)->getMorphClass())->whereIn('linkable_id', $alertIds)])
+                ->orderByRaw('case when status in (?, ?, ?) then 0 else 1 end', ItTicket::OPEN_STATUSES)->orderByDesc('id')->get()
+            : collect();
+        foreach ($sources as $monitorId => $source) {
+            $event = $source['event'];
+            $episode = $source['episode'];
+            $signal = $signals->get($event->id);
+            $field = MonitoringIssueEpisode::field($event->event_type).'_key';
+            if (! $signal || (int) $signal->site_id !== $episode['site_id']
+                || $signal->external_ref !== 'device_event_'.$event->id
+                || $signal->signal_type_code !== 'device_'.$event->event_type
+                || data_get($signal->normalized_data, MonitoringIssueEpisode::field($event->event_type).'_version') !== 1
+                || data_get($signal->normalized_data, 'canonical_device_id') !== $episode['device_id']
+                || data_get($signal->normalized_data, $field) !== $episode['key']) {
+                continue;
+            }
+            $alert = $alerts->get($signal->alert_id ?? $signal->correlated_alert_id);
+            if ($alert !== null && (int) $alert->site_id !== $episode['site_id']) {
+                continue;
+            }
+            $snapshot = $snapshots->first(fn (MonitoringIncidentEvidenceSnapshot $snapshot): bool => (int) $snapshot->device_event_id === (int) $event->id
+                && (int) $snapshot->device_id === $episode['device_id'] && (int) $snapshot->site_id === $episode['site_id']
+                && in_array($snapshot->evidence_version, [1, 2], true)
+                && $snapshot->hasValidChecksum()
+                && data_get($snapshot->snapshot, 'ticket.id') === (int) $snapshot->it_ticket_id
+                && data_get($snapshot->snapshot, 'device.id') === $episode['device_id']
+                && data_get($snapshot->snapshot, 'site.id') === $episode['site_id']
+                && data_get($snapshot->snapshot, 'observation.id') === (int) $event->id
+                && data_get($snapshot->snapshot, 'observation.event_type') === $event->event_type
+                && data_get($snapshot->snapshot, 'observation.source') === $event->source
+                && data_get($snapshot->snapshot, 'observation.'.$field) === $episode['key']);
+            $ticket = $tickets->first(fn (ItTicket $ticket): bool => (int) $ticket->site_id === $episode['site_id']
+                && (($snapshot !== null && (int) $ticket->id === (int) $snapshot->it_ticket_id)
+                    || ($alert !== null && $ticket->links->contains(fn ($link): bool => (int) $link->linkable_id === (int) $alert->id))));
+            $canViewAlert = $alert !== null && $readableAlertIds->contains((int) $alert->id);
+            $result->put($monitorId, [
+                'control_room' => $canViewAlert ? [
+                    'id' => $alert->id, 'reference' => $alert->reference_number, 'status' => $alert->status,
+                    'href' => "/control-room/alerts/{$alert->id}",
+                    'access' => ['state' => 'available', 'label' => 'Open Control Room alert'],
+                ] : null,
+                'it_incident' => $ticket ? [
+                    'id' => $ticket->id, 'reference' => $ticket->reference, 'title' => $ticket->title,
+                    'status' => $ticket->status, 'monitoring_recovered_at' => $ticket->monitoring_recovered_at?->toIso8601String(),
+                    'href' => "/it/tickets/{$ticket->id}",
+                ] : null,
+            ]);
+        }
+
+        return $result;
+    }
+
+    /** Non-IT and pre-episode records retain their existing scoped operational correlation. */
+    private function legacyCorrelations(Collection $monitors, Collection $sitesByDevice, User $viewer): Collection
     {
         $canViewControlRoom = $viewer->canDo('controlRoom.viewAny') || $viewer->canDo('controlRoom.alerts.view');
         $canViewIt = $viewer->canDo('it.view') || $viewer->canDo('it.manage');

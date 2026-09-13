@@ -1,0 +1,47 @@
+{
+  "date": "2026-09-12",
+  "reviewer": "Astra",
+  "provenance": "Manually recorded from successful tool process exit results; raw test/build streams are separate files.",
+  "checks": [
+    {
+      "name": "Governance feature/unit suite",
+      "command": "PHP 8.4 vendor/bin/pest tests/Feature/Governance tests/Unit/Governance --compact",
+      "databaseFamily": "oblivion_gov_review_20260912",
+      "exitCode": 0,
+      "passed": 281,
+      "assertions": 2148,
+      "durationSeconds": 671.42,
+      "rawOutput": "governance-suite.txt"
+    },
+    {
+      "name": "TypeScript",
+      "command": "C:/Users/steph/.hermes/node/node.exe node_modules/typescript/bin/tsc --noEmit",
+      "exitCode": 0,
+      "rawOutput": "types.txt",
+      "note": "Successful checker emitted no text."
+    },
+    {
+      "name": "Fresh Vite production assets",
+      "command": "node node_modules/vite/bin/vite.js build --outDir public/gov-review-20260912 --base /gov-review-20260912/",
+      "exitCode": 0,
+      "duration": "4m 4s",
+      "rawOutput": "build.txt",
+      "observedBrowserScript": "/gov-review-20260912/assets/app-B8MwfjgM.js"
+    },
+    {
+      "name": "Adversarial probe observations",
+      "exitCode": 0,
+      "results": [
+        "probe-results.json",
+        "extra-probe-results.json"
+      ],
+      "note": "These reproduce failures and positive controls; exit 0 means the observation scripts completed, not product acceptance passed."
+    },
+    {
+      "name": "Read-only cleanup verification",
+      "exitCode": 0,
+      "results": "cleanup-check.json",
+      "note": "Both review database families absent; temporary build absent. Owned preview process 27684 stopped and browser tab closed."
+    }
+  ]
+}

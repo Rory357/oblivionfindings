@@ -1,0 +1,22 @@
+{
+  "task_count": 24,
+  "task_updates": 24,
+  "acceptance_count": 28,
+  "acceptance_updates": 28,
+  "results": [
+    {
+      "Name": "Blocked",
+      "Count": 1
+    },
+    {
+      "Name": "Failed",
+      "Count": 24
+    },
+    {
+      "Name": "Not tested",
+      "Count": 3
+    }
+  ],
+  "finding_count": 17,
+  "broken_source_links": []
+}

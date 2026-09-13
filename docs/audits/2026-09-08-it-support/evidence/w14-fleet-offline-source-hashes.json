@@ -1,0 +1,18 @@
+[
+  {
+    "path": "app/Jobs/DetectFleetOfflineDevices.php",
+    "sha256": "3cff775701e19d525c84af9c09913a63cf9460910dde36fb2268daa1348d278c"
+  },
+  {
+    "path": "app/Services/Fleet/FleetSignalService.php",
+    "sha256": "6ceaa4a768512885b15eaf270ce4efa487558ad5be538ed13c66f27ae726f397"
+  },
+  {
+    "path": "app/Events/FleetSignalEmitted.php",
+    "sha256": "c375270083c87e6abc82a88ed0125b6429b2a7ffcb84ac7f744f7c29b2f98701"
+  },
+  {
+    "path": "tests/Feature/Fleet/FleetOfflineSignalAtomicityTest.php",
+    "sha256": "22bccc5152b5660c25d04468b2359ef2faccdfdba748ffb3e4e87318bbc890fa"
+  }
+]

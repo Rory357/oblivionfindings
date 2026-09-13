@@ -3,6 +3,7 @@
 namespace App\Http\Requests\It;
 
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Http\Requests\It\Concerns\BindsItBrowserActor;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItProvisioningTemplate;
 use App\Models\ItProvisioningTemplateTask;
@@ -12,15 +13,21 @@ use Illuminate\Validation\Validator;
 
 class StoreItProvisioningTemplateRequest extends FormRequest
 {
+    use BindsItBrowserActor;
+
     public function authorize(): bool
     {
-        return (bool) $this->user()?->canDo('it.manage');
+        return $this->user()?->isApproved() && $this->user()->canDo('it.manage') && $this->hasCurrentBrowserActor();
     }
 
     /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
+            ...$this->browserActorRules(),
+            'actor_user_id' => ['required_with:request_uuid', 'integer', 'min:1'],
+            'request_uuid' => ['sometimes', 'required', 'uuid', ...($this->isMethod('PATCH') ? ['prohibited'] : [])],
+            'expected_version' => [$this->isMethod('PATCH') ? 'required' : 'nullable', 'integer', 'min:1'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'lifecycle_type' => ['required', Rule::in(ItProvisioningTemplate::LIFECYCLE_TYPES)],

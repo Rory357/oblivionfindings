@@ -1739,177 +1739,175 @@ function buildGovernanceSubPanelGroups({
     // existing route — this only changes how items are grouped in the sidebar.
     const groups: SubPanelGroup[] = [];
 
-    // Board Meetings — the meeting lifecycle (dashboard, meetings, packs, CEO reports)
-    const boardMeetings: NavItem[] = [];
+    // 1. Overview & My work
+    const overview: NavItem[] = [];
     if (can?.governance?.view) {
-        boardMeetings.push({
-            title: 'Dashboard',
+        overview.push({
+            title: 'Overview',
             href: '/governance/dashboard',
             icon: Landmark,
         });
-        boardMeetings.push({
+        overview.push({
+            title: 'My work',
+            href: '/governance/my-work',
+            icon: ListChecks,
+        });
+        overview.push({
+            title: 'Calendar',
+            href: '/governance/meetings/calendar',
+            icon: CalendarDays,
+        });
+    }
+    if (overview.length > 0) {
+        groups.push({ label: 'Overview & My work', items: overview });
+    }
+
+    // 2. Meetings & decisions — meetings, packs, CEO reports, resolutions, actions, evaluations
+    const meetingsDecisions: NavItem[] = [];
+    if (can?.governance?.meetings?.view || can?.governance?.view) {
+        meetingsDecisions.push({
             title: 'Meetings',
             href: '/governance/meetings',
             icon: CalendarDays,
         });
     }
-    if (can?.governance?.packs?.view || can?.governance?.view) {
-        boardMeetings.push({
+    if (can?.governance?.packs?.view) {
+        meetingsDecisions.push({
             title: 'Board Packs',
             href: '/governance/packs',
             icon: FileText,
         });
     }
-    if (can?.governance?.['ceo-reports']?.view || can?.governance?.view) {
-        boardMeetings.push({
+    if (can?.governance?.['ceo-reports']?.view) {
+        meetingsDecisions.push({
             title: 'CEO Reports',
             href: '/governance/ceo-reports',
             icon: FileText,
         });
     }
-    if (boardMeetings.length > 0)
-        groups.push({ label: 'Board Meetings', items: boardMeetings });
-
-    // Decisions & Actions — resolutions, actions, evaluations
-    const decisions: NavItem[] = [];
-    if (can?.governance?.resolutions?.view || can?.governance?.view) {
-        decisions.push({
+    if (can?.governance?.resolutions?.view) {
+        meetingsDecisions.push({
             title: 'Resolutions',
             href: '/governance/resolutions',
             icon: ClipboardCheck,
         });
     }
-    if (can?.governance?.actions?.view || can?.governance?.view) {
-        decisions.push({
+    if (can?.governance?.actions?.view) {
+        meetingsDecisions.push({
             title: 'Action Items',
             href: '/governance/actions',
             icon: ClipboardList,
         });
     }
-    if (can?.governance?.evaluations?.view || can?.governance?.view) {
-        decisions.push({
+    if (can?.governance?.evaluations?.view) {
+        meetingsDecisions.push({
             title: 'Board Evaluations',
             href: '/governance/evaluations',
             icon: ClipboardCheck,
         });
     }
-    if (decisions.length > 0)
-        groups.push({ label: 'Decisions & Actions', items: decisions });
+    if (meetingsDecisions.length > 0) {
+        groups.push({ label: 'Meetings & decisions', items: meetingsDecisions });
+    }
 
-    // Risk & Compliance — register, compliance calendar, clinical, Te Tiriti
-    const risk: NavItem[] = [];
-    if (can?.governance?.risks?.view || can?.governance?.view) {
-        risk.push({
+    // 3. Oversight — risks, compliance, financial, strategy, policies, evidence
+    const oversight: NavItem[] = [];
+    if (can?.governance?.risks?.view) {
+        oversight.push({
             title: 'Risk Register',
             href: '/governance/risks',
             icon: Target,
         });
     }
-    if (can?.governance?.compliance?.view || can?.governance?.view) {
-        risk.push({
+    if (can?.governance?.compliance?.view) {
+        oversight.push({
             title: 'Compliance',
             href: '/governance/compliance',
             icon: Shield,
         });
     }
-    // Operational compliance command centre (org-wide exception roll-up) — surfaced for
-    // board assurance. Distinct from the obligations register above; gate on its own view perm.
-    if (can?.compliance?.view || can?.governance?.view) {
-        risk.push({
+    if (can?.compliance?.view) {
+        oversight.push({
             title: 'Operational Compliance',
             href: '/compliance',
             icon: ShieldCheck,
         });
     }
-    if (can?.governance?.clinical?.view || can?.governance?.view) {
-        risk.push({
+    if (can?.governance?.clinical?.view) {
+        oversight.push({
             title: 'Clinical Governance',
             href: '/governance/clinical',
             icon: Shield,
         });
     }
-    if (can?.governance?.['te-tiriti']?.view || can?.governance?.view) {
-        risk.push({
+    if (can?.governance?.['te-tiriti']?.view) {
+        oversight.push({
             title: 'Te Tiriti',
             href: '/governance/te-tiriti',
             icon: Landmark,
         });
     }
-    if (risk.length > 0)
-        groups.push({ label: 'Risk & Compliance', items: risk });
-
-    // Finance & Spend — budgets and spend approvals
-    const finance: NavItem[] = [];
-    if (can?.governance?.budgets?.view || can?.governance?.view) {
-        finance.push({
+    if (can?.governance?.budgets?.view) {
+        oversight.push({
             title: 'Budgets',
             href: '/governance/budgets',
             icon: DollarSign,
         });
     }
     if (can?.governance?.spend?.view) {
-        finance.push({
+        oversight.push({
             title: 'Spend Approvals',
             href: '/governance/spend-approvals',
             icon: DollarSign,
         });
     }
-    if (finance.length > 0)
-        groups.push({ label: 'Finance & Spend', items: finance });
-
-    // Strategy & Performance — strategic plan and performance reviews
-    const strategy: NavItem[] = [];
-    if (can?.governance?.strategy?.view || can?.governance?.view) {
-        strategy.push({
+    if (can?.governance?.strategy?.view) {
+        oversight.push({
             title: 'Strategic Plan',
             href: '/governance/strategy',
             icon: Target,
         });
     }
-    if (can?.governance?.performance?.view || can?.governance?.view) {
-        strategy.push({
+    if (can?.governance?.performance?.view) {
+        oversight.push({
             title: 'Performance',
             href: '/governance/performance',
             icon: ClipboardCheck,
         });
     }
     if (can?.roadmap?.view) {
-        strategy.push({
+        oversight.push({
             title: 'Roadmap',
             href: '/roadmap/dashboard',
             icon: Map,
         });
     }
-    if (strategy.length > 0)
-        groups.push({ label: 'Strategy & Performance', items: strategy });
-
-    // Policies & Evidence — policies, documents, interests register
-    const policies: NavItem[] = [];
-    if (can?.governance?.policies?.view || can?.governance?.view) {
-        policies.push({
+    if (can?.governance?.policies?.view) {
+        oversight.push({
             title: 'Policies',
             href: '/governance/policies',
-            icon: FileText,
+            icon: BookOpen,
         });
     }
-    if (can?.governance?.documents?.view || can?.governance?.view) {
-        policies.push({
+    if (can?.governance?.documents?.view) {
+        oversight.push({
             title: 'Documents',
             href: '/governance/documents',
             icon: FileText,
         });
     }
-    if (can?.governance?.interests?.view || can?.governance?.view) {
-        policies.push({
+    if (can?.governance?.interests?.view) {
+        oversight.push({
             title: 'Interests Register',
             href: '/governance/interests',
             icon: ClipboardList,
         });
     }
-    if (policies.length > 0)
-        groups.push({ label: 'Policies & Evidence', items: policies });
+    if (oversight.length > 0) {
+        groups.push({ label: 'Oversight', items: oversight });
+    }
 
-    // Admin & Settings — board members, audit log, settings
+    // 4. Board administration — board members, audit log, governance settings
     const admin: NavItem[] = [];
     if (can?.governance?.meetings?.manage) {
         admin.push({
@@ -1932,8 +1930,9 @@ function buildGovernanceSubPanelGroups({
             icon: Shield,
         });
     }
-    if (admin.length > 0)
-        groups.push({ label: 'Admin & Settings', items: admin });
+    if (admin.length > 0) {
+        groups.push({ label: 'Board administration', items: admin });
+    }
 
     return groups;
 }

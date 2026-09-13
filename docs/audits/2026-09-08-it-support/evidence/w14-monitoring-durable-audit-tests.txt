@@ -1,0 +1,90 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_62435d7ef1eb46a7",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItMonitoringDeliveryRecoveryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mlost queued listener is recovered once independently of the acknowledged Control Room alert[39m[90m               [39m [90m177.38s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT insertion failure rolls back its ticket and evidence but preserves Control Room delivery for retry[39m[90m       [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexhausted failures require an explicit durable retry and preserve lifetime attempts during a queue outage[39m[90m   [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('site')[39m[90m                         [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('inactive_site')[39m[90m                [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('domain')[39m[90m                       [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('episode')[39m[90m                      [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('signal')[39m[90m                       [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90minactive source requires repair and explicit retry without discarding the approved scope binding[39m[90m            [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90munmatched recovery is explicit and unsupported device domains never create technical work[39m[90m                   [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy acknowledged events remain unverified rather than recreating already settled IT work[39m[90m                 [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequired completion audit failure rolls back the IT result and is recoverable without duplicating the alert[39m[90m [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT dispatch intent rolls back with an interrupted source acknowledgement and is prepared on retry[39m[90m           [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelivery audit counters accept bounded integers and reject free text provider material[39m[90m                      [39m [90m0.12s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\SecurityDevices\SettingsAuditTest[39m
+  [32;1m✓[39;22m[90m [39m[90muser without any settings permission is forbidden[39m[90m                                                           [39m [90m1.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcommand administrator receives the shared navigation capability and can open settings[39m[90m                       [39m [90m8.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90msettings projects real safe defaults profiles exceptions and feature support[39m[90m                                [39m [90m9.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90maudit is report permission only whitelisted record scoped and safely projected[39m[90m                             [39m [90m17.28s[39m  
+  [32;1m✓[39;22m[90m [39m[90mintegration secret mutation audit never persists reusable secret content[39m[90m                                    [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mshared audit policy redacts technical payloads but preserves safe state evidence[39m[90m                            [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdirect audit logger calls are sanitized for protected models[39m[90m                                                [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprotected audit logger derives canonical site and device scope instead of trusting callers[39m[90m                 [39m [90m17.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdevice asset link audit cannot be rehomed by unrelated caller context[39m[90m                                      [39m [90m25.24s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdevice maintenance audit cannot be rehomed and has no actor fallback without a canonical parent[39m[90m            [39m [90m17.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprotected child model survey uses only unambiguous canonical device relations[39m[90m                               [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90morphan device assignment audit discards fabricated device and caller scope[39m[90m                                 [39m [90m17.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msite assignment uses the target site instead of caller scope[39m[90m                                               [39m [90m17.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mroom assignment uses the rooms site instead of caller scope[39m[90m                                                [39m [90m17.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclient assignment uses the clients site instead of caller scope[39m[90m                                            [39m [90m17.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mall sites auditors can see null site assignment evidence[39m[90m                                                   [39m [90m25.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvehicle assignment scope preserves only consistent site evidence[39m[90m                                            [39m [90m0.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvehicle audit scope never reinterprets a residential room id as a hardware room[39m[90m                             [39m [90m0.59s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfuture device audit uses only the current assignment after a site move[39m[90m                                     [39m [90m17.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistorical assignment audit uses its persisted site scope after device moves[39m[90m                               [39m [90m17.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauditable assignment resolves canonical scope once at persistence boundary[39m[90m                                  [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90msite specific integration audit is limited to accessible sites[39m[90m                                              [39m [90m8.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleted site audit remains visible only inside the persisted scope[39m[90m                                         [39m [90m17.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleted devices and assignments persist safe site ids for all canonical assignment contexts[39m[90m                 [39m [90m8.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90msite restricted group count only includes groups with visible devices[39m[90m                                       [39m [90m8.84s[39m  
+
+  [90mTests:[39m    [32;1m39 passed[39;22m[90m (631 assertions)[39m
+  [90mDuration:[39m [39m452.36s[39m
+
+{"exit_code":0,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_62435d7ef1eb46a7",
+    "database_mutations_performed": false
+}

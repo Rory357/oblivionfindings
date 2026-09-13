@@ -1,0 +1,6 @@
+{"sequence":1,"utc":"2026-09-12T00:18:01+00:00","pid":25428,"memory_bytes":2097152,"peak_memory_bytes":2097152,"phase":"prepend_started","memory_limit":"1024M"}
+{"sequence":2,"utc":"2026-09-12T00:18:01+00:00","pid":25428,"memory_bytes":14680064,"peak_memory_bytes":16777216,"phase":"event_tracer_registered"}
+{"sequence":3,"utc":"2026-09-12T00:18:01+00:00","pid":25428,"memory_bytes":16777216,"peak_memory_bytes":16777216,"phase":"phpunit_event","event":"PHPUnit\\Event\\TestRunner\\BootstrapFinished"}
+{"sequence":4,"utc":"2026-09-12T00:18:01+00:00","pid":25428,"memory_bytes":20971520,"peak_memory_bytes":20971520,"phase":"phpunit_event","event":"PHPUnit\\Event\\TestRunner\\ExecutionStarted"}
+{"sequence":5,"utc":"2026-09-12T00:18:01+00:00","pid":25428,"memory_bytes":20971520,"peak_memory_bytes":20971520,"phase":"phpunit_event","event":"PHPUnit\\Event\\Test\\BeforeFirstTestMethodFinished"}
+{"sequence":6,"utc":"2026-09-12T00:18:01+00:00","pid":25428,"memory_bytes":20971520,"peak_memory_bytes":20971520,"phase":"phpunit_event","event":"PHPUnit\\Event\\Test\\PreparationStarted","test_file":"vendor/pestphp/pest/src/Factories/TestCaseFactory.php(175) : eval()'d code","test_line":15,"test_method_hash":"9555a57178eda8b7072061bc5b4b531c404018a53a2375db52979c3b1d4c4a54"}

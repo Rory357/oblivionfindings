@@ -20,6 +20,7 @@ import {
     TicketLinkedContext,
     type TicketDeviceOption,
     type TicketLinkedAlert,
+    type TicketLinkedAsset,
     type TicketLinkedChange,
     type TicketLinkedDevice,
     type TicketLinkedMajorIncident,
@@ -209,6 +210,7 @@ interface Props {
     mergeTargets: MergeTarget[];
     linked_context: {
         devices: TicketLinkedDevice[];
+        assets?: TicketLinkedAsset[];
         alerts: TicketLinkedAlert[];
         incident_evidence: MonitoringIncidentEvidence[];
         changes: TicketLinkedChange[];
@@ -760,16 +762,21 @@ export default function ItTicketShow({
                             }
                             subline={
                                 <>
-                                    Raised by{' '}
-                                    {ticket.requester.href ? (
-                                        <Link
-                                            href={ticket.requester.href}
-                                            className="rounded-sm underline underline-offset-2 focus-visible:ring-2"
-                                        >
-                                            {ticket.requester.name}
-                                        </Link>
+                                    {ticket.source === 'system' &&
+                                    ticket.requester.id === null ? (
+                                        'Raised automatically'
+                                    ) : ticket.requester.href ? (
+                                        <>
+                                            Raised by{' '}
+                                            <Link
+                                                href={ticket.requester.href}
+                                                className="rounded-sm underline underline-offset-2 focus-visible:ring-2"
+                                            >
+                                                {ticket.requester.name}
+                                            </Link>
+                                        </>
                                     ) : (
-                                        ticket.requester.name
+                                        <>Raised by {ticket.requester.name}</>
                                     )}
                                     {ticket.created_human
                                         ? ' · ' + ticket.created_human
@@ -2153,6 +2160,7 @@ export default function ItTicketShow({
                                     deviceOptions={deviceOptions}
                                     recoveredAt={ticket.monitoring_recovered_at}
                                     devices={linked_context.devices}
+                                    assets={linked_context.assets}
                                     alerts={linked_context.alerts}
                                     incidentEvidence={
                                         linked_context.incident_evidence

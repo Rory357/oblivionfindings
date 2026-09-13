@@ -17,14 +17,25 @@ import {
 export interface WorkflowAction {
     id: string;
     area: string;
+    area_key?: string;
     title: string;
     detail: string;
     priority: Priority;
     status: WorkflowStatus;
     due_date: string | null;
+    due_at?: string | null;
     action_label: string;
     action_url: string;
     owner: string | null;
+    assignee_user_id?: number | null;
+    board_member_id?: number | null;
+    kind?: 'vote' | 'read' | 'act' | 'know';
+    source?: {
+        type: string;
+        id: number;
+        reference: string;
+        href: string;
+    };
 }
 
 interface BoardPriorityCardProps {

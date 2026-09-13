@@ -67,7 +67,14 @@ export default function PolicyShow({
     const getStatusColor = (status: string) => governanceStatusColor(status);
 
     return (
-        <AppLayout>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Policies', href: '/governance/policies' },
+                { title: policy.title, href: `/governance/policies/${policy.id}` },
+            ]}
+        >
             <Head title={policy.title} />
             <PageLayout
                 hero={

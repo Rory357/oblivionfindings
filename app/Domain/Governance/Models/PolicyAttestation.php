@@ -12,12 +12,13 @@ class PolicyAttestation extends Model
     use AuditableChanges;
 
     protected $fillable = [
-        'governance_policy_id', 'user_id', 'acknowledged', 'acknowledged_at', 'notes',
+        'governance_policy_id', 'user_id', 'policy_version', 'due_date', 'acknowledged', 'acknowledged_at', 'notes',
     ];
 
     protected $casts = [
         'acknowledged' => 'boolean',
         'acknowledged_at' => 'datetime',
+        'due_date' => 'date',
     ];
 
     public function policy(): BelongsTo

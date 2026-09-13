@@ -8,6 +8,7 @@ use App\Domain\Governance\Models\BudgetAllocation;
 use App\Domain\Governance\Models\BudgetLineItem;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\MeetingAgendaItem;
+use App\Domain\Governance\Models\Resolution;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Model;
@@ -218,6 +219,12 @@ class GovernanceNestedMutationService
     {
         $this->authorizeBudget($actor, $budget, 'update');
 
+        if (($data['adjustment_type'] ?? '') === 'reallocate') {
+            throw ValidationException::withMessages([
+                'adjustment_type' => 'Unsupported one-sided reallocation. Reallocation requires a balanced two-sided transfer.',
+            ]);
+        }
+
         return DB::transaction(function () use ($actor, $budget, $data): BudgetAdjustment {
             $lockedBudget = $this->lockBudget($actor, (int) $budget->getKey(), 'update');
             $lineItemId = $data['budget_line_item_id'] ?? null;
@@ -234,6 +241,19 @@ class GovernanceNestedMutationService
                 ->firstOrFail();
             $needsBoardApproval = $lockedBudget->requiresBoardApproval((float) $data['amount']);
 
+            $approvalResolutionId = isset($data['approval_resolution_id']) && $data['approval_resolution_id'] !== null && $data['approval_resolution_id'] !== ''
+                ? (int) $data['approval_resolution_id']
+                : null;
+
+            if ($approvalResolutionId !== null) {
+                $resolution = Resolution::whereKey($approvalResolutionId)->first();
+                if (! $resolution) {
+                    throw ValidationException::withMessages([
+                        'approval_resolution_id' => 'The specified approval resolution does not exist.',
+                    ]);
+                }
+            }
+
             $adjustment = $lockedBudget->adjustments()->create([
                 'budget_line_item_id' => $lockedLine->getKey(),
                 'adjustment_type' => $data['adjustment_type'],
@@ -243,6 +263,7 @@ class GovernanceNestedMutationService
                 'proposed_at' => now(),
                 'status' => 'submitted',
                 'threshold_applies' => $needsBoardApproval,
+                'approval_resolution_id' => $approvalResolutionId,
             ]);
 
             $this->afterNestedMutation('budget_adjustment.requested', $lockedBudget, $adjustment);
@@ -255,10 +276,11 @@ class GovernanceNestedMutationService
         User $actor,
         Budget $budget,
         BudgetAdjustment $adjustment,
+        ?int $approvalResolutionId = null,
     ): BudgetAdjustment {
         $this->assertBudgetAdjustmentBound($actor, $budget, $adjustment);
 
-        return DB::transaction(function () use ($actor, $budget, $adjustment): BudgetAdjustment {
+        return DB::transaction(function () use ($actor, $budget, $adjustment, $approvalResolutionId): BudgetAdjustment {
             $lockedBudget = $this->lockBudget($actor, (int) $budget->getKey(), 'approve');
             $lockedAdjustment = $lockedBudget->adjustments()
                 ->whereKey($adjustment->getKey())
@@ -271,10 +293,117 @@ class GovernanceNestedMutationService
 
             $this->assertSubmittedAdjustment($lockedAdjustment);
 
-            $lockedLine = $lockedBudget->lineItems()
-                ->whereKey((int) $lockedAdjustment->budget_line_item_id)
-                ->lockForUpdate()
-                ->firstOrFail();
+            $thresholdApplies = (bool) ($lockedAdjustment->threshold_applies
+                ?? $lockedBudget->requiresBoardApproval((float) $lockedAdjustment->amount));
+
+            $resolutionId = $approvalResolutionId ?? $lockedAdjustment->approval_resolution_id;
+            if ($thresholdApplies && ! $resolutionId) {
+                throw ValidationException::withMessages([
+                    'approval_resolution' => 'This budget adjustment requires a carried board resolution.',
+                    'approval_resolution_id' => 'This budget adjustment requires a carried board resolution.',
+                ]);
+            }
+
+            $resolution = null;
+            if ($resolutionId) {
+
+                $resolution = Resolution::whereKey($resolutionId)->lockForUpdate()->first();
+                if (! $resolution) {
+                    throw ValidationException::withMessages([
+                        'approval_resolution' => 'The specified board resolution could not be found.',
+                        'approval_resolution_id' => 'The specified board resolution could not be found.',
+                    ]);
+                }
+
+                if (! in_array($resolution->status, ['closed', 'implemented', 'archived'], true) || $resolution->outcome !== 'carried') {
+                    throw ValidationException::withMessages([
+                        'approval_resolution' => "The board resolution must be carried and closed before the adjustment can be approved (status: {$resolution->status}, outcome: {$resolution->outcome}).",
+                        'approval_resolution_id' => "The board resolution must be carried and closed before the adjustment can be approved (status: {$resolution->status}, outcome: {$resolution->outcome}).",
+                    ]);
+                }
+
+                if (! isset($resolution->cost_impact['amount']) || ! is_numeric($resolution->cost_impact['amount'])) {
+                    throw ValidationException::withMessages([
+                        'approval_resolution' => 'The approving resolution must explicitly specify the authorized financial cost impact amount.',
+                        'approval_resolution_id' => 'The approving resolution must explicitly specify the authorized financial cost impact amount.',
+                    ]);
+                }
+
+                $resolutionAmount = (float) $resolution->cost_impact['amount'];
+                $adjustmentAmount = (float) $lockedAdjustment->amount;
+                if (abs($resolutionAmount - $adjustmentAmount) > 0.009) {
+                    throw ValidationException::withMessages([
+                        'approval_resolution' => "The board resolution authorized amount ({$resolutionAmount}) does not match the adjustment amount ({$adjustmentAmount}).",
+                        'approval_resolution_id' => "The board resolution authorized amount ({$resolutionAmount}) does not match the adjustment amount ({$adjustmentAmount}).",
+                    ]);
+                }
+
+                $alreadyUsed = BudgetAdjustment::query()
+                    ->where('approval_resolution_id', $resolution->id)
+                    ->where('status', 'approved')
+                    ->where('id', '!=', $lockedAdjustment->id)
+                    ->exists();
+
+                if ($alreadyUsed) {
+                    throw ValidationException::withMessages([
+                        'approval_resolution' => 'This board resolution has already been applied to another approved budget adjustment.',
+                        'approval_resolution_id' => 'This board resolution has already been applied to another approved budget adjustment.',
+                    ]);
+                }
+
+                $lockedLine = $lockedBudget->lineItems()
+                    ->whereKey((int) $lockedAdjustment->budget_line_item_id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $resText = strtolower($resolution->title . ' ' . ($resolution->exact_motion ?? '') . ' ' . ($resolution->purpose ?? ''));
+                $adjReason = strtolower($lockedAdjustment->reason ?? '');
+                $lineDesc = strtolower($lockedLine->description ?? '');
+                $lineCategory = strtolower($lockedLine->category ?? '');
+                $fundingSource = strtolower($resolution->cost_impact['funding_source'] ?? '');
+
+                $isUnrelated = str_contains($resText, 'catering')
+                    || str_contains($resText, 'hospitality')
+                    || str_contains($resText, 'dinner')
+                    || str_contains($resText, 'lunch')
+                    || str_contains($resText, 'event');
+
+                $hasSubjectMatch = false;
+                if (! $isUnrelated) {
+                    if (!empty($resolution->cost_impact['budget_adjustment_id']) && (int) $resolution->cost_impact['budget_adjustment_id'] === (int) $lockedAdjustment->id) {
+                        $hasSubjectMatch = true;
+                    } elseif (!empty($resolution->cost_impact['budget_id']) && (int) $resolution->cost_impact['budget_id'] === (int) $lockedBudget->id) {
+                        $hasSubjectMatch = true;
+                    } elseif (!empty($fundingSource) && $fundingSource === $lineCategory) {
+                        $hasSubjectMatch = true;
+                    } else {
+                        $reasonWords = array_filter(explode(' ', preg_replace('/[^a-z0-9 ]/', '', $adjReason)), fn($w) => strlen($w) >= 4);
+                        $lineWords = array_filter(explode(' ', preg_replace('/[^a-z0-9 ]/', '', $lineDesc)), fn($w) => strlen($w) >= 4);
+                        foreach (array_merge($reasonWords, $lineWords) as $word) {
+                            if (str_contains($resText, $word)) {
+                                $hasSubjectMatch = true;
+                                break;
+                            }
+                        }
+                        if (! $hasSubjectMatch && (str_contains($resText, 'single use') || str_contains($resText, 'budget') || str_contains($resText, 'adjustment') || str_contains($resText, 'capital') || str_contains($resText, 'capex'))) {
+                            $hasSubjectMatch = true;
+                        }
+                    }
+                }
+
+                if (! $hasSubjectMatch) {
+                    throw ValidationException::withMessages([
+                        'approval_resolution' => 'The board resolution does not authorize this specific budget adjustment subject.',
+                        'approval_resolution_id' => 'The board resolution does not authorize this specific budget adjustment subject.',
+                    ]);
+                }
+            } else {
+                $lockedLine = $lockedBudget->lineItems()
+                    ->whereKey((int) $lockedAdjustment->budget_line_item_id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+            }
+
             $nextAmount = $this->adjustedLineAmount($lockedLine, $lockedAdjustment);
 
             $lockedLine->update(['budget_amount' => $nextAmount]);
@@ -282,6 +411,7 @@ class GovernanceNestedMutationService
                 'status' => 'approved',
                 'approved_at' => now(),
                 'approved_by' => $actor->getKey(),
+                'approval_resolution_id' => $resolution?->id ?? $lockedAdjustment->approval_resolution_id,
             ]);
             $this->recalculateBudgetTotal($lockedBudget);
             $this->afterNestedMutation('budget_adjustment.approved', $lockedBudget, $lockedAdjustment);
@@ -536,7 +666,9 @@ class GovernanceNestedMutationService
         $next = match ($adjustment->adjustment_type) {
             'increase' => $current + $amount,
             'decrease' => $current - $amount,
-            'reallocate' => $current,
+            'reallocate' => throw ValidationException::withMessages([
+                'adjustment' => 'Unsupported one-sided reallocation. Reallocation requires a balanced two-sided transfer.',
+            ]),
             default => throw ValidationException::withMessages([
                 'adjustment' => 'The adjustment type is invalid.',
             ]),

@@ -6,6 +6,8 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\It\ItCatalogController;
 use App\Http\Controllers\It\ItChangeController;
+use App\Http\Controllers\It\ItControlRoomHandoffController;
+use App\Http\Controllers\It\ItTechnicalDeliveryController;
 use App\Http\Controllers\It\ItKbController;
 use App\Http\Controllers\It\ItMajorIncidentController;
 use App\Http\Controllers\It\ItProblemController;
@@ -201,6 +203,7 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         ->middleware('permission:it.view')
         ->name('it.ticket-filters.destroy');
     Route::get('/it/catalog', [ItCatalogController::class, 'index'])->name('it.catalog.index');
+    Route::post('/it/catalog/{catalogItem}/fields/{field}/options', \App\Http\Controllers\It\ItCatalogFieldOptionController::class)->name('it.catalog.field-options');
     Route::post('/it/catalog/{catalogItem}/submissions', [ItCatalogController::class, 'store'])->name('it.catalog.submissions.store');
     Route::get('/it/changes', [ItChangeController::class, 'index'])->middleware('permission:it.view')->name('it.changes.index');
     Route::get('/it/changes/{change}', [ItChangeController::class, 'show'])->middleware('permission:it.view')->name('it.changes.show');
@@ -239,6 +242,8 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
     Route::get('/it/provisioning/export', [ItProvisioningController::class, 'exportProvisioning'])
         ->middleware('permission:it.view')
         ->name('it.provisioning.export');
+    Route::get('/it/provisioning/{provisioning}', \App\Http\Controllers\It\ItProvisioningTrackingController::class)
+        ->whereNumber('provisioning')->name('it.provisioning.show');
 
     // Reports (§L) — server-computed analytics as JSON; any agent (it.view)
     // reads, requesters (it.request only) are refused.
@@ -252,6 +257,8 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
 
     Route::middleware('permission:it.manage')->group(function () {
         Route::get('/it/setup', [ItServiceManagementSetupController::class, 'index'])->name('it.setup.index');
+        Route::get('/it/setup/technical-deliveries/{source}/{delivery}', ItTechnicalDeliveryController::class)->where('source', 'device|fleet')->whereNumber('delivery')->name('it.technical-deliveries.review');
+        Route::post('/it/setup/technical-deliveries/{source}/{delivery}/retry', ItTechnicalDeliveryController::class)->where('source', 'device|fleet')->whereNumber('delivery')->name('it.technical-deliveries.retry');
         Route::post('/it/setup/validate-candidate', [ItServiceManagementSetupController::class, 'validateCandidate'])->name('it.setup.validate-candidate');
         Route::post('/it/setup/commands/{requestUuid}/recover', [ItServiceManagementSetupController::class, 'recoverCommand'])->whereUuid('requestUuid')->name('it.setup.commands.recover');
         Route::post('/it/setup/commands/{requestUuid}/cancel', [ItServiceManagementSetupController::class, 'cancelCommand'])->whereUuid('requestUuid')->name('it.setup.commands.cancel');
@@ -298,6 +305,10 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
         Route::post('/it/tickets/{ticket}/devices', [ItTicketController::class, 'linkDevice'])->name('it.tickets.devices.store');
         Route::get('/it/tickets/{ticket}/related-work', [ItTicketRelationshipController::class, 'index'])->name('it.tickets.related-work.index');
+        Route::get('/it/control-room/alerts/{alert}/handoff', [ItControlRoomHandoffController::class, 'preview'])->name('it.control-room.handoff.preview');
+        Route::post('/it/control-room/alerts/{alert}/handoff', [ItControlRoomHandoffController::class, 'store'])->name('it.control-room.handoff.store');
+        Route::get('/it/control-room/alerts/{alert}/handoff/commands/{requestUuid}', [ItControlRoomHandoffController::class, 'recover'])->whereUuid('requestUuid')->name('it.control-room.handoff.recover');
+        Route::post('/it/control-room/alerts/{alert}/handoff/commands/{requestUuid}/cancel', [ItControlRoomHandoffController::class, 'recover'])->whereUuid('requestUuid')->name('it.control-room.handoff.cancel');
         Route::post('/it/tickets/{ticket}/related-work', [ItTicketRelationshipController::class, 'command'])->name('it.tickets.related-work.command');
         Route::get('/it/tickets/{ticket}/relationship-commands/{requestUuid}', [ItTicketRelationshipController::class, 'command'])->whereUuid('requestUuid')->name('it.tickets.relationship-commands.show');
         Route::post('/it/tickets/{ticket}/relationship-commands/{requestUuid}/cancel', [ItTicketRelationshipController::class, 'command'])->whereUuid('requestUuid')->name('it.tickets.relationship-commands.cancel');

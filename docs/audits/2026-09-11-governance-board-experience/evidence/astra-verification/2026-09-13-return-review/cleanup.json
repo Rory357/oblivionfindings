@@ -1,0 +1,19 @@
+{
+  "protected_source_hash_check": "source-integrity.json",
+  "preview_process": 43504,
+  "fixture_stop_signal": "stop-runtime.flag",
+  "finished_at": "2026-09-13T08:05:43.1756584+12:00",
+  "browser_tab_closed": true,
+  "database_inventory": "No audit/runtime/Sites test schemas or connections remain",
+  "fixture_process": 20892,
+  "database_inventory_file": "database-cleanup-check.json",
+  "preview_process_stopped": true,
+  "live_env_and_public_hot_unchanged_by_review": true,
+  "removed_owned_directories": [
+    "C:\\Users\\steph\\Herd\\oblivionfindings\\public\\build-gov-audit-20260913",
+    "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\audits\\2026-09-11-governance-board-experience\\evidence\\astra-verification\\2026-09-13-return-review\\runtime-storage"
+  ],
+  "viewport_reset": true,
+  "fixture_exit_code": 0,
+  "preview_exit_code_after_owned_stop": "-1"
+}

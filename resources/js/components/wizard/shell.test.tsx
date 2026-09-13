@@ -6,7 +6,7 @@ import {
     waitFor,
 } from '@testing-library/react';
 import { Circle } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -90,6 +90,69 @@ describe('WizardShell', () => {
             }),
         );
         expect(onStepClick).toHaveBeenCalledWith(1);
+    });
+
+    it('lets a replacement workspace retain focus after the outgoing dialog unmounts', async () => {
+        function ReplacementWorkflow() {
+            const [handoff, setHandoff] = useState(false);
+            return (
+                <WizardShell
+                    key={handoff ? 'handoff' : 'workspace'}
+                    open
+                    onClose={() => setHandoff(false)}
+                    title={handoff ? 'IT handoff' : 'Alert workspace'}
+                    description="Prepare technical work for the operational alert."
+                    railIcon={Circle}
+                    railTitle="Alert"
+                    railSub="Control Room"
+                    steps={twoSteps}
+                    stepIndex={0}
+                    onStepClick={vi.fn()}
+                    onCloseAutoFocus={
+                        handoff ? (event) => event.preventDefault() : undefined
+                    }
+                    onOpenAutoFocus={(event) => {
+                        if (!handoff && event.target instanceof HTMLElement) {
+                            const trigger =
+                                event.target.querySelector<HTMLElement>(
+                                    '[data-return-trigger]',
+                                );
+                            if (trigger) {
+                                event.preventDefault();
+                                trigger.focus();
+                            }
+                        }
+                    }}
+                >
+                    {handoff ? (
+                        <Button onClick={() => setHandoff(false)}>
+                            Back to alert
+                        </Button>
+                    ) : (
+                        <Button
+                            data-return-trigger
+                            onClick={() => setHandoff(true)}
+                        >
+                            Prepare IT handoff
+                        </Button>
+                    )}
+                </WizardShell>
+            );
+        }
+        render(<ReplacementWorkflow />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Prepare IT handoff' }),
+        );
+        await waitFor(() =>
+            expect(
+                screen.getByRole('dialog', { name: 'IT handoff' }),
+            ).toBeVisible(),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Back to alert' }));
+        await new Promise((resolve) => window.setTimeout(resolve, 20));
+        expect(
+            screen.getByRole('button', { name: 'Prepare IT handoff' }),
+        ).toHaveFocus();
     });
 
     it('wires an accessible name and description to the complete shell regions', () => {

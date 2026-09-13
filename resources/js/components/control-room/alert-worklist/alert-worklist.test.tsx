@@ -2,6 +2,7 @@ import {
     cleanup,
     fireEvent,
     render,
+    renderHook,
     screen,
     waitFor,
 } from '@testing-library/react';
@@ -9,6 +10,7 @@ import { Copy, Eye } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { useAlertWorkspaceFocusReturn } from '../use-alert-workspace-focus-return';
 import { AlertWorklist } from './alert-worklist';
 import type { AlertWorklistRow } from './types';
 
@@ -74,6 +76,66 @@ const row: AlertWorklistRow = {
 };
 
 afterEach(cleanup);
+
+describe('workspace return to its owning alert worklist', () => {
+    function worklist(rows: AlertWorklistRow[] = [row]) {
+        return (
+            <AlertWorklist
+                rows={rows}
+                selected={new Set()}
+                onSelectionChange={vi.fn()}
+                onSort={vi.fn()}
+                onOpen={vi.fn()}
+            />
+        );
+    }
+
+    it('retains the canonical row opener across a nested handoff replacement', () => {
+        render(worklist());
+        const { result } = renderHook(useAlertWorkspaceFocusReturn);
+        const opener = screen.getByRole('button', {
+            name: 'Continue response for CR-2026-0031',
+        });
+        result.current.rememberOpen(row.id);
+        const nestedClose = new Event('closeAutoFocus', { cancelable: true });
+        result.current.onCloseAutoFocus(nestedClose);
+        expect(nestedClose.defaultPrevented).toBe(true);
+        expect(opener).not.toHaveFocus();
+
+        result.current.beginClose();
+        const exit = new Event('closeAutoFocus', { cancelable: true });
+        result.current.onCloseAutoFocus(exit);
+        expect(exit.defaultPrevented).toBe(true);
+        expect(opener).toHaveFocus();
+    });
+
+    it('focuses the retained worklist when the originating row disappears', () => {
+        const view = render(worklist());
+        const { result } = renderHook(useAlertWorkspaceFocusReturn);
+        result.current.rememberOpen(row.id);
+        view.rerender(worklist([]));
+        result.current.beginClose();
+        result.current.onCloseAutoFocus(
+            new Event('closeAutoFocus', { cancelable: true }),
+        );
+        expect(
+            screen.getByRole('region', { name: 'Actionable alerts' }),
+        ).toHaveFocus();
+        expect(screen.getByText('No alerts in this view')).toBeInTheDocument();
+    });
+
+    it('provides a worklist fallback for a directly opened workspace without a trigger', () => {
+        render(worklist());
+        const { result } = renderHook(useAlertWorkspaceFocusReturn);
+        result.current.beginClose();
+        result.current.onCloseAutoFocus(
+            new Event('closeAutoFocus', { cancelable: true }),
+        );
+        expect(
+            screen.getByRole('region', { name: 'Actionable alerts' }),
+        ).toHaveFocus();
+    });
+});
 
 describe('canonical alert worklist', () => {
     it('names selection and sorting controls and shows readable SLA/playbook context', () => {

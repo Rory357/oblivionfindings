@@ -1,0 +1,112 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_bc9e11843da14232",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItTechnicalDeliveryOperationsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mtechnical delivery facts use only permitted current sources and never project raw diagnostics with ('devi[39m[90m…[39m [90m253.53s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtechnical delivery facts use only permitted current sources and never project raw diagnostics with ('fleet'[39m[90m…[39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrevoked source access and unapproved actors have no delivery counts[39m[90m                                         [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mscope drift and a lost last approved site remove counts as well as history[39m[90m                                  [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown outcome text is concealed and source delivery never implies IT success[39m[90m                              [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtechnical history is bounded and page clamping preserves complete visible counts[39m[90m                            [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90man unapplied delivery schema reports unavailable instead of healthy zero metrics[39m[90m                            [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90msetup operations publishes current actor-bound technical delivery facts and validates pages[39m[90m                 [39m [90m1.41s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelivery search uses only public classifications within the same source scope with ('device')[39m[90m               [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelivery search uses only public classifications within the same source scope with ('fleet')[39m[90m                [39m [90m1.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfiltered delivery pagination preserves encoded search and its canonical history anchor[39m[90m                      [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma reviewed HTTP retry grants one bounded attempt and rejects the same stale request with ('device')[39m[90m         [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma reviewed HTTP retry grants one bounded attempt and rejects the same stale request with ('fleet')[39m[90m          [39m [90m0.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90man uncertain queue dispatch retains the retry allowance without claiming completed work[39m[90m                     [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma changed delivery outcome invalidates the reviewed retry even when it fails again[39m[90m                          [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforged actor and source identifiers and lost site access deny retry before any allowance[39m[90m                    [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90maudit failure rolls back the allowance and hides exception details even in debug mode[39m[90m                       [39m [90m0.66s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItMonitoringDeliveryRecoveryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mlost queued listener is recovered once independently of the acknowledged Control Room alert[39m[90m                 [39m [90m0.29s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT insertion failure rolls back its ticket and evidence but preserves Control Room delivery for retry[39m[90m       [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexhausted failures require an explicit durable retry and preserve lifetime attempts during a queue outage[39m[90m   [39m [90m0.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('site')[39m[90m                         [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('inactive_site')[39m[90m                [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('domain')[39m[90m                       [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('episode')[39m[90m                      [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelayed IT delivery denies changed canonical scope or source evidence with ('signal')[39m[90m                       [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90minactive source requires repair and explicit retry without discarding the approved scope binding[39m[90m            [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90munmatched recovery is explicit and unsupported device domains never create technical work[39m[90m                   [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy acknowledged events remain unverified rather than recreating already settled IT work[39m[90m                 [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequired completion audit failure rolls back the IT result and is recoverable without duplicating the alert[39m[90m [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mIT dispatch intent rolls back with an interrupted source acknowledgement and is prepared on retry[39m[90m           [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelivery audit counters accept bounded integers and reject free text provider material[39m[90m                      [39m [90m0.11s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItFleetDeliveryContractTest[39m
+  [32;1m✓[39;22m[90m [39m[90mFleet IT delivery commits once and retains the independent acknowledged operational alert[39m[90m                   [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet consumer failure rolls back writes and exhausts only IT attempts[39m[90m                                      [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet audit failure rolls back the consumer and permits a subsequent successful attempt[39m[90m                     [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('site')[39m[90m                            [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('inactive_site')[39m[90m                   [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('archived_site')[39m[90m                   [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('pairing')[39m[90m                         [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('provider')[39m[90m                        [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('source')[39m[90m                          [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('episode')[39m[90m                         [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('occurrence')[39m[90m                      [39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('signal')[39m[90m                          [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('routing')[39m[90m                         [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet delayed delivery rejects changed canonical source boundaries with ('suppressed')[39m[90m                      [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet recovered episode passes its true paired offline identity even when delivered first[39m[90m                   [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet pre-contract acknowledgements stay unknown and suppressed sources have no IT intent[39m[90m                   [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet rollback refuses to discard recorded IT outcomes[39m[90m                                                      [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet recovery occurrence must agree with the persisted heartbeat before intent preparation[39m[90m                 [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet IT cannot run before acknowledgement or overwrite an already prepared source identity[39m[90m                 [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet driver-safety events remain outside automatic IT intake[39m[90m                                               [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreal Fleet source and IT jobs create one canonical direct ticket and a sealed Fleet snapshot[39m[90m                [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90murgent Fleet work keeps its operational alert and exact recovery never closes either record[39m[90m                 [39m [90m0.24s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreordered Fleet recovery creates open verification work without a stale alert and a later episode gets new[39m[90m… [39m [90m0.31s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet IT retry recovers a failed real ticket write without resending the source alert[39m[90m                       [39m [90m0.24s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet source evidence requires current asset and device grants while ticket access remains usable[39m[90m           [39m [90m0.38s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet maintenance suppresses both direct work and operational alert creation[39m[90m                                [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet queued IT work preserves the already recorded rule assessment[39m[90m                                         [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFleet operational recovery audit failure rolls back recovery and can be retried[39m[90m                             [39m [90m0.24s[39m  
+
+  [90mTests:[39m    [32;1m59 passed[39;22m[90m (553 assertions)[39m
+  [90mDuration:[39m [39m274.85s[39m
+
+{"phase":"focused_tests_finished","exit_code":0}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_bc9e11843da14232",
+    "database_mutations_performed": false
+}

@@ -1,0 +1,32 @@
+{
+    "database": "oblivion_gov_audit_20260911_9888",
+    "method": "GovernancePresenter::buildTimeline",
+    "read_only": true,
+    "roles": {
+        "member": {
+            "count": 1,
+            "keys": [
+                1
+            ],
+            "is_list": false,
+            "json_prefix": "{"
+        },
+        "treasurer": {
+            "count": 1,
+            "keys": [
+                1
+            ],
+            "is_list": false,
+            "json_prefix": "{"
+        },
+        "chair": {
+            "count": 2,
+            "keys": [
+                0,
+                1
+            ],
+            "is_list": true,
+            "json_prefix": "["
+        }
+    }
+}

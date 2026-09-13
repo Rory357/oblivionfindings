@@ -1,0 +1,122 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_b2481a1b689140ca",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Architecture\ItSecuritySingleTenantBoundaryTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mit keeps active IT Security Devices and Monitoring partition behavior at absolute zero[39m[90m                      [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit keeps the Fleet dashboard on canonical Site and Security Devices projections[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps native monitoring to IT independent of the Control Room Device projection[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps IT report Device metrics behind canonical Security and Devices visibility[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps Device health monitoring out of the retained Control Room projection[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps Control Room Device pages focused on signal activity instead of duplicate Device health[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps Security and Devices command batch navigation free of inert hash targets[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps Device assignment history in the canonical Device profile payload only[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps active IT and Security Devices surfaces free of known inert interaction patterns[39m[90m                   [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit keeps the interaction audit bound to the exact release cross-module source inventory[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps the Site Profile technology tab bound to its canonical optional projection[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps Queclink governed actions safe when no tracker is paired[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps IT provisioning lifecycle mutations serialized and centrally audited[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps ticket approvals serialized and centrally audited[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps ticket merges private serialized and centrally audited[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps ticket triage serialized approval safe and reasoned[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps ticket conversations feedback and watchers serialized and centrally audited[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps ticket intake resolution and lifecycle evidence centrally governed[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps ordinary ticket intake linked to canonical Security and Devices records[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps ticket work tasks visible and governed from the canonical workspace[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps specialised IT work auditable and requester activity minimum necessary[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps waiting ownership explicit governed and requester safe[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps canonical routed ownership visible to technicians and private from requesters[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps ordinary ticket classification connected to service routing and the working UI[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps every server-backed ticket queue filter visible in the desktop queue[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps knowledge lifecycle deletion and feedback serialized and centrally owned[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps catalogue authoring publishing and entity choices governed end to end[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps provisioning creation cancellation and HR handover centrally governed[39m
+  [32;1m✓[39;22m[90m [39m[90mit detects an injected tenant authorization shortcut in a new file[39m
+  [32;1m✓[39;22m[90m [39m[90mit detects legacy storage values laundered back into an active query[39m
+  [32;1m✓[39;22m[90m [39m[90mit rejects direct compatibility helpers and record derived compatibility writes[39m
+  [32;1m✓[39;22m[90m [39m[90mit allows only the fingerprinted model write compatibility helper[39m
+  [32;1m✓[39;22m[90m [39m[90mit pins the exact compatibility evidence files excluded from active source scanning[39m[90m                         [39m [90m0.37s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit detects plain product terminology and tenant shaped runtime contracts[39m
+  [32;1m✓[39;22m[90m [39m[90mit distinguishes the canonical Microsoft OAuth authority setting from application tenancy[39m
+  [32;1m✓[39;22m[90m [39m[90mit changes the debt fingerprint when equal-count tenant shortcut semantics change[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps legacy storage compatibility narrow and rejects the same field in a new model[39m[90m                      [39m [90m0.01s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit protects every converted IT Security Devices and integration storage writer model[39m
+  [32;1m✓[39;22m[90m [39m[90mit includes Security and Devices compatibility support that lives outside the domain folder[39m[90m                 [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit covers active IT Security Devices integration Site UI and browser dependencies[39m[90m                           [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit keeps Security and Devices navigation inside the original application sidebar[39m
+  [32;1m✓[39;22m[90m [39m[90mit does not retain the obsolete HR organisation context concern[39m[90m                                             [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit keeps visible IT and Security Devices copy on application and Site language[39m
+  [32;1m✓[39;22m[90m [39m[90mit uses an application shaped integration management permission across active dependencies[39m[90m                  [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects a new tenant partition migration while excluding exact historical migrations[39m[90m                     [39m [90m0.02s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Architecture\ItSecurityDesktopReleaseAcceptanceBoundaryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit keeps the final IT and Security release matrix deployed desktop role Site privacy and restore complete[39m[90m   [39m [90m0.02s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Architecture\ItSecuritySingleTenantBoundaryTest[22m [90m>[39m it keeps active IT Security Devices and Monitorin…   
+[39;1m  Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+-Array &0 []
++Array &0 [
++    0 => 'database/migrations/2026_08_23_000230_create_workforce_availability_coverage_actions.php|new_tenant_partition_migration|1|759b6ffea819a48a',
++    1 => 'tests/Feature/Monitoring/MetricRetentionTest.php|legacy_storage_read|4|d7899c8e43196339',
++][39;22m
+
+  at [32mtests\Architecture\ItSecuritySingleTenantBoundaryTest.php[39m:[32m7[39m
+      3▕ it('keeps active IT Security Devices and Monitoring partition behavior at absolute zero', function () {
+      4▕     $root = str_replace('\\', '/', dirname(__DIR__, 2));
+      5▕     $actual = itSecurityTenantDebtSnapshot($root);
+      6▕ 
+  ➜   7▕     expect($actual)->toBe([])
+      8▕         ->and(itSecurityApprovedTenantDebt())->toBe([]);
+      9▕ });
+     10▕ 
+     11▕ it('keeps the Fleet dashboard on canonical Site and Security Devices projections', function () {
+
+  [33m1   [39m[39;1mtests\Architecture\ItSecuritySingleTenantBoundaryTest.php[39;22m:[39;1m7[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m45 passed[39;22m[90m (918 assertions)[39m
+  [90mDuration:[39m [39m1.97s[39m
+
+{"exit_code":1,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_b2481a1b689140ca",
+    "database_mutations_performed": false
+}

@@ -138,6 +138,7 @@ export function AlertWorklistRow({
                     <div className="col-start-2 col-end-4 flex items-center justify-end gap-1 md:col-start-5 md:col-end-6">
                         <Button
                             size="sm"
+                            data-alert-workspace-trigger={row.id}
                             onClick={() => onOpen(row.id)}
                             aria-label={`${row.next_action.label} for ${reference}`}
                         >

@@ -1,0 +1,21 @@
+# W15 template create recovery browser evidence — 12 September 2026
+
+Runtime `7a54d00ec6e14a57`, fingerprint `805ffe3e39514093b2740fbe86ce9e9c3e474a8353bc4ddbecd0e57546a7a330`. Owned in-app desktop tabs 32 and 33; no resizing. Identity confirmed this checkout, isolated schema, normal CSRF, array mail, sync queue and manifest `0dd863a105a07e71dbbdcd8ce652e08052e48a34e7e26abf10b43d60896bbc29`. Bootstrap67454 exited0. No real account execution, provider configuration or communications.
+
+## Actual outcomes
+
+1. Normal technician login; New template; named synthetic request; selected approved Site A; configured a Verify task, manual instructions, approval and evidence requirements. Review displayed the exact matching rules and work before submission.
+2. Guarded helper held only synthetic technician3's actor row for25 seconds. Save was submitted while that lock was held; Cancel wait displayed an explicit uncertain outcome, retained the reviewed fields and disabled edit/repeated save. Lock74659 released and exited0 with no data mutation. Check saved result displayed confirmed Template saved. Read-only reconciliation shows exactly one new template2, immutable version2 (template version1), and receipt1/UUID `aa2083fa-a046-4835-8ff0-279f59df681c`, committed and not cancelled. No second template resulted from recovery.
+3. A second named synthetic Verify template tested cancellation after an uncertain response. Lock59784 held the same actor row; Save / Cancel wait / Cancel earlier create showed explicit confirmation explaining that already-saved work would be kept. After the lock released (exit0/no data mutation), Enter on Check and cancel create returned confirmed Template saved. It preserved template3 and its original receipt2/UUID `a09af917-2263-495c-b097-7410013cc3da`; no rollback or fabricated cancellation. Cancellation-before-commit is covered by the focused PHP/UI and real-worker cases, not claimed from this browser ordering.
+4. A third private draft was prepared as technician3. In tab33, normal logout and login as restricted requester2 changed the shared sign-in. Saving the stale technician draft in tab32 was refused. The private draft was concealed, no success pane appeared, and saved-result reconciliation confirms no third create receipt or fourth template.
+5. This denied-context journey found a real UI gap: Close / Discard returned to stale setup props, including the old technician header and saved template cards. The warning had no direct refreshed-workspace action. The subsequent implementation hides template-list content in the denied/expired context, latches concealment while a recovery check is pending, and routes dismissal or Return to service desk through a fresh permission-scoped visit. It also distinguishes new-draft discard copy from editing an existing saved template. This correction is not yet browser-verified at this checkpoint.
+
+Both tabs had empty console-error lists. One action-picker click timed out at the CUA/CDP layer; settled DOM was reread and the ordinary picker action then succeeded. No duplicate write was issued. The desktop warning screenshot was inspected in tool output and showed the missing direct recovery action described above.
+
+## Reconciliation and cleanup
+
+`w15-template-create-recovery-browser-first-records.json` records the first recovery; `w15-template-create-recovery-browser-records.json` records the final state: original fixture template1 plus exactly two intended new templates2/3, three immutable versions, two committed template-create receipts and no changed-actor draft. Creation/audit atomicity is proven by the focused PHP suite; this browser inspector does not query audit-log counts.
+
+Owned tabs32/33 closed. Both controlled lock processes exited0. Exact cleanup97255 exited0, reporting only the owned schema/directory removed and no Herd environment change. Independent postflight exited0 with schema/directory absent and no database mutations. No runtime or test import remains from this browser run.
+
+Next: focused UI/lint/build/types for the denied-context correction, then a fresh fingerprinted desktop browser check of changed actor → denied draft → footer/Escape return to the current requester's permitted service desk. Preserve existing user tabs and protected design files. Full W15 and the full module remain incomplete.

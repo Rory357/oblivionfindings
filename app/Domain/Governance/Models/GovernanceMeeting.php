@@ -102,7 +102,12 @@ class GovernanceMeeting extends Model
 
     public function boardPack(): HasOne
     {
-        return $this->hasOne(BoardPack::class);
+        return $this->hasOne(BoardPack::class)->where('is_current', true);
+    }
+
+    public function boardPacks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BoardPack::class)->orderByDesc('revision_number');
     }
 
     public function resolutions(): HasMany
@@ -193,15 +198,67 @@ class GovernanceMeeting extends Model
 
     public function calculateQuorum(): array
     {
-        $present = $this->attendances()->where('status', 'present')->count();
-        $total = BoardMember::active()->count();
-        $required = ceil($total * ($this->quorum_required / 100));
+        if ($this->board_committee_id) {
+            $eligibleMembers = BoardMember::query()
+                ->active()
+                ->where(function ($q) {
+                    $q->whereHas('committeeMemberships', function ($sq) {
+                        $sq->where('board_committee_id', $this->board_committee_id)
+                            ->where('is_active', true);
+                    });
+                    if ($this->chair_id) {
+                        $q->orWhere('id', $this->chair_id);
+                    }
+                    if ($this->secretary_id) {
+                        $q->orWhere('id', $this->secretary_id);
+                    }
+                })
+                ->get();
+        } else {
+            $eligibleMembers = BoardMember::active()->get();
+        }
+
+        $eligibleIds = $eligibleMembers->pluck('id');
+        $total = $eligibleMembers->count();
+
+        // Both 'present' and 'late' count as attendance for quorum
+        $present = $this->attendances()
+            ->whereIn('status', ['present', 'late'])
+            ->whereIn('board_member_id', $eligibleIds)
+            ->count();
+
+        $quorumRequiredPct = $this->quorum_required ?? 50;
+        $required = (int) ceil($total * ($quorumRequiredPct / 100));
 
         return [
             'present' => $present,
             'required' => $required,
-            'met' => $present >= $required,
+            'total' => $total,
+            'total_members' => $total,
+            'percentage' => $total > 0 ? round(($present / $total) * 100, 1) : 0.0,
+            'met' => $total === 0 || $present >= $required,
+            'is_met' => $total === 0 || $present >= $required,
         ];
+    }
+
+    public function isInvited(BoardMember $member): bool
+    {
+        if (! $member->is_active) {
+            return false;
+        }
+
+        if ($this->board_committee_id) {
+            if ($member->id === $this->chair_id || $member->id === $this->secretary_id) {
+                return true;
+            }
+
+            return $member->committeeMemberships()
+                ->where('board_committee_id', $this->board_committee_id)
+                ->where('is_active', true)
+                ->exists();
+        }
+
+        return true;
     }
 
     public function updateQuorumStatus(): void

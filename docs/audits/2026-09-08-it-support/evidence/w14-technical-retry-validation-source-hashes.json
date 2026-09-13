@@ -1,0 +1,70 @@
+{
+  "captured_at": "2026-09-11T20:32:37.8160346Z",
+  "source": [
+    {
+      "path": "app/Domain/It/Services/ItTechnicalDeliveryService.php",
+      "sha256": "01e9bd0445322ffc906ad704684edea490f9fe58702e72d1f736cf768c461df6"
+    },
+    {
+      "path": "app/Domain/It/Services/ItTechnicalDeliveryOperationsPresenter.php",
+      "sha256": "b9a7fc4f8b0a905456e8b394791e970412d1a1487b5483baf83b61c6e50792fe"
+    },
+    {
+      "path": "app/Domain/It/Services/ItTechnicalDeliveryRecoveryService.php",
+      "sha256": "592908f2b7f5befaa5459edc02ee63fb12470c365af6879856155a4bdb1d18dd"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItTechnicalDeliveryController.php",
+      "sha256": "851cb9c14aa551433b601dadaabd5b2942de5db6fd706922dbaf6c0ac4ec1d6a"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+      "sha256": "fbc8ebffd7f20c54d1524130a16f976071a72eecc185708fa2c84c9a700032ed"
+    },
+    {
+      "path": "app/Http/Middleware/ProtectItDraftResponses.php",
+      "sha256": "1b6b3022a16b485940c1b7948c8cd3811e6c4c306fbfc4df5e73f41d42744008"
+    },
+    {
+      "path": "routes/web.php",
+      "sha256": "5f7050fa8ffaa2685811e87ad823429b3b2eae65d66b13b528eaebc4295e1486"
+    },
+    {
+      "path": "resources/js/components/it/it-service-operations.tsx",
+      "sha256": "e7bff2ee1ed89b7e9cc3c67fd5e50a0805447a3a934e3b2c03c90399fa613146"
+    },
+    {
+      "path": "resources/js/components/it/it-technical-delivery-contract.ts",
+      "sha256": "8a47cc265af94c83b180843262489439128cac9cc7fe799ba627de45739c7a11"
+    },
+    {
+      "path": "resources/js/components/it/it-technical-delivery-health.tsx",
+      "sha256": "0c7cc7a010851706e38eceea3dc69eba65a509879d7417ebe95f9aa24d39abfc"
+    },
+    {
+      "path": "resources/js/components/it/it-technical-delivery-health.test.tsx",
+      "sha256": "0d8a84a009a6d585a8d60f05399dc08c3b4fcaa955e622372f36b9aae5fdf11d"
+    },
+    {
+      "path": "resources/js/components/it/it-technical-delivery-recovery.tsx",
+      "sha256": "f4dabf4869e763fca28559aeaad517ecf3db8a59033f7c0567044427e555533d"
+    },
+    {
+      "path": "resources/js/components/it/it-technical-delivery-recovery.test.tsx",
+      "sha256": "1b53c026fa30521ec5b93d7c07c3949a1f8336cb992cbfe81853f0521255859f"
+    },
+    {
+      "path": "tests/Feature/It/ItTechnicalDeliveryOperationsTest.php",
+      "sha256": "b80174a2054eb2f8ef97bbf580f68734e5ce049204cbda81feb3d03019d432e2"
+    },
+    {
+      "path": "tests/Concurrency/It/ItTechnicalDeliveryRetryConcurrencyTest.php",
+      "sha256": "2ca255723ba71be7a4a4a7c1d9c67ff27d0d40efcd43b5971131d70ee826db37"
+    },
+    {
+      "path": "tests/Support/It/technical-delivery-retry-worker.php",
+      "sha256": "d206d3d87143533ea391f5c978077c3cda81a94f7761ec7798853d6a58025cc9"
+    }
+  ],
+  "browser_acceptance": "Pending current build and owned desktop journey"
+}

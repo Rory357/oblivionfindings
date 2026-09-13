@@ -67,7 +67,7 @@ class DashboardAggregatorService
             'it_cyber' => fn () => $this->getItCyberMetrics($range),
             'fleet_assets' => fn () => $this->getFleetAssetMetrics($range),
             'compliance_calendar' => fn () => $this->getComplianceCalendar(),
-            'decisions_required' => fn () => $this->getDecisionsRequired(),
+            'decisions_required' => fn () => $this->getDecisionsRequired($viewer),
             'roadmap' => fn () => $this->getRoadmapMetrics(),
             'control_room' => fn () => $this->getControlRoomMetrics($range),
             'incidents' => fn () => $this->getIncidentMetrics($range),
@@ -80,7 +80,7 @@ class DashboardAggregatorService
                 $widgets[$key] = $callback();
             } catch (\Throwable $e) {
                 Log::warning("Dashboard widget '{$key}' failed: ".$e->getMessage());
-                $widgets[$key] = ['status' => 'unavailable', 'error' => $e->getMessage()];
+                $widgets[$key] = ['status' => 'unavailable', 'reason' => 'Widget data temporarily unavailable'];
             }
         }
 
@@ -143,18 +143,25 @@ class DashboardAggregatorService
 
     public function getTopRisks(int $limit = 10): array
     {
-        $risks = RiskRegisterEntry::active()
+        $baseQuery = RiskRegisterEntry::active();
+        $totalCount = (clone $baseQuery)->count();
+        $criticalCount = (clone $baseQuery)->where('residual_score', '>=', 20)->count();
+        $highCount = (clone $baseQuery)->whereBetween('residual_score', [15, 19])->count();
+        $mediumCount = (clone $baseQuery)->whereBetween('residual_score', [10, 14])->count();
+        $aboveAppetiteCount = (clone $baseQuery)->where('within_appetite', false)->count();
+
+        $risks = (clone $baseQuery)
             ->with('riskOwner:id,name')
             ->orderByDesc('residual_score')
             ->limit($limit)
             ->get();
 
         return [
-            'count' => $risks->count(),
-            'critical' => $risks->where('residual_score', '>=', 20)->count(),
-            'high' => $risks->whereBetween('residual_score', [15, 19])->count(),
-            'medium' => $risks->whereBetween('residual_score', [10, 14])->count(),
-            'above_appetite' => $risks->where('within_appetite', false)->count(),
+            'count' => $totalCount,
+            'critical' => $criticalCount,
+            'high' => $highCount,
+            'medium' => $mediumCount,
+            'above_appetite' => $aboveAppetiteCount,
             'items' => $risks->map(fn ($r) => [
                 'id' => $r->id,
                 'reference' => $r->risk_reference,
@@ -170,9 +177,26 @@ class DashboardAggregatorService
     public function getRiskChanges(array $range): array
     {
         $new = RiskRegisterEntry::whereBetween('identified_at', [$range['start'], $range['end']])->count();
-        $escalated = RiskRegisterEntry::whereBetween('updated_at', [$range['start'], $range['end']])
-            ->whereColumn('residual_score', '>', 'inherent_score')
-            ->count();
+
+        // Risk escalation means actual previous/current residual change, not residual>inherent
+        $escalated = 0;
+        if (SchemaCache::hasTable('audit_logs')) {
+            try {
+                $escalated = \App\Models\AuditLog::query()
+                    ->where(function ($q) {
+                        $q->where('auditable_type', RiskRegisterEntry::class)
+                            ->orWhere('action', 'like', 'riskregisterentry.%');
+                    })
+                    ->whereBetween('created_at', [$range['start'], $range['end']])
+                    ->where(function ($q) {
+                        $q->whereRaw("CAST(JSON_UNQUOTE(JSON_EXTRACT(meta, '$.after.residual_score')) AS SIGNED) > CAST(JSON_UNQUOTE(JSON_EXTRACT(meta, '$.before.residual_score')) AS SIGNED)");
+                    })
+                    ->count();
+            } catch (\Throwable $e) {
+                $escalated = 0;
+            }
+        }
+
         $closed = RiskRegisterEntry::whereBetween('closed_at', [$range['start'], $range['end']])->count();
 
         return [
@@ -296,8 +320,8 @@ class DashboardAggregatorService
             ->first();
 
         $base = [
-            'budget_utilization' => 0,
-            'variance' => 0,
+            'budget_utilization' => null,
+            'variance' => null,
             'status' => 'unknown',
         ];
 
@@ -345,11 +369,17 @@ class DashboardAggregatorService
                 $varianceService = app(BudgetVarianceService::class);
                 $period = now()->format('Y-m');
                 $org = $varianceService->organisationVariance(null, $period, $period);
-                $overBudgetSites = collect($org['sites'] ?? [])
-                    ->filter(fn ($s) => bccomp((string) ($s['variance'] ?? '0'), '0', 2) > 0);
+                $sites = $org['sites'] ?? [];
+                if (! empty($sites)) {
+                    $overBudgetSites = collect($sites)
+                        ->filter(fn ($s) => bccomp((string) ($s['variance'] ?? '0'), '0', 2) > 0);
 
-                $base['sites_over_budget_count'] = $overBudgetSites->count();
-                $base['sites_over_budget_amount'] = round((float) $overBudgetSites->sum(fn ($s) => (float) ($s['variance'] ?? 0)), 2);
+                    $base['sites_over_budget_count'] = $overBudgetSites->count();
+                    $base['sites_over_budget_amount'] = round((float) $overBudgetSites->sum(fn ($s) => (float) ($s['variance'] ?? 0)), 2);
+                } else {
+                    $base['sites_over_budget_count'] = null;
+                    $base['sites_over_budget_amount'] = null;
+                }
             } catch (\Throwable $e) {
                 // Service unavailable in this environment; skip silently.
             }
@@ -420,10 +450,16 @@ class DashboardAggregatorService
         ])->toArray();
     }
 
-    public function getDecisionsRequired(): array
+    public function getDecisionsRequired(?User $viewer = null): array
     {
-        $resolutions = Resolution::where('status', 'open')
-            ->orderBy('deadline')
+        $viewer ??= auth()->user();
+        $query = Resolution::where('status', 'open');
+
+        if ($viewer instanceof User) {
+            app(GovernanceRecordAccessService::class)->scopeResolutions($query, $viewer);
+        }
+
+        $resolutions = $query->orderBy('deadline')
             ->limit(10)
             ->get();
 

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Domain\It\Services\ItFleetDeliveryService;
 use App\Exceptions\SafetySignalUnroutable;
 use App\Models\FleetSignalOutbox;
 use App\Services\ControlRoom\SignalProcessingService;
@@ -66,12 +67,27 @@ class DispatchFleetSignalOutbox implements ShouldBeUnique, ShouldQueue
                         'Fleet safety signal has no canonical Site or active signal source.',
                     );
                 }
-                $processor->process($controlSignal);
+                if (in_array($signal->signal_type, ['device.offline', 'device.online'], true)) {
+                    $processor->processFleetAvailability($controlSignal);
+                } else {
+                    $processor->process($controlSignal);
+                }
+
+                app(ItFleetDeliveryService::class)->prepare($signal, $controlSignal);
 
                 $outbox->forceFill([
                     'status' => 'sent',
                     'last_error' => null,
                 ])->save();
+                DB::afterCommit(function (): void {
+                    try {
+                        DispatchFleetMonitoringTicket::dispatch($this->outboxId);
+                    } catch (Throwable $exception) {
+                        Log::warning('Fleet IT dispatch deferred to recovery sweep', [
+                            'outbox_id' => $this->outboxId, 'exception_type' => $exception::class,
+                        ]);
+                    }
+                });
             }, 3);
         } catch (SafetySignalUnroutable $exception) {
             $this->recordFailure('unroutable', $exception);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\BindsItBrowserActor;
 use App\Models\ItCatalogItem;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItTicket;
@@ -11,6 +12,8 @@ use Illuminate\Validation\Validator;
 
 class SaveItCatalogItemRequest extends FormRequest
 {
+    use BindsItBrowserActor;
+
     public const FIELD_TYPES = [
         'text',
         'textarea',
@@ -28,13 +31,17 @@ class SaveItCatalogItemRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return (bool) $this->user()?->canDo('it.manage');
+        return $this->user()?->isApproved() && $this->user()->canDo('it.manage') && $this->hasCurrentBrowserActor();
     }
 
     /** @return array<string, array<int, mixed>> */
     public function rules(): array
     {
         return [
+            ...$this->browserActorRules(),
+            'actor_user_id' => ['required_with:request_uuid', 'integer', 'min:1'],
+            'request_uuid' => ['sometimes', 'required', 'uuid', ...($this->isMethod('PATCH') ? ['prohibited'] : [])],
+            'expected_version' => [$this->isMethod('PATCH') ? 'required' : 'nullable', 'integer', 'min:1'],
             'it_service_id' => [
                 'nullable',
                 'integer',
@@ -52,6 +59,8 @@ class SaveItCatalogItemRequest extends FormRequest
             'default_priority' => ['required', Rule::in(ItTicket::PRIORITIES)],
             'requires_approval' => ['required', 'boolean'],
             'internal_only' => ['required', 'boolean'],
+            'site_scope' => ['sometimes', 'nullable', 'array', 'min:1', 'max:100'],
+            'site_scope.*' => ['integer', 'min:1', 'distinct'],
             'search_terms' => ['present', 'array', 'max:20'],
             'search_terms.*' => ['string', 'max:100', 'distinct:strict'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:100000'],

@@ -107,7 +107,7 @@ function ConfirmationBody({
             'The wait stopped. Confirmation may still finish. Review the current ticket before trying again.',
         );
     };
-    const confirm = async () => {
+    const submitResolutionConfirmation = async () => {
         if (state !== 'ready' || busy || request.current) return;
         const controller = new AbortController();
         request.current = controller;
@@ -251,7 +251,7 @@ function ConfirmationBody({
                 {state !== 'done' && state !== 'unavailable' && (
                     <Button
                         disabled={busy || state !== 'ready'}
-                        onClick={() => void confirm()}
+                        onClick={() => void submitResolutionConfirmation()}
                     >
                         {busy && (
                             <Loader2

@@ -19,6 +19,7 @@ interface Meeting {
     id: number;
     title: string;
     meeting_type: string;
+    board_committee_id?: number | null;
     scheduled_at: string;
     duration_minutes: number;
     location: string | null;
@@ -41,9 +42,16 @@ const toLocalInput = (value: string) => {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-export default function MeetingEdit({ auth, meeting, boardMembers }: Props) {
+export default function MeetingEdit({
+    auth,
+    meeting,
+    boardMembers,
+    committees = [],
+}: Props) {
     const { data, setData, put, processing, errors } = useForm({
         title: meeting.title ?? '',
+        meeting_type: meeting.meeting_type ?? 'full_board',
+        board_committee_id: meeting.board_committee_id ? String(meeting.board_committee_id) : '',
         scheduled_at: meeting.scheduled_at
             ? toLocalInput(meeting.scheduled_at)
             : '',
@@ -82,6 +90,85 @@ export default function MeetingEdit({ auth, meeting, boardMembers }: Props) {
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={submit} className="space-y-6">
+                            {/* Meeting Type */}
+                            <div className="space-y-2">
+                                <Label htmlFor="meeting_type">
+                                    Meeting Type
+                                </Label>
+                                <Select
+                                    value={data.meeting_type}
+                                    onValueChange={(value) =>
+                                        setData('meeting_type', value)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="full_board">
+                                            Full Board Meeting
+                                        </SelectItem>
+                                        <SelectItem value="audit_risk">
+                                            Audit & Risk Committee
+                                        </SelectItem>
+                                        <SelectItem value="people">
+                                            People Committee
+                                        </SelectItem>
+                                        <SelectItem value="finance">
+                                            Finance Committee
+                                        </SelectItem>
+                                        <SelectItem value="special_general">
+                                            Special General Meeting
+                                        </SelectItem>
+                                        <SelectItem value="executive_session">
+                                            Executive Session
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {errors.meeting_type && (
+                                    <p className="text-sm text-status-critical">
+                                        {errors.meeting_type}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Committee (if applicable) */}
+                            {committees && committees.length > 0 && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="board_committee_id">
+                                        Committee (Optional)
+                                    </Label>
+                                    <Select
+                                        value={data.board_committee_id || 'none'}
+                                        onValueChange={(value) =>
+                                            setData('board_committee_id', value === 'none' ? '' : value)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select committee (or Full Board)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">
+                                                None (Full Board)
+                                            </SelectItem>
+                                            {committees.map((committee) => (
+                                                <SelectItem
+                                                    key={committee.id}
+                                                    value={String(committee.id)}
+                                                >
+                                                    {committee.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.board_committee_id && (
+                                        <p className="text-sm text-status-critical">
+                                            {errors.board_committee_id}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="space-y-2">
                                 <Label htmlFor="title">Meeting Title</Label>
                                 <Input

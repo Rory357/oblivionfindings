@@ -1,0 +1,1 @@
+resources/js/components/it/__tests__/it-provisioning-templates.test.tsx(212,9): error TS2554: Expected 1 arguments, but got 2.

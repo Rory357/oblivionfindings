@@ -1,0 +1,15 @@
+{
+    "checked_at": "2026-09-13T00:06:33+00:00",
+    "cases": {
+        "restricted_pack_still_in_visible_query": {
+            "can_view": false,
+            "visible_query_includes": true
+        },
+        "confidential_paper_without_agenda_flag_downloads": {
+            "private_source_visible": false,
+            "download_status": 200,
+            "private_paper_bytes": true,
+            "scope": "Synthetic historical/corrupt manifest tests download recheck; not a claim that current builder creates this exact shape."
+        }
+    }
+}

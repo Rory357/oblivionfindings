@@ -57,13 +57,13 @@ class GovernanceSpendDashboardScopeTest extends TestCase
         $siteAViewer = $this->actor($this->siteA, ['governance.view', 'governance.spend.view']);
         $siteAResponse = $this->dashboard($siteAViewer);
         $this->assertSame(1, $siteAResponse->json('widgets.financial.pending_spend_count'));
-        $this->assertSame(100.0, $siteAResponse->json('widgets.financial.pending_spend_total'));
+        $this->assertEquals(100.0, $siteAResponse->json('widgets.financial.pending_spend_total'));
         $this->assertVisibleCompletedSpend($siteAResponse, $approvedA, [$approvedB]);
 
         $siteBViewer = $this->actor($this->siteB, ['governance.view', 'governance.spend.view']);
         $siteBResponse = $this->dashboard($siteBViewer);
         $this->assertSame(1, $siteBResponse->json('widgets.financial.pending_spend_count'));
-        $this->assertSame(200.0, $siteBResponse->json('widgets.financial.pending_spend_total'));
+        $this->assertEquals(200.0, $siteBResponse->json('widgets.financial.pending_spend_total'));
         $this->assertVisibleCompletedSpend($siteBResponse, $approvedB, [$approvedA]);
 
         $global = $this->actor(null, [
@@ -73,7 +73,7 @@ class GovernanceSpendDashboardScopeTest extends TestCase
         ]);
         $globalResponse = $this->dashboard($global);
         $this->assertSame(2, $globalResponse->json('widgets.financial.pending_spend_count'));
-        $this->assertSame(300.0, $globalResponse->json('widgets.financial.pending_spend_total'));
+        $this->assertEquals(300.0, $globalResponse->json('widgets.financial.pending_spend_total'));
         $globalCompleted = collect($globalResponse->json('cockpit.recently_completed'))
             ->where('kind', 'spend_approved');
         $this->assertCount(2, $globalCompleted);

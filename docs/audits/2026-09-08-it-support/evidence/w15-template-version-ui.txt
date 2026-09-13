@@ -1,0 +1,1580 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/it-provisioning-templates.test.tsx (6 tests | 6 failed) 370ms
+   × reviews matching rules and task evidence then saves with the original edit version 191ms
+   × does not show success for an unconfirmed save ({"error":"Save rejected."}) 43ms
+   × does not show success for an unconfirmed save ({}) 37ms
+   × preserves a stale draft until the author confirms loading the current version 28ms
+   × keeps unsaved edits when closing is cancelled and never saves through the discard control 35ms
+   × returns invalid required details and dependency graphs to their editable step 32ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > reviews matching rules and task evidence then saves with the original edit version
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Edit template"
+
+Here are the accessible roles:
+
+  heading:
+
+  Name "Lifecycle workflow templates":
+  <h2
+    class="flex items-center gap-2 text-base font-bold text-foreground"
+  />
+
+  Name "Support worker joiner":
+  <h3
+    class="truncate text-sm font-bold"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-1 max-w-3xl text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="mt-1 text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="truncate text-xs font-semibold"
+  />
+
+  Name "":
+  <p
+    class="truncate text-[10.5px] text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New template":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+  />
+
+  Name "Edit Support worker joiner":
+  <button
+    aria-label="Edit Support worker joiner"
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground size-9"
+    data-slot="button"
+  />
+
+  --------------------------------------------------
+  article:
+
+  Name "":
+  <article
+    class="rounded-xl border border-border bg-background p-4"
+  />
+
+  --------------------------------------------------
+  list:
+
+  Name "":
+  <ol
+    class="mt-3 grid gap-2"
+  />
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  <li
+    class="flex items-start gap-2 rounded-lg border border-border/70 p-2.5"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <section
+      class="rounded-2xl border border-border bg-card p-4 sm:p-5"
+    >
+      <div
+        class="flex flex-wrap items-start justify-between gap-3"
+      >
+        <div>
+          <h2
+            class="flex items-center gap-2 text-base font-bold text-foreground"
+          >
+            <svg
+              class="lucide lucide-git-merge h-4 w-4 text-primary"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="18"
+                cy="18"
+                r="3"
+              />
+              <circle
+                cx="6"
+                cy="6"
+                r="3"
+              />
+              <path
+                d="M6 21V9a9 9 0 0 0 9 9"
+              />
+            </svg>
+             
+            Lifecycle workflow templates
+          </h2>
+          <p
+            class="mt-1 max-w-3xl text-xs text-muted-foreground"
+          >
+            Define ordered or parallel IT steps for HR joiners, role/site movers, and leavers. The most specific active role, site, and employment match wins.
+          </p>
+        </div>
+        <button
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+          data-slot="button"
+        >
+          <svg
+            class="lucide lucide-plus h-4 w-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M5 12h14"
+            />
+            <path
+              d="M12 5v14"
+            />
+          </svg>
+           New template
+        </button>
+      </div>
+      <div
+        class="mt-4 grid gap-3 lg:grid-cols-2"
+      >
+        <article
+          class="rounded-xl border border-border bg-background p-4"
+        >
+          <div
+            class="flex items-start justify-between gap-3"
+          >
+            <div
+              class="min-w-0"
+            >
+              <div
+                class="flex flex-wrap items-center gap-2"
+              >
+                <h3
+                  class="truncate text-sm font-bold"
+                >
+                  Support worker joiner
+                </h3>
+                <span
+                  class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+                >
+                  Joiner
+                </span>
+              </div>
+              <p
+                class="mt-1 text-xs text-muted-foreground"
+              >
+                Approved account workflow
+              </p>
+            </div>
+            <button
+              aria-label="Edit Support worker joiner"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground size-9"
+              data-slot="button"
+            >
+              <svg
+                class="lucide lucide-pencil h-4 w-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                />
+                <path
+                  d="m15 5 4 4"
+                />
+              </svg>
+            </button>
+          </div>
+          <div
+            class="mt-3 flex flex-wrap gap-1.5 text-[10.5px]"
+          >
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Role: 
+              Any
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Site: 
+              Approved house
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Employment:
+               
+              Any
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Priority 
+              10
+            </span>
+          </div>
+          <ol
+            class="mt-3 grid gap-2"
+          >
+            <li
+              class="flex items-start gap-2 rounded-lg border border-border/70 p-2.5"
+            >
+              <span
+                class="grid h-6 w-6 flex-none place-items-center rounded-md bg-primary/10 text-[10px] font-bold text-primary"
+              >
+                1
+              </span>
+              <div
+                class="min-w-0 flex-1"
+              >
+                <p
+                  class="truncate text-xs font-semibold"
+                >
+                  Prepare the account
+                </p>
+                <p
+                  class="truncate text-[10.5px] text-muted-foreground"
+                >
+                  Grant
+                   
+                  Account
+                   · Service desk
+                </p>
+              </div>
+              <svg
+                class="lucide lucide-shield-check h-3.5 w-3.5 text-primary"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+                />
+                <path
+                  d="m9 12 2 2 4-4"
+                />
+              </svg>
+            </li>
+          </ol>
+        </article>
+      </div>
+    </section>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ edit resources/js/components/it/__tests__/it-provisioning-templates.test.tsx:113:28
+    111| const edit = () => {
+    112|     mount();
+    113|     fireEvent.click(screen.getByRole('button', { name: 'Edit template'…
+       |                            ^
+    114| };
+    115| const review = () =>
+ ❯ resources/js/components/it/__tests__/it-provisioning-templates.test.tsx:131:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > does not show success for an unconfirmed save ({"error":"Save rejected."})
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > does not show success for an unconfirmed save ({})
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Edit template"
+
+Here are the accessible roles:
+
+  heading:
+
+  Name "Lifecycle workflow templates":
+  <h2
+    class="flex items-center gap-2 text-base font-bold text-foreground"
+  />
+
+  Name "Support worker joiner":
+  <h3
+    class="truncate text-sm font-bold"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-1 max-w-3xl text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="mt-1 text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="truncate text-xs font-semibold"
+  />
+
+  Name "":
+  <p
+    class="truncate text-[10.5px] text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New template":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+  />
+
+  Name "Edit Support worker joiner":
+  <button
+    aria-label="Edit Support worker joiner"
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground size-9"
+    data-slot="button"
+  />
+
+  --------------------------------------------------
+  article:
+
+  Name "":
+  <article
+    class="rounded-xl border border-border bg-background p-4"
+  />
+
+  --------------------------------------------------
+  list:
+
+  Name "":
+  <ol
+    class="mt-3 grid gap-2"
+  />
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  <li
+    class="flex items-start gap-2 rounded-lg border border-border/70 p-2.5"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <section
+      class="rounded-2xl border border-border bg-card p-4 sm:p-5"
+    >
+      <div
+        class="flex flex-wrap items-start justify-between gap-3"
+      >
+        <div>
+          <h2
+            class="flex items-center gap-2 text-base font-bold text-foreground"
+          >
+            <svg
+              class="lucide lucide-git-merge h-4 w-4 text-primary"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="18"
+                cy="18"
+                r="3"
+              />
+              <circle
+                cx="6"
+                cy="6"
+                r="3"
+              />
+              <path
+                d="M6 21V9a9 9 0 0 0 9 9"
+              />
+            </svg>
+             
+            Lifecycle workflow templates
+          </h2>
+          <p
+            class="mt-1 max-w-3xl text-xs text-muted-foreground"
+          >
+            Define ordered or parallel IT steps for HR joiners, role/site movers, and leavers. The most specific active role, site, and employment match wins.
+          </p>
+        </div>
+        <button
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+          data-slot="button"
+        >
+          <svg
+            class="lucide lucide-plus h-4 w-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M5 12h14"
+            />
+            <path
+              d="M12 5v14"
+            />
+          </svg>
+           New template
+        </button>
+      </div>
+      <div
+        class="mt-4 grid gap-3 lg:grid-cols-2"
+      >
+        <article
+          class="rounded-xl border border-border bg-background p-4"
+        >
+          <div
+            class="flex items-start justify-between gap-3"
+          >
+            <div
+              class="min-w-0"
+            >
+              <div
+                class="flex flex-wrap items-center gap-2"
+              >
+                <h3
+                  class="truncate text-sm font-bold"
+                >
+                  Support worker joiner
+                </h3>
+                <span
+                  class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+                >
+                  Joiner
+                </span>
+              </div>
+              <p
+                class="mt-1 text-xs text-muted-foreground"
+              >
+                Approved account workflow
+              </p>
+            </div>
+            <button
+              aria-label="Edit Support worker joiner"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground size-9"
+              data-slot="button"
+            >
+              <svg
+                class="lucide lucide-pencil h-4 w-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                />
+                <path
+                  d="m15 5 4 4"
+                />
+              </svg>
+            </button>
+          </div>
+          <div
+            class="mt-3 flex flex-wrap gap-1.5 text-[10.5px]"
+          >
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Role: 
+              Any
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Site: 
+              Approved house
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Employment:
+               
+              Any
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Priority 
+              10
+            </span>
+          </div>
+          <ol
+            class="mt-3 grid gap-2"
+          >
+            <li
+              class="flex items-start gap-2 rounded-lg border border-border/70 p-2.5"
+            >
+              <span
+                class="grid h-6 w-6 flex-none place-items-center rounded-md bg-primary/10 text-[10px] font-bold text-primary"
+              >
+                1
+              </span>
+              <div
+                class="min-w-0 flex-1"
+              >
+                <p
+                  class="truncate text-xs font-semibold"
+                >
+                  Prepare the account
+                </p>
+                <p
+                  class="truncate text-[10.5px] text-muted-foreground"
+                >
+                  Grant
+                   
+                  Account
+                   · Service desk
+                </p>
+              </div>
+              <svg
+                class="lucide lucide-shield-check h-3.5 w-3.5 text-primary"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+                />
+                <path
+                  d="m9 12 2 2 4-4"
+                />
+              </svg>
+            </li>
+          </ol>
+        </article>
+      </div>
+    </section>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ edit resources/js/components/it/__tests__/it-provisioning-templates.test.tsx:113:28
+    111| const edit = () => {
+    112|     mount();
+    113|     fireEvent.click(screen.getByRole('button', { name: 'Edit template'…
+       |                            ^
+    114| };
+    115| const review = () =>
+ ❯ resources/js/components/it/__tests__/it-provisioning-templates.test.tsx:161:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > preserves a stale draft until the author confirms loading the current version
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Edit template"
+
+Here are the accessible roles:
+
+  heading:
+
+  Name "Lifecycle workflow templates":
+  <h2
+    class="flex items-center gap-2 text-base font-bold text-foreground"
+  />
+
+  Name "Support worker joiner":
+  <h3
+    class="truncate text-sm font-bold"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-1 max-w-3xl text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="mt-1 text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="truncate text-xs font-semibold"
+  />
+
+  Name "":
+  <p
+    class="truncate text-[10.5px] text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New template":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+  />
+
+  Name "Edit Support worker joiner":
+  <button
+    aria-label="Edit Support worker joiner"
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground size-9"
+    data-slot="button"
+  />
+
+  --------------------------------------------------
+  article:
+
+  Name "":
+  <article
+    class="rounded-xl border border-border bg-background p-4"
+  />
+
+  --------------------------------------------------
+  list:
+
+  Name "":
+  <ol
+    class="mt-3 grid gap-2"
+  />
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  <li
+    class="flex items-start gap-2 rounded-lg border border-border/70 p-2.5"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <section
+      class="rounded-2xl border border-border bg-card p-4 sm:p-5"
+    >
+      <div
+        class="flex flex-wrap items-start justify-between gap-3"
+      >
+        <div>
+          <h2
+            class="flex items-center gap-2 text-base font-bold text-foreground"
+          >
+            <svg
+              class="lucide lucide-git-merge h-4 w-4 text-primary"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="18"
+                cy="18"
+                r="3"
+              />
+              <circle
+                cx="6"
+                cy="6"
+                r="3"
+              />
+              <path
+                d="M6 21V9a9 9 0 0 0 9 9"
+              />
+            </svg>
+             
+            Lifecycle workflow templates
+          </h2>
+          <p
+            class="mt-1 max-w-3xl text-xs text-muted-foreground"
+          >
+            Define ordered or parallel IT steps for HR joiners, role/site movers, and leavers. The most specific active role, site, and employment match wins.
+          </p>
+        </div>
+        <button
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+          data-slot="button"
+        >
+          <svg
+            class="lucide lucide-plus h-4 w-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M5 12h14"
+            />
+            <path
+              d="M12 5v14"
+            />
+          </svg>
+           New template
+        </button>
+      </div>
+      <div
+        class="mt-4 grid gap-3 lg:grid-cols-2"
+      >
+        <article
+          class="rounded-xl border border-border bg-background p-4"
+        >
+          <div
+            class="flex items-start justify-between gap-3"
+          >
+            <div
+              class="min-w-0"
+            >
+              <div
+                class="flex flex-wrap items-center gap-2"
+              >
+                <h3
+                  class="truncate text-sm font-bold"
+                >
+                  Support worker joiner
+                </h3>
+                <span
+                  class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+                >
+                  Joiner
+                </span>
+              </div>
+              <p
+                class="mt-1 text-xs text-muted-foreground"
+              >
+                Approved account workflow
+              </p>
+            </div>
+            <button
+              aria-label="Edit Support worker joiner"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground size-9"
+              data-slot="button"
+            >
+              <svg
+                class="lucide lucide-pencil h-4 w-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                />
+                <path
+                  d="m15 5 4 4"
+                />
+              </svg>
+            </button>
+          </div>
+          <div
+            class="mt-3 flex flex-wrap gap-1.5 text-[10.5px]"
+          >
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Role: 
+              Any
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Site: 
+              Approved house
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Employment:
+               
+              Any
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Priority 
+              10
+            </span>
+          </div>
+          <ol
+            class="mt-3 grid gap-2"
+          >
+            <li
+              class="flex items-start gap-2 rounded-lg border border-border/70 p-2.5"
+            >
+              <span
+                class="grid h-6 w-6 flex-none place-items-center rounded-md bg-primary/10 text-[10px] font-bold text-primary"
+              >
+                1
+              </span>
+              <div
+                class="min-w-0 flex-1"
+              >
+                <p
+                  class="truncate text-xs font-semibold"
+                >
+                  Prepare the account
+                </p>
+                <p
+                  class="truncate text-[10.5px] text-muted-foreground"
+                >
+                  Grant
+                   
+                  Account
+                   · Service desk
+                </p>
+              </div>
+              <svg
+                class="lucide lucide-shield-check h-3.5 w-3.5 text-primary"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+                />
+                <path
+                  d="m9 12 2 2 4-4"
+                />
+              </svg>
+            </li>
+          </ol>
+        </article>
+      </div>
+    </section>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ edit resources/js/components/it/__tests__/it-provisioning-templates.test.tsx:113:28
+    111| const edit = () => {
+    112|     mount();
+    113|     fireEvent.click(screen.getByRole('button', { name: 'Edit template'…
+       |                            ^
+    114| };
+    115| const review = () =>
+ ❯ resources/js/components/it/__tests__/it-provisioning-templates.test.tsx:178:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > keeps unsaved edits when closing is cancelled and never saves through the discard control
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Edit template"
+
+Here are the accessible roles:
+
+  heading:
+
+  Name "Lifecycle workflow templates":
+  <h2
+    class="flex items-center gap-2 text-base font-bold text-foreground"
+  />
+
+  Name "Support worker joiner":
+  <h3
+    class="truncate text-sm font-bold"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-1 max-w-3xl text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="mt-1 text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="truncate text-xs font-semibold"
+  />
+
+  Name "":
+  <p
+    class="truncate text-[10.5px] text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New template":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+  />
+
+  Name "Edit Support worker joiner":
+  <button
+    aria-label="Edit Support worker joiner"
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground size-9"
+    data-slot="button"
+  />
+
+  --------------------------------------------------
+  article:
+
+  Name "":
+  <article
+    class="rounded-xl border border-border bg-background p-4"
+  />
+
+  --------------------------------------------------
+  list:
+
+  Name "":
+  <ol
+    class="mt-3 grid gap-2"
+  />
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  <li
+    class="flex items-start gap-2 rounded-lg border border-border/70 p-2.5"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <section
+      class="rounded-2xl border border-border bg-card p-4 sm:p-5"
+    >
+      <div
+        class="flex flex-wrap items-start justify-between gap-3"
+      >
+        <div>
+          <h2
+            class="flex items-center gap-2 text-base font-bold text-foreground"
+          >
+            <svg
+              class="lucide lucide-git-merge h-4 w-4 text-primary"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="18"
+                cy="18"
+                r="3"
+              />
+              <circle
+                cx="6"
+                cy="6"
+                r="3"
+              />
+              <path
+                d="M6 21V9a9 9 0 0 0 9 9"
+              />
+            </svg>
+             
+            Lifecycle workflow templates
+          </h2>
+          <p
+            class="mt-1 max-w-3xl text-xs text-muted-foreground"
+          >
+            Define ordered or parallel IT steps for HR joiners, role/site movers, and leavers. The most specific active role, site, and employment match wins.
+          </p>
+        </div>
+        <button
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+          data-slot="button"
+        >
+          <svg
+            class="lucide lucide-plus h-4 w-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M5 12h14"
+            />
+            <path
+              d="M12 5v14"
+            />
+          </svg>
+           New template
+        </button>
+      </div>
+      <div
+        class="mt-4 grid gap-3 lg:grid-cols-2"
+      >
+        <article
+          class="rounded-xl border border-border bg-background p-4"
+        >
+          <div
+            class="flex items-start justify-between gap-3"
+          >
+            <div
+              class="min-w-0"
+            >
+              <div
+                class="flex flex-wrap items-center gap-2"
+              >
+                <h3
+                  class="truncate text-sm font-bold"
+                >
+                  Support worker joiner
+                </h3>
+                <span
+                  class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+                >
+                  Joiner
+                </span>
+              </div>
+              <p
+                class="mt-1 text-xs text-muted-foreground"
+              >
+                Approved account workflow
+              </p>
+            </div>
+            <button
+              aria-label="Edit Support worker joiner"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground size-9"
+              data-slot="button"
+            >
+              <svg
+                class="lucide lucide-pencil h-4 w-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                />
+                <path
+                  d="m15 5 4 4"
+                />
+              </svg>
+            </button>
+          </div>
+          <div
+            class="mt-3 flex flex-wrap gap-1.5 text-[10.5px]"
+          >
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Role: 
+              Any
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Site: 
+              Approved house
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Employment:
+               
+              Any
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Priority 
+              10
+            </span>
+          </div>
+          <ol
+            class="mt-3 grid gap-2"
+          >
+            <li
+              class="flex items-start gap-2 rounded-lg border border-border/70 p-2.5"
+            >
+              <span
+                class="grid h-6 w-6 flex-none place-items-center rounded-md bg-primary/10 text-[10px] font-bold text-primary"
+              >
+                1
+              </span>
+              <div
+                class="min-w-0 flex-1"
+              >
+                <p
+                  class="truncate text-xs font-semibold"
+                >
+                  Prepare the account
+                </p>
+                <p
+                  class="truncate text-[10.5px] text-muted-foreground"
+                >
+                  Grant
+                   
+                  Account
+                   · Service desk
+                </p>
+              </div>
+              <svg
+                class="lucide lucide-shield-check h-3.5 w-3.5 text-primary"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+                />
+                <path
+                  d="m9 12 2 2 4-4"
+                />
+              </svg>
+            </li>
+          </ol>
+        </article>
+      </div>
+    </section>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ edit resources/js/components/it/__tests__/it-provisioning-templates.test.tsx:113:28
+    111| const edit = () => {
+    112|     mount();
+    113|     fireEvent.click(screen.getByRole('button', { name: 'Edit template'…
+       |                            ^
+    114| };
+    115| const review = () =>
+ ❯ resources/js/components/it/__tests__/it-provisioning-templates.test.tsx:206:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > returns invalid required details and dependency graphs to their editable step
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Edit template"
+
+Here are the accessible roles:
+
+  heading:
+
+  Name "Lifecycle workflow templates":
+  <h2
+    class="flex items-center gap-2 text-base font-bold text-foreground"
+  />
+
+  Name "Support worker joiner":
+  <h3
+    class="truncate text-sm font-bold"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-1 max-w-3xl text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="mt-1 text-xs text-muted-foreground"
+  />
+
+  Name "":
+  <p
+    class="truncate text-xs font-semibold"
+  />
+
+  Name "":
+  <p
+    class="truncate text-[10.5px] text-muted-foreground"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New template":
+  <button
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+    data-slot="button"
+  />
+
+  Name "Edit Support worker joiner":
+  <button
+    aria-label="Edit Support worker joiner"
+    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground size-9"
+    data-slot="button"
+  />
+
+  --------------------------------------------------
+  article:
+
+  Name "":
+  <article
+    class="rounded-xl border border-border bg-background p-4"
+  />
+
+  --------------------------------------------------
+  list:
+
+  Name "":
+  <ol
+    class="mt-3 grid gap-2"
+  />
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  <li
+    class="flex items-start gap-2 rounded-lg border border-border/70 p-2.5"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <section
+      class="rounded-2xl border border-border bg-card p-4 sm:p-5"
+    >
+      <div
+        class="flex flex-wrap items-start justify-between gap-3"
+      >
+        <div>
+          <h2
+            class="flex items-center gap-2 text-base font-bold text-foreground"
+          >
+            <svg
+              class="lucide lucide-git-merge h-4 w-4 text-primary"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="18"
+                cy="18"
+                r="3"
+              />
+              <circle
+                cx="6"
+                cy="6"
+                r="3"
+              />
+              <path
+                d="M6 21V9a9 9 0 0 0 9 9"
+              />
+            </svg>
+             
+            Lifecycle workflow templates
+          </h2>
+          <p
+            class="mt-1 max-w-3xl text-xs text-muted-foreground"
+          >
+            Define ordered or parallel IT steps for HR joiners, role/site movers, and leavers. The most specific active role, site, and employment match wins.
+          </p>
+        </div>
+        <button
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+          data-slot="button"
+        >
+          <svg
+            class="lucide lucide-plus h-4 w-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M5 12h14"
+            />
+            <path
+              d="M12 5v14"
+            />
+          </svg>
+           New template
+        </button>
+      </div>
+      <div
+        class="mt-4 grid gap-3 lg:grid-cols-2"
+      >
+        <article
+          class="rounded-xl border border-border bg-background p-4"
+        >
+          <div
+            class="flex items-start justify-between gap-3"
+          >
+            <div
+              class="min-w-0"
+            >
+              <div
+                class="flex flex-wrap items-center gap-2"
+              >
+                <h3
+                  class="truncate text-sm font-bold"
+                >
+                  Support worker joiner
+                </h3>
+                <span
+                  class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold bg-status-success-bg text-status-success border-status-success/30"
+                >
+                  Joiner
+                </span>
+              </div>
+              <p
+                class="mt-1 text-xs text-muted-foreground"
+              >
+                Approved account workflow
+              </p>
+            </div>
+            <button
+              aria-label="Edit Support worker joiner"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground size-9"
+              data-slot="button"
+            >
+              <svg
+                class="lucide lucide-pencil h-4 w-4"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                />
+                <path
+                  d="m15 5 4 4"
+                />
+              </svg>
+            </button>
+          </div>
+          <div
+            class="mt-3 flex flex-wrap gap-1.5 text-[10.5px]"
+          >
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Role: 
+              Any
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Site: 
+              Approved house
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Employment:
+               
+              Any
+            </span>
+            <span
+              class="rounded-full bg-muted px-2 py-1"
+            >
+              Priority 
+              10
+            </span>
+          </div>
+          <ol
+            class="mt-3 grid gap-2"
+          >
+            <li
+              class="flex items-start gap-2 rounded-lg border border-border/70 p-2.5"
+            >
+              <span
+                class="grid h-6 w-6 flex-none place-items-center rounded-md bg-primary/10 text-[10px] font-bold text-primary"
+              >
+                1
+              </span>
+              <div
+                class="min-w-0 flex-1"
+              >
+                <p
+                  class="truncate text-xs font-semibold"
+                >
+                  Prepare the account
+                </p>
+                <p
+                  class="truncate text-[10.5px] text-muted-foreground"
+                >
+                  Grant
+                   
+                  Account
+                   · Service desk
+                </p>
+              </div>
+              <svg
+                class="lucide lucide-shield-check h-3.5 w-3.5 text-primary"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+                />
+                <path
+                  d="m9 12 2 2 4-4"
+                />
+              </svg>
+            </li>
+          </ol>
+        </article>
+      </div>
+    </section>
+  </div>
+</body>
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ edit resources/js/components/it/__tests__/it-provisioning-templates.test.tsx:113:28
+    111| const edit = () => {
+    112|     mount();
+    113|     fireEvent.click(screen.getByRole('button', { name: 'Edit template'…
+       |                            ^
+    114| };
+    115| const review = () =>
+ ❯ resources/js/components/it/__tests__/it-provisioning-templates.test.tsx:226:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed (6)
+   Start at  16:10:48
+   Duration  3.37s (transform 183ms, setup 138ms, import 1.53s, tests 370ms, environment 1.15s)
+

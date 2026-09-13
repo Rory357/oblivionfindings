@@ -21,12 +21,13 @@ class GovernancePolicy extends Model
 
     protected $fillable = [
         'policy_code', 'title', 'category', 'purpose', 'content',
-        'version_number', 'status', 'approval_resolution_id',
-        'owner_id', 'approved_by', 'approved_at', 'effective_from',
-        'review_due', 'next_review_date', 'supersedes_policy_id', 'created_by',
+        'version_number', 'status', 'requires_attestation', 'attestation_frequency',
+        'approval_resolution_id', 'owner_id', 'approved_by', 'approved_at',
+        'effective_from', 'review_due', 'next_review_date', 'supersedes_policy_id', 'created_by',
     ];
 
     protected $casts = [
+        'requires_attestation' => 'boolean',
         'approved_at' => 'datetime',
         'effective_from' => 'date',
         'review_due' => 'date',

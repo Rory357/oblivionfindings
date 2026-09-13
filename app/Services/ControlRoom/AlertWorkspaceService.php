@@ -2,6 +2,7 @@
 
 namespace App\Services\ControlRoom;
 
+use App\Domain\It\Services\ItControlRoomHandoffService;
 use App\Domain\Monitoring\Presenters\MonitoringIncidentEvidencePresenter;
 use App\Domain\SecurityDevices\Models\Device as CanonicalDevice;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -403,8 +404,11 @@ class AlertWorkspaceService
             ] : null,
             'linked_hs_event' => $this->hsVisibility->forControlRoomAlert($alert, $user),
             'linked_it_work' => $monitoringContext['linked_it_work'],
+            'it_handoff' => ['viewer_user_id' => (int) $user->id,
+                'can_open' => app(ItControlRoomHandoffService::class)->canPrepare($alert, $user)],
             'linked_device' => $linkedCanonicalDevice,
             'monitoring_incident_evidence' => $monitoringContext['incident_evidence'],
+            'monitoring_recovery' => $this->monitoringIncidentEvidence->recoveryForAlert($alert, $user),
             'linked_operational_evidence' => $linkedOperationalEvidence,
             'resolve_gate' => $resolveGate,
             'close_gate' => $closeGate,

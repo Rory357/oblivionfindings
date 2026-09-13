@@ -1,0 +1,140 @@
+{
+    "token": "e39f7158a6024dcb",
+    "mutations_performed": false,
+    "items": [
+        {
+            "id": 1,
+            "name": "W15 e39f7158a6024dcb synthetic approval request",
+            "outcome_type": "provisioning",
+            "provisioning_type": "equipment",
+            "requires_approval": 1,
+            "internal_only": 0,
+            "is_published": 1,
+            "form_schema_version": 1,
+            "published_version_id": 1,
+            "lock_version": 2
+        },
+        {
+            "id": 2,
+            "name": "W15 e39f7158a6024dcb synthetic service request",
+            "outcome_type": "service_request",
+            "provisioning_type": null,
+            "requires_approval": 0,
+            "internal_only": 0,
+            "is_published": 1,
+            "form_schema_version": 1,
+            "published_version_id": 2,
+            "lock_version": 2
+        },
+        {
+            "id": 3,
+            "name": "W15 e39f7158a6024dcb synthetic draft request",
+            "outcome_type": "service_request",
+            "provisioning_type": null,
+            "requires_approval": 0,
+            "internal_only": 0,
+            "is_published": 0,
+            "form_schema_version": 1,
+            "published_version_id": null,
+            "lock_version": 1
+        },
+        {
+            "id": 4,
+            "name": "W15 e39f7158a6024dcb synthetic confidential revised draft",
+            "outcome_type": "service_request",
+            "provisioning_type": null,
+            "requires_approval": 0,
+            "internal_only": 1,
+            "is_published": 1,
+            "form_schema_version": 2,
+            "published_version_id": 3,
+            "lock_version": 3
+        },
+        {
+            "id": 5,
+            "name": "W15 synthetic presentation recovery",
+            "outcome_type": "service_request",
+            "provisioning_type": null,
+            "requires_approval": 0,
+            "internal_only": 0,
+            "is_published": 0,
+            "form_schema_version": 1,
+            "published_version_id": null,
+            "lock_version": 1
+        }
+    ],
+    "create_receipts": [
+        {
+            "id": 1,
+            "actor_user_id": 3,
+            "resource": "catalogue-items",
+            "request_uuid": "754c13a0-c2f5-4d58-94b3-5fea8024f8ee",
+            "it_catalog_item_id": 5,
+            "committed_at": "2026-09-12 14:42:05",
+            "cancelled_at": null
+        }
+    ],
+    "versions": [
+        {
+            "id": 1,
+            "catalog_item_id": 1,
+            "version": 1,
+            "provenance": "reviewed_publication",
+            "published_by": 3,
+            "contract": "{\"name\": \"W15 e39f7158a6024dcb synthetic approval request\", \"slug\": \"w15-e39f7158a6024dcb-synthetic-approval-request\", \"category\": \"hardware\", \"sort_order\": 0, \"description\": \"Isolated catalogue verification only. No external fulfilment or communication.\", \"form_schema\": {\"fields\": [{\"key\": \"details\", \"max\": 2000, \"type\": \"textarea\", \"label\": \"What do you need?\", \"required\": true, \"visibility\": \"requester\"}]}, \"outcome_type\": \"provisioning\", \"search_terms\": [\"synthetic\", \"approval\"], \"internal_only\": false, \"it_service_id\": null, \"default_priority\": \"normal\", \"provisioning_type\": \"equipment\", \"requires_approval\": true, \"form_schema_version\": 1}"
+        },
+        {
+            "id": 2,
+            "catalog_item_id": 2,
+            "version": 1,
+            "provenance": "reviewed_publication",
+            "published_by": 3,
+            "contract": "{\"name\": \"W15 e39f7158a6024dcb synthetic service request\", \"slug\": \"w15-e39f7158a6024dcb-synthetic-service-request\", \"category\": \"hardware\", \"sort_order\": 0, \"description\": \"Isolated catalogue verification only. No external fulfilment or communication.\", \"form_schema\": {\"fields\": [{\"key\": \"details\", \"max\": 2000, \"type\": \"textarea\", \"label\": \"What do you need?\", \"required\": true, \"visibility\": \"requester\"}]}, \"outcome_type\": \"service_request\", \"search_terms\": [\"synthetic\", \"service\"], \"internal_only\": false, \"it_service_id\": null, \"default_priority\": \"normal\", \"provisioning_type\": null, \"requires_approval\": false, \"form_schema_version\": 1}"
+        },
+        {
+            "id": 3,
+            "catalog_item_id": 4,
+            "version": 1,
+            "provenance": "reviewed_publication",
+            "published_by": 3,
+            "contract": "{\"name\": \"W15 e39f7158a6024dcb synthetic versioned request\", \"slug\": \"w15-e39f7158a6024dcb-synthetic-versioned-request\", \"category\": \"hardware\", \"sort_order\": 0, \"description\": \"Isolated catalogue verification only. No external fulfilment or communication.\", \"form_schema\": {\"fields\": [{\"key\": \"details\", \"max\": 2000, \"type\": \"textarea\", \"label\": \"What do you need?\", \"required\": true, \"visibility\": \"requester\"}]}, \"outcome_type\": \"service_request\", \"search_terms\": [\"synthetic\", \"versioned\"], \"internal_only\": false, \"it_service_id\": null, \"default_priority\": \"normal\", \"provisioning_type\": null, \"requires_approval\": false, \"form_schema_version\": 1}"
+        }
+    ],
+    "submissions": [
+        {
+            "id": 1,
+            "catalog_item_id": 1,
+            "requester_user_id": 1,
+            "schema_version": 1,
+            "catalog_version_id": 1,
+            "contract_snapshot": "{\"name\": \"W15 e39f7158a6024dcb synthetic approval request\", \"slug\": \"w15-e39f7158a6024dcb-synthetic-approval-request\", \"category\": \"hardware\", \"sort_order\": 0, \"description\": \"Isolated catalogue verification only. No external fulfilment or communication.\", \"form_schema\": {\"fields\": [{\"key\": \"details\", \"max\": 2000, \"type\": \"textarea\", \"label\": \"What do you need?\", \"required\": true, \"visibility\": \"requester\"}]}, \"outcome_type\": \"provisioning\", \"search_terms\": [\"synthetic\", \"approval\"], \"internal_only\": false, \"it_service_id\": null, \"default_priority\": \"normal\", \"provisioning_type\": \"equipment\", \"requires_approval\": true, \"form_schema_version\": 1}",
+            "input_sha256": "746ae5bf87ae8a6284f32637800b6731f675e509f8868dcf4449634573f4e36b",
+            "result_type": "it_provisioning_request",
+            "result_id": 1
+        }
+    ],
+    "provisioning": [
+        {
+            "id": 1,
+            "employee_profile_id": 1,
+            "created_by": 1,
+            "type": "equipment",
+            "status": "pending",
+            "approval_required": 1,
+            "approval_status": "pending",
+            "approved_by_user_id": null,
+            "fulfilled_by": null,
+            "evidence_summary": null
+        }
+    ],
+    "events": [
+        {
+            "id": 1,
+            "subject_type": "it_provisioning_request",
+            "subject_id": 1,
+            "actor_user_id": 1,
+            "type": "created",
+            "payload": "{\"source\": \"catalog\", \"catalog_item_id\": 1, \"approval_required\": true, \"form_schema_version\": 1}"
+        }
+    ]
+}

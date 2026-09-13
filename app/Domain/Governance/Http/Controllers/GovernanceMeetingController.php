@@ -15,9 +15,11 @@ use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\Governance\Services\ExecutiveMeetingAccessService;
 use App\Domain\Governance\Services\GovernanceNestedMutationService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
+use App\Domain\Governance\Services\MeetingMinuteService;
 use App\Domain\Governance\Support\GovernancePresenter;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
+use DomainException;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -29,16 +31,27 @@ class GovernanceMeetingController extends Controller
         protected GovernanceNestedMutationService $nestedMutations,
         protected BoardPackAccessService $boardPackAccess,
         protected ExecutiveMeetingAccessService $executiveAccess,
+        protected MeetingMinuteService $minuteService,
     ) {}
 
-    public function create()
+    public function create(Request $request)
     {
         $boardMembers = BoardMember::with('user')->get();
         $committees = BoardCommittee::all();
 
+        $initialScheduledAt = null;
+        if ($request->filled('date')) {
+            $date = $request->input('date');
+            $hour = $request->input('hour');
+            $hourNum = is_numeric($hour) ? (int) $hour : 9;
+            $padHour = str_pad((string) $hourNum, 2, '0', STR_PAD_LEFT);
+            $initialScheduledAt = "{$date}T{$padHour}:00";
+        }
+
         return Inertia::render('Governance/Meetings/Create', [
             'boardMembers' => $boardMembers,
             'committees' => $committees,
+            'initialScheduledAt' => $initialScheduledAt,
         ]);
     }
 
@@ -139,8 +152,11 @@ class GovernanceMeetingController extends Controller
             'secretary.user',
             'agendaItems.presenter',
             'attendances.boardMember.user',
+            'rsvps.boardMember.user',
             'ceoReport.submittedBy',
-            'minutes',
+            'minutes.draftedBy',
+            'minutes.reviewedBy.user',
+            'minutes.signedBy.user',
             'boardPack',
             'resolutions',
         ]);
@@ -164,6 +180,10 @@ class GovernanceMeetingController extends Controller
         // The meeting payload needs only a linkable pack summary, never the raw model fields.
         $visiblePack?->setVisible(['id', 'distributed_at']);
 
+        $viewerBoardMember = $viewer->boardMember;
+        $viewerCanRsvp = $viewerBoardMember !== null && $meeting->isInvited($viewerBoardMember);
+        $viewerRsvp = $viewerCanRsvp ? $meeting->rsvps->firstWhere('board_member_id', $viewerBoardMember->id) : null;
+
         return Inertia::render('Governance/Meetings/Show', [
             'meeting' => $meeting,
             'quorum' => $quorum,
@@ -171,8 +191,11 @@ class GovernanceMeetingController extends Controller
             'canEdit' => $meeting->isEditable() && $viewer->can('update', $meeting),
             'canManageMinutes' => $viewer->can('manageMinutes', $meeting),
             'canApproveMinutes' => $viewer->can('approveMinutes', $meeting),
+            'canSignMinutes' => $viewer->can('signMinutes', $meeting),
             'workflowChecklist' => $workflowChecklist,
             'meetingCockpit' => $meetingCockpit,
+            'viewerCanRsvp' => $viewerCanRsvp,
+            'viewerRsvp' => $viewerRsvp,
         ]);
     }
 
@@ -302,22 +325,12 @@ class GovernanceMeetingController extends Controller
             'content_blocks' => 'nullable|array',
         ]);
 
-        $contentBlocks = $validated['content_blocks'] ?? null;
-        if (empty($contentBlocks)) {
-            $contentBlocks = $meeting->generateMinutesSkeleton();
+        try {
+            $this->minuteService->storeMinutes($meeting, $validated['content_blocks'] ?? null, $request->user());
+            return redirect()->back()->with('success', 'Minutes drafted.');
+        } catch (DomainException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
         }
-
-        $minutes = MeetingMinute::create([
-            'governance_meeting_id' => $meeting->id,
-            'content_blocks' => $contentBlocks,
-            'status' => 'draft',
-            'drafted_by' => auth()->id(),
-            'drafted_at' => now(),
-        ]);
-
-        $meeting->update(['status' => 'minutes_draft']);
-
-        return redirect()->back()->with('success', 'Minutes drafted.');
     }
 
     public function updateMinutes(Request $request, GovernanceMeeting $meeting)
@@ -328,35 +341,74 @@ class GovernanceMeetingController extends Controller
             return redirect()->back()->with('error', 'Minutes have not been created for this meeting yet.');
         }
 
+        if (! $meeting->minutes->canEdit()) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => "Minutes in status '{$meeting->minutes->status}' cannot be edited in place. Approved and signed minutes are immutable."], 422);
+            }
+            return redirect()->back()->with('error', "Minutes in status '{$meeting->minutes->status}' cannot be edited in place. Approved and signed minutes are immutable. Create a correction draft to propose revisions.");
+        }
+
         $validated = $request->validate([
             'content_blocks' => 'required|array',
+            'expected_version' => 'nullable|integer',
         ]);
 
-        $meeting->minutes->update([
-            'content_blocks' => $validated['content_blocks'],
-        ]);
-        $meeting->minutes->incrementVersion();
+        try {
+            $this->minuteService->updateMinutes(
+                $meeting,
+                $validated['content_blocks'],
+                $request->user(),
+                $validated['expected_version'] ?? null
+            );
 
-        return redirect()->back()->with('success', 'Minutes updated.');
+            return redirect()->back()->with('success', 'Minutes updated.');
+        } catch (DomainException $e) {
+            if ($request->wantsJson()) {
+                $status = str_contains($e->getMessage(), 'Stale edit') ? 409 : 422;
+                return response()->json(['error' => $e->getMessage()], $status);
+            }
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function submitMinutesForReview(Request $request, GovernanceMeeting $meeting)
+    {
+        $this->authorize('manageMinutes', $meeting);
+
+        try {
+            $this->minuteService->submitForReview($meeting, $request->user());
+            return redirect()->back()->with('success', 'Minutes submitted for review.');
+        } catch (DomainException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
     }
 
     public function approveMinutes(Request $request, GovernanceMeeting $meeting)
     {
         $this->authorize('approveMinutes', $meeting);
 
-        if (! $meeting->minutes) {
-            return redirect()->back()->with('error', 'Minutes have not been created for this meeting yet.');
-        }
-
-        $meeting->minutes->update([
-            'status' => 'approved',
-            'reviewed_by' => auth()->user()->boardMember?->id,
-            'reviewed_at' => now(),
+        $validated = $request->validate([
+            'notes' => 'nullable|string',
+            'expected_version' => 'required|integer',
+            'expected_hash' => 'nullable|string',
         ]);
 
-        $meeting->update(['status' => 'minutes_approved']);
-
-        return redirect()->back()->with('success', 'Minutes approved.');
+        try {
+            $this->minuteService->approveMinutes(
+                $meeting,
+                $request->user(),
+                $validated['notes'] ?? null,
+                (int) $validated['expected_version'],
+                $validated['expected_hash'] ?? null
+            );
+            return redirect()->back()->with('success', 'Minutes approved.');
+        } catch (DomainException $e) {
+            $status = str_contains($e->getMessage(), 'conflict') ? 409 : 422;
+            if ($request->wantsJson()) {
+                return response()->json(['error' => $e->getMessage()], $status);
+            }
+            return redirect()->back()->with('error', $e->getMessage());
+        }
     }
 
     public function recordAttendance(Request $request, GovernanceMeeting $meeting)
@@ -366,11 +418,18 @@ class GovernanceMeetingController extends Controller
         $validated = $request->validate([
             'attendance' => 'required|array',
             'attendance.*.board_member_id' => 'required|exists:board_members,id',
-            'attendance.*.status' => 'required|in:present,apology,no_show,late',
+            'attendance.*.status' => 'required|in:present,apology,no_show,late,unrecorded',
             'attendance.*.apology_reason' => 'nullable|string',
         ]);
 
         foreach ($validated['attendance'] as $record) {
+            if ($record['status'] === 'unrecorded') {
+                MeetingAttendance::where('governance_meeting_id', $meeting->id)
+                    ->where('board_member_id', $record['board_member_id'])
+                    ->delete();
+                continue;
+            }
+
             MeetingAttendance::updateOrCreate(
                 [
                     'governance_meeting_id' => $meeting->id,
@@ -385,40 +444,80 @@ class GovernanceMeetingController extends Controller
             );
         }
 
-        $meeting->updateQuorumStatus();
-
         return redirect()->back()->with('success', 'Attendance recorded.');
     }
 
-    public function lockMeeting(GovernanceMeeting $meeting)
+    public function lockMeeting(Request $request, GovernanceMeeting $meeting)
     {
-        $this->authorize('update', $meeting);
+        $this->authorize('lock', $meeting);
 
-        if ($meeting->isLocked()) {
-            return redirect()->back()->with('error', 'Meeting is already locked.');
-        }
-
-        $meeting->lock(auth()->id());
+        $meeting->update([
+            'status' => 'locked',
+            'locked_at' => now(),
+            'locked_by' => $request->user()->id,
+        ]);
 
         return redirect()->back()->with('success', 'Meeting locked. No further edits allowed.');
     }
 
-    public function signMinutes(GovernanceMeeting $meeting)
+    public function signMinutes(Request $request, GovernanceMeeting $meeting)
     {
-        $this->authorize('approveMinutes', $meeting);
+        $this->authorize('signMinutes', $meeting);
 
-        $minutes = $meeting->minutes;
-        if (! $minutes) {
-            return redirect()->back()->with('error', 'No minutes found for this meeting.');
+        $validated = $request->validate([
+            'expected_version' => 'required|integer',
+            'expected_hash' => 'nullable|string',
+        ]);
+
+        try {
+            $this->minuteService->signMinutes(
+                $meeting,
+                $request->user(),
+                (int) $validated['expected_version'],
+                $validated['expected_hash'] ?? null
+            );
+            return redirect()->back()->with('success', 'Minutes signed successfully.');
+        } catch (DomainException $e) {
+            $status = str_contains($e->getMessage(), 'conflict') ? 409 : 422;
+            if ($request->wantsJson()) {
+                return response()->json(['error' => $e->getMessage()], $status);
+            }
+            return redirect()->back()->with('error', $e->getMessage());
         }
+    }
 
-        if (! $minutes->isApproved()) {
-            return redirect()->back()->with('error', 'Minutes must be approved before signing.');
+    public function archiveMinutes(Request $request, GovernanceMeeting $meeting)
+    {
+        $this->authorize('archiveMinutes', $meeting);
+
+        try {
+            $this->minuteService->archiveMinutes($meeting, $request->user());
+            return redirect()->back()->with('success', 'Minutes archived.');
+        } catch (DomainException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => $e->getMessage()], 422);
+            }
+            return redirect()->back()->with('error', $e->getMessage());
         }
+    }
 
-        $minutes->sign(auth()->id());
+    public function createMinutesCorrection(Request $request, GovernanceMeeting $meeting)
+    {
+        $this->authorize('manageMinutes', $meeting);
 
-        return redirect()->back()->with('success', 'Minutes signed successfully.');
+        $validated = $request->validate([
+            'reason' => 'required|string|min:5|max:1000',
+        ]);
+
+        try {
+            $this->minuteService->createCorrection($meeting, $request->user(), $validated['reason']);
+            return redirect()->back()->with('success', 'Correction draft created. Prior approved version is preserved in version history.');
+        } catch (DomainException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => $e->getMessage()], 422);
+            }
+            return redirect()->back()->with('error', $e->getMessage());
+        }
     }
 
     public function advanceStatus(GovernanceMeeting $meeting)
@@ -439,27 +538,61 @@ class GovernanceMeetingController extends Controller
         $this->authorize('view', $meeting);
 
         $validated = $request->validate([
-            'status' => 'required|in:attending,apology,tentative',
-            'dietary_requirements' => 'nullable|string|max:255',
+            'response' => 'nullable|in:accepted,declined,tentative,attending,apology,unsure',
+            'status' => 'nullable|in:accepted,declined,tentative,attending,apology,unsure',
+            'decline_reason' => 'nullable|string|max:500',
             'notes' => 'nullable|string|max:500',
+            'dietary_requirements' => 'nullable|boolean',
+            'dietary_notes' => 'nullable|string|max:255',
         ]);
 
-        $boardMember = auth()->user()->boardMember;
+        $viewer = $request->user();
+        $boardMember = $viewer->boardMember;
         if (! $boardMember) {
-            return redirect()->back()->with('error', 'You are not a board member.');
+            abort(403, 'You are not a registered board member.');
         }
 
-        MeetingRsvp::updateOrCreate(
+        if (! $meeting->isInvited($boardMember)) {
+            abort(403, 'You are not an invited member of this committee meeting.');
+        }
+
+        $rawResponse = $validated['response'] ?? $validated['status'] ?? 'accepted';
+        $normalizedResponse = match ($rawResponse) {
+            'attending', 'accepted' => 'accepted',
+            'apology', 'declined' => 'declined',
+            'unsure', 'tentative' => 'tentative',
+            default => 'accepted',
+        };
+
+        $declineReason = $validated['decline_reason'] ?? ($normalizedResponse === 'declined' ? ($validated['notes'] ?? null) : null);
+        $dietaryNotes = $validated['dietary_notes'] ?? ($normalizedResponse !== 'declined' ? ($validated['notes'] ?? null) : null);
+        $hasDietary = ! empty($validated['dietary_requirements']) || ! empty($dietaryNotes);
+
+        $rsvp = MeetingRsvp::updateOrCreate(
             [
                 'governance_meeting_id' => $meeting->id,
                 'board_member_id' => $boardMember->id,
             ],
             [
-                ...$validated,
+                'response' => $normalizedResponse,
+                'decline_reason' => $declineReason,
+                'dietary_requirements' => $hasDietary,
+                'dietary_notes' => $dietaryNotes,
                 'responded_at' => now(),
             ]
         );
 
-        return redirect()->back()->with('success', 'RSVP recorded.');
+        $receiptId = sprintf('RSVP-%d-%d-%s', $meeting->id, $boardMember->id, now()->format('YmdHis'));
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'RSVP recorded.',
+                'receipt_id' => $receiptId,
+                'rsvp' => $rsvp->fresh()->load('boardMember.user'),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'RSVP recorded.')->with('receipt_id', $receiptId);
     }
 }

@@ -16,8 +16,8 @@ class ItServiceCatalogSeeder extends Seeder
         ];
 
         foreach ($items as $sort => $attributes) {
-            ItCatalogItem::query()->updateOrCreate(
-                ['tenant_id' => 1, 'slug' => $attributes['slug']],
+            ItCatalogItem::query()->firstOrCreate(
+                ['slug' => $attributes['slug']],
                 [
                     ...$attributes,
                     'description' => 'Use this guided request so IT receives the right information first time.',

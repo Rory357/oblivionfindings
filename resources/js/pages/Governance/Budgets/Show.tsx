@@ -80,6 +80,14 @@ interface LineItem {
     notes: string | null;
 }
 
+interface CarriedResolution {
+    id: number;
+    resolution_reference: string;
+    title: string;
+    outcome: string | null;
+    cost_impact?: { amount?: number; currency?: string } | null;
+}
+
 interface Adjustment {
     id: number;
     adjustment_type: string;
@@ -89,6 +97,15 @@ interface Adjustment {
     reason: string;
     status: string;
     threshold_applies: boolean;
+    approval_resolution_id: number | null;
+    approval_resolution: {
+        id: number;
+        resolution_reference: string;
+        title: string;
+        status: string;
+        outcome: string | null;
+        cost_impact?: { amount?: number; currency?: string } | null;
+    } | null;
     proposed_by: { name: string };
     approved_by: { name: string } | null;
     proposed_at: string;
@@ -138,6 +155,7 @@ interface Budget {
 interface Props extends PageProps {
     budget: Budget;
     categories: Record<string, string>;
+    carriedResolutions?: CarriedResolution[];
     canEdit: boolean;
     canPropose: boolean;
     canApprove: boolean;
@@ -147,6 +165,7 @@ export default function BudgetShow({
     auth,
     budget,
     categories,
+    carriedResolutions = [],
     canEdit,
     canPropose,
     canApprove,
@@ -185,6 +204,7 @@ export default function BudgetShow({
         adjustment_type: 'increase',
         amount: '',
         reason: '',
+        approval_resolution_id: '',
     });
 
     const allocationForm = useForm({
@@ -359,10 +379,13 @@ export default function BudgetShow({
         );
     };
 
-    const approveAdjustment = (adjustmentId: number) => {
+    const approveAdjustment = (
+        adjustmentId: number,
+        resolutionId?: number | null,
+    ) => {
         router.post(
             `/governance/budgets/${budget.id}/adjustments/${adjustmentId}/approve`,
-            {},
+            resolutionId ? { approval_resolution_id: resolutionId } : {},
             {
                 preserveScroll: true,
             },
@@ -380,6 +403,7 @@ export default function BudgetShow({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Budgets', href: '/governance/budgets' },
                 {
@@ -1471,6 +1495,88 @@ export default function BudgetShow({
                                                         </p>
                                                     )}
                                                 </div>
+                                                {Number(
+                                                    adjustmentForm.data.amount,
+                                                ) >=
+                                                    Number(
+                                                        budget.total_budget,
+                                                    ) *
+                                                        0.05 && (
+                                                    <div className="space-y-1 rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm">
+                                                        <p className="font-medium text-status-warning">
+                                                            Board Resolution
+                                                            Required
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            This adjustment
+                                                            exceeds the 5%
+                                                            threshold ($
+                                                            {(
+                                                                Number(
+                                                                    budget.total_budget,
+                                                                ) * 0.05
+                                                            ).toFixed(2)}
+                                                            ) and requires a
+                                                            carried board
+                                                            resolution.
+                                                        </p>
+                                                        {carriedResolutions.length >
+                                                            0 && (
+                                                            <div className="mt-2">
+                                                                <Label className="text-xs">
+                                                                    Attach
+                                                                    Carried
+                                                                    Resolution
+                                                                    (optional)
+                                                                </Label>
+                                                                <Select
+                                                                    value={
+                                                                        adjustmentForm
+                                                                            .data
+                                                                            .approval_resolution_id ||
+                                                                        undefined
+                                                                    }
+                                                                    onValueChange={(
+                                                                        v,
+                                                                    ) =>
+                                                                        adjustmentForm.setData(
+                                                                            'approval_resolution_id',
+                                                                            v,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <SelectTrigger className="h-8 text-xs">
+                                                                        <SelectValue placeholder="Select carried resolution..." />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {carriedResolutions.map(
+                                                                            (
+                                                                                res,
+                                                                            ) => (
+                                                                                <SelectItem
+                                                                                    key={
+                                                                                        res.id
+                                                                                    }
+                                                                                    value={String(
+                                                                                        res.id,
+                                                                                    )}
+                                                                                >
+                                                                                    {
+                                                                                        res.resolution_reference
+                                                                                    }{' '}
+                                                                                    —{' '}
+                                                                                    {
+                                                                                        res.title
+                                                                                    }
+                                                                                </SelectItem>
+                                                                            ),
+                                                                        )}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 <p className="text-xs text-muted-foreground">
                                                     Adjustments exceeding 5% of
                                                     total budget will require
@@ -1546,9 +1652,20 @@ export default function BudgetShow({
                                                                                 variant="destructive"
                                                                                 className="text-xs"
                                                                             >
-                                                                                Board
-                                                                                Approval
-                                                                                Required
+                                                                                Board Approval Required
+                                                                            </Badge>
+                                                                        )}
+                                                                        {adj.approval_resolution && (
+                                                                            <Badge
+                                                                                variant="outline"
+                                                                                className={cn(
+                                                                                    'text-xs',
+                                                                                    adj.approval_resolution.outcome === 'carried'
+                                                                                        ? 'border-status-success/40 text-status-success'
+                                                                                        : 'border-status-warning/40 text-status-warning',
+                                                                                )}
+                                                                            >
+                                                                                {adj.approval_resolution.resolution_reference} ({adj.approval_resolution.outcome || adj.approval_resolution.status})
                                                                             </Badge>
                                                                         )}
                                                                     </div>
@@ -1583,20 +1700,72 @@ export default function BudgetShow({
                                                                             'en-NZ',
                                                                         )}
                                                                     </p>
+                                                                    {adj.approval_resolution && (
+                                                                        <div className="mt-1 text-xs">
+                                                                            <Link
+                                                                                href={`/governance/resolutions/${adj.approval_resolution.id}`}
+                                                                                className="text-primary hover:underline"
+                                                                            >
+                                                                                View Resolution {adj.approval_resolution.resolution_reference}
+                                                                            </Link>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
-                                                                <div className="ml-4 flex gap-2">
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        className="border-status-success/30 text-status-success hover:bg-status-success-bg"
-                                                                        onClick={() =>
-                                                                            approveAdjustment(
-                                                                                adj.id,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        Approve
-                                                                    </Button>
+                                                                <div className="ml-4 flex flex-col items-end gap-2">
+                                                                    {adj.threshold_applies && (!adj.approval_resolution || adj.approval_resolution.outcome !== 'carried') ? (
+                                                                        <div className="flex flex-col items-end gap-1">
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                asChild
+                                                                                className="border-status-warning/40 text-status-warning hover:bg-status-warning-bg"
+                                                                            >
+                                                                                <Link href={adj.approval_resolution ? `/governance/resolutions/${adj.approval_resolution.id}` : '/governance/resolutions'}>
+                                                                                    Board decision required
+                                                                                </Link>
+                                                                            </Button>
+                                                                            {carriedResolutions.length > 0 && (
+                                                                                <Select
+                                                                                    onValueChange={(val) =>
+                                                                                        approveAdjustment(
+                                                                                            adj.id,
+                                                                                            Number(val),
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    <SelectTrigger className="h-7 text-xs">
+                                                                                        <SelectValue placeholder="Apply carried resolution..." />
+                                                                                    </SelectTrigger>
+                                                                                    <SelectContent>
+                                                                                        {carriedResolutions.map(
+                                                                                            (res) => (
+                                                                                                <SelectItem
+                                                                                                    key={res.id}
+                                                                                                    value={String(res.id)}
+                                                                                                >
+                                                                                                    Apply {res.resolution_reference}
+                                                                                                </SelectItem>
+                                                                                            ),
+                                                                                        )}
+                                                                                    </SelectContent>
+                                                                                </Select>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            className="border-status-success/30 text-status-success hover:bg-status-success-bg"
+                                                                            onClick={() =>
+                                                                                approveAdjustment(
+                                                                                    adj.id,
+                                                                                    adj.approval_resolution_id ?? adj.approval_resolution?.id,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            Approve
+                                                                        </Button>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1636,6 +1805,14 @@ export default function BudgetShow({
                                                                                 ),
                                                                             )}
                                                                         </span>
+                                                                        {adj.approval_resolution && (
+                                                                            <Badge
+                                                                                variant="outline"
+                                                                                className="text-xs"
+                                                                            >
+                                                                                Resolution {adj.approval_resolution.resolution_reference}
+                                                                            </Badge>
+                                                                        )}
                                                                     </div>
                                                                     <p className="text-sm text-muted-foreground">
                                                                         {

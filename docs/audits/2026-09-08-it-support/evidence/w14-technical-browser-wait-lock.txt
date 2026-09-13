@@ -1,0 +1,2 @@
+{"token":"33eaee60878c45e8","outbox_id":10,"lock_held":true,"maximum_hold_seconds":25,"record_mutations":false}
+{"token":"33eaee60878c45e8","lock_released":true,"record_mutations":false}

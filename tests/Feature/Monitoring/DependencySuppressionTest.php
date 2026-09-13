@@ -12,6 +12,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
+use App\Models\ControlRoom\SignalRule;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\Site;
@@ -161,6 +162,8 @@ it('persists a suppressed symptom and root cause without emitting a duplicate av
 it('recovers only the matching Control Room alert and IT incident when one of two root monitors recovers', function () {
     config()->set('queue.default', 'sync');
     $this->seed(SecurityDevicesSignalSeeder::class);
+    // This scenario verifies operational alerts, so configure an explicit urgent policy.
+    SignalRule::query()->where('signal_type_code', 'device_offline')->update(['output_severity' => 'high']);
     $site = dependencySite();
     $device = dependencyDevice($site, ['name' => 'Shared edge appliance']);
     $projection = ControlRoomDevice::query()->create([
@@ -211,12 +214,13 @@ it('recovers only the matching Control Room alert and IT incident when one of tw
         null,
     );
 
-    $resolvedAlerts = ControlRoomAlert::query()->where('device_id', $projection->id)->where('status', ControlRoomAlert::STATUS_RESOLVED)->get();
+    $recoveredAlerts = ControlRoomAlert::query()->where('device_id', $projection->id)->whereNotNull('context->monitoring_recoveries')->get();
     $recoveredTickets = ItTicket::query()->whereNotNull('monitoring_recovered_at')->get();
     $recoveryEvent = $recoveredTickets->first()?->events()->where('type', 'monitoring_recovered')->first();
 
-    expect($resolvedAlerts)->toHaveCount(1)
-        ->and(data_get($resolvedAlerts->first()?->context, 'normalized_data.monitor_correlation_key'))->toBe($keys->first())
+    expect($recoveredAlerts)->toHaveCount(1)
+        ->and($recoveredAlerts->first()->status)->toBe(ControlRoomAlert::STATUS_OPEN)
+        ->and(data_get($recoveredAlerts->first()?->context, 'normalized_data.monitor_correlation_key'))->toBe($keys->first())
         ->and($recoveredTickets)->toHaveCount(1)
         ->and(data_get($recoveryEvent?->payload, 'monitor_correlation_key'))
         ->toBe($keys->first());

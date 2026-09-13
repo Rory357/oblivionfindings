@@ -1,0 +1,46 @@
+[
+  {
+    "path": "app/Services/ControlRoom/SignalProcessingService.php",
+    "sha256": "2a61a9b21ee440d7a21101c80c9527fd8f96c34267f0adb3a0ada4a734902fc5"
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringAvailabilityEpisode.php",
+    "sha256": "3c5555df3ef9ba85fe209ed43b4c4477cfb929391d6f96a01bc46d21c80e9860"
+  },
+  {
+    "path": "app/Domain/It/Services/ItMonitoringDeliveryService.php",
+    "sha256": "badef5a443dd1ce397be113bd37b34ec8c87ec86038669225d9859b86b2c55d9"
+  },
+  {
+    "path": "app/Domain/Monitoring/Presenters/MonitoringIncidentEvidencePresenter.php",
+    "sha256": "8584be06dfb4199fca603645781fc393181a1e64a80fc833a4ad966882f07561"
+  },
+  {
+    "path": "app/Services/ControlRoom/AlertWorkspaceService.php",
+    "sha256": "e090d61364ce97a3a7464d348da050abf2a87181cdbc3b2d25635ae7ce0a81c4"
+  },
+  {
+    "path": "app/Services/ControlRoom/ControlRoomAlertProvenanceService.php",
+    "sha256": "3ee563b7351d4ae16ef08ef877600c27fcc4dfa8d19e16c8c410b3d7af5dbfc3"
+  },
+  {
+    "path": "resources/js/components/control-room/alert-workspace-dialog.tsx",
+    "sha256": "ba45b7d77ccbe728bdd142f9dcf86b96019b46e20b0ba3082cf5c6be21c17407"
+  },
+  {
+    "path": "resources/js/components/control-room/alert-workspace-dialog.test.tsx",
+    "sha256": "b1c6a26e35f9c79544563fec8bd7bdd373f10abef3828f5283678b043603f9cb"
+  },
+  {
+    "path": "tests/Feature/Monitoring/MonitoringAvailabilityEpisodeTest.php",
+    "sha256": "cff2a8d183d53b8aab1ebb053c4fb481f6c02b372306f6162bf890e7b9c06efe"
+  },
+  {
+    "path": "tests/Feature/Monitoring/DependencySuppressionTest.php",
+    "sha256": "c9684cb79bc444de33fd856d8fb58f33e86a478f85380abe77ca999466abd60e"
+  },
+  {
+    "path": "docs/audits/2026-09-08-it-support/evidence/w14-monitoring-browser-fixture.php",
+    "sha256": "b4488071b92357902c85635be3ec17b07e463b3fee6f1f015f582c64f3d5e2d3"
+  }
+]

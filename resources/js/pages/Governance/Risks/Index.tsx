@@ -83,6 +83,7 @@ export default function RiskIndex({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Risks', href: '/governance/risks' },
             ]}

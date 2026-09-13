@@ -36,10 +36,14 @@ class BoardPackController extends Controller
             ->latest('id');
 
         if ($status = $request->string('status')->toString()) {
-            if ($status === 'distributed') {
-                $query->whereNotNull('distributed_at');
+            if ($status === 'distributed' || $status === 'current') {
+                $query->whereNotNull('distributed_at')->where('is_current', true);
             } elseif ($status === 'draft') {
                 $query->whereNull('distributed_at');
+            } elseif ($status === 'superseded') {
+                $query->where('is_current', false)->where('build_status', 'published');
+            } elseif ($status === 'failed') {
+                $query->where('build_status', 'failed');
             }
         }
 
@@ -49,7 +53,7 @@ class BoardPackController extends Controller
         if ($canManage) {
             // Only pack managers use the generation dialog or need draft meeting metadata.
             $meetingsWithoutPack = GovernanceMeeting::query()
-                ->whereDoesntHave('boardPack')
+                ->whereDoesntHave('boardPacks')
                 ->whereNotIn('status', ['cancelled', 'archived'])
                 ->orderBy('scheduled_at')
                 ->withCount('agendaItems')
@@ -80,8 +84,10 @@ class BoardPackController extends Controller
             ],
             'summary' => [
                 'total' => (clone $visibleQuery)->count(),
-                'distributed' => (clone $visibleQuery)->whereNotNull('distributed_at')->count(),
+                'distributed' => (clone $visibleQuery)->whereNotNull('distributed_at')->where('is_current', true)->count(),
                 'draft' => (clone $visibleQuery)->whereNull('distributed_at')->count(),
+                'superseded' => (clone $visibleQuery)->where('is_current', false)->where('build_status', 'published')->count(),
+                'failed' => (clone $visibleQuery)->where('build_status', 'failed')->count(),
             ],
             'meetings_without_pack' => $meetingsWithoutPack,
         ]);
@@ -90,13 +96,41 @@ class BoardPackController extends Controller
     public function show(Request $request, BoardPack $pack)
     {
         $this->access->concealUnlessVisible($request->user(), $pack);
-        $pack->load(['meeting', 'snapshot', 'generatedBy']);
+        $pack->load(['meeting', 'snapshot', 'generatedBy', 'supersedes']);
         $presented = $this->presenter->present($pack);
+
+        $boardMemberId = $this->access->recipientBoardMemberId($request->user(), $pack);
+        $hasRead = $boardMemberId ? $pack->hasMemberRead($boardMemberId) : false;
+        $myReceipt = $boardMemberId ? $pack->getMemberReceipt($boardMemberId) : null;
+
+        $allRevisions = BoardPack::query()
+            ->where('governance_meeting_id', $pack->governance_meeting_id)
+            ->orderByDesc('revision_number')
+            ->get(['id', 'governance_meeting_id', 'revision_number', 'supersedes_id', 'build_status', 'is_current', 'generated_at', 'distributed_at', 'file_size'])
+            ->map(fn (BoardPack $p) => [
+                'id' => $p->id,
+                'revision_number' => (int) ($p->revision_number ?? 1),
+                'build_status' => $p->build_status ?? 'published',
+                'is_current' => (bool) ($p->is_current ?? true),
+                'generated_at' => $p->generated_at?->toIso8601String(),
+                'distributed_at' => $p->distributed_at?->toIso8601String(),
+                'file_size' => $p->file_size,
+            ])
+            ->all();
+
+        $currentPack = BoardPack::where('governance_meeting_id', $pack->governance_meeting_id)
+            ->where('is_current', true)
+            ->first();
 
         return Inertia::render('Governance/Packs/Show', [
             'pack' => $this->presentShowPack($pack),
+            'all_revisions' => $allRevisions,
+            'current_pack_id' => $currentPack?->id ?? $pack->id,
+            'current_revision_number' => $currentPack?->revision_number ?? $pack->revision_number ?? 1,
             'is_distributed' => $pack->isDistributed(),
-            'can_mark_read' => $this->access->recipientBoardMemberId($request->user(), $pack) !== null,
+            'can_mark_read' => $boardMemberId !== null && $pack->isDistributed() && ! $hasRead,
+            'has_read' => $hasRead,
+            'my_receipt' => $myReceipt,
             'read_count' => $pack->readCount(),
             'download_count' => $pack->downloadCount(),
             'manifestSections' => $presented['manifestSections'],
@@ -223,7 +257,9 @@ class BoardPackController extends Controller
         $this->access->concealUnlessVisible($viewer, $pack);
 
         // Never create a tracking event for a file that cannot be delivered.
-        if (! $pack->file_path || ! Storage::exists($pack->file_path)) {
+        $disk = Storage::disk('local');
+        $hasFile = $pack->file_path && ($disk->exists($pack->file_path) || file_exists(storage_path('app/'.$pack->file_path)));
+        if (! $hasFile) {
             abort(404, 'Pack file not found.');
         }
 
@@ -240,11 +276,16 @@ class BoardPackController extends Controller
                 'board_member_id' => $recipientBoardMemberId,
                 'user_id' => $viewer->id,
                 'meeting_id' => $pack->governance_meeting_id,
+                'revision_number' => $pack->revision_number,
                 'managed_access' => $this->access->canManage($viewer),
             ]
         );
 
-        return Storage::download($pack->file_path, basename($pack->file_path));
+        if ($disk->exists($pack->file_path)) {
+            return $disk->download($pack->file_path, basename($pack->file_path));
+        }
+
+        return response()->download(storage_path('app/'.$pack->file_path), basename($pack->file_path));
     }
 
     public function preview(GovernanceMeeting $meeting)
@@ -262,9 +303,25 @@ class BoardPackController extends Controller
         $boardMemberId = $this->access->recipientBoardMemberId($request->user(), $pack);
         abort_unless($boardMemberId !== null, 404);
 
-        $pack->recordRead($boardMemberId);
+        $receipt = $pack->recordRead($boardMemberId, $request->user()->id);
 
-        return response()->json(['success' => true]);
+        GovernanceAuditService::log(
+            'board_pack.read',
+            'BoardPack',
+            $pack->id,
+            [
+                'board_member_id' => $boardMemberId,
+                'user_id' => $request->user()->id,
+                'revision_number' => $pack->revision_number,
+                'receipt_id' => $receipt['receipt_id'] ?? null,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'receipt' => $receipt,
+            'revision_number' => $pack->revision_number,
+        ]);
     }
 
     public function regenerate(BoardPack $pack)
@@ -406,6 +463,11 @@ class BoardPackController extends Controller
         return [
             'id' => (int) $pack->id,
             'meeting_id' => (int) $pack->governance_meeting_id,
+            'revision_number' => (int) ($pack->revision_number ?? 1),
+            'supersedes_id' => $pack->supersedes_id ? (int) $pack->supersedes_id : null,
+            'build_status' => $pack->build_status ?? 'published',
+            'is_current' => (bool) ($pack->is_current ?? true),
+            'actual_document_count' => $pack->actualDocumentCount(),
             'meeting' => $pack->meeting ? [
                 'id' => (int) $pack->meeting->id,
                 'title' => $pack->meeting->title,
@@ -419,6 +481,8 @@ class BoardPackController extends Controller
             'distributed_at' => $pack->distributed_at?->toIso8601String(),
             'created_at' => $pack->created_at?->toIso8601String(),
             'updated_at' => $pack->updated_at?->toIso8601String(),
+            'read_count' => $pack->readCount(),
+            'download_count' => $pack->downloadCount(),
         ];
     }
 
@@ -429,14 +493,23 @@ class BoardPackController extends Controller
     {
         return [
             'id' => (int) $pack->id,
+            'revision_number' => (int) ($pack->revision_number ?? 1),
+            'supersedes_id' => $pack->supersedes_id ? (int) $pack->supersedes_id : null,
+            'build_status' => $pack->build_status ?? 'published',
+            'error_reference' => $pack->error_reference,
+            'is_current' => (bool) ($pack->is_current ?? true),
             'generated_at' => $pack->generated_at?->toIso8601String(),
             'distributed_at' => $pack->distributed_at?->toIso8601String(),
             'file_size' => $pack->file_size,
             'watermark_text' => $pack->watermark_text,
             'meeting' => [
+                'id' => (int) $pack->meeting->id,
                 'title' => $pack->meeting->title,
                 'scheduled_at' => $pack->meeting->scheduled_at?->toIso8601String(),
+                'location' => $pack->meeting->location,
+                'meeting_type' => $pack->meeting->meeting_type,
             ],
+            'actual_document_count' => $pack->actualDocumentCount(),
         ];
     }
 

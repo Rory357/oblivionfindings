@@ -9,7 +9,7 @@ final class ItSetupCommandReceipt extends Model
 {
     protected $fillable = [
         'actor_user_id', 'resource', 'request_uuid', 'request_hash',
-        'it_team_id', 'it_queue_id', 'it_service_id',
+        'it_team_id', 'it_queue_id', 'it_service_id', 'it_catalog_item_id', 'it_provisioning_template_id',
         'committed_configuration_version', 'committed_at', 'cancelled_at',
     ];
 

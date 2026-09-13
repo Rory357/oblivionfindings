@@ -78,7 +78,7 @@ class ResolutionQuorumDecisionSnapshotTest extends TestCase
         $this->assertCount(3, $snapshot['individual_votes']);
         $this->assertSame('meeting', $snapshot['quorum_details']['resolution_mode']);
         $this->assertSame(3, $snapshot['quorum_details']['present']);
-        $this->assertSame(2, $snapshot['quorum_details']['required']);
+        $this->assertSame(3, $snapshot['quorum_details']['required']);
     }
 
     public function test_meeting_resolution_with_quorum_unmet_is_defeated_even_if_all_votes_are_for(): void
@@ -120,14 +120,14 @@ class ResolutionQuorumDecisionSnapshotTest extends TestCase
 
         $resolution->refresh();
 
-        // Must be defeated because quorum was not met
+        // Must be no_quorum because quorum was not met
         $this->assertSame('closed', $resolution->status);
-        $this->assertSame('defeated', $resolution->outcome);
+        $this->assertSame('no_quorum', $resolution->outcome);
 
         $snapshot = $resolution->vote_summary['decision_snapshot'] ?? null;
         $this->assertNotNull($snapshot);
         $this->assertFalse($snapshot['quorum_met']);
-        $this->assertSame('defeated', $snapshot['outcome']);
+        $this->assertSame('no_quorum', $snapshot['outcome']);
         $this->assertSame(1, $snapshot['quorum_details']['present']);
         $this->assertSame(3, $snapshot['quorum_details']['required']);
     }
@@ -167,7 +167,7 @@ class ResolutionQuorumDecisionSnapshotTest extends TestCase
         $this->assertTrue($snapshot['quorum_met']);
         $this->assertSame('out_of_session', $snapshot['quorum_details']['resolution_mode']);
         $this->assertSame(3, $snapshot['quorum_details']['present']);
-        $this->assertSame(2, $snapshot['quorum_details']['required']);
+        $this->assertSame(3, $snapshot['quorum_details']['required']);
     }
 
     public function test_out_of_session_resolution_fails_quorum_when_participation_insufficient(): void
@@ -197,14 +197,15 @@ class ResolutionQuorumDecisionSnapshotTest extends TestCase
 
         $resolution->refresh();
 
-        $this->assertSame('defeated', $resolution->outcome);
+        $this->assertSame('no_quorum', $resolution->outcome);
         $snapshot = $resolution->vote_summary['decision_snapshot'];
         $this->assertFalse($snapshot['quorum_met']);
+        $this->assertSame('no_quorum', $snapshot['outcome']);
         $this->assertSame(1, $snapshot['quorum_details']['present']);
-        $this->assertSame(2, $snapshot['quorum_details']['required']);
+        $this->assertSame(3, $snapshot['quorum_details']['required']);
     }
 
-    public function test_conflict_declaration_counts_towards_participation_and_is_locked_in_snapshot(): void
+    public function test_conflict_declaration_excludes_from_presence_and_is_locked_in_snapshot(): void
     {
         $admin = $this->createAdminUser();
 
@@ -212,6 +213,8 @@ class ResolutionQuorumDecisionSnapshotTest extends TestCase
         $m1 = $this->createBoardMember($u1);
         $u2 = $this->createUserWithRole('board_member');
         $m2 = $this->createBoardMember($u2);
+        $u3 = $this->createUserWithRole('board_member');
+        $m3 = $this->createBoardMember($u3);
 
         $meeting = $this->createMeeting($admin, [
             'quorum_required' => 50,
@@ -220,6 +223,7 @@ class ResolutionQuorumDecisionSnapshotTest extends TestCase
         $meeting->attendances()->createMany([
             ['board_member_id' => $m1->id, 'status' => 'present', 'marked_at' => now(), 'marked_by' => $admin->id],
             ['board_member_id' => $m2->id, 'status' => 'present', 'marked_at' => now(), 'marked_by' => $admin->id],
+            ['board_member_id' => $m3->id, 'status' => 'present', 'marked_at' => now(), 'marked_by' => $admin->id],
         ]);
 
         $resolution = $this->createResolution($admin, [
@@ -229,13 +233,14 @@ class ResolutionQuorumDecisionSnapshotTest extends TestCase
             'voting_threshold' => 'simple_majority',
         ]);
 
-        // Member 1 votes for
+        // Members 1 and 2 vote for (quorum floor(3/2)+1 = 2 met)
         $this->votingService->castVote($resolution, $m1, 'for');
+        $this->votingService->castVote($resolution, $m2, 'for');
 
-        // Member 2 declares conflict and withdraws
+        // Member 3 declares conflict and withdraws (excluded from quorum presence)
         $this->votingService->declareConflict(
             $resolution,
-            $m2,
+            $m3,
             'material',
             'Financial interest in contract vendor',
             $admin,
@@ -246,11 +251,13 @@ class ResolutionQuorumDecisionSnapshotTest extends TestCase
 
         $resolution->refresh();
 
-        // 2 active members, 1 vote + 1 conflict. 1 for, 0 against -> 100% for.
+        // 3 active members, 2 non-recused present voters >= 2 required. 2 for, 0 against -> carried.
         $this->assertSame('carried', $resolution->outcome);
 
         $snapshot = $resolution->vote_summary['decision_snapshot'];
         $this->assertTrue($snapshot['quorum_met']);
+        $this->assertSame(2, $snapshot['quorum_details']['present']);
+        $this->assertSame(2, $snapshot['quorum_details']['required']);
         $this->assertSame(1, $snapshot['vote_summary']['conflicts']);
         $this->assertCount(1, $snapshot['conflicts']);
         $this->assertSame('material', $snapshot['conflicts'][0]['type']);
@@ -297,5 +304,58 @@ class ResolutionQuorumDecisionSnapshotTest extends TestCase
         $this->votingService->closeVoting($res2);
         $res2->refresh();
         $this->assertSame('defeated', $res2->outcome);
+    }
+
+    public function test_resolution_tie_is_defeated_only_after_quorum_is_met(): void
+    {
+        $admin = $this->createAdminUser();
+
+        // 4 active board members: N=4, quorum required = floor(4/2)+1 = 3
+        $u1 = $this->createUserWithRole('board_member');
+        $m1 = $this->createBoardMember($u1);
+        $u2 = $this->createUserWithRole('board_member');
+        $m2 = $this->createBoardMember($u2);
+        $u3 = $this->createUserWithRole('board_member');
+        $m3 = $this->createBoardMember($u3);
+        $u4 = $this->createUserWithRole('board_member');
+        $m4 = $this->createBoardMember($u4);
+
+        // Case A: 4 members vote: 2 for, 2 against.
+        // Quorum is MET (4 >= 3).
+        // Since for (50%) <= 0.5, resolution is DEFEATED after valid quorum.
+        $resMet = $this->createResolution($admin, [
+            'governance_meeting_id' => null,
+            'status' => 'open',
+            'quorum_required' => true,
+            'voting_threshold' => 'simple_majority',
+        ]);
+        $this->votingService->castVote($resMet, $m1, 'for');
+        $this->votingService->castVote($resMet, $m2, 'for');
+        $this->votingService->castVote($resMet, $m3, 'against');
+        $this->votingService->castVote($resMet, $m4, 'against');
+        $this->votingService->closeVoting($resMet);
+
+        $resMet->refresh();
+        $this->assertSame('closed', $resMet->status);
+        $this->assertSame('defeated', $resMet->outcome);
+        $this->assertTrue($resMet->vote_summary['decision_snapshot']['quorum_met']);
+
+        // Case B: Only 2 members vote: 1 for, 1 against.
+        // Quorum is NOT MET (2 < 3).
+        // Outcome must be NO_QUORUM ("No valid decision — quorum not met"), not defeated!
+        $resUnmet = $this->createResolution($admin, [
+            'governance_meeting_id' => null,
+            'status' => 'open',
+            'quorum_required' => true,
+            'voting_threshold' => 'simple_majority',
+        ]);
+        $this->votingService->castVote($resUnmet, $m1, 'for');
+        $this->votingService->castVote($resUnmet, $m2, 'against');
+        $this->votingService->closeVoting($resUnmet);
+
+        $resUnmet->refresh();
+        $this->assertSame('closed', $resUnmet->status);
+        $this->assertSame('no_quorum', $resUnmet->outcome);
+        $this->assertFalse($resUnmet->vote_summary['decision_snapshot']['quorum_met']);
     }
 }

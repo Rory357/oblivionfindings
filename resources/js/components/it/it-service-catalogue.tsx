@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useForm } from '@inertiajs/react';
 import { BookOpen, Send } from 'lucide-react';
 import { type FormEvent, useMemo, useState } from 'react';
+import { CatalogueEntityPicker } from './catalogue-entity-picker';
 
 type CatalogValue = string | number | boolean | string[] | null;
 type CatalogOption = string | { label: string; value: string | number };
@@ -41,6 +42,7 @@ export interface CatalogItem {
     requires_approval: boolean;
     form_schema_version: number;
     form_schema: { fields?: CatalogField[] };
+    site_options?: { id: number; name: string }[];
 }
 
 export interface CatalogFieldOption {
@@ -56,6 +58,7 @@ export type CatalogFieldOptions = Record<
 >;
 
 interface Props {
+    actorId: number;
     items: CatalogItem[];
     fieldOptions: CatalogFieldOptions;
     /** Scoped search + category pill — owned by the page header
@@ -87,6 +90,7 @@ function initialValues(item: CatalogItem): Record<string, CatalogValue> {
 }
 
 export function ItServiceCatalogue({
+    actorId,
     items,
     fieldOptions,
     query,
@@ -97,10 +101,12 @@ export function ItServiceCatalogue({
         schema_version: number;
         idempotency_key: string;
         values: Record<string, CatalogValue>;
+        site_id: number | null;
     }>({
         schema_version: 1,
         idempotency_key: '',
         values: {},
+        site_id: null,
     });
 
     const filtered = useMemo(() => {
@@ -129,6 +135,10 @@ export function ItServiceCatalogue({
             schema_version: item.form_schema_version,
             idempotency_key: submissionKey(),
             values: initialValues(item),
+            site_id:
+                item.outcome_type === 'provisioning'
+                    ? null
+                    : (item.site_options?.[0]?.id ?? null),
         });
     };
 
@@ -255,10 +265,51 @@ export function ItServiceCatalogue({
                             ) : null}
 
                             <div className="mt-5 space-y-4">
+                                {selected.outcome_type !== 'provisioning' ? (
+                                    <label className="block space-y-1 text-sm font-medium">
+                                        <span>Request site</span>
+                                        <select
+                                            required
+                                            className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                            value={form.data.site_id ?? ''}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'site_id',
+                                                    event.target.value
+                                                        ? Number(
+                                                              event.target
+                                                                  .value,
+                                                          )
+                                                        : null,
+                                                )
+                                            }
+                                        >
+                                            <option value="">
+                                                Choose an approved site
+                                            </option>
+                                            {(selected.site_options ?? []).map(
+                                                (site) => (
+                                                    <option
+                                                        key={site.id}
+                                                        value={site.id}
+                                                    >
+                                                        {site.name}
+                                                    </option>
+                                                ),
+                                            )}
+                                        </select>
+                                    </label>
+                                ) : null}
                                 {(selected.form_schema.fields ?? []).map(
                                     (field) => (
                                         <CatalogFieldControl
                                             key={field.key}
+                                            actorId={actorId}
+                                            itemId={selected.id}
+                                            schemaVersion={
+                                                selected.form_schema_version
+                                            }
+                                            disabled={form.processing}
                                             field={field}
                                             options={
                                                 fieldOptions[
@@ -317,12 +368,20 @@ function optionLabel(option: CatalogOption): string {
 }
 
 function CatalogFieldControl({
+    actorId,
+    itemId,
+    schemaVersion,
+    disabled,
     field,
     options,
     value,
     error,
     onChange,
 }: {
+    actorId: number;
+    itemId: number;
+    schemaVersion: number;
+    disabled: boolean;
     field: CatalogField;
     options: CatalogFieldOption[];
     value: CatalogValue | undefined;
@@ -412,28 +471,28 @@ function CatalogFieldControl({
             </div>
         );
     } else if (['employee', 'user', 'asset'].includes(field.type ?? '')) {
-        const noun = humanize(field.type ?? 'record').toLocaleLowerCase();
         control = (
-            <select
-                {...shared}
-                className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-                value={String(value ?? '')}
-                onChange={(event) =>
-                    onChange(
-                        event.target.value === ''
-                            ? ''
-                            : Number(event.target.value),
-                    )
+            <CatalogueEntityPicker
+                actorId={actorId}
+                itemId={itemId}
+                schemaVersion={schemaVersion}
+                fieldKey={field.key}
+                label={field.label}
+                id={id}
+                required={field.required}
+                disabled={disabled}
+                invalid={Boolean(error)}
+                describedBy={describedBy || undefined}
+                value={
+                    value === '' || value === null || value === undefined
+                        ? null
+                        : Number(value)
                 }
-            >
-                <option value="">Choose a {noun}</option>
-                {options.map((option) => (
-                    <option key={option.id} value={option.id}>
-                        {option.name}
-                        {option.detail ? ` — ${option.detail}` : ''}
-                    </option>
-                ))}
-            </select>
+                initialSelected={options.find(
+                    (option) => option.id === Number(value),
+                )}
+                onChange={(next) => onChange(next ?? '')}
+            />
         );
     } else if (field.type === 'boolean') {
         control = (

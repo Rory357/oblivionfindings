@@ -2,6 +2,8 @@
 
 namespace App\Domain\It\Services;
 
+use App\Models\ItCatalogItem;
+use App\Models\ItProvisioningTemplate;
 use App\Models\ItQueue;
 use App\Models\ItService;
 use App\Models\ItSetupCommandReceipt;
@@ -18,7 +20,12 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class ItSetupCommandService
 {
-    public function __construct(private readonly ItServiceManagementSetupService $setup) {}
+    public function __construct(
+        private readonly ItServiceManagementSetupService $setup,
+        private readonly ItCatalogManagementService $catalogue,
+        private readonly ItProvisioningTemplateService $templates,
+        private readonly ItWorkAccessService $workAccess,
+    ) {}
 
     /** @param array<string, mixed> $data @return array<string, mixed> */
     public function create(User $actor, string $resource, array $data): array
@@ -26,7 +33,11 @@ final class ItSetupCommandService
         $uuid = strtolower((string) ($data['request_uuid'] ?? ''));
         abort_unless(Str::isUuid($uuid), 422, 'A valid create command identity is required.');
         $payload = Arr::except($data, ['actor_user_id', 'request_uuid', 'configuration_version']);
-        $hash = hash('sha256', json_encode(Arr::sortRecursive($payload), JSON_THROW_ON_ERROR));
+        $hash = hash('sha256', json_encode(
+            in_array($resource, ['catalogue-items', 'provisioning-templates'], true)
+                ? $this->orderedContract($payload) : Arr::sortRecursive($payload),
+            JSON_THROW_ON_ERROR,
+        ));
 
         return DB::transaction(function () use ($actor, $resource, $data, $uuid, $payload, $hash): array {
             $actor = $this->lockedActor($actor, (int) ($data['actor_user_id'] ?? 0));
@@ -47,10 +58,13 @@ final class ItSetupCommandService
                 'teams' => ['it_teams', 'name'],
                 'queues' => ['it_queues', 'key'],
                 'services' => ['it_services', 'key'],
+                'catalogue-items', 'provisioning-templates' => [null, null],
             };
             // Replay must be checked before the original name/key becomes a
             // duplicate. A new command still receives normal validation.
-            Validator::make($payload, [$uniqueField => ['required', Rule::unique($table, $uniqueField)]])->validate();
+            if ($uniqueField !== null) {
+                Validator::make($payload, [$uniqueField => ['required', Rule::unique($table, $uniqueField)]])->validate();
+            }
             $receipt = ItSetupCommandReceipt::query()->create([
                 'actor_user_id' => $actor->id, 'resource' => $resource,
                 'request_uuid' => $uuid, 'request_hash' => $hash,
@@ -59,6 +73,8 @@ final class ItSetupCommandService
                 'teams' => $this->setup->createTeam($actor, $payload),
                 'queues' => $this->setup->createQueue($actor, $payload),
                 'services' => $this->setup->createService($actor, $payload),
+                'catalogue-items' => $this->catalogue->create($actor, $payload),
+                'provisioning-templates' => $this->templates->create($actor, $payload),
             };
             $receipt->forceFill([
                 $this->recordColumn($resource) => $record->id,
@@ -131,7 +147,9 @@ final class ItSetupCommandService
     private function recordColumn(string $resource): string
     {
         return match ($resource) {
-            'teams' => 'it_team_id', 'queues' => 'it_queue_id', 'services' => 'it_service_id'
+            'teams' => 'it_team_id', 'queues' => 'it_queue_id', 'services' => 'it_service_id',
+            'catalogue-items' => 'it_catalog_item_id',
+            'provisioning-templates' => 'it_provisioning_template_id',
         };
     }
 
@@ -141,6 +159,8 @@ final class ItSetupCommandService
             $record instanceof ItTeam => $this->setup->teamVersion($record),
             $record instanceof ItQueue => $this->setup->queueVersion($record),
             $record instanceof ItService => $this->setup->serviceVersion($record),
+            $record instanceof ItCatalogItem => hash('sha256', 'catalogue:'.$record->id.':'.$record->lock_version),
+            $record instanceof ItProvisioningTemplate => hash('sha256', 'provisioning-template:'.$record->id.':'.$record->lock_version),
         };
     }
 
@@ -149,9 +169,24 @@ final class ItSetupCommandService
     {
         abort_unless($receipt->committed_at && $receipt->{$this->recordColumn($receipt->resource)}, 503, 'The create result cannot yet be confirmed. Check its outcome again.');
         $model = match ($receipt->resource) {
-            'teams' => ItTeam::class, 'queues' => ItQueue::class, 'services' => ItService::class
+            'teams' => ItTeam::class, 'queues' => ItQueue::class, 'services' => ItService::class,
+            'catalogue-items' => ItCatalogItem::class,
+            'provisioning-templates' => ItProvisioningTemplate::class,
         };
         $record = $model::query()->findOrFail($receipt->{$this->recordColumn($receipt->resource)});
+        if ($record instanceof ItProvisioningTemplate) {
+            // Receipt ownership never bypasses the current canonical Site boundary.
+            abort_unless($record->site_id === null || $actor->canDo('it.organisationWide')
+                || in_array((int) $record->site_id, $this->workAccess->approvedSiteIds($actor), true), 404);
+
+            return $this->result($actor, $receipt, $record, $replayed);
+        }
+        // Catalogue authoring uses the current approved IT manager boundary.
+        // lockedActor revalidates it for every create, recovery and cancellation;
+        // receipt ownership alone never grants access to an archived record.
+        if ($record instanceof ItCatalogItem) {
+            return $this->result($actor, $receipt, $record, $replayed);
+        }
         $fields = match (true) {
             $record instanceof ItTeam => [...$record->only(['manager_user_id']), 'members' => $record->members->map(fn (User $member) => ['user_id' => $member->id, 'role' => $member->pivot->role])->all()],
             $record instanceof ItQueue => [...($record->filter_rules ?? []), 'team_id' => $record->team_id],
@@ -165,10 +200,28 @@ final class ItSetupCommandService
             'base_fields' => $fields, 'fields' => [], 'bound_scopes' => [],
         ]);
 
+        return $this->result($actor, $receipt, $record, $replayed);
+    }
+
+    private function result(User $actor, ItSetupCommandReceipt $receipt, Model $record, bool $replayed): array
+    {
         return ['status' => 'committed', 'data' => [
             'viewer_user_id' => $actor->id, 'resource' => $receipt->resource, 'request_uuid' => $receipt->request_uuid,
             'id' => $record->id, 'committed_configuration_version' => $receipt->committed_configuration_version,
             'configuration_version' => $this->version($record), 'replayed' => $replayed,
         ]];
+    }
+
+    /** Sort object keys for stable retries, retaining authored field/choice order. */
+    private function orderedContract(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        return array_map(fn (mixed $child): mixed => $this->orderedContract($child), $value);
     }
 }

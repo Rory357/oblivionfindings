@@ -17,6 +17,7 @@ use App\Domain\It\Services\ItServiceIdentityCredentialService;
 use App\Domain\It\Services\ItServiceManagementSetupService;
 use App\Domain\It\Services\ItSetupCommandService;
 use App\Domain\It\Services\ItSlaReadService;
+use App\Domain\It\Services\ItTechnicalDeliveryOperationsPresenter;
 use App\Domain\It\Services\ItTicketRoutingEligibility;
 use App\Domain\It\Services\ItTicketRoutingService;
 use App\Domain\It\Services\ItWorkAccessService;
@@ -49,6 +50,7 @@ use DomainException;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ItServiceManagementSetupController extends Controller
@@ -79,6 +81,8 @@ class ItServiceManagementSetupController extends Controller
             'automation_to' => ['nullable', 'date_format:Y-m-d'],
             'automation_page' => ['sometimes', 'required', 'integer', 'min:1'],
             'api_request_page' => ['sometimes', 'required', 'integer', 'min:1'],
+            'device_delivery_page' => ['sometimes', 'required', 'integer', 'min:1'],
+            'fleet_delivery_page' => ['sometimes', 'required', 'integer', 'min:1'],
             'review_resource' => ['sometimes', 'required', 'in:teams,queues,services'],
             'actor_user_id' => ['sometimes', 'required', 'integer', 'min:1'],
             'delivery_comment_id' => ['sometimes', 'required', 'integer', 'min:1'],
@@ -232,6 +236,7 @@ class ItServiceManagementSetupController extends Controller
             ->get()
             ->map(fn (ItProvisioningTemplate $template) => [
                 'id' => $template->id,
+                'lock_version' => $template->lock_version,
                 'name' => $template->name,
                 'description' => $template->description,
                 'lifecycle_type' => $template->lifecycle_type,
@@ -299,7 +304,7 @@ class ItServiceManagementSetupController extends Controller
             : collect();
         $catalogItems = Schema::hasTable('it_catalog_items')
             ? ItCatalogItem::query()
-                ->with('service:id,name')
+                ->with(['service:id,name', 'publishedVersion'])
                 ->withCount('submissions')
                 ->orderBy('sort_order')
                 ->orderBy('name')
@@ -314,6 +319,7 @@ class ItServiceManagementSetupController extends Controller
             : 0;
 
         $operationsAudit = [
+            'technical_delivery_health' => app(ItTechnicalDeliveryOperationsPresenter::class)->operations($user, $automationPeriod),
             'automation_history' => app(ItAutomationOperationsPresenter::class)->operations($user, $automationPeriod, $request->integer('automation_page', 1)),
             'api_health' => app(ItApiOperationsPresenter::class)->operations(
                 $user, $manageableApiIdentities, $request->integer('api_request_page', 1), $automationPeriod,
@@ -384,7 +390,10 @@ class ItServiceManagementSetupController extends Controller
                 'requires_approval' => $item->requires_approval,
                 'is_published' => $item->is_published,
                 'internal_only' => $item->internal_only,
+                'site_scope' => $item->site_scope,
                 'form_schema_version' => $item->form_schema_version,
+                'lock_version' => $item->lock_version,
+                'published_version' => $item->publishedVersion?->version,
                 'form_schema' => $item->form_schema,
                 'search_terms' => $item->search_terms,
                 'sort_order' => $item->sort_order,
@@ -569,6 +578,10 @@ class ItServiceManagementSetupController extends Controller
 
     public function storeCatalogItem(SaveItCatalogItemRequest $request)
     {
+        if ($request->filled('request_uuid')) {
+            return $this->createCommand($request, 'catalogue-items');
+        }
+
         return $this->run(
             fn () => $this->catalogueManagement->create($request->user(), $request->validated()),
             'Catalogue request saved as a draft.',
@@ -585,8 +598,16 @@ class ItServiceManagementSetupController extends Controller
 
     public function publishCatalogItem(Request $request, ItCatalogItem $catalogItem)
     {
+        $data = $request->validate(['expected_version' => ['required', 'integer', 'min:1']]);
+
         return $this->run(
-            fn () => $this->catalogueManagement->publish($catalogItem, $request->user()),
+            function () use ($catalogItem, $request, $data) {
+                try {
+                    return $this->catalogueManagement->publish($catalogItem, $request->user(), (int) $data['expected_version']);
+                } catch (DomainException $exception) {
+                    throw ValidationException::withMessages(['publication' => $exception->getMessage()]);
+                }
+            },
             'Catalogue request published.',
         );
     }
@@ -598,6 +619,7 @@ class ItServiceManagementSetupController extends Controller
                 $catalogItem,
                 $request->user(),
                 $request->validated('reason'),
+                (int) $request->validated('expected_version'),
             ),
             'Catalogue request unpublished.',
         );
@@ -605,13 +627,17 @@ class ItServiceManagementSetupController extends Controller
 
     public function storeProvisioningTemplate(StoreItProvisioningTemplateRequest $request)
     {
+        if ($request->filled('request_uuid')) {
+            return $this->createCommand($request, 'provisioning-templates');
+        }
+
         try {
             $this->provisioningTemplates->create($request->user(), $request->validated());
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
 
-        return redirect()->route('it.setup.index')
+        return redirect()->route('it.setup.index', ['tab' => 'provisioning'])
             ->with('success', 'Provisioning template created.');
     }
 
@@ -629,7 +655,7 @@ class ItServiceManagementSetupController extends Controller
             return redirect()->back()->with('error', $exception->getMessage());
         }
 
-        return redirect()->route('it.setup.index')
+        return redirect()->route('it.setup.index', ['tab' => 'provisioning'])
             ->with('success', 'Provisioning template updated.');
     }
 

@@ -1,0 +1,26 @@
+[
+  {
+    "path": "app/Jobs/DetectFleetOfflineDevices.php",
+    "sha256": "3cff775701e19d525c84af9c09913a63cf9460910dde36fb2268daa1348d278c"
+  },
+  {
+    "path": "app/Services/Fleet/FleetSignalService.php",
+    "sha256": "6ceaa4a768512885b15eaf270ce4efa487558ad5be538ed13c66f27ae726f397"
+  },
+  {
+    "path": "app/Events/FleetSignalEmitted.php",
+    "sha256": "c375270083c87e6abc82a88ed0125b6429b2a7ffcb84ac7f744f7c29b2f98701"
+  },
+  {
+    "path": "tests/Feature/Fleet/FleetOfflineSignalAtomicityTest.php",
+    "sha256": "418ef36074db2b1e19990d9714cfca83b2d28a88dd1a82e1b86f9e13d2c9fe91"
+  },
+  {
+    "path": "tests/Concurrency/It/FleetOfflinePublicationConcurrencyTest.php",
+    "sha256": "327c179524eaa3a8abc602859b05d7e132c365cca20a6cb4238768b995a8c722"
+  },
+  {
+    "path": "tests/Support/It/fleet-offline-concurrency-worker.php",
+    "sha256": "7e756ad1b4e033c5974735afec310f7d7c1d02c1b3616962689292e25ba8d5b1"
+  }
+]

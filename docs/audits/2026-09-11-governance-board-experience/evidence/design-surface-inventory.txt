@@ -1,0 +1,130 @@
+resources/js/pages/governance\TeTiriti\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\TeTiriti\Index.tsx:118:                    <PageHero
+resources/js/pages/governance\Strategy\Show.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Strategy\Show.tsx:131:                    <PageHero
+resources/js/pages/governance\Strategy\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Strategy\Index.tsx:58:                    <PageHero
+resources/js/pages/governance\Strategy\Edit.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Strategy\Edit.tsx:64:                    <PageHero
+resources/js/pages/governance\Strategy\Create.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Strategy\Create.tsx:47:                    <PageHero
+resources/js/pages/governance\Strategy\Changes.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Strategy\Changes.tsx:79:                    <PageHero
+resources/js/pages/governance\Settings\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Settings\Index.tsx:64:                    <PageHero
+resources/js/pages/governance\Clinical\Trends.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Clinical\Trends.tsx:110:                    <PageHero
+resources/js/pages/governance\AuditLog\Index.tsx:2:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\AuditLog\Index.tsx:131:                    <PageHero
+resources/js/pages/governance\Clinical\Dashboard.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Clinical\Dashboard.tsx:105:                    <PageHero
+resources/js/pages/governance\Packs\Show.tsx:5:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Packs\Show.tsx:119:                    <PageHero
+resources/js/pages/governance\Evaluations\Show.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Evaluations\Show.tsx:83:                    <PageHero
+resources/js/pages/governance\Packs\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Packs\Index.tsx:86:                    <PageHero
+resources/js/pages/governance\Reports\BoardMonthly.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Reports\BoardMonthly.tsx:78:                    <PageHero
+resources/js/pages/governance\Reports\RiskNarrative.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Reports\RiskNarrative.tsx:81:                    <PageHero
+resources/js/pages/governance\Admin\BoardMembers.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Admin\BoardMembers.tsx:94:                    <PageHero
+resources/js/pages/governance\Resolutions\Show.tsx:5:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Resolutions\Show.tsx:238:                    <PageHero
+resources/js/pages/governance\SpendApprovals\Show.tsx:5:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\SpendApprovals\Show.tsx:146:                    <PageHero
+resources/js/pages/governance\Evaluations\Results.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Evaluations\Results.tsx:77:                    <PageHero
+resources/js/pages/governance\Actions\Show.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Actions\Show.tsx:112:                    <PageHero
+resources/js/pages/governance\Reports\ComplianceStatus.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Reports\ComplianceStatus.tsx:66:                    <PageHero
+resources/js/pages/governance\Resolutions\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Resolutions\Index.tsx:78:                    <PageHero
+resources/js/pages/governance\Evaluations\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Evaluations\Index.tsx:54:                    <PageHero
+resources/js/pages/governance\CeoReports\Show.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\CeoReports\Show.tsx:536:                    <PageHero
+resources/js/pages/governance\Reports\Committee.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Reports\Committee.tsx:94:                    <PageHero
+resources/js/pages/governance\Actions\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Actions\Index.tsx:81:                    <PageHero
+resources/js/pages/governance\SpendApprovals\Index.tsx:2:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\SpendApprovals\Index.tsx:134:                    <PageHero
+resources/js/pages/governance\Evaluations\Create.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Evaluations\Create.tsx:60:                    <PageHero
+resources/js/pages/governance\Resolutions\Create.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Resolutions\Create.tsx:66:                    <PageHero
+resources/js/pages/governance\Compliance\Show.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Compliance\Show.tsx:195:                    <PageHero
+resources/js/pages/governance\CeoReports\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\CeoReports\Index.tsx:142:                    <PageHero
+resources/js/pages/governance\Compliance\Create.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Compliance\Create.tsx:54:                    <PageHero
+resources/js/pages/governance\Dashboard.tsx:6:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Dashboard.tsx:112:                    <PageHero
+resources/js/pages/governance\SpendApprovals\Edit.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\SpendApprovals\Edit.tsx:91:                    <PageHero
+resources/js/pages/governance\Compliance\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Compliance\Index.tsx:91:                    <PageHero
+resources/js/pages/governance\Documents\Show.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Documents\Show.tsx:57:                    <PageHero
+resources/js/pages/governance\Risks\Edit.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Risks\Edit.tsx:60:                    <PageHero
+resources/js/pages/governance\CeoReports\Create.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\CeoReports\Create.tsx:45:                    <PageHero
+resources/js/pages/governance\Risks\Heatmap.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Risks\Heatmap.tsx:68:                    <PageHero
+resources/js/pages/governance\Documents\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Documents\Index.tsx:90:                    <PageHero
+resources/js/pages/governance\SpendApprovals\Create.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\SpendApprovals\Create.tsx:70:                    <PageHero
+resources/js/pages/governance\Risks\Create.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Risks\Create.tsx:55:                    <PageHero
+resources/js/pages/governance\Risks\Committee.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Risks\Committee.tsx:67:                    <PageHero
+resources/js/pages/governance\Compliance\Calendar.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Compliance\Calendar.tsx:55:                    <PageHero
+resources/js/pages/governance\Compliance\Edit.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Compliance\Edit.tsx:67:                    <PageHero
+resources/js/pages/governance\Risks\Trends.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Risks\Trends.tsx:77:                    <PageHero
+resources/js/pages/governance\Risks\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Risks\Index.tsx:94:                    <PageHero
+resources/js/pages/governance\Risks\Show.tsx:5:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Risks\Show.tsx:194:                    <PageHero
+resources/js/pages/governance\Meetings\Calendar.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Meetings\Calendar.tsx:191:                    <PageHero
+resources/js/pages/governance\Policies\Attestations.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Policies\Attestations.tsx:128:                    <PageHero
+resources/js/pages/governance\Meetings\Show.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Meetings\Show.tsx:438:                    <PageHero
+resources/js/pages/governance\Meetings\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Meetings\Index.tsx:82:                    <PageHero
+resources/js/pages/governance\Policies\Create.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Policies\Create.tsx:44:                    <PageHero
+resources/js/pages/governance\Policies\Edit.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Policies\Edit.tsx:57:                    <PageHero
+resources/js/pages/governance\Policies\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Policies\Index.tsx:57:                    <PageHero
+resources/js/pages/governance\Policies\Show.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Policies\Show.tsx:74:                    <PageHero
+resources/js/pages/governance\Interests\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Interests\Index.tsx:89:                    <PageHero
+resources/js/pages/governance\Performance\Create.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Performance\Create.tsx:59:                    <PageHero
+resources/js/pages/governance\Budgets\Edit.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Budgets\Edit.tsx:59:                    <PageHero
+resources/js/pages/governance\Performance\Edit.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Performance\Edit.tsx:72:                    <PageHero
+resources/js/pages/governance\Interests\MyInterests.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Interests\MyInterests.tsx:76:                    <PageHero
+resources/js/pages/governance\Budgets\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Budgets\Index.tsx:81:                    <PageHero
+resources/js/pages/governance\Budgets\Show.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Budgets\Show.tsx:395:                    <PageHero
+resources/js/pages/governance\Performance\Index.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Performance\Index.tsx:65:                    <PageHero
+resources/js/pages/governance\Performance\Show.tsx:1:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance\Performance\Show.tsx:206:                    <PageHero

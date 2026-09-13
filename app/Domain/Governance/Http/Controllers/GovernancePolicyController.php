@@ -74,6 +74,8 @@ class GovernancePolicyController extends Controller
             'effective_from' => $validated['effective_date'],
             'review_due' => $validated['review_date'],
             'next_review_date' => $validated['review_date'],
+            'requires_attestation' => $validated['requires_attestation'] ?? false,
+            'attestation_frequency' => $validated['attestation_frequency'] ?? null,
         ]);
 
         return redirect()->route('governance.policies.show', $policy)
@@ -119,6 +121,7 @@ class GovernancePolicyController extends Controller
             'review_date' => 'sometimes|date',
             'status' => 'sometimes|in:draft,active,under_review,archived',
             'requires_attestation' => 'boolean',
+            'attestation_frequency' => 'nullable|in:annual,biannual,quarterly',
         ]);
 
         $payload = [];
@@ -136,6 +139,9 @@ class GovernancePolicyController extends Controller
         }
 
         if (array_key_exists('content', $validated)) {
+            if ($policy->status === 'approved' && $validated['content'] !== $policy->content) {
+                abort(422, 'Approved policy content cannot be modified in place. Please create a new policy version.');
+            }
             $payload['content'] = $validated['content'];
         }
 
@@ -146,6 +152,14 @@ class GovernancePolicyController extends Controller
 
         if (array_key_exists('status', $validated)) {
             $payload['status'] = $this->normalizeStatus($validated['status']);
+        }
+
+        if (array_key_exists('requires_attestation', $validated)) {
+            $payload['requires_attestation'] = $validated['requires_attestation'];
+        }
+
+        if (array_key_exists('attestation_frequency', $validated)) {
+            $payload['attestation_frequency'] = $validated['attestation_frequency'];
         }
 
         $policy->update($payload);
@@ -184,6 +198,7 @@ class GovernancePolicyController extends Controller
             ],
             [
                 'acknowledged' => true,
+                'policy_version' => $policy->version_number,
                 'acknowledged_at' => now(),
                 'notes' => $validated['notes'] ?? null,
             ]
@@ -285,7 +300,8 @@ class GovernancePolicyController extends Controller
             'status' => $this->presentStatus($policy->status),
             'effective_date' => $policy->effective_from?->toDateString(),
             'review_date' => $policy->next_review_date?->toDateString() ?? $policy->review_due?->toDateString(),
-            'requires_attestation' => false,
+            'requires_attestation' => (bool) $policy->requires_attestation,
+            'attestation_frequency' => $policy->attestation_frequency,
             'attestations_count' => $policy->attestations_count,
         ];
     }
@@ -302,7 +318,8 @@ class GovernancePolicyController extends Controller
             'status' => $this->presentStatus($policy->status),
             'effective_date' => $policy->effective_from?->toDateString(),
             'review_date' => $policy->next_review_date?->toDateString() ?? $policy->review_due?->toDateString(),
-            'requires_attestation' => false,
+            'requires_attestation' => (bool) $policy->requires_attestation,
+            'attestation_frequency' => $policy->attestation_frequency,
             'approved_by_user' => $policy->approvedBy ? ['name' => $policy->approvedBy->name] : null,
             'approved_at' => $policy->approved_at?->toIso8601String(),
             'attestations' => $policy->attestations->map(fn (PolicyAttestation $attestation) => [

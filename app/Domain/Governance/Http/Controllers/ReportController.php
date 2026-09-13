@@ -2,7 +2,6 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
-use App\Domain\Finance\Services\BudgetActualsService;
 use App\Domain\Governance\Models\BoardCommittee;
 use App\Domain\Governance\Models\ComplianceObligation;
 use App\Domain\Governance\Models\RiskRegisterEntry;
@@ -21,13 +20,11 @@ class ReportController extends Controller
         protected AuditEvidencePackService $evidenceService,
         protected GovernanceWorkflowService $workflowService,
         protected GovernancePresenter $presenter,
-        protected BudgetActualsService $budgetActualsService,
     ) {}
 
     public function boardMonthly(Request $request)
     {
         $range = ['start' => now()->startOfMonth(), 'end' => now()];
-        $this->syncBudgetActuals($request);
         $widgets = [
             'top_risks' => $this->aggregator->getTopRisks(),
             'voided_risks' => $this->aggregator->getVoidedRisks($range),
@@ -73,7 +70,6 @@ class ReportController extends Controller
             ->orderByDesc('residual_score')
             ->get();
 
-        $this->syncBudgetActuals($request);
         $widgets = match ($committee) {
             'audit_risk' => [
                 'top_risks' => $this->aggregator->getTopRisks(),
@@ -233,14 +229,5 @@ class ReportController extends Controller
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="compliance-register-'.now()->format('Y-m-d').'.csv"',
         ]);
-    }
-
-    protected function syncBudgetActuals(Request $request): void
-    {
-        try {
-            $this->budgetActualsService->syncActuals($request->user()?->organization_id);
-        } catch (\Throwable $exception) {
-            report($exception);
-        }
     }
 }

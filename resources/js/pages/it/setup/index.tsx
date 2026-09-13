@@ -883,6 +883,8 @@ export default function ItSetupIndex({
                     )}
                     {tab === 'catalogue' ? (
                         <ItCatalogueManagement
+                            key={actorId}
+                            actorId={actorId}
                             items={catalogItems.filter((item) =>
                                 match(
                                     [
@@ -894,10 +896,13 @@ export default function ItSetupIndex({
                                 ),
                             )}
                             services={services}
+                            sites={sites}
                         />
                     ) : null}
                     {tab === 'provisioning' ? (
                         <ItProvisioningTemplates
+                            key={actorId}
+                            actorId={actorId}
                             templates={provisioningTemplates.filter((item) =>
                                 match(
                                     [

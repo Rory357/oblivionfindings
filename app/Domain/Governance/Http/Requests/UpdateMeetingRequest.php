@@ -14,6 +14,8 @@ class UpdateMeetingRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'meeting_type' => 'sometimes|in:full_board,audit_risk,people,finance,special_general,executive_session',
+            'board_committee_id' => 'nullable|exists:board_committees,id',
             'title' => 'sometimes|string|max:255',
             'scheduled_at' => 'sometimes|date',
             'duration_minutes' => 'sometimes|integer|min:30|max:480',
@@ -23,6 +25,7 @@ class UpdateMeetingRequest extends FormRequest
             'status' => 'sometimes|in:scheduled,agenda_draft,agenda_final,in_progress,minutes_draft,minutes_review,minutes_approved,minutes_signed,archived',
             'chair_id' => 'nullable|exists:board_members,id',
             'secretary_id' => 'nullable|exists:board_members,id',
+            'quorum_required' => 'sometimes|integer|min:25|max:100',
         ];
     }
 }

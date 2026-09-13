@@ -16,6 +16,8 @@ class Monitor extends Model
 {
     use HasFactory, WritesLegacyStorageContext;
 
+    protected $hidden = ['availability_episode', 'condition_episode'];
+
     protected static function newFactory(): MonitorFactory
     {
         return MonitorFactory::new();
@@ -59,6 +61,8 @@ class Monitor extends Model
         'effective_state' => MonitorState::class,
         'pending_state' => MonitorState::class,
         'config' => 'array',
+        'availability_episode' => 'array',
+        'condition_episode' => 'array',
         'pending_count' => 'integer',
         'affects_availability' => 'boolean',
         'is_enabled' => 'boolean',

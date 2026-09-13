@@ -6,6 +6,7 @@ use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItProblemService;
 use App\Domain\It\Services\ItSlaReadService;
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\It\StoreItProblemRequest;
 use App\Http\Requests\It\TransitionItProblemRequest;
@@ -120,7 +121,7 @@ class ItProblemController extends Controller
             ],
             'ticket' => [
                 ...$this->ticketOption($ticket),
-                'description' => $ticket->description,
+                'description' => MonitoringTechnicalSummary::ticketDescription($ticket),
                 'category' => $ticket->category,
                 'next_action' => $ticket->next_action,
                 ...app(ItSlaReadService::class)->present($ticket),

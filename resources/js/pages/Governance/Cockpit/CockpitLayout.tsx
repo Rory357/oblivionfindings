@@ -1,15 +1,4 @@
 import { cn } from '@/lib/utils';
-import { Link } from '@inertiajs/react';
-import {
-    BookOpen,
-    ClipboardList,
-    FileText,
-    FolderOpen,
-    HeartPulse,
-    Landmark,
-    ShieldCheck,
-    Star,
-} from 'lucide-react';
 
 import {
     BoardPackPanel,
@@ -17,15 +6,12 @@ import {
 } from '@/components/governance/BoardPackPanel';
 import type { WorkflowAction } from '@/components/governance/BoardPriorityCard';
 import { FinancialGovernancePanel } from '@/components/governance/FinancialGovernancePanel';
-import {
-    GovernanceCalendar,
-    type CalendarEvent,
-} from '@/components/governance/GovernanceCalendar';
+import type { CalendarEvent } from '@/components/governance/GovernanceCalendar';
 import {
     GovernanceTimeline,
     type TimelinePayload,
 } from '@/components/governance/GovernanceTimeline';
-import { KpiBand, type KpiTile } from '@/components/governance/KpiBand';
+import type { KpiTile } from '@/components/governance/KpiBand';
 import {
     MeetingReadinessPanel,
     type NextMeetingPayload,
@@ -84,66 +70,15 @@ export interface CockpitLayoutProps {
         actions: WorkflowAction[];
     };
     permissions: GovernancePermissionMap;
+    currentUserId?: number | null;
     currentUserName?: string | null;
     boardRole?: string | null;
     userRole?: string | null;
+    onRefresh?: () => void;
 }
 
-const MODULE_TILES = [
-    {
-        label: 'Policies',
-        href: '/governance/policies',
-        icon: BookOpen,
-        tone: 'text-status-info bg-status-info-bg',
-    },
-    {
-        label: 'CEO Reports',
-        href: '/governance/ceo-reports',
-        icon: FileText,
-        tone: 'text-primary bg-primary/10',
-    },
-    {
-        label: 'Interests',
-        href: '/governance/interests/mine',
-        icon: ClipboardList,
-        tone: 'text-primary bg-primary/10',
-    },
-    {
-        label: 'Evaluations',
-        href: '/governance/evaluations',
-        icon: Star,
-        tone: 'text-status-warning bg-status-warning-bg',
-    },
-    {
-        label: 'Documents',
-        href: '/governance/documents',
-        icon: FolderOpen,
-        tone: 'text-status-success bg-status-success-bg',
-    },
-    {
-        label: 'Clinical',
-        href: '/governance/clinical',
-        icon: HeartPulse,
-        tone: 'text-status-critical bg-status-critical-bg',
-    },
-    {
-        label: 'Te Tiriti',
-        href: '/governance/te-tiriti',
-        icon: Landmark,
-        tone: 'text-status-info bg-status-info-bg',
-    },
-    // Operational compliance command centre (org-wide exception roll-up — board assurance).
-    // Distinct from the governance "Compliance" obligations register (/governance/compliance).
-    {
-        label: 'Compliance Centre',
-        href: '/compliance',
-        icon: ShieldCheck,
-        tone: 'text-primary bg-primary/10',
-    },
-] as const;
-
 /**
- * Compose the 3-zone main grid order based on the user's role preset.
+ * Compose the main assurance grid order based on the user's role preset.
  * Treasurer sees Financial above Risk; others use the default order.
  */
 function shouldPinFinancial(role: GovernanceRolePreset): boolean {
@@ -154,9 +89,11 @@ export function CockpitLayout({
     cockpit,
     workflow,
     permissions,
+    currentUserId,
     currentUserName,
     boardRole,
     userRole,
+    onRefresh,
 }: CockpitLayoutProps) {
     const role = detectRolePreset(boardRole, userRole);
     const cardsByKey = cockpit.cards_by_key ?? {};
@@ -182,45 +119,39 @@ export function CockpitLayout({
     const canViewAudit = canDoGovernance(permissions, 'audit', 'view');
 
     return (
-        <div className="space-y-6">
-            {/* Period label */}
-            {cockpit.period_label && (
-                <p className="text-xs tracking-wide text-muted-foreground uppercase">
-                    {cockpit.period_label}
-                </p>
-            )}
-
-            {/* KPI band (4 tiles) */}
-            <KpiBand kpis={cockpit.kpi_band} />
-
-            {/* Main 3-zone grid */}
-            <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-                <PriorityOverviewPanel
-                    actions={workflow.actions}
-                    summary={workflow.summary}
+        <div className="space-y-5">
+            {/* L1 Row 1: Next Authorised Meeting + Needs My Attention */}
+            <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
+                <MeetingReadinessPanel
+                    nextMeeting={cockpit.next_meeting}
+                    canScheduleMeeting={canManageMeetings}
                 />
-
-                <div className="space-y-6">
-                    <MyNextActionsRail
-                        actions={workflow.actions}
-                        currentUserName={currentUserName}
-                    />
-                    <GovernanceCalendar
-                        events={cockpit.calendar_events ?? []}
-                    />
-                </div>
+                <MyNextActionsRail
+                    actions={workflow.actions}
+                    currentUserId={currentUserId}
+                    currentUserName={currentUserName}
+                    showFallback={false}
+                />
             </div>
 
-            {/* Next Meeting Readiness */}
-            <MeetingReadinessPanel
-                nextMeeting={cockpit.next_meeting}
-                canScheduleMeeting={canManageMeetings}
+            {/* L1 Row 2: Board Priorities Table */}
+            <PriorityOverviewPanel
+                actions={workflow.actions}
+                summary={workflow.summary}
             />
 
-            {/* Risk + Compliance and Financial — pinning order depends on role */}
+            {/* L1 Row 3: What Changed (Timeline) — only if user can view audit feed */}
+            {canViewAudit && (
+                <GovernanceTimeline
+                    timeline={cockpit.timeline}
+                    onRetry={onRefresh}
+                />
+            )}
+
+            {/* L1 Row 4: Compact Assurance Groups (Financial & Risk/Compliance) */}
             <div
                 className={cn(
-                    'grid gap-6 lg:grid-cols-2',
+                    'grid gap-5 lg:grid-cols-2',
                     shouldPinFinancial(role) && 'lg:grid-flow-col-dense',
                 )}
             >
@@ -253,46 +184,19 @@ export function CockpitLayout({
                 )}
             </div>
 
-            {/* Board Pack */}
-            <BoardPackPanel
-                pack={cockpit.board_pack}
-                canUploadPack={canManagePacks}
-            />
+            {/* L1 Row 5: Board Pack (if present) */}
+            {cockpit.board_pack && (
+                <BoardPackPanel
+                    pack={cockpit.board_pack}
+                    canUploadPack={canManagePacks}
+                />
+            )}
 
-            {/* Timeline — only show if user can view audit feed */}
-            {canViewAudit && <GovernanceTimeline timeline={cockpit.timeline} />}
-
-            {/* Recently Completed (renders nothing if empty) */}
-            <RecentlyCompletedRail items={cockpit.recently_completed ?? []} />
-
-            {/* Operational Signals (collapsed accordion preserving old widgets) */}
+            {/* L1 Row 6: Operational Signals (progressively disclosed accordion) */}
             <OperationalSignalsAccordion cardsByKey={cardsByKey} />
 
-            {/* Governance Modules tile grid */}
-            <div>
-                <h2 className="mb-3 text-base font-semibold text-foreground">
-                    Governance Modules
-                </h2>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
-                    {MODULE_TILES.map((tile) => (
-                        <Link
-                            key={tile.href}
-                            href={tile.href}
-                            className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card p-4 text-center transition hover:border-primary/40 hover:bg-muted/50"
-                        >
-                            <div className={cn('rounded-lg p-2', tile.tone)}>
-                                <tile.icon
-                                    className="h-5 w-5"
-                                    aria-hidden="true"
-                                />
-                            </div>
-                            <span className="text-sm font-medium text-foreground">
-                                {tile.label}
-                            </span>
-                        </Link>
-                    ))}
-                </div>
-            </div>
+            {/* L1 Row 7: Recently Completed (renders nothing if empty) */}
+            <RecentlyCompletedRail items={cockpit.recently_completed ?? []} />
         </div>
     );
 }

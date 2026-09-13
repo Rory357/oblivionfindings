@@ -15,6 +15,8 @@ class StrategicGoal extends Model
 
     protected $fillable = [
         'strategic_plan_id',
+        'origin_goal_id',
+        'roadmap_initiative_id',
         'timeframe',
         'pillar',
         'title',
@@ -32,11 +34,18 @@ class StrategicGoal extends Model
         'risks' => 'array',
         'progress_pct' => 'decimal:2',
         'order' => 'integer',
+        'origin_goal_id' => 'integer',
+        'roadmap_initiative_id' => 'integer',
     ];
 
     public function strategicPlan(): BelongsTo
     {
         return $this->belongsTo(StrategicPlan::class);
+    }
+
+    public function originGoal(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'origin_goal_id');
     }
 
     public function leadExecutive(): BelongsTo
@@ -47,6 +56,11 @@ class StrategicGoal extends Model
     public function initiatives(): HasMany
     {
         return $this->hasMany(StrategicInitiative::class);
+    }
+
+    public function roadmapInitiative(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domain\Roadmap\Models\Initiative::class, 'roadmap_initiative_id');
     }
 
     public function scopeByPillar($query, string $pillar)

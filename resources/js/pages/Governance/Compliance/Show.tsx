@@ -8,6 +8,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -25,6 +26,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { governanceStatusColor } from '@/lib/governance-status';
 import { cn } from '@/lib/utils';
@@ -70,6 +72,7 @@ interface Obligation {
     obligation_code: string | null;
     obligation_title: string;
     description: string;
+    requirements?: string | null;
     frequency: string;
     due_date: string;
     next_due_date: string | null;
@@ -77,6 +80,11 @@ interface Obligation {
     owner: { id: number; name: string } | null;
     completed_at: string | null;
     completed_by: { name: string } | null;
+    completion_notes?: string | null;
+    version_number?: number;
+    parent_obligation_id?: number | null;
+    parent_obligation?: { id: number; obligation_title: string; due_date: string } | null;
+    recurrences?: Array<{ id: number; obligation_title: string; due_date: string; status: string }>;
     evidence_required: boolean;
     evidence_provided: boolean;
     sign_off_required: boolean;
@@ -103,6 +111,56 @@ export default function ComplianceShow({ auth, obligation }: Props) {
         file: null as File | null,
     });
     const [submitting, setSubmitting] = useState(false);
+
+    // Enhanced Completion Dialog State
+    const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+    const [completionNotes, setCompletionNotes] = useState('');
+    const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<number[]>([]);
+    const [completeSubmitting, setCompleteSubmitting] = useState(false);
+    const [completeError, setCompleteError] = useState<string | null>(null);
+
+    const isEvidenceExpired = (ev: Evidence) => {
+        if (!ev.valid_until) return false;
+        const validUntil = new Date(ev.valid_until);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return validUntil < today;
+    };
+
+    const validEvidenceItems = evidenceItems.filter((ev) => !isEvidenceExpired(ev));
+    const hasValidEvidence = validEvidenceItems.length > 0;
+    const canComplete = !obligation.evidence_required || hasValidEvidence;
+
+    const openCompleteDialog = () => {
+        setSelectedEvidenceIds(validEvidenceItems.map((e) => e.id));
+        setCompletionNotes(obligation.completion_notes || '');
+        setCompleteError(null);
+        setShowCompleteDialog(true);
+    };
+
+    const handleComplete = async () => {
+        setCompleteSubmitting(true);
+        setCompleteError(null);
+        try {
+            await axios.post(
+                completeObligation.url({ obligation: obligation.id }),
+                {
+                    evidence_ids: selectedEvidenceIds.length > 0 ? selectedEvidenceIds : undefined,
+                    completion_notes: completionNotes || undefined,
+                    expected_version: obligation.version_number ?? 1,
+                },
+            );
+            setShowCompleteDialog(false);
+            router.reload();
+        } catch (error: any) {
+            const msg =
+                error.response?.data?.message ||
+                'Failed to mark obligation complete.';
+            setCompleteError(msg);
+        } finally {
+            setCompleteSubmitting(false);
+        }
+    };
 
     const getFrameworkLabel = (framework: string) => {
         const labels: Record<string, string> = {
@@ -164,22 +222,11 @@ export default function ComplianceShow({ auth, obligation }: Props) {
         }
     };
 
-    const markComplete = async () => {
-        if (!confirm('Mark this obligation as complete?')) return;
-        try {
-            await axios.post(
-                completeObligation.url({ obligation: obligation.id }),
-            );
-            router.reload();
-        } catch (error) {
-            console.error('Failed to mark complete:', error);
-        }
-    };
-
     return (
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Compliance', href: '/governance/compliance' },
                 {
@@ -347,11 +394,205 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                                     </DialogContent>
                                 </Dialog>
                                 {obligation.status !== 'complete' && (
-                                    <Button onClick={markComplete}>
+                                    <Button
+                                        onClick={openCompleteDialog}
+                                        data-dusk="open-complete-dialog-button"
+                                    >
                                         <CheckCircle className="mr-2 h-4 w-4" />
                                         Mark Complete
                                     </Button>
                                 )}
+                                <Dialog
+                                    open={showCompleteDialog}
+                                    onOpenChange={setShowCompleteDialog}
+                                >
+                                    <DialogContent className="max-w-xl">
+                                        <DialogHeader>
+                                            <DialogTitle>
+                                                Complete Compliance Obligation
+                                            </DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4 py-3">
+                                            {completeError && (
+                                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
+                                                    {completeError}
+                                                </div>
+                                            )}
+
+                                            <div className="rounded-lg border bg-muted/40 p-3 space-y-1 text-sm">
+                                                <p className="font-semibold text-foreground">
+                                                    {obligation.obligation_title}
+                                                </p>
+                                                <p className="text-muted-foreground">
+                                                    {getFrameworkLabel(obligation.framework)} &bull; Due: {obligation.due_date}
+                                                </p>
+                                                {obligation.requirements && (
+                                                    <p className="text-xs text-muted-foreground pt-1 border-t border-border mt-1">
+                                                        <span className="font-medium">Requirements:</span>{' '}
+                                                        {obligation.requirements}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {obligation.evidence_required && !hasValidEvidence && (
+                                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 space-y-3">
+                                                    <div className="flex items-start gap-2">
+                                                        <AlertTriangle className="h-5 w-5 text-status-critical shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <p className="font-medium text-status-critical">
+                                                                Valid Evidence Required
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                                                Evidence is mandatory to satisfy this compliance obligation, but no active, unexpired evidence is currently attached.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="w-full"
+                                                        onClick={() => {
+                                                            setShowCompleteDialog(false);
+                                                            setShowUploadDialog(true);
+                                                        }}
+                                                    >
+                                                        <Upload className="mr-2 h-4 w-4" />
+                                                        Upload Evidence First
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            <div>
+                                                <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                                                    Attached Evidence ({evidenceItems.length})
+                                                </Label>
+                                                {evidenceItems.length > 0 ? (
+                                                    <div className="mt-2 space-y-2 max-h-48 overflow-y-auto pr-1">
+                                                        {evidenceItems.map((ev) => {
+                                                            const expired = isEvidenceExpired(ev);
+                                                            const isChecked = selectedEvidenceIds.includes(ev.id);
+                                                            return (
+                                                                <label
+                                                                    key={ev.id}
+                                                                    className={cn(
+                                                                        'flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors',
+                                                                        expired
+                                                                            ? 'opacity-60 bg-muted/30 cursor-not-allowed'
+                                                                            : 'hover:bg-muted/40',
+                                                                        isChecked &&
+                                                                            !expired &&
+                                                                            'border-primary/50 bg-primary/5',
+                                                                    )}
+                                                                >
+                                                                    <Checkbox
+                                                                        checked={isChecked}
+                                                                        disabled={expired}
+                                                                        onCheckedChange={(checked) => {
+                                                                            if (checked) {
+                                                                                setSelectedEvidenceIds([
+                                                                                    ...selectedEvidenceIds,
+                                                                                    ev.id,
+                                                                                ]);
+                                                                            } else {
+                                                                                setSelectedEvidenceIds(
+                                                                                    selectedEvidenceIds.filter(
+                                                                                        (id) =>
+                                                                                            id !==
+                                                                                            ev.id,
+                                                                                    ),
+                                                                                );
+                                                                            }
+                                                                        }}
+                                                                        className="mt-0.5"
+                                                                    />
+                                                                    <div className="flex-1 text-xs">
+                                                                        <div className="flex items-center justify-between gap-2">
+                                                                            <span className="font-medium text-foreground">
+                                                                                {ev.title}
+                                                                            </span>
+                                                                            {expired ? (
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="border-status-critical/30 text-status-critical text-[10px]"
+                                                                                >
+                                                                                    Expired ({ev.valid_until})
+                                                                                </Badge>
+                                                                            ) : ev.valid_until ? (
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="border-status-success/30 text-status-success text-[10px]"
+                                                                                >
+                                                                                    Valid until {ev.valid_until}
+                                                                                </Badge>
+                                                                            ) : (
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="text-[10px]"
+                                                                                >
+                                                                                    Active
+                                                                                </Badge>
+                                                                            )}
+                                                                        </div>
+                                                                        <p className="text-muted-foreground capitalize mt-0.5">
+                                                                            {ev.evidence_type.replace('_', ' ')} &bull; Uploaded by {ev.uploaded_by?.name || 'Unknown'}
+                                                                        </p>
+                                                                    </div>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-xs text-muted-foreground mt-2 italic">
+                                                        No evidence files uploaded yet.
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div>
+                                                <Label
+                                                    htmlFor="completion-notes"
+                                                    className="text-xs font-semibold uppercase text-muted-foreground"
+                                                >
+                                                    Completion Notes
+                                                </Label>
+                                                <Textarea
+                                                    id="completion-notes"
+                                                    value={completionNotes}
+                                                    onChange={(e) =>
+                                                        setCompletionNotes(
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="Add details on how this obligation was fulfilled, relevant findings, or actions taken..."
+                                                    className="mt-1"
+                                                    rows={3}
+                                                />
+                                            </div>
+                                        </div>
+                                        <DialogFooter className="gap-2 sm:gap-0">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() =>
+                                                    setShowCompleteDialog(false)
+                                                }
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                onClick={handleComplete}
+                                                disabled={
+                                                    completeSubmitting ||
+                                                    !canComplete
+                                                }
+                                                data-dusk="submit-complete-obligation-button"
+                                            >
+                                                {completeSubmitting
+                                                    ? 'Completing...'
+                                                    : 'Complete Obligation'}
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
                             </div>
                         }
                     />
@@ -516,14 +757,26 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                             </CardHeader>
                             <CardContent>
                                 {obligation.status === 'complete' ? (
-                                    <div>
-                                        <p className="font-medium text-status-success">
-                                            Completed
-                                        </p>
-                                        <p className="text-sm text-status-success">
-                                            {obligation.completed_at} by{' '}
-                                            {obligation.completed_by?.name}
-                                        </p>
+                                    <div className="space-y-2">
+                                        <div>
+                                            <p className="font-medium text-status-success">
+                                                Completed
+                                            </p>
+                                            <p className="text-sm text-status-success">
+                                                {obligation.completed_at} by{' '}
+                                                {obligation.completed_by?.name || 'Authorized Staff'}
+                                            </p>
+                                        </div>
+                                        {obligation.completion_notes && (
+                                            <div className="rounded bg-background/80 p-2 text-xs">
+                                                <p className="font-semibold text-muted-foreground">
+                                                    Completion Notes:
+                                                </p>
+                                                <p className="text-foreground whitespace-pre-wrap">
+                                                    {obligation.completion_notes}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <div>
@@ -578,6 +831,37 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                                         {obligation.frequency}
                                     </p>
                                 </div>
+                                {obligation.parent_obligation && (
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">
+                                            Prior Cycle
+                                        </p>
+                                        <a
+                                            href={`/governance/compliance/${obligation.parent_obligation.id}`}
+                                            className="text-sm font-medium text-primary hover:underline"
+                                        >
+                                            {obligation.parent_obligation.obligation_title} ({obligation.parent_obligation.due_date})
+                                        </a>
+                                    </div>
+                                )}
+                                {obligation.recurrences && obligation.recurrences.length > 0 && (
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">
+                                            Next Cycle
+                                        </p>
+                                        <div className="space-y-1 mt-0.5">
+                                            {obligation.recurrences.map((rec) => (
+                                                <a
+                                                    key={rec.id}
+                                                    href={`/governance/compliance/${rec.id}`}
+                                                    className="block text-sm font-medium text-primary hover:underline"
+                                                >
+                                                    Due {rec.due_date} ({rec.status})
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 {obligation.next_due_date && (
                                     <div>
                                         <p className="text-sm text-muted-foreground">

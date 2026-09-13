@@ -1,0 +1,43 @@
+{
+  "task": "GOV-W02",
+  "name": "Denial and Leak Prevention Report",
+  "timestamp": "2026-09-12T09:18:00+12:00",
+  "findings_addressed": [
+    {
+      "finding_id": "GOV-F01",
+      "severity": "P0",
+      "summary": "Sensitive scope disappears in derived records",
+      "status": "Resolved",
+      "verification": "GovernanceDerivedAudienceTest tests resolutions index, show, attachments, calendar, and cockpit next_meeting"
+    },
+    {
+      "finding_id": "GOV-F02",
+      "severity": "P0",
+      "summary": "CEO performance access is board-wide without record assignment",
+      "status": "Resolved",
+      "verification": "PerformanceReviewPolicy implemented; ordinary members receive 403 on index/show/edit; CEO can access own review and self-assessment"
+    },
+    {
+      "finding_id": "GOV-F12",
+      "severity": "P1",
+      "summary": "Follow-up closure can assert completion without evidence / source privacy not enforced in index/show",
+      "status": "Resolved",
+      "verification": "ActionItemPolicy and scopeActionItems enforce parent meeting and resolution visibility"
+    },
+    {
+      "finding_id": "GOV-F16",
+      "severity": "P1",
+      "summary": "Document download uses different root from upload",
+      "status": "Resolved",
+      "verification": "GovernanceDocumentController::download uses Storage::disk('local') with fallback to ensure disk consistency"
+    }
+  ],
+  "test_execution": {
+    "command": "& 'C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe' vendor/bin/pest tests/Feature/Governance/ExecutiveMeetingVisibilityTest.php tests/Feature/Governance/GovernanceBoardPacksTest.php tests/Feature/Governance/GovernancePerformanceReviewTest.php tests/Feature/Governance/GovernanceDerivedAudienceTest.php --compact",
+    "exit_code": 0,
+    "total_tests": 36,
+    "assertions": 697,
+    "failures": 0,
+    "duration_seconds": 299.40
+  }
+}

@@ -15,6 +15,7 @@ class UnpublishItCatalogItemRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'expected_version' => ['required', 'integer', 'min:1'],
             'reason' => ['required', 'string', 'max:2000'],
         ];
     }

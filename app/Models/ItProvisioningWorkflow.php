@@ -17,6 +17,7 @@ class ItProvisioningWorkflow extends Model
     protected $fillable = [
         'employee_profile_id',
         'provisioning_template_id',
+        'template_version_id',
         'lifecycle_type',
         'source_type',
         'source_id',
@@ -38,6 +39,11 @@ class ItProvisioningWorkflow extends Model
     public function employeeProfile(): BelongsTo
     {
         return $this->belongsTo(HrEmployeeProfile::class, 'employee_profile_id');
+    }
+
+    public function templateVersion(): BelongsTo
+    {
+        return $this->belongsTo(ItProvisioningTemplateVersion::class, 'template_version_id');
     }
 
     public function template(): BelongsTo

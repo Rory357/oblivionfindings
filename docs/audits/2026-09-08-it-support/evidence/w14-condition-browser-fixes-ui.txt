@@ -1,0 +1,39 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/it-technical-delivery-health.test.tsx (13 tests | 2 failed) 1028ms
+     × refreshes authoritative filtered history only after closing a unconfirmed retry 125ms
+     × refreshes authoritative filtered history only after closing a stopped retry 139ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/it-technical-delivery-health.test.tsx > technical delivery operations > refreshes authoritative filtered history only after closing a unconfirmed retry
+AssertionError: expected "wrap" to be called once, but got 2 times
+ ❯ resources/js/components/it/it-technical-delivery-health.test.tsx:161:26
+    159|                 }),
+    160|             );
+    161|             expect(post).toHaveBeenCalledOnce();
+       |                          ^
+    162|         },
+    163|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  resources/js/components/it/it-technical-delivery-health.test.tsx > technical delivery operations > refreshes authoritative filtered history only after closing a stopped retry
+AssertionError: expected "wrap" to be called once, but got 3 times
+ ❯ resources/js/components/it/it-technical-delivery-health.test.tsx:161:26
+    159|                 }),
+    160|             );
+    161|             expect(post).toHaveBeenCalledOnce();
+       |                          ^
+    162|         },
+    163|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 32 passed (34)
+   Start at  10:02:00
+   Duration  30.35s (transform 554ms, setup 4.71s, import 44.88s, tests 1.57s, environment 34.66s)
+

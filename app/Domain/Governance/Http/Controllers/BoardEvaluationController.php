@@ -24,9 +24,9 @@ class BoardEvaluationController extends Controller
                     'title' => $evaluation->title,
                     'evaluation_type' => $evaluation->evaluation_type,
                     'status' => $this->presentEvaluationStatus($evaluation->status),
-                    'period_start' => now()->setYear($evaluation->year)->startOfYear()->toDateString(),
-                    'period_end' => now()->setYear($evaluation->year)->endOfYear()->toDateString(),
-                    'due_date' => ($evaluation->opened_at?->copy()->addWeeks(2) ?? now()->setYear($evaluation->year)->endOfYear())->toDateString(),
+                    'period_start' => $evaluation->period_start?->toDateString() ?? now()->setYear($evaluation->year)->startOfYear()->toDateString(),
+                    'period_end' => $evaluation->period_end?->toDateString() ?? now()->setYear($evaluation->year)->endOfYear()->toDateString(),
+                    'due_date' => $evaluation->due_date?->toDateString() ?? ($evaluation->opened_at?->copy()->addWeeks(2) ?? now()->setYear($evaluation->year)->endOfYear())->toDateString(),
                     'responses_count' => $evaluation->responses_count,
                 ];
             });
@@ -62,6 +62,11 @@ class BoardEvaluationController extends Controller
             'title' => $validated['title'],
             'evaluation_type' => $validated['evaluation_type'],
             'year' => (int) date('Y', strtotime($validated['period_end'])),
+            'period_start' => $validated['period_start'],
+            'period_end' => $validated['period_end'],
+            'due_date' => $validated['due_date'],
+            'version_number' => 1,
+            'audience' => $request->input('audience', 'all_members'),
             'status' => 'draft',
             'questions' => collect($validated['questions'])->values()->map(fn (array $question, int $index) => [
                 'id' => $index + 1,
@@ -96,9 +101,9 @@ class BoardEvaluationController extends Controller
                 'title' => $evaluation->title,
                 'evaluation_type' => $evaluation->evaluation_type,
                 'status' => $this->presentEvaluationStatus($evaluation->status),
-                'period_start' => now()->setYear($evaluation->year)->startOfYear()->toDateString(),
-                'period_end' => now()->setYear($evaluation->year)->endOfYear()->toDateString(),
-                'due_date' => ($evaluation->opened_at?->copy()->addWeeks(2) ?? now()->addWeeks(2))->toDateString(),
+                'period_start' => $evaluation->period_start?->toDateString() ?? now()->setYear($evaluation->year)->startOfYear()->toDateString(),
+                'period_end' => $evaluation->period_end?->toDateString() ?? now()->setYear($evaluation->year)->endOfYear()->toDateString(),
+                'due_date' => $evaluation->due_date?->toDateString() ?? ($evaluation->opened_at?->copy()->addWeeks(2) ?? now()->addWeeks(2))->toDateString(),
                 'questions' => collect($evaluation->questions ?? [])->values()->map(fn (array $question) => [
                     'id' => $question['id'] ?? null,
                     'text' => $question['question'] ?? $question['text'] ?? '',
@@ -139,10 +144,29 @@ class BoardEvaluationController extends Controller
             return redirect()->back()->with('error', 'You are not a board member.');
         }
 
+        if ($evaluation->status !== 'open') {
+            abort(422, 'This evaluation is not currently open for responses.');
+        }
+
+        if ($evaluation->due_date && now()->isAfter($evaluation->due_date->copy()->endOfDay())) {
+            abort(422, 'The submission deadline for this evaluation has passed.');
+        }
+
         $validated = $request->validate([
             'answers' => 'required|array',
             'overall_comments' => 'nullable|string',
         ]);
+
+        $questions = collect($evaluation->questions ?? []);
+        foreach ($questions as $index => $q) {
+            $val = $validated['answers'][(string) $index] ?? $validated['answers'][$index] ?? null;
+            $qType = $q['type'] ?? 'text';
+            if ($qType === 'rating' && $val !== null) {
+                if (!is_numeric($val) || (int) $val < 1 || (int) $val > 5) {
+                    abort(422, 'Rating answers must be between 1 and 5.');
+                }
+            }
+        }
 
         BoardEvaluationResponse::updateOrCreate(
             [

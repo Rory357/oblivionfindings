@@ -3,6 +3,7 @@
 namespace App\Domain\It\Presenters;
 
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\User;
@@ -74,6 +75,16 @@ final class ItTicketActivityPresenter
     private function projectEvent(ItTicketEvent $event, bool $canWork, User $viewer): array
     {
         $payload = $canWork ? $event->payload : $this->publicPayload($event);
+        if ($event->type === 'control_room_handoff') {
+            $payload = ['message' => 'Technical work linked from Control Room. Operational response remains in Control Room.'];
+        }
+        if (in_array($event->type, ['created_from_monitoring', 'monitoring_handoff_bound', 'monitoring_evidence_added', 'monitoring_recovered'], true)) {
+            // Source IDs and diagnostics remain behind the context presenter's
+            // current Device/Control Room permissions, including in hub feeds.
+            $monitorEventType = data_get($event->payload, 'monitor_event_type');
+            $payload = ['message' => MonitoringTechnicalSummary::activity($event->type,
+                is_string($monitorEventType) ? $monitorEventType : null)];
+        }
         if (in_array($event->type, ['related_work_linked', 'related_work_unlinked'], true)) {
             $counterpart = ItTicket::query()->find($event->payload['target_id'] ?? null);
             if (! $counterpart || ! $this->workAccess->canView($viewer, $counterpart)) {

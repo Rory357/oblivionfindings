@@ -1,0 +1,9 @@
+{
+  "started": true,
+  "token": "7a54d00ec6e14a57",
+  "database": "oblivion_it_draft_browser_7a54d00ec6e14a57",
+  "pid": 43572,
+  "url": "http://127.0.0.1:8766",
+  "root": "C:\\Users\\steph\\Herd\\oblivionfindings\\storage\\framework\\testing\\it-draft-browser-7a54d00ec6e14a57",
+  "browser_verified": false
+}

@@ -52,7 +52,11 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         'network-it-workspace-acceptance',
         'operations-workspaces-acceptance',
         'security-devices-accessibility',
+        'security-devices-commands',
+        'security-devices-device-crud',
+        'security-devices-discovery-lifecycle',
         'security-devices-estate-operations',
+        'security-devices-monitoring-lifecycle',
         'security-devices-navigation',
         'security-devices-workspace-shell',
         'security-workspace-acceptance',
@@ -431,7 +435,7 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
     ))->toBe(1);
 
     $inventoryNames = [];
-    expect(preg_match_all("/'([^']+)'/", $inventoryMatch[1], $inventoryNames))->toBe(14)
+    expect(preg_match_all("/'([^']+)'/", $inventoryMatch[1], $inventoryNames))->toBe(count($expectedDesktopOnlySpecs))
         ->and($inventoryNames[1])->toBe($expectedDesktopOnlySpecs);
 
     foreach ($expectedDesktopOnlySpecs as $desktopOnlySpec) {

@@ -1,0 +1,1071 @@
+resources/js/pages/governance/Dashboard.tsx:6:import { PageHero, PageLayout } from '@/components/page';
+resources/js/pages/governance/Dashboard.tsx:63:        } finally {
+resources/js/pages/governance/Dashboard.tsx:77:            } finally {
+resources/js/pages/governance/Dashboard.tsx:112:                    <PageHero
+resources/js/components/governance\RecentlyCompletedRail.tsx:21:        | 'action_completed'
+resources/js/components/governance\RecentlyCompletedRail.tsx:27:    completed_at: string | null;
+resources/js/components/governance\RecentlyCompletedRail.tsx:28:    completed_label: string | null;
+resources/js/components/governance\RecentlyCompletedRail.tsx:46:    action_completed: {
+resources/js/components/governance\RecentlyCompletedRail.tsx:69: * Reassurance rail — closed risks, completed actions, signed minutes, signed
+resources/js/components/governance\RecentlyCompletedRail.tsx:77:        <Card data-dusk="cockpit-recently-completed">
+resources/js/components/governance\RecentlyCompletedRail.tsx:89:                            KIND_META[item.kind] ?? KIND_META.action_completed;
+resources/js/components/governance\RecentlyCompletedRail.tsx:124:                                    {item.completed_label ? (
+resources/js/components/governance\RecentlyCompletedRail.tsx:125:                                        <span>{item.completed_label}</span>
+resources/js/components/governance\MyNextActionsRail.tsx:49:                  a.owner.toLowerCase() === currentUserName.toLowerCase(),
+app/Domain/Governance/Models\BoardEvaluation.php:28:    public function creator(): BelongsTo
+app/Domain/Governance/Models\BoardEvaluation.php:33:    public function responses(): HasMany
+app/Domain/Governance/Models\BoardEvaluation.php:38:    public function open(): void
+app/Domain/Governance/Models\BoardEvaluation.php:43:    public function close(): void
+app/Domain/Governance/Models\BoardEvaluation.php:49:    public function aggregateResults(): void
+app/Domain/Governance/Models\BoardEvaluation.php:81:    public function getCompletionRate(): float
+app/Domain/Governance/Models\AuditEvidencePack.php:47:    public function generatedBy(): BelongsTo
+app/Domain/Governance/Models\AuditEvidencePack.php:52:    public function scopeByType($query, string $type)
+app/Domain/Governance/Models\AuditEvidencePack.php:57:    public function scopeExpiring($query)
+app/Domain/Governance/Models\AuditEvidencePack.php:63:    public function scopeOnLegalHold($query)
+app/Domain/Governance/Models\AuditEvidencePack.php:68:    public function isOnLegalHold(): bool
+app/Domain/Governance/Models\AuditEvidencePack.php:73:    public function isExpiringSoon(int $days = 30): bool
+app/Domain/Governance/Models\AuditEvidencePack.php:80:    public function applyLegalHold(string $reason): void
+app/Domain/Governance/Models\AuditEvidencePack.php:88:    public function releaseLegalHold(): void
+app/Domain/Governance/Models\AuditEvidencePack.php:96:    public function verifyIntegrity(): bool
+app/Domain/Governance/Models\AuditEvidencePack.php:105:    public function getDownloadUrl(): ?string
+app/Domain/Governance/Models\AuditEvidencePack.php:113:    public function canDelete(): bool
+app/Domain/Governance/Models\AuditEvidencePack.php:120:    public function getTypeLabel(): string
+app/Domain/Governance/Models\ActionItem.php:24:        'completed_at',
+app/Domain/Governance/Models\ActionItem.php:25:        'completed_by',
+app/Domain/Governance/Models\ActionItem.php:42:        'completed_at' => 'datetime',
+app/Domain/Governance/Models\ActionItem.php:65:    public function assignedTo(): BelongsTo
+app/Domain/Governance/Models\ActionItem.php:70:    public function completedBy(): BelongsTo
+app/Domain/Governance/Models\ActionItem.php:72:        return $this->belongsTo(User::class, 'completed_by');
+app/Domain/Governance/Models\ActionItem.php:75:    public function escalatedBy(): BelongsTo
+app/Domain/Governance/Models\ActionItem.php:80:    public function createdBy(): BelongsTo
+app/Domain/Governance/Models\ActionItem.php:85:    public function source()
+app/Domain/Governance/Models\ActionItem.php:90:    public function scopeOpen($query)
+app/Domain/Governance/Models\ActionItem.php:95:    public function scopeBlocked($query)
+app/Domain/Governance/Models\ActionItem.php:100:    public function scopeOverdue($query)
+app/Domain/Governance/Models\ActionItem.php:106:    public function scopeForUser($query, int $userId)
+app/Domain/Governance/Models\ActionItem.php:111:    public function scopeHighPriority($query)
+app/Domain/Governance/Models\ActionItem.php:116:    public function isOpen(): bool
+app/Domain/Governance/Models\ActionItem.php:121:    public function isOverdue(): bool
+app/Domain/Governance/Models\ActionItem.php:126:    public function daysUntilDue(): int
+app/Domain/Governance/Models\ActionItem.php:131:    public function updateProgress(int $pct, ?string $notes = null): void
+app/Domain/Governance/Models\ActionItem.php:143:    public function block(string $reason): void
+app/Domain/Governance/Models\ActionItem.php:152:    public function unblock(): void
+app/Domain/Governance/Models\ActionItem.php:161:    public function markComplete(int $userId, ?string $notes = null): void
+app/Domain/Governance/Models\ActionItem.php:165:            'completed_at' => now(),
+app/Domain/Governance/Models\ActionItem.php:166:            'completed_by' => $userId,
+app/Domain/Governance/Models\ActionItem.php:171:    public function escalate(int $userId, string $reason): void
+app/Domain/Governance/Models\BoardCommittee.php:33:    public function members(): BelongsToMany
+app/Domain/Governance/Models\BoardCommittee.php:40:    public function chair(): BelongsTo
+app/Domain/Governance/Models\BoardCommittee.php:45:    public function meetings(): HasMany
+app/Domain/Governance/Models\BoardCommittee.php:50:    public function scopeActive($query)
+app/Domain/Governance/Models\BoardCommittee.php:55:    public function scopeByType($query, string $type)
+app/Domain/Governance/Models\BoardCommittee.php:60:    public function isAuditRisk(): bool
+app/Domain/Governance/Models\BoardCommittee.php:65:    public function isPeople(): bool
+app/Domain/Governance/Models\BoardCommittee.php:70:    public function isFinance(): bool
+app/Domain/Governance/Http/Controllers\ClinicalGovernanceController.php:16:    public function __construct(
+app/Domain/Governance/Http/Controllers\ClinicalGovernanceController.php:20:    public function dashboard(Request $request)
+app/Domain/Governance/Http/Controllers\ClinicalGovernanceController.php:32:    public function storeIndicator(Request $request)
+app/Domain/Governance/Http/Controllers\ClinicalGovernanceController.php:66:    public function recordSnapshot(Request $request)
+app/Domain/Governance/Http/Controllers\ClinicalGovernanceController.php:88:    public function trends(Request $request)
+app/Domain/Governance/Http/Controllers\ClinicalGovernanceController.php:101:    protected function mapIndicators($indicators): array
+app/Domain/Governance/Http/Controllers\ClinicalGovernanceController.php:124:    protected function mapSnapshot(ClinicalGovernanceSnapshot $snapshot, Request $request): array
+app/Domain/Governance/Http/Controllers\ClinicalGovernanceController.php:158:    protected function nextManualIndicatorCode(): string
+app/Domain/Governance/Models\BoardMember.php:39:    public function user(): BelongsTo
+app/Domain/Governance/Models\BoardMember.php:44:    public function committees(): BelongsToMany
+app/Domain/Governance/Models\BoardMember.php:51:    public function preferences(): HasOne
+app/Domain/Governance/Models\BoardMember.php:56:    public function attendances(): HasMany
+app/Domain/Governance/Models\BoardMember.php:61:    public function votes(): HasMany
+app/Domain/Governance/Models\BoardMember.php:66:    public function conflictDeclarations(): HasMany
+app/Domain/Governance/Models\BoardMember.php:71:    public function chairedMeetings(): HasMany
+app/Domain/Governance/Models\BoardMember.php:76:    public function scopeActive($query)
+app/Domain/Governance/Models\BoardMember.php:86:    public function scopeChair($query)
+app/Domain/Governance/Models\BoardMember.php:91:    public function scopeSecretary($query)
+app/Domain/Governance/Models\BoardMember.php:96:    public function isChair(): bool
+app/Domain/Governance/Models\BoardMember.php:101:    public function isSecretary(): bool
+app/Domain/Governance/Models\BoardMember.php:106:    public function isObserver(): bool
+app/Domain/Governance/Models\BoardMember.php:111:    public function canVote(): bool
+app/Domain/Governance/Models\BoardMember.php:117:    public function isCommitteeMember(string $committeeType): bool
+app/Domain/Governance/Models\BoardMember.php:125:    public function getFullNameAttribute(): string
+app/Domain/Governance/Models\BoardMember.php:130:    public function getEmailAttribute(): ?string
+app/Domain/Governance/Models\BoardMemberInterest.php:25:    public function boardMember(): BelongsTo
+app/Domain/Governance/Models\BoardMemberInterest.php:30:    public function recordedBy(): BelongsTo
+app/Domain/Governance/Models\BoardMemberInterest.php:35:    public function scopeCurrent($query)
+app/Domain/Governance/Models\BoardMemberInterest.php:40:    public function scopeForMember($query, int $memberId)
+app/Domain/Governance/Models\BoardMemberInterest.php:45:    public function cease(): void
+app/Domain/Governance/Http/Controllers\BoardMemberAdminController.php:14:    public function index()
+app/Domain/Governance/Http/Controllers\BoardMemberAdminController.php:35:    public function store(Request $request)
+app/Domain/Governance/Http/Controllers\BoardMemberAdminController.php:72:    public function update(Request $request, BoardMember $boardMember)
+app/Domain/Governance/Http/Controllers\BoardMemberAdminController.php:87:    public function destroy(BoardMember $boardMember)
+app/Domain/Governance/Http/Controllers\BudgetController.php:18:    public function __construct(
+app/Domain/Governance/Http/Controllers\BudgetController.php:22:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\BudgetController.php:42:    public function create()
+app/Domain/Governance/Http/Controllers\BudgetController.php:49:    public function show(Request $request, Budget $budget)
+app/Domain/Governance/Http/Controllers\BudgetController.php:85:    public function store(Request $request)
+app/Domain/Governance/Http/Controllers\BudgetController.php:110:    public function update(Request $request, Budget $budget)
+app/Domain/Governance/Http/Controllers\BudgetController.php:126:    public function propose(Request $request, Budget $budget)
+app/Domain/Governance/Http/Controllers\BudgetController.php:141:    public function approve(Request $request, Budget $budget)
+app/Domain/Governance/Http/Controllers\BudgetController.php:152:            return redirect()->back()->with('error', 'The board resolution has not been carried yet. Voting must be completed first.');
+app/Domain/Governance/Http/Controllers\BudgetController.php:170:    public function edit(Budget $budget)
+app/Domain/Governance/Http/Controllers\BudgetController.php:182:    public function storeLineItem(Request $request, Budget $budget)
+app/Domain/Governance/Http/Controllers\BudgetController.php:204:    public function updateLineItem(Request $request, Budget $budget, BudgetLineItem $lineItem)
+app/Domain/Governance/Http/Controllers\BudgetController.php:224:    public function destroyLineItem(Request $request, Budget $budget, BudgetLineItem $lineItem)
+app/Domain/Governance/Http/Controllers\BudgetController.php:233:    public function storeAllocation(Request $request, Budget $budget)
+app/Domain/Governance/Http/Controllers\BudgetController.php:271:    public function updateAllocation(Request $request, Budget $budget, BudgetAllocation $allocation)
+app/Domain/Governance/Http/Controllers\BudgetController.php:306:    public function destroyAllocation(Request $request, Budget $budget, BudgetAllocation $allocation)
+app/Domain/Governance/Http/Controllers\BudgetController.php:318:    public function requestAdjustment(Request $request, Budget $budget)
+app/Domain/Governance/Http/Controllers\BudgetController.php:349:    public function approveAdjustment(Request $request, Budget $budget, BudgetAdjustment $adjustment)
+app/Domain/Governance/Http/Controllers\BudgetController.php:356:    public function rejectAdjustment(Request $request, Budget $budget, BudgetAdjustment $adjustment)
+app/Domain/Governance/Http/Controllers\BudgetController.php:376:    public function recordActuals(Request $request, Budget $budget)
+app/Domain/Governance/Http/Controllers\BudgetController.php:400:    private function validInteger(mixed $value): ?int
+resources/js/components/governance\GovernanceAttachmentsPanel.tsx:184:        } finally {
+app/Domain/Governance/Models\BoardMemberPreference.php:40:    public function boardMember(): BelongsTo
+app/Domain/Governance/Models\BoardMemberPreference.php:45:    public function isQuietHours(): bool
+app/Domain/Governance/Models\BoardMemberPreference.php:59:    public function canSendEmail(string $type): bool
+app/Domain/Governance/Models\BoardMemberPreference.php:74:    public function getNextDigestDateTime(): \Carbon\Carbon
+app/Domain/Governance/Models\BoardMemberPreference.php:95:    public function digestWindowFor(?Carbon $reference = null, int $windowMinutes = 15): array
+app/Domain/Governance/Models\BoardMemberPreference.php:118:    public function isDigestDueAt(?Carbon $reference = null, int $windowMinutes = 15): bool
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:14:    public function index()
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:39:    public function create()
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:46:    public function store(Request $request)
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:78:    public function show(BoardEvaluation $evaluation)
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:118:                'completed' => $evaluation->responses()->whereNotNull('submitted_at')->count(),
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:123:    public function launch(BoardEvaluation $evaluation)
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:135:    public function respond(Request $request, BoardEvaluation $evaluation)
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:161:    public function close(BoardEvaluation $evaluation)
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:173:    public function results(BoardEvaluation $evaluation)
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:184:    protected function normalizeAnswers(BoardEvaluation $evaluation, array $answers, ?string $overallComments): array
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:214:    protected function presentMyResponse(BoardEvaluationResponse $response): array
+app/Domain/Governance/Http/Controllers\BoardEvaluationController.php:234:    protected function presentEvaluationStatus(string $status): string
+app/Domain/Governance/Models\BoardEvaluationResponse.php:24:    public function evaluation(): BelongsTo
+app/Domain/Governance/Models\BoardEvaluationResponse.php:29:    public function boardMember(): BelongsTo
+app/Domain/Governance/Models\BoardEvaluationResponse.php:34:    public function submit(): void
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:16:    public function __construct(protected DashboardAggregatorService $aggregator) {}
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:18:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:35:    public function create(Request $request)
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:44:    public function store(Request $request)
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:67:    public function show(CeoBoardReport $report)
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:79:    public function update(Request $request, CeoBoardReport $report)
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:94:    public function submit(CeoBoardReport $report)
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:103:    public function markPresented(CeoBoardReport $report)
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:112:    public function kpiSnapshot()
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:125:    public function attachFiles(Request $request, CeoBoardReport $report)
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:169:    public function deleteAttachment(Request $request, CeoBoardReport $report, string $attachment)
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:198:    public function downloadAttachment(CeoBoardReport $report, string $attachment)
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:216:    protected function validateReport(Request $request, bool $creating): array
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:248:    protected function captureKpiSnapshot(): ?array
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:271:    protected function safe(callable $fn): mixed
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:288:    protected function meetingOptions(?CeoBoardReport $includeReportMeeting = null): array
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:308:    protected function presentReport(CeoBoardReport $report, bool $brief = false): array
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:371:    protected function presentAttachments(CeoBoardReport $report): array
+app/Domain/Governance/Http/Controllers\CeoBoardReportController.php:391:    protected function sectionsComplete(CeoBoardReport $report): int
+app/Domain/Governance/Models\BoardPack.php:53:    public function meeting(): BelongsTo
+app/Domain/Governance/Models\BoardPack.php:58:    public function snapshot(): BelongsTo
+app/Domain/Governance/Models\BoardPack.php:63:    public function generatedBy(): BelongsTo
+app/Domain/Governance/Models\BoardPack.php:68:    public function isDistributed(): bool
+app/Domain/Governance/Models\BoardPack.php:73:    public function markAsDistributed(array $boardMemberIds): void
+app/Domain/Governance/Models\BoardPack.php:81:    public function recordDownload(int $boardMemberId): void
+app/Domain/Governance/Models\BoardPack.php:92:    public function recordRead(int $boardMemberId): void
+app/Domain/Governance/Models\BoardPack.php:104:    public function readCount(): int
+app/Domain/Governance/Models\BoardPack.php:109:    public function downloadCount(): int
+app/Domain/Governance/Models\BoardPack.php:114:    public function verifyIntegrity(): bool
+app/Domain/Governance/Http/Controllers\BoardInterestController.php:13:    public function index()
+app/Domain/Governance/Http/Controllers\BoardInterestController.php:32:    public function store(Request $request)
+app/Domain/Governance/Http/Controllers\BoardInterestController.php:71:    public function update(Request $request, BoardMemberInterest $interest)
+app/Domain/Governance/Http/Controllers\BoardInterestController.php:90:    public function myInterests()
+app/Domain/Governance/Http/Controllers\BoardInterestController.php:112:    protected function presentInterest(BoardMemberInterest $interest): array
+app/Domain/Governance/Http/Controllers\ActionItemController.php:13:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\ActionItemController.php:15:        $query = ActionItem::with(['assignedTo', 'completedBy', 'createdBy']);
+app/Domain/Governance/Http/Controllers\ActionItemController.php:46:    public function show(ActionItem $action)
+app/Domain/Governance/Http/Controllers\ActionItemController.php:48:        $action->load(['assignedTo', 'completedBy', 'createdBy']);
+app/Domain/Governance/Http/Controllers\ActionItemController.php:55:    public function complete(Request $request, ActionItem $action)
+app/Domain/Governance/Http/Controllers\ActionItemController.php:70:        return redirect()->back()->with('success', 'Action item completed.');
+app/Domain/Governance/Http/Controllers\ActionItemController.php:73:    public function store(StoreActionItemRequest $request)
+app/Domain/Governance/Http/Controllers\ActionItemController.php:86:    public function updateProgress(Request $request, ActionItem $action)
+app/Domain/Governance/Http/Controllers\ActionItemController.php:100:    public function block(Request $request, ActionItem $action)
+app/Domain/Governance/Http/Controllers\ActionItemController.php:113:    public function unblock(ActionItem $action)
+app/Domain/Governance/Http/Controllers\ActionItemController.php:122:    public function escalate(Request $request, ActionItem $action)
+app/Domain/Governance/Http/Controllers\DashboardController.php:16:    public function __construct(
+app/Domain/Governance/Http/Controllers\DashboardController.php:23:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\DashboardController.php:48:    public function data(Request $request)
+app/Domain/Governance/Http/Controllers\DashboardController.php:131:    public function widget(Request $request, string $widget)
+app/Domain/Governance/Http/Controllers\DashboardController.php:152:    protected function getDateRange(string $period): array
+app/Domain/Governance/Http/Controllers\DashboardController.php:166:    protected function syncBudgetActuals(Request $request): void
+app/Domain/Governance/Models\BoardSkillsMatrix.php:46:    public function boardMember(): BelongsTo
+app/Domain/Governance/Models\BoardSkillsMatrix.php:51:    public function assessedBy(): BelongsTo
+app/Domain/Governance/Models\BoardSkillsMatrix.php:56:    public function getCategoryLabel(): string
+app/Domain/Governance/Models\BoardSkillsMatrix.php:61:    public function getProficiencyLabel(): string
+app/Domain/Governance/Http/Controllers\BoardPackController.php:22:    public function __construct(
+app/Domain/Governance/Http/Controllers\BoardPackController.php:28:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:90:    public function show(Request $request, BoardPack $pack)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:109:    public function generate(Request $request, GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:164:    protected function regenerateForMeeting(Request $request, GovernanceMeeting $meeting, BoardPack $existingPack)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:195:    public function distribute(Request $request, BoardPack $pack)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:220:    public function download(Request $request, BoardPack $pack)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:250:    public function preview(GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:259:    public function markAsRead(Request $request, BoardPack $pack)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:270:    public function regenerate(BoardPack $pack)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:284:    public function attachFiles(Request $request, BoardPack $pack)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:336:    public function deleteAttachment(Request $request, BoardPack $pack, string $attachment)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:372:    public function downloadAttachment(Request $request, BoardPack $pack, string $attachment)
+app/Domain/Governance/Http/Controllers\BoardPackController.php:404:    private function presentIndexPack(BoardPack $pack): array
+app/Domain/Governance/Http/Controllers\BoardPackController.php:428:    private function presentShowPack(BoardPack $pack): array
+app/Domain/Governance/Http/Controllers\BoardPackController.php:448:    public function presentSupplementaryAttachments(BoardPack $pack): array
+app/Domain/Governance/Models\BreakGlassAccess.php:48:    public function requester(): BelongsTo
+app/Domain/Governance/Models\BreakGlassAccess.php:53:    public function approver(): BelongsTo
+app/Domain/Governance/Models\BreakGlassAccess.php:58:    public function closer(): BelongsTo
+app/Domain/Governance/Models\BreakGlassAccess.php:63:    public function scopePending($query)
+app/Domain/Governance/Models\BreakGlassAccess.php:68:    public function scopeActive($query)
+app/Domain/Governance/Models\BreakGlassAccess.php:74:    public function scopeBoardNotNotified($query)
+app/Domain/Governance/Models\BreakGlassAccess.php:79:    public function isPending(): bool
+app/Domain/Governance/Models\BreakGlassAccess.php:84:    public function isApproved(): bool
+app/Domain/Governance/Models\BreakGlassAccess.php:89:    public function isActive(): bool
+app/Domain/Governance/Models\BreakGlassAccess.php:96:    public function isExpired(): bool
+app/Domain/Governance/Models\BreakGlassAccess.php:101:    public function canApprove(User $user): bool
+app/Domain/Governance/Models\BreakGlassAccess.php:112:    public function approve(int $userId, ?string $notes = null, int $durationHours = 4): void
+app/Domain/Governance/Models\BreakGlassAccess.php:124:    public function reject(int $userId, string $reason): void
+app/Domain/Governance/Models\BreakGlassAccess.php:134:    public function logAction(string $action, array $details = []): void
+app/Domain/Governance/Models\BreakGlassAccess.php:145:    public function close(int $userId, ?string $notes = null): void
+app/Domain/Governance/Models\BreakGlassAccess.php:155:    public function markBoardNotified(): void
+app/Domain/Governance/Http/Controllers\ComplianceController.php:24:    public function __construct(
+app/Domain/Governance/Http/Controllers\ComplianceController.php:29:    public function create()
+app/Domain/Governance/Http/Controllers\ComplianceController.php:38:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\ComplianceController.php:66:    public function show(ComplianceObligation $obligation)
+app/Domain/Governance/Http/Controllers\ComplianceController.php:77:    public function store(StoreComplianceObligationRequest $request)
+app/Domain/Governance/Http/Controllers\ComplianceController.php:112:    public function update(Request $request, ComplianceObligation $obligation)
+app/Domain/Governance/Http/Controllers\ComplianceController.php:138:    public function complete(Request $request, ComplianceObligation $obligation)
+app/Domain/Governance/Http/Controllers\ComplianceController.php:156:    public function uploadEvidence(Request $request, ComplianceObligation $obligation)
+app/Domain/Governance/Http/Controllers\ComplianceController.php:180:    public function calendar()
+app/Domain/Governance/Http/Controllers\ComplianceController.php:202:    public function edit(ComplianceObligation $obligation)
+app/Domain/Governance/Http/Controllers\ComplianceController.php:211:    public function storeNotifiableIncident(Request $request)
+app/Domain/Governance/Http/Controllers\ComplianceController.php:256:    private function resolveOwner(Request $request, mixed $ownerId): ?User
+app/Domain/Governance/Http/Controllers\ComplianceController.php:279:    protected function getFrameworks(): array
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:14:    public function __construct(
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:18:    public function create()
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:27:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:43:    public function show(PerformanceReview $review)
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:56:    public function store(Request $request)
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:83:    public function update(Request $request, PerformanceReview $review)
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:97:    public function addGoal(Request $request, PerformanceReview $review)
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:119:    public function submitAssessment(Request $request, PerformanceReview $review)
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:141:    public function edit(PerformanceReview $review)
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:150:    public function submitFeedback(Request $request, PerformanceReview $review)
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:173:    public function submitSelfAssessment(Request $request, PerformanceReview $review)
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:187:     * Board approval — finalises the review to completed, optionally linking the
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:190:    public function approve(Request $request, PerformanceReview $review)
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:200:        return redirect()->back()->with('success', 'Performance review approved and completed.');
+app/Domain/Governance/Http/Controllers\PerformanceReviewController.php:203:    protected function getReviewCycles(): array
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:26:    public function __construct(
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:34:    public function create()
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:45:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:57:    public function calendar(Request $request)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:133:    public function show(Request $request, GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:179:    public function edit(GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:193:    public function store(StoreMeetingRequest $request)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:209:    public function update(UpdateMeetingRequest $request, GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:224:    public function destroy(GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:234:    public function addAgendaItem(Request $request, GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:256:    public function updateAgendaItem(Request $request, GovernanceMeeting $meeting, MeetingAgendaItem $item)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:284:    public function removeAgendaItem(Request $request, GovernanceMeeting $meeting, MeetingAgendaItem $item)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:297:    public function storeMinutes(Request $request, GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:323:    public function updateMinutes(Request $request, GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:343:    public function approveMinutes(Request $request, GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:362:    public function recordAttendance(Request $request, GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:393:    public function lockMeeting(GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:406:    public function signMinutes(GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:424:    public function advanceStatus(GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceMeetingController.php:437:    public function submitRsvp(Request $request, GovernanceMeeting $meeting)
+app/Domain/Governance/Http/Controllers\GovernanceSettingController.php:23:    public function __construct()
+app/Domain/Governance/Http/Controllers\GovernanceSettingController.php:90:    public function index(): Response
+app/Domain/Governance/Http/Controllers\GovernanceSettingController.php:109:    public function update(Request $request): RedirectResponse
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:15:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:42:    public function create()
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:49:    public function store(Request $request)
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:83:    public function show(GovernancePolicy $policy)
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:91:            'completed' => $policy->attestations()->where('acknowledged', true)->count(),
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:101:    public function edit(GovernancePolicy $policy)
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:110:    public function update(Request $request, GovernancePolicy $policy)
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:156:    public function approve(Request $request, GovernancePolicy $policy)
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:171:    public function attest(Request $request, GovernancePolicy $policy)
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:208:    public function attestations(Request $request)
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:243:        $completed = $policies->filter(fn ($p) => ! empty($p['my_attestation']) && ($p['my_attestation']['acknowledged'] ?? false))->values();
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:248:            'completed' => $completed,
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:252:                'completed_count' => $completed->count(),
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:258:    public function newVersion(Request $request, GovernancePolicy $policy)
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:278:    protected function presentPolicyListItem(GovernancePolicy $policy): array
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:293:    protected function presentPolicy(GovernancePolicy $policy): array
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:318:    protected function normalizeStatus(string $status): string
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:327:    protected function presentStatus(string $status): string
+app/Domain/Governance/Http/Controllers\GovernancePolicyController.php:336:    protected function generatePolicyCode(): string
+app/Domain/Governance/Http/Controllers\GovernanceDocumentController.php:12:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\GovernanceDocumentController.php:46:    public function store(Request $request)
+app/Domain/Governance/Http/Controllers\GovernanceDocumentController.php:75:    public function show(GovernanceDocument $document)
+app/Domain/Governance/Http/Controllers\GovernanceDocumentController.php:102:    public function download(GovernanceDocument $document)
+app/Domain/Governance/Http/Controllers\GovernanceDocumentController.php:112:    public function destroy(GovernanceDocument $document)
+app/Domain/Governance/Models\Budget.php:40:    public function proposedBy(): BelongsTo
+app/Domain/Governance/Models\Budget.php:45:    public function createdBy(): BelongsTo
+app/Domain/Governance/Models\Budget.php:50:    public function approvalResolution(): BelongsTo
+app/Domain/Governance/Models\Budget.php:55:    public function supersedes(): BelongsTo
+app/Domain/Governance/Models\Budget.php:60:    public function lineItems(): HasMany
+app/Domain/Governance/Models\Budget.php:65:    public function adjustments(): HasMany
+app/Domain/Governance/Models\Budget.php:70:    public function allocations(): HasMany
+app/Domain/Governance/Models\Budget.php:75:    public function scopeByFiscalYear($query, string $year)
+app/Domain/Governance/Models\Budget.php:80:    public function scopeApproved($query)
+app/Domain/Governance/Models\Budget.php:85:    public function isDrafting(): bool
+app/Domain/Governance/Models\Budget.php:90:    public function isProposed(): bool
+app/Domain/Governance/Models\Budget.php:95:    public function isApproved(): bool
+app/Domain/Governance/Models\Budget.php:100:    public function propose(int $userId): void
+app/Domain/Governance/Models\Budget.php:132:    public function approve(int $resolutionId): void
+app/Domain/Governance/Models\Budget.php:141:    public function getTotalAllocated(): float
+app/Domain/Governance/Models\Budget.php:146:    public function getTotalActual(): float
+app/Domain/Governance/Models\Budget.php:151:    public function getTotalVariance(): float
+app/Domain/Governance/Models\Budget.php:156:    public function getVariancePercentage(): float
+app/Domain/Governance/Models\Budget.php:165:    public function getRemainingBudget(): float
+app/Domain/Governance/Models\Budget.php:170:    public function recalculateTotals(): void
+app/Domain/Governance/Models\Budget.php:180:    public function requiresBoardApproval(float $adjustmentAmount, float $thresholdPct = 5.0): bool
+app/Domain/Governance/Http/Controllers\GovernanceAuditLogController.php:23:    public function __construct(protected BoardPackAccessService $boardPackAccess) {}
+app/Domain/Governance/Http/Controllers\GovernanceAuditLogController.php:25:    public function index(Request $request): Response
+app/Domain/Governance/Http/Controllers\GovernanceAuditLogController.php:79:    public function export(Request $request): StreamedResponse
+app/Domain/Governance/Http/Controllers\GovernanceAuditLogController.php:115:    private function resolveFilters(Request $request): array
+app/Domain/Governance/Http/Controllers\GovernanceAuditLogController.php:130:    private function entityTypes(array $excludedEntityTypes): array
+app/Domain/Governance/Http/Controllers\GovernanceAuditLogController.php:147:    private function actionTypes(array $excludedEntityTypes): array
+app/Domain/Governance/Http/Controllers\GovernanceAuditLogController.php:160:    private function changeTypes(array $excludedEntityTypes): array
+app/Domain/Governance/Http/Controllers\GovernanceAuditLogController.php:173:    private function excludedEntityTypes(Request $request): array
+app/Domain/Governance/Models\BudgetAllocation.php:33:    public function budget(): BelongsTo
+app/Domain/Governance/Models\BudgetAllocation.php:38:    public function budgetLineItem(): BelongsTo
+app/Domain/Governance/Models\BudgetAllocation.php:43:    public function createdBy(): BelongsTo
+app/Domain/Governance/Models\BudgetAllocation.php:51:    public function getVarianceAttribute(): float
+app/Domain/Governance/Models\BudgetAllocation.php:59:    public function getVariancePercentAttribute(): ?float
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:21:    public function __construct(private readonly SpendApprovalCommandService $commands) {}
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:23:    public function index(Request $request): Response
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:86:    public function create(Request $request): Response
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:103:    public function edit(Request $request, SpendApproval $approval): Response
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:122:    public function show(Request $request, SpendApproval $approval): Response
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:149:    public function store(Request $request): RedirectResponse
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:160:    public function update(Request $request, SpendApproval $approval): RedirectResponse
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:176:    public function submit(Request $request, SpendApproval $approval): RedirectResponse
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:189:    public function approve(Request $request, SpendApproval $approval): RedirectResponse
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:200:    public function reject(Request $request, SpendApproval $approval): RedirectResponse
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:211:    private function validatePayload(Request $request): array
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:231:    private function validateDecision(Request $request): array
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:246:    public function attachFiles(Request $request, SpendApproval $approval): RedirectResponse|Response|JsonResponse
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:296:    public function deleteAttachment(Request $request, SpendApproval $approval, string $attachment): RedirectResponse|JsonResponse
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:312:    public function downloadAttachment(Request $request, SpendApproval $approval, string $attachment)
+app/Domain/Governance/Http/Controllers\SpendApprovalController.php:334:    public function presentAttachments(SpendApproval $approval): array
+app/Domain/Governance/Http/Controllers\TeTiritiController.php:12:    public function index()
+app/Domain/Governance/Http/Controllers\TeTiritiController.php:43:    public function store(Request $request)
+app/Domain/Governance/Http/Controllers\TeTiritiController.php:73:    public function update(Request $request, TeTiritiObligation $obligation)
+app/Domain/Governance/Http/Controllers\TeTiritiController.php:108:    protected function normalizeStatus(?string $status): string
+app/Domain/Governance/Http/Controllers\TeTiritiController.php:117:    protected function presentStatus(?string $status): string
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:20:    public function __construct(
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:24:    public function create()
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:31:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:63:    public function show(RiskRegisterEntry $risk)
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:100:    public function store(StoreRiskRegisterRequest $request)
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:145:    public function update(UpdateRiskRegisterRequest $request, RiskRegisterEntry $risk)
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:161:    public function accept(Request $request, RiskRegisterEntry $risk)
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:194:    public function close(Request $request, RiskRegisterEntry $risk)
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:208:    public function addTreatment(Request $request, RiskRegisterEntry $risk)
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:231:    public function linkEvent(Request $request, RiskRegisterEntry $risk)
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:251:    public function edit(RiskRegisterEntry $risk)
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:258:    public function heatmap()
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:266:    public function trends()
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:277:    public function committeeView(string $committee)
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:301:    protected function getCategories(): array
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:319:    public function attachTreatmentFiles(Request $request, RiskRegisterEntry $risk, RiskTreatment $treatment)
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:368:    public function deleteTreatmentAttachment(
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:406:    public function downloadTreatmentAttachment(
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:431:    protected function presentTreatmentAttachments(RiskRegisterEntry $risk, RiskTreatment $treatment): array
+app/Domain/Governance/Http/Controllers\RiskRegisterController.php:451:    protected function ensureTreatmentBelongsToRisk(RiskRegisterEntry $risk, RiskTreatment $treatment): void
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:17:    public function syncCurrentSnapshot(?Carbon $asOf = null): ClinicalGovernanceSnapshot
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:62:    public function supportedIndicators(): Collection
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:71:    public function recentSnapshots(int $limit = 12): Collection
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:81:    public function definitionMeta(): array
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:99:    public function sourceHint(): string
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:104:    protected function definitions(Carbon $periodStart, Carbon $periodEnd): array
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:187:    protected function syncIndicators(Collection $definitions): Collection
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:211:    protected function previousSnapshotValues(Carbon $periodStart): Collection
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:228:    protected function countClinicalEvents(ClinicalEventType $type, Carbon $start, Carbon $end): int
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:236:    protected function dateRange(?Carbon $asOf = null): array
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:246:    protected function trend(float $value, ?float $previousValue): string
+app/Domain/Governance/Services\ClinicalGovernanceAutomationService.php:263:    protected function narrative(array $indicatorValues): string
+app/Domain/Governance/Models\BudgetAdjustment.php:39:    public function budget(): BelongsTo
+app/Domain/Governance/Models\BudgetAdjustment.php:44:    public function lineItem(): BelongsTo
+app/Domain/Governance/Models\BudgetAdjustment.php:49:    public function proposedBy(): BelongsTo
+app/Domain/Governance/Models\BudgetAdjustment.php:54:    public function approvedBy(): BelongsTo
+app/Domain/Governance/Models\BudgetAdjustment.php:59:    public function approvalResolution(): BelongsTo
+app/Domain/Governance/Models\BudgetAdjustment.php:64:    public function scopePending($query)
+app/Domain/Governance/Models\BudgetAdjustment.php:69:    public function scopeApproved($query)
+app/Domain/Governance/Models\BudgetAdjustment.php:74:    public function scopeRequiringBoardApproval($query)
+app/Domain/Governance/Models\BudgetAdjustment.php:79:    public function isDraft(): bool
+app/Domain/Governance/Models\BudgetAdjustment.php:84:    public function isSubmitted(): bool
+app/Domain/Governance/Models\BudgetAdjustment.php:89:    public function isApproved(): bool
+app/Domain/Governance/Models\BudgetAdjustment.php:94:    public function isIncrease(): bool
+app/Domain/Governance/Models\BudgetAdjustment.php:99:    public function isDecrease(): bool
+app/Domain/Governance/Models\BudgetAdjustment.php:104:    public function isReallocation(): bool
+app/Domain/Governance/Services\ExecutiveMeetingAccessService.php:12:    public function hasExecutiveAuthority(User $user): bool
+app/Domain/Governance/Services\ExecutiveMeetingAccessService.php:18:    public function canViewMeeting(User $user, GovernanceMeeting $meeting): bool
+app/Domain/Governance/Services\ExecutiveMeetingAccessService.php:90:    public function canViewAgendaItem(User $user, GovernanceMeeting $meeting, MeetingAgendaItem $item): bool
+app/Domain/Governance/Services\ExecutiveMeetingAccessService.php:138:    public function canManageConfidentialAgenda(User $user, GovernanceMeeting $meeting): bool
+app/Domain/Governance/Services\ExecutiveMeetingAccessService.php:156:    public function applyMeetingVisibilityScope(Builder $query, User $user): Builder
+app/Domain/Governance/Services\IncidentEscalationService.php:34:    public function shouldAutoEscalate(?string $severity): bool
+app/Domain/Governance/Services\IncidentEscalationService.php:44:    public function escalateClientIncident(
+app/Domain/Governance/Services\IncidentEscalationService.php:67:    public function escalateClientIncidentOrFail(
+app/Domain/Governance/Services\IncidentEscalationService.php:124:    public function acknowledgeEscalation(IncidentGovernanceEscalation $escalation, int $userId, ?string $actionTaken = null): void
+app/Domain/Governance/Services\IncidentEscalationService.php:134:    public function closeEscalation(IncidentGovernanceEscalation $escalation, int $userId, string $actionTaken): void
+app/Domain/Governance/Services\IncidentEscalationService.php:144:    public function getOpenEscalations(): array
+app/Domain/Governance/Services\IncidentEscalationService.php:152:    private function linkToRiskRegister(ClientIncident $incident, IncidentGovernanceEscalation $escalation, int $riskId): void
+app/Domain/Governance/Services\IncidentEscalationService.php:180:    private function inferReason(ClientIncident $incident): string
+app/Domain/Governance/Services\IncidentEscalationService.php:197:    private function resolveChairUserId(): ?int
+app/Domain/Governance/Services\IncidentEscalationService.php:205:    private function resolveCeoUserId(): ?int
+app/Domain/Governance/Http/Controllers\ReportController.php:19:    public function __construct(
+app/Domain/Governance/Http/Controllers\ReportController.php:27:    public function boardMonthly(Request $request)
+app/Domain/Governance/Http/Controllers\ReportController.php:56:    public function committeeReport(Request $request, string $committee)
+app/Domain/Governance/Http/Controllers\ReportController.php:105:    public function complianceStatus()
+app/Domain/Governance/Http/Controllers\ReportController.php:124:    public function riskNarrative()
+app/Domain/Governance/Http/Controllers\ReportController.php:161:    public function evidencePack(Request $request)
+app/Domain/Governance/Http/Controllers\ReportController.php:183:    public function export(Request $request, string $type)
+app/Domain/Governance/Http/Controllers\ReportController.php:195:    private function exportRisksCsv()
+app/Domain/Governance/Http/Controllers\ReportController.php:218:    private function exportComplianceCsv()
+app/Domain/Governance/Http/Controllers\ReportController.php:238:    protected function syncBudgetActuals(Request $request): void
+app/Domain/Governance/Http/Controllers\StrategicPlanController.php:12:    public function create()
+app/Domain/Governance/Http/Controllers\StrategicPlanController.php:19:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\StrategicPlanController.php:33:    public function show(Request $request, StrategicPlan $plan)
+app/Domain/Governance/Http/Controllers\StrategicPlanController.php:44:    public function store(Request $request)
+app/Domain/Governance/Http/Controllers\StrategicPlanController.php:74:    public function update(Request $request, StrategicPlan $plan)
+app/Domain/Governance/Http/Controllers\StrategicPlanController.php:87:            'status' => ['sometimes', 'string', 'in:draft,active,completed,archived'],
+app/Domain/Governance/Http/Controllers\StrategicPlanController.php:104:    public function addGoal(Request $request, StrategicPlan $plan)
+app/Domain/Governance/Http/Controllers\StrategicPlanController.php:128:    public function approve(Request $request, StrategicPlan $plan)
+app/Domain/Governance/Http/Controllers\StrategicPlanController.php:142:    public function edit(StrategicPlan $plan)
+app/Domain/Governance/Http/Controllers\StrategicPlanController.php:153:    public function createVersion(Request $request, StrategicPlan $plan)
+app/Domain/Governance/Http/Controllers\StrategicPlanController.php:167:    public function changes(StrategicPlan $plan)
+app/Domain/Governance/Models\BudgetLineItem.php:54:    public function calculateVariance(): void
+app/Domain/Governance/Models\BudgetLineItem.php:62:    public function budget(): BelongsTo
+app/Domain/Governance/Models\BudgetLineItem.php:67:    public function scopeByCategory($query, string $category)
+app/Domain/Governance/Models\BudgetLineItem.php:72:    public function scopeWithVariance($query)
+app/Domain/Governance/Models\BudgetLineItem.php:77:    public function scopeSignificantVariance($query, float $threshold = 5)
+app/Domain/Governance/Models\BudgetLineItem.php:82:    public function getVarianceColor(): string
+app/Domain/Governance/Models\BudgetLineItem.php:92:    public function isOverBudget(): bool
+app/Domain/Governance/Models\BudgetLineItem.php:97:    public function isUnderBudget(): bool
+app/Domain/Governance/Models\BudgetLineItem.php:102:    public function hasSignificantVariance(float $threshold = 5): bool
+app/Domain/Governance/Services\EvidenceLibraryService.php:11:    public function storeEvidence(
+app/Domain/Governance/Services\EvidenceLibraryService.php:37:    public function linkToObligation(EvidenceLibrary $evidence, int $obligationId): void
+app/Domain/Governance/Services\EvidenceLibraryService.php:42:    public function getByCategory(string $category): \Illuminate\Database\Eloquent\Collection
+app/Domain/Governance/Services\EvidenceLibraryService.php:50:    public function getExpiringSoon(int $days = 30): \Illuminate\Database\Eloquent\Collection
+app/Domain/Governance/Http/Controllers\ResolutionController.php:22:    public function __construct(
+app/Domain/Governance/Http/Controllers\ResolutionController.php:26:    public function create(Request $request)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:38:    public function index(Request $request)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:59:    public function show(Resolution $resolution)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:87:    public function store(StoreResolutionRequest $request)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:113:    public function update(UpdateResolutionRequest $request, Resolution $resolution)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:122:    public function vote(Request $request, Resolution $resolution)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:157:    public function declareConflict(Request $request, Resolution $resolution)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:187:    public function openVoting(Request $request, Resolution $resolution)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:207:    public function closeVoting(Request $request, Resolution $resolution)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:225:    public function finalize(Request $request, Resolution $resolution)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:252:    protected function getMyPendingVotes(): array
+app/Domain/Governance/Http/Controllers\ResolutionController.php:272:    public function attachFiles(Request $request, Resolution $resolution)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:320:    public function deleteAttachment(Request $request, Resolution $resolution, string $attachment)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:353:    public function downloadAttachment(Resolution $resolution, string $attachment)
+app/Domain/Governance/Http/Controllers\ResolutionController.php:374:    protected function presentAttachments(Resolution $resolution): array
+app/Domain/Governance/Services\VotingService.php:17:    public function openVoting(Resolution $resolution, ?\DateTime $deadline = null): void
+app/Domain/Governance/Services\VotingService.php:29:    public function castVote(
+app/Domain/Governance/Services\VotingService.php:74:    public function declareConflict(
+app/Domain/Governance/Services\VotingService.php:106:    public function closeVoting(Resolution $resolution, ?string $notes = null): void
+app/Domain/Governance/Services\VotingService.php:126:    public function calculateQuorum(?int $meetingId, ?Resolution $resolution = null): array
+app/Domain/Governance/Services\VotingService.php:182:    public function isQuorumMet(Resolution $resolution): bool
+app/Domain/Governance/Services\VotingService.php:195:    public function getVotingResults(Resolution $resolution): array
+app/Domain/Governance/Services\VotingService.php:231:    public function getPendingVotes(int $boardMemberId): Collection
+app/Domain/Governance/Services\VotingService.php:249:    public function createWrittenResolution(
+app/Domain/Governance/Services\VotingService.php:277:    public function detectPotentialConflicts(Resolution $resolution, BoardMember $boardMember): array
+app/Domain/Governance/Services\VotingService.php:305:    public function sendVotingReminders(Resolution $resolution): int
+app/Domain/Governance/Services\BoardPackAccessService.php:21:    public function canViewPacks(User $viewer): bool
+app/Domain/Governance/Services\BoardPackAccessService.php:26:    public function canManage(User $viewer): bool
+app/Domain/Governance/Services\BoardPackAccessService.php:33:    public function visibleQuery(User $viewer): Builder
+app/Domain/Governance/Services\BoardPackAccessService.php:56:    public function canView(User $viewer, BoardPack $pack): bool
+app/Domain/Governance/Services\BoardPackAccessService.php:66:    public function visiblePack(User $viewer, ?BoardPack $pack): ?BoardPack
+app/Domain/Governance/Services\BoardPackAccessService.php:71:    public function concealUnlessVisible(User $viewer, BoardPack $pack): void
+app/Domain/Governance/Services\BoardPackAccessService.php:76:    public function recipientBoardMemberId(User $viewer, BoardPack $pack): ?int
+app/Domain/Governance/Services\BoardPackAccessService.php:94:    public function visibleNotificationQuery(User $viewer, bool $unreadOnly = false): MorphMany
+app/Domain/Governance/Services\BoardPackAccessService.php:122:    public function scopeAuditVisibility(Builder $query, ?User $viewer): Builder
+app/Domain/Governance/Services\BoardPackAccessService.php:142:    private function boardMemberId(User $viewer): ?int
+app/Domain/Governance/Services\BoardPackAccessService.php:152:    private function hasMeeting(BoardPack $pack): bool
+app/Domain/Governance/Services\BoardPackBuilderService.php:22:    public function __construct(
+app/Domain/Governance/Services\BoardPackBuilderService.php:33:    public function build(GovernanceMeeting $meeting, ?DashboardSnapshot $snapshot = null): BoardPack
+app/Domain/Governance/Services\BoardPackBuilderService.php:61:    protected function buildDocumentManifest(array $content): array
+app/Domain/Governance/Services\BoardPackBuilderService.php:79:    protected function buildPackContent(GovernanceMeeting $meeting, $snapshot): array
+app/Domain/Governance/Services\BoardPackBuilderService.php:145:    protected function generateFile(GovernanceMeeting $meeting, array $content): array
+app/Domain/Governance/Services\BoardPackBuilderService.php:159:    protected function generateJsonPack(GovernanceMeeting $meeting, array $content): array
+app/Domain/Governance/Services\BoardPackBuilderService.php:182:    protected function generatePdf(GovernanceMeeting $meeting, array $content): array
+app/Domain/Governance/Services\BoardPackBuilderService.php:212:    protected function generateContentChecksum(array $content): string
+app/Domain/Governance/Services\BoardPackBuilderService.php:220:    protected function getMeetingTypeLabel(string $type): string
+app/Domain/Governance/Services\BoardPackBuilderService.php:236:    public function distribute(BoardPack $pack, ?array $boardMemberIds = null): void
+app/Domain/Governance/Services\BoardPackBuilderService.php:265:    public function regenerate(BoardPack $pack): BoardPack
+app/Domain/Governance/Services\BoardPackBuilderService.php:302:    public function preview(GovernanceMeeting $meeting): array
+app/Domain/Governance/Services\BoardPackBuilderService.php:326:    protected function estimatePageCount(array $manifest): int
+app/Domain/Governance/Services\BoardPackBuilderService.php:345:    protected function buildFinanceSection($snapshot): ?array
+app/Domain/Governance/Services\BoardPackBuilderService.php:363:    protected function buildCommitteeReports(GovernanceMeeting $meeting): array
+app/Domain/Governance/Services\BoardPackBuilderService.php:384:    protected function buildSupportingDocuments(GovernanceMeeting $meeting): array
+app/Domain/Governance/Services\BoardPackBuilderService.php:411:    protected function sectionTitle(string $key): string
+app/Domain/Governance/Services\AuditEvidencePackService.php:13:    public function generate(string $type, ?string $periodStart = null, ?string $periodEnd = null, ?string $framework = null): AuditEvidencePack
+app/Domain/Governance/Services\AuditEvidencePackService.php:38:    public function download(int $packId)
+app/Domain/Governance/Services\AuditEvidencePackService.php:51:    private function gatherComplianceEvidence($start, $end, ?string $framework): array
+app/Domain/Governance/Services\AuditEvidencePackService.php:87:    private function gatherRiskEvidence($start, $end): array
+app/Domain/Governance/Services\AuditEvidencePackService.php:116:    private function gatherMeetingEvidence($start, $end): array
+app/Domain/Governance/Services\AuditEvidencePackService.php:138:    private function gatherFullGovernanceEvidence($start, $end): array
+app/Domain/Governance/Models\CeoBoardReport.php:44:    public function meeting(): BelongsTo
+app/Domain/Governance/Models\CeoBoardReport.php:49:    public function submittedBy(): BelongsTo
+app/Domain/Governance/Models\CeoBoardReport.php:54:    public function presentedBy(): BelongsTo
+app/Domain/Governance/Models\CeoBoardReport.php:59:    public function isDraft(): bool
+app/Domain/Governance/Models\CeoBoardReport.php:64:    public function isSubmitted(): bool
+app/Domain/Governance/Models\CeoBoardReport.php:69:    public function isPresented(): bool
+app/Domain/Governance/Models\CeoBoardReport.php:74:    public function isOverdue(): bool
+app/Domain/Governance/Models\CeoBoardReport.php:79:    public function submit(?array $kpiSnapshot = null): void
+app/Domain/Governance/Models\CeoBoardReport.php:93:    public function markPresented(?User $by = null): void
+app/Domain/Governance/Models\CeoBoardReport.php:102:    public function periodLabel(): ?string
+app/Domain/Governance/Models\CeoBoardReport.php:122:    public function daysUntilDeadline(): ?int
+app/Domain/Governance/Models\ClinicalGovernanceIndicator.php:36:    public function scopeActive($query)
+app/Domain/Governance/Models\ClinicalGovernanceIndicator.php:41:    public function scopeByCategory($query, string $category)
+app/Domain/Governance/Models\ClinicalGovernanceIndicator.php:46:    public function getStatus(float $value): string
+app/Domain/Governance/Services\ComplianceEngineService.php:18:    public function createObligation(
+app/Domain/Governance/Services\ComplianceEngineService.php:52:    public function calculateNextDueDate(string $frequency, ?Carbon $from = null): Carbon
+app/Domain/Governance/Services\ComplianceEngineService.php:67:    public function completeObligation(
+app/Domain/Governance/Services\ComplianceEngineService.php:69:        User $completedBy,
+app/Domain/Governance/Services\ComplianceEngineService.php:72:        $obligation->markComplete($completedBy->id);
+app/Domain/Governance/Services\ComplianceEngineService.php:91:    protected function scheduleNextOccurrence(ComplianceObligation $completed): void
+app/Domain/Governance/Services\ComplianceEngineService.php:93:        $nextDueDate = $this->calculateNextDueDate($completed->frequency, $completed->due_date);
+app/Domain/Governance/Services\ComplianceEngineService.php:96:        $existing = ComplianceObligation::where('framework', $completed->framework)
+app/Domain/Governance/Services\ComplianceEngineService.php:97:            ->where('obligation_code', $completed->obligation_code)
+app/Domain/Governance/Services\ComplianceEngineService.php:103:                $completed->framework,
+app/Domain/Governance/Services\ComplianceEngineService.php:104:                $completed->obligation_title,
+app/Domain/Governance/Services\ComplianceEngineService.php:105:                $completed->description,
+app/Domain/Governance/Services\ComplianceEngineService.php:106:                $completed->frequency,
+app/Domain/Governance/Services\ComplianceEngineService.php:107:                $completed->owner,
+app/Domain/Governance/Services\ComplianceEngineService.php:109:                $completed->obligation_code,
+app/Domain/Governance/Services\ComplianceEngineService.php:110:                $completed->reminder_days
+app/Domain/Governance/Services\ComplianceEngineService.php:118:    public function uploadEvidence(
+app/Domain/Governance/Services\ComplianceEngineService.php:146:    public function scheduleReminders(ComplianceObligation $obligation): void
+app/Domain/Governance/Services\ComplianceEngineService.php:172:    public function processDueReminders(): int
+app/Domain/Governance/Services\ComplianceEngineService.php:230:    protected function escalateReminder(ComplianceReminder $reminder): void
+app/Domain/Governance/Services\ComplianceEngineService.php:268:    private function resolveFinalEscalationRecipient(): int
+app/Domain/Governance/Services\ComplianceEngineService.php:281:    public function getComplianceStatus(): array
+app/Domain/Governance/Services\ComplianceEngineService.php:312:    public function getUpcomingObligations(int $days = 30): array
+app/Domain/Governance/Services\ComplianceEngineService.php:334:    public function generateEvidencePack(
+app/Domain/Governance/Services\ComplianceEngineService.php:341:            ->whereBetween('completed_at', [$startDate, $endDate])
+app/Domain/Governance/Services\ComplianceEngineService.php:350:                'completed_at' => $obligation->completed_at?->toDateString(),
+app/Domain/Governance/Services\ComplianceEngineService.php:372:    public function seedDefaultObligations(): void
+app/Domain/Governance/Services\DashboardAggregatorService.php:31:    public function __construct(
+app/Domain/Governance/Services\DashboardAggregatorService.php:44:    public function aggregate(
+app/Domain/Governance/Services\DashboardAggregatorService.php:104:    public function captureSnapshot(
+app/Domain/Governance/Services\DashboardAggregatorService.php:129:    protected function getDateRange(string $periodType, ?Carbon $start, ?Carbon $end): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:144:    public function getTopRisks(int $limit = 10): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:170:    public function getRiskChanges(array $range): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:186:    public function getClientSafetyMetrics(array $range): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:208:    public function getOperationalSafetyMetrics(array $range): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:225:    public function getPrivacyMetrics(array $range): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:244:                ? DataSubjectRequest::where('status', '!=', 'completed')->count()
+app/Domain/Governance/Services\DashboardAggregatorService.php:257:    public function getWorkforceMetrics(array $range): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:292:    public function getFinancialMetrics(array $range, ?User $viewer = null): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:372:    public function getItCyberMetrics(array $range): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:403:    public function getComplianceCalendar(int $days = 90): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:423:    public function getDecisionsRequired(): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:470:    public function getRoadmapMetrics(): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:482:    public function getControlRoomMetrics(array $range): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:509:    public function getIncidentMetrics(array $range): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:534:    public function getSafeguardingMetrics(array $range): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:554:    public function getVoidedRisks(array $range): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:577:    public function getFleetAssetMetrics(array $range): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:625:    public function getHsBackboneMetrics(array $range, ?User $viewer = null): array
+app/Domain/Governance/Services\DashboardAggregatorService.php:638:    protected function determineStatus(int $value, array $thresholds): string
+app/Domain/Governance/Services\DashboardAggregatorService.php:647:    protected function getDataFreshness(): array
+app/Domain/Governance/Services\RiskScoringService.php:61:    public function calculateInherentScore(int $likelihood, int $impact): int
+app/Domain/Governance/Services\RiskScoringService.php:69:    public function calculateResidualScore(int $inherentScore, string $controlEffectiveness): int
+app/Domain/Governance/Services\RiskScoringService.php:78:    public function getRiskLevel(int $score): string
+app/Domain/Governance/Services\RiskScoringService.php:92:    public function getRiskColor(int $score): string
+app/Domain/Governance/Services\RiskScoringService.php:105:    public function isWithinAppetite(RiskRegisterEntry $risk): bool
+app/Domain/Governance/Services\RiskScoringService.php:114:    public function getAppetiteThreshold(string $category): int
+app/Domain/Governance/Services\RiskScoringService.php:129:    public function recalculateRisk(RiskRegisterEntry $risk): void
+app/Domain/Governance/Services\RiskScoringService.php:140:    public function acceptRisk(
+app/Domain/Governance/Services\RiskScoringService.php:167:    public function createTreatment(
+app/Domain/Governance/Services\RiskScoringService.php:191:    public function generateHeatmapData(): array
+app/Domain/Governance/Services\RiskScoringService.php:216:    public function getTrendAnalysis(int $months = 12): array
+app/Domain/Governance/Services\RiskScoringService.php:238:    public function getCategorySummary(): array
+app/Domain/Governance/Services\RiskScoringService.php:261:    public function generateBoardReport(): array
+app/Domain/Governance/Services\RecurringMeetingService.php:11:    public function generateUpcoming(int $monthsAhead = 3): int
+app/Domain/Governance/Services\RecurringMeetingService.php:23:    public function generateForSchedule(RecurringMeetingSchedule $schedule, int $monthsAhead = 3): int
+app/Domain/Governance/Services\RecurringMeetingService.php:60:    protected function calculateDates(RecurringMeetingSchedule $schedule, int $monthsAhead): array
+app/Domain/Governance/Services\RecurringMeetingService.php:81:    protected function resolveDateForMonth(RecurringMeetingSchedule $schedule, Carbon $monthStart): ?Carbon
+app/Domain/Governance/Services\RecurringMeetingService.php:139:    protected function generateTitle(RecurringMeetingSchedule $schedule, Carbon $date): string
+app/Domain/Governance/Services\GovernanceWorkflowService.php:20:    public function __construct(protected BoardPackAccessService $boardPackAccess) {}
+app/Domain/Governance/Services\GovernanceWorkflowService.php:22:    public function dashboardWorkflow(?User $user = null, int $limit = 15): array
+app/Domain/Governance/Services\GovernanceWorkflowService.php:47:    public function meetingChecklist(GovernanceMeeting $meeting, ?User $user = null): array
+app/Domain/Governance/Services\GovernanceWorkflowService.php:215:    protected function previousMeeting(GovernanceMeeting $meeting): ?GovernanceMeeting
+app/Domain/Governance/Services\GovernanceWorkflowService.php:224:    protected function previousMeetingOpenActions(?GovernanceMeeting $meeting): Collection
+app/Domain/Governance/Services\GovernanceWorkflowService.php:248:    protected function meetingActions(?User $user): Collection
+app/Domain/Governance/Services\GovernanceWorkflowService.php:380:    protected function resolutionActions(): Collection
+app/Domain/Governance/Services\GovernanceWorkflowService.php:429:    protected function riskActions(): Collection
+app/Domain/Governance/Services\GovernanceWorkflowService.php:449:                'Risk Register',
+app/Domain/Governance/Services\GovernanceWorkflowService.php:462:    protected function complianceActions(): Collection
+app/Domain/Governance/Services\GovernanceWorkflowService.php:499:    protected function budgetActions(): Collection
+app/Domain/Governance/Services\GovernanceWorkflowService.php:558:    protected function actionItemActions(): Collection
+app/Domain/Governance/Services\GovernanceWorkflowService.php:595:    protected function makeAction(
+app/Domain/Governance/Services\GovernanceWorkflowService.php:623:    protected function dueStatus(mixed $date): string
+app/Domain/Governance/Services\GovernanceWorkflowService.php:639:    protected function parseDate(mixed $value): ?Carbon
+app/Domain/Governance/Services\GovernanceWorkflowService.php:652:    protected function actionRank(array $action): int
+app/Domain/Governance/Models\ClinicalGovernanceSnapshot.php:26:    public function capturedBy(): BelongsTo
+app/Domain/Governance/Models\ClinicalGovernanceSnapshot.php:31:    public function getCriticalCount(): int
+app/Domain/Governance/Models\ClinicalGovernanceSnapshot.php:38:    public function getWarningCount(): int
+app/Domain/Governance/Models\ComplianceEvidence.php:44:    public function obligation(): BelongsTo
+app/Domain/Governance/Models\ComplianceEvidence.php:49:    public function uploadedBy(): BelongsTo
+app/Domain/Governance/Models\ComplianceEvidence.php:54:    public function verifiedBy(): BelongsTo
+app/Domain/Governance/Models\ComplianceEvidence.php:59:    public function scopeVerified($query)
+app/Domain/Governance/Models\ComplianceEvidence.php:64:    public function scopePendingVerification($query)
+app/Domain/Governance/Models\ComplianceEvidence.php:69:    public function scopeExpiringSoon($query, int $days = 30)
+app/Domain/Governance/Models\ComplianceEvidence.php:74:    public function isVerified(): bool
+app/Domain/Governance/Models\ComplianceEvidence.php:79:    public function isExpiringSoon(int $days = 30): bool
+app/Domain/Governance/Models\ComplianceEvidence.php:84:    public function verify(int $userId, ?string $notes = null): void
+app/Domain/Governance/Models\ComplianceEvidence.php:97:    public function getFileUrl(): ?string
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:23:    public function __construct(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:28:    public function assertAgendaItemBound(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:40:    public function addAgendaItem(User $actor, GovernanceMeeting $meeting, array $data): MeetingAgendaItem
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:62:    public function updateAgendaItem(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:89:    public function removeAgendaItem(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:109:    public function assertBudgetLineItemBound(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:118:    public function assertBudgetLineItemMutable(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:127:    public function assertBudgetStructureMutable(User $actor, Budget $budget): void
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:135:    public function assertBudgetLineItemsBound(User $actor, Budget $budget, array $lineItemIds): void
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:150:    public function storeBudgetLineItem(User $actor, Budget $budget, array $data): BudgetLineItem
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:165:    public function updateBudgetLineItem(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:188:    public function destroyBudgetLineItem(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:208:    public function assertBudgetAdjustmentBound(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:217:    public function requestBudgetAdjustment(User $actor, Budget $budget, array $data): BudgetAdjustment
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:254:    public function approveBudgetAdjustment(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:293:    public function rejectBudgetAdjustment(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:332:    public function recordBudgetActuals(User $actor, Budget $budget, array $actuals): void
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:365:    public function assertBudgetAllocationBoundAndAccessible(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:375:    public function assertBudgetAllocationSiteAccessible(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:384:    public function storeBudgetAllocation(User $actor, Budget $budget, array $data): BudgetAllocation
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:413:    public function updateBudgetAllocation(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:441:    public function destroyBudgetAllocation(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:461:    protected function afterNestedMutation(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:467:    private function lockMeeting(User $actor, int $meetingId): GovernanceMeeting
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:475:    private function lockBudget(User $actor, int $budgetId, string $ability): Budget
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:483:    private function lockBudgetStructure(User $actor, int $budgetId): Budget
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:491:    private function authorizeMeeting(User $actor, GovernanceMeeting $meeting): void
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:496:    private function authorizeBudget(User $actor, Budget $budget, string $ability): void
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:501:    private function authorizeBudgetStructure(User $actor, Budget $budget): void
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:507:    private function reorderAgendaItems(GovernanceMeeting $meeting): void
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:523:    private function recalculateBudgetTotal(Budget $budget): void
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:530:    private function adjustedLineAmount(
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:554:    private function assertSubmittedAdjustment(BudgetAdjustment $adjustment): void
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:563:    private function assertAllocationSiteAccess(User $actor, ?int $siteId): void
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:584:    private function modelKey(Model|int $model): int
+app/Domain/Governance/Services\GovernanceNestedMutationService.php:593:    private function normalizeIds(array $ids): array
+app/Domain/Governance/Models\CommitteeMembership.php:29:    public function committee(): BelongsTo
+app/Domain/Governance/Models\CommitteeMembership.php:34:    public function boardMember(): BelongsTo
+app/Domain/Governance/Models\CommitteeMembership.php:39:    public function scopeActive($query)
+app/Domain/Governance/Models\CommitteeMembership.php:48:    public function isChair(): bool
+app/Domain/Governance/Services\PerformanceReviewService.php:22:    public function createReview(
+app/Domain/Governance/Services\PerformanceReviewService.php:44:    public function addGoal(
+app/Domain/Governance/Services\PerformanceReviewService.php:66:    public function addKpi(
+app/Domain/Governance/Services\PerformanceReviewService.php:93:    public function syncKpis(PerformanceReview $review): void
+app/Domain/Governance/Services\PerformanceReviewService.php:111:    protected function fetchKpiValue(PerformanceKpi $kpi): mixed
+app/Domain/Governance/Services\PerformanceReviewService.php:136:    protected function calculateIncidentRate(array $period): ?float
+app/Domain/Governance/Services\PerformanceReviewService.php:149:    protected function countSeriousIncidents(array $period): int
+app/Domain/Governance/Services\PerformanceReviewService.php:159:    protected function countSafeguardingConcerns(array $period): int
+app/Domain/Governance/Services\PerformanceReviewService.php:167:    protected function getLatestAuditScore(): ?float
+app/Domain/Governance/Services\PerformanceReviewService.php:176:    protected function calculateTurnoverRate(array $period): ?float
+app/Domain/Governance/Services\PerformanceReviewService.php:185:    protected function calculateTrainingCompliance(): ?float
+app/Domain/Governance/Services\PerformanceReviewService.php:194:    protected function getBudgetVariance(): ?float
+app/Domain/Governance/Services\PerformanceReviewService.php:203:    protected function calculateComplianceTraining(): ?float
+app/Domain/Governance/Services\PerformanceReviewService.php:212:    protected function calculateUptime(array $period): ?float
+app/Domain/Governance/Services\PerformanceReviewService.php:230:    protected function countSecurityIncidents(array $period): int
+app/Domain/Governance/Services\PerformanceReviewService.php:240:    public function generateDefaultGoals(PerformanceReview $review): void
+app/Domain/Governance/Services\PerformanceReviewService.php:252:                'criteria' => 'Audit score >85%; all corrective actions completed on time',
+app/Domain/Governance/Services\PerformanceReviewService.php:295:    public function generateDefaultKpis(PerformanceReview $review): void
+app/Domain/Governance/Services\PerformanceReviewService.php:325:    public function generateScorecard(PerformanceReview $review): array
+app/Domain/Governance/Services\PerformanceReviewService.php:373:    public function submitBoardAssessment(
+app/Domain/Governance/Services\SpendApprovalCommandService.php:29:    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+app/Domain/Governance/Services\SpendApprovalCommandService.php:31:    public function assertHasAccessibleSite(User $actor): void
+app/Domain/Governance/Services\SpendApprovalCommandService.php:39:    public function accessibleSiteOptions(User $actor): array
+app/Domain/Governance/Services\SpendApprovalCommandService.php:57:    public function resolveAccessibleApproval(User $actor, int $approvalId): SpendApproval
+app/Domain/Governance/Services\SpendApprovalCommandService.php:64:    public function accessibleApprovalQuery(User $actor): Builder
+app/Domain/Governance/Services\SpendApprovalCommandService.php:74:    public function readableApprovalQuery(?User $actor): ?Builder
+app/Domain/Governance/Services\SpendApprovalCommandService.php:92:    public function assertCanonicalSourceForRead(User $actor, SpendApproval $approval): void
+app/Domain/Governance/Services\SpendApprovalCommandService.php:104:    public function canonicalBillSourceEvidence(FinBill $bill, int $approvalSiteId): array
+app/Domain/Governance/Services\SpendApprovalCommandService.php:109:    public function create(User $actor, array $payload): SpendApproval
+app/Domain/Governance/Services\SpendApprovalCommandService.php:140:    public function update(User $actor, int $approvalId, array $payload, int $expectedVersion): SpendApproval
+app/Domain/Governance/Services\SpendApprovalCommandService.php:169:    public function submit(User $actor, int $approvalId, int $expectedVersion): SpendApproval
+app/Domain/Governance/Services\SpendApprovalCommandService.php:206:    public function decide(User $actor, int $approvalId, string $outcome, array $command): SpendApproval
+app/Domain/Governance/Services\SpendApprovalCommandService.php:306:    public function appendAttachments(User $actor, int $approvalId, array $attachments): SpendApproval
+app/Domain/Governance/Services\SpendApprovalCommandService.php:335:    public function removeAttachment(User $actor, int $approvalId, string $attachmentId): array
+app/Domain/Governance/Services\SpendApprovalCommandService.php:371:    private function lockApproval(int $approvalId, array $accessibleSiteIds): SpendApproval
+app/Domain/Governance/Services\SpendApprovalCommandService.php:380:    private function lockActors(array $ids): array
+app/Domain/Governance/Services\SpendApprovalCommandService.php:391:    private function assertVersion(SpendApproval $approval, int $expectedVersion): void
+app/Domain/Governance/Services\SpendApprovalCommandService.php:401:    private function lockAndCanonicalizeParents(array $payload, array $accessibleSiteIds): array
+app/Domain/Governance/Services\SpendApprovalCommandService.php:470:    private function lockParent(string $model, mixed $id): ?object
+app/Domain/Governance/Services\SpendApprovalCommandService.php:484:    private function lockResolution(mixed $id): ?Resolution
+app/Domain/Governance/Services\SpendApprovalCommandService.php:493:    private function canonicalSourceEvidence(
+app/Domain/Governance/Services\SpendApprovalCommandService.php:536:    private function billSourceEvidence(FinBill $bill, int $approvalSiteId): array
+app/Domain/Governance/Services\SpendApprovalCommandService.php:554:    private function purchaseOrderSourceEvidence(
+app/Domain/Governance/Services\SpendApprovalCommandService.php:580:    private function paymentRunSourceEvidence(
+app/Domain/Governance/Services\SpendApprovalCommandService.php:616:    private function accessibleSiteIds(User $actor): array
+app/Domain/Governance/Services\SpendApprovalCommandService.php:624:    private function scopedApprovalQuery(User $actor): Builder
+app/Domain/Governance/Services\SpendApprovalCommandService.php:629:    private function scopedApprovalQueryForSiteIds(array $siteIds): Builder
+app/Domain/Governance/Services\SpendApprovalCommandService.php:647:    private function applyCanonicalReadSourceScope(Builder $query): Builder
+app/Domain/Governance/Services\SpendApprovalCommandService.php:700:    private function conceal(): never
+app/Domain/Governance/Services\SpendApprovalCommandService.php:705:    private function decisionFingerprint(int $actorId, string $outcome, array $command): string
+app/Domain/Governance/Services\SpendApprovalCommandService.php:717:    private function validateDecisionCommand(string $outcome, array $command): void
+app/Domain/Governance/Services\SpendApprovalCommandService.php:736:    private function resolutionEvidence(Resolution $resolution): array
+app/Domain/Governance/Services\SpendApprovalCommandService.php:747:    private function parentFields(): array
+app/Domain/Governance/Services\SpendApprovalCommandService.php:752:    private function requiresBoard(array $payload): bool
+app/Domain/Governance/Services\SpendApprovalCommandService.php:757:    private function nextReference(): string
+app/Domain/Governance/Services\SpendApprovalCommandService.php:776:    protected function audit(string $action, int $approvalId, array $metadata = []): void
+app/Domain/Governance/Models\ComplianceReminder.php:34:    public function obligation(): BelongsTo
+app/Domain/Governance/Models\ComplianceReminder.php:39:    public function scopePending($query)
+app/Domain/Governance/Models\ComplianceReminder.php:44:    public function scopeDue($query)
+app/Domain/Governance/Models\ComplianceReminder.php:50:    public function markSent(): void
+app/Domain/Governance/Models\ComplianceReminder.php:58:    public function markFailed(string $error): void
+app/Domain/Governance/Models\ComplianceReminder.php:66:    public function markAcknowledged(): void
+app/Domain/Governance/Models\ComplianceObligation.php:33:        'completed_at',
+app/Domain/Governance/Models\ComplianceObligation.php:34:        'completed_by',
+app/Domain/Governance/Models\ComplianceObligation.php:47:        'completed_at' => 'datetime',
+app/Domain/Governance/Models\ComplianceObligation.php:64:    public function updateStatus(): void
+app/Domain/Governance/Models\ComplianceObligation.php:81:    public function owner(): BelongsTo
+app/Domain/Governance/Models\ComplianceObligation.php:92:    public function workforceRequirement(): BelongsTo
+app/Domain/Governance/Models\ComplianceObligation.php:97:    public function completedBy(): BelongsTo
+app/Domain/Governance/Models\ComplianceObligation.php:99:        return $this->belongsTo(User::class, 'completed_by');
+app/Domain/Governance/Models\ComplianceObligation.php:102:    public function signedOffBy(): BelongsTo
+app/Domain/Governance/Models\ComplianceObligation.php:107:    public function evidence(): HasMany
+app/Domain/Governance/Models\ComplianceObligation.php:112:    public function reminders(): HasMany
+app/Domain/Governance/Models\ComplianceObligation.php:117:    public function scopeByFramework($query, string $framework)
+app/Domain/Governance/Models\ComplianceObligation.php:122:    public function scopeOverdue($query)
+app/Domain/Governance/Models\ComplianceObligation.php:127:    public function scopeDueSoon($query, int $days = 30)
+app/Domain/Governance/Models\ComplianceObligation.php:133:    public function scopeForOwner($query, int $userId)
+app/Domain/Governance/Models\ComplianceObligation.php:138:    public function isComplete(): bool
+app/Domain/Governance/Models\ComplianceObligation.php:143:    public function isOverdue(): bool
+app/Domain/Governance/Models\ComplianceObligation.php:148:    public function isDueSoon(int $days = 7): bool
+app/Domain/Governance/Models\ComplianceObligation.php:153:    public function markComplete(int $userId): void
+app/Domain/Governance/Models\ComplianceObligation.php:157:            'completed_at' => now(),
+app/Domain/Governance/Models\ComplianceObligation.php:158:            'completed_by' => $userId,
+app/Domain/Governance/Models\ComplianceObligation.php:162:    public function signOff(int $userId): void
+app/Domain/Governance/Models\ComplianceObligation.php:170:    public function getFrameworkLabel(): string
+app/Domain/Governance/Models\ConflictDeclaration.php:35:    public function meeting(): BelongsTo
+app/Domain/Governance/Models\ConflictDeclaration.php:40:    public function resolution(): BelongsTo
+app/Domain/Governance/Models\ConflictDeclaration.php:45:    public function boardMember(): BelongsTo
+app/Domain/Governance/Models\ConflictDeclaration.php:50:    public function recordedBy(): BelongsTo
+app/Domain/Governance/Models\ConflictDeclaration.php:55:    public function isMaterial(): bool
+app/Domain/Governance/Models\ConflictDeclaration.php:60:    public function isRelated(): bool
+app/Domain/Governance/Models\ConflictDeclaration.php:65:    public function isPrejudicial(): bool
+app/Domain/Governance/Models\ConflictDeclaration.php:70:    public function preventsVoting(): bool
+app/Domain/Governance/Models\DashboardSnapshot.php:35:    public function capturedBy(): BelongsTo
+app/Domain/Governance/Models\DashboardSnapshot.php:40:    public function boardPack(): HasOne
+app/Domain/Governance/Models\DashboardSnapshot.php:50:    public function verifyIntegrity(): bool
+app/Domain/Governance/Models\DashboardSnapshot.php:56:    public function getWidgetData(string $widget): ?array
+app/Domain/Governance/Models\DashboardSnapshot.php:61:    public function scopeForPeriod($query, string $type, string $start, string $end)
+app/Domain/Governance/Models\DashboardSnapshot.php:68:    public function scopeLatest($query)
+app/Domain/Governance/Models\EvidenceLibrary.php:31:    public function uploadedBy(): BelongsTo
+app/Domain/Governance/Models\EvidenceLibrary.php:36:    public function obligations(): BelongsToMany
+app/Domain/Governance/Models\EvidenceLibrary.php:46:    public function isValid(): bool
+app/Domain/Governance/Models\EvidenceLibrary.php:51:    public function isExpiring(int $days = 30): bool
+app/Domain/Governance/Models\EvidenceLibrary.php:56:    public function scopeValid($query)
+app/Domain/Governance/Models\EvidenceLibrary.php:63:    public function scopeExpiring($query, int $days = 30)
+app/Domain/Governance/Models\GovernanceDocument.php:27:    public function uploadedBy(): BelongsTo
+app/Domain/Governance/Models\GovernanceDocument.php:32:    public function supersedes(): BelongsTo
+app/Domain/Governance/Models\GovernanceDocument.php:37:    public function scopeCurrent($query)
+app/Domain/Governance/Models\GovernanceDocument.php:42:    public function scopeByType($query, string $type)
+app/Domain/Governance/Models\GovernanceDocument.php:47:    public function scopeByCategory($query, string $category)
+app/Domain/Governance/Models\GovernanceFeedbackEscalation.php:25:    public function assignedTo(): BelongsTo
+app/Domain/Governance/Models\GovernanceFeedbackEscalation.php:30:    public function escalatedBy(): BelongsTo
+app/Domain/Governance/Models\GovernanceFeedbackEscalation.php:35:    public function resolvedBy(): BelongsTo
+app/Domain/Governance/Models\GovernanceFeedbackEscalation.php:40:    public function scopeOpen($query)
+app/Domain/Governance/Models\GovernanceFeedbackEscalation.php:45:    public function scopeCritical($query)
+app/Domain/Governance/Models\GovernanceFeedbackEscalation.php:50:    public function resolve(int $userId, string $notes): void
+app/Domain/Governance/Models\GovernanceFeedbackEscalation.php:60:    public function escalateToBoard(int $userId): void
+app/Domain/Governance/Models\GovernancePolicy.php:36:    public function owner(): BelongsTo
+app/Domain/Governance/Models\GovernancePolicy.php:41:    public function approvedBy(): BelongsTo
+app/Domain/Governance/Models\GovernancePolicy.php:46:    public function creator(): BelongsTo
+app/Domain/Governance/Models\GovernancePolicy.php:51:    public function approvalResolution(): BelongsTo
+app/Domain/Governance/Models\GovernancePolicy.php:56:    public function supersedes(): BelongsTo
+app/Domain/Governance/Models\GovernancePolicy.php:61:    public function attestations(): HasMany
+app/Domain/Governance/Models\GovernancePolicy.php:66:    public function scopeActive($query)
+app/Domain/Governance/Models\GovernancePolicy.php:71:    public function scopeByCategory($query, string $category)
+app/Domain/Governance/Models\GovernancePolicy.php:76:    public function scopeReviewDue($query)
+app/Domain/Governance/Models\GovernancePolicy.php:82:    public function isDraft(): bool
+app/Domain/Governance/Models\GovernancePolicy.php:87:    public function isApproved(): bool
+app/Domain/Governance/Models\GovernancePolicy.php:92:    public function approve(int $userId, ?int $resolutionId = null): void
+app/Domain/Governance/Models\GovernancePolicy.php:104:    public function createNewVersion(int $userId): self
+app/Domain/Governance/Models\GovernanceMeeting.php:68:    public function committee(): BelongsTo
+app/Domain/Governance/Models\GovernanceMeeting.php:73:    public function chair(): BelongsTo
+app/Domain/Governance/Models\GovernanceMeeting.php:78:    public function secretary(): BelongsTo
+app/Domain/Governance/Models\GovernanceMeeting.php:83:    public function creator(): BelongsTo
+app/Domain/Governance/Models\GovernanceMeeting.php:88:    public function agendaItems(): HasMany
+app/Domain/Governance/Models\GovernanceMeeting.php:93:    public function attendances(): HasMany
+app/Domain/Governance/Models\GovernanceMeeting.php:98:    public function minutes(): HasOne
+app/Domain/Governance/Models\GovernanceMeeting.php:103:    public function boardPack(): HasOne
+app/Domain/Governance/Models\GovernanceMeeting.php:108:    public function resolutions(): HasMany
+app/Domain/Governance/Models\GovernanceMeeting.php:113:    public function conflictDeclarations(): HasMany
+app/Domain/Governance/Models\GovernanceMeeting.php:118:    public function recurringSchedule(): BelongsTo
+app/Domain/Governance/Models\GovernanceMeeting.php:123:    public function rsvps(): HasMany
+app/Domain/Governance/Models\GovernanceMeeting.php:128:    public function ceoReport(): HasOne
+app/Domain/Governance/Models\GovernanceMeeting.php:133:    public function scopeUpcoming($query)
+app/Domain/Governance/Models\GovernanceMeeting.php:140:    public function scopePast($query)
+app/Domain/Governance/Models\GovernanceMeeting.php:146:    public function scopeByType($query, string $type)
+app/Domain/Governance/Models\GovernanceMeeting.php:151:    public function isFullBoard(): bool
+app/Domain/Governance/Models\GovernanceMeeting.php:156:    public function isCommittee(): bool
+app/Domain/Governance/Models\GovernanceMeeting.php:161:    public function isExecutiveSession(): bool
+app/Domain/Governance/Models\GovernanceMeeting.php:166:    public function isDraft(): bool
+app/Domain/Governance/Models\GovernanceMeeting.php:171:    public function isEditable(): bool
+app/Domain/Governance/Models\GovernanceMeeting.php:176:    public function canDistributePack(): bool
+app/Domain/Governance/Models\GovernanceMeeting.php:181:    public function isLocked(): bool
+app/Domain/Governance/Models\GovernanceMeeting.php:186:    public function lock(int $userId): void
+app/Domain/Governance/Models\GovernanceMeeting.php:194:    public function calculateQuorum(): array
+app/Domain/Governance/Models\GovernanceMeeting.php:207:    public function updateQuorumStatus(): void
+app/Domain/Governance/Models\GovernanceMeeting.php:213:    public function advanceStatus(string $newStatus): bool
+app/Domain/Governance/Models\GovernanceMeeting.php:235:    public function generateMinutesSkeleton(): array
+app/Domain/Governance/Models\GovernanceMeeting.php:253:    public function autoAdvanceStatus(): bool
+app/Domain/Governance/Models\IncidentGovernanceEscalation.php:27:    public function notifiableIncident(): BelongsTo
+app/Domain/Governance/Models\IncidentGovernanceEscalation.php:32:    public function riskEntry(): BelongsTo
+app/Domain/Governance/Models\IncidentGovernanceEscalation.php:37:    public function notifiedChairUser(): BelongsTo
+app/Domain/Governance/Models\IncidentGovernanceEscalation.php:42:    public function notifiedCeoUser(): BelongsTo
+app/Domain/Governance/Models\IncidentGovernanceEscalation.php:47:    public function acknowledgedBy(): BelongsTo
+app/Domain/Governance/Models\IncidentGovernanceEscalation.php:52:    public function scopePending($query)
+app/Domain/Governance/Models\IncidentGovernanceEscalation.php:57:    public function acknowledge(int $userId, ?string $action = null): void
+app/Domain/Governance/Models\MeetingAttendance.php:38:    public function meeting(): BelongsTo
+app/Domain/Governance/Models\MeetingAttendance.php:43:    public function boardMember(): BelongsTo
+app/Domain/Governance/Models\MeetingAttendance.php:48:    public function markedBy(): BelongsTo
+app/Domain/Governance/Models\MeetingAttendance.php:53:    public function isPresent(): bool
+app/Domain/Governance/Models\MeetingAttendance.php:58:    public function isApology(): bool
+app/Domain/Governance/Models\MeetingAttendance.php:63:    public function isNoShow(): bool
+app/Domain/Governance/Models\MeetingAttendance.php:68:    public function scopePresent($query)
+app/Domain/Governance/Models\MeetingAttendance.php:73:    public function scopeApologies($query)
+app/Domain/Governance/Models\MeetingAgendaItem.php:33:    public function meeting(): BelongsTo
+app/Domain/Governance/Models\MeetingAgendaItem.php:38:    public function presenter(): BelongsTo
+app/Domain/Governance/Models\MeetingAgendaItem.php:43:    public function resolution(): BelongsTo
+app/Domain/Governance/Models\MeetingAgendaItem.php:48:    public function isDecision(): bool
+app/Domain/Governance/Models\MeetingAgendaItem.php:53:    public function isConsent(): bool
+app/Domain/Governance/Models\MeetingAgendaItem.php:58:    public function isConfidential(): bool
+app/Domain/Governance/Models\NotifiableIncident.php:60:    public function submittedBy(): BelongsTo
+app/Domain/Governance/Models\NotifiableIncident.php:65:    public function notifiedBy(): BelongsTo
+app/Domain/Governance/Models\NotifiableIncident.php:70:    public function closedByUser(): BelongsTo
+app/Domain/Governance/Models\NotifiableIncident.php:75:    public function sitePreservationReleasedBy(): BelongsTo
+app/Domain/Governance/Models\NotifiableIncident.php:80:    public function closureCertifiedBy(): BelongsTo
+app/Domain/Governance/Models\NotifiableIncident.php:85:    public function relatedIncident(): BelongsTo
+app/Domain/Governance/Models\NotifiableIncident.php:90:    public function workplaceInjury(): BelongsTo
+app/Domain/Governance/Models\NotifiableIncident.php:95:    public function isPending(): bool
+app/Domain/Governance/Models\NotifiableIncident.php:100:    public function isNotified(): bool
+app/Domain/Governance/Models\NotifiableIncident.php:105:    public function markNotified(int $userId, ?string $reference = null): void
+app/Domain/Governance/Models\NotifiableIncident.php:115:    public function close(int $userId, string $outcome): void
+app/Domain/Governance/Models\NotifiableIncident.php:125:    public function getAuthorityLabel(): string
+app/Domain/Governance/Models\NotifiableIncident.php:136:    public function getIncidentTypeLabel(): string
+app/Domain/Governance/Models\MeetingRsvp.php:24:    public function meeting(): BelongsTo
+app/Domain/Governance/Models\MeetingRsvp.php:29:    public function boardMember(): BelongsTo
+app/Domain/Governance/Models\MeetingRsvp.php:34:    public function isAccepted(): bool
+app/Domain/Governance/Models\MeetingRsvp.php:39:    public function isDeclined(): bool
+app/Domain/Governance/Models\MeetingRsvp.php:44:    public function isTentative(): bool
+app/Domain/Governance/Models\MeetingMinute.php:37:    public function meeting(): BelongsTo
+app/Domain/Governance/Models\MeetingMinute.php:42:    public function draftedBy(): BelongsTo
+app/Domain/Governance/Models\MeetingMinute.php:47:    public function reviewedBy(): BelongsTo
+app/Domain/Governance/Models\MeetingMinute.php:52:    public function approvalResolution(): BelongsTo
+app/Domain/Governance/Models\MeetingMinute.php:57:    public function isDraft(): bool
+app/Domain/Governance/Models\MeetingMinute.php:62:    public function isUnderReview(): bool
+app/Domain/Governance/Models\MeetingMinute.php:67:    public function isApproved(): bool
+app/Domain/Governance/Models\MeetingMinute.php:72:    public function isSigned(): bool
+app/Domain/Governance/Models\MeetingMinute.php:77:    public function isArchived(): bool
+app/Domain/Governance/Models\MeetingMinute.php:82:    public function canEdit(): bool
+app/Domain/Governance/Models\MeetingMinute.php:87:    public function incrementVersion(): void
+app/Domain/Governance/Models\MeetingMinute.php:104:    public function advanceStatus(string $newStatus, int $userId): bool
+app/Domain/Governance/Models\MeetingMinute.php:139:    public function sign(int $userId): bool
+app/Domain/Governance/Models\MeetingMinute.php:144:    public function archive(): bool
+app/Domain/Governance/Models\PerformanceReview.php:42:    public function reviewee(): BelongsTo
+app/Domain/Governance/Models\PerformanceReview.php:47:    public function creator(): BelongsTo
+app/Domain/Governance/Models\PerformanceReview.php:52:    public function approvalResolution(): BelongsTo
+app/Domain/Governance/Models\PerformanceReview.php:57:    public function goals(): HasMany
+app/Domain/Governance/Models\PerformanceReview.php:62:    public function kpis(): HasMany
+app/Domain/Governance/Models\PerformanceReview.php:67:    public function feedback(): HasMany
+app/Domain/Governance/Models\PerformanceReview.php:72:    public function getFeedbackSummary(): array
+app/Domain/Governance/Models\PerformanceReview.php:89:    public function scopeByReviewee($query, int $userId)
+app/Domain/Governance/Models\PerformanceReview.php:94:    public function scopeActive($query)
+app/Domain/Governance/Models\PerformanceReview.php:96:        return $query->where('status', '!=', 'completed');
+app/Domain/Governance/Models\PerformanceReview.php:99:    public function scopeAnnual($query)
+app/Domain/Governance/Models\PerformanceReview.php:104:    public function isDrafting(): bool
+app/Domain/Governance/Models\PerformanceReview.php:109:    public function isSelfReview(): bool
+app/Domain/Governance/Models\PerformanceReview.php:114:    public function isCompleted(): bool
+app/Domain/Governance/Models\PerformanceReview.php:116:        return $this->status === 'completed';
+app/Domain/Governance/Models\PerformanceReview.php:119:    public function getWeightedScore(): ?float
+app/Domain/Governance/Models\PerformanceReview.php:135:    public function submitSelfAssessment(string $assessment): void
+app/Domain/Governance/Models\PerformanceReview.php:144:    public function approve(?int $resolutionId = null): void
+app/Domain/Governance/Models\PerformanceReview.php:147:            'status' => 'completed',
+app/Domain/Governance/Models\PerformanceKpi.php:40:    public function performanceReview(): BelongsTo
+app/Domain/Governance/Models\PerformanceKpi.php:45:    public function scopeByPillar($query, string $pillar)
+app/Domain/Governance/Models\PerformanceKpi.php:50:    public function scopeAutomated($query)
+app/Domain/Governance/Models\PerformanceKpi.php:55:    public function scopeNeedsSync($query)
+app/Domain/Governance/Models\PerformanceKpi.php:64:    public function syncFromDataSource(): void
+app/Domain/Governance/Models\PerformanceKpi.php:80:    protected function fetchValueFromSource(): mixed
+app/Domain/Governance/Models\PerformanceKpi.php:87:    public function getVariance(): ?float
+app/Domain/Governance/Models\PerformanceKpi.php:95:    public function getVariancePercentage(): ?float
+app/Domain/Governance/Models\PerformanceGoal.php:36:    public function performanceReview(): BelongsTo
+app/Domain/Governance/Models\PerformanceGoal.php:41:    public function scopeByPillar($query, string $pillar)
+app/Domain/Governance/Models\PerformanceGoal.php:46:    public function isAchieved(): bool
+app/Domain/Governance/Models\PerformanceGoal.php:51:    public function isMissed(): bool
+app/Domain/Governance/Models\PerformanceGoal.php:56:    public function getAchievementPercentage(): float
+app/Domain/Governance/Models\PerformanceFeedback.php:35:    public function review(): BelongsTo
+app/Domain/Governance/Models\PerformanceFeedback.php:40:    public function reviewer(): BelongsTo
+app/Domain/Governance/Models\PerformanceFeedback.php:45:    public function isSubmitted(): bool
+app/Domain/Governance/Models\PerformanceFeedback.php:50:    public function submit(): void
+app/Domain/Governance/Models\PerformanceFeedback.php:55:    public function getAverageRating(): ?float
+app/Domain/Governance/Models\RiskAcceptance.php:28:        'review_completed',
+app/Domain/Governance/Models\RiskAcceptance.php:37:        'review_completed' => 'boolean',
+app/Domain/Governance/Models\RiskAcceptance.php:41:    public function risk(): BelongsTo
+app/Domain/Governance/Models\RiskAcceptance.php:46:    public function resolution(): BelongsTo
+app/Domain/Governance/Models\RiskAcceptance.php:51:    public function acceptedBy(): BelongsTo
+app/Domain/Governance/Models\RiskAcceptance.php:56:    public function isBoardResolution(): bool
+app/Domain/Governance/Models\RiskAcceptance.php:61:    public function isDelegated(): bool
+app/Domain/Governance/Models\RiskAcceptance.php:66:    public function isExpired(): bool
+app/Domain/Governance/Models\RiskAcceptance.php:71:    public function isExpiringSoon(int $days = 30): bool
+app/Domain/Governance/Models\RiskAcceptance.php:76:    public function scopeActive($query)
+app/Domain/Governance/Models\RiskAcceptance.php:81:    public function scopeExpiring($query, int $days = 30)
+app/Domain/Governance/Models\RiskAcceptance.php:86:    public function completeReview(): void
+app/Domain/Governance/Models\RiskAcceptance.php:89:            'review_completed' => true,
+app/Domain/Governance/Models\Resolution.php:77:    public function meeting(): BelongsTo
+app/Domain/Governance/Models\Resolution.php:82:    public function proposedBy(): BelongsTo
+app/Domain/Governance/Models\Resolution.php:87:    public function votes(): HasMany
+app/Domain/Governance/Models\Resolution.php:92:    public function conflictDeclarations(): HasMany
+app/Domain/Governance/Models\Resolution.php:97:    public function agendaItem(): HasMany
+app/Domain/Governance/Models\Resolution.php:102:    public function isDraft(): bool
+app/Domain/Governance/Models\Resolution.php:107:    public function isOpen(): bool
+app/Domain/Governance/Models\Resolution.php:112:    public function isClosed(): bool
+app/Domain/Governance/Models\Resolution.php:117:    public function isOverdue(): bool
+app/Domain/Governance/Models\Resolution.php:122:    public function openForVoting(?\DateTime $deadline = null): void
+app/Domain/Governance/Models\Resolution.php:131:    public function closeVoting(?array $quorumSnapshot = null): void
+app/Domain/Governance/Models\Resolution.php:179:    public function generateActionItems(): void
+app/Domain/Governance/Models\Resolution.php:195:    public function actionItems(): HasMany
+app/Domain/Governance/Models\Resolution.php:200:    public function markImplemented(?string $notes = null): void
+app/Domain/Governance/Models\Resolution.php:208:    public function markArchived(?string $notes = null): void
+app/Domain/Governance/Models\Resolution.php:216:    public function calculateVoteSummary(): array
+app/Domain/Governance/Models\Resolution.php:228:    public function determineOutcome(array $summary, ?bool $isQuorumMet = null): string
+app/Domain/Governance/Models\Resolution.php:249:    public function hasBoardMemberVoted(int $boardMemberId): bool
+app/Domain/Governance/Models\Resolution.php:254:    public function getBoardMemberVote(int $boardMemberId): ?Vote
+app/Domain/Governance/Models\RecurringMeetingSchedule.php:30:    public function meetings(): HasMany
+app/Domain/Governance/Models\RecurringMeetingSchedule.php:35:    public function creator(): BelongsTo
+app/Domain/Governance/Models\RecurringMeetingSchedule.php:40:    public function scopeActive($query)
+app/Domain/Governance/Models\RecurringMeetingSchedule.php:45:    public function generateTitle(Carbon $date): string
+app/Domain/Governance/Models\RecurringMeetingSchedule.php:54:    public function getNextDates(int $count = 6): array
+app/Domain/Governance/Models\RecurringMeetingSchedule.php:80:    public function createMeetingForDate(Carbon $date): GovernanceMeeting
+app/Domain/Governance/Models\PolicyAttestation.php:23:    public function policy(): BelongsTo
+app/Domain/Governance/Models\PolicyAttestation.php:28:    public function user(): BelongsTo
+app/Domain/Governance/Models\PolicyAttestation.php:33:    public function acknowledge(): void
+app/Domain/Governance/Models\RiskTreatment.php:25:        'completed_at',
+app/Domain/Governance/Models\RiskTreatment.php:26:        'completed_by',
+app/Domain/Governance/Models\RiskTreatment.php:38:        'completed_at' => 'datetime',
+app/Domain/Governance/Models\RiskTreatment.php:45:    public function risk(): BelongsTo
+app/Domain/Governance/Models\RiskTreatment.php:50:    public function assignedTo(): BelongsTo
+app/Domain/Governance/Models\RiskTreatment.php:55:    public function completedBy(): BelongsTo
+app/Domain/Governance/Models\RiskTreatment.php:57:        return $this->belongsTo(User::class, 'completed_by');
+app/Domain/Governance/Models\RiskTreatment.php:60:    public function createdBy(): BelongsTo
+app/Domain/Governance/Models\RiskTreatment.php:65:    public function scopeActive($query)
+app/Domain/Governance/Models\RiskTreatment.php:70:    public function scopeOverdue($query)
+app/Domain/Governance/Models\RiskTreatment.php:76:    public function isPlanned(): bool
+app/Domain/Governance/Models\RiskTreatment.php:81:    public function isInProgress(): bool
+app/Domain/Governance/Models\RiskTreatment.php:86:    public function isComplete(): bool
+app/Domain/Governance/Models\RiskTreatment.php:91:    public function start(): void
+app/Domain/Governance/Models\RiskTreatment.php:99:    public function complete(int $userId, ?string $evidence = null): void
+app/Domain/Governance/Models\RiskTreatment.php:103:            'completed_at' => now(),
+app/Domain/Governance/Models\RiskTreatment.php:104:            'completed_by' => $userId,
+app/Domain/Governance/Models\StrategicPlan.php:42:    public function creator(): BelongsTo
+app/Domain/Governance/Models\StrategicPlan.php:47:    public function approvalResolution(): BelongsTo
+app/Domain/Governance/Models\StrategicPlan.php:52:    public function supersedes(): BelongsTo
+app/Domain/Governance/Models\StrategicPlan.php:57:    public function goals(): HasMany
+app/Domain/Governance/Models\StrategicPlan.php:62:    public function scopeActive($query)
+app/Domain/Governance/Models\StrategicPlan.php:67:    public function scopeDraft($query)
+app/Domain/Governance/Models\StrategicPlan.php:72:    public function isDraft(): bool
+app/Domain/Governance/Models\StrategicPlan.php:77:    public function isApproved(): bool
+app/Domain/Governance/Models\StrategicPlan.php:82:    public function isArchived(): bool
+app/Domain/Governance/Models\StrategicPlan.php:87:    public function approve(int $resolutionId): void
+app/Domain/Governance/Models\StrategicPlan.php:96:    public function archive(): void
+app/Domain/Governance/Models\StrategicPlan.php:101:    public function getProgressPercentage(): float
+app/Domain/Governance/Models\StrategicPlan.php:110:    public function createNewVersion(string $notes, int $userId): self
+app/Domain/Governance/Models\StrategicPlan.php:138:    public function captureSnapshot(): void
+app/Domain/Governance/Models\StrategicPlan.php:148:        $this->update(['last_snapshot' => $snapshot]);
+app/Domain/Governance/Models\StrategicPlan.php:154:    public function getChangesSinceLastSnapshot(): array
+app/Domain/Governance/Models\StrategicPlan.php:156:        if (empty($this->last_snapshot)) {
+app/Domain/Governance/Models\StrategicPlan.php:160:        $previous = collect($this->last_snapshot)->keyBy('id');
+app/Domain/Governance/Models\RiskAppetiteSetting.php:23:    public function approvedBy(): BelongsTo
+app/Domain/Governance/Models\RiskAppetiteSetting.php:28:    public function approvalResolution(): BelongsTo
+app/Domain/Governance/Models\RiskEventLink.php:49:    public function risk(): BelongsTo
+app/Domain/Governance/Models\RiskEventLink.php:54:    public function linkedBy(): BelongsTo
+app/Domain/Governance/Models\RiskEventLink.php:59:    public function event()
+app/Domain/Governance/Models\RiskEventLink.php:74:    public function scopeByType($query, string $type)
+app/Domain/Governance/Models\RiskEventLink.php:79:    public function scopeRecent($query)
+app/Domain/Governance/Models\SpendApproval.php:79:    public function source(): MorphTo
+app/Domain/Governance/Models\SpendApproval.php:84:    public function requestedBy(): BelongsTo
+app/Domain/Governance/Models\SpendApproval.php:89:    public function decidedBy(): BelongsTo
+app/Domain/Governance/Models\SpendApproval.php:94:    public function submittedBy(): BelongsTo
+app/Domain/Governance/Models\SpendApproval.php:99:    public function site(): BelongsTo
+app/Domain/Governance/Models\SpendApproval.php:104:    public function costCentre(): BelongsTo
+app/Domain/Governance/Models\SpendApproval.php:109:    public function fundingStream(): BelongsTo
+app/Domain/Governance/Models\SpendApproval.php:114:    public function donorFund(): BelongsTo
+app/Domain/Governance/Models\SpendApproval.php:119:    public function resolution(): BelongsTo
+app/Domain/Governance/Models\SpendApproval.php:124:    public function budget(): BelongsTo
+app/Domain/Governance/Models\SpendApproval.php:129:    public function budgetLineItem(): BelongsTo
+app/Domain/Governance/Models\SpendApproval.php:134:    public function decisions(): HasMany
+app/Domain/Governance/Models\SpendApproval.php:139:    public function isPending(): bool
+app/Domain/Governance/Models\SpendApproval.php:144:    public function isDecided(): bool
+app/Domain/Governance/Models\SpendApproval.php:149:    public function decisionContentDigest(?array $sourceEvidence = null): string
+app/Domain/Governance/Models\RiskRegisterEntry.php:82:    public function calculateScores(): void
+app/Domain/Governance/Models\RiskRegisterEntry.php:97:    public function riskOwner(): BelongsTo
+app/Domain/Governance/Models\RiskRegisterEntry.php:102:    public function identifiedBy(): BelongsTo
+app/Domain/Governance/Models\RiskRegisterEntry.php:107:    public function closedBy(): BelongsTo
+app/Domain/Governance/Models\RiskRegisterEntry.php:112:    public function events(): HasMany
+app/Domain/Governance/Models\RiskRegisterEntry.php:117:    public function treatments(): HasMany
+app/Domain/Governance/Models\RiskRegisterEntry.php:122:    public function acceptances(): HasMany
+app/Domain/Governance/Models\RiskRegisterEntry.php:127:    public function scopeActive($query)
+app/Domain/Governance/Models\RiskRegisterEntry.php:132:    public function scopeCritical($query)
+app/Domain/Governance/Models\RiskRegisterEntry.php:137:    public function scopeHigh($query)
+app/Domain/Governance/Models\RiskRegisterEntry.php:142:    public function scopeByCategory($query, string $category)
+app/Domain/Governance/Models\RiskRegisterEntry.php:147:    public function scopeAboveAppetite($query)
+app/Domain/Governance/Models\RiskRegisterEntry.php:152:    public function scopeReviewDue($query)
+app/Domain/Governance/Models\RiskRegisterEntry.php:157:    public function isCritical(): bool
+app/Domain/Governance/Models\RiskRegisterEntry.php:162:    public function isHigh(): bool
+app/Domain/Governance/Models\RiskRegisterEntry.php:167:    public function isMedium(): bool
+app/Domain/Governance/Models\RiskRegisterEntry.php:172:    public function isLow(): bool
+app/Domain/Governance/Models\RiskRegisterEntry.php:177:    public function requiresBoardAcceptance(): bool
+app/Domain/Governance/Models\RiskRegisterEntry.php:182:    public function close(string $reason, int $userId): void
+app/Domain/Governance/Models\RiskRegisterEntry.php:192:    public function getSeverityColor(): string
+app/Domain/Governance/Models\TeTiritiObligation.php:31:    public function owner(): BelongsTo
+app/Domain/Governance/Models\TeTiritiObligation.php:36:    public function scopeByPrinciple($query, string $principle)
+app/Domain/Governance/Models\TeTiritiObligation.php:41:    public function scopeInProgress($query)
+app/Domain/Governance/Models\TeTiritiObligation.php:46:    public function getPrincipleLabel(): string
+app/Domain/Governance/Models\StrategicInitiative.php:41:    public function strategicGoal(): BelongsTo
+app/Domain/Governance/Models\StrategicInitiative.php:46:    public function owner(): BelongsTo
+app/Domain/Governance/Models\StrategicInitiative.php:51:    public function scopeByStatus($query, string $status)
+app/Domain/Governance/Models\StrategicInitiative.php:56:    public function scopeOverdue($query)
+app/Domain/Governance/Models\StrategicInitiative.php:62:    public function isPlanning(): bool
+app/Domain/Governance/Models\StrategicInitiative.php:67:    public function isInProgress(): bool
+app/Domain/Governance/Models\StrategicInitiative.php:72:    public function isComplete(): bool
+app/Domain/Governance/Models\StrategicInitiative.php:77:    public function isOnHold(): bool
+app/Domain/Governance/Models\StrategicInitiative.php:82:    public function isOverdue(): bool
+app/Domain/Governance/Models\StrategicInitiative.php:89:    public function getBudgetVariance(): float
+app/Domain/Governance/Models\StrategicInitiative.php:94:    public function getBudgetUtilization(): float
+app/Domain/Governance/Models\StrategicInitiative.php:102:    public function complete(): void
+app/Domain/Governance/Models\StrategicGoal.php:37:    public function strategicPlan(): BelongsTo
+app/Domain/Governance/Models\StrategicGoal.php:42:    public function leadExecutive(): BelongsTo
+app/Domain/Governance/Models\StrategicGoal.php:47:    public function initiatives(): HasMany
+app/Domain/Governance/Models\StrategicGoal.php:52:    public function scopeByPillar($query, string $pillar)
+app/Domain/Governance/Models\StrategicGoal.php:57:    public function scopeByTimeframe($query, string $timeframe)
+app/Domain/Governance/Models\StrategicGoal.php:62:    public function scopeActive($query)
+app/Domain/Governance/Models\StrategicGoal.php:67:    public function isNotStarted(): bool
+app/Domain/Governance/Models\StrategicGoal.php:72:    public function isInProgress(): bool
+app/Domain/Governance/Models\StrategicGoal.php:77:    public function isAchieved(): bool
+app/Domain/Governance/Models\StrategicGoal.php:82:    public function isAtRisk(): bool
+app/Domain/Governance/Models\StrategicGoal.php:87:    public function updateProgress(): void
+app/Domain/Governance/Models\StrategicGoal.php:95:        $completed = $initiatives->where('status', 'complete')->count();
+app/Domain/Governance/Models\StrategicGoal.php:98:        $this->progress_pct = $total > 0 ? ($completed / $total) * 100 : 0;
+app/Domain/Governance/Models\Vote.php:32:    public function resolution(): BelongsTo
+app/Domain/Governance/Models\Vote.php:37:    public function boardMember(): BelongsTo
+app/Domain/Governance/Models\Vote.php:42:    public function recordedBy(): BelongsTo
+app/Domain/Governance/Models\Vote.php:47:    public function isFor(): bool
+app/Domain/Governance/Models\Vote.php:52:    public function isAgainst(): bool
+app/Domain/Governance/Models\Vote.php:57:    public function isAbstain(): bool
+app/Domain/Governance/Models\Vote.php:62:    public function generateHash(): string
+app/Domain/Governance/Models\Vote.php:73:    public function verifyIntegrity(): bool
+app/Domain/Governance/Models\SpendApprovalDecision.php:32:    public function approval(): BelongsTo

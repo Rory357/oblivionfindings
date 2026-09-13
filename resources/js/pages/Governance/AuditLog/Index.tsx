@@ -120,6 +120,7 @@ export default function GovernanceAuditLogIndex({
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Audit Log', href: '/governance/audit-log' },
             ]}

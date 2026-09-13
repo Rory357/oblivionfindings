@@ -22,7 +22,7 @@ use Illuminate\Support\Str;
 
 final class ItProvisioningWorkflowService
 {
-    public function resolveTemplate(HrEmployeeProfile $profile, string $lifecycleType): ?ItProvisioningTemplate
+    public function resolveTemplate(HrEmployeeProfile $profile, string $lifecycleType, bool $lock = false): ?ItProvisioningTemplate
     {
         if (! in_array($lifecycleType, ItProvisioningTemplate::LIFECYCLE_TYPES, true)) {
             throw new DomainException('Unsupported provisioning lifecycle type.');
@@ -41,6 +41,8 @@ final class ItProvisioningWorkflowService
                 ->whereNull('employment_type')
                 ->orWhere('employment_type', $profile->employment_type))
             ->with('tasks')
+            ->when($lock, fn ($query) => $query->lockForUpdate())
+            ->orderBy('id')
             ->get()
             ->sortByDesc(fn (ItProvisioningTemplate $template) => [
                 $this->specificity($template, $profile),
@@ -77,11 +79,6 @@ final class ItProvisioningWorkflowService
             return $this->loaded($existing);
         }
 
-        $template = $this->resolveTemplate($profile, $lifecycleType);
-        if (! $template) {
-            throw new DomainException("No active {$lifecycleType} provisioning template matches this employee.");
-        }
-
         return DB::transaction(function () use (
             $profile,
             $lifecycleType,
@@ -93,7 +90,6 @@ final class ItProvisioningWorkflowService
             $changes,
             $onboardingChecklist,
             $offboardingChecklist,
-            $template,
         ): ItProvisioningWorkflow {
             $locked = ItProvisioningWorkflow::query()
                 ->where('source_event_key', $sourceEventKey)
@@ -103,6 +99,13 @@ final class ItProvisioningWorkflowService
                 return $this->loaded($locked);
             }
 
+            // Resolve and copy under the same parent locks used by template
+            // editing; an edit cannot replace tasks halfway through launch.
+            $template = $this->resolveTemplate($profile, $lifecycleType, lock: true);
+            if (! $template) {
+                throw new DomainException("No active {$lifecycleType} provisioning template matches this employee.");
+            }
+            $version = app(ItProvisioningTemplateVersionService::class)->current($template);
             $profile->loadMissing(['primarySite:id,name', 'user:id,name,email', 'manager:id,name']);
             $effective = $this->effectiveAt($profile, $lifecycleType, $effectiveAt, $offboardingChecklist);
             $safeChanges = array_intersect_key($changes, array_flip(ItProvisioningTemplateTask::TRIGGER_FIELDS));
@@ -110,6 +113,7 @@ final class ItProvisioningWorkflowService
             $workflow = ItProvisioningWorkflow::query()->create([
                 'employee_profile_id' => $profile->id,
                 'provisioning_template_id' => $template->id,
+                'template_version_id' => $version->id,
                 'lifecycle_type' => $lifecycleType,
                 'source_type' => $sourceType,
                 'source_id' => $sourceId,
@@ -169,11 +173,12 @@ final class ItProvisioningWorkflowService
                 'source_type' => $sourceType,
                 'source_id' => $sourceId,
                 'template_id' => $template->id,
+                'template_version_id' => $version->id,
                 'request_count' => $workflow->requests()->count(),
             ]);
 
             return $this->loaded($workflow);
-        });
+        }, 3);
     }
 
     public function tryLaunchFromOnboarding(HrOnboardingChecklist $checklist, int $actorId): ?ItProvisioningWorkflow
@@ -485,6 +490,7 @@ final class ItProvisioningWorkflowService
     {
         return $workflow->load([
             'template:id,name,lifecycle_type',
+            'templateVersion',
             'employeeProfile.user:id,name,email',
             'requests.responsibleTeam:id,name',
         ]);

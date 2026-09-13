@@ -14,12 +14,14 @@ use App\Domain\It\Presenters\ItTicketActivityPresenter;
 use App\Domain\It\Presenters\ItTicketConversationPresenter;
 use App\Domain\It\Presenters\ItTicketRoutingPresenter;
 use App\Domain\It\Services\ItAutomationScheduleCatalog;
+use App\Domain\It\Services\ItCatalogAccessService;
 use App\Domain\It\Services\ItCatalogFieldOptionService;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItKbAccessService;
 use App\Domain\It\Services\ItLinkedContextOptions;
 use App\Domain\It\Services\ItProvisioningAccessService;
 use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
+use App\Domain\It\Services\ItProvisioningTrackingService;
 use App\Domain\It\Services\ItSavedTicketFilterService;
 use App\Domain\It\Services\ItSlaReadService;
 use App\Domain\It\Services\ItTicketIntakeService;
@@ -29,6 +31,7 @@ use App\Domain\It\Services\ItTicketRequestTrace;
 use App\Domain\It\Services\ItTicketTriageService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\It\Services\ItWorkTransitionService;
+use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\It\ApproveProvisioningRequestRequest;
 use App\Http\Requests\It\AssignProvisioningRequestRequest;
@@ -221,11 +224,12 @@ class ItProvisioningController extends Controller
 
         $catalogItems = $canRequest ? ItCatalogItem::query()
             ->published()
-            ->when(! $canManage, fn ($query) => $query->where('internal_only', false))
-            ->orderBy('sort_order')
-            ->orderBy('name')
+            ->with('publishedVersion')
             ->get()
-            ->map(fn (ItCatalogItem $item) => $item->discoveryPayload($canManage))
+            ->map(fn (ItCatalogItem $item) => $item->publishedContract())
+            ->filter(fn (ItCatalogItem $item) => app(ItCatalogAccessService::class)->canDiscover($user, $item))
+            ->sortBy([['sort_order', 'asc'], ['name', 'asc']])
+            ->map(fn (ItCatalogItem $item) => app(ItCatalogAccessService::class)->discoveryPayload($user, $item))
             ->values() : collect();
         $catalogEntityTypes = $catalogItems
             ->flatMap(fn (array $item) => collect($item['form_schema']['fields'] ?? [])->pluck('type'))
@@ -245,6 +249,7 @@ class ItProvisioningController extends Controller
                 'priority_matrix' => ItTicketPriorityService::MATRIX,
             ],
             'myTickets' => $canRequest ? $this->myTicketRows($user) : [],
+            'myProvisioning' => $canRequest ? app(ItProvisioningTrackingService::class)->listing($user, $request) : null,
             'catalogItems' => $catalogItems->all(),
             'catalogFieldOptions' => $canRequest
                 ? $this->catalogFieldOptions->forTypes($user, $catalogEntityTypes)
@@ -1023,7 +1028,7 @@ class ItProvisioningController extends Controller
         }
 
         return $this->provisioningAccess->applyWorkflowScope(ItProvisioningWorkflow::query(), $user)
-            ->with(['employeeProfile:id,user_id,position_title', 'employeeProfile.user:id,name', 'template:id,name'])
+            ->with(['employeeProfile:id,user_id,position_title', 'employeeProfile.user:id,name', 'template:id,name', 'templateVersion'])
             ->withCount([
                 'requests',
                 'requests as completed_requests_count' => fn ($query) => $query->where('status', 'done'),
@@ -1038,7 +1043,9 @@ class ItProvisioningController extends Controller
                 'status' => $workflow->status,
                 'effective_at' => $workflow->effective_at?->toIso8601String(),
                 'source_type' => $workflow->source_type,
-                'template' => $workflow->template?->name,
+                'template' => $workflow->templateVersion?->contract['name'] ?? $workflow->template?->name,
+                'template_version' => $workflow->templateVersion?->version,
+                'template_provenance' => $workflow->templateVersion?->provenance ?? 'legacy_unrecorded',
                 'employee' => [
                     'id' => $workflow->employee_profile_id,
                     'name' => $workflow->employeeProfile?->user?->name ?? 'Unknown',
@@ -1111,7 +1118,7 @@ class ItProvisioningController extends Controller
                     'reference' => $t->reference,
                     'lock_version' => (int) $t->lock_version,
                     'title' => $t->title,
-                    'description' => $t->description,
+                    'description' => MonitoringTechnicalSummary::ticketDescription($t),
                     'work_type' => $t->work_type,
                     'service' => $t->service ? ['id' => $t->service->id, 'name' => $t->service->name] : null,
                     'category' => $t->category,
@@ -1179,7 +1186,7 @@ class ItProvisioningController extends Controller
                 'reference' => $t->reference,
                 'lock_version' => (int) $t->lock_version,
                 'title' => $t->title,
-                'description' => $t->description,
+                'description' => MonitoringTechnicalSummary::ticketDescription($t),
                 'category' => $t->category,
                 'priority' => $t->priority,
                 'status' => $t->status,

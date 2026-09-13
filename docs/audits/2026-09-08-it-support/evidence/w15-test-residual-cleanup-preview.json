@@ -1,0 +1,13 @@
+{
+    "mode": "preview",
+    "fingerprint": "461220cd4c6bda5f0172b1facd12c250cc4cb6135c129fabd89d8a798ecec8f0",
+    "before": [
+        {
+            "schema": "oblivion_it_support_test_it_e55abe5c09fe4c1a",
+            "exists": true,
+            "table_count": 835,
+            "active_connections": 0
+        }
+    ],
+    "database_mutations_performed": false
+}

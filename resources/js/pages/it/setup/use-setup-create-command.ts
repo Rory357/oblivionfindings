@@ -2,9 +2,14 @@ import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import type { SetupFields, SetupResource } from './use-setup-memory';
 
+export type SetupCreateResource =
+    | SetupResource
+    | 'catalogue-items'
+    | 'provisioning-templates';
+
 export type SetupCreated = {
     id: number;
-    resource: SetupResource;
+    resource: SetupCreateResource;
     request_uuid: string;
     configuration_version: string;
     committed_configuration_version: string;
@@ -38,11 +43,11 @@ const uuid = (value: unknown): value is string =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         value,
     );
-const markerKey = (actorId: number, resource: SetupResource) =>
+const markerKey = (actorId: number, resource: SetupCreateResource) =>
     `it.setup.pending-command.v1.actor.${actorId}.${resource}`;
 function initial(
     actorId: number | undefined,
-    resource: SetupResource,
+    resource: SetupCreateResource,
     active: boolean,
 ): Snapshot {
     let pending: string | null = null;
@@ -67,7 +72,7 @@ function initial(
 export function useSetupCreateCommand(options: {
     active: boolean;
     actorId?: number;
-    resource: SetupResource;
+    resource: SetupCreateResource;
     timeoutMs?: number;
 }) {
     const [value, setValue] = useState(() =>
@@ -89,7 +94,7 @@ export function useSetupCreateCommand(options: {
     };
     const clearMarker = (
         actorId: number,
-        resource: SetupResource,
+        resource: SetupCreateResource,
         requestUuid: string,
     ) => {
         try {

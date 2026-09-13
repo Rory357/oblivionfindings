@@ -32,7 +32,9 @@ final class BoardPackAccessService
     /** @return Builder<BoardPack> */
     public function visibleQuery(User $viewer): Builder
     {
-        $query = BoardPack::query()->whereHas('meeting');
+        $query = BoardPack::query()->whereHas('meeting', function (Builder $mq) use ($viewer) {
+            app(ExecutiveMeetingAccessService::class)->applyMeetingVisibilityScope($mq, $viewer);
+        });
 
         if (! $this->canViewPacks($viewer)) {
             return $query->whereRaw('1 = 0');
@@ -50,6 +52,9 @@ final class BoardPackAccessService
 
         return $query
             ->whereNotNull('distributed_at')
+            ->where(function ($q) {
+                $q->whereNull('build_status')->orWhere('build_status', 'published');
+            })
             ->whereJsonContains('distributed_to', $boardMemberId);
     }
 
@@ -59,8 +64,56 @@ final class BoardPackAccessService
             return false;
         }
 
-        return $this->canManage($viewer)
-            || $this->recipientBoardMemberId($viewer, $pack) !== null;
+        $meeting = $pack->relationLoaded('meeting') ? $pack->meeting : $pack->meeting()->first();
+        if ($meeting && ! app(ExecutiveMeetingAccessService::class)->canViewMeeting($viewer, $meeting)) {
+            return false;
+        }
+
+        if ($this->canManage($viewer)) {
+            return true;
+        }
+
+        if (($pack->build_status ?? 'published') !== 'published') {
+            return false;
+        }
+
+        if ($this->recipientBoardMemberId($viewer, $pack) === null) {
+            return false;
+        }
+
+        // Audience safety: verify viewer can access confidential agenda items if present
+        $manifest = $pack->document_manifest ?? [];
+        $contentSections = $manifest['content_sections'] ?? [];
+        $agenda = $contentSections['agenda'] ?? [];
+
+        $hasConfidential = false;
+        foreach ($agenda as $item) {
+            if (! empty($item['is_confidential'])) {
+                $hasConfidential = true;
+                break;
+            }
+        }
+
+        if ($hasConfidential) {
+            $execAccess = app(ExecutiveMeetingAccessService::class);
+            if (! $execAccess->hasExecutiveAuthority($viewer)) {
+                $boardMember = $viewer->boardMember;
+                $isChairOrSec = $meeting && $boardMember && (
+                    (int) $meeting->chair_id === (int) $boardMember->id ||
+                    (int) $meeting->secretary_id === (int) $boardMember->id
+                );
+                $isCommitteeMember = $meeting && $meeting->board_committee_id && $boardMember?->committeeMemberships()
+                    ->where('board_committee_id', $meeting->board_committee_id)
+                    ->where('is_active', true)
+                    ->exists();
+
+                if (! $isChairOrSec && ! $isCommitteeMember) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     public function visiblePack(User $viewer, ?BoardPack $pack): ?BoardPack

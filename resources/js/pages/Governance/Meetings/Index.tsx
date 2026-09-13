@@ -71,6 +71,7 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Meetings', href: '/governance/meetings' },
             ]}

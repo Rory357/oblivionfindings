@@ -451,7 +451,8 @@ class FleetTelemetryIngestService
             }
 
             $state = FleetVehicleStateSnapshot::query()
-                ->firstOrNew(['asset_id' => $asset->id]);
+                ->lockForUpdate()->firstOrNew(['asset_id' => $asset->id]);
+            $previousState = clone $state;
 
             $previousEvent = $state->last_event_id
                 ? FleetTelemetryEvent::query()->find($state->last_event_id)
@@ -472,6 +473,7 @@ class FleetTelemetryIngestService
             ]);
 
             $state->save();
+            $this->signals->emitRecovery($previousState, $event);
 
             $vehicleSignal = null;
             if (! empty($normalized['sos_flag'])) {

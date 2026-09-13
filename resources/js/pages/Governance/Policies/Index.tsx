@@ -47,6 +47,7 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Policies', href: '/governance/policies' },
             ]}

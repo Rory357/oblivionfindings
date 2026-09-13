@@ -1,0 +1,134 @@
+{
+    "checked_at": "2026-09-13T00:02:16+00:00",
+    "database": "oblivion_gov_review2_runtime_20260913_39488",
+    "cases": {
+        "completed_private_action_still_leaks": {
+            "can_view": false,
+            "private_title_in_completed_feed": true
+        },
+        "present_attendance_still_invites": {
+            "can_view_without_explicit_invitation": true
+        },
+        "expired_committee_still_grants_access": {
+            "expired_member_can_view": true
+        },
+        "rules_change_after_open_changes_outcome": {
+            "opening_written_unanimity": true,
+            "profile_changed_after_open": true,
+            "outcome": "carried",
+            "frozen_rule_payload": null
+        },
+        "quorum_denominator_changes_after_open": {
+            "opening_electorate_count": 4,
+            "before": {
+                "present": 0,
+                "apologies": 0,
+                "total_eligible": 4,
+                "required": 3,
+                "met": false,
+                "percentage_present": 0,
+                "resolution_mode": "out_of_session"
+            },
+            "after": {
+                "present": 0,
+                "apologies": 0,
+                "total_eligible": 3,
+                "required": 2,
+                "met": false,
+                "percentage_present": 0,
+                "resolution_mode": "out_of_session"
+            }
+        },
+        "rules_authority_keyword_bypass": {
+            "unrelated_motion": "Buy printer paper for the office",
+            "activated": true
+        },
+        "strategy_authority_keyword_bypass": {
+            "motion": "Buy employee wellbeing resources",
+            "unrelated_plan_status": "approved"
+        },
+        "budget_authority_keyword_bypass": {
+            "motion": "Approve vehicle capital purchase",
+            "explicit_adjustment_id": null,
+            "adjustment_status": "approved",
+            "budget_total": "106000.00"
+        },
+        "legitimate_catering_authority_rejected": {
+            "exception": "Illuminate\\Validation\\ValidationException",
+            "message": "The board resolution does not authorize this specific budget adjustment subject. (and 1 more error)"
+        },
+        "action_public_asset_is_accepted_evidence": {
+            "file_is_public_website_asset": true,
+            "completed": "complete",
+            "receipt": "ACT-REC-ACT-UDLCGH-20260913000216",
+            "evidence": [
+                "robots.txt"
+            ]
+        },
+        "completed_action_can_be_blocked_again": {
+            "status": "blocked",
+            "completion_receipt": "SYNTHETIC-PRIOR",
+            "completed_at": "2026-09-13T00:02:16.000000Z",
+            "version_number": 2
+        },
+        "duplicate_name_followup_wrong_owner": {
+            "intended_user_id": 5,
+            "same_name_users": [
+                3,
+                5
+            ],
+            "actual_assigned_to": 3
+        },
+        "draft_policy_can_be_attested": {
+            "http_status": 302,
+            "policy_status": "draft",
+            "receipt_count": 1
+        },
+        "evaluation_accepts_missing_and_wrong_type_answers": {
+            "http_status": 302,
+            "stored_audience": "chair_only",
+            "responses": [
+                {
+                    "board_member_id": 3,
+                    "answers": [
+                        {
+                            "type": "rating",
+                            "answer": null,
+                            "question": "Rating",
+                            "question_id": 1
+                        },
+                        {
+                            "type": "yes_no",
+                            "answer": [
+                                "not",
+                                "boolean"
+                            ],
+                            "question": "Yes or no",
+                            "question_id": 2
+                        }
+                    ]
+                }
+            ]
+        },
+        "future_unverified_compliance_evidence_passes": {
+            "valid_from": "2027-01-01T00:00:00.000000Z",
+            "verified": false,
+            "obligation_status": "complete",
+            "evidence_provided": true
+        },
+        "settings_partial_write_on_validation_failure": {
+            "http_status": 422,
+            "capex_before": null,
+            "capex_after_failed_request": "12345"
+        },
+        "settings_negative_threshold_saved": {
+            "http_status": 302,
+            "saved": "-999"
+        },
+        "reminder_duplicates_across_hour_boundary": {
+            "elapsed_minutes": 2,
+            "claimed_window_hours": 4,
+            "notifications": 2
+        }
+    }
+}

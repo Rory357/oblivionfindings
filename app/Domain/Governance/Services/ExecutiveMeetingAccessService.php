@@ -51,35 +51,20 @@ final class ExecutiveMeetingAccessService
             return true;
         }
 
-        if ($boardMember->isCommitteeMember('executive') || $boardMember->isCommitteeMember('executive_session')) {
-            return true;
-        }
-
-        if ($meeting->relationLoaded('attendances')) {
-            if ($meeting->attendances->contains(fn ($att) => (int) $att->board_member_id === (int) $boardMember->id)) {
-                return true;
-            }
-        } elseif ($meeting->attendances()->where('board_member_id', $boardMember->id)->exists()) {
-            return true;
-        }
-
-        if ($meeting->relationLoaded('rsvps')) {
-            if ($meeting->rsvps->contains(fn ($rsvp) => (int) $rsvp->board_member_id === (int) $boardMember->id)) {
-                return true;
-            }
-        } elseif ($meeting->rsvps()->where('board_member_id', $boardMember->id)->exists()) {
+        $hasPresentAttendance = $meeting->attendances()
+            ->where('board_member_id', $boardMember->id)
+            ->where('status', 'present')
+            ->whereNotNull('marked_by')
+            ->exists();
+        if ($hasPresentAttendance) {
             return true;
         }
 
         if ($meeting->board_committee_id) {
-            if ($meeting->relationLoaded('committee') && $meeting->committee) {
-                if ($boardMember->isCommitteeMember($meeting->committee->committee_type)) {
-                    return true;
-                }
-            } elseif ($meeting->committee()->whereHas('members', function ($query) use ($boardMember) {
-                $query->where('board_members.id', $boardMember->id)
-                    ->where('committee_memberships.is_active', true);
-            })->exists()) {
+            if ($boardMember->committeeMemberships()
+                ->where('board_committee_id', $meeting->board_committee_id)
+                ->where('is_active', true)
+                ->exists()) {
                 return true;
             }
         }
@@ -120,16 +105,13 @@ final class ExecutiveMeetingAccessService
             return true;
         }
 
-        if ($boardMember->isCommitteeMember('executive') || $boardMember->isCommitteeMember('executive_session')) {
-            return true;
-        }
-
-        if ($meeting->relationLoaded('attendances')) {
-            if ($meeting->attendances->contains(fn ($att) => (int) $att->board_member_id === (int) $boardMember->id)) {
+        if ($meeting->board_committee_id) {
+            if ($boardMember->committeeMemberships()
+                ->where('board_committee_id', $meeting->board_committee_id)
+                ->where('is_active', true)
+                ->exists()) {
                 return true;
             }
-        } elseif ($meeting->attendances()->where('board_member_id', $boardMember->id)->exists()) {
-            return true;
         }
 
         return false;
@@ -160,25 +142,28 @@ final class ExecutiveMeetingAccessService
         }
 
         $boardMember = $user->boardMember;
-        if ($boardMember && ($boardMember->isCommitteeMember('executive') || $boardMember->isCommitteeMember('executive_session'))) {
-            return $query;
-        }
-
         $boardMemberId = $boardMember?->id;
+        $isActive = $boardMember?->is_active ?? false;
 
-        return $query->where(function (Builder $q) use ($user, $boardMemberId) {
+        return $query->where(function (Builder $q) use ($user, $boardMemberId, $isActive) {
             $q->where('meeting_type', '!=', 'executive_session')
-                ->orWhere(function (Builder $execQuery) use ($user, $boardMemberId) {
+                ->orWhere(function (Builder $execQuery) use ($user, $boardMemberId, $isActive) {
                     $execQuery->where('meeting_type', 'executive_session')
-                        ->where(function (Builder $allowed) use ($user, $boardMemberId) {
+                        ->where(function (Builder $allowed) use ($user, $boardMemberId, $isActive) {
                             $allowed->where('created_by', $user->id);
 
-                            if ($boardMemberId !== null) {
+                            if ($boardMemberId !== null && $isActive) {
                                 $allowed->orWhere('chair_id', $boardMemberId)
                                     ->orWhere('secretary_id', $boardMemberId)
-                                    ->orWhereHas('attendances', fn (Builder $att) => $att->where('board_member_id', $boardMemberId))
-                                    ->orWhereHas('rsvps', fn (Builder $rsvp) => $rsvp->where('board_member_id', $boardMemberId))
-                                    ->orWhereHas('committee.members', fn (Builder $cm) => $cm->where('board_members.id', $boardMemberId)->where('committee_memberships.is_active', true));
+                                    ->orWhereHas('attendances', fn (Builder $att) => $att
+                                        ->where('board_member_id', $boardMemberId)
+                                        ->where('status', 'present')
+                                        ->whereNotNull('marked_by')
+                                    )
+                                    ->orWhereHas('committee.members', fn (Builder $cm) => $cm
+                                        ->where('board_members.id', $boardMemberId)
+                                        ->where('committee_memberships.is_active', true)
+                                    );
                             }
                         });
                 });

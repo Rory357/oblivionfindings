@@ -1,0 +1,17 @@
+{
+  "captured_at": "2026-09-11T23:58:47.1008167Z",
+  "source": [
+    {
+      "path": "app/Domain/It/Services/ItCatalogSubmissionService.php",
+      "sha256": "ff531e32f125f333e577046359f54e69cd8fc61d568f303f5a5d473a7bbdcb9e"
+    },
+    {
+      "path": "tests/Feature/It/ItServiceCatalogTest.php",
+      "sha256": "31c66502e4b4fcdd8dc6519d2889cb4f9b578a624bb69dee994f0f5e866eacf5"
+    }
+  ],
+  "browser_verified": false,
+  "test_run": "68103",
+  "test_token": "it_56587a4befa54d9e",
+  "status": "passed:20 tests; terminal0; all14 postflight checks and schema absence"
+}

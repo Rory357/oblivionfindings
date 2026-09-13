@@ -35,14 +35,14 @@ class EscalateOverdueActionItems implements ShouldQueue
             );
 
             $recipient = $item->assignedTo;
-            $profile = $recipient?->hrEmployeeProfile;
-            $hasCurrentProfile = ! $profile || (
-                ! $profile->trashed()
-                && $profile->is_active
-                && $profile->start_date
-                && $profile->start_date->startOfDay()->lte($today)
-                && (! $profile->end_date || $profile->end_date->startOfDay()->gte($today))
-            );
+            $profile = $recipient ? \App\Domain\Hr\Models\HrEmployeeProfile::withTrashed()->where('user_id', $recipient->id)->first() : null;
+            $hasCurrentProfile = $profile
+                ? (! $profile->trashed()
+                    && $profile->is_active
+                    && $profile->start_date
+                    && $profile->start_date->startOfDay()->lte($today)
+                    && (! $profile->end_date || $profile->end_date->startOfDay()->gte($today)))
+                : true;
 
             if ($recipient?->approved_at
                 && $hasCurrentProfile

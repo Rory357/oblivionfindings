@@ -1,0 +1,33 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/control-room/it-handoff-dialog.test.tsx (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/control-room/it-handoff-dialog.test.tsx [ resources/js/components/control-room/it-handoff-dialog.test.tsx ]
+Error: Failed to resolve import "@testing-library/user-event" from "resources/js/components/control-room/it-handoff-dialog.test.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/steph/Herd/oblivionfindings/resources/js/components/control-room/it-handoff-dialog.test.tsx:8:0
+  5  |  const __vi_import_0__ = await import("react/jsx-dev-runtime");
+  6  |  const __vi_import_1__ = await import("@testing-library/react");
+  7  |  const __vi_import_2__ = await import("@testing-library/user-event");
+     |                                       ^
+  8  |  const __vi_import_3__ = await import("axios");
+  9  |  const __vi_import_4__ = await import("./it-handoff-dialog");
+ ❯ TransformPluginContext._formatLog node_modules/vite/dist/node/chunks/config.js:29079:43
+ ❯ TransformPluginContext.error node_modules/vite/dist/node/chunks/config.js:29076:14
+ ❯ normalizeUrl node_modules/vite/dist/node/chunks/config.js:27199:18
+ ❯ node_modules/vite/dist/node/chunks/config.js:27257:32
+ ❯ TransformPluginContext.transform node_modules/vite/dist/node/chunks/config.js:27225:4
+ ❯ EnvironmentPluginContainer.transform node_modules/vite/dist/node/chunks/config.js:28877:14
+ ❯ loadAndTransform node_modules/vite/dist/node/chunks/config.js:22746:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  25 passed (25)
+   Start at  06:32:06
+   Duration  4.05s (transform 653ms, setup 517ms, import 2.54s, tests 1.23s, environment 4.47s)
+

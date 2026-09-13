@@ -1,0 +1,1 @@
+{"tool":"pint","result":"fixed","files":[{"path":"docs\\audits\\2026-09-08-it-support\\evidence\\w14-monitoring-browser-fixture.php","fixers":["fully_qualified_strict_types","unary_operator_spaces","not_operator_with_successor_space","ordered_imports"]}]}

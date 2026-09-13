@@ -18,6 +18,7 @@ import {
     Activity,
     AlertTriangle,
     BookOpenCheck,
+    Boxes,
     CalendarClock,
     CheckCircle2,
     CircleAlert,
@@ -46,6 +47,14 @@ export interface TicketLinkedDevice {
     access: LinkedWorkspaceAccess;
     is_monitoring_evidence: boolean;
     can_unlink: boolean;
+}
+
+export interface TicketLinkedAsset {
+    id: number | null;
+    name: string | null;
+    asset_tag: string | null;
+    href: string | null;
+    access: LinkedWorkspaceAccess;
 }
 
 export interface TicketDeviceOption {
@@ -116,6 +125,7 @@ interface LinkedWorkspaceAccess {
 interface Props {
     recoveredAt: string | null;
     devices: TicketLinkedDevice[];
+    assets?: TicketLinkedAsset[];
     alerts: TicketLinkedAlert[];
     problems?: TicketLinkedProblem[];
     changes?: TicketLinkedChange[];
@@ -252,6 +262,7 @@ function WorkspaceRecordDestination({
 export function TicketLinkedContext({
     recoveredAt,
     devices,
+    assets = [],
     alerts,
     problems = [],
     changes = [],
@@ -279,6 +290,7 @@ export function TicketLinkedContext({
     const hasLinks =
         incidentEvidence.length > 0 ||
         devices.length > 0 ||
+        assets.length > 0 ||
         alerts.length > 0 ||
         problems.length > 0 ||
         changes.length > 0 ||
@@ -424,9 +436,10 @@ export function TicketLinkedContext({
                         />
                     ))}
                     <p className="rounded-lg border border-dashed border-border px-2.5 py-2 text-[11px] text-muted-foreground">
-                        The Device and Control Room records below are live now.
-                        IT owns this ticket; Control Room continues to own
-                        operational response.
+                        Linked records show their current details. The sealed
+                        evidence above stays unchanged. IT owns this ticket; any
+                        linked Control Room alert retains its own operational
+                        response.
                     </p>
                 </div>
             ) : null}
@@ -479,6 +492,49 @@ export function TicketLinkedContext({
                                 </div>
                             </li>
                         ))}
+                    </ul>
+                </div>
+            ) : null}
+
+            {assets.length > 0 ? (
+                <div className="mt-3">
+                    <h3 className="text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                        Affected assets
+                    </h3>
+                    <ul className="mt-1.5 space-y-2">
+                        {assets.map((asset, index) => {
+                            const available =
+                                asset.access.state === 'available' &&
+                                asset.id !== null &&
+                                asset.href;
+                            return (
+                                <li
+                                    key={
+                                        asset.id ?? `restricted-asset-${index}`
+                                    }
+                                    className="overflow-hidden rounded-xl border border-border/70 bg-muted/20"
+                                >
+                                    <WorkspaceRecordDestination
+                                        href={available ? asset.href : null}
+                                        access={asset.access}
+                                        icon={Boxes}
+                                        iconClassName="text-primary"
+                                        reference={
+                                            available
+                                                ? (asset.asset_tag ??
+                                                  'Fleet & Assets')
+                                                : 'Fleet & Assets'
+                                        }
+                                        title={
+                                            available
+                                                ? (asset.name ??
+                                                  'Affected asset')
+                                                : 'Affected asset'
+                                        }
+                                    />
+                                </li>
+                            );
+                        })}
                     </ul>
                 </div>
             ) : null}

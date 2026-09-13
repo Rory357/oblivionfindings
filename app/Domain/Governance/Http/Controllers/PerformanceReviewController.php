@@ -17,6 +17,8 @@ class PerformanceReviewController extends Controller
 
     public function create()
     {
+        $this->authorize('create', PerformanceReview::class);
+
         $boardMembers = \App\Domain\Governance\Models\BoardMember::with('user')->get();
         
         return Inertia::render('Governance/Performance/Create', [
@@ -26,13 +28,34 @@ class PerformanceReviewController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', PerformanceReview::class);
+
         $query = PerformanceReview::with(['reviewee', 'goals', 'kpis']);
+
+        app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class)
+            ->scopePerformanceReviews($query, $request->user());
 
         if ($request->has('reviewee_id')) {
             $query->byReviewee($request->reviewee_id);
         }
 
-        $reviews = $query->orderByDesc('created_at')->paginate(15);
+        $user = $request->user() ?? auth()->user();
+
+        $reviews = $query->orderByDesc('created_at')
+            ->paginate(15)
+            ->through(function (PerformanceReview $review) use ($user) {
+                $isReviewee = (int) $review->reviewee_id === (int) $user?->id;
+                $canAssess = $user ? $user->can('assess', $review) : false;
+
+                if ($isReviewee && ! $canAssess && $review->status !== 'completed') {
+                    $review->overall_rating = null;
+                    $review->overall_assessment = null;
+                    $review->board_decision = null;
+                    $review->decision_notes = null;
+                }
+
+                return $review;
+            });
 
         return Inertia::render('Governance/Performance/Index', [
             'reviews' => $reviews,
@@ -40,21 +63,50 @@ class PerformanceReviewController extends Controller
         ]);
     }
 
-    public function show(PerformanceReview $review)
+    public function show(Request $request, PerformanceReview $review)
     {
+        $this->authorize('view', $review);
+
+        $user = $request->user() ?? auth()->user();
+        $isReviewee = (int) $review->reviewee_id === (int) $user?->id;
+        $canAssess = $user ? $user->can('assess', $review) : false;
+
         $review->load(['reviewee', 'goals', 'kpis', 'creator']);
 
         $scorecard = $this->performanceService->generateScorecard($review);
 
+        if ($isReviewee && ! $canAssess && $review->status !== 'completed') {
+            $review->overall_rating = null;
+            $review->overall_assessment = null;
+            $review->board_decision = null;
+            $review->decision_notes = null;
+
+            if (is_array($scorecard)) {
+                $scorecard['overall_rating'] = null;
+                $scorecard['board_decision'] = null;
+                $scorecard['overall_score'] = null;
+            }
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'review' => $review,
+                'scorecard' => $scorecard,
+                'can_assess' => $canAssess,
+            ]);
+        }
+
         return Inertia::render('Governance/Performance/Show', [
             'review' => $review,
             'scorecard' => $scorecard,
-            'can_assess' => auth()->user()->canDo('governance.performance.manage'),
+            'can_assess' => $canAssess,
         ]);
     }
 
     public function store(Request $request)
     {
+        $this->authorize('create', PerformanceReview::class);
+
         $validated = $request->validate([
             'reviewee_id' => 'required|exists:users,id',
             'review_cycle' => 'required|string',
@@ -82,6 +134,8 @@ class PerformanceReviewController extends Controller
 
     public function update(Request $request, PerformanceReview $review)
     {
+        $this->authorize('update', $review);
+
         $validated = $request->validate([
             'overall_rating' => 'sometimes|in:exceeds,meets,needs_improvement,unsatisfactory',
             'overall_assessment' => 'sometimes|string',
@@ -96,6 +150,8 @@ class PerformanceReviewController extends Controller
 
     public function addGoal(Request $request, PerformanceReview $review)
     {
+        $this->authorize('update', $review);
+
         $validated = $request->validate([
             'pillar' => 'required|in:safety,quality,people,finance,compliance,it_resilience',
             'goal_description' => 'required|string',
@@ -118,6 +174,8 @@ class PerformanceReviewController extends Controller
 
     public function submitAssessment(Request $request, PerformanceReview $review)
     {
+        $this->authorize('assess', $review);
+
         $validated = $request->validate([
             'goal_assessments' => 'required|array',
             'goal_assessments.*.score' => 'required|numeric|min:1|max:5',
@@ -140,6 +198,8 @@ class PerformanceReviewController extends Controller
 
     public function edit(PerformanceReview $review)
     {
+        $this->authorize('update', $review);
+
         $review->load(['reviewee', 'goals', 'kpis']);
 
         return Inertia::render('Governance/Performance/Edit', [
@@ -149,6 +209,8 @@ class PerformanceReviewController extends Controller
 
     public function submitFeedback(Request $request, PerformanceReview $review)
     {
+        $this->authorize('view', $review);
+
         $validated = $request->validate([
             'reviewer_role' => 'required|in:board_member,peer,direct_report,self',
             'ratings' => 'nullable|array',
@@ -172,7 +234,7 @@ class PerformanceReviewController extends Controller
      */
     public function submitSelfAssessment(Request $request, PerformanceReview $review)
     {
-        abort_unless(auth()->user()?->canDo('governance.performance.manage'), 403);
+        $this->authorize('submitSelfAssessment', $review);
 
         $validated = $request->validate([
             'self_assessment' => 'required|string|max:10000',
@@ -189,7 +251,7 @@ class PerformanceReviewController extends Controller
      */
     public function approve(Request $request, PerformanceReview $review)
     {
-        abort_unless(auth()->user()?->canDo('governance.performance.manage'), 403);
+        $this->authorize('update', $review);
 
         $validated = $request->validate([
             'resolution_id' => 'nullable|integer',

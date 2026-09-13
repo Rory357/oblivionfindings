@@ -1,0 +1,67 @@
+{
+    "token": "33eaee60878c45e8",
+    "mutations_performed": false,
+    "cases": {
+        "retry": {
+            "source": "device",
+            "outcome": {
+                "id": 8,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        },
+        "retry_stale": {
+            "source": "device",
+            "outcome": {
+                "id": 9,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        },
+        "retry_access": {
+            "source": "device",
+            "outcome": {
+                "id": 10,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        },
+        "fleet_retry": {
+            "source": "fleet",
+            "outcome": {
+                "id": 5,
+                "status": "sent",
+                "it_status": "failed",
+                "it_attempts": 1,
+                "it_attempt_limit": 3,
+                "it_outcome_code": "processing_failed",
+                "it_ticket_ids": null,
+                "it_completed_at": null
+            },
+            "tickets": [],
+            "audits": []
+        }
+    },
+    "ticket_count": 19
+}

@@ -1,0 +1,46 @@
+[
+  {
+    "path": "app/Domain/Monitoring/Models/Monitor.php",
+    "sha256": "cb0416a2181f982c9f4b1f96fc9df643a503f0af6bbc7ded2f76f67610ab9766"
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringAvailabilityEpisode.php",
+    "sha256": "5be03ab7a7cb2bb433eda3f135fc4bdec503d90e3548cad0a47f890f8b6e5a44"
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringObservationIngestor.php",
+    "sha256": "20ef676fc5cf32dedd317e34eb1b4e922a3f2773a7f40a51a84b2e45ecc743b1"
+  },
+  {
+    "path": "app/Observers/DeviceEventObserver.php",
+    "sha256": "11e7f3d7cf6ec0f42bbf29e27f1fce8b892b0d3d0992c120ec4dcd2fc6d9d27e"
+  },
+  {
+    "path": "app/Domain/It/Services/ItMonitoringDeliveryService.php",
+    "sha256": "347902ba4671ec2abccb37854564ddcbcf26ce8cf07c5687faaf60e20a27df77"
+  },
+  {
+    "path": "app/Listeners/It/CreateOrUpdateMonitoringTicket.php",
+    "sha256": "b3842af461aa95255efda3dcb57846f0d5e7bc39f4b4be5abbf1c0a27e35de8e"
+  },
+  {
+    "path": "app/Services/ControlRoom/SignalProcessingService.php",
+    "sha256": "45e33c873c1b81642d5035e3e4f502d69643475c790cc599a7e62c3d7c5e90e4"
+  },
+  {
+    "path": "database/migrations/2026_09_12_000026_add_monitor_availability_episode.php",
+    "sha256": "6ba5fccfd2ba89a4e0075babda4387dca1a899a6dc6d1688abf7be9e83c0d8e9"
+  },
+  {
+    "path": "tests/Feature/Monitoring/MonitoringAvailabilityEpisodeTest.php",
+    "sha256": "c229b01f93a39b46fb0aace37a4421f5e7e87b5d86c7a1d52a003d1fd5ffef94"
+  },
+  {
+    "path": "tests/Concurrency/It/ItMonitoringDeliveryConcurrencyTest.php",
+    "sha256": "86e480a8aba5cf92ef4d21bd330e5d3f413457bb242c30f97762aa20b5f8d695"
+  },
+  {
+    "path": "tests/Support/It/monitoring-delivery-concurrency-worker.php",
+    "sha256": "5bed41a33d1154cf73f77bf824394d7f1fa1e9741120dc0897eb82fbe5bdea91"
+  }
+]

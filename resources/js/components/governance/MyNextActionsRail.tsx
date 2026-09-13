@@ -16,6 +16,7 @@ import { PriorityBadge } from './PriorityBadge';
 
 interface MyNextActionsRailProps {
     actions: WorkflowAction[];
+    currentUserId?: number | null;
     currentUserName?: string | null;
     /** When the current user has none assigned, we fall back to highest priority items. */
     showFallback?: boolean;
@@ -39,16 +40,19 @@ function ownerInitials(name: string | null): string {
  */
 export function MyNextActionsRail({
     actions,
+    currentUserId,
     currentUserName,
-    showFallback = true,
+    showFallback = false,
 }: MyNextActionsRailProps) {
-    const owned = currentUserName
-        ? actions.filter(
-              (a) =>
-                  a.owner &&
-                  a.owner.toLowerCase() === currentUserName.toLowerCase(),
-          )
-        : [];
+    const owned = actions.filter((a) => {
+        if (currentUserId && a.assignee_user_id) {
+            return a.assignee_user_id === currentUserId;
+        }
+        if (currentUserName && a.owner && !a.assignee_user_id) {
+            return a.owner.toLowerCase() === currentUserName.toLowerCase();
+        }
+        return false;
+    });
 
     const rankPriority = (a: WorkflowAction): number => {
         const pri =
@@ -73,16 +77,16 @@ export function MyNextActionsRail({
                 <div className="flex items-start justify-between gap-2">
                     <div>
                         <CardTitle className="text-base">
-                            My Next Actions
+                            Needs my attention
                         </CardTitle>
                         <CardDescription>
                             {showingFallback
                                 ? 'Top board priorities to consider next.'
-                                : 'Items assigned directly to you.'}
+                                : 'Your pending votes, reading and follow-up.'}
                         </CardDescription>
                     </div>
                     <Link
-                        href="/governance/actions"
+                        href="/governance/my-work"
                         className="text-xs font-medium text-primary hover:underline"
                     >
                         View all

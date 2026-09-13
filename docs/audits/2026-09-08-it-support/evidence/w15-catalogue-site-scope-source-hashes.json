@@ -1,0 +1,113 @@
+{
+  "captured_at": "2026-09-12T15:00:00.9395629+12:00",
+  "design": [
+    {
+      "sha256": "96863e01d924e954255cd61f550396c2f2eea9778bbaab7e8570ef9d63279c22",
+      "path": "DESIGN.md"
+    },
+    {
+      "sha256": "62515485265119962773e6015fefe38be94434aae468acd017c078da61b20ab5",
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "86259475c987d6e30001604316379eb608aea9f83e16941b6aa476a94bca6957",
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "c3ee6c8acaa22049084f819e3ad2a33f457e936e467492079f16c15e9a611d2b",
+      "path": "design_styles/DESIGN_TOKENS.md"
+    },
+    {
+      "sha256": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac",
+      "path": "design_styles/LIST_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "cc20485e6e42e0a848b8cacc8ac6124e5e5a01206d966de6ebbbdec39dbe2a91",
+      "path": "design_styles/LOADER_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "9295cdb1386322b8a088ae03de41bc3c75a0fbe3e8fa3331c92c704ccb15895d",
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "748c94c030984d16c1a78f3b70855d1cf8f22461ab017e4ac8287ab9e8809cdf",
+      "path": "design_styles/oblivion-loader-01-demo.html"
+    },
+    {
+      "sha256": "a528a0e863a676fdbbfcb028e532ece2799e39a7345ca3c1eca619ac4491d931",
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md"
+    },
+    {
+      "sha256": "aee723e21491e9be908554a6f200d73204280a63d9028ea78de6bb9049f4a477",
+      "path": "design_styles/POPUP_STYLE_GUIDE.md"
+    }
+  ],
+  "source": [
+    {
+      "path": "app/Domain/It/Services/ItCatalogAccessService.php",
+      "sha256": "7a45e7f6566c06161ab47715a7135b6ab6c385df6b91957ebf37e9b9c3703683"
+    },
+    {
+      "path": "app/Domain/It/Services/ItCatalogManagementService.php",
+      "sha256": "f7f0f8a938cf2fefa7f859404234d2d7a045e096dc97a6c2ee0949de7d6c3084"
+    },
+    {
+      "path": "app/Domain/It/Services/ItCatalogSubmissionService.php",
+      "sha256": "454338de4dfc05ee4a56f80e80e8b967e2309f4b223968ef39409cbe1f229fcf"
+    },
+    {
+      "path": "app/Models/ItCatalogItem.php",
+      "sha256": "23da321ac46448691a14cb8004584536487c73ad631e21f30e513b4cfca26b3c"
+    },
+    {
+      "path": "app/Http/Requests/It/SaveItCatalogItemRequest.php",
+      "sha256": "4a8fa1fc69e99f981e77932f720d668bbc5b9eee9f6dbd6bb1aec17926ab0750"
+    },
+    {
+      "path": "app/Http/Requests/It/StoreCatalogRequest.php",
+      "sha256": "3e7053f18702ebd79a8f67d89b419631edf2134be46d7edd5fed555b2779d73b"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItCatalogController.php",
+      "sha256": "fe69d018175353d4fd78e5971e70384dd2a7b15c76d5039f978f3e91f7fdce24"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItProvisioningController.php",
+      "sha256": "6ea827d5584d38079d40a3e4d6ca07e0b614c6f4040b0f7f5aadbb8d612d1a14"
+    },
+    {
+      "path": "app/Http/Controllers/It/ItServiceManagementSetupController.php",
+      "sha256": "b001b5e92ad119b7ff570abd5fdadffbd9d9b48ed9a04024841ad59b93103400"
+    },
+    {
+      "path": "database/migrations/2026_09_12_000037_scope_it_catalogue_sites.php",
+      "sha256": "3efa51aebef72f7549d6b30b0573395bf959a3bb70a05b81dad59dbbdbecb4ad"
+    },
+    {
+      "path": "resources/js/components/it/it-catalogue-management.tsx",
+      "sha256": "ca89e8714feedfb6eac579c326b20d7433b8b793cd1d56367681278ab6f956ad"
+    },
+    {
+      "path": "resources/js/components/it/it-service-catalogue.tsx",
+      "sha256": "9a7d9b194c2e5d029ed0840e7b0eba215d6f78012d0dfd3f7d4ea7f4c391eeb6"
+    },
+    {
+      "path": "resources/js/pages/it/setup/index.tsx",
+      "sha256": "5d89e2de6e00bfb2e151e5d712bd004c5261c1520aa732cf59f925670102e0f6"
+    },
+    {
+      "path": "resources/js/components/it/__tests__/it-catalogue-management.test.tsx",
+      "sha256": "ca4c1d970d63f0275307581e81a9d348a02f5fd48a6c1db3144412c45b5d2be7"
+    },
+    {
+      "path": "tests/Feature/It/ItServiceCatalogTest.php",
+      "sha256": "6ba9826d88117e1862faaa80abe608eb4d3575d6bd1e430a9112ff75a24303d6"
+    },
+    {
+      "path": "docs/audits/2026-09-08-it-support/evidence/w15-catalogue-browser-inspect.php",
+      "sha256": "5baca540a394db3a97d69f1914c2e23f27a8364d5aa1b7357c220635be334ef9"
+    }
+  ],
+  "build": "52836 terminal0; 3m58s; app-KLo09MfF.js",
+  "manifest_sha256": "a53c166a8ec81646964b4238845dd1120f6374fcf38c65a6acc33b9b881d694e"
+}

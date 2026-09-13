@@ -1,0 +1,42 @@
+
+  [90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[31;1m⨯[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[31;1m⨯[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m
+  [90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Governance\GovernanceNestedBindingIntegrityTest[22m [90m>[39m adjustment failure ro… [41;1m ArgumentCountError [49;22m  
+[39;1m  Too few arguments to function App\Domain\Governance\Services\GovernanceNestedMutationService::__construct(), 1 passed in C:\Users\steph\Herd\oblivionfindings\tests\Feature\Governance\GovernanceNestedBindingIntegrityTest.php on line 243 and exactly 2 expected[39;22m
+
+  at [32mapp\Domain\Governance\Services\GovernanceNestedMutationService.php[39m:[32m23[39m
+     19▕ class GovernanceNestedMutationService
+     20▕ {
+     21▕     private const ALLOCATION_SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
+     22▕ 
+  ➜  23▕     public function __construct(
+     24▕         private readonly UserSiteAccessService $siteAccess,
+     25▕         private readonly ExecutiveMeetingAccessService $executiveAccess,
+     26▕     ) {}
+     27▕
+
+  [33m1   [39m[39;1mapp\Domain\Governance\Services\GovernanceNestedMutationService.php[39;22m:[39;1m23[39;22m
+  [33m2   [39m[39;1mtests\Feature\Governance\GovernanceNestedBindingIntegrityTest.php[39;22m:[39;1m243[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Governance\GovernanceSpendDashboardScopeTest[22m [90m>[39m dashboard spend surfaces require action and…    
+[39;1m  Failed asserting that 100 is identical to 100.0.[39;22m
+
+  at [32mtests\Feature\Governance\GovernanceSpendDashboardScopeTest.php[39m:[32m60[39m
+     56▕ 
+     57▕         $siteAViewer = $this->actor($this->siteA, ['governance.view', 'governance.spend.view']);
+     58▕         $siteAResponse = $this->dashboard($siteAViewer);
+     59▕         $this->assertSame(1, $siteAResponse->json('widgets.financial.pending_spend_count'));
+  ➜  60▕         $this->assertSame(100.0, $siteAResponse->json('widgets.financial.pending_spend_total'));
+     61▕         $this->assertVisibleCompletedSpend($siteAResponse, $approvedA, [$approvedB]);
+     62▕ 
+     63▕         $siteBViewer = $this->actor($this->siteB, ['governance.view', 'governance.spend.view']);
+     64▕         $siteBResponse = $this->dashboard($siteBViewer);
+
+  [33m1   [39m[39;1mtests\Feature\Governance\GovernanceSpendDashboardScopeTest.php[39;22m:[39;1m60[39;22m
+
+
+  [90mTests:[39m    [31;1m2 failed[39;22m[90m,[39m[39m [39m[32;1m162 passed[39;22m[90m (1474 assertions)[39m
+  [90mDuration:[39m [39m410.15s[39m
+

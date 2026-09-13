@@ -64,7 +64,7 @@ class GovernanceMeetingPolicy
             return true;
         }
 
-        return $user->hasRole('admin', 'board_secretary');
+        return $user->hasRole('admin', 'board_chair', 'board_secretary');
     }
 
     public function approveMinutes(User $user, GovernanceMeeting $meeting): bool
@@ -79,6 +79,16 @@ class GovernanceMeetingPolicy
         }
 
         return $user->hasRole('admin', 'board_chair');
+    }
+
+    public function signMinutes(User $user, GovernanceMeeting $meeting): bool
+    {
+        return $this->approveMinutes($user, $meeting);
+    }
+
+    public function archiveMinutes(User $user, GovernanceMeeting $meeting): bool
+    {
+        return $this->approveMinutes($user, $meeting);
     }
 
     public function generatePack(User $user, GovernanceMeeting $meeting): bool

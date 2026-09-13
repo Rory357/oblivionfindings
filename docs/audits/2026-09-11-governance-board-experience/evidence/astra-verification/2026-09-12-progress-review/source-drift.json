@@ -1,0 +1,6 @@
+{
+  "tracked_implementation_patch_unchanged": true,
+  "files_in_patch": 87,
+  "head": "f7ad55b5e426042668e33c0ab31f10e9e04717b3",
+  "other_worktree_changes": "IT, My Day and RBAC changes appeared during this review and were preserved. Checks describe the recorded fixture/build; final integration must recheck current shared source."
+}

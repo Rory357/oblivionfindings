@@ -70,6 +70,7 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
         <AppLayout
             user={auth.user}
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Budgets', href: '/governance/budgets' },
             ]}

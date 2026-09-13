@@ -4,7 +4,9 @@ namespace App\Domain\Monitoring\Models;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
+use App\Models\Asset;
 use App\Models\ControlRoomAlert;
+use App\Models\FleetSignal;
 use App\Models\ItTicket;
 use App\Models\Site;
 use DomainException;
@@ -20,6 +22,8 @@ final class MonitoringIncidentEvidenceSnapshot extends Model
         'it_ticket_id',
         'device_id',
         'device_event_id',
+        'fleet_signal_id',
+        'asset_id',
         'site_id',
         'evidence_version',
         'captured_at',
@@ -36,6 +40,13 @@ final class MonitoringIncidentEvidenceSnapshot extends Model
 
     protected static function booted(): void
     {
+        self::creating(function (self $snapshot): void {
+            if ($snapshot->evidence_version === 3
+                ? ($snapshot->device_event_id !== null || $snapshot->fleet_signal_id === null || $snapshot->asset_id === null)
+                : ($snapshot->fleet_signal_id !== null || $snapshot->asset_id !== null || $snapshot->device_event_id === null)) {
+                throw new DomainException('Evidence must have exactly one canonical source type.');
+            }
+        });
         $immutable = static function (): never {
             throw new DomainException('Monitoring incident evidence is immutable.');
         };
@@ -67,6 +78,16 @@ final class MonitoringIncidentEvidenceSnapshot extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function fleetSignal(): BelongsTo
+    {
+        return $this->belongsTo(FleetSignal::class);
+    }
+
+    public function asset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class);
     }
 
     /** @param array<string, mixed> $snapshot */

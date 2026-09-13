@@ -5,6 +5,7 @@ use App\Domain\It\InboundEmailIngestor;
 use App\Domain\It\Presenters\ItTicketContextPresenter;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItTicketLinkService;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -94,8 +95,8 @@ test('linked context includes only canonical device alert and related work visib
     assignIngressDeviceToSite($allowedDevice, $allowedSite, $viewer);
     assignIngressDeviceToSite($hiddenDevice, $hiddenSite, $viewer);
 
-    $allowedAlert = ControlRoomAlert::factory()->create(['site_id' => $allowedSite->id]);
-    $hiddenAlert = ControlRoomAlert::factory()->create(['site_id' => $hiddenSite->id]);
+    $allowedAlert = ControlRoomAlert::factory()->create(['site_id' => $allowedSite->id, 'source' => 'manual', 'alert_type' => 'Device Offline']);
+    $hiddenAlert = ControlRoomAlert::factory()->create(['site_id' => $hiddenSite->id, 'source' => 'manual', 'alert_type' => 'Device Offline']);
 
     $allowedChange = ItChange::factory()->create();
     $allowedChange->ticket()->update(['site_id' => $allowedSite->id]);
@@ -140,11 +141,15 @@ test('inbound replies quarantine unknown inactive sensitive and unrelated sender
     ]);
     $ingestor = app(InboundEmailIngestor::class);
 
+    expect(app(ItWorkAccessService::class)->canView($sensitiveAgent, $sensitive))->toBeFalse();
+
     $cases = [
         ['nobody@example.test', 'IT-90001', 'sender_unknown'],
         [$inactive->email, 'IT-90001', 'sender_inactive'],
         [$unrelated->email, 'IT-90001', 'sender_unauthorized'],
-        [$sensitiveAgent->email, 'IT-90002', 'sensitive_work'],
+        // Reference resolution denies inaccessible work before inspecting its
+        // reply policy, so quarantine must not disclose ticket sensitivity.
+        [$sensitiveAgent->email, 'IT-90002', 'sender_unauthorized'],
     ];
 
     foreach ($cases as $index => [$from, $reference, $reason]) {
@@ -291,8 +296,8 @@ test('ticket links require a current responsible actor and canonical target visi
     $hiddenDevice = Device::factory()->itInfrastructure()->create();
     assignIngressDeviceToSite($allowedDevice, $site, $actor);
     assignIngressDeviceToSite($hiddenDevice, $hiddenSite, $actor);
-    $allowedAlert = ControlRoomAlert::factory()->create(['site_id' => $site->id]);
-    $hiddenAlert = ControlRoomAlert::factory()->create(['site_id' => $hiddenSite->id]);
+    $allowedAlert = ControlRoomAlert::factory()->create(['site_id' => $site->id, 'source' => 'manual', 'alert_type' => 'Device Offline']);
+    $hiddenAlert = ControlRoomAlert::factory()->create(['site_id' => $hiddenSite->id, 'source' => 'manual', 'alert_type' => 'Device Offline']);
     $allowedRelated = ItTicket::factory()->create([
         'site_id' => $site->id,
         'work_type' => 'change',

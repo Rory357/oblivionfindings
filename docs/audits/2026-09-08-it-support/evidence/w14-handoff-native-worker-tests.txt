@@ -1,0 +1,73 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_469fcc5800794284",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Concurrency\It\ItMonitoringDeliveryConcurrencyTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mcompeting deliveries interruption and retry preserve one canonical result[39m[90m                                 [39m [90m188.75s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Concurrency\It\ItMonitoringDeliveryConcurrencyTest[22m [90m>[39m competing deliveries interruption and retry pr…   
+[39;1m  Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+@@ @@
+-'handoff_rejected'
++'linked'[39;22m
+
+  at [32mtests\Support\It\VerifiesMonitoringHandoffConcurrency.php[39m:[32m69[39m
+     65▕                     $this->assertSame('ticket_updated', $outbox->it_outcome_code);
+     66▕                     $this->assertSame($actor->id, $ticket->links()->where('relationship', 'source_alert')->sole()->created_by_user_id);
+     67▕                     $this->assertSame(1, $ticket->events()->where('type', 'monitoring_handoff_bound')->count());
+     68▕                 } else {
+  ➜  69▕                     $this->assertSame('handoff_rejected', $results[1]['result']);
+     70▕                     $this->assertNotSame($target->id, $ticket->id);
+     71▕                     $this->assertSame('system', $ticket->source);
+     72▕                     $this->assertSame(0, $target->links()->where('relationship', 'source_alert')->count());
+     73▕                 }
+
+  [33m1   [39m[39;1mtests\Support\It\VerifiesMonitoringHandoffConcurrency.php[39;22m:[39;1m69[39;22m
+  [33m2   [39m[39;1mtests\Concurrency\It\ItMonitoringDeliveryConcurrencyTest.php[39;22m:[39;1m128[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m (181 assertions)[39m
+  [90mDuration:[39m [39m189.00s[39m
+
+{"phase":"focused_tests_finished","exit_code":1}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_469fcc5800794284",
+    "database_mutations_performed": false
+}

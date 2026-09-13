@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Domain\It\Exceptions\ItTicketCommandConflict;
 use App\Domain\It\Exceptions\ItTicketDraftException;
+use App\Domain\It\Exceptions\ItTicketVersionConflict;
 use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -23,7 +25,18 @@ final class ProtectItDraftResponses
     public static function applies(Request $request): bool
     {
         return $request->is('it/drafts', 'it/drafts/*', 'it/tickets/*/task-candidates/validate', 'it/tickets/*/tasks/*/history', 'it/tickets/*/approval-history')
-            || self::isApprovalCommand($request);
+            || self::isApprovalCommand($request) || self::isControlRoomHandoff($request)
+            || self::isTechnicalDelivery($request);
+    }
+
+    private static function isTechnicalDelivery(Request $request): bool
+    {
+        return $request->is('it/setup/technical-deliveries/*');
+    }
+
+    private static function isControlRoomHandoff(Request $request): bool
+    {
+        return $request->is('it/control-room/alerts/*/handoff', 'it/control-room/alerts/*/handoff/*');
     }
 
     private static function isApprovalCommand(Request $request): bool
@@ -48,12 +61,17 @@ final class ProtectItDraftResponses
         $response = $next($request);
         if ($response->isRedirection()) {
             $response = response()->json([
-                'code' => 'session_expired', 'message' => self::isApprovalCommand($request)
+                'code' => 'session_expired', 'message' => self::isControlRoomHandoff($request)
+                    ? 'Sign in again, then check the saved IT handoff.'
+                    : (self::isApprovalCommand($request)
                     ? 'Sign in again, then check the saved approval command.'
                     : ($request->is('it/tickets/*/approval-history') ? 'Sign in again, then reload approval history.'
                         : ($request->is('it/tickets/*/tasks/*/history')
-                            ? 'Sign in again, then reload this task’s history.' : 'Sign in again, then check this draft before continuing.')),
+                            ? 'Sign in again, then reload this task’s history.' : 'Sign in again, then check this draft before continuing.'))),
             ], 401);
+            if (self::isTechnicalDelivery($request)) {
+                $response = response()->json(['code' => 'session_expired', 'message' => 'Sign in again, then review the current delivery outcome.'], 401);
+            }
         }
         $response->headers->set('Cache-Control', 'no-store, private');
 
@@ -68,6 +86,7 @@ final class ProtectItDraftResponses
 
         $status = match (true) {
             $exception instanceof ItTicketDraftException => $exception->status,
+            $exception instanceof ItTicketCommandConflict, $exception instanceof ItTicketVersionConflict => 409,
             $exception instanceof ValidationException => 422,
             $exception instanceof AuthenticationException => 401,
             $exception instanceof TokenMismatchException => 419,
@@ -76,6 +95,27 @@ final class ProtectItDraftResponses
             $exception instanceof HttpExceptionInterface => $exception->getStatusCode(),
             default => 500,
         };
+        if (self::isTechnicalDelivery($request)) {
+            return response()->json(match (true) {
+                $exception instanceof ValidationException => ['code' => 'delivery_validation_failed', 'message' => 'Review the delivery request fields.', 'errors' => $exception->errors()],
+                $status === 401 || $status === 419 => ['code' => 'session_expired', 'message' => 'Sign in again, then review the current delivery outcome.'],
+                $status === 403 => ['code' => 'access_unavailable', 'message' => 'Your delivery access is no longer available.'],
+                $status === 404 => ['code' => 'delivery_unavailable', 'message' => 'This delivery is unavailable.'],
+                $status === 409 => ['code' => 'delivery_changed', 'message' => 'Delivery changed. Review its current outcome before requesting another retry.'],
+                default => ['code' => 'delivery_outcome_unknown', 'message' => 'The retry outcome could not be confirmed. Review the current delivery before retrying.'],
+            }, $status, ['Cache-Control' => 'no-store, private']);
+        }
+        if (self::isControlRoomHandoff($request)) {
+            return response()->json(match (true) {
+                $exception instanceof ValidationException => ['code' => 'handoff_validation_failed', 'message' => 'Review the IT handoff fields.', 'errors' => $exception->errors()],
+                $exception instanceof ItTicketVersionConflict => ['code' => 'stale_ticket', 'message' => 'The selected ticket changed. Refresh and review the handoff again.'],
+                $exception instanceof ItTicketCommandConflict => ['code' => 'command_conflict', 'message' => 'This request reference belongs to a different handoff. Check its saved result.'],
+                $status === 401 || $status === 419 => ['code' => 'session_expired', 'message' => 'Sign in again, then check the saved IT handoff.'],
+                $status === 403 => ['code' => 'access_unavailable', 'message' => 'Your access to this IT handoff is no longer available.'],
+                $status === 404 => ['code' => 'handoff_unavailable', 'message' => 'This IT handoff is unavailable.'],
+                default => ['code' => 'handoff_outcome_unknown', 'message' => 'The IT handoff result could not be confirmed. Check the saved request before retrying.'],
+            }, $status, ['Cache-Control' => 'no-store, private']);
+        }
         if ($request->is('it/tickets/*/approval-history')) {
             return response()->json(match (true) {
                 $exception instanceof ValidationException => ['code' => 'history_validation', 'message' => 'The approval history request could not be checked.', 'errors' => $exception->errors()],
@@ -126,9 +166,9 @@ final class ProtectItDraftResponses
         if (! self::applies(request())) {
             return null;
         }
-        Log::error(self::isApprovalCommand(request()) ? 'IT approval command failed'
+        Log::error(self::isControlRoomHandoff(request()) ? 'IT Control Room handoff failed' : (self::isApprovalCommand(request()) ? 'IT approval command failed'
             : (request()->is('it/tickets/*/approval-history') ? 'IT approval history request failed'
-                : (request()->is('it/tickets/*/tasks/*/history') ? 'IT task history request failed' : 'IT draft request failed')), [
+                : (request()->is('it/tickets/*/tasks/*/history') ? 'IT task history request failed' : 'IT draft request failed'))), [
                     'failure_id' => (string) Str::uuid(), 'exception_type' => $exception::class,
                     'source_file' => $exception->getFile(), 'source_line' => $exception->getLine(),
                 ]);

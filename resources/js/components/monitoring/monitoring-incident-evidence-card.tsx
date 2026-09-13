@@ -23,8 +23,9 @@ export interface MonitoringIncidentEvidence {
         severity?: string | null;
         source?: string | null;
         triggered_at?: string | null;
-    };
+    } | null;
     ticket: { id?: number; reference?: string | null; title?: string | null };
+    asset?: { id?: number; name?: string | null; asset_tag?: string | null };
     device: {
         id?: number;
         uid?: string | null;
@@ -47,12 +48,19 @@ export interface MonitoringIncidentEvidence {
     };
 }
 
-const label = (value: string | null | undefined) =>
-    value
+const label = (value: string | null | undefined) => {
+    if (value === 'monitor_failed' || value === 'device_monitor_failed') {
+        return 'Technical check failed';
+    }
+    if (value === 'monitor_recovered' || value === 'device_monitor_recovered') {
+        return 'Technical check recovered';
+    }
+    return value
         ? value
-              .replace(/[_-]/g, ' ')
+              .replace(/[_.-]/g, ' ')
               .replace(/^\w/, (character) => character.toUpperCase())
         : 'Not recorded';
+};
 
 export function MonitoringIncidentEvidenceCard({
     evidence,
@@ -94,33 +102,61 @@ export function MonitoringIncidentEvidenceCard({
                     unstyled
                     className="rounded-lg border border-border/60 bg-background/70 px-2.5 py-2"
                 >
-                    <dt className="flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
-                        <RadioTower
-                            aria-hidden="true"
-                            className="h-3.5 w-3.5"
-                        />
-                        Original alert
-                    </dt>
-                    <dd className="mt-1 text-[12px] font-semibold text-foreground">
-                        {evidence.alert.reference ?? 'Control Room alert'} ·{' '}
-                        {label(evidence.alert.type)}
-                    </dd>
-                    <dd className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <StatusBadge
-                            variant={
-                                evidence.alert.severity === 'critical' ||
-                                evidence.alert.severity === 'high'
-                                    ? 'critical'
-                                    : 'warning'
-                            }
-                            size="sm"
-                        >
-                            {label(evidence.alert.severity)}
-                        </StatusBadge>
-                        <span>
-                            {formatDateTime(evidence.alert.triggered_at)}
-                        </span>
-                    </dd>
+                    {evidence.alert ? (
+                        <>
+                            <dt className="flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                                <RadioTower
+                                    aria-hidden="true"
+                                    className="h-3.5 w-3.5"
+                                />
+                                Original alert
+                            </dt>
+                            <dd className="mt-1 text-[12px] font-semibold text-foreground">
+                                {evidence.alert.reference ??
+                                    'Control Room alert'}{' '}
+                                · {label(evidence.alert.type)}
+                            </dd>
+                            <dd className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <StatusBadge
+                                    variant={
+                                        evidence.alert.severity ===
+                                            'critical' ||
+                                        evidence.alert.severity === 'high'
+                                            ? 'critical'
+                                            : 'warning'
+                                    }
+                                    size="sm"
+                                >
+                                    {label(evidence.alert.severity)}
+                                </StatusBadge>
+                                <span>
+                                    {formatDateTime(
+                                        evidence.alert.triggered_at,
+                                    )}
+                                </span>
+                            </dd>
+                        </>
+                    ) : (
+                        <>
+                            <dt className="flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                                <RadioTower
+                                    aria-hidden="true"
+                                    className="h-3.5 w-3.5"
+                                />
+                                Source route
+                            </dt>
+                            <dd className="mt-1 text-[12px] font-semibold text-foreground">
+                                Direct to IT
+                            </dd>
+                            <dd className="mt-1 text-[11px] text-muted-foreground">
+                                Recorded from{' '}
+                                {evidence.observation.source === 'fleet'
+                                    ? 'Fleet availability monitoring'
+                                    : 'device monitoring'}
+                                . This evidence has no Control Room alert.
+                            </dd>
+                        </>
+                    )}
                 </Card>
 
                 <Card
@@ -139,13 +175,26 @@ export function MonitoringIncidentEvidenceCard({
                             .filter(Boolean)
                             .join(' · ')}
                     </dd>
+                    {evidence.asset ? (
+                        <dd className="mt-1 text-[11px] text-muted-foreground">
+                            Asset at capture:{' '}
+                            {[evidence.asset.name, evidence.asset.asset_tag]
+                                .filter(Boolean)
+                                .join(' · ') || 'Recorded asset'}
+                        </dd>
+                    ) : null}
                     <dd className="mt-1 flex flex-wrap gap-1.5">
                         <StatusBadge variant="neutral" size="sm">
-                            {label(evidence.device.status)}
+                            Device status: {label(evidence.device.status)}
                         </StatusBadge>
                         <StatusBadge variant="neutral" size="sm">
+                            Recorded health:{' '}
                             {label(evidence.device.health_status)}
                         </StatusBadge>
+                    </dd>
+                    <dd className="text-caption mt-1 text-muted-foreground">
+                        These are the device record values at capture. The
+                        monitoring observation is recorded separately below.
                     </dd>
                 </Card>
 

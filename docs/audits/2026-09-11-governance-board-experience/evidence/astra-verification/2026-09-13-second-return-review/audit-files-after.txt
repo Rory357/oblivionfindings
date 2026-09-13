@@ -1,0 +1,15 @@
+ M docs/audits/2026-09-11-governance-board-experience/acceptance-checklist.md
+ M docs/audits/2026-09-11-governance-board-experience/antigravity-implementation-prompt.md
+ M docs/audits/2026-09-11-governance-board-experience/astra-verification-prompt.md
+ M docs/audits/2026-09-11-governance-board-experience/audit.md
+ M docs/audits/2026-09-11-governance-board-experience/implementation-plan.md
+ M docs/audits/2026-09-11-governance-board-experience/implementation-progress.md
+ M docs/audits/2026-09-11-governance-board-experience/implementation-tasks.md
+?? docs/audits/2026-09-11-governance-board-experience/astra-progress-review-2026-09-12.md
+?? docs/audits/2026-09-11-governance-board-experience/astra-second-return-review-2026-09-13.md
+?? docs/audits/2026-09-11-governance-board-experience/astra-verification.md
+?? docs/audits/2026-09-11-governance-board-experience/evidence/astra-verification/
+?? docs/audits/2026-09-11-governance-board-experience/evidence/implementation/
+?? docs/audits/2026-09-11-governance-board-experience/gemini-correction-prompt.md
+?? docs/audits/2026-09-11-governance-board-experience/gemini-fresh-context-prompt.md
+?? docs/audits/2026-09-11-governance-board-experience/navigation-workflow-decision-2026-09-13.md

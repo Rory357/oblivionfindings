@@ -18,18 +18,30 @@ import { Head, useForm } from '@inertiajs/react';
 interface Props extends PageProps {
     boardMembers: Array<{ id: number; user: { name: string } }>;
     committees: Array<{ id: number; name: string; committee_type: string }>;
+    initialScheduledAt?: string | null;
 }
 
 export default function MeetingCreate({
     auth,
     boardMembers,
     committees,
+    initialScheduledAt,
 }: Props) {
+    const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const urlDate = searchParams?.get('date');
+    const urlHour = searchParams?.get('hour');
+    let fallbackScheduledAt = '';
+    if (urlDate) {
+        const hourNum = urlHour !== null && urlHour !== undefined ? parseInt(urlHour, 10) : 9;
+        const padHour = String(isNaN(hourNum) ? 9 : hourNum).padStart(2, '0');
+        fallbackScheduledAt = `${urlDate}T${padHour}:00`;
+    }
+
     const { data, setData, post, processing, errors } = useForm({
         meeting_type: 'full_board',
         board_committee_id: '',
         title: '',
-        scheduled_at: '',
+        scheduled_at: initialScheduledAt || fallbackScheduledAt || '',
         duration_minutes: 120,
         location: '',
         virtual_link: '',
@@ -103,6 +115,43 @@ export default function MeetingCreate({
                                     </p>
                                 )}
                             </div>
+
+                            {/* Committee (if applicable) */}
+                            {committees && committees.length > 0 && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="board_committee_id">
+                                        Committee (Optional)
+                                    </Label>
+                                    <Select
+                                        value={data.board_committee_id || 'none'}
+                                        onValueChange={(value) =>
+                                            setData('board_committee_id', value === 'none' ? '' : value)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select committee (or Full Board)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">
+                                                None (Full Board)
+                                            </SelectItem>
+                                            {committees.map((committee) => (
+                                                <SelectItem
+                                                    key={committee.id}
+                                                    value={String(committee.id)}
+                                                >
+                                                    {committee.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.board_committee_id && (
+                                        <p className="text-sm text-status-critical">
+                                            {errors.board_committee_id}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Title */}
                             <div className="space-y-2">

@@ -1,0 +1,2 @@
+resources/js/components/monitoring/monitoring-incident-evidence-card.tsx 766ms
+resources/js/components/monitoring/monitoring-incident-evidence-card.test.tsx 92ms

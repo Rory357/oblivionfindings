@@ -29,6 +29,26 @@ trait GovernanceTestHelpers
         if ($adminRole) {
             $adminRole->permissions()->sync(Permission::pluck('id'));
         }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('governance_voting_profiles')) {
+            \App\Domain\Governance\Models\GovernanceVotingProfile::updateOrCreate(
+                ['governing_body' => 'board', 'board_committee_id' => null],
+                [
+                    'legal_form' => 'charitable_trust',
+                    'governing_document_reference' => 'Trust Deed 2024 (Test Authority)',
+                    'governing_document_version' => 'v1.0',
+                    'quorum_mode' => 'majority_floor_plus_one',
+                    'quorum_formula' => 'floor(N/2)+1',
+                    'ordinary_threshold_formula' => 'for > against of valid votes cast',
+                    'unanimous_denominator_formula' => 'assent from all entitled voters',
+                    'written_voting_permitted' => true,
+                    'written_unanimity_required' => false,
+                    'recusal_policy' => 'exclude_from_presence_and_tally_without_reducing_N',
+                    'is_active' => true,
+                    'approved_at' => now(),
+                ]
+            );
+        }
     }
 
     protected function createAdminUser(array $overrides = []): User
@@ -91,10 +111,19 @@ trait GovernanceTestHelpers
         return Resolution::create(array_merge([
             'resolution_reference' => 'RES-'.strtoupper(Str::random(6)),
             'title' => 'Test Resolution',
-            'context' => 'Test resolution context',
-            'options' => [],
+            'exact_motion' => 'That the Board approves the proposal as presented.',
+            'purpose' => 'decision',
+            'context' => 'Test resolution context providing background and rationale for the decision.',
+            'options' => [
+                ['label' => 'Approve', 'description' => 'Proceed with implementation', 'benefits' => 'Immediate rollout', 'drawbacks' => 'Capital outlay'],
+                ['label' => 'Defer', 'description' => 'Defer to next financial year', 'benefits' => 'Preserves cash', 'drawbacks' => 'Delays benefits'],
+            ],
+            'recommendation' => 'Management recommends Option 1 (Approve) based on service continuity.',
+            'cost_impact' => ['amount' => 0, 'currency' => 'NZD', 'funding_source' => 'Operational', 'is_none' => true],
+            'risk_impact' => ['level' => 'low', 'description' => 'Low residual operational risk'],
             'voting_threshold' => 'simple_majority',
             'status' => 'draft',
+            'version_number' => 1,
             'proposed_by' => $proposer->id,
             'proposed_at' => now(),
         ], $overrides));

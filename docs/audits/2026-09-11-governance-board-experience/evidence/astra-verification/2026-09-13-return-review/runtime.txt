@@ -1,0 +1,25 @@
+no_approved_profile_opens
+written_disabled_opens
+written_unanimity_rule_ignored
+unanimous_all_entitled_for
+new_member_outside_frozen_electorate_can_vote
+quorum_profile_ignored
+draft_resolution_activates_rules
+unrelated_carried_resolution_activates_rules
+assigned_private_action
+attendance_status_still_grants_private_access
+unassigned_executive_committee_grants_access
+ceo_review_detail_and_list
+fabricated_action_evidence_in_testing
+empty_evidence_record_in_local_environment
+stale_action_models_overwrite
+completed_action_reopens
+stale_minutes_approval_from_ui_payload
+stale_minutes_explicit_version_rejected
+unrelated_same_amount_resolution_approves_budget
+pack_confidential_agenda_and_motion
+private_decision_widget
+policy_work_feed
+calendar_implemented_and_cancelled
+role_http_smoke
+REVIEW_READY {"database":"oblivion_gov_review_runtime_20260913_20892","pid":20892,"actors":{"chair":{"user_id":1,"board_member_id":1,"email":"review-chair@example.test","role":"board_chair"},"secretary":{"user_id":2,"board_member_id":2,"email":"review-secretary@example.test","role":"board_secretary"},"member":{"user_id":3,"board_member_id":3,"email":"review-member@example.test","role":"board_member"},"finance":{"user_id":4,"board_member_id":4,"email":"review-finance@example.test","role":"board_member"},"other":{"user_id":5,"board_member_id":5,"email":"review-other@example.test","role":"board_member"},"ceo":{"user_id":6,"board_member_id":null,"email":"review-ceo@example.test","role":"ceo"},"observer":{"user_id":7,"board_member_id":6,"email":"review-observer@example.test","role":"board_observer"}},"meeting_id":1,"private_meeting_id":2,"resolution_id":1,"private_resolution_id":2,"private_action_id":1,"review_id":1,"minute_id":1,"obligation_id":1,"committee_id":1,"normal_action_id":43}

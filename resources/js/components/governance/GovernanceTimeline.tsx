@@ -39,6 +39,7 @@ export interface TimelinePayload {
 interface GovernanceTimelineProps {
     timeline: TimelinePayload;
     defaultLimit?: number;
+    onRetry?: () => void;
 }
 
 function actorInitials(name: string): string {
@@ -59,11 +60,14 @@ function actorInitials(name: string): string {
 export function GovernanceTimeline({
     timeline,
     defaultLimit = 8,
+    onRetry,
 }: GovernanceTimelineProps) {
     const [expanded, setExpanded] = useState(false);
-    const events = timeline.events;
+    const isArray = Array.isArray(timeline?.events);
+    const events = isArray ? timeline.events : [];
 
     const grouped = useMemo(() => {
+        if (!isArray) return [];
         const map = new Map<string, TimelineEvent[]>();
         for (const e of events.slice(
             0,
@@ -75,7 +79,7 @@ export function GovernanceTimeline({
             map.set(day, list);
         }
         return Array.from(map.entries());
-    }, [events, expanded, defaultLimit]);
+    }, [events, expanded, defaultLimit, isArray]);
 
     return (
         <Card data-dusk="cockpit-timeline">
@@ -86,12 +90,12 @@ export function GovernanceTimeline({
                             Governance Timeline
                         </CardTitle>
                         <CardDescription>
-                            {timeline.since
+                            {timeline?.since
                                 ? `What has changed since ${timeline.since.title} on ${timeline.since.held_label}.`
                                 : 'Recent governance activity across the organisation.'}
                         </CardDescription>
                     </div>
-                    {timeline.since && (
+                    {timeline?.since && (
                         <Link
                             href={`/governance/meetings/${timeline.since.meeting_id}`}
                             className="text-xs font-medium text-primary hover:underline"
@@ -102,7 +106,33 @@ export function GovernanceTimeline({
                 </div>
             </CardHeader>
             <CardContent>
-                {events.length === 0 ? (
+                {!isArray ? (
+                    <div
+                        className="rounded-lg border border-dashed border-destructive/50 bg-destructive/5 p-8 text-center"
+                        data-dusk="timeline-error"
+                    >
+                        <History
+                            className="mx-auto h-5 w-5 text-destructive"
+                            aria-hidden="true"
+                        />
+                        <p className="mt-2 text-sm font-medium text-foreground">
+                            Recent activity could not be loaded
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Activity data was malformed or temporarily unavailable.
+                        </p>
+                        {onRetry && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={onRetry}
+                                className="mt-4"
+                            >
+                                Retry
+                            </Button>
+                        )}
+                    </div>
+                ) : events.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-border p-8 text-center">
                         <History
                             className="mx-auto h-5 w-5 text-muted-foreground"

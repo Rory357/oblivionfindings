@@ -1,0 +1,74 @@
+[
+  {
+    "path": "app/Domain/It/Services/ItTicketLinkService.php",
+    "matches": true
+  },
+  {
+    "path": "app/Domain/It/Services/ItControlRoomHandoffService.php",
+    "matches": true
+  },
+  {
+    "path": "app/Domain/It/Presenters/ItTicketActivityPresenter.php",
+    "matches": true
+  },
+  {
+    "path": "app/Domain/Monitoring/Services/MonitoringIncidentEvidenceService.php",
+    "matches": true
+  },
+  {
+    "path": "app/Domain/Monitoring/Presenters/MonitoringIncidentEvidencePresenter.php",
+    "matches": true
+  },
+  {
+    "path": "app/Listeners/It/CreateOrUpdateMonitoringTicket.php",
+    "matches": true
+  },
+  {
+    "path": "app/Listeners/It/CreateOrUpdateFleetMonitoringTicket.php",
+    "matches": true
+  },
+  {
+    "path": "tests/Feature/It/ItControlRoomHandoffTest.php",
+    "matches": true
+  },
+  {
+    "path": "tests/Concurrency/It/ItMonitoringDeliveryConcurrencyTest.php",
+    "matches": true
+  },
+  {
+    "path": "tests/Concurrency/It/ItFleetDeliveryConcurrencyTest.php",
+    "matches": true
+  },
+  {
+    "path": "tests/Support/It/monitoring-delivery-concurrency-worker.php",
+    "matches": true
+  },
+  {
+    "path": "tests/Support/It/VerifiesMonitoringHandoffConcurrency.php",
+    "matches": true
+  },
+  {
+    "path": "app/Http/Requests/It/ControlRoomHandoffRequest.php",
+    "matches": true
+  },
+  {
+    "path": "app/Http/Controllers/It/ItControlRoomHandoffController.php",
+    "matches": true
+  },
+  {
+    "path": "app/Http/Middleware/ProtectItDraftResponses.php",
+    "matches": true
+  },
+  {
+    "path": "routes/web.php",
+    "matches": true
+  },
+  {
+    "path": "resources/js/hooks/it-control-room-handoff-contract.ts",
+    "matches": true
+  },
+  {
+    "path": "resources/js/hooks/it-control-room-handoff-contract.test.ts",
+    "matches": true
+  }
+]

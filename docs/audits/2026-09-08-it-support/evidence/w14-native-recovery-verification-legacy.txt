@@ -1,0 +1,66 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_a2a6d1339a73461e",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Monitoring\MonitoringRecoveryPipelineTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit resolves the offline alert and does not create a device-online alert[39m[90m                                   [39m [90m176.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit processes an identity-less recovery without resolving unrelated alerts[39m[90m                                   [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects non-recovery signals from the device recovery path[39m[90m                                               [39m [90m0.13s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItMonitoringTicketIntegrationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit links one ticket idempotently to a canonical device and alert[39m[90m                                            [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects a human ticket link without a current responsible actor[39m[90m                                          [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rejects monitoring links when canonical device and alert site evidence is absent[39m[90m                         [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit allows a system incident without a human requester[39m[90m                                                       [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit creates one linked system incident for a confirmed IT infrastructure outage[39m[90m                              [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit keeps separate canonical Device outages distinct without Control Room projections[39m[90m                        [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit adds repeated evidence to the same ticket instead of creating a duplicate[39m[90m                                [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit creates a fresh incident when an outage repeats after the earlier monitoring ticket was resolved[39m[90m         [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit marks the ticket monitoring recovered but leaves technician resolution open[39m[90m                              [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not recover a system ticket that lacks the enforced monitoring principal evidence[39m[90m                   [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not turn security or healthcare signals into automatic IT incidents without policy with ('security'[39m[90m…[39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not turn security or healthcare signals into automatic IT incidents without policy with ('iot_healt[39m[90m…[39m [90m0.17s[39m  
+
+  [90mTests:[39m    [32;1m15 passed[39;22m[90m (54 assertions)[39m
+  [90mDuration:[39m [39m179.58s[39m
+
+{"phase":"focused_tests_finished","exit_code":0}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_a2a6d1339a73461e",
+    "database_mutations_performed": false
+}

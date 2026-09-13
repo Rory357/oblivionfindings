@@ -105,6 +105,24 @@ function EmptyForTab({ tab }: { tab: TabKey }) {
     );
 }
 
+function scopedViewUrl(tab: TabKey): string {
+    switch (tab) {
+        case 'meetings':
+            return '/governance/meetings';
+        case 'actions':
+            return '/governance/actions';
+        case 'risks':
+            return '/governance/risks';
+        case 'compliance':
+            return '/governance/compliance';
+        case 'policies':
+            return '/governance/policies';
+        case 'all':
+        default:
+            return '/governance/actions';
+    }
+}
+
 /**
  * Tabbed list of priority cards. Tabs use the same `PageTabs` component the
  * Sites module uses, so visual styling is identical (underlined trigger,
@@ -155,7 +173,7 @@ export function PriorityOverviewPanel({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <CardTitle className="text-lg">
-                            Priority Overview
+                            Board priorities
                         </CardTitle>
                         <CardDescription>
                             Board decisions, risks and obligations ranked by
@@ -195,7 +213,7 @@ export function PriorityOverviewPanel({
                                 <EmptyForTab tab={def.key} />
                             ) : (
                                 filterFor(def.key, actions)
-                                    .slice(0, 10)
+                                    .slice(0, 8)
                                     .map((action) => (
                                         <BoardPriorityCard
                                             key={action.id}
@@ -203,13 +221,16 @@ export function PriorityOverviewPanel({
                                         />
                                     ))
                             )}
-                            {filtered.length > 10 && def.key === tab ? (
+                            {filtered.length > 8 && def.key === tab ? (
                                 <div className="pt-2 text-center">
                                     <Link
-                                        href="/governance/actions"
+                                        href={scopedViewUrl(def.key)}
                                         className="text-xs font-medium text-primary hover:underline"
                                     >
-                                        View all {filtered.length} items
+                                        View all {filtered.length}{' '}
+                                        {def.key === 'all'
+                                            ? 'priorities'
+                                            : def.label.toLowerCase()}
                                     </Link>
                                 </div>
                             ) : null}

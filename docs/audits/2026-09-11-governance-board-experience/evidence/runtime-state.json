@@ -1,0 +1,59 @@
+{
+    "database": "oblivion_gov_audit_20260911_9888",
+    "actors": {
+        "member": {
+            "user_id": 1,
+            "role": "board_member",
+            "email": "gov-member@example.test",
+            "board_member_id": 1
+        },
+        "chair": {
+            "user_id": 2,
+            "role": "board_chair",
+            "email": "gov-chair@example.test",
+            "board_member_id": 2
+        },
+        "secretary": {
+            "user_id": 3,
+            "role": "board_secretary",
+            "email": "gov-secretary@example.test",
+            "board_member_id": 3
+        },
+        "treasurer": {
+            "user_id": 4,
+            "role": "board_member",
+            "email": "gov-treasurer@example.test",
+            "board_member_id": 4
+        },
+        "ceo": {
+            "user_id": 5,
+            "role": "ceo",
+            "email": "gov-ceo@example.test",
+            "board_member_id": null
+        },
+        "observer": {
+            "user_id": 6,
+            "role": "board_observer",
+            "email": "gov-observer@example.test",
+            "board_member_id": 5
+        },
+        "duplicate": {
+            "user_id": 7,
+            "role": "board_member",
+            "email": "gov-duplicate@example.test",
+            "board_member_id": 6
+        }
+    },
+    "meeting_id": 1,
+    "executive_meeting_id": 2,
+    "resolution_id": 1,
+    "private_resolution_id": 2,
+    "no_deadline_resolution_id": 3,
+    "pack_id": 1,
+    "minute_id": 1,
+    "budget_id": 1,
+    "strategy_id": 1,
+    "obligation_id": 1,
+    "checkout": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "pid": 9888
+}

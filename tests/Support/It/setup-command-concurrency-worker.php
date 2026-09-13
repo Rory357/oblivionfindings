@@ -21,7 +21,7 @@ if (DB::connection()->getDatabaseName() !== getenv('DB_DATABASE') || config('mai
 }
 Notification::fake();
 [$script, $operation, $actorId, $resource, $uuid, $ready, $attempt, $release] = $argv;
-if (! in_array($operation, ['create', 'cancel'], true) || ! in_array($resource, ['teams', 'queues', 'services'], true)) {
+if (! in_array($operation, ['create', 'cancel'], true) || ! in_array($resource, ['teams', 'queues', 'services', 'provisioning-templates'], true)) {
     throw new RuntimeException('Unexpected isolated Setup operation.');
 }
 $barrierRoot = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, storage_path('framework/testing')).DIRECTORY_SEPARATOR;
@@ -46,7 +46,18 @@ $commands = app(ItSetupCommandService::class);
 $result = $operation === 'cancel' ? $commands->cancel($actor, $resource, $uuid, (int) $actor->id)
     : $commands->create($actor, $resource, [
         'actor_user_id' => $actor->id, 'request_uuid' => $uuid, 'name' => 'Isolated Setup '.$uuid,
-        'is_active' => false, ...($resource !== 'teams' ? ['key' => 'isolated-'.$uuid] : []),
+        'is_active' => false, ...(in_array($resource, ['queues', 'services'], true) ? ['key' => 'isolated-'.$uuid] : []),
         ...($resource === 'services' ? ['status' => 'operational', 'criticality' => 'medium'] : []),
+        ...($resource === 'provisioning-templates' ? [
+            'lifecycle_type' => 'joiner', 'site_id' => null, 'position_role' => null,
+            'employment_type' => null, 'selection_priority' => 0,
+            'tasks' => [[
+                'task_key' => 'account', 'title' => 'Verify synthetic account',
+                'description' => 'Manual verification only', 'category' => 'account', 'action' => 'verify',
+                'request_type' => 'account', 'responsible_team_id' => null, 'stage' => 1, 'sort_order' => 0,
+                'dependency_task_keys' => [], 'trigger_fields' => [], 'approval_required' => true,
+                'evidence_required' => true, 'due_offset_days' => 0, 'fulfiller_fields' => ['work_email'],
+            ]],
+        ] : []),
     ]);
 echo json_encode([...$result, 'attempted_at' => $attemptedAt, 'completed_at' => microtime(true)], JSON_THROW_ON_ERROR);

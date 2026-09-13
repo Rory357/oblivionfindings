@@ -67,7 +67,15 @@ class ComplianceController extends Controller
     {
         $this->authorize('view', $obligation);
 
-        $obligation->load(['owner', 'evidence.uploadedBy', 'reminders']);
+        $obligation->load([
+            'owner',
+            'completedBy',
+            'signedOffBy',
+            'evidence.uploadedBy',
+            'reminders',
+            'parentObligation',
+            'recurrences',
+        ]);
 
         return Inertia::render('Governance/Compliance/Show', [
             'obligation' => $obligation,
@@ -142,12 +150,20 @@ class ComplianceController extends Controller
         $validated = $request->validate([
             'evidence_ids' => 'nullable|array',
             'evidence_ids.*' => 'exists:compliance_evidence,id',
+            'completion_notes' => 'nullable|string|max:2000',
+            'notes' => 'nullable|string|max:2000',
+            'expected_version' => 'nullable|integer|min:1',
         ]);
+
+        $notes = $validated['completion_notes'] ?? $validated['notes'] ?? null;
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
         $this->complianceService->completeObligation(
             $obligation,
             auth()->user(),
-            $validated['evidence_ids'] ?? null
+            $validated['evidence_ids'] ?? null,
+            $notes,
+            $expectedVersion
         );
 
         return redirect()->back()->with('success', 'Obligation marked complete.');

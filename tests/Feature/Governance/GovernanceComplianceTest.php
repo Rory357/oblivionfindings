@@ -62,13 +62,28 @@ class GovernanceComplianceTest extends TestCase
             'obligation_title' => 'Updated Obligation',
         ]);
 
-        $completeResponse = $this->actingAs($admin)->post("/governance/compliance/{$obligation->id}/complete", []);
+        \Illuminate\Support\Facades\Storage::disk('local')->put('docs/filing.pdf', 'evidence content');
+        ComplianceEvidence::create([
+            'compliance_obligation_id' => $obligation->id,
+            'evidence_type' => 'document',
+            'title' => 'Valid annual filing document',
+            'file_path' => 'docs/filing.pdf',
+            'valid_until' => today()->addMonths(6),
+            'uploaded_by' => $admin->id,
+            'uploaded_at' => now(),
+        ]);
+
+        $completeResponse = $this->actingAs($admin)->post("/governance/compliance/{$obligation->id}/complete", [
+            'completion_notes' => 'Filed with registry successfully.',
+            'expected_version' => 1,
+        ]);
         $completeResponse->assertRedirect();
 
         $this->assertDatabaseHas('compliance_obligations', [
             'id' => $obligation->id,
             'status' => 'complete',
             'completed_by' => $admin->id,
+            'completion_notes' => 'Filed with registry successfully.',
         ]);
     }
 
@@ -156,6 +171,88 @@ class GovernanceComplianceTest extends TestCase
                 ->has('relatedIncidents')
                 ->has('frameworks')
             );
+    }
+
+    public function test_complete_obligation_fails_validation_when_evidence_required_and_missing(): void
+    {
+        $admin = $this->createAdminUser();
+        $obligation = $this->createComplianceObligation($admin, [
+            'evidence_required' => true,
+        ]);
+
+        $response = $this->actingAs($admin)->post("/governance/compliance/{$obligation->id}/complete", []);
+        $response->assertSessionHasErrors('evidence');
+
+        $obligation->refresh();
+        $this->assertNotEquals('complete', $obligation->status);
+    }
+
+    public function test_complete_obligation_fails_validation_when_borrowing_foreign_evidence(): void
+    {
+        $admin = $this->createAdminUser();
+        $obligationA = $this->createComplianceObligation($admin, ['obligation_code' => 'PRIV-F-A']);
+        $obligationB = $this->createComplianceObligation($admin, ['obligation_code' => 'PRIV-F-B']);
+
+        $evidenceB = ComplianceEvidence::create([
+            'compliance_obligation_id' => $obligationB->id,
+            'evidence_type' => 'document',
+            'title' => 'Evidence of Obligation B',
+            'file_path' => 'docs/b.pdf',
+            'valid_until' => today()->addMonths(6),
+            'uploaded_by' => $admin->id,
+            'uploaded_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)->post("/governance/compliance/{$obligationA->id}/complete", [
+            'evidence_ids' => [$evidenceB->id],
+        ]);
+        $response->assertSessionHasErrors('evidence_ids');
+
+        // Verify evidence B is still owned by obligation B
+        $evidenceB->refresh();
+        $this->assertEquals($obligationB->id, $evidenceB->compliance_obligation_id);
+    }
+
+    public function test_complete_obligation_fails_validation_when_evidence_expired(): void
+    {
+        $admin = $this->createAdminUser();
+        $obligation = $this->createComplianceObligation($admin);
+
+        $expired = ComplianceEvidence::create([
+            'compliance_obligation_id' => $obligation->id,
+            'evidence_type' => 'certification',
+            'title' => 'Expired ISO Audit',
+            'file_path' => 'docs/expired.pdf',
+            'valid_until' => today()->subDays(10),
+            'uploaded_by' => $admin->id,
+            'uploaded_at' => now()->subYear(),
+        ]);
+
+        $response = $this->actingAs($admin)->post("/governance/compliance/{$obligation->id}/complete", [
+            'evidence_ids' => [$expired->id],
+        ]);
+        $response->assertSessionHasErrors('evidence_ids');
+    }
+
+    public function test_complete_obligation_fails_with_409_on_stale_expected_version(): void
+    {
+        $admin = $this->createAdminUser();
+        $obligation = $this->createComplianceObligation($admin, ['version_number' => 2]);
+
+        ComplianceEvidence::create([
+            'compliance_obligation_id' => $obligation->id,
+            'evidence_type' => 'document',
+            'title' => 'Evidence file',
+            'file_path' => 'docs/f.pdf',
+            'valid_until' => today()->addMonths(6),
+            'uploaded_by' => $admin->id,
+            'uploaded_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)->post("/governance/compliance/{$obligation->id}/complete", [
+            'expected_version' => 1, // Stale version
+        ]);
+        $response->assertStatus(409);
     }
 
     private function makeCurrentStaff(User $user): void

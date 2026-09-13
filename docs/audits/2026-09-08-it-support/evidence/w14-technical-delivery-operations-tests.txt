@@ -1,0 +1,122 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_eb7c89d60ff64a93",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItTechnicalDeliveryOperationsTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mtechnical delivery facts use only permitted current sources and never project raw diagnostics with ('devi[39m[90m…[39m [90m179.05s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mtechnical delivery facts use only permitted current sources and never project raw diagnostics with ('fleet'[39m[90m…[39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrevoked source access and unapproved actors have no delivery counts[39m[90m                                         [39m [90m0.63s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mscope drift and a lost last approved site remove counts as well as history[39m[90m                                  [39m [90m0.63s[39m  
+  [31;1m⨯[39;22m[90m [39m[90munknown outcome text is concealed and source delivery never implies IT success[39m[90m                              [39m [90m0.59s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTechnicalDeliveryOperationsTest[22m [90m>[39m technical delivery facts use only permitted current…    
+[39;1m  Failed asserting that an array has a key 'can_view' with the value false.
+Failed asserting that false matches expected true.[39;22m
+
+  at [32mtests\Feature\It\ItTechnicalDeliveryOperationsTest.php[39m:[32m95[39m
+     91▕     technicalOperationsDelivery($site, $source, ['it_status' => null, 'it_scope' => null]);
+     92▕     technicalOperationsDelivery(Site::factory()->create(), $source, ['it_status' => 'failed']);
+     93▕ 
+     94▕     $health = collect(app(ItTechnicalDeliveryOperationsPresenter::class)->operations($actor)['sources'])->firstWhere('source', $source);
+  ➜  95▕     expect($health)->toMatchArray(['can_view' => true, 'available' => true, 'total' => 2, 'failures' => 1, 'pending' => 0, 'legacy_unverified' => null])
+     96▕         ->and($health['oldest_pending_at'])->toBe(now()->subHour()->toIso8601String())
+     97▕         ->and($health['last_success_at'])->toBe(now()->subMinutes(4)->toIso8601String())
+     98▕         ->and(collect($health['rows'])->firstWhere('id', $failed->id))->toMatchArray(['attempts' => 3, 'outcome_code' => 'processing_failed', 'source_delivered' => true])
+     99▕         ->and(json_encode($health))->not->toContain('private-', '999999', 'it_scope', 'payload', 'device_id', 'asset_id');
+
+  [33m1   [39m[39;1mtests\Feature\It\ItTechnicalDeliveryOperationsTest.php[39;22m:[39;1m95[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTechnicalDeliveryOperationsTest[22m [90m>[39m technical delivery facts use only permitted current…    
+[39;1m  Failed asserting that an array has a key 'can_view' with the value false.
+Failed asserting that false matches expected true.[39;22m
+
+  at [32mtests\Feature\It\ItTechnicalDeliveryOperationsTest.php[39m:[32m95[39m
+     91▕     technicalOperationsDelivery($site, $source, ['it_status' => null, 'it_scope' => null]);
+     92▕     technicalOperationsDelivery(Site::factory()->create(), $source, ['it_status' => 'failed']);
+     93▕ 
+     94▕     $health = collect(app(ItTechnicalDeliveryOperationsPresenter::class)->operations($actor)['sources'])->firstWhere('source', $source);
+  ➜  95▕     expect($health)->toMatchArray(['can_view' => true, 'available' => true, 'total' => 2, 'failures' => 1, 'pending' => 0, 'legacy_unverified' => null])
+     96▕         ->and($health['oldest_pending_at'])->toBe(now()->subHour()->toIso8601String())
+     97▕         ->and($health['last_success_at'])->toBe(now()->subMinutes(4)->toIso8601String())
+     98▕         ->and(collect($health['rows'])->firstWhere('id', $failed->id))->toMatchArray(['attempts' => 3, 'outcome_code' => 'processing_failed', 'source_delivered' => true])
+     99▕         ->and(json_encode($health))->not->toContain('private-', '999999', 'it_scope', 'payload', 'device_id', 'asset_id');
+
+  [33m1   [39m[39;1mtests\Feature\It\ItTechnicalDeliveryOperationsTest.php[39;22m:[39;1m95[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTechnicalDeliveryOperationsTest[22m [90m>[39m scope drift and a lost last approved site remove cou…   
+[39;1m  Failed asserting that null is identical to 0.[39;22m
+
+  at [32mtests\Feature\It\ItTechnicalDeliveryOperationsTest.php[39m:[32m123[39m
+    119▕     DeviceAssignment::query()->create([
+    120▕         'device_id' => $row->event->device_id, 'assignable_type' => DeviceAssignment::TARGET_SITE,
+    121▕         'assignable_id' => $other->id, 'assignment_type' => 'permanent', 'assigned_at' => now(), 'assigned_by_user_id' => $actor->id,
+    122▕     ]);
+  ➜ 123▕     expect(app(ItTechnicalDeliveryOperationsPresenter::class)->operations($actor)['sources'][0]['total'])->toBe(0);
+    124▕     technicalOperationsDelivery($site);
+    125▕     HrEmployeeProfile::query()->where('user_id', $actor->id)->update(['is_active' => false]);
+    126▕     expect(app(ItTechnicalDeliveryOperationsPresenter::class)->operations($actor->fresh())['sources'][0])
+    127▕         ->toMatchArray(['total' => 0, 'rows' => []]);
+
+  [33m1   [39m[39;1mtests\Feature\It\ItTechnicalDeliveryOperationsTest.php[39;22m:[39;1m123[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItTechnicalDeliveryOperationsTest[22m [90m>[39m unknown outcome text is concealed an… [41;1m ErrorException [49;22m  
+[39;1m  Undefined array key 0[39;22m
+
+  at [32mtests\Feature\It\ItTechnicalDeliveryOperationsTest.php[39m:[32m135[39m
+    131▕     $site = Site::factory()->create();
+    132▕     $actor = technicalOperationsActor($site);
+    133▕     technicalOperationsDelivery($site, attributes: ['it_status' => 'unroutable', 'it_outcome_code' => 'private-diagnostic-sentinel']);
+    134▕     $health = app(ItTechnicalDeliveryOperationsPresenter::class)->operations($actor)['sources'][0];
+  ➜ 135▕     expect($health['last_success_at'])->toBeNull()->and($health['rows'][0])
+    136▕         ->toMatchArray(['state' => 'unroutable', 'outcome_code' => null, 'source_delivered' => true])
+    137▕         ->and(json_encode($health))->not->toContain('private-diagnostic-sentinel');
+    138▕ });
+    139▕
+
+
+  [90mTests:[39m    [31;1m4 failed[39;22m[90m,[39m[39m [39m[32;1m1 passed[39;22m[90m,[39m[39m [2m2 pending[22m[39m[90m (15 assertions)[39m
+  [90mDuration:[39m [39m181.97s[39m
+
+{"exit_code":2,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_eb7c89d60ff64a93",
+    "database_mutations_performed": false
+}

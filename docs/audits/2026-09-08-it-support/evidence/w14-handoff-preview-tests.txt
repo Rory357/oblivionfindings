@@ -1,0 +1,95 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_cb5092c8a00a45d2",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItControlRoomHandoffTest[39m
+  [32;1m✓[39;22m[90m [39m[90mhandoff preview uses canonical site services and permits recovery after alert resolution[39m[90m                  [39m [90m178.59s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP preview is actor-bound private and contains no operational free text[39m[90m                           [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP commit replay recovery and late cancellation return one canonical outcome[39m[90m                      [39m [90m0.29s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP unknown receipt is distinct from denial and cancellation blocks late submission[39m[90m                [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP stale source target and changed command intent cannot silently save[39m[90m                            [39m [90m0.29s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP failure hides debug text and does not flash submitted work before a safe retry[39m[90m                 [39m [90m0.30s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP denies source or actor changes on every operation without exposing receipts with ('grant')[39m[90m     [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP denies source or actor changes on every operation without exposing receipts with ('site')[39m[90m      [39m [90m0.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP denies source or actor changes on every operation without exposing receipts with ('privacy')[39m[90m   [39m [90m0.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP denies source or actor changes on every operation without exposing receipts with ('unapproved'[39m[90m…[39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhandoff HTTP signed-out requests return private JSON instead of a login page or old input[39m[90m                   [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhuman creation uses canonical intake and one recoverable audited handoff without changing the alert[39m[90m         [39m [90m0.24s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexisting ticket selection creates a canonical actor link and rejects another destination[39m[90m                    [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic work already linked to the alert is reused rather than copied by human creation[39m[90m                   [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcancellation tombstone prevents late creation and does not expose another alert receipt[39m[90m                     [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mchanged intent cannot replay a committed command[39m[90m                                                            [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstale source and target versions fail before writes[39m[90m                                                         [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmandatory handoff audit failure rolls back intake links and receipts and a retry succeeds[39m[90m                   [39m [90m0.30s[39m  
+  [32;1m✓[39;22m[90m [39m[90msource permissions Site and controlled content are checked before preview or receipt disclosure with ('gran[39m[90m…[39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90msource permissions Site and controlled content are checked before preview or receipt disclosure with ('site[39m[90m…[39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90msource permissions Site and controlled content are checked before preview or receipt disclosure with ('priv[39m[90m…[39m [90m0.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross Site settled and merged candidates cannot be linked and are absent from search with ('site')[39m[90m          [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross Site settled and merged candidates cannot be linked and are absent from search with ('closed')[39m[90m        [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcross Site settled and merged candidates cannot be linked and are absent from search with ('merged')[39m[90m        [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcontrolled source metadata remains concealed in existing IT context and human link service[39m[90m                  [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclassification and original actor are validated before a handoff can create work with ('category')[39m[90m          [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclassification and original actor are validated before a handoff can create work with ('impact')[39m[90m            [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclassification and original actor are validated before a handoff can create work with ('urgency')[39m[90m           [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclassification and original actor are validated before a handoff can create work with ('viewer_user_id')[39m[90m    [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued monitoring binds the real human selection and preserves recovery replay and later episodes with ('na[39m[90m…[39m [90m0.44s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued monitoring binds the real human selection and preserves recovery replay and later episodes with ('na[39m[90m…[39m [90m0.39s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued monitoring binds the real human selection and preserves recovery replay and later episodes with ('fl[39m[90m…[39m [90m0.38s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqueued monitoring binds the real human selection and preserves recovery replay and later episodes with ('fl[39m[90m…[39m [90m0.36s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma human looking source link without a committed handoff receipt cannot redirect automatic delivery with ('n[39m[90m…[39m [90m0.26s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma human looking source link without a committed handoff receipt cannot redirect automatic delivery with ('f[39m[90m…[39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma handoff merged before queued delivery requires reconciliation rather than creating another ticket with ('[39m[90m…[39m [90m0.24s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma handoff merged before queued delivery requires reconciliation rather than creating another ticket with ('[39m[90m…[39m [90m0.21s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItControlRoomMonitoringContextTest[39m
+  [32;1m✓[39;22m[90m [39m[90mone immutable incident snapshot preserves original evidence while both workspaces show live canonical state[39m[90m [39m [90m0.39s[39m  
+  [32;1m✓[39;22m[90m [39m[90msource permissions Site access and checksum integrity fail closed on both projections[39m[90m                       [39m [90m0.34s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.28s[39m  
+  [32;1m✓[39;22m[90m [39m[90mautomatic monitoring never copies free text diagnostics into IT descriptions activity or snapshots with dat[39m[90m…[39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistorical monitoring diagnostics stay protected without changing stored evidence or human authored descrip[39m[90m…[39m [90m0.58s[39m  
+
+  [90mTests:[39m    [32;1m44 passed[39;22m[90m (464 assertions)[39m
+  [90mDuration:[39m [39m189.40s[39m
+
+{"phase":"focused_tests_finished","exit_code":0}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_cb5092c8a00a45d2",
+    "database_mutations_performed": false
+}

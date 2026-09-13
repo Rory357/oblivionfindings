@@ -45,10 +45,16 @@ final class ItApiOperationsPresenter
         $historyTotal = (clone $query)->count();
         $lastPage = max(1, (int) ceil($historyTotal / 25));
         $page = max(1, min($page, $lastPage));
-        $url = fn (int $number) => '/it/setup?'.http_build_query([
-            'tab' => 'operations', ...array_intersect_key($filters, array_flip(['automation_from', 'automation_to'])),
-            ...($search !== '' ? ['q' => $search] : []), 'api_request_page' => $number,
-        ]).'#it-api-request-history';
+        $url = function (int $number) use ($filters, $search): string {
+            $query = [
+                'tab' => 'operations', ...array_intersect_key($filters, array_flip(['automation_from', 'automation_to'])),
+                ...($search !== '' ? ['q' => $search] : []), 'api_request_page' => $number,
+            ];
+            // Match Request::getQueryString normalization so Inertia retains the fragment.
+            ksort($query);
+
+            return '/it/setup?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986).'#it-api-request-history';
+        };
         $previousUrl = $page > 1 ? $url($page - 1) : null;
         $nextUrl = $page < $lastPage ? $url($page + 1) : null;
         $links = [['label' => 'Previous', 'url' => $previousUrl, 'active' => false]];

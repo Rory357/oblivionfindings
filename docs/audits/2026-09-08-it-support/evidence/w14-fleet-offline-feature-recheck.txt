@@ -1,0 +1,197 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_b373c024f1d34e3d",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\Fleet\FleetOfflineSignalAtomicityTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit commits one offline source and outbox before dispatch and ignores repeat sweeps[39m[90m                        [39m [90m174.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rolls back the offline transition if the durable outbox cannot be saved and permits retry[39m[90m                [39m [90m0.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit does not dispatch source work when the enclosing caller rolls back[39m[90m                                       [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit waits for the enclosing caller commit before dispatching the signal and outbox job[39m[90m                       [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mit rechecks a candidate after a fresh heartbeat arrives during the scan[39m[90m                                     [39m [90m0.12s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mit retains the configured cutoff and creates a new source only after a later heartbeat episode[39m[90m              [39m [90m0.14s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\ControlRoom\SafetySignalDeliveryRecoveryTest[39m
+  [32;1m✓[39;22m[90m [39m[90msource and outbox intent roll back together when outbox persistence fails[39m[90m                                   [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrecovery reconciles a missing outbox and retry converges on one fleet alert[39m[90m                                 [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mshift null site is visible unroutable and replays once after repair[39m[90m                                         [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mduplicate and reordered device event jobs produce one correlated final alert[39m[90m                                [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdevice event without site is unroutable then replays without duplicate alert[39m[90m                                [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdevice dead letter is visible and safe replay creates one final alert[39m[90m                                       [39m [90m0.15s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\FleetTelemetryIngestTest[39m
+  [32;1m✓[39;22m[90m [39m[90mingest creates fleet event and signal[39m[90m                                                                       [39m [90m1.36s[39m  
+  [32;1m✓[39;22m[90m [39m[90mingest is idempotent[39m[90m                                                                                        [39m [90m0.12s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mgeofence signal emitted when outside[39m[90m                                                                        [39m [90m0.13s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mtrip start and stop[39m[90m                                                                                         [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconsent masking blocks location for client linked tracker[39m[90m                                                   [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfleet vehicle without consent stores coordinates[39m[90m                                                            [39m [90m0.16s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mconsented client tracker updates canonical device location[39m[90m                                                  [39m [90m0.15s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mclient tracker fails closed when assignment and tracker lack consent id[39m[90m                                     [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgl30 battery low updates device health and event without location change[39m[90m                                    [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgl30 sos emits resident safety signal and updates device meta[39m[90m                                               [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstaff tracker sos routes to lone worker emergency not resident[39m[90m                                              [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90msos person routing rejects a staff assignment from another site[39m[90m                                             [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90msos person routing revalidates assignment released and reassigned after device resolution[39m[90m                   [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90msos person routing rejects a primary driver from another site[39m[90m                                               [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90msos person routing rejects device changed before locked revalidation with data set "device domain changed"[39m[90m  [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90msos person routing rejects device changed before locked revalidation with data set "device provider changed[39m[90m…[39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal sos acceptance treats released staff history as person intent[39m[90m                                         [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal telemetry acceptance released staff history suppresses same site primary driver fallback[39m[90m              [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal telemetry acceptance invalid person attribution sanitizes every persisted surface with data set "acti[39m[90m…[39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinal telemetry acceptance invalid person attribution sanitizes every persisted surface with data set "clie[39m[90m…[39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask7 final telemetry consent blocked payload uses a safe operational envelope[39m[90m                              [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtask7 final telemetry worker route rechecks assignment after vehicle sos before side effects[39m[90m                [39m [90m0.20s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mtask7 final telemetry late worker consent withdrawal masks location but preserves the emergency[39m[90m             [39m [90m0.23s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Fleet\FleetOfflineSignalAtomicityTest[22m [90m>[39m it retains the configured cutoff and creates a new…    
+[39;1m  Failed asserting that 1 is identical to 2.[39;22m
+
+  at [32mtests\Feature\Fleet\FleetOfflineSignalAtomicityTest.php[39m:[32m139[39m
+    135▕     $state->update(['status' => 'online', 'last_seen_at' => now()]);
+    136▕     $this->travel(16)->minutes();
+    137▕     $detector->handle(app(FleetSignalService::class));
+    138▕     expect($state->fresh()->status)->toBe('offline')
+  ➜ 139▕         ->and(FleetSignal::query()->count())->toBe(2)
+    140▕         ->and(FleetSignal::query()->where('idempotency_key', '!=', $firstKey)->count())->toBe(1)
+    141▕         ->and(FleetSignalOutbox::query()->count())->toBe(2);
+    142▕ });
+    143▕
+
+  [33m1   [39m[39;1mtests\Feature\Fleet\FleetOfflineSignalAtomicityTest.php[39;22m:[39;1m139[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\FleetTelemetryIngestTest[22m [90m>[39m geofence signal emitted when outside                                
+[39;1m  Failed asserting that a row in the table [fleet_signals] matches the attributes {
+    "asset_id": 11,
+    "signal_type": "geofence.breach"
+}.
+
+The table is empty.[39;22m
+
+  at [32mtests\Feature\FleetTelemetryIngestTest.php[39m:[32m219[39m
+    215▕         $this->withHeader('X-Telemetry-Token', 'test-token')
+    216▕             ->postJson('/telemetry/ingest/queclink', $payload)
+    217▕             ->assertStatus(200);
+    218▕ 
+  ➜ 219▕         $this->assertDatabaseHas('fleet_signals', [
+    220▕             'asset_id' => $asset->id,
+    221▕             'signal_type' => 'geofence.breach',
+    222▕         ]);
+    223▕     }
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\FleetTelemetryIngestTest[22m [90m>[39m trip start and stop                                                 
+[39;1m  Failed asserting that a row in the table [fleet_trips] matches the attributes {
+    "asset_id": 12,
+    "status": "closed"
+}.
+
+The table is empty.[39;22m
+
+  at [32mtests\Feature\FleetTelemetryIngestTest.php[39m:[32m296[39m
+    292▕                 'speed' => 0,
+    293▕             ])
+    294▕             ->assertStatus(200);
+    295▕ 
+  ➜ 296▕         $this->assertDatabaseHas('fleet_trips', [
+    297▕             'asset_id' => $asset->id,
+    298▕             'status' => 'closed',
+    299▕         ]);
+    300▕     }
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\FleetTelemetryIngestTest[22m [90m>[39m consented client tracker updates canonical device location          
+[39;1m  Failed asserting that 0.0 matches expected -36.8485.[39;22m
+
+  at [32mtests\Feature\FleetTelemetryIngestTest.php[39m:[32m464[39m
+    460▕             ->assertStatus(200);
+    461▕ 
+    462▕         $device->refresh();
+    463▕ 
+  ➜ 464▕         $this->assertEqualsWithDelta(-36.8485, (float) $device->latitude, 0.0001);
+    465▕         $this->assertEqualsWithDelta(174.7633, (float) $device->longitude, 0.0001);
+    466▕         $this->assertEquals(7.5, $device->meta['speed']);
+    467▕         $this->assertEquals(180, $device->meta['heading']);
+    468▕     }
+
+  [33m1   [39m[39;1mtests\Feature\FleetTelemetryIngestTest.php[39;22m:[39;1m464[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\FleetTelemetryIngestTest[22m [90m>[39m client tracker fails closed when assignment and tracker lack con…   
+[39;1m  Failed asserting that false is true.[39;22m
+
+  at [32mtests\Feature\FleetTelemetryIngestTest.php[39m:[32m501[39m
+    497▕             'status' => 'given',
+    498▕             'given_at' => now()->subDay(),
+    499▕             'expires_at' => now()->addDays(30),
+    500▕         ]);
+  ➜ 501▕         $this->assertTrue($consent->isValid());
+    502▕ 
+    503▕         $asset = Asset::create([
+    504▕             'site_id' => $site->id,
+    505▕             'client_id' => $client->id,
+
+  [33m1   [39m[39;1mtests\Feature\FleetTelemetryIngestTest.php[39;22m:[39;1m501[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\FleetTelemetryIngestTest[22m [90m>[39m task7 final telemetry late worker consen… [41;1m ModelNotFoundException [49;22m  
+[39;1m  No query results for model [App\Models\ControlRoom\Signal].[39;22m
+
+  at [32mvendor\laravel\framework\src\Illuminate\Database\Eloquent\Builder.php[39m:[32m827[39m
+    823▕     {
+    824▕         try {
+    825▕             return $this->baseSole($columns);
+    826▕         } catch (RecordsNotFoundException) {
+  ➜ 827▕             throw (new ModelNotFoundException)->setModel(get_class($this->model));
+    828▕         }
+    829▕     }
+    830▕ 
+    831▕     /**
+
+  [33m1   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\Eloquent\Builder.php[39;22m:[39;1m827[39;22m
+  [33m2   [39m[39;1mtests\Feature\FleetTelemetryIngestTest.php[39;22m:[39;1m1225[39;22m
+
+
+  [90mTests:[39m    [31;1m6 failed[39;22m[90m,[39m[39m [39m[32;1m29 passed[39;22m[90m,[39m[39m [2m18 pending[22m[39m[90m (1444 assertions)[39m
+  [90mDuration:[39m [39m181.41s[39m
+
+{"exit_code":2,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_b373c024f1d34e3d",
+    "database_mutations_performed": false
+}

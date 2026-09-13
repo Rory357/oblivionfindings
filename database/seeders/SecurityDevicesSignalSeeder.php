@@ -33,6 +33,8 @@ class SecurityDevicesSignalSeeder extends Seeder
         );
 
         $signalTypes = [
+            ['code' => 'device_monitor_failed', 'name' => 'Technical check failed', 'category' => SignalType::CATEGORY_HOME_FACILITY, 'default_severity' => 'high'],
+            ['code' => 'device_monitor_recovered', 'name' => 'Technical check recovered', 'category' => SignalType::CATEGORY_HOME_FACILITY, 'default_severity' => 'info'],
             ['code' => 'device_alarm_trigger', 'name' => 'Device Alarm Triggered', 'category' => SignalType::CATEGORY_SECURITY, 'default_severity' => 'critical'],
             ['code' => 'device_tamper', 'name' => 'Device Tampered', 'category' => SignalType::CATEGORY_SECURITY, 'default_severity' => 'high'],
             ['code' => 'device_motion_detected', 'name' => 'Motion Detected', 'category' => SignalType::CATEGORY_SECURITY, 'default_severity' => 'medium'],
@@ -76,6 +78,7 @@ class SecurityDevicesSignalSeeder extends Seeder
 
             $payload = [
                 'signal_type_id' => $signalTypeId,
+                'signal_type_code' => $rule['signal_type_code'],
                 'signal_source_id' => $source->id,
                 'priority' => $rule['priority'],
                 'output_severity' => $rule['output_severity'],

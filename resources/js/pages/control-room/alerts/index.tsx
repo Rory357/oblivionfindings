@@ -12,6 +12,7 @@ import {
 } from '@/components/control-room/bulk-alert-action-dialog';
 import { buildControlRoomAlertRowActions } from '@/components/control-room/control-room-alert-row-actions';
 import { NewAlertWizard } from '@/components/control-room/new-alert-wizard';
+import { useAlertWorkspaceFocusReturn } from '@/components/control-room/use-alert-workspace-focus-return';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -227,21 +228,26 @@ export default function AlertsIndex({
     );
     const searchRef = useRef<HTMLInputElement>(null);
     const isCanonicalWorklist = basePath === '/control-room/alerts';
+    const workspaceFocus = useAlertWorkspaceFocusReturn();
 
     // Workspace-over-list: fetch only the `detail` prop and open the dialog
     // without navigating away; closing drops the param so `detail` goes null.
-    const openWorkspace = (id: number) =>
+    const openWorkspace = (id: number) => {
+        workspaceFocus.rememberOpen(id);
         router.get(
             basePath,
             { ...filters, alert: String(id) } as Record<string, string>,
             { preserveState: true, preserveScroll: true, only: ['detail'] },
         );
-    const closeWorkspace = () =>
+    };
+    const closeWorkspace = () => {
+        workspaceFocus.beginClose();
         router.get(basePath, { ...filters } as Record<string, string>, {
             preserveState: true,
             preserveScroll: true,
             only: ['detail'],
         });
+    };
 
     const rowActions = (row: CanonicalAlertItem) =>
         buildControlRoomAlertRowActions(row, {
@@ -1001,6 +1007,7 @@ export default function AlertsIndex({
                     detail={detail}
                     open
                     onClose={closeWorkspace}
+                    onCloseAutoFocus={workspaceFocus.onCloseAutoFocus}
                 />
             ) : null}
 

@@ -25,6 +25,59 @@ vi.mock('@inertiajs/react', () => ({
 
 afterEach(cleanup);
 
+it('opens the canonical asset register from available Fleet context', () => {
+    render(
+        <TicketLinkedContext
+            recoveredAt={null}
+            devices={[]}
+            alerts={[]}
+            assets={[
+                {
+                    id: 17,
+                    name: 'Support vehicle',
+                    asset_tag: 'FLEET-17',
+                    href: '/fleet-assets/assets/17',
+                    access: { state: 'available', message: null },
+                },
+            ]}
+        />,
+    );
+    expect(
+        screen.getByRole('link', { name: /FLEET-17.*Support vehicle/ }),
+    ).toHaveAttribute('href', '/fleet-assets/assets/17');
+});
+
+it('conceals restricted asset metadata and renders no source link', () => {
+    render(
+        <TicketLinkedContext
+            recoveredAt={null}
+            devices={[]}
+            alerts={[]}
+            assets={[
+                {
+                    id: 17,
+                    name: 'Hidden vehicle',
+                    asset_tag: 'HIDDEN-17',
+                    href: '/fleet-assets/assets/17',
+                    access: {
+                        state: 'restricted',
+                        message:
+                            'Asset access is required to view this source record.',
+                    },
+                },
+            ]}
+        />,
+    );
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hidden vehicle')).not.toBeInTheDocument();
+    expect(screen.queryByText('HIDDEN-17')).not.toBeInTheDocument();
+    expect(
+        screen.getByText(
+            'Asset access is required to view this source record.',
+        ),
+    ).toBeInTheDocument();
+});
+
 const deviceFixture = {
     id: 10,
     uid: 'NET-CORE-01',

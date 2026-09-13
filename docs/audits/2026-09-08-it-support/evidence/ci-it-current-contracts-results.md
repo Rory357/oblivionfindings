@@ -1,0 +1,11 @@
+# Current ticket architecture contracts — 11 September 2026
+
+Mapped W01–W13 / release gate. Implemented and verified updates to tests/Architecture/ItSecuritySingleTenantBoundaryTest.php; no production behavior or access rule changed in this contract-review slice.
+
+The checks now follow current canonical ownership: approval controls use the shared approval dialog; merge discovery delegates to the canonical service with requester and conversation-audience checks; attachment cleanup uses durable storage intents and retained lock/failure checks; upload rules check MIME and extension; Site intake uses TicketSiteField; task actions and recovery live in their dedicated components; waiting metadata remains worker-only with redacted requester state; routing selects an eligible primary owner or cover; priority participates in rerouting; the extracted ticket list contains the routing summary; saved-filter clearing tolerates formatting; API audience labels come from the typed contract, and setup text comes from the approved wizard.
+
+Verification: full selected architecture run45 passed,1 failed,918 assertions. Exact guarded tokenit_b2481a1b689140ca; terminal1 from the known aggregate failure, all14 postflight checks passed and schema absent. Logs ci-it-current-contracts-test.txt/style.txt. Intermediate runs exposed additional moved ownership (resolution audit now in ItWorkTransitionService and shared MIME/extension rules), which were inspected and corrected rather than restoring obsolete implementation locations.
+
+Remaining aggregate findings are not waived: database/migrations/2026_08_23_000230_create_workforce_availability_coverage_actions.php adds organization_id; tests/Feature/Monitoring/MetricRetentionTest.php has four LegacyStorageContext::attributes writes in raw historical/forged-provenance insert fixtures. Those four locations were inspected and are fixture writes rather than tenant query filtering, but any scanner exception must remain narrow. Do not alter existing schema or exempt the full suite without an appropriate dependency review. Full architecture/release gate remains open.
+
+No browser was required for these test-only changes; the last visible UI verification remains separately recorded. W14 implementation resumed independently after this contract review.

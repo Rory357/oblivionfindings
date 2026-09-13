@@ -7,6 +7,7 @@ use App\Domain\It\Services\ItLinkedContextOptions;
 use App\Domain\It\Services\ItMajorIncidentService;
 use App\Domain\It\Services\ItSlaReadService;
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\It\StoreItMajorIncidentRequest;
 use App\Http\Requests\It\StoreItMajorIncidentUpdateRequest;
@@ -131,7 +132,7 @@ class ItMajorIncidentController extends Controller
             ],
             'ticket' => [
                 ...$this->ticketOption($majorIncident->ticket),
-                'description' => $majorIncident->ticket->description,
+                'description' => MonitoringTechnicalSummary::ticketDescription($majorIncident->ticket),
                 'category' => $majorIncident->ticket->category,
                 'next_action' => $majorIncident->ticket->next_action,
                 ...app(ItSlaReadService::class)->present($majorIncident->ticket),

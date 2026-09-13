@@ -1,0 +1,1254 @@
+[
+  {
+    "sha256": "2972A5612C834F4745010658AEAA2CD4640D4D7A29D932E9952E406C790718ED",
+    "path": "AGENTS.md"
+  },
+  {
+    "sha256": "ED484EE07B964A5B44C9998C7A0B7416EE2E2468AAFF94935FFE1C0FC699107C",
+    "path": "app/Domain/Governance\\Console\\SpawnRecurringMeetingsCommand.php"
+  },
+  {
+    "sha256": "D0D3EE61FF770517E7BA47DCCC6359B3A41076368588736DBF79D504EE8C20F6",
+    "path": "app/Domain/Governance\\Console\\SyncDonorFundComplianceCommand.php"
+  },
+  {
+    "sha256": "938B7B99730D864DEEDFD70BDDD46DD4677D4F96437CEE09444C4764AAC69223",
+    "path": "app/Domain/Governance\\Console\\SyncSiteRiskReviewsCommand.php"
+  },
+  {
+    "sha256": "2253BCCE9CBF01DAFB7096BA00532CD09CBB20301A7F3DE38B04DF9B0837C0AD",
+    "path": "app/Domain/Governance\\Data\\GovernanceWorkItem.php"
+  },
+  {
+    "sha256": "C1001B43F6000237ACBF3D7E1ECBD61157C4A0A45BC5827E1CC6B067AF7BD780",
+    "path": "app/Domain/Governance\\Enums\\GovernanceArea.php"
+  },
+  {
+    "sha256": "99C633F713571C78E4F2DD4941BF416804804EFC266B44C04BF2CE8627DF1CA6",
+    "path": "app/Domain/Governance\\Enums\\GovernanceWorkKind.php"
+  },
+  {
+    "sha256": "B5A2B89C016497FA85AA4145CD5E5DA48AB56D1B6F02FFD7AD1C310F7E771384",
+    "path": "app/Domain/Governance\\Http\\Controllers\\ActionItemController.php"
+  },
+  {
+    "sha256": "8A9B01046E14208FFF7733EE4207EE2F57AA8A8ACD6887320D444458A44D4362",
+    "path": "app/Domain/Governance\\Http\\Controllers\\BoardEvaluationController.php"
+  },
+  {
+    "sha256": "1F65DA28A40307D29131C374979B01B96D364714A13264E3D5590754E5636DA6",
+    "path": "app/Domain/Governance\\Http\\Controllers\\BoardInterestController.php"
+  },
+  {
+    "sha256": "3DE3AA53BEE8EDCB5967983985FE993C02499AF20BC959564D3F97E8BF0823B6",
+    "path": "app/Domain/Governance\\Http\\Controllers\\BoardMemberAdminController.php"
+  },
+  {
+    "sha256": "2EAF9891070103A538E40C703764FB714D7D0235A28FB75E46D1A7D19B0AD9D5",
+    "path": "app/Domain/Governance\\Http\\Controllers\\BoardPackController.php"
+  },
+  {
+    "sha256": "0CC746500DBCE67372C6DFAFF3E56F37AF5D047D4F35EBEF62CEF96839BE7A4E",
+    "path": "app/Domain/Governance\\Http\\Controllers\\BudgetController.php"
+  },
+  {
+    "sha256": "44F501EF3812BA575245D77D06C437130C39140BA211C7B3E915EDE276807087",
+    "path": "app/Domain/Governance\\Http\\Controllers\\CeoBoardReportController.php"
+  },
+  {
+    "sha256": "6B45283E38A4B6E769EB8F5AF66CA13C18EAA9B84B3F013D51BF71971ED722FD",
+    "path": "app/Domain/Governance\\Http\\Controllers\\ClinicalGovernanceController.php"
+  },
+  {
+    "sha256": "ABB4E9E9B1CEE635A1B17AC0283C3D33E88B4B9293B817C3CFB3A474CB2FDC62",
+    "path": "app/Domain/Governance\\Http\\Controllers\\ComplianceController.php"
+  },
+  {
+    "sha256": "8DDE8042490CF40A85294095BD6E1504B0EB4898FACB7B4ACB8AE641E25A0412",
+    "path": "app/Domain/Governance\\Http\\Controllers\\DashboardController.php"
+  },
+  {
+    "sha256": "EAAF9C11AF75C27617147E538233686F587F0D0ECF2E1EA057A3E91A974862DC",
+    "path": "app/Domain/Governance\\Http\\Controllers\\GovernanceAuditLogController.php"
+  },
+  {
+    "sha256": "F5DF091453666ECC741228A5C6D2CBB557F5B8D751BDA22469A82A480C5C8A11",
+    "path": "app/Domain/Governance\\Http\\Controllers\\GovernanceCalendarController.php"
+  },
+  {
+    "sha256": "4786A9AF7BB21108CAA9332AD20868127AF0E2F500E4E4AA85183C41087A8A69",
+    "path": "app/Domain/Governance\\Http\\Controllers\\GovernanceDocumentController.php"
+  },
+  {
+    "sha256": "ED27A73729B21202B7536000E8699C9F414A03C7603794954648EE435A8AA4B8",
+    "path": "app/Domain/Governance\\Http\\Controllers\\GovernanceMeetingController.php"
+  },
+  {
+    "sha256": "E9078DC715468FC169915896176F3CDBAAB141732ED58424B5B95FC1905F7548",
+    "path": "app/Domain/Governance\\Http\\Controllers\\GovernanceMyWorkController.php"
+  },
+  {
+    "sha256": "5A8AF9348522708766B90F87A3B70478B87781340FADECAB03F5E02CDD7B8C8E",
+    "path": "app/Domain/Governance\\Http\\Controllers\\GovernancePolicyController.php"
+  },
+  {
+    "sha256": "FA19071F1F9C75E605C340E347A5F5F57636A08C8E03E6ED0F5C28893E1237CF",
+    "path": "app/Domain/Governance\\Http\\Controllers\\GovernanceSettingController.php"
+  },
+  {
+    "sha256": "77C0F4A63E461D70D2A15FDB79074846F73C3D3945BF3D92F236413A2D12E898",
+    "path": "app/Domain/Governance\\Http\\Controllers\\PerformanceReviewController.php"
+  },
+  {
+    "sha256": "D392CEB0FCA9EBCEF9EC366AF4912EB65B221D3CCE9EB98F5F01D192A5377B02",
+    "path": "app/Domain/Governance\\Http\\Controllers\\ReportController.php"
+  },
+  {
+    "sha256": "AD408AB680EC205182A86FA21BB151EAA666A450E6F7B05B3A7217D052CED551",
+    "path": "app/Domain/Governance\\Http\\Controllers\\ResolutionController.php"
+  },
+  {
+    "sha256": "C4BA94D87F1321877DAE17F6CDB2F59C485E34D35A5A99EF757D3BFF2CBAC4B1",
+    "path": "app/Domain/Governance\\Http\\Controllers\\RiskRegisterController.php"
+  },
+  {
+    "sha256": "1111A5FE6CD2664557DAC3297681E01CAFEEA1851C44FCB486C3BFE4274D574A",
+    "path": "app/Domain/Governance\\Http\\Controllers\\SpendApprovalController.php"
+  },
+  {
+    "sha256": "1DD373D343E25C05FA17A1B441032970DC24A88E50FFBF210A2FE4B59094DC9A",
+    "path": "app/Domain/Governance\\Http\\Controllers\\StrategicPlanController.php"
+  },
+  {
+    "sha256": "148BB0FDC2CE148E7AFCA9FF33F229946EF660610D8629AE578FD30CB0598818",
+    "path": "app/Domain/Governance\\Http\\Controllers\\TeTiritiController.php"
+  },
+  {
+    "sha256": "A4DCC5A6917933953B4A4D13533DD4EC12623A0CA13BAB92ACF2652F6FFA9DF7",
+    "path": "app/Domain/Governance\\Http\\Requests\\StoreActionItemRequest.php"
+  },
+  {
+    "sha256": "7419592683B32F45B6A431B4F002EA6BBF0C0D2C00D1430E3FC0A1279E554304",
+    "path": "app/Domain/Governance\\Http\\Requests\\StoreComplianceObligationRequest.php"
+  },
+  {
+    "sha256": "AFC7E1B1BAE8935A6B46DA79EDA2E820F0CDCA79A3FBB94C548B3EA8E9DDC74B",
+    "path": "app/Domain/Governance\\Http\\Requests\\StoreMeetingRequest.php"
+  },
+  {
+    "sha256": "AC53FD6DBCB0AB5A27DF064F682AC6FDC4B6476292718F9AA059E65F300DC682",
+    "path": "app/Domain/Governance\\Http\\Requests\\StoreResolutionRequest.php"
+  },
+  {
+    "sha256": "D6DDF2733D5A162D940B1B881FCA7AF98F40002ED952BBFD1B6F9751786C950B",
+    "path": "app/Domain/Governance\\Http\\Requests\\StoreRiskRegisterRequest.php"
+  },
+  {
+    "sha256": "341C9FCDCFEE0687C5844DC365BA4336419EA542AD80DC3E9A8196AE9778397B",
+    "path": "app/Domain/Governance\\Http\\Requests\\UpdateActionItemRequest.php"
+  },
+  {
+    "sha256": "B2CBABF82548DFE8B2D8008CC1A3D66B813F2801EDAD3FA3D72174E08BBB62F9",
+    "path": "app/Domain/Governance\\Http\\Requests\\UpdateMeetingRequest.php"
+  },
+  {
+    "sha256": "0BC04F8E16DFE686E6974B76F47CF264ED65CA26EA58527BD2A00FE13C970CA2",
+    "path": "app/Domain/Governance\\Http\\Requests\\UpdateResolutionRequest.php"
+  },
+  {
+    "sha256": "622241CECD57C450E7C5AB08960E586DFDE064B44A70967E2157F9D9151C050B",
+    "path": "app/Domain/Governance\\Http\\Requests\\UpdateRiskRegisterRequest.php"
+  },
+  {
+    "sha256": "C8B0482A806AEF58268E615C54A7EFB5492E7B5B9E3A20B6D2383664600FBB06",
+    "path": "app/Domain/Governance\\Jobs\\CaptureRiskHeatmapSnapshot.php"
+  },
+  {
+    "sha256": "BC77776B0C9A0A5232645ED6E909713A279570DC0E2FC52C80275CABF861935F",
+    "path": "app/Domain/Governance\\Jobs\\CheckComplianceDeadlines.php"
+  },
+  {
+    "sha256": "ECB8CD2D8282D8B24C4EE564C56645F79350615B10E3EA4F04439140D10317DE",
+    "path": "app/Domain/Governance\\Jobs\\EscalateOverdueActionItems.php"
+  },
+  {
+    "sha256": "933F8C266EC8B27A73128D5F0177C6D63AC77E4E4383F3D6BFB369D05F791848",
+    "path": "app/Domain/Governance\\Jobs\\GenerateBoardPack.php"
+  },
+  {
+    "sha256": "DFD4ED894F26F0E6B7CA63E776F20E9A9E2E32535A288D48E4F4868E31C78665",
+    "path": "app/Domain/Governance\\Jobs\\SendBoardDigest.php"
+  },
+  {
+    "sha256": "1362F8D7660C2C745E17D471127A84365EC3698329AFA82325643F2622FE2604",
+    "path": "app/Domain/Governance\\Jobs\\SendBoardPackNotification.php"
+  },
+  {
+    "sha256": "37C9B4805637DC699F4E8DD77EFB12E489B90660C1DC90302DB4A65E99EA35EE",
+    "path": "app/Domain/Governance\\Jobs\\SendComplianceReminder.php"
+  },
+  {
+    "sha256": "EB45EB1AF6DB2824EEA3BA4FB500EBD457C5730B06CEA18F4072084EB5521EDD",
+    "path": "app/Domain/Governance\\Jobs\\SendPreReadReminders.php"
+  },
+  {
+    "sha256": "B4AE2A09228129E0BAB8A2E07DFE7CC2B3F4F8C43D2995A336AC00D377419D5A",
+    "path": "app/Domain/Governance\\Jobs\\SendVotingReminder.php"
+  },
+  {
+    "sha256": "240257D0F3BD007EEAC110CDE7FFEAB9F81E092C6D02DC0F0547B14C4F7EEED4",
+    "path": "app/Domain/Governance\\Models\\ActionItem.php"
+  },
+  {
+    "sha256": "0D5BE46A2E26B617A4A7D283908D2C8636F6199C513A26A67902F34A2522B1F1",
+    "path": "app/Domain/Governance\\Models\\AuditEvidencePack.php"
+  },
+  {
+    "sha256": "78952211F9BCEEF1B97AF59CB2A5548354D514DA57EEFF9994120807EA47B494",
+    "path": "app/Domain/Governance\\Models\\BoardCommittee.php"
+  },
+  {
+    "sha256": "7334438B64778C2BB768553FF132AA4AAD8DCD091570AABDC8FE3EB28412D610",
+    "path": "app/Domain/Governance\\Models\\BoardEvaluation.php"
+  },
+  {
+    "sha256": "5B7638457F59CF85487E7CD66A52BB8215B1923456D77221F14A7F9DBA9486B5",
+    "path": "app/Domain/Governance\\Models\\BoardEvaluationResponse.php"
+  },
+  {
+    "sha256": "15DF49D415E2938608F0EB6EE35C64F2B90580A99D37F5F1D72EA051AE935487",
+    "path": "app/Domain/Governance\\Models\\BoardMember.php"
+  },
+  {
+    "sha256": "5464B57EF7080CFFAE0106AC890DA44ABB007A47383517CDFF7B97FB5897BDDE",
+    "path": "app/Domain/Governance\\Models\\BoardMemberInterest.php"
+  },
+  {
+    "sha256": "47B4081E921AC98F3F2376576C1B4B74E09CBC500B596FA3F85D06E9EFEC4853",
+    "path": "app/Domain/Governance\\Models\\BoardMemberPreference.php"
+  },
+  {
+    "sha256": "4A3AFC71B7D6FB28634434F272559E54A056550E76ADE9BB76B6E366FC02FAD8",
+    "path": "app/Domain/Governance\\Models\\BoardPack.php"
+  },
+  {
+    "sha256": "B048D25BB067982223AC73FD570C483AFAFDD02719FD73D3D60739438FEC10BE",
+    "path": "app/Domain/Governance\\Models\\BoardSkillsMatrix.php"
+  },
+  {
+    "sha256": "D53636F13134976C94F91F3ADD14C6F3D989F2D20B8B7687DC230681841FC999",
+    "path": "app/Domain/Governance\\Models\\BreakGlassAccess.php"
+  },
+  {
+    "sha256": "37C05DB30B1CDB871E37A83FC9B8EB6C0FA225964BDB49AF08A64F7D1AC19174",
+    "path": "app/Domain/Governance\\Models\\Budget.php"
+  },
+  {
+    "sha256": "D3A061B5B3536C9BFBFE218651D8D4B04565BD9B01BD5617A644E56B1D64A261",
+    "path": "app/Domain/Governance\\Models\\BudgetAdjustment.php"
+  },
+  {
+    "sha256": "6184358C518F82F542CF2D0643285AF7E9BF917464290B91945204C0997D2DC1",
+    "path": "app/Domain/Governance\\Models\\BudgetAllocation.php"
+  },
+  {
+    "sha256": "03FC46F1781377A53995C16788BA39E5E632F4B6D83402850B43F7FFC8028426",
+    "path": "app/Domain/Governance\\Models\\BudgetLineItem.php"
+  },
+  {
+    "sha256": "315980DC8DF735C4424C8AF3B73A1377EE2A83D1DDBBE98EECA2F9B8999C6FBB",
+    "path": "app/Domain/Governance\\Models\\CeoBoardReport.php"
+  },
+  {
+    "sha256": "9088F0F85FF3FE77DB21D95402D88E5DC0C29C63711FAE568F756CC65C4EA9C6",
+    "path": "app/Domain/Governance\\Models\\ClinicalGovernanceIndicator.php"
+  },
+  {
+    "sha256": "6187A1A6C9FDE38EA0E4B6F8210BC4785DD81E194DF3F222349B9066B5484363",
+    "path": "app/Domain/Governance\\Models\\ClinicalGovernanceSnapshot.php"
+  },
+  {
+    "sha256": "AB17BA7F54CF153C6B79987DFAD7DAD04485F0DF6C683B32E14DAC0C96E7CFDB",
+    "path": "app/Domain/Governance\\Models\\CommitteeMembership.php"
+  },
+  {
+    "sha256": "FDE4E7C3378F7ECDD7E01A0A6808132FF39423E4D7DECF62289CC1A31A6B0089",
+    "path": "app/Domain/Governance\\Models\\ComplianceEvidence.php"
+  },
+  {
+    "sha256": "4244A50FB2B0AE6281B9965CC4B10A2429F08F41021B899F398525198BF6DE39",
+    "path": "app/Domain/Governance\\Models\\ComplianceObligation.php"
+  },
+  {
+    "sha256": "224335DBDEF99C5D873CE5892E84F054157DA9BD39C5499D00B79B192F95BCE7",
+    "path": "app/Domain/Governance\\Models\\ComplianceReminder.php"
+  },
+  {
+    "sha256": "08304A6A715D9FF37144AE4AE8DF46AE985990E26BF8B4F823E543008875B4AD",
+    "path": "app/Domain/Governance\\Models\\ConflictDeclaration.php"
+  },
+  {
+    "sha256": "15B019DD9BF1DC0BEE6FE6A724815F985A37E2DF958042FD9C87C7D0E3C84B62",
+    "path": "app/Domain/Governance\\Models\\DashboardSnapshot.php"
+  },
+  {
+    "sha256": "E6857813E5869977A3374303B1F09EC640099403575AE4629C6EB3BC28BD7FE9",
+    "path": "app/Domain/Governance\\Models\\EvidenceLibrary.php"
+  },
+  {
+    "sha256": "92CE9E24E5B4551312C8419147EA4B6500B86EAF06FC045B6E400A1920CB91CC",
+    "path": "app/Domain/Governance\\Models\\GovernanceDocument.php"
+  },
+  {
+    "sha256": "B3634E96820EAB548FA5F42A7F958489475E4996D4CE9887B539B00DDC00592B",
+    "path": "app/Domain/Governance\\Models\\GovernanceFeedbackEscalation.php"
+  },
+  {
+    "sha256": "7C0E54EA08AA183B625EA635CAB205E5141209E4803AE103D262FF87683415EC",
+    "path": "app/Domain/Governance\\Models\\GovernanceMeeting.php"
+  },
+  {
+    "sha256": "D5BA7927723EC5665F214D92F7F70F6A01173182CCE728354C8640BFE4EE0F1F",
+    "path": "app/Domain/Governance\\Models\\GovernancePolicy.php"
+  },
+  {
+    "sha256": "15FD971D572D54B7901B967C4E6CC62EE7B074DD43DAF1F0ED1071EEDA818D33",
+    "path": "app/Domain/Governance\\Models\\GovernanceSetting.php"
+  },
+  {
+    "sha256": "EB758A232138A438F782D97CAE3F8756A214FE62D4D2FA0816C5937C64934FC6",
+    "path": "app/Domain/Governance\\Models\\GovernanceVotingProfile.php"
+  },
+  {
+    "sha256": "93D1E67FF0675C7681A21D835CD0B12FD8C0CF11E85FA4868225A5DC0FD349B3",
+    "path": "app/Domain/Governance\\Models\\IncidentGovernanceEscalation.php"
+  },
+  {
+    "sha256": "D98063D866C9F7B27D4C19EA995BBF033C9E05989C9E175EA83D12355BA99AE1",
+    "path": "app/Domain/Governance\\Models\\MeetingAgendaItem.php"
+  },
+  {
+    "sha256": "D92D16B272625E1B5C289185E3F29B608BECF25DC633DB2CF0D5D859A7FA0006",
+    "path": "app/Domain/Governance\\Models\\MeetingAttendance.php"
+  },
+  {
+    "sha256": "9D394519DDC3DCA3AD2182E732D63450CADEAD8E2F7F920D23C6D8F30BFE4F14",
+    "path": "app/Domain/Governance\\Models\\MeetingMinute.php"
+  },
+  {
+    "sha256": "68BCE9416F870CC24854E4EFE1C4281DF9162592B58994582DE38F745299757F",
+    "path": "app/Domain/Governance\\Models\\MeetingRsvp.php"
+  },
+  {
+    "sha256": "9993ACDDBCC1CCBB94FD203F97FC0B2914060B036ADBE2F81692AFF7623A546F",
+    "path": "app/Domain/Governance\\Models\\NotifiableIncident.php"
+  },
+  {
+    "sha256": "82C13D1BE8E9BBD5C152C9206A35C2ED6E22037DEBBFCE1FC65CC093284282A6",
+    "path": "app/Domain/Governance\\Models\\PerformanceFeedback.php"
+  },
+  {
+    "sha256": "8BAD93388F0DDB7DA9CD810F074A97533A4AAEC9BBF01FB8874721224D1A8B94",
+    "path": "app/Domain/Governance\\Models\\PerformanceGoal.php"
+  },
+  {
+    "sha256": "B0564C17261EFE4AD01D0952B2186FAD88D9D586A6925C803617E6FA49E8B748",
+    "path": "app/Domain/Governance\\Models\\PerformanceKpi.php"
+  },
+  {
+    "sha256": "15A6163DE5FD1345813F659BDD1164CC5E3DF0598B690CB542CF36101282F4BE",
+    "path": "app/Domain/Governance\\Models\\PerformanceReview.php"
+  },
+  {
+    "sha256": "9DF3332B47FC8AF8F2D2E08CC60E9EC716F75355592EE87A2B67B0BF91D8593A",
+    "path": "app/Domain/Governance\\Models\\PolicyAttestation.php"
+  },
+  {
+    "sha256": "F96DA4DA4598A19C6FDE118F9C80A3A636A42D326A686F62F85668E53F0F9710",
+    "path": "app/Domain/Governance\\Models\\RecurringMeetingSchedule.php"
+  },
+  {
+    "sha256": "81645D8CD269BFED080D252F5BD642C4E91577AF37DB1A3BD1A019B89A43C227",
+    "path": "app/Domain/Governance\\Models\\Resolution.php"
+  },
+  {
+    "sha256": "C3FF4CF8F6ED23E511E501B5B857E024301BAE3A291496EDC2E0FCC495C2BA05",
+    "path": "app/Domain/Governance\\Models\\RiskAcceptance.php"
+  },
+  {
+    "sha256": "FB3430BF9DC186E18F9929C02E5A4E9312A215283C169104144ECD909F57498F",
+    "path": "app/Domain/Governance\\Models\\RiskAppetiteSetting.php"
+  },
+  {
+    "sha256": "0735B4AEB227A8A246CFF3AB30D6DBADDD55357DE78E560AB0162307F4168212",
+    "path": "app/Domain/Governance\\Models\\RiskEventLink.php"
+  },
+  {
+    "sha256": "D77365CB49835838141D6FE66026DE0D7251008B71A0F98269BBB72DC367D7D3",
+    "path": "app/Domain/Governance\\Models\\RiskHeatmapSnapshot.php"
+  },
+  {
+    "sha256": "8846CD709A6A259ABC693C69B1EE2A1DAAE176A8662DA8B7DE90B2784E959AD7",
+    "path": "app/Domain/Governance\\Models\\RiskRegisterEntry.php"
+  },
+  {
+    "sha256": "B847331052EC7EB92ADEB7CD9C1A4C46CEB4CB3FAFD88EB4CA7F86612E3A0158",
+    "path": "app/Domain/Governance\\Models\\RiskTreatment.php"
+  },
+  {
+    "sha256": "7AA054D8E524E3CBD915ADB633F4232152349FA35A538542113DFC75494E131B",
+    "path": "app/Domain/Governance\\Models\\SpendApproval.php"
+  },
+  {
+    "sha256": "8666DBB1A3B628A05CB8422F7D8CACE14EFBEEE96E3FC55BD9D5A0BA2B16B61D",
+    "path": "app/Domain/Governance\\Models\\SpendApprovalDecision.php"
+  },
+  {
+    "sha256": "816D8AB56E1E7C3BF57432B6C7CECB950B34384D981ADA8F25922D2E0E070222",
+    "path": "app/Domain/Governance\\Models\\StrategicGoal.php"
+  },
+  {
+    "sha256": "F4EB6B92A01C943E8436E69A05D362182F9F9359232E76F5175F0F1B62A13B19",
+    "path": "app/Domain/Governance\\Models\\StrategicInitiative.php"
+  },
+  {
+    "sha256": "7119BACA264BC83611CB26736D89A873758104EC3FA517660FC4D2B59C67B887",
+    "path": "app/Domain/Governance\\Models\\StrategicPlan.php"
+  },
+  {
+    "sha256": "06C1ABE51DB00283D8959502418B972463B7011FCE6AE96F1E8B5DE99E9E34ED",
+    "path": "app/Domain/Governance\\Models\\TeTiritiObligation.php"
+  },
+  {
+    "sha256": "070C8D9A7D03C0F7CD34E2DB5E0768BC2B25A16A0ABC1A6A41A4DC22936E4D46",
+    "path": "app/Domain/Governance\\Models\\Vote.php"
+  },
+  {
+    "sha256": "6A096AFD52E3CBB459FE3026DFD07FFB1CECA0B98DA60CACAF722B5E68E942C3",
+    "path": "app/Domain/Governance\\Notifications\\ActionItemEscalatedNotification.php"
+  },
+  {
+    "sha256": "2C82D783657F3D5580722664670243AF317FF5F78BB4F4D062380A29CD56B864",
+    "path": "app/Domain/Governance\\Notifications\\BoardDigestNotification.php"
+  },
+  {
+    "sha256": "550DCEEE41D81ECD3B896B252145047809826DE8A03C9DB2A83AF572487D0A10",
+    "path": "app/Domain/Governance\\Notifications\\BoardPackPublishedNotification.php"
+  },
+  {
+    "sha256": "2006A906386298F5CF2406D08065FD9AFFCED46E188119A446BC114B82C66A42",
+    "path": "app/Domain/Governance\\Notifications\\CEOReviewMilestoneNotification.php"
+  },
+  {
+    "sha256": "CD265EC0CB3BDB38F5289EE8FAD1A586F2E6D1431CFB3695A6DF661BF876037A",
+    "path": "app/Domain/Governance\\Notifications\\ComplianceReminderNotification.php"
+  },
+  {
+    "sha256": "0FD13F333FF0579D4763EA1DCF148F4BDF59BBBA75CEB480F2D224E2D952FE6E",
+    "path": "app/Domain/Governance\\Notifications\\PreReadReminderNotification.php"
+  },
+  {
+    "sha256": "B0384DAB1FE1E340A6C25C79308DFE7C9323EB04E5870641769086ACE87972EC",
+    "path": "app/Domain/Governance\\Notifications\\RiskReviewDueNotification.php"
+  },
+  {
+    "sha256": "6B2D80F0037B0E4C95B58B04EC302A8FBA5EA7E2EC8E3791DFB43F94F3773C64",
+    "path": "app/Domain/Governance\\Notifications\\VotingReminderNotification.php"
+  },
+  {
+    "sha256": "188483B22971E619B7FD67D81F8A426E20B3F87FE719843CAA7D5FBC5F90E186",
+    "path": "app/Domain/Governance\\Policies\\ActionItemPolicy.php"
+  },
+  {
+    "sha256": "6DF6C977229C41DBD22F88B64656BF51B70F3644FC925E409009AD15DD5296D4",
+    "path": "app/Domain/Governance\\Policies\\BoardEvaluationPolicy.php"
+  },
+  {
+    "sha256": "EB8DA9AE7ED60F538D41FF28E705CA3A9EC9D0FF5ABC2E8B96A1D2AAC5C823FD",
+    "path": "app/Domain/Governance\\Policies\\BoardMemberInterestPolicy.php"
+  },
+  {
+    "sha256": "1392048DBA1F787E4A6F9DF676DDFA619698CC117E03FB86F93295D6CB7B1886",
+    "path": "app/Domain/Governance\\Policies\\BoardMemberPolicy.php"
+  },
+  {
+    "sha256": "D39C1B55133181EAE59DB1031285883EC549D84BD5C1A031766AC71BD98B4B71",
+    "path": "app/Domain/Governance\\Policies\\BudgetPolicy.php"
+  },
+  {
+    "sha256": "5499BA3DEF3C828BB75C064204F4F681BF637557A9C4DA6EE020F98B616382F4",
+    "path": "app/Domain/Governance\\Policies\\CeoBoardReportPolicy.php"
+  },
+  {
+    "sha256": "1DEE8D7B1193B902EC21D3908E488DE4CE974DFD1E91F13E68A79BC2B77810FE",
+    "path": "app/Domain/Governance\\Policies\\ComplianceObligationPolicy.php"
+  },
+  {
+    "sha256": "A21F5D21A98D64CEA0FE09841DC80DEDE7FC584E2BBC19029CA8568A09BF6062",
+    "path": "app/Domain/Governance\\Policies\\GovernanceDocumentPolicy.php"
+  },
+  {
+    "sha256": "3322D0058A18378204A50F731F64BE90231CD4D9F5F10A62A506C75CF559BAD7",
+    "path": "app/Domain/Governance\\Policies\\GovernanceMeetingPolicy.php"
+  },
+  {
+    "sha256": "C0123173CD97E8B0C66C9546C9ECD94F0271DAB97B6B8A44F7F0E2B38185F93E",
+    "path": "app/Domain/Governance\\Policies\\GovernancePolicyPolicy.php"
+  },
+  {
+    "sha256": "6DF85B88F04A6D0120482E015287511F38FA2120101A793ADAA41E958F48EC67",
+    "path": "app/Domain/Governance\\Policies\\PerformanceReviewPolicy.php"
+  },
+  {
+    "sha256": "7471452691102AE87BA805E85D7004E0EFA9D1C84883DB2E1A1498635BB30D53",
+    "path": "app/Domain/Governance\\Policies\\ResolutionPolicy.php"
+  },
+  {
+    "sha256": "51B3EAB79666402F6CFE116B6D621B9AAF3AEED7C8FA4FAE88CD4B824C87EA1B",
+    "path": "app/Domain/Governance\\Policies\\RiskRegisterEntryPolicy.php"
+  },
+  {
+    "sha256": "4BF56E0DD0068B8CC31790EFA7B3BD7A2641C9EC2419FA5AF30E2DDDC8E30622",
+    "path": "app/Domain/Governance\\Policies\\SpendApprovalPolicy.php"
+  },
+  {
+    "sha256": "02EB580C209CB09B3F3A4DF42612FEB882C1EE06DD7DAC753071245C772725FE",
+    "path": "app/Domain/Governance\\Policies\\StrategicPlanPolicy.php"
+  },
+  {
+    "sha256": "DFB94922B8170C308E74F565DC6363DC7C587CD1D45DA25CA18A2233CDB2FD0F",
+    "path": "app/Domain/Governance\\Services\\AuditEvidencePackService.php"
+  },
+  {
+    "sha256": "A7C7FE4F89A8AE98FC788760DF54E5D923EA667615156246B4D78FE19BE55890",
+    "path": "app/Domain/Governance\\Services\\BoardPackAccessService.php"
+  },
+  {
+    "sha256": "64EBD6F2FC6EF80B33B732D10555E1927A9498EAF2B834729AFBBD113420F3A8",
+    "path": "app/Domain/Governance\\Services\\BoardPackBuilderService.php"
+  },
+  {
+    "sha256": "90871ACB4D219E4A239F191AA7315DE2B5F167EF2FFC45D0B5E8E0BEB1F2874E",
+    "path": "app/Domain/Governance\\Services\\ClinicalGovernanceAutomationService.php"
+  },
+  {
+    "sha256": "5E02B7A683BB356220F6DBA4F5AFC266C7355839387080FF39061F3B04356C9A",
+    "path": "app/Domain/Governance\\Services\\ComplianceEngineService.php"
+  },
+  {
+    "sha256": "82D717F72011A833FB431DB88CE8C3B3F814011C96DF94E2ADB2243D63E8CACB",
+    "path": "app/Domain/Governance\\Services\\DashboardAggregatorService.php"
+  },
+  {
+    "sha256": "2C4113284F078F561DAE6DA53BF826250F7CB4F7FCC94370C53FA78D984DFE42",
+    "path": "app/Domain/Governance\\Services\\EvidenceLibraryService.php"
+  },
+  {
+    "sha256": "D3207BC9F347B4769BB95E8E36223F1DB2D97F98FA51A05A20FD6DA9161A4CAF",
+    "path": "app/Domain/Governance\\Services\\ExecutiveMeetingAccessService.php"
+  },
+  {
+    "sha256": "97AA0FFEE2AE19F67944FECF6C10E7DD931CDEB0C2664CE181D7C82E3FA5A47E",
+    "path": "app/Domain/Governance\\Services\\GovernanceAuditService.php"
+  },
+  {
+    "sha256": "A8FE434959F08A132AB0E5043B708F17717EF532679C0CAB35A9E02B4A8596A3",
+    "path": "app/Domain/Governance\\Services\\GovernanceCalendarQuery.php"
+  },
+  {
+    "sha256": "D89FF19B4DC655EA566D0B847B327D52B463A4F93CD82F6B9A83ADBDF2B24962",
+    "path": "app/Domain/Governance\\Services\\GovernanceNestedMutationService.php"
+  },
+  {
+    "sha256": "E1414646B6A1FC9B843B8EE79602DCC138D8EDB6729E7AE2791EB0EA339C4CAA",
+    "path": "app/Domain/Governance\\Services\\GovernanceRecordAccessService.php"
+  },
+  {
+    "sha256": "215CDA079EE2A95457E88C7FCBA02A163F708ED1A0114D7D3DD049D5B599DAD7",
+    "path": "app/Domain/Governance\\Services\\GovernanceVotingProfileService.php"
+  },
+  {
+    "sha256": "C7E2E25C077C989C46345DB268D3686DAF4E4C7DE7C0E0B7090E7D4C80D52C68",
+    "path": "app/Domain/Governance\\Services\\GovernanceWorkflowService.php"
+  },
+  {
+    "sha256": "FAAA19D3C6585AA886D07BD3F0282B754836ED3AF476B6517DF939FEF1C5CC45",
+    "path": "app/Domain/Governance\\Services\\GovernanceWorkQuery.php"
+  },
+  {
+    "sha256": "FE7BBE871A8EE6DA2876F2D9E81E5D046027F6661E0E4CCFC2C7D4440394DBB7",
+    "path": "app/Domain/Governance\\Services\\IncidentEscalationService.php"
+  },
+  {
+    "sha256": "C49739B2D2D5D61F6B85489501CCF83E451655CD5439E23F0FCD047EF6E17FD3",
+    "path": "app/Domain/Governance\\Services\\MeetingMinuteService.php"
+  },
+  {
+    "sha256": "74A5702FF8472C1E586916608A3FA1F7E7B7F8C9A1D98E86C6F31A508DB7691C",
+    "path": "app/Domain/Governance\\Services\\PerformanceReviewService.php"
+  },
+  {
+    "sha256": "061046AF1073A09F374ECE8B5B6F3D7F1FBBE6B838F8197C1AC75D725AD7FF1D",
+    "path": "app/Domain/Governance\\Services\\RecurringMeetingService.php"
+  },
+  {
+    "sha256": "13CF8588AEFDB681C11DC692A58C3620194ED5BEE63B38E7B90717B137F37921",
+    "path": "app/Domain/Governance\\Services\\RiskScoringService.php"
+  },
+  {
+    "sha256": "65988F046185542E2A3ED9ECC6034233D7B1649CFA8B68E8345FE9B6F192C7C3",
+    "path": "app/Domain/Governance\\Services\\SpendApprovalCommandService.php"
+  },
+  {
+    "sha256": "C4400AFCC3D8B3A893E8A4226FE7590326956A39C972B79DAC57CE0AF3D39CB1",
+    "path": "app/Domain/Governance\\Services\\VotingService.php"
+  },
+  {
+    "sha256": "6F56F03135CE95A5318316F6B9DB077C3F3E304A97A33727F3456CA253E0020B",
+    "path": "app/Domain/Governance\\Support\\BoardPackPresenter.php"
+  },
+  {
+    "sha256": "A51FD3672C178044FFA75DE3BDCC936AD848EC51E4202DADB165C1BD42EA17DA",
+    "path": "app/Domain/Governance\\Support\\GovernancePresenter.php"
+  },
+  {
+    "sha256": "6873F1940539CCBAC802161FECC3340FB171C7B5366A3F78D151FCB16CEEE7C5",
+    "path": "app/Providers/AuthServiceProvider.php"
+  },
+  {
+    "sha256": "4ADC3EF20ACE833C41112DB20A767816A7C9ADC364863BAAF80CBCA29BD1C88D",
+    "path": "CLAUDE.md"
+  },
+  {
+    "sha256": "F0BC6D17CCB7E07C196FC9B14CAFB98F03630F6878B08EDB411EE9A133B3D656",
+    "path": "database/seeders/GovernancePermissionsSeeder.php"
+  },
+  {
+    "sha256": "48B46E586A9CE3AA6ED66BD5A13E8EC0AA8B4EDB3F84FC18E6E5DFB6ABD4705C",
+    "path": "database/seeders/RbacSeeder.php"
+  },
+  {
+    "sha256": "62515485265119962773E6015FEFE38BE94434AAE468ACD017C078DA61B20AB5",
+    "path": "design_styles\\APP_SHELL_STYLE_GUIDE.md"
+  },
+  {
+    "sha256": "86259475C987D6E30001604316379EB608AEA9F83E16941B6AA476A94BCA6957",
+    "path": "design_styles\\BUTTON_STYLE_GUIDE.md"
+  },
+  {
+    "sha256": "C3EE6C8ACAA22049084F819E3AD2A33F457E936E467492079F16C15E9A611D2B",
+    "path": "design_styles\\DESIGN_TOKENS.md"
+  },
+  {
+    "sha256": "56B59B464FD46917446B482B8E355D47D7341105915F6C016B6195E2A58138AC",
+    "path": "design_styles\\LIST_STYLE_GUIDE.md"
+  },
+  {
+    "sha256": "CC20485E6E42E0A848B8CACC8AC6124E5E5A01206D966DE6EBBBDEC39DBE2A91",
+    "path": "design_styles\\LOADER_STYLE_GUIDE.md"
+  },
+  {
+    "sha256": "9295CDB1386322B8A088AE03DE41BC3C75A0FBE3E8FA3331C92C704CCB15895D",
+    "path": "design_styles\\NAVIGATION_STYLE_GUIDE.md"
+  },
+  {
+    "sha256": "748C94C030984D16C1A78F3B70855D1CF8F22461AB017E4AC8287AB9E8809CDF",
+    "path": "design_styles\\oblivion-loader-01-demo.html"
+  },
+  {
+    "sha256": "A528A0E863A676FDBBFCB028E532ECE2799E39A7345CA3C1ECA619AC4491D931",
+    "path": "design_styles\\PAGE_HEADER_STYLE_GUIDE.md"
+  },
+  {
+    "sha256": "AEE723E21491E9BE908554A6F200D73204280A63D9028EA78DE6BB9049F4A477",
+    "path": "design_styles\\POPUP_STYLE_GUIDE.md"
+  },
+  {
+    "sha256": "96863E01D924E954255CD61F550396C2F2EEA9778BBAAB7E8570EF9D63279C22",
+    "path": "DESIGN.md"
+  },
+  {
+    "sha256": "73D0BACC46C5BA260E48187FCBF956387236AC456E125BF84941FBBB4636B226",
+    "path": "playwright.governance.config.ts"
+  },
+  {
+    "sha256": "B7B4C23C1FB7AEE099DFAE264B4F0FF654DF95CD5FBFBF2956FD83A5FC24330F",
+    "path": "resources/js/components/governance\\BoardPackPanel.tsx"
+  },
+  {
+    "sha256": "5CA6FB8DEC5057D66945E83DA9650134AAC250D85855C69CDE2749EF5A4253FA",
+    "path": "resources/js/components/governance\\BoardPriorityCard.tsx"
+  },
+  {
+    "sha256": "015590F05C7C2BFE2D0AB7F4ACD8319C9BE611EC940699189B74A66F7BA97F89",
+    "path": "resources/js/components/governance\\CockpitSkeleton.tsx"
+  },
+  {
+    "sha256": "DFDD274200D710625B354AB8718F3BD6B81DCA5CEFAA846CA5DE14E61CB4195F",
+    "path": "resources/js/components/governance\\FinancialGovernancePanel.tsx"
+  },
+  {
+    "sha256": "8CF3B1E2B7FF9BA95599C924D3DC5C433B2836F5C03E0180A6B37590369C1A44",
+    "path": "resources/js/components/governance\\GovernanceAttachmentsPanel.tsx"
+  },
+  {
+    "sha256": "687FC384867733EF20002DB0F4996AE51796F220856905087C77155DFC59EFEA",
+    "path": "resources/js/components/governance\\GovernanceCalendar.tsx"
+  },
+  {
+    "sha256": "303AB7D5EE54C810B137913CD8CBFF9BD6B580C70CF992DA64380FB18D347DC5",
+    "path": "resources/js/components/governance\\GovernanceTimeline.tsx"
+  },
+  {
+    "sha256": "6C0A4F81007096B5F2722358B64A63672E09A8C828FFF89060CC83005C309B9E",
+    "path": "resources/js/components/governance\\KpiBand.tsx"
+  },
+  {
+    "sha256": "D280BD3354766178B714F9BF5AC9CA3FFE4C8758540C7A07497B8F614D4F6700",
+    "path": "resources/js/components/governance\\MeetingReadinessPanel.tsx"
+  },
+  {
+    "sha256": "B43D45562800B7A7FD4FE5599BF59DBD6CEE5B72E8CA173AECC13F6D77DADDCC",
+    "path": "resources/js/components/governance\\MyNextActionsRail.tsx"
+  },
+  {
+    "sha256": "ED8A9B07339F5A1014395342D3B5D1F5DD95E4E77E8B9C4FEC09F98F92026A5A",
+    "path": "resources/js/components/governance\\NextActionButton.tsx"
+  },
+  {
+    "sha256": "AFCC871C24934F258929BD6AF2276B24BC93EE4828E5DABF13945C88FC973FEA",
+    "path": "resources/js/components/governance\\OperationalSignalsAccordion.tsx"
+  },
+  {
+    "sha256": "D6D005442F0CA4541A52A945691BB8F1CD15F9F551BB3489F9A918A49C0B181F",
+    "path": "resources/js/components/governance\\PriorityBadge.tsx"
+  },
+  {
+    "sha256": "877E8688144373C361857739C77722390CA0E12242A679E4804FED922F16E812",
+    "path": "resources/js/components/governance\\PriorityOverviewPanel.tsx"
+  },
+  {
+    "sha256": "3F7115BBD5087AB75D9B7A4E161CF50AADD97872FCA7084CAD54CC478F8A6AB9",
+    "path": "resources/js/components/governance\\RecentlyCompletedRail.tsx"
+  },
+  {
+    "sha256": "66BA9CCC1024A0EAF0DCBFDB2239959E2F0B264B1F3143F5A692D575B4D48F2B",
+    "path": "resources/js/components/governance\\RiskComplianceWatchlist.tsx"
+  },
+  {
+    "sha256": "C2F0AD9EC2F8D96FD7497586D559D38708409C6B8FCC60D145D33033A565B665",
+    "path": "resources/js/components/page/page-header.tsx"
+  },
+  {
+    "sha256": "23B66DE1A2689DFFA67F2ACE03C678A954276A82641D4EFABDF0A5978C8CE302",
+    "path": "resources/js/components/wizard/shell.tsx"
+  },
+  {
+    "sha256": "E0DCC8E9B3A3487DE3070A1B42346B2898CA6D2702389DCE201C97E04DE9A999",
+    "path": "resources/js/pages/Governance\\Actions\\Index.tsx"
+  },
+  {
+    "sha256": "64C7D45C43E5C0BFF5DBC3C51ABCA96540B06430B298287FA9E1C124F006314B",
+    "path": "resources/js/pages/Governance\\Actions\\Show.tsx"
+  },
+  {
+    "sha256": "BC177D645F6974D12B7C58BF24F80D5141E43050AEBB198819C60379CC12B4E3",
+    "path": "resources/js/pages/Governance\\Admin\\BoardMembers.tsx"
+  },
+  {
+    "sha256": "FC8BCB143153BC4AE23E409F7F76DECAE70DE56F6BE5A9C2BEF2355D6503B3E7",
+    "path": "resources/js/pages/Governance\\AuditLog\\Index.tsx"
+  },
+  {
+    "sha256": "9601B334B0F711E385F455E92CFB967775F0A3E5D0B41CB6825BBABF6A46D262",
+    "path": "resources/js/pages/Governance\\Budgets\\Create.tsx"
+  },
+  {
+    "sha256": "826BCB8A43D17E6D2229449864C81EA63B73BD7DC4B7B03C23520B225326947D",
+    "path": "resources/js/pages/Governance\\Budgets\\Edit.tsx"
+  },
+  {
+    "sha256": "51248549486EED7A20C1C5AFDA8A0BF8FEF7AB89057431AD293A8F2C356DC225",
+    "path": "resources/js/pages/Governance\\Budgets\\Index.tsx"
+  },
+  {
+    "sha256": "00945D6A20CA7E27EA90919788E19A91F9B150E5A243DC2A2493D625AEDBE425",
+    "path": "resources/js/pages/Governance\\Budgets\\Show.tsx"
+  },
+  {
+    "sha256": "1BACBB3F02B64963FEBA6E7A12786E1702BB8A04C4452F24D62406D564211073",
+    "path": "resources/js/pages/Governance\\Calendar\\Index.tsx"
+  },
+  {
+    "sha256": "29B35ED591E4C3FD45E282A16D6CCA39D0064E65EB1A4D98360ACB3F07E69C68",
+    "path": "resources/js/pages/Governance\\CeoReports\\_attachments.tsx"
+  },
+  {
+    "sha256": "AE43B3CB46262AEAE6AEEACC15B6693FE56D7297942D1A89D0A1F55C26D41B77",
+    "path": "resources/js/pages/Governance\\CeoReports\\_dialogs.tsx"
+  },
+  {
+    "sha256": "C1AB56063F57E4FF1DBCE07342F68FF78EEE25311A813866564D7C08AEB74049",
+    "path": "resources/js/pages/Governance\\CeoReports\\Create.tsx"
+  },
+  {
+    "sha256": "0AF8886E36E69974F3987A03C14028932C9BF2F1E0786A370DAC86B68E3F04A7",
+    "path": "resources/js/pages/Governance\\CeoReports\\Index.tsx"
+  },
+  {
+    "sha256": "13AF15EBAE6835E4A0BCE9419D1A9086536738202263358B317C3908E58B5308",
+    "path": "resources/js/pages/Governance\\CeoReports\\Show.tsx"
+  },
+  {
+    "sha256": "5D26FC439B71AF36CC51778D1079E052EDF2376E984B1D0DB209F68E1C0613B3",
+    "path": "resources/js/pages/Governance\\Clinical\\Dashboard.tsx"
+  },
+  {
+    "sha256": "914772FE53532D87F9A9D52B11CC0B89DEC72DB67C09C0C8E80F3720F4B550F9",
+    "path": "resources/js/pages/Governance\\Clinical\\Trends.tsx"
+  },
+  {
+    "sha256": "046D1E10CB03EC1A891C90899F50EEB61568C26D0B76FCE24D68006728AC7223",
+    "path": "resources/js/pages/Governance\\Cockpit\\CockpitLayout.tsx"
+  },
+  {
+    "sha256": "E067193C1CB428434D45D21EB1B12E103F3F618F75F99EF8E8E409360BCA8DC3",
+    "path": "resources/js/pages/Governance\\Compliance\\Calendar.tsx"
+  },
+  {
+    "sha256": "9402965F775B56B51E66B9C9153CB74C6E8C9E7D753EB65B01BA01D56F0521C2",
+    "path": "resources/js/pages/Governance\\Compliance\\Create.tsx"
+  },
+  {
+    "sha256": "89840ADAD07CEF68084876163FF7B39C932E6A34AE1BBB66F640D42CC25F44D3",
+    "path": "resources/js/pages/Governance\\Compliance\\Edit.tsx"
+  },
+  {
+    "sha256": "0A470D5E1F7044C99C8C674DBA196CD600DC5A5B4417EF28589B20BD814F45EC",
+    "path": "resources/js/pages/Governance\\Compliance\\Index.tsx"
+  },
+  {
+    "sha256": "22D55BDE264342642B0A0E849E4BFCA4834112D333C9DCE8C51DE97CA6DE7323",
+    "path": "resources/js/pages/Governance\\Compliance\\Show.tsx"
+  },
+  {
+    "sha256": "E6FD94BCE90474DB757F682209B179E6A02C659DA93330036C5A16E343ED2A28",
+    "path": "resources/js/pages/Governance\\Components\\WidgetCard.tsx"
+  },
+  {
+    "sha256": "14DD5088FC914FCC8796FCF6A78262F4C381E5FF56C0A710B7E3FB639A2DD75B",
+    "path": "resources/js/pages/Governance\\Dashboard.tsx"
+  },
+  {
+    "sha256": "C7DF39A01A23B624754DA56896E6964E09F872C437A42D9779F8829A3C30E375",
+    "path": "resources/js/pages/Governance\\Documents\\Index.tsx"
+  },
+  {
+    "sha256": "9B514460343F96F3DDC20F578FB2F9F140E5067A388C69E1D441E6A8666E9442",
+    "path": "resources/js/pages/Governance\\Documents\\Show.tsx"
+  },
+  {
+    "sha256": "07C457DBEE162D7070E9144CB5845318CE6024955659962F269A2277D4723534",
+    "path": "resources/js/pages/Governance\\Evaluations\\Create.tsx"
+  },
+  {
+    "sha256": "E755D55AFC01CE7B01030A8953599AB74B9DBA12BE75F3EF7CC9FC0172649C23",
+    "path": "resources/js/pages/Governance\\Evaluations\\Index.tsx"
+  },
+  {
+    "sha256": "40A6007C62D5AC7DAF3F159A199B5FC447715223341AC1C70479BE9B54226704",
+    "path": "resources/js/pages/Governance\\Evaluations\\Results.tsx"
+  },
+  {
+    "sha256": "DAD06C6F8F141B122710B041BE6717A18201E93C64AA5EB6DD6ADE28D9A934BE",
+    "path": "resources/js/pages/Governance\\Evaluations\\Show.tsx"
+  },
+  {
+    "sha256": "EACDF00B1E7C824CEEEDFF85398F46534AC52B964E7D988C9A2E5C58E385B930",
+    "path": "resources/js/pages/Governance\\Interests\\Index.tsx"
+  },
+  {
+    "sha256": "6C290E632BC950920C6AA880A36DDA4BC627CB1C253AB8C197F2AA8CACDB3646",
+    "path": "resources/js/pages/Governance\\Interests\\MyInterests.tsx"
+  },
+  {
+    "sha256": "123B6A70DE0D12BEA5C0499E25851F35C94D8F604FD23DDB58FE5F732A4B98DF",
+    "path": "resources/js/pages/Governance\\Meetings\\Calendar.tsx"
+  },
+  {
+    "sha256": "3643A6246585F93DCBEB938110A16A7BFDDDF7D1B1AD5DC8EF0D0E1FB26466E2",
+    "path": "resources/js/pages/Governance\\Meetings\\Create.tsx"
+  },
+  {
+    "sha256": "FB36F576B8D1B589003220D180A54F158C8C471F83B524BBE21F9921D66B1259",
+    "path": "resources/js/pages/Governance\\Meetings\\Edit.tsx"
+  },
+  {
+    "sha256": "6D7AB73EBEEEA9FDE354D5350B152CC6F5CC95BC22110603019710FB34DE3ACE",
+    "path": "resources/js/pages/Governance\\Meetings\\Index.tsx"
+  },
+  {
+    "sha256": "7600E58DF368E2CC18A8649570844E3C11ECE22846774D10E1E050C9282006F0",
+    "path": "resources/js/pages/Governance\\Meetings\\Show.tsx"
+  },
+  {
+    "sha256": "80CC7AE2FAB55527B0D319A0742369AD612983645F74908CD1A76AE1C89E7120",
+    "path": "resources/js/pages/Governance\\MyWork\\Index.tsx"
+  },
+  {
+    "sha256": "9EE9D08E7A573E59FF3C92CC5BFA9E4078CD4BDBD3AED45FC6CD0C77F6B63459",
+    "path": "resources/js/pages/Governance\\Packs\\_dialogs.tsx"
+  },
+  {
+    "sha256": "4107FFFB1ACA8BD2D65453A6EF5875544E495F85D2B3F597A508CCD781386C51",
+    "path": "resources/js/pages/Governance\\Packs\\Index.tsx"
+  },
+  {
+    "sha256": "15369ED942393940D95E60499CDC65A7366CC75AEE5DF142D9F554E93B61E069",
+    "path": "resources/js/pages/Governance\\Packs\\Show.tsx"
+  },
+  {
+    "sha256": "844C3A7B1ADB882405D33A9548F468F3EEF531554D2566B50574F62737988A3C",
+    "path": "resources/js/pages/Governance\\Performance\\Create.tsx"
+  },
+  {
+    "sha256": "07AC3A226A79E94591BD589A7BCA6A74328D18BCEC99E1FE76DFE3827A5310FA",
+    "path": "resources/js/pages/Governance\\Performance\\Edit.tsx"
+  },
+  {
+    "sha256": "47500C6B4362126C5F829C7BC62DB29A78BCD89ECC27FB95E52FC767C99AADD5",
+    "path": "resources/js/pages/Governance\\Performance\\Index.tsx"
+  },
+  {
+    "sha256": "168522327AE9D0F322798586865FF34F6DF17FA5E84BA39FD3473552F717EEB8",
+    "path": "resources/js/pages/Governance\\Performance\\Show.tsx"
+  },
+  {
+    "sha256": "9EC9AE253F9589966ED701772F0D8E7EF09DF2EBA8C533ADE1D47EF3A3E70B41",
+    "path": "resources/js/pages/Governance\\Policies\\Attestations.tsx"
+  },
+  {
+    "sha256": "918BF37D9B1518DDF8EA513B4D0ACDABBCBF8C7E6B5775FE55D7781F6417AE08",
+    "path": "resources/js/pages/Governance\\Policies\\Create.tsx"
+  },
+  {
+    "sha256": "D270B0CF899AC4D2A5E987EBCC4A840CF469E6857ED7E47A3DFABFD2A0346DC4",
+    "path": "resources/js/pages/Governance\\Policies\\Edit.tsx"
+  },
+  {
+    "sha256": "4FCE85F1B0A3DB5CAA0E8AAC80112FAF0982826B2408E408DFEE71EADCD042F8",
+    "path": "resources/js/pages/Governance\\Policies\\Index.tsx"
+  },
+  {
+    "sha256": "3424C07ECC8B92C69A69D49AD2699EB3DFF241C5036E29004FC4E844E15D6FF0",
+    "path": "resources/js/pages/Governance\\Policies\\Show.tsx"
+  },
+  {
+    "sha256": "1F0ECB61AE6D32A3593A34EDDE5157C8A4125E4AAFE5845E2ECF1B91BE38F9EC",
+    "path": "resources/js/pages/Governance\\Reports\\BoardMonthly.tsx"
+  },
+  {
+    "sha256": "F13F5E8686CB335C4D9A9073F0F51EF83585D8B93FD752AB321E20B15A18480E",
+    "path": "resources/js/pages/Governance\\Reports\\Committee.tsx"
+  },
+  {
+    "sha256": "60DCABE4D755478484A0BB78DE94FDEE880D10596B80239B9B8C720CD2CBC0D6",
+    "path": "resources/js/pages/Governance\\Reports\\ComplianceStatus.tsx"
+  },
+  {
+    "sha256": "85F2330FCA0C75781A1B211A1F2DB9CC952EBD5EA7C22853886F787C45191A9F",
+    "path": "resources/js/pages/Governance\\Reports\\RiskNarrative.tsx"
+  },
+  {
+    "sha256": "EB399C0C0021202EE2DAD54CBDE06AD6303A3C2ACA59CC9B63EDED9AB9610DE3",
+    "path": "resources/js/pages/Governance\\Resolutions\\_dialogs.tsx"
+  },
+  {
+    "sha256": "B8858222121EF82A2ADD5469F0C93757340BC7EAF62972C45655B7877E2C27CB",
+    "path": "resources/js/pages/Governance\\Resolutions\\Create.tsx"
+  },
+  {
+    "sha256": "53CCE94299F6D646FAEBF04A94FE5022690A424FC7FE569B3C2BFC2259F4375D",
+    "path": "resources/js/pages/Governance\\Resolutions\\Index.tsx"
+  },
+  {
+    "sha256": "3FCE95376F05CE4B8E6B76E69F855B4599E906CF4BB4A0441838E08072790968",
+    "path": "resources/js/pages/Governance\\Resolutions\\Show.tsx"
+  },
+  {
+    "sha256": "E414B945FD7CF94749BE5F1897DD1483AA6A0D0E6243BD47433FC718AFE980E1",
+    "path": "resources/js/pages/Governance\\Risks\\Committee.tsx"
+  },
+  {
+    "sha256": "4FAC71F637F59F53F7AE35D9E1FA618273C147B955453FC266F0F72DC6E8B584",
+    "path": "resources/js/pages/Governance\\Risks\\Create.tsx"
+  },
+  {
+    "sha256": "6FB63A3E025E616147140010896F0665D30A42CAB5E0C4B498663F77B3F0A8F7",
+    "path": "resources/js/pages/Governance\\Risks\\Edit.tsx"
+  },
+  {
+    "sha256": "4FB398A972CA48C73CFF918726A43C1748E8F5953B47C6C725988CB44C709599",
+    "path": "resources/js/pages/Governance\\Risks\\Heatmap.tsx"
+  },
+  {
+    "sha256": "003FB053EE6CDDE301194CA619BCFB1C08C9EAE499CBE85E5C6CC64DA009C6B1",
+    "path": "resources/js/pages/Governance\\Risks\\Index.tsx"
+  },
+  {
+    "sha256": "B677E54589007C2F3D031659092ADB89EC142FD412A6CEFD0D23CF8C9360191E",
+    "path": "resources/js/pages/Governance\\Risks\\Show.tsx"
+  },
+  {
+    "sha256": "3FE4A95FF7C2F86A8A05B043EF3C8B384B47539B30F5968DCDF43EAC20081B5D",
+    "path": "resources/js/pages/Governance\\Risks\\Trends.tsx"
+  },
+  {
+    "sha256": "04BBFDB4EBB7820C37E714B60308EC1A8F3D4A53487C8B21BEE0E92194A9A421",
+    "path": "resources/js/pages/Governance\\Settings\\Index.tsx"
+  },
+  {
+    "sha256": "04260974ED9B0BBE6550C1FD5E32EFC6C643393E0ACEE38248EE63E0A3F03DD9",
+    "path": "resources/js/pages/Governance\\SpendApprovals\\Create.tsx"
+  },
+  {
+    "sha256": "FA51389DE66D278C385F816E93B71E923CCE28DC6D3E98CE5104B383612037D9",
+    "path": "resources/js/pages/Governance\\SpendApprovals\\Edit.tsx"
+  },
+  {
+    "sha256": "1D84F315EADCD4D40B4F20CF0930DACE6883DDE24D180F3A6C84F26776A0CD5B",
+    "path": "resources/js/pages/Governance\\SpendApprovals\\Index.tsx"
+  },
+  {
+    "sha256": "601FE3F06C6CF2E7DD2FE506073781F48A47EDD8967D305A86FB61230611B15E",
+    "path": "resources/js/pages/Governance\\SpendApprovals\\Show.tsx"
+  },
+  {
+    "sha256": "E9871AF6D9C18A4B7F088DCFA6774E1D109005A70F1DD3EB6BC18EDA90F14E6A",
+    "path": "resources/js/pages/Governance\\Strategy\\Changes.tsx"
+  },
+  {
+    "sha256": "D03E2C190B99834AEF5B0C91B6CEF2CEDC7AEB648AAEE7DB82E6F144F4B18D76",
+    "path": "resources/js/pages/Governance\\Strategy\\Create.tsx"
+  },
+  {
+    "sha256": "2C4C64EC1192499B1D4EC33A82C04B7E7D1F1F90F4CA4CDF9E3BD661B27BC046",
+    "path": "resources/js/pages/Governance\\Strategy\\Edit.tsx"
+  },
+  {
+    "sha256": "07D1403F80E23B03E66E90BB7B7771F8CB0CD8EF61C1B6DC0751996FC5230D90",
+    "path": "resources/js/pages/Governance\\Strategy\\Index.tsx"
+  },
+  {
+    "sha256": "7F9C32B20098338533DC13B8C93E7C0D772C705B71A3D7853D5A87CF28B1E3C7",
+    "path": "resources/js/pages/Governance\\Strategy\\Show.tsx"
+  },
+  {
+    "sha256": "2BC53FE57E3A9A8E458BC0907CA6090D3993ABBC0C63EC02F213EE0B4FB235A6",
+    "path": "resources/js/pages/Governance\\TeTiriti\\Index.tsx"
+  },
+  {
+    "sha256": "04F05050EF3C83CD02A6AB94D661A01EDD9FE5FFD2DDF5AFF2997FC2113CB924",
+    "path": "resources/js/pages/sites/calendar/_parts.tsx"
+  },
+  {
+    "sha256": "240952115CD9DB1610EBCA47B0951A1C5C18B3778A0A8920E4B73C66558AFE71",
+    "path": "resources/js/pages/sites/calendar/SiteCalendar.tsx"
+  },
+  {
+    "sha256": "5DD0A6821FEEAAB729C98144498B949283C8509451DEA82DE2E96124014646AF",
+    "path": "routes/governance.php"
+  },
+  {
+    "sha256": "28D6CF2EEF06BD79EE832E70CF31ADE65686A92505DCF1F85BAF643552EE778F",
+    "path": "tests/e2e/governance\\fixtures.ts"
+  },
+  {
+    "sha256": "A4D9970925C915C19758AEABCE6D6FE1E9249582D0440E1C1622BB8B39AA9654",
+    "path": "tests/e2e/governance\\global-setup.ts"
+  },
+  {
+    "sha256": "0F33A15EDBE0A466F0279F9CA12A391EEC8D4B8F5B60BA45DC09A170A772ACAE",
+    "path": "tests/e2e/governance\\global-teardown.ts"
+  },
+  {
+    "sha256": "E05A871E5A42E359A70203871AA064AD2FFF2B5D69B7E02BA79B81158B57E812",
+    "path": "tests/e2e/governance\\governance-journeys.spec.ts"
+  },
+  {
+    "sha256": "9094AE4015852C5D7013570F919A520529AE816BA9447DF43312878A80793AEB",
+    "path": "tests/e2e/governance\\server.php"
+  },
+  {
+    "sha256": "FB4522EE2FCD948F43B2EC8E8822C0C9D9EB103BE4E3571DDFA5249384350EF3",
+    "path": "tests/Feature/Governance\\ActionItemEscalationRecipientAuthorizationTest.php"
+  },
+  {
+    "sha256": "DEE5DCF606E6A76AD040F7E97B41125C689D0F048967633990ED4FB30B81A068",
+    "path": "tests/Feature/Governance\\ClinicalGovernanceAutomationTest.php"
+  },
+  {
+    "sha256": "F89AF22AE81BA40D64FB7E4D8E4FB044C42E57B5804F698D68BC6A28DDBCE721",
+    "path": "tests/Feature/Governance\\ComplianceReminderQueuedRecipientAuthorizationTest.php"
+  },
+  {
+    "sha256": "F585BE76198DE30623B55BDA30D0A59381DA092E587C6973E1F7CA94543C86CE",
+    "path": "tests/Feature/Governance\\ExecutiveMeetingVisibilityTest.php"
+  },
+  {
+    "sha256": "B66FC7BC2877C29A142AD3A9D846886A1ED080CD5E4D9316C5415DBEEA284431",
+    "path": "tests/Feature/Governance\\GovernanceActionItemsTest.php"
+  },
+  {
+    "sha256": "0D29EA85A4751B81EAEF5BDE448BB8C6E8E4E83BB82666B4DDDE0FF0BB9579B0",
+    "path": "tests/Feature/Governance\\GovernanceBoardMemberAdminTest.php"
+  },
+  {
+    "sha256": "110AD8E23CF00E362706834DD957E7A82D2D8553B3F740EC8E42AE8A3447CCAD",
+    "path": "tests/Feature/Governance\\GovernanceBoardMemberSelfServiceTest.php"
+  },
+  {
+    "sha256": "15B6ECE75F748290F4A9457EECABD453E058A97C3A41F1667D6369F735D0A8C1",
+    "path": "tests/Feature/Governance\\GovernanceBoardPacksTest.php"
+  },
+  {
+    "sha256": "AD584A78033BEAA96846C7B2BAE448AC4EABEF1F8C27C9636223C18A272B3D11",
+    "path": "tests/Feature/Governance\\GovernanceBudgetsTest.php"
+  },
+  {
+    "sha256": "681D026B32F16FBAE9E6448B513A9260561E804EF6DD6961EBCC5022037203CF",
+    "path": "tests/Feature/Governance\\GovernanceCalendarScopeTest.php"
+  },
+  {
+    "sha256": "EF38C0140322B711A3A3CB4D37F6150A08A86265A181DCC3E366449C2898CA4D",
+    "path": "tests/Feature/Governance\\GovernanceComplianceTest.php"
+  },
+  {
+    "sha256": "D2B618B171C6AB34DC6E681AAB30362E1C8E184DDDD44119856AF46A015C4B16",
+    "path": "tests/Feature/Governance\\GovernanceCrossModuleEscalationTest.php"
+  },
+  {
+    "sha256": "F6C3F4BCA8DD2EC29AD3D052B310E6388E62378A7491D747700EBDB00AF875E3",
+    "path": "tests/Feature/Governance\\GovernanceDashboardTest.php"
+  },
+  {
+    "sha256": "9521CDFC38FD06305632279CAB2A89366AC2B6158D925EF2BB0D950371A79777",
+    "path": "tests/Feature/Governance\\GovernanceDerivedAudienceTest.php"
+  },
+  {
+    "sha256": "62328029BA39BFC6F033E9540FDE3ADE9289CC0D6584B4B7E1A16BA3B1C6C9DC",
+    "path": "tests/Feature/Governance\\GovernanceMeetingsTest.php"
+  },
+  {
+    "sha256": "E394C54FFCD261419971328BD3EDD61A921DBEDB7354E4802B389A3578913335",
+    "path": "tests/Feature/Governance\\GovernanceMinuteIntegrityTest.php"
+  },
+  {
+    "sha256": "AF6FF6A50BB35198744D0B315EFA214D90E86D213EF0D7DCA38ED9C96AA387E9",
+    "path": "tests/Feature/Governance\\GovernanceMyWorkTest.php"
+  },
+  {
+    "sha256": "C88B5D354198945F04637F2473DFCE260385D2272A2EF4AF18557EA8E9724C4D",
+    "path": "tests/Feature/Governance\\GovernanceNestedBindingIntegrityTest.php"
+  },
+  {
+    "sha256": "5C04889DC386666C4D3D77BD6C1FFC7742C5458CACECE89DE57CFDFBB8DF794C",
+    "path": "tests/Feature/Governance\\GovernancePerformanceReviewTest.php"
+  },
+  {
+    "sha256": "A517352A5017C025F226CACF40528268F1FC4409630F020384493063D599BAAD",
+    "path": "tests/Feature/Governance\\GovernanceReportsTest.php"
+  },
+  {
+    "sha256": "C21C5AFCF53711426E391219F7C3F2B9EF4C8B46DDC8F80DF65CE97B00E18104",
+    "path": "tests/Feature/Governance\\GovernanceResolutionsTest.php"
+  },
+  {
+    "sha256": "D5CF785D173AB6E754FD943BB4E97C848AC177909FA2A34C257170A08DFDD5E5",
+    "path": "tests/Feature/Governance\\GovernanceRiskRegisterTest.php"
+  },
+  {
+    "sha256": "6AA1E2BCADED9F21287838F748BB7A58637811B3F15C83896AD7A17736A7412A",
+    "path": "tests/Feature/Governance\\GovernanceSpendApprovalsTest.php"
+  },
+  {
+    "sha256": "5CF72539AAE7B576076A190CFB2495C25698473AF15F01D08E341EBA53853E13",
+    "path": "tests/Feature/Governance\\GovernanceSpendDashboardScopeTest.php"
+  },
+  {
+    "sha256": "F45B1C92546EDA5E4D1C0891BF5C22FB08B00945C05EA70B35F0FD4879CE4B75",
+    "path": "tests/Feature/Governance\\GovernanceStrategyTest.php"
+  },
+  {
+    "sha256": "6138F131949F3070AB1EB2C073CE75F39E32987002A0C40719F1FF2F1C11A0EB",
+    "path": "tests/Feature/Governance\\ResolutionQuorumDecisionSnapshotTest.php"
+  },
+  {
+    "sha256": "A1D6C8A8CC9B59D366D0C5C27A9A4128BC34B6627C40CA5A5F771E5BF5A5CA13",
+    "path": "tests/Feature/Governance\\RiskReviewReminderAuthorizationTest.php"
+  },
+  {
+    "sha256": "445D0221AFED5D6F6055995E03DE2CCC1E49751F224E15CCCE633F9E7BADE95F",
+    "path": "tests/Feature/Governance\\SpendApprovalAuthorityMigrationTest.php"
+  },
+  {
+    "sha256": "8DE18665576D372B115E9C7E2EDECF4EC52E9C46439BDC0C9F132543428F05B2",
+    "path": "tests/Feature/Governance\\SpendApprovalAuthorityTest.php"
+  },
+  {
+    "sha256": "B32633F789CB12C09B44F6CA6E35FA4742249F1E04A1AC0BC8C93F39E77D691A",
+    "path": "tests/Feature/Governance\\UpdateBudgetVariancesCommandTest.php"
+  },
+  {
+    "sha256": "4BD483368AFF4A0303D59BB5A18FDD9C487F2E729F20EF9D4E29AE31EB41D9C7",
+    "path": "tests/Feature/Governance\\VotingReminderQueuedAuthorizationTest.php"
+  },
+  {
+    "sha256": "31D2C74014FCDC20ABE79BAF516FE7F6A6EFC6E9CDFB22727091DD968A58F122",
+    "path": "tests/Support/GovernanceSyntheticFixtures.php"
+  },
+  {
+    "sha256": "F88E3A2686EC9F51C44EC304760FB07185F543D2E1B011ACD3E01651F8773010",
+    "path": "tests/Support/GovernanceTestHelpers.php"
+  },
+  {
+    "sha256": "89872E92712993D42361D9D444A80A92EC5F633EEDFC2179C78447ADF337330F",
+    "path": "tests/TestCase.php"
+  },
+  {
+    "sha256": "2F46F916AD04E788974F9696C344EA1B8E575D22A4F5F0CE99B4698D8BA8110E",
+    "path": "tests/Unit/Governance\\BoardMemberPreferenceTest.php"
+  },
+  {
+    "sha256": "A173F134BBFB8A03DB3429B6F3174CD514C24E6BBB64E45B79781DF37E02E74D",
+    "path": "tests/Unit/Governance\\BoardPackPresenterTest.php"
+  },
+  {
+    "sha256": "0F331BC448D069C1D40D1E857E1F26ECB9396899C851710BA3EE9F9A7C0DD3F5",
+    "path": "tests/Unit/Governance\\ComplianceEngineServiceTest.php"
+  },
+  {
+    "sha256": "07947434FE6703623474598AC0AD976B93EDF17045556F00150085E85F3EE900",
+    "path": "tests/Unit/Governance\\GovernancePresenterTest.php"
+  },
+  {
+    "sha256": "991A7954C6B56F7616C4EDD6BB9F4652AB64C46313260B2C02865140F419B903",
+    "path": "tests/Unit/Governance\\GovernanceSyntheticFixturesTest.php"
+  },
+  {
+    "sha256": "5CC14477F2E584AC57596C8A5D9C21F8498962B4E118499E10EF17F8B1996E5D",
+    "path": "tests/Unit/Governance\\GovernanceWorkflowServiceTest.php"
+  },
+  {
+    "sha256": "FBCDA05291517AA5FF30207E831BFCFBD47B2612BCCADC02ADB2C7DFCE4F7C28",
+    "path": "tests/Unit/Governance\\RiskScoringServiceTest.php"
+  },
+  {
+    "sha256": "A2EAD92B9758192BB1BC9C033DC1C6519BE4FE07344AF7F183F396395E8AA633",
+    "path": "tests/Unit/Governance\\VotingServiceTest.php"
+  },
+  {
+    "sha256": "F026A83CB632177AB885AF1919635AC6E5AE53FAE54AD42B83FE19BA0CBF053A",
+    "path": "vite.config.ts"
+  }
+]

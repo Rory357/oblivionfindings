@@ -1,0 +1,68 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_0df99888873d413d",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Concurrency\It\ItMonitoringDeliveryConcurrencyTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mcompeting deliveries interruption and retry preserve one canonical result[39m[90m                                 [39m [90m178.20s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Concurrency\It\ItMonitoringDeliveryConcurrencyTest[22m [90m>[39m competing deliveries interruption a… [41;1m TypeError [49;22m  
+[39;1m  App\Domain\Monitoring\Services\MonitoringAvailabilityEpisode::fromEvent(): Argument #1 ($event) must be of type App\Domain\SecurityDevices\Models\DeviceEvent, null given, called in C:\Users\steph\Herd\oblivionfindings\tests\Concurrency\It\ItMonitoringDeliveryConcurrencyTest.php on line 164[39;22m
+
+  at [32mapp\Domain\Monitoring\Services\MonitoringAvailabilityEpisode.php[39m:[32m30[39m
+     26▕     {
+     27▕         return self::validate($monitor->availability_episode, (int) $monitor->device_id, $siteId, (int) $monitor->id);
+     28▕     }
+     29▕ 
+  ➜  30▕     public static function fromEvent(DeviceEvent $event, ?int $siteId = null): ?array
+     31▕     {
+     32▕         $payload = $event->payload ?? [];
+     33▕         if ($event->source !== 'oblivion_monitoring' || ($payload['availability_episode_version'] ?? null) !== 1
+     34▕             || ! is_int($payload['monitor_id'] ?? null) || ! is_int($payload['site_id'] ?? null)) {
+
+  [33m1   [39m[39;1mapp\Domain\Monitoring\Services\MonitoringAvailabilityEpisode.php[39;22m:[39;1m30[39;22m
+  [33m2   [39m[39;1mtests\Concurrency\It\ItMonitoringDeliveryConcurrencyTest.php[39;22m:[39;1m164[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m (25 assertions)[39m
+  [90mDuration:[39m [39m178.45s[39m
+
+{"exit_code":2,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_0df99888873d413d",
+    "database_mutations_performed": false
+}

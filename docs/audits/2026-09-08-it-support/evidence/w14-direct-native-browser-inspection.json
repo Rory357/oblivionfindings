@@ -1,0 +1,25 @@
+{
+    "token": "703b38b1a99f4d16",
+    "database_matches": true,
+    "mutations_performed": false,
+    "counts": {
+        "users": 9,
+        "sites": 3,
+        "it_tickets": 7,
+        "it_teams": 0,
+        "devices": 0,
+        "monitors": 0,
+        "device_event_signal_outbox": 0,
+        "control_room_signals": 0,
+        "monitoring_incident_evidence_snapshots": 0
+    },
+    "latest_migrations": [
+        "2026_09_12_000027_allow_direct_monitoring_incident_evidence",
+        "2026_09_12_000026_add_monitor_availability_episode",
+        "2026_09_11_000025_add_device_monitoring_it_delivery",
+        "2026_09_11_000024_add_it_service_identity_commands"
+    ],
+    "source_permissions": [
+        "controlRoom.alerts.view"
+    ]
+}

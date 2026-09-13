@@ -13,12 +13,17 @@ class BoardEvaluation extends Model
     use AuditableChanges;
 
     protected $fillable = [
-        'title', 'evaluation_type', 'year', 'status', 'summary',
+        'title', 'evaluation_type', 'year', 'period_start', 'period_end',
+        'due_date', 'version_number', 'audience', 'status', 'summary',
         'questions', 'aggregate_results', 'recommendations',
         'action_plan', 'created_by', 'opened_at', 'closed_at',
     ];
 
     protected $casts = [
+        'period_start' => 'date',
+        'period_end' => 'date',
+        'due_date' => 'date',
+        'version_number' => 'integer',
         'questions' => 'array',
         'aggregate_results' => 'array',
         'opened_at' => 'datetime',

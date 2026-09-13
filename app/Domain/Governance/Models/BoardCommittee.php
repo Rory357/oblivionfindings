@@ -33,8 +33,27 @@ class BoardCommittee extends Model
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(BoardMember::class, 'committee_memberships')
-            ->withPivot(['role', 'appointed_at', 'term_end', 'is_active'])
+            ->withPivot(['role', 'has_voting_seat', 'appointed_at', 'term_end', 'is_active'])
             ->withTimestamps();
+    }
+
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(CommitteeMembership::class);
+    }
+
+    public function votingMemberships(): HasMany
+    {
+        return $this->hasMany(CommitteeMembership::class)
+            ->where('is_active', true)
+            ->whereNotIn('role', ['adviser', 'observer'])
+            ->where(function ($q) {
+                $q->whereNull('has_voting_seat')->orWhere('has_voting_seat', true);
+            })
+            ->whereDate('appointed_at', '<=', today())
+            ->where(function ($q) {
+                $q->whereNull('term_end')->orWhereDate('term_end', '>=', today());
+            });
     }
 
     public function chair(): BelongsTo

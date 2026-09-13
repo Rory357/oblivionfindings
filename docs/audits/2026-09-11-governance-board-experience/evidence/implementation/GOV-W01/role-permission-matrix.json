@@ -1,0 +1,87 @@
+{
+  "taskId": "GOV-W01",
+  "generated_at": "2026-09-12T08:45:00Z",
+  "roles": {
+    "chair": {
+      "role": "admin",
+      "board_role": "chair",
+      "permissions": [
+        "governance.view",
+        "governance.meetings.view",
+        "governance.meetings.manage",
+        "governance.resolutions.view",
+        "governance.resolutions.vote",
+        "governance.resolutions.manage",
+        "governance.boardPacks.view",
+        "governance.boardPacks.manage",
+        "governance.actions.view",
+        "governance.actions.manage",
+        "governance.executive.view",
+        "governance.performance.manage"
+      ]
+    },
+    "secretary": {
+      "role": "staff",
+      "board_role": "secretary",
+      "permissions": [
+        "governance.view",
+        "governance.meetings.view",
+        "governance.meetings.manage",
+        "governance.resolutions.view",
+        "governance.resolutions.manage",
+        "governance.boardPacks.view",
+        "governance.boardPacks.manage",
+        "governance.actions.view",
+        "governance.actions.manage"
+      ]
+    },
+    "member": {
+      "role": "staff",
+      "board_role": "member",
+      "permissions": [
+        "governance.view",
+        "governance.meetings.view",
+        "governance.resolutions.view",
+        "governance.resolutions.vote",
+        "governance.boardPacks.view",
+        "governance.actions.view"
+      ]
+    },
+    "finance": {
+      "role": "staff",
+      "board_role": "member",
+      "committee_role": "chair",
+      "permissions": [
+        "governance.view",
+        "governance.meetings.view",
+        "governance.resolutions.view",
+        "governance.resolutions.vote",
+        "governance.boardPacks.view",
+        "governance.actions.view",
+        "governance.spend.view",
+        "governance.spend.approve"
+      ]
+    },
+    "ceo": {
+      "role": "ceo",
+      "board_role": null,
+      "permissions": [
+        "governance.view",
+        "governance.meetings.view",
+        "governance.resolutions.view",
+        "governance.boardPacks.view",
+        "governance.actions.view"
+      ]
+    },
+    "observer": {
+      "role": "staff",
+      "board_role": "observer",
+      "permissions": [
+        "governance.view",
+        "governance.meetings.view",
+        "governance.resolutions.view",
+        "governance.boardPacks.view"
+      ]
+    }
+  }
+}

@@ -26,12 +26,20 @@ class ItProvisioningTemplate extends Model
         'is_active',
         'created_by_user_id',
         'updated_by_user_id',
+        'lock_version',
+        'current_version_id',
     ];
 
     protected $casts = [
         'selection_priority' => 'integer',
         'is_active' => 'boolean',
+        'lock_version' => 'integer',
     ];
+
+    public function currentVersion(): BelongsTo
+    {
+        return $this->belongsTo(ItProvisioningTemplateVersion::class, 'current_version_id');
+    }
 
     public function tasks(): HasMany
     {
