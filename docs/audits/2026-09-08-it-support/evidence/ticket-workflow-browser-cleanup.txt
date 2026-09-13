@@ -1,0 +1,7 @@
+{"database_removed":"oblivion_ticket_work_browser_b23f6fd52ad443fd","token":"b23f6fd52ad443fd","other_databases_affected":false}
+{
+  "token": "b23f6fd52ad443fd",
+  "database_removed": true,
+  "owned_directory_removed": true,
+  "current_herd_environment_changed": false
+}

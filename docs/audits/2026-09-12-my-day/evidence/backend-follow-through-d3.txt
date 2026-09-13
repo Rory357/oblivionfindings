@@ -1,0 +1,41 @@
+
+  [90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[31;1m⨯[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[31;1m⨯[39;22m
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\MyDayTaskHelpTest[22m [90m>[39m it closes the actual attendance session with an ac… [41;1m ValidationException [49;22m  
+[39;1m  This shift still has incomplete tasks. Complete all tasks or allow completion with a reason.[39;22m
+
+  at [32mvendor\laravel\framework\src\Illuminate\Validation\ValidationException.php[39m:[32m70[39m
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+  [33m1   [39m[39;1mvendor\laravel\framework\src\Illuminate\Validation\ValidationException.php[39;22m:[39;1m70[39;22m
+  [33m2   [39m[39;1mapp\Domain\Shifts\Lifecycle\ShiftLifecycleService.php[39;22m:[39;1m352[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Tasks\ShiftTaskProviderTest[22m [90m>[39m it counts zero and populated rostered shift tasks for the nav…   
+[39;1m  Failed asserting that 0 is identical to 1.[39;22m
+
+  at [32mtests\Feature\Tasks\ShiftTaskProviderTest.php[39m:[32m171[39m
+    167▕     ]);
+    168▕ 
+    169▕     $projection = $aggregator->navigationBadgeFor($worker);
+    170▕ 
+  ➜ 171▕     expect($aggregator->badgeCountFor($worker))->toBe(1)
+    172▕         ->and($projection)->toBe([
+    173▕             'view' => true,
+    174▕             'badge' => 1,
+    175▕             'degraded' => false,
+
+  [33m1   [39m[39;1mtests\Feature\Tasks\ShiftTaskProviderTest.php[39;22m:[39;1m171[39;22m
+
+
+  [90mTests:[39m    [31;1m2 failed[39;22m[90m,[39m[39m [39m[32;1m56 passed[39;22m[90m (236 assertions)[39m
+  [90mDuration:[39m [39m229.30s[39m
+

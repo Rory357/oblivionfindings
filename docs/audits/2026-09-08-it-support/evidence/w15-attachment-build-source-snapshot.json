@@ -1,0 +1,1798 @@
+[
+  {
+    "path": "app/Domain/It\\Contracts\\TracksItEmailDelivery.php",
+    "sha256": "14efa81903951e39f76fca063f33b35f1f52c0cda0c64189d5b4b1a79192a94d"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItAttachmentStorageReservation.php",
+    "sha256": "e603747493ec3769bdbfc94392520492e032c9657fa5ca789a2e315f657554e2"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItBulkActionResult.php",
+    "sha256": "6e3e971571fc620acbce236332ba0f54657e2cb2d2fb6f040a292841ed66f13d"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItEmailAttachment.php",
+    "sha256": "f7664a2a10c0858bf1e954f52ec0927a37d94dc746a76b6b2caf6c6d54bb199c"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItScannedEmailAttachment.php",
+    "sha256": "b1632904bacae3bd9d8074a16cea896de17bac0c7a47a88ac092195f438fb87f"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItTicketApprovalCommandResult.php",
+    "sha256": "05cdc221d2337acd4e4271a738bb6d243367e3b4c04f5d3e1d41c57f3496a4a9"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItTicketApprovalInput.php",
+    "sha256": "f49ba4cdf3bd1434d85077a67c403a95fd175ac2608d50000cd53b8fe4a6defb"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItTicketCommentCancellationResult.php",
+    "sha256": "53490d64ff163d540ac4abe306982067b81c287f1354abec291dc8944b6904da"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItTicketCommentResult.php",
+    "sha256": "402f2f21c218fefdb41846b34b04a5957fbdbd7eabba589f04cb62e6aa10d390"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItTicketCreationResult.php",
+    "sha256": "03e642e9298ec29835e2ec2b87e6d399b90675e5c7722535b7f0573016911209"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItTicketResolutionInput.php",
+    "sha256": "d5b1be061a8cfe9f7576e8fbc5a2195553a08d18c21669d590634e6781eda40d"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItTicketWatcherResult.php",
+    "sha256": "3fb891cfd2c4ee5b6ad4049bbef15f12164efa2eb1c947fbc25756f7bed5683a"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItTransitionInput.php",
+    "sha256": "526045cbb11b1fcf0d7e3285260c51b6368ad9a248105452234c4e5e77e52b84"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItWorkTaskCommandResult.php",
+    "sha256": "a5eb029077ea58b798880de909b4a59f0c0384fc10df1c98ffc899fdf543d06b"
+  },
+  {
+    "path": "app/Domain/It\\Data\\ItWorkTaskInput.php",
+    "sha256": "ec8a896653b61e03d8e02bf6fd932a081bee4b9ae2c23e227a9f392bc18989c5"
+  },
+  {
+    "path": "app/Domain/It\\Enums\\ItTicketCommandChannel.php",
+    "sha256": "2082f06be0f3b75d8ba3453211489b1ca261bb051e8d1f7d8f5c19fe8b246add"
+  },
+  {
+    "path": "app/Domain/It\\Enums\\ItTicketDraftPurpose.php",
+    "sha256": "6c0c06a61260113020aa57523978b1bb53d92d862bf91e79ee5d1bcf36041b05"
+  },
+  {
+    "path": "app/Domain/It\\Enums\\ItWorkflowState.php",
+    "sha256": "051025462179adc16e2918e1943b3003e4095d6959c827ebf0d29992d95cbccd"
+  },
+  {
+    "path": "app/Domain/It\\Enums\\ItWorkType.php",
+    "sha256": "072f99bb90650787fa002a9c4e931c6fa9dc796da54e593eb10859cdff60bc52"
+  },
+  {
+    "path": "app/Domain/It\\Exceptions\\ItInboundAttachmentUnavailable.php",
+    "sha256": "011eead4645402465b2e96df732388737290c6e66229d259e18ed782f5ca011b"
+  },
+  {
+    "path": "app/Domain/It\\Exceptions\\ItInboundContentException.php",
+    "sha256": "ef0c501332f09dcb995094571774a8111c9ff11ec7d7862b642007561998f65e"
+  },
+  {
+    "path": "app/Domain/It\\Exceptions\\ItInboundHeaderException.php",
+    "sha256": "23c826439df80d2f1d15ece2c21817d51fcb9cca4349c4e05f8748be9abe8dc5"
+  },
+  {
+    "path": "app/Domain/It\\Exceptions\\ItMailboxPollSuperseded.php",
+    "sha256": "f2286600faab7f9f034347e4c18cb354e55a96cd33a54bcfdce3990179f55804"
+  },
+  {
+    "path": "app/Domain/It\\Exceptions\\ItSettlementBlocked.php",
+    "sha256": "b214485464dc97776370dadb1f2ac0a7be313f1ca05a723f71ef873b89ab24b1"
+  },
+  {
+    "path": "app/Domain/It\\Exceptions\\ItTicketCommandConflict.php",
+    "sha256": "54e1c73ac7aa29469db13d732851f7e601e10364d0850de20eafeacae1ded49a"
+  },
+  {
+    "path": "app/Domain/It\\Exceptions\\ItTicketCommandUnavailable.php",
+    "sha256": "ef39dc48c0e0e94081b179ef8f5dabe3a6fc3a32bd9604ba4767cef4eebb8424"
+  },
+  {
+    "path": "app/Domain/It\\Exceptions\\ItTicketDraftException.php",
+    "sha256": "72239016866f9bd680c97545e7fb9874681c98bf508cd5904922d9d8801df980"
+  },
+  {
+    "path": "app/Domain/It\\Exceptions\\ItTicketVersionConflict.php",
+    "sha256": "5123fb924736ff84231e3e631e93b5f89da82e6b86bf174570e0eee02bd94b95"
+  },
+  {
+    "path": "app/Domain/It\\InboundEmailIngestor.php",
+    "sha256": "f82c7bc7e356e97708c5a7360dd23d8e8589648ffd350659bdd2d3d161baec50"
+  },
+  {
+    "path": "app/Domain/It\\ItModuleNavigation.php",
+    "sha256": "865216a3c4bfbbaa290f2909114276e419317bf7c477d4636c0570c5341af834"
+  },
+  {
+    "path": "app/Domain/It\\ItStaffDirectory.php",
+    "sha256": "21e5b8aebfa75aedb1b11b2758683a5a924daff0f9d577766a7e536f2f6a907a"
+  },
+  {
+    "path": "app/Domain/It\\ItTicketReferenceResolver.php",
+    "sha256": "1cca307da976cd11c12b765b10f7113a2c4068bbb41af3bc68a0d17d1a873322"
+  },
+  {
+    "path": "app/Domain/It\\Presenters\\ItTicketActivityPresenter.php",
+    "sha256": "47df3dc1e906cad3c86c4b0cd1ca59954c6de8c754f9d2e68bd29534bb85addb"
+  },
+  {
+    "path": "app/Domain/It\\Presenters\\ItTicketApprovalPresenter.php",
+    "sha256": "032e333e28a88f5a300c31f7d87939bb4c35e6d0b86f216426f18bdbec1ba30a"
+  },
+  {
+    "path": "app/Domain/It\\Presenters\\ItTicketCommentDeliveryPresenter.php",
+    "sha256": "866e64121dd7a043cab4008e228c1a7dd01d6cebb4520549ec27f1d4889270ac"
+  },
+  {
+    "path": "app/Domain/It\\Presenters\\ItTicketContextPresenter.php",
+    "sha256": "20ee26e9f3a4b0761420893f3f91a22850576c5eb2d38eff271dfe3863671939"
+  },
+  {
+    "path": "app/Domain/It\\Presenters\\ItTicketConversationPresenter.php",
+    "sha256": "461ecfe24a68846645478e3bb6861d65b940319c2c8031dfadae0088b72ab33a"
+  },
+  {
+    "path": "app/Domain/It\\Presenters\\ItTicketRoutingPresenter.php",
+    "sha256": "a46baeeb0d76d3c3bed0b57e5caf6e60fec4fa0d87d4ab359380e9041a77522f"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItApiFieldPolicy.php",
+    "sha256": "db98a9d0c8a92fdc78bc959a15ce984a7933c02322844ebd9cca4a0d6e6a4fa2"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItApiOperationsPresenter.php",
+    "sha256": "4f2d2644d35e8f8549102c58a269481b3b20ce90d1afc6e0272993f21ed2770c"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItApiWorkItemService.php",
+    "sha256": "e669d4d6b75c038d3cb786926ea4f62a06a3352a457d57a5b6883aab864c9bce"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItAttachmentCleanupReadService.php",
+    "sha256": "2ee76ba56730a12dc8c420ca65bd94eca94c90fbe9307690dc4dfec51310e1c6"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItAttachmentStorageIntentService.php",
+    "sha256": "0cb318b4d504fd8eee092ff19f399b0d728ccf58b46c6807ca97dd37d2bdc511"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItAttachmentStorageService.php",
+    "sha256": "d70be5e616983a9eb82b8b33929e495736857bd39aa4aea4e93eb5e3ec6f6545"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItAttachmentWriteContext.php",
+    "sha256": "5865f565b069f083c7cd8c7f3341a0790f4e531f2c32ee5d59944157c3014e8b"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItAutomationFreshnessService.php",
+    "sha256": "9c6aa5ab76978f09f8aaa6b1c14f32944a670249f15c53ec6d2e78b942dfde3b"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItAutomationOperationsPresenter.php",
+    "sha256": "679ecf60c14d550cc7d867f8768b0588913ae6e3cf55103a65e426224fb56d63"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItAutomationRunDiagnostics.php",
+    "sha256": "554ddd0133e5dd07abcb5dd655ab142eabb13e873a1aeebc40fafd4bdfb686fb"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItAutomationRunOutcome.php",
+    "sha256": "0a1b9a6583e7edd03c1db2c34e7429feaec62d52626db6f1508f01939b78c54d"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItAutomationRunRecorder.php",
+    "sha256": "8546aea1e428619b7962b98e060876a9cf7d4dec5d8d0d5a8d0c7264be0aecbb"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItAutomationScheduleCatalog.php",
+    "sha256": "b87d2088079fa889e76f96bfba72d21c6d5b2bb1caa2883a234d63de11a597e8"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItCatalogAccessService.php",
+    "sha256": "9701bea317e1cd1614bf6caa464c86027d677859a0011a6eed28a225107c20b9"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItCatalogAttachmentService.php",
+    "sha256": "14c34322fab07b06e17adf626802531f340b003692dff6b6f227a9586658b66c"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItCatalogFieldOptionService.php",
+    "sha256": "db4d960330c24e78743f867850a1b5420f292b63bc871347dee89ffff80de90f"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItCatalogManagementService.php",
+    "sha256": "f7f0f8a938cf2fefa7f859404234d2d7a045e096dc97a6c2ee0949de7d6c3084"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItCatalogSubmissionService.php",
+    "sha256": "ce57485d0d0824c3e36a3b63e086919dcb1627986c9cda545b6236d77cd950de"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItChangeService.php",
+    "sha256": "f723719d8252b601b737a92b856f9a81de3cb0f6b75d471e24a0f3a1d65fd7e4"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItControlRoomHandoffService.php",
+    "sha256": "15f098f867c4fed7f7e26ccd1989bbaa378575fb5baa6e763a255e4cc4011e75"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItEmailAttachments.php",
+    "sha256": "f7ff7f17cc45f920ae90666ccd511f13e8bb528e4d686e81eef9ad08c1c933c1"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItEmailBase64.php",
+    "sha256": "4690101ca411ebf4fcee2cc4d8c22378b8e7562fb23b63315906c3cc16f3ef8e"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItEmailContent.php",
+    "sha256": "3613a8af6271f6d9b76a284382edefd1d28723f3f8265b5cb3a70d452a97fd41"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItEmailDeliveryFailure.php",
+    "sha256": "c4cb19bb3bb01c4607ef8ec5fd33df60863fbc2ab5b39cf7e674c1ad215c2fe3"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItEmailDeliveryService.php",
+    "sha256": "ceda1a6daa33b7e4550a0fc2e9da6df02a3cdd7ce83d35fb7a581013d1f253af"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItEmailHeaders.php",
+    "sha256": "83a202e594f9e1d9c11b2f35bfd22eb6514af3632c07e94b01e9a2a0684f8f7e"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItEmailMessageIdentifiers.php",
+    "sha256": "9f9dc46a2ec4187ef1097036f95d6b77e56166a2596b393c848f7329a4074c50"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItFleetAvailability.php",
+    "sha256": "2934b5d34deea242459ec98ba3bc59b17469457787127e495ccb64803538a9d3"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItFleetDeliveryService.php",
+    "sha256": "c46fedbd96d6b2fe9c7155bcf870ba5b5f6edeaf86a758fcba4f544bc5f35875"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItInboundAttachmentStaging.php",
+    "sha256": "575603acc2ad8dd8bc5df9b495dbde1acebaa816f9983042d6676b58a4453eb3"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItInboundQuarantineReview.php",
+    "sha256": "5736f645f9bb90ea6e63658948d60b729f4f7fa1b57a8968550f0ebeec914da4"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItKbAccessService.php",
+    "sha256": "bff19f3090470abb7068246f82fb3cf8a00e1cf16d3d5b7b89f7e6d1b4a3fa08"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItKbLifecycleService.php",
+    "sha256": "875c40a77759c3494a3c9450afcf1930aea72b32093c4801a598b0db4bc1742d"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItLinkedContextOptions.php",
+    "sha256": "07731ccdbfc60740f5d188363a160e877b8d8d564769f00a38533ac2536e8128"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItMailboxConfigurationService.php",
+    "sha256": "58ebfa23efc728c9f9d2976e39fc8cd6efa392f6c211561fab2d0f6d62658938"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItMailboxConnectionPresenter.php",
+    "sha256": "cb05ebcbccc6429e1864a27f0b7267005b3ba3c96b8e3542d56395a511ac5cfd"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItMailboxInbox.php",
+    "sha256": "eb26c430fde5d9021b122e4b7cb77824b52830dfcdbc8bc45f06d11e52ea9f16"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItMailboxPollingToken.php",
+    "sha256": "d7d5ffc41c389dfab2b07f6202e34b941980fad84a70638ece8ea4eab9cd0b02"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItMailboxPollState.php",
+    "sha256": "906361eaed15ab2360f368b63a6eb3b9835d1208cf5e7e2e9ffa324d1fe18478"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItMajorIncidentService.php",
+    "sha256": "d32f2b41d4007fd68db76af0395e77a088a7e8acd760fdf1f08648db446e5069"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItMonitoringDeliveryService.php",
+    "sha256": "f5bbead4690cdb6daa3519e6b518d9d828d96e4d4c2b5d00ccd7770b81eefdcc"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItOutboundMailer.php",
+    "sha256": "28534ea8ca5b405c7e20da5667ad9baa158a01940be83e73b1ad8dd170cfedb5"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItProblemService.php",
+    "sha256": "2bae4a20b42c875fedec7ea1adb92066a27cb69682a6b98431917b198ecfb038"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItProvisioningAccessService.php",
+    "sha256": "22b21db27af5cec0b941350ae1123b562b692b22bf4035afb567ff982e2ab5fd"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItProvisioningRequestLifecycleService.php",
+    "sha256": "5c1eff2af68fda492e5b85ff8764b91e11a1b7905c47a195e81e45b9198a4067"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItProvisioningTemplateService.php",
+    "sha256": "73c4f4ebda729f53a43063b007dc667cb2e1a37eb7923e9213cc25b2489f3f5a"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItProvisioningTemplateVersionService.php",
+    "sha256": "a295341c1df8d2155942293172e74f1e1ba775c3fd084b07fb8c815617f1e769"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItProvisioningTrackingService.php",
+    "sha256": "cbf0759fb157c6db5e6d114ff17185779af8084e6a9bdd6583b06c7f55586a4f"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItProvisioningWorkflowService.php",
+    "sha256": "73a462cefe6d17981fde239d8cb17f072ea45fc511a8460901243cb9aff698ea"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItSavedTicketFilterService.php",
+    "sha256": "2b9a31c5bd72e2c4d04ecc3e7373401cb04a0f924829c66db256314a562c8a1a"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItServiceIdentityCommandService.php",
+    "sha256": "38916f95b0e978780618c1383b199c3dd14593ce59a6794e7fdf5ceece496327"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItServiceIdentityCredentialService.php",
+    "sha256": "89caecc85086215b24be68a8b2a9f232cf61455f4f39247a8c0ed3c884462d86"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItServiceManagementSetupService.php",
+    "sha256": "eecb81029f11ab3648c2b825610edaee21b745f1ed3e150cfae221a44e9d216d"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItSetupCommandService.php",
+    "sha256": "7eedb9425f01accda56089768de1651edd8c3e0106f106c8dd9d0c83e622248d"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItSlaClockService.php",
+    "sha256": "d97981871309e92f0463693b510fe7fc3c3b672de5febf66b87897a5444191f5"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItSlaReadService.php",
+    "sha256": "82f2c795976987051a4403ff00c38a1a5d1cf5c8cb02981f83299abac9fe7e5f"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTechnicalDeliveryOperationsPresenter.php",
+    "sha256": "b25482b51fd5ef1ec1d23295f47a835206663c4db4a625bbfbae034ee94cd3c4"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTechnicalDeliveryRecoveryService.php",
+    "sha256": "592908f2b7f5befaa5459edc02ee63fb12470c365af6879856155a4bdb1d18dd"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTechnicalDeliveryService.php",
+    "sha256": "01e9bd0445322ffc906ad704684edea490f9fe58702e72d1f736cf768c461df6"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketApprovalCandidateService.php",
+    "sha256": "09d718b42e7af50e5f1581a0da671c40774c34229fd6f900d6f64840b3c7cb70"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketApprovalCommandService.php",
+    "sha256": "2ac9a36d011c2a9438718ae088ed5903c2980ffe86485984231d55b5abea111b"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketApprovalResponsibilityService.php",
+    "sha256": "478e715963bad66c0013c8e65fdec5efde573df49e498f1f0b7a0c850da0632b"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketApprovalService.php",
+    "sha256": "b3afa8c0d9954a410ec02a7f392d301bc46d028ef651361d52a810f3e59003a1"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketDeviceContextService.php",
+    "sha256": "b85e228b8805cd4148da3f57b04bfe34cf31ad419a9bb211d45a317367c4b892"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketDraftAttachmentService.php",
+    "sha256": "9f46510712ddcbc5d556c4acb203e87c311c0056deeecde2b5268e64024834fa"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketDraftPayload.php",
+    "sha256": "59949a99c89455fe36f9b9b444b610633ccdd3d7e8a2b7b50339b0929c93a66a"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketDraftPruner.php",
+    "sha256": "f4341deaa00a68183fcf10cc5b83324e1353efef61ad88a21ec7135e579c4b87"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketDraftService.php",
+    "sha256": "27b86f40a2b0379be4b49661c6a0aa7b2f9cdbade913e4633c7d65e041b31eb2"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketIntakeService.php",
+    "sha256": "8743b97954fdfd008b4bd8994461160036be0452523e7e354d7dfd7129d24a11"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketInteractionService.php",
+    "sha256": "b68be5fc996a3b8852f887099d1be8aee49df854042a5e86cdb153c70fefc9b9"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketLinkService.php",
+    "sha256": "7b39c08de0a16742cd4c7fad0a75b1a6299552159f7cd0ea0ea68804b4c0c565"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketMergeService.php",
+    "sha256": "84b376ccce74bed4ad0dc57651ec3fd5a6b8c9fdd32cf0d8201750e429b71c80"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketPriorityService.php",
+    "sha256": "0756273ab018f4e30b2f386312be7812310869af959efa31ddf1279b04b22091"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketRequestTrace.php",
+    "sha256": "a6ec5ce91ecf52342e65095fd62a15dbaa16ca118b851e132c2de6f0093e884a"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketRoutingEligibility.php",
+    "sha256": "e35e7011c5a621467dbfb3027a16e65a78f4c493adffe701e64c1440edde722c"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketRoutingService.php",
+    "sha256": "6cbeb6664b3a72e9667ec4aa728626f6b7e9f3a217599dd22024ec4cace3e243"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketTriageService.php",
+    "sha256": "5c5bc6f777d85d7eb2c6b03ebab549118485dac9c8a9229f36df6d02e05eace2"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItTicketVersionService.php",
+    "sha256": "087e3a22d693e628edd73dca59e58f624a79bd497bde9e41d6ca34462dcec68a"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItWorkAccessService.php",
+    "sha256": "a80947b24e93d66550ad033a209505d325224ffdc78278d35143d1db5ae92434"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItWorkTaskCandidateService.php",
+    "sha256": "ed3f2e881c5e580c53fa96b9810efdf39a6e6b0e7e599dd04e8e94a34deb2002"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItWorkTaskCommandService.php",
+    "sha256": "4028638002c274bcdb26229ca659d916a61d55a7f7011da6cdc1306fc3845052"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItWorkTaskCompletionService.php",
+    "sha256": "08c15bf5f897cf742f2fa8bb2596ca9e1495722a9e8314b67aafd195728d6efc"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItWorkTaskGraphEvaluator.php",
+    "sha256": "fe3908eef8128869ac27be07be5a14bd404bd0f9365b39db2d0f3be801bb5b80"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItWorkTaskReadinessService.php",
+    "sha256": "ef95c57c507a4ba51af6d220c82baef7960fe2c7c1237b7c58c0ffca6a9b542f"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItWorkTaskService.php",
+    "sha256": "6597516faad4083ca7a09c8b0ecdb2caa332fc05fbe30c783a7d63593a20f99f"
+  },
+  {
+    "path": "app/Domain/It\\Services\\ItWorkTransitionService.php",
+    "sha256": "3a7ee27593b7c7ead69885e924136d88808cb22a380654adb2de0a5712c4888e"
+  },
+  {
+    "path": "app/Http/Controllers/It\\Concerns\\BuildsItOptions.php",
+    "sha256": "2ea5701d82db43b7be3f2f1f1488e770ab90922048cec386d641c4aea28660c5"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItCatalogController.php",
+    "sha256": "9d8fae6cbc8b7888ac56d7db6cb996e5c4346945878fc5d931d3e3fc6301f306"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItCatalogFieldOptionController.php",
+    "sha256": "a9284d908847b27df865de42402b86895febe432d13301dd2d4b7255822d8f31"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItCatalogRequestedForOptionController.php",
+    "sha256": "70ec597fa36bef344a82dfc5936ed2775960e27639dd5227d8f306e5394ae8e4"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItChangeController.php",
+    "sha256": "6ea48899dc8e0f9f6dc659d297f5581e1101a2008e29434c77e5a5a3c9051563"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItControlRoomHandoffController.php",
+    "sha256": "be6bf31cd218ff74a25cb27e50b089462e0a04f53fcde6903f8b2dda08f61512"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItEmailDeliveryWebhookController.php",
+    "sha256": "7eec8d98e2a346e6a991476aeec2e92fe3a548c0671a492a42089a94acc68420"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItInboundEmailController.php",
+    "sha256": "2ee187ee324bc904b9f0315948417f00b6e2ea6fc87dc50bbe3b4d6d4e7cf5dc"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItKbController.php",
+    "sha256": "03bb2a437827288a5dc008ba75383568443c49bbcc6fb980791f9a323acd9486"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItMajorIncidentController.php",
+    "sha256": "70566df4ed56af5ed24c51e04eaab8a872dfbe86eb6e585fcc8a785060cf2548"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItProblemController.php",
+    "sha256": "eea91b3cff533242bf046a661ac3d76426a51ca2003d0e1aa4cc5cd6af73fc30"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItProvisioningController.php",
+    "sha256": "627443117a14d3094dfb1f621ba8bfb63bef5d19a95829fec21b1916d345e661"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItProvisioningTrackingController.php",
+    "sha256": "0158868dac8de5def17f014d9a28d46f2cd406bfca26f72535186272d4055615"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItReportsController.php",
+    "sha256": "a457d4b25abaf430eb5e38de17c0f4200961948de58832fd7cc72e01e8d4d497"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItSavedTicketFilterController.php",
+    "sha256": "8e7bc0ca423085858f5917857214bc39c8f9bc0999ed739775c166c026795108"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItServiceIdentityController.php",
+    "sha256": "92a8301c67aae2fc46a69dbab3ce68d814d5f32a35092d77bdc4b8b7de580e8f"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItServiceManagementSetupController.php",
+    "sha256": "08ca6312b766afbfffcd2ca2401a7bfefdf0cbf436d2d505f73a687a2fd7e466"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItTechnicalDeliveryController.php",
+    "sha256": "851cb9c14aa551433b601dadaabd5b2942de5db6fd706922dbaf6c0ac4ec1d6a"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItTicketApprovalController.php",
+    "sha256": "450745269fc54bfd6d1b727dcdcb0a8df60c77dd8ada8d611472fe23b064e4c5"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItTicketController.php",
+    "sha256": "1b6d8b21e3360da11f8febdd01c65f7e7cfd2096a95483dffdda02d7844eb8e6"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItTicketDraftController.php",
+    "sha256": "4851e89b740bd59be4d392e733e0ea5fab8454b2e7c9c1787ebd1bdc82620a6b"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItTicketDuplicateSuggestionController.php",
+    "sha256": "0e13687f2e956b8828b2f82cdff6a45337e7ff2279efac3b11e03fa88ee652d0"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItTicketRelationshipController.php",
+    "sha256": "e657a5172495f0a075411e8ae7db038ec00cb74b94b926d4e4af1b9e697dda07"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItWorkspaceRedirectController.php",
+    "sha256": "69b52c8ca26e0ca0abc868d85e6c8bd0952adcb915b62e85d3eccff055b89255"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItWorkTaskController.php",
+    "sha256": "311ba22b3bf742ef9a9aa8f1b66197d772d0843697a973debc5b23754249ac21"
+  },
+  {
+    "path": "app/Http/Controllers/It\\ItWorkTaskHistoryController.php",
+    "sha256": "ed108bad15f198d55db338843c8b3e97c9b4dd92eaaba2043ad68b1f6ff7ef25"
+  },
+  {
+    "path": "app/Http/Requests/It\\Api\\LinkItApiWorkItemRequest.php",
+    "sha256": "71389be374554f4125caa918ac68a3dc31db7448a19600912bdab72b579044e1"
+  },
+  {
+    "path": "app/Http/Requests/It\\Api\\StoreItApiCommentRequest.php",
+    "sha256": "d84a6b50f216f4028c0fc0094a2ecfcb7686bc1e6a7ac5782c13e29ff71bc28a"
+  },
+  {
+    "path": "app/Http/Requests/It\\Api\\StoreItApiWorkItemRequest.php",
+    "sha256": "b6de233b7c5436225a746a7f5c2e938ff465e863dbd0b86ba31f18cbcf8ff1d0"
+  },
+  {
+    "path": "app/Http/Requests/It\\Api\\TransitionItApiWorkItemRequest.php",
+    "sha256": "a04db96e9098be6d2887dfc61feb2379c0d703f30eae4bc8dbd29b9efbd0b6ab"
+  },
+  {
+    "path": "app/Http/Requests/It\\Api\\UpdateItApiWorkItemRequest.php",
+    "sha256": "493e4bb22a071d8844a273a45258e0b7d7fdf193268c1659a499e277163fead1"
+  },
+  {
+    "path": "app/Http/Requests/It\\ApproveProvisioningRequestRequest.php",
+    "sha256": "3441da8f0cd964ea95481c52d7617b30304c42733ed56efe66d840affe974280"
+  },
+  {
+    "path": "app/Http/Requests/It\\AssignProvisioningRequestRequest.php",
+    "sha256": "4c1489a3447139c96964335d21c88bfbc0daacc2fb5f081d54e49743a8084b0f"
+  },
+  {
+    "path": "app/Http/Requests/It\\BulkProvisioningActionRequest.php",
+    "sha256": "6fa8c2e78aae8d3354cdc93ddd55ced2df5f0839a38a75bac005717fb8fbcd9a"
+  },
+  {
+    "path": "app/Http/Requests/It\\BulkTicketActionRequest.php",
+    "sha256": "a739caed4422eba14dd6e962e13ccf2f8bae8fadb3a12bd86e7fdb28e55550d7"
+  },
+  {
+    "path": "app/Http/Requests/It\\CancelItTicketCommentCommandRequest.php",
+    "sha256": "e0d50b7b571ec6e0e4f1c80ccdd1683b81429d22737a786ecf40c13fa82e2fee"
+  },
+  {
+    "path": "app/Http/Requests/It\\CancelProvisioningRequestRequest.php",
+    "sha256": "c10d20422a29b6393dfff578c72efa5aa077baf7d3b4ed8c75bed494f92df932"
+  },
+  {
+    "path": "app/Http/Requests/It\\CloseTicketRequest.php",
+    "sha256": "96d49fa42232821e0ec46421cbe9cd75d6574f744f46289c86a8f6d831e94fe7"
+  },
+  {
+    "path": "app/Http/Requests/It\\CompleteItWorkTaskRequest.php",
+    "sha256": "c8735c6e1a1b39282eb6895782ed43fbe593c16607fc4f0396424c4cb8e37a90"
+  },
+  {
+    "path": "app/Http/Requests/It\\Concerns\\BindsItBrowserActor.php",
+    "sha256": "cbdddb9d6220e1d677759b28411ef5bf9939e175bd1d1428e7623f22f03f1f34"
+  },
+  {
+    "path": "app/Http/Requests/It\\Concerns\\ConcealsInaccessibleItKnowledge.php",
+    "sha256": "9f0b29c7967c7f34611697258cb4ec28de5fba3e4a8043ece0902f1be84824ab"
+  },
+  {
+    "path": "app/Http/Requests/It\\Concerns\\ConcealsInaccessibleItWork.php",
+    "sha256": "3e8d44fe6b8c73c91d84c66ffdfb17dcb7baddd015f5b4af3880a4e818c2df4a"
+  },
+  {
+    "path": "app/Http/Requests/It\\Concerns\\HasItDraftCommit.php",
+    "sha256": "063cd1b7bf1f8428c4fd1cb6e2b2b468de4db4a47c4427368594550481d7fd12"
+  },
+  {
+    "path": "app/Http/Requests/It\\Concerns\\ValidatesItApprovalCommand.php",
+    "sha256": "78eaefd8850c32ccc827951fb2e4e36f8a9b5e4614ceb49b1e79e2cbba36d203"
+  },
+  {
+    "path": "app/Http/Requests/It\\Concerns\\ValidatesItTaskCommand.php",
+    "sha256": "1e1e83b06f74c9dc41fabb3d7f6bdb217899bee57299632ec8d30ced49512e00"
+  },
+  {
+    "path": "app/Http/Requests/It\\ConfirmTicketResolutionRequest.php",
+    "sha256": "cf0d9a2512fcf1aa137889b673b77680a7b0330842de29da9cf538f94e1095db"
+  },
+  {
+    "path": "app/Http/Requests/It\\ControlRoomHandoffRequest.php",
+    "sha256": "f87ac6fa6fc5461f0339916ffe58e260d3f30c2bbaa388ec5522a8cdee189565"
+  },
+  {
+    "path": "app/Http/Requests/It\\DecideApprovalRequest.php",
+    "sha256": "7d8c65b8c5ecac2ca5a3067a50569e6a65ba28c18e341bed8740c3364bf77f01"
+  },
+  {
+    "path": "app/Http/Requests/It\\DeleteKbArticleRequest.php",
+    "sha256": "d3bd8e0a83cb0001705b07a12bb1d88495ca8635ec5b55412ddd10fe9c0afad9"
+  },
+  {
+    "path": "app/Http/Requests/It\\FailProvisioningRequestRequest.php",
+    "sha256": "6c49b3675937724297e64dd4b02850ab033dca86c798eabd7a896177994bcc42"
+  },
+  {
+    "path": "app/Http/Requests/It\\FulfilProvisioningRequestRequest.php",
+    "sha256": "909a14baab95861a75ec3ddec4244261ef54d3850c3a212f16c30022aec2f50d"
+  },
+  {
+    "path": "app/Http/Requests/It\\IngestInboundEmailRequest.php",
+    "sha256": "6e623b1d6b9ec0cba6d497d6f5bb52d9bc15a3a8a91ff757e2412af5b68ac880"
+  },
+  {
+    "path": "app/Http/Requests/It\\ItTicketApprovalCommandIdentityRequest.php",
+    "sha256": "0e9e671114a85f7d70d93947fbff1a9ff0eba01546d5824fe1e4599a5cf47098"
+  },
+  {
+    "path": "app/Http/Requests/It\\ItWorkTaskCommandIdentityRequest.php",
+    "sha256": "9500901b135582d96921ea42c2ff1ef9ef4c924a4a0dcf2eb1d5977d5b55166e"
+  },
+  {
+    "path": "app/Http/Requests/It\\KbHelpfulRequest.php",
+    "sha256": "0744686e209b144d800c806f4af3e6682b23bb3036fa33ea73b975d4f4d58086"
+  },
+  {
+    "path": "app/Http/Requests/It\\LinkTicketDeviceRequest.php",
+    "sha256": "06fa025203fd033830536a6ffaf247f594f1ae5eabfd014f1a6ad4c5f2bb33c9"
+  },
+  {
+    "path": "app/Http/Requests/It\\MergeTicketRequest.php",
+    "sha256": "fe27ae5ecffdeab08f9dba623aaaccf6a6400032c00dc101a1e6c776047f2e51"
+  },
+  {
+    "path": "app/Http/Requests/It\\PreviewTicketMergeRequest.php",
+    "sha256": "96500b04e30f9d19243e6e0677392544cefa21e3b69c7c8d0e23393bfc7d3ddd"
+  },
+  {
+    "path": "app/Http/Requests/It\\ReadTicketDuplicateSuggestionsRequest.php",
+    "sha256": "a943b63ea8e6d78a55b73f38c5b1b3b5af389f672ddd2d2c1f7420fd84d4dc98"
+  },
+  {
+    "path": "app/Http/Requests/It\\ReadTicketMergeCommandRequest.php",
+    "sha256": "b78bf63907b173babb39e80698db833cf4d425b0a926af6adffd47fa6be485f3"
+  },
+  {
+    "path": "app/Http/Requests/It\\ReadTicketRelatedWorkRequest.php",
+    "sha256": "1c6a55f95ae727f78789ee270b279c9f78e0b45b6d1dcb462c44ee6d68cd1479"
+  },
+  {
+    "path": "app/Http/Requests/It\\RecoverCatalogSubmissionRequest.php",
+    "sha256": "8515a19b31ee22891de83a64884d039ad55180c41b96b711564cc477299ad349"
+  },
+  {
+    "path": "app/Http/Requests/It\\RecoverItSetupCommandRequest.php",
+    "sha256": "4518262db1ce928103dee1571ea750152b1be7eb393aa7454b7bc67c146e46f4"
+  },
+  {
+    "path": "app/Http/Requests/It\\RecoverItTicketCommandRequest.php",
+    "sha256": "8610530231e6a2a2cb73f706490047ca4b57c4a8f4573341bbe1e99361fb128f"
+  },
+  {
+    "path": "app/Http/Requests/It\\RecoverItTicketCommentCommandRequest.php",
+    "sha256": "24cae1a883e096d4cf5d08c955241cd82ee16144cb21047571fbb0c2693193d1"
+  },
+  {
+    "path": "app/Http/Requests/It\\ReopenItWorkTaskRequest.php",
+    "sha256": "88892a2c6df7fb92129822e812c3c574b89d3caf33e89d425a2a4eeadbc1ef39"
+  },
+  {
+    "path": "app/Http/Requests/It\\ReopenTicketRequest.php",
+    "sha256": "aa5543dee393e77a55489e9a6789516efb014b906cab09925bcecaa4142f179e"
+  },
+  {
+    "path": "app/Http/Requests/It\\ReorderItWorkTasksRequest.php",
+    "sha256": "91173c04765d393dfcdc13da8c845313740a88b980e07e0227bcdfaba90c8713"
+  },
+  {
+    "path": "app/Http/Requests/It\\RequestApprovalRequest.php",
+    "sha256": "692db54c9079ed8bc8378ab168c57394234cf26df56f31041205b4bde7591e24"
+  },
+  {
+    "path": "app/Http/Requests/It\\ResolveTicketRequest.php",
+    "sha256": "ad4027af3c0e43db065c8333c81ed042dc4ddc8e43f2a1649b28667c3fd98ddc"
+  },
+  {
+    "path": "app/Http/Requests/It\\RetireKbArticleRequest.php",
+    "sha256": "e325640ae90abb2b9865cc397063d4e3b3b748be60e5bdebac075f8db390869e"
+  },
+  {
+    "path": "app/Http/Requests/It\\SaveItCatalogItemRequest.php",
+    "sha256": "b515869760a23b27b92b8df2a6fe758287432e5b08f415cb972c13fef1561d5a"
+  },
+  {
+    "path": "app/Http/Requests/It\\SaveItQueueRequest.php",
+    "sha256": "4fd4dd3f0224cce5e30b00ac04f29fa9296f0bda13c2cb8711118aec13379aa0"
+  },
+  {
+    "path": "app/Http/Requests/It\\SaveItServiceRequest.php",
+    "sha256": "3106c1c2b0c92b76bceb0105332ed95980643b43e03ff443ecbb994d068f858a"
+  },
+  {
+    "path": "app/Http/Requests/It\\SaveItTeamRequest.php",
+    "sha256": "c5154c209e9dda0ecdfa171ef2f8266a826b361d13c8eac6914364c9b23c1c80"
+  },
+  {
+    "path": "app/Http/Requests/It\\SearchItCatalogFieldOptionsRequest.php",
+    "sha256": "2cdd8a44210fdcbb2e494869803ba08dae8bc55e7de8c2419ec28ba0a3c26966"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreCatalogRequest.php",
+    "sha256": "f6c3c1690bf36eef8c21823deeae22aeb6ffef439d3eb251f81afcef75c011bf"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreItChangeRequest.php",
+    "sha256": "83211ed3427609080d9002e4e7b1f6d060589a12643ad2e7017fc11abfd363ee"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreItMajorIncidentRequest.php",
+    "sha256": "a8718146a2b8e39e5d3fcc390549b5b16bcb7891481d785a5e42251c942c122f"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreItMajorIncidentUpdateRequest.php",
+    "sha256": "cb550fc92311a8bc59662282938230507e845459b9bc19fb6fbc7e6cd8117ab3"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreItProblemRequest.php",
+    "sha256": "c4a2e586ccabc23c49aae95c2f1e35309613f1c75f492ffd61677f70ca8f033b"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreItProvisioningTemplateRequest.php",
+    "sha256": "a934ace5baa7ccd9deea188c06dea6391d3d86948671d8890f8b8b50f77332fc"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreItSavedTicketFilterRequest.php",
+    "sha256": "0052a67e3d1b8c84959b1d348c70f60aa52e1258d1a4d49a34e1ab2c3aaf7c48"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreItServiceIdentityRequest.php",
+    "sha256": "b8cedccd3530d45fd285710564449b44a8ec5a504db9425fe44ec24ef21d7930"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreItTicketRequest.php",
+    "sha256": "1c7a25fc72b15a20b39b0b21f722f51d227fe389c420488c8b9148d194c9b260"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreItWorkTaskRequest.php",
+    "sha256": "a28e2fa37042fd16c4b652b504cd90638af8c2c88cb1537d1710a090319ec1f9"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreKbArticleRequest.php",
+    "sha256": "dfc3ad91724f36637f5af45275d0c7325844952878f6e19e3046103284465117"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreProvisioningRequestRequest.php",
+    "sha256": "2f07f81f9f4722e3086e5785510e0ccf51113ac7b0d19021f624131c6e68382a"
+  },
+  {
+    "path": "app/Http/Requests/It\\StoreTicketCommentRequest.php",
+    "sha256": "a8fe6e27a981daa1b73910999669dbc62f1a94fc0ba08e7901b7338090bf2826"
+  },
+  {
+    "path": "app/Http/Requests/It\\SubmitCsatRequest.php",
+    "sha256": "fcd55d5b98eb8b59d5fb7f191c78cd1aa697486c666ddd9ee20b6ebb03cb5ee1"
+  },
+  {
+    "path": "app/Http/Requests/It\\TicketRelationshipCommandRequest.php",
+    "sha256": "1d069130254899153352c30dac55b7db297ca48d1f1f2348f363a6e324cd1e79"
+  },
+  {
+    "path": "app/Http/Requests/It\\TransitionItChangeRequest.php",
+    "sha256": "7fcc995122f3a33ec47ad4d47190be237d95f6030ac8cbac071f5e6c794f0448"
+  },
+  {
+    "path": "app/Http/Requests/It\\TransitionItMajorIncidentRequest.php",
+    "sha256": "b4cbaa0b2f8d1bb50c38b3cf6bf323497a0429db7b2a45cd8544c98df206dba9"
+  },
+  {
+    "path": "app/Http/Requests/It\\TransitionItProblemRequest.php",
+    "sha256": "1cd75d06387d370f98f67f0df87e54c409b2ed99b6eaffebab7c8b1eac11e44e"
+  },
+  {
+    "path": "app/Http/Requests/It\\TransitionItWorkRequest.php",
+    "sha256": "0c765fecf4160f7dd8851a81b11306380ca678ac6e6be8ff8c25d6b990f979ba"
+  },
+  {
+    "path": "app/Http/Requests/It\\UnpublishItCatalogItemRequest.php",
+    "sha256": "154f240a3eef84ec52b0ebb29f7694ee99681d5db3a7f65e91008041162d0860"
+  },
+  {
+    "path": "app/Http/Requests/It\\UpdateItChangeRequest.php",
+    "sha256": "b8a82b52a758c759ec26bdd63bca6e7a019b5cecc5cd347a68559ce13e19fd4a"
+  },
+  {
+    "path": "app/Http/Requests/It\\UpdateItEmailDeliveryStatusRequest.php",
+    "sha256": "9d7560b74e55bacb91e49c9bbf69439a80ca8755d6ef8f4c3935172a418e0ba5"
+  },
+  {
+    "path": "app/Http/Requests/It\\UpdateItMajorIncidentRequest.php",
+    "sha256": "a4f1854209c23836754394befa615ebc2c8affe5b0bab002dee31cca82248a9d"
+  },
+  {
+    "path": "app/Http/Requests/It\\UpdateItProblemRequest.php",
+    "sha256": "afa405f8048512fa940eb275c17275b69ac4068d559f096d3a57bba9994541ff"
+  },
+  {
+    "path": "app/Http/Requests/It\\UpdateItWorkTaskRequest.php",
+    "sha256": "98d07b8b55998ab6b853a7fdd9676257d429fe7c1a6c2ec5f41c333101abe400"
+  },
+  {
+    "path": "app/Http/Requests/It\\UpdateKbArticleRequest.php",
+    "sha256": "9057447b7b0dd4754bfd926b5cf8228b7bbb088d85e321035de0dbb04e26bc5e"
+  },
+  {
+    "path": "app/Http/Requests/It\\UpdateSlaPoliciesRequest.php",
+    "sha256": "9a08bc4570b1a6a6ebabd37e557b5b4c0ace99bf2030d225b535e2d8b22bac15"
+  },
+  {
+    "path": "app/Http/Requests/It\\UpdateTicketRequest.php",
+    "sha256": "56256729a84898a60f534981b6b2b65da42a163bd9c6e296c5aac6ce21fbaf9a"
+  },
+  {
+    "path": "app/Http/Requests/It\\UpdateTicketWatcherRequest.php",
+    "sha256": "759dba519a2bbd63eee19c01db20676c9bbad902ca9cb094e2b5c6f926afb78d"
+  },
+  {
+    "path": "app/Http/Requests/It\\ValidateItApprovalCandidateRequest.php",
+    "sha256": "f7a0a1d4977b857b1e040aadcee35261259b603427b3f3154213400f3a190266"
+  },
+  {
+    "path": "app/Http/Requests/It\\ValidateItMergeCandidateRequest.php",
+    "sha256": "df0fb32629c77e7fbd7dc279d1f31fc3cdf13c4a84f506af62e955fa2c74303d"
+  },
+  {
+    "path": "app/Http/Requests/It\\ValidateItSetupCandidateRequest.php",
+    "sha256": "834d4a10a29d1554398c4528f3084d7dd2618b725503de3747bc225f0d4da8da"
+  },
+  {
+    "path": "app/Http/Requests/It\\ValidateItWorkTaskCandidateRequest.php",
+    "sha256": "c2f9ae34dcc7708a014d53ac33cc60a12910ed60d74ec3440e553886c288c569"
+  },
+  {
+    "path": "app/Http/Requests/It\\WithdrawApprovalRequest.php",
+    "sha256": "5fdd3b2155d1785526589af103259faddc3f7d77b169e9a7f2756b79b941fca4"
+  },
+  {
+    "path": "app/Models\\ItApiRequest.php",
+    "sha256": "06be7bb71c45bdb6d9365e07c72fc623337b2fbd28a509d24798938f5483ff23"
+  },
+  {
+    "path": "app/Models\\ItAttachment.php",
+    "sha256": "88cd98262d7cbe8f37c42e2ce884942f35784311de0ad7cc34eff3a3df99b6d6"
+  },
+  {
+    "path": "app/Models\\ItAttachmentStorageIntent.php",
+    "sha256": "8f6d924a26988ca5d9536aab753bc8c43d365975469556c02cf7409ae524d43e"
+  },
+  {
+    "path": "app/Models\\ItAutomationRun.php",
+    "sha256": "abc1da117c6d9a1cbfc7738683cb248dbcac3c9b48fdf09aed2995ea67ce27c7"
+  },
+  {
+    "path": "app/Models\\ItCatalogItem.php",
+    "sha256": "8591b8d17759d5618a1a7d9a458807825318e312c2bc95988c56e5edad3355cf"
+  },
+  {
+    "path": "app/Models\\ItCatalogSubmission.php",
+    "sha256": "b4ad63b1680989a5b0d4a214d76862477a30f9eb59088e4cacd95a97f413ef6e"
+  },
+  {
+    "path": "app/Models\\ItCatalogVersion.php",
+    "sha256": "997460ab4edc1465d09e09ffae9956f4114864e8035fff825f8ea8e673bf84e0"
+  },
+  {
+    "path": "app/Models\\ItChange.php",
+    "sha256": "2f30abc41da72b68f4d3a43d83fe4191779cbf4d0795ae620595a908e6386733"
+  },
+  {
+    "path": "app/Models\\ItEmailDelivery.php",
+    "sha256": "26ef1d05f280eb0f4f20d488f822b3eba9ef03876439797eab19ce782fad619b"
+  },
+  {
+    "path": "app/Models\\ItInboundEmail.php",
+    "sha256": "3c1cfacd1fa7ea3c85fd337af2a5812672ca1e24237b6bb57459988ee90ecf16"
+  },
+  {
+    "path": "app/Models\\ItKbArticle.php",
+    "sha256": "0e89dd3ad1217c0a7c5f379279355c2c8982b7d40316ffd6a7b808ecf2fdc327"
+  },
+  {
+    "path": "app/Models\\ItKbInteraction.php",
+    "sha256": "ec2b1a5566e85fa6c36ad80c9ae1600fcfb57be48592a840b0bf2a2f8323dd6f"
+  },
+  {
+    "path": "app/Models\\ItMailboxConnection.php",
+    "sha256": "f2ee85e7da8668b7b2a03edfaa498e26e466d27c99866bc1f9450c9b273ee6aa"
+  },
+  {
+    "path": "app/Models\\ItMajorIncident.php",
+    "sha256": "954c59aebf5fb1f1ed63e837a51aee7d63aa983245ba1a89194e1ba6aea1179e"
+  },
+  {
+    "path": "app/Models\\ItMajorIncidentUpdate.php",
+    "sha256": "994f4ac99872f6e529ff05b5d6dfb5eac8c2e6f968efbff06ad12ac855064333"
+  },
+  {
+    "path": "app/Models\\ItProblem.php",
+    "sha256": "6122e31634fc0961596e89b0edf5908c4c559b1339ae87c2de2f872850184c1f"
+  },
+  {
+    "path": "app/Models\\ItProvisioningRequest.php",
+    "sha256": "abf4eb99133d07447bcd773f245248b8bd870cd38dc654d40631914c1dd3939d"
+  },
+  {
+    "path": "app/Models\\ItProvisioningTemplate.php",
+    "sha256": "cb3ac72e2daec8023fcfff0923a4fd75e70190f806a1511bdb49a79f60055e11"
+  },
+  {
+    "path": "app/Models\\ItProvisioningTemplateTask.php",
+    "sha256": "163c6e73d69d1db579d5d544324480ccecc79e793697cae1de2278db9edaaf9d"
+  },
+  {
+    "path": "app/Models\\ItProvisioningTemplateVersion.php",
+    "sha256": "edcfad0a662c6c347b16f7ccc340d90796b3816373f4c86a0699c195b391ee06"
+  },
+  {
+    "path": "app/Models\\ItProvisioningWorkflow.php",
+    "sha256": "b5d76552061133f2c842bd8b9adf08fc27c2ae3b3a41a78aef194a837bdb9cc6"
+  },
+  {
+    "path": "app/Models\\ItQueue.php",
+    "sha256": "2600153ddf9ec413e8f3eefbf5d060319a226f1079b94ea89d6b1a8d32cc2199"
+  },
+  {
+    "path": "app/Models\\ItSavedTicketFilter.php",
+    "sha256": "1eabe3cb9b1844d8b09f137f0e7ebbf2411e608e2f5372d6cc87f26b3a7c103e"
+  },
+  {
+    "path": "app/Models\\ItSecurityDesktopReleaseFixturePack.php",
+    "sha256": "a491bfc3c66860d8af4550e722ed00b217a283f867effe7f2adb26ab3ebf81fd"
+  },
+  {
+    "path": "app/Models\\ItService.php",
+    "sha256": "4250eb51811dfdb9802da27ac72eca4f4352dd43d542887a5d9b8690a9478109"
+  },
+  {
+    "path": "app/Models\\ItServiceIdentity.php",
+    "sha256": "3073c2d9fd39f529a62e6bea13a4e2d54c690b41b245b5589971ae6099c64fbc"
+  },
+  {
+    "path": "app/Models\\ItServiceIdentityCommandReceipt.php",
+    "sha256": "efef11fed69496b3d22f2f76050dba4583611c467ec13f1a936d27276046401d"
+  },
+  {
+    "path": "app/Models\\ItSetupCommandReceipt.php",
+    "sha256": "39c9c2a0612f51901f5cc0aca335db90a558c12fdfb9439a6547337137a29a01"
+  },
+  {
+    "path": "app/Models\\ItSlaPolicy.php",
+    "sha256": "a5527d2719128d65955d165eab227dd939a60ec5a7b2b760f26f37a637b6db07"
+  },
+  {
+    "path": "app/Models\\ItTeam.php",
+    "sha256": "f3b681ed68a263971a0ab9f753f560d376eab2a0aa9275624833dc37db03528e"
+  },
+  {
+    "path": "app/Models\\ItTicket.php",
+    "sha256": "c56e394fea38944112d864797b59158430103c48db9621bee5462f111ce51378"
+  },
+  {
+    "path": "app/Models\\ItTicketApproval.php",
+    "sha256": "c4ade37aa8256612abb5d9b462f5c9245f979a67d949e4dbbb3dd1c06d57ca11"
+  },
+  {
+    "path": "app/Models\\ItTicketCommandReceipt.php",
+    "sha256": "562a4e89698b67e0975d608502cbc96ce4b5aea9cacb1a116604cebe82a412ab"
+  },
+  {
+    "path": "app/Models\\ItTicketComment.php",
+    "sha256": "0034f4568b6557b853672c7e771cb158f980d03f9f0e56e8f2c2a6fa2a77b4d6"
+  },
+  {
+    "path": "app/Models\\ItTicketDraft.php",
+    "sha256": "18781dff630cae2ebd347b0ccfbdc9f03afb21fc01226c12d134ce31e2bd7140"
+  },
+  {
+    "path": "app/Models\\ItTicketEvent.php",
+    "sha256": "42187ec1564eaa9d653b0a1aa1e477795cb31bf5c477b2fab1a5a7e13c262747"
+  },
+  {
+    "path": "app/Models\\ItTicketLink.php",
+    "sha256": "14c0c09315eaf5592806a11b2327e33b812b20c86ab72979fa102543feb6c6d7"
+  },
+  {
+    "path": "app/Models\\ItWorkTask.php",
+    "sha256": "aad58c5e8fee6c9faf3a8370ec93648c01eb3cc27063651d58f49a39946c59af"
+  },
+  {
+    "path": "app/Models\\ItWorkTaskCompletion.php",
+    "sha256": "75f16376db995aa050668116da0ef1946e5eeb0d0ae174e06c2b4bd5f70ef5d2"
+  },
+  {
+    "path": "app/Providers/AppServiceProvider.php",
+    "sha256": "09a2a4db975d244d878bb881d670379a26bf44a3181c12462910d9a6a3c30b8c"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\catalogue-entity-picker.test.tsx",
+    "sha256": "26359a02512902a515511dab0cf7c96295065568aa3941ae4f3f7bba9c4ae36d"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\catalogue-request-wizard.test.tsx",
+    "sha256": "951043b100e3e08f4ec109b4195e8385644042aab285ea02bce748baece7b6a7"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\catalogue-submission-contract.test.ts",
+    "sha256": "6ac1413b23283d269423e30e1d7f5dbcd1d4b5b229dda6f4b70b246b5aa97114"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\csat.test.tsx",
+    "sha256": "c35f04b72670df07bbf4ade49434b5512b8cde01fbf022cab9ed190ee4064709"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\it-bulk-result.test.ts",
+    "sha256": "11f6e8db725109d609fa651617a233965049382545b7b9d2e42c6475eb09bfff"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\it-catalogue-management.test.tsx",
+    "sha256": "6bcf28d7f512ac787c2346974ad279ceccf90b0144cedd669016aa8673273c75"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\it-module-navigation.test.tsx",
+    "sha256": "00c8e203c2b7234a1e8c02844cc65a24e3dab4eac635557b04e575429a216303"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\it-provisioning-templates.test.tsx",
+    "sha256": "79ab2684c3683a2cf90eedad7bef5decef8c61fbfab9569425b1c8d86b38d3a1"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\it-reports.test.tsx",
+    "sha256": "c397354309797316c16d2c4741527aeb2d4640a7dd0721780d9e8c00a7c1d968"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\it-service-operations.test.tsx",
+    "sha256": "94267f400243fde0dc1084ea01e0806847687c3b293c99c6839cc25625785810"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\knowledge-draft-delete-dialog.test.tsx",
+    "sha256": "d34a3e96f47b7b4c48799b2f19dd754e458bd8509fcdfdb8c9f969a7a070494a"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\merge-ticket-dialog.test.tsx",
+    "sha256": "bc78bc181d0a425d5562c830366943ad9e0d12a5e5d2356f4d5de2230f87be44"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\provisioning-cancel-dialog.test.tsx",
+    "sha256": "9e8a8cd2520dc9718e27b2c7bbdb358ce6509fd0f30715eac2a0af23d843ed00"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\provisioning-tracking.test.tsx",
+    "sha256": "38da4937922ef234c543016b71447d629327c2732fdaf614d2d5adbbce33400b"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\resolve-ticket-dialog.test.tsx",
+    "sha256": "db786a68a381b9438c5947ef288b70a091d57aaa0c573b949821d04eeac27037"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\sla-evidence.test.tsx",
+    "sha256": "ff5adddd7ada3bf442b1f810ad38b062d958d849dc693185c635264e0a49af65"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-advanced-filters.test.tsx",
+    "sha256": "912f9165f50e7b4b4ddbf9fef96a46e79330166b79e10da54b3c02427c80dc61"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-approval-controls.test.tsx",
+    "sha256": "62040dfbb8024f12c6a465d0a429c04da5e39bf95bee4537b5840cb3a8514672"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-approval-history.test.tsx",
+    "sha256": "bbbd4539263b2f833692d23d4239bc50a36295c1ade9d2dd6aa66f720e322cd4"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-close-dialog.test.tsx",
+    "sha256": "0aeecc8242d4b592c4fcb87fc29066f1e80922697691e03f9965a373d1f4c056"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-command-wizard.test.tsx",
+    "sha256": "340919ce4326ae4bf7693bd820ae9870c15b15b281237334ac0c6a8e1ebb9c57"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-comment-delivery.test.tsx",
+    "sha256": "bec22090efdf55e53297fc80e828ed492f522679c511bea4c580fe301353ec72"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-confirm-resolution-dialog.test.tsx",
+    "sha256": "4e78943db6ea6a0d67f0f7efe09476bac87cad0f31d60981dffa6d06c6c90bfb"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-conversation-list.test.tsx",
+    "sha256": "b311ac00dba21d6ee9edd99371a8986eeda12bcba6f0495911427c79f2490a00"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-creation-access.test.tsx",
+    "sha256": "22d977e151fe65eed419cf3a68f645e3abeab0394508dc4f2d94edbd90dd996a"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-device-link.test.tsx",
+    "sha256": "59fc5165a4eca2b4d4178d4f9563f5c7cb497cc1c57cdeee889fd593b1e99c7d"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-draft-recovery.test.tsx",
+    "sha256": "f28b250dd5b8f1682ca40ed41645935d81e9e28a278b19c6a4ebf3c88eee148c"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-drawer.test.tsx",
+    "sha256": "b24dc1798f1525c399acdcd33acc5e311293f650802d0a26481e180d2197931e"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-duplicate-suggestions.test.tsx",
+    "sha256": "3f1f04f50c9c805e29bef8582447fea79ea2ce64a70effe54303913024a6f38d"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-form-command.test.tsx",
+    "sha256": "48015b05051054a9c02680b2808b3db7da9088b658945c5610537b0c9f967b2d"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-intake-attachment-accessibility.test.tsx",
+    "sha256": "ab19303aa8ae917a1b2bf44f68f8c1eb541cca0b3bb60c6b1c8b10695a04bb2d"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-intake-draft.test.tsx",
+    "sha256": "c7c81b9f747e1e59e9068c956af7c3e1eaf181348d8eff753d27b905198e2548"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-intake-file-selection.test.tsx",
+    "sha256": "2a071a963674f7e01e290d3af4943a365f54947e8b38cd766a80eddf7fd1e0a7"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-intake-triage.test.tsx",
+    "sha256": "82f0fbe10dfe1bced76476378066ed33ba2837941f2fb20db5c22b60c1d78475"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-linked-context.test.tsx",
+    "sha256": "f09056a71d9617ab0a89fc5f7ddf07c76e1c8ce18883063970a495fe510a6526"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-merge-recovery.test.tsx",
+    "sha256": "6a03609c66e891ad33b22b01b2e4c12ba0bffb87d394b53fa54143975fb8fb89"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-merged-originals.test.tsx",
+    "sha256": "0c521294d3f19e9a1b3bb3b6d7dbaa4338886e2386202bd098b203ed86e5f0ad"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-property-mutation.test.tsx",
+    "sha256": "45e17b3d6a7564f1151c7001cf825695e030331b83f520ade0ee381aac7c9cc4"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-related-work.test.tsx",
+    "sha256": "d6e702cf575e40dffd0d8b8a6afa467559d1b71326c6b376f01212a382106039"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-reopen-dialog.test.tsx",
+    "sha256": "7588b5820ff0c5f2bf2ac8a903e3706188fbc88577c040341d113adf48c4e33e"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-reply-composer.test.tsx",
+    "sha256": "27f3d676fe00a029023d197a320a65a6df253baf10415c3c58c6a2c3cfa9e076"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-reply-draft-integration.test.tsx",
+    "sha256": "3736b4c63d692a1984e181011b2a095ee836b3a9ced8e9d1eb8820e4955258e2"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-routing-dialog.test.tsx",
+    "sha256": "e8da9412547ab9e9b97124108597c18af42308833bc730644de2ddd7c9b0ef74"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-routing-summary.test.tsx",
+    "sha256": "7dd6bd9128e933fb0dc525b1ef309a65efd6dd0f965eb18285e5fce2c1fa799b"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-saved-filters.test.tsx",
+    "sha256": "903b8d945602fbff007b9fc78e28b0a28477fdf46004458e5cb6740e67de56c3"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-thread.test.tsx",
+    "sha256": "5f4652bbe8ab8e5c9f8479fc495884b5f08c82d73acc7bf26e8ad82b100ddc29"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-version-conflict.test.tsx",
+    "sha256": "688fa71433f47f52043a50640c417caa43f1bf3f67a5240151ee84c962c9a491"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-waiting-dialog.test.tsx",
+    "sha256": "72eace14ae679688283ae2299341c69a3655e525a20c34b5b18649dc84992917"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-watchers.test.tsx",
+    "sha256": "8f450f4c7334b4cd1c68e73a3d55f98f12003ffc884fdeac655b1bfbd13bd4ad"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-work-task-focus.test.tsx",
+    "sha256": "cb44863f1c3fe5615d86944975c84a50519b0a2ed796242fef76ffa6aadc09b8"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-work-task-lifecycle.test.tsx",
+    "sha256": "d94140057b545c32318733d840d87ee8f686a4376af76b18317e36d74d04b6b6"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-work-task-review.test.tsx",
+    "sha256": "74c23a96d7fec3e607b09b6189abfb059d43e9077bb061eb6429c40f7016845c"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-work-task-wizard-focus.test.tsx",
+    "sha256": "1a670b8cc653f43e3eed343d7c0a97720ec663e239f36362173d323eaef46d7d"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\ticket-work-tasks.test.tsx",
+    "sha256": "979acfe1b55d831fbab63b95da2bc34c696d416f3589d919049be08b27833efe"
+  },
+  {
+    "path": "resources/js/components/it\\__tests__\\use-catalogue-submission.test.ts",
+    "sha256": "d498cf0c000a1c937ca2a9a85439c5dbcd5a9327a6251f238102360a9bbefb6f"
+  },
+  {
+    "path": "resources/js/components/it\\catalogue-attachments.tsx",
+    "sha256": "0a099aedd42b9df5b8c80ff59a9c75c12ea4998c7ac05fb7694229c8ac702572"
+  },
+  {
+    "path": "resources/js/components/it\\catalogue-entity-picker.tsx",
+    "sha256": "8013d5e0f5ae2e696150e03c1f636d1cbc46c497ec99d86a028b4792b7ba0fec"
+  },
+  {
+    "path": "resources/js/components/it\\catalogue-request-fields.tsx",
+    "sha256": "c3e43967fc5172140cff9caa669483b383c5bbf07b0af5321aee49f7e38f6fb7"
+  },
+  {
+    "path": "resources/js/components/it\\catalogue-request-wizard.tsx",
+    "sha256": "752e995eb17685e01de98ba594e2caf168c84c94792ac7b20107657102712467"
+  },
+  {
+    "path": "resources/js/components/it\\catalogue-submission-contract.ts",
+    "sha256": "41762dd1d3203dd4b6f18bcea9ae8fafc8ccc814b05d10a0ad4e8eddca471463"
+  },
+  {
+    "path": "resources/js/components/it\\csat-stars.tsx",
+    "sha256": "59e41fb7e866e9dfad7017c2529f17492bb9825495f6bc2bfc0abcbfc6a16402"
+  },
+  {
+    "path": "resources/js/components/it\\csat.tsx",
+    "sha256": "1e4fab0013f79b55636753f3a674592ae87ba75ca24af6bdce0e0480d2ce2463"
+  },
+  {
+    "path": "resources/js/components/it\\it-api-identities-dialog.test.tsx",
+    "sha256": "36ba026055322e4415737bfe73a0716ab167e84ae3e326800bcdc7881e8864b8"
+  },
+  {
+    "path": "resources/js/components/it\\it-api-identities.test.tsx",
+    "sha256": "3ed85f74e68a515f47c5b52e4c8a81da9fd95b08572eec6fd7c9e6025e817455"
+  },
+  {
+    "path": "resources/js/components/it\\it-api-identities.tsx",
+    "sha256": "819f5213f3de3254e3db9f6ac242ee49615301094fbbd5c800079935e636854a"
+  },
+  {
+    "path": "resources/js/components/it\\it-api-identity-contract.ts",
+    "sha256": "8a05055bf88428f8c12d018df06085e13b863a574120657e19785675ad0ae847"
+  },
+  {
+    "path": "resources/js/components/it\\it-api-operations.test.tsx",
+    "sha256": "097a52f6b0567838b129970f6685cbd63d94bf238098e205473e23b391aa653e"
+  },
+  {
+    "path": "resources/js/components/it\\it-api-operations.tsx",
+    "sha256": "8bb378896da411b8de76d278899d494b42057323b72011074afbed4c3f7abd20"
+  },
+  {
+    "path": "resources/js/components/it\\it-automation-history.test.tsx",
+    "sha256": "82995d309b693bfa898b48e6105044d908f3d93b4c8720614f9c1ec5f84c9273"
+  },
+  {
+    "path": "resources/js/components/it\\it-automation-history.tsx",
+    "sha256": "905bb186e9d0291c6426c838fa522d8ea84fe6367460ecf2dae20c6824965f4d"
+  },
+  {
+    "path": "resources/js/components/it\\it-bulk-result.tsx",
+    "sha256": "42f19793bf0e8a622f623af21bf30dd7f0da39612d2787b01c53a0d4aaf73ae8"
+  },
+  {
+    "path": "resources/js/components/it\\it-catalogue-management.tsx",
+    "sha256": "1da48c6ed4e9456449cd7103ba31d023bc82ee91d4e5e1d837aa9d55cf9f34f8"
+  },
+  {
+    "path": "resources/js/components/it\\it-channel-health.test.tsx",
+    "sha256": "f005172103cf6a402c1d977b05edaad1e1715b987bab507ddf051730dbfb8250"
+  },
+  {
+    "path": "resources/js/components/it\\it-channel-health.tsx",
+    "sha256": "5f8619c8945fd07d0942b0013d3df79d6b6557409679cc436c5b648a5c721df3"
+  },
+  {
+    "path": "resources/js/components/it\\it-hero.tsx",
+    "sha256": "5c1c6c3a09924a3e5ec807c3fd4dd5ce8d94186bda0871b7fb2e4191cda8b2a6"
+  },
+  {
+    "path": "resources/js/components/it\\it-module-shell.tsx",
+    "sha256": "2e6ad95a9541e93fbbf99ccaa6f0da26cacf690c3e56825817e150193dac8599"
+  },
+  {
+    "path": "resources/js/components/it\\it-overview.tsx",
+    "sha256": "5756f1b2256abb2d7356e69b59699f029ee39a0723c8971e7e4e78484eb4fe94"
+  },
+  {
+    "path": "resources/js/components/it\\it-provisioning-list.tsx",
+    "sha256": "b986369cee39ba15b8626147703dbce725641eac9087a0a0f14279e5c28da799"
+  },
+  {
+    "path": "resources/js/components/it\\it-provisioning-templates.tsx",
+    "sha256": "ca8c8d672e814be5c3177c40c9deee2592ec55dbf519f2ec4c1d6a7d40322274"
+  },
+  {
+    "path": "resources/js/components/it\\it-reports.tsx",
+    "sha256": "4a7e98ef65fb12638e6ec0291283991bbee4ba758669cecd66ce2612d74dfaee"
+  },
+  {
+    "path": "resources/js/components/it\\it-service-catalogue.tsx",
+    "sha256": "b7e38589305eecc16fbe2da761dc75f2d6c71f91c3ac649816fc1fc9b7324d2a"
+  },
+  {
+    "path": "resources/js/components/it\\it-service-operations.tsx",
+    "sha256": "e7bff2ee1ed89b7e9cc3c67fd5e50a0805447a3a934e3b2c03c90399fa613146"
+  },
+  {
+    "path": "resources/js/components/it\\it-side-navigation.tsx",
+    "sha256": "6343c13ebdcff8dd9d1f3698aa96b746aae8555a1e70734f2693d59fec9b1874"
+  },
+  {
+    "path": "resources/js/components/it\\it-technical-delivery-contract.ts",
+    "sha256": "8a47cc265af94c83b180843262489439128cac9cc7fe799ba627de45739c7a11"
+  },
+  {
+    "path": "resources/js/components/it\\it-technical-delivery-health.test.tsx",
+    "sha256": "035a045cfba0284ad11e2576a883cded00cfea246984b241bbb44c667e0cf715"
+  },
+  {
+    "path": "resources/js/components/it\\it-technical-delivery-health.tsx",
+    "sha256": "cfef25bc25d442b09d0562673283c985456f5bad3d4a0074ad4ec82189f7e904"
+  },
+  {
+    "path": "resources/js/components/it\\it-technical-delivery-recovery.test.tsx",
+    "sha256": "1b53c026fa30521ec5b93d7c07c3949a1f8336cb992cbfe81853f0521255859f"
+  },
+  {
+    "path": "resources/js/components/it\\it-technical-delivery-recovery.tsx",
+    "sha256": "be69816368a3c2f786c4d83774add2eb930de64197c573473eee865ed269f3f7"
+  },
+  {
+    "path": "resources/js/components/it\\it-ticket-list.tsx",
+    "sha256": "78f680df8d586ad6dce6250bccac8ee46929b0483022d3057a21d57df5e6bcf7"
+  },
+  {
+    "path": "resources/js/components/it\\it-wizards.tsx",
+    "sha256": "55d26497761357e7dbfc4f539fac219f36b18493e5fe4f14914a56f34803bf62"
+  },
+  {
+    "path": "resources/js/components/it\\knowledge-draft-delete-dialog.tsx",
+    "sha256": "43116dd591e085a76561a2a337077f2377d296f405c8c08d12f392215ccd5727"
+  },
+  {
+    "path": "resources/js/components/it\\merge-ticket-dialog.tsx",
+    "sha256": "05655b92e6452cfc6620ebe1bcc0043784e5a749f60f6d95b526c8d704ff33bc"
+  },
+  {
+    "path": "resources/js/components/it\\my-provisioning-list.tsx",
+    "sha256": "3b2babb775d02b863e1d07069544aff9c990883bdfcbffaae0fc0e00ec0798d3"
+  },
+  {
+    "path": "resources/js/components/it\\my-tickets-list.test.tsx",
+    "sha256": "c12143d6866a13513946953441fb35001bb22d19c3e69521798e36afc5565481"
+  },
+  {
+    "path": "resources/js/components/it\\my-tickets-list.tsx",
+    "sha256": "6dc36e8c688692ad412fd99bcd66dcb34caeea4dc0318203a0e6189b92269002"
+  },
+  {
+    "path": "resources/js/components/it\\provisioning-cancel-dialog.tsx",
+    "sha256": "e7808790119976115dd28ed01d5dd4415b0d1e750669351c1dc78e3ba2ad3d06"
+  },
+  {
+    "path": "resources/js/components/it\\resolve-ticket-dialog.tsx",
+    "sha256": "100b39dcf246c358b664bfe6de3d3f79daf62d15f699504890adae9f23983ae1"
+  },
+  {
+    "path": "resources/js/components/it\\sla-chip.tsx",
+    "sha256": "a46df03e159acbf030e8166206839f400919b305ef3aa2ad44d569b8469ddb7d"
+  },
+  {
+    "path": "resources/js/components/it\\sla-evidence.tsx",
+    "sha256": "49d4e05c46e371b5fec9ba3661c3ba3b68377996d49b0e7037a93bac8616dd4d"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-advanced-filters.tsx",
+    "sha256": "c7f49df67b6bc69a93773c943bc70b58e40e81f9e7b8f3183d993cc47a131ddb"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-approval-controls.tsx",
+    "sha256": "7304ee69d0ca28810c6953cdf95e9485d2ca307540ba4482be0951f28eba7d41"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-approval-dialog.tsx",
+    "sha256": "1db828e1476828ce24fd6582f4d170af76e6ee9da8bc814cb739b10c75104af5"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-approval-history.tsx",
+    "sha256": "b307a254de966cebdd885f2926ee53ea1f8b04f4c5841d645a63eb82957a627c"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-approval-record.tsx",
+    "sha256": "114b9c48213ca61a5cac7e73eec36203f7d0db9b98655383ade5226ad8b5827d"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-approval-recovery.tsx",
+    "sha256": "6b33d0b552ce76b3b8b599a4d09bec1da6c098b7131b3d3e54040ca1125633d8"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-close-dialog.tsx",
+    "sha256": "6fb7533e775bd19ba4ecd63d249860b4c0376bbb7f5545f90ade5ea0dee77d0f"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-command-wizard.tsx",
+    "sha256": "1cd4bd7b4b88de660663aae640d22e92229513a7659e78559ae889d2041a2b09"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-comment-delivery.tsx",
+    "sha256": "165d0dbc13703dea479eb16404a62c6dc12ae1434b2489a9abc1f3fdabb7f505"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-conversation-summary.tsx",
+    "sha256": "e6caa80e50cab119f4114a7743a9d92394cbbbe0772c44012605652ea8516a6b"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-draft-recovery.tsx",
+    "sha256": "27d72ad1c8e4105accf058a8a8c114aab795a3c444197f1e85eaccac1a43ba6e"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-drawer.tsx",
+    "sha256": "472c54d56a4b7354804743819b147dd592ce385353fe0a166ab6f95e4ce79688"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-duplicate-suggestions.tsx",
+    "sha256": "9a1db2b6a2dc54126600c3d7993f30fd359854c33da64c6d565e77bd76dd679f"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-intake-draft.tsx",
+    "sha256": "f8cea70be52a59f5afb257b2ec8b9109f3ee20a3924da0d60e256a8b6a0fd72f"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-intake-fields.tsx",
+    "sha256": "71bdfcba89eadd36fa5706dd3cc60b429bd207285a656634b70803b7283c2b3f"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-linked-context.tsx",
+    "sha256": "c4424413344436fc0765b383f2d2d3c0b7973df9995ea859e5f5bec9c227ad5b"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-merge-recovery.tsx",
+    "sha256": "730a864b4e0a11d656d937dc8cca6bbdfdae3bc2b6ac1cefd26461382ea33e74"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-merged-originals.tsx",
+    "sha256": "c3b71d4d587c68cb5766b7e9f31cc8bc75e6ed6dc196e5cec838351edda36cf0"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-property-mutation.tsx",
+    "sha256": "bf57b8d1ec5b5a885569f9fa4302aa2a19599fe219b11c9bbb8885d4ecbe3abe"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-related-work.tsx",
+    "sha256": "d83c54439bc6a008ae9ee6b9f2ba9481f1b6e2ad5ecab2bfebc8131797e921c5"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-reopen-dialog.tsx",
+    "sha256": "d21a62c9a65fc66357b5b55e95b29af8f6b1294f6dc7ed6fda2f6681cc7c8de1"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-reply-composer.tsx",
+    "sha256": "6956e48070006b4da41e5b1ad202b77271b6c680eb73051fa78d9bb18d00143c"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-resolution-summary.tsx",
+    "sha256": "a5a47a1d4ac8e5f565fbe0cad472aa6afb7ef9cf77654c1faded8134187a2b22"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-resolution.ts",
+    "sha256": "263fb931fe9855c79336fb805a5db0bff5e96b46d86590a31ed2f40b063734aa"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-routing-dialog.tsx",
+    "sha256": "5fa4a91fb4dfa11562f563f9dfe7d50d1dedbe56ddffe407ed01fd03718e4e79"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-routing-summary.tsx",
+    "sha256": "74edadf8ed158b3679a7d1f5944286976d3440bba09d7823e0d4c5c8721e48e4"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-saved-filters.tsx",
+    "sha256": "15491111f11337e955df85af1fca0c89131003019667935a711f2cda778fc8db"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-thread.tsx",
+    "sha256": "f94a548c8e338e553a754afeed36b34273a42f38aced30a3f42942d06542a7dc"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-triage-reason-dialog.tsx",
+    "sha256": "b2f1d844dde6e58a14265dec72724110b1737d8cfbb8902bf12eb3ba10828c4e"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-version-conflict.tsx",
+    "sha256": "7855bc411c09108447528e84315f4787059089e0fb9e9f4b7ec2f6b87d0f3cdf"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-view-options.ts",
+    "sha256": "d4efe60c104d1f6d5c12d6e75e7d4388f5e05de8cfb4142dd96857feba912a26"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-waiting-dialog.tsx",
+    "sha256": "208aaa26c6c76cb69a6c80a7a88887104a5a18b5d8e1792df82dbb5cff134b71"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-watcher-activity.ts",
+    "sha256": "4e113616d60db21493ccdc2aeda4337df6b0f44bca252ebff652554fbe49e90c"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-watchers.tsx",
+    "sha256": "8de02ff4ec93054fed5f687036b33d0d2fa5108e024d3a0bbb2cb09da11df4bc"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-work-task-action-dialog.tsx",
+    "sha256": "429f5bb09b5d6420052489406e013cd20efa431ce4a35ac5b598c2c3a1af3776"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-work-task-history.tsx",
+    "sha256": "418788ac423e8ed5277710bc73c6cf1142c7fc675d02c9575c626018eddbe68d"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-work-task-recovery.tsx",
+    "sha256": "b0adc2500fd8093bbd2c878dd69d93ed34b2d35b66e9f04e69f608b7fef58412"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-work-task-wizard.tsx",
+    "sha256": "24b0c29a7c07ac347ff27c09201d82c0061d3057b5a0d0078dbbf8325cb1366c"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-work-tasks.tsx",
+    "sha256": "b5231ad5c14d71ef0b354243d8ef6566c1556cbe4df85ded9012a98d6260e40d"
+  },
+  {
+    "path": "resources/js/components/it\\ticket-workspace-header.tsx",
+    "sha256": "2cdd423fb685a1c8dd8ec3acae874f2962f369c6e4382ee30e03028a61d70cf6"
+  },
+  {
+    "path": "resources/js/components/it\\use-catalogue-submission.ts",
+    "sha256": "8c6ef9946388f3237edbc4ac3db11810e6dafb2beb2f02f764410fc1256f0785"
+  },
+  {
+    "path": "resources/js/components/it\\use-ticket-form-command.tsx",
+    "sha256": "e859e6322eec5af31e0301d17002aacc3b04300f85c96d32e62cd7e521b16ed6"
+  },
+  {
+    "path": "resources/js/components/it\\workflow-template-destination.test.tsx",
+    "sha256": "e67b28d802a37d153e5804bd426cd17db5245516ad850c942d74c93d8bf2ce3d"
+  },
+  {
+    "path": "resources/js/components/it\\workflow-template-destination.tsx",
+    "sha256": "0d2baf5f68b0021f4b123688959c245d69b7a0dcb21de4622a2820ac9c154d8a"
+  },
+  {
+    "path": "resources/js/pages/it\\changes\\changes.test.tsx",
+    "sha256": "0d69c880967d813d29a2f873996e2aa96b72cdf46fb6279141863431c7998d7e"
+  },
+  {
+    "path": "resources/js/pages/it\\changes\\index.tsx",
+    "sha256": "19b90bb76923da6d6923b7e5924a36f4e2d2d421dce7abe6c976b0720b30979a"
+  },
+  {
+    "path": "resources/js/pages/it\\changes\\show.tsx",
+    "sha256": "0151ad46d15f83eb2c11f497b7bb31f12a799acdb1933eb49f45c061f0d9db8c"
+  },
+  {
+    "path": "resources/js/pages/it\\index.tsx",
+    "sha256": "71afe5b4ce1b05d6a170b83742b02b1b081e44733056884f62065e24271c827c"
+  },
+  {
+    "path": "resources/js/pages/it\\knowledge-access.test.tsx",
+    "sha256": "bb5747b82d3d638e20b462d08f79e8e870877dcd1dda27fbddbf35444c88e928"
+  },
+  {
+    "path": "resources/js/pages/it\\major-incidents\\index.tsx",
+    "sha256": "fc3dfbaa1a7af2cdd0e3ba60d63dbd9f8247e7ccd6a0a9af3c4d2f567086d4f2"
+  },
+  {
+    "path": "resources/js/pages/it\\major-incidents\\major-incidents.test.tsx",
+    "sha256": "015a943bb57160a821ff47d16e57f9468564a597b92be84f52053484e4c9f27d"
+  },
+  {
+    "path": "resources/js/pages/it\\major-incidents\\show.tsx",
+    "sha256": "03775406a2c494bd5e8aa60d1fefc2eb29d663c7d31338a2640bd7bb31585332"
+  },
+  {
+    "path": "resources/js/pages/it\\major-incidents\\status.tsx",
+    "sha256": "45f8038ca4d72bc1e58bf15aa7d5ed106a38f684f6b11ab083e327225b56d08f"
+  },
+  {
+    "path": "resources/js/pages/it\\problems\\index.tsx",
+    "sha256": "e5ba2649a1a36e51e49f2a0f6d6fd12f2aa7ae2638af2ad8d373906846052a29"
+  },
+  {
+    "path": "resources/js/pages/it\\problems\\problems.test.tsx",
+    "sha256": "10050c72d3e250b0bcbff2eb035d8cb2a111894a19af92233a680c68d6e4ff88"
+  },
+  {
+    "path": "resources/js/pages/it\\problems\\show.tsx",
+    "sha256": "f163ebda279dfa86d3014287ba52febcc0b54537035a85c0ef29d7e6f84be00f"
+  },
+  {
+    "path": "resources/js/pages/it\\provisioning\\show.tsx",
+    "sha256": "44c8beff31a3785897cb7c6b1dd3a3be71b09b344c645000991c2ec9a0407cb4"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\_create-recovery.tsx",
+    "sha256": "d3358760ba6c3007fe3ad65a85add59f7ca2f440e6feabf7d45f5b798fc6299f"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\_dialogs.tsx",
+    "sha256": "57a846ad5923ac4ce582b07e48cd5f7193dadf575782b04979a8629a1df23527"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\_header.tsx",
+    "sha256": "b83b33cc4b54fb357b7310fd8acb1560aeaed9caf940929f370d798e940e008c"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\_memory-recovery.tsx",
+    "sha256": "a947fb054ca50edd7bf3e8a6fea3f35b374eaa60fa8a12d532df03d0aebf11c3"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\_registers.tsx",
+    "sha256": "1b2ca120750c1fa94d7105970d8738f1e73865096a859dfc1329ff7c68a73062"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\_types.ts",
+    "sha256": "1d56c5d976ce2260b5894f6209306075865e7ee855690ae1d64d7b6bfa303bc7"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\index.tsx",
+    "sha256": "a090da02aa778c557b04c6153b32cab489c3919b5d5c48e8754b85b4d20fc747"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\queue-routing.test.tsx",
+    "sha256": "40c47fed12f3af2e7264ec67fb361abe2d811f343a495004b266b1ef1124e7b3"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\setup-record-wizard.test.tsx",
+    "sha256": "87344dbfcf781a610792afd11abfb508e821a9df29309455d833f8043b8b1a18"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\setup-workspace.test.tsx",
+    "sha256": "de23660d655b7f2e64323bf4e9cd632e0402ca18a02156cf620c332d473cbd5b"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\use-setup-create-command.test.tsx",
+    "sha256": "9f5b25f31d5394633b90a83f6082cc64a82e4efa574ea3d1d60b41b62a0c8c3f"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\use-setup-create-command.ts",
+    "sha256": "691b898d95f941c89a3e666e807590539ac3e38aa69b640840685e30cbe13319"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\use-setup-memory.test.tsx",
+    "sha256": "68f137746ac358e03f51eec4aa2dc2c632649e1da8650137b9173f4e9ef7827b"
+  },
+  {
+    "path": "resources/js/pages/it\\setup\\use-setup-memory.ts",
+    "sha256": "72c0de39f3f650acb677226fc75ffe227825582ba9cccc6c5fcecf1e8b283606"
+  },
+  {
+    "path": "resources/js/pages/it\\tickets\\_dialogs.tsx",
+    "sha256": "6c52440458578665f71bf56538f341c46be7f78d6bf18212eb05174a2a718bcc"
+  },
+  {
+    "path": "resources/js/pages/it\\tickets\\show.test.tsx",
+    "sha256": "c9e953a9790cc2a9d96c190c6a657c3b252f2726b906b46cdc29dd0cb64fb942"
+  },
+  {
+    "path": "resources/js/pages/it\\tickets\\show.tsx",
+    "sha256": "d39f6e9c07eee40ba7f4e110e35039974e3a6802502b7d25cbaeb0b2bcccd3d0"
+  },
+  {
+    "path": "routes/web.php",
+    "sha256": "596bf33f14b46cb739a91bdecbc1cae01042202474318d58ea54059b3e0f9b24"
+  },
+  {
+    "path": "vite.config.ts",
+    "sha256": "f026a83cb632177ab885af1919635ac6e5ae53fae54ad42b83fe19ba0cbf053a"
+  }
+]

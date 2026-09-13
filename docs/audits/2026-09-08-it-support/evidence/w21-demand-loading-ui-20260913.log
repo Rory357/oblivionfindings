@@ -1,0 +1,38 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+stderr | resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > keeps the Service Desk rail focused on tickets and request entry points
+React does not recognize the `preserveState` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `preservestate` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `preserveScroll` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `preservescroll` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+
+·······x···············
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/knowledge-editor-loading.test.tsx > loads a proposal before editing and preserves typed changes after a later context refresh
+TypeError: form.defaults is not a function
+ ❯ resources/js/components/it/it-wizards.tsx:3217:14
+    3215|             related_records: loaded.related_records ?? [],
+    3216|         };
+    3217|         form.defaults(next);
+       |              ^
+    3218|         form.setData(next);
+    3219|         originalRelationships.current = JSON.stringify(
+ ❯ Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:20
+ ❯ runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+ ❯ commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:29
+ ❯ commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:11
+ ❯ commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15484:13
+ ❯ recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:11
+ ❯ commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15476:11
+ ❯ recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:11
+ ❯ commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15519:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 22 passed (23)
+   Start at  12:09:22
+   Duration  7.58s (transform 1.39s, setup 459ms, import 8.64s, tests 3.05s, environment 4.04s)
+

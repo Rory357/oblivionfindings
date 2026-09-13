@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Ticket detail · Interactive mockup · Oblivion Care</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="mockup.css">
+</head>
+<body>
+<div id="ticket-mockup">
+  <div class="mock-label"><span><i data-icon="FlaskConical"></i><strong>Interactive mockup</strong><span class="mock-explanation">Synthetic ticket · Changes stay in this preview</span></span><div><button data-action="coverage-review">Feature guide</button><button data-action="preview-options">Preview states</button><button data-action="reset">Reset preview</button></div></div>
+  <header class="shell-header">
+    <div class="wordmark"><span class="wordmark-ring"></span><span>blivion <span class="wordmark-care">Care</span></span></div>
+    <div class="shell-date"><b>Sunday</b> 13 September 2026</div>
+    <button class="command-search" data-action="shell-info"><i data-icon="Search"></i><span>Search or jump to…</span><kbd>Ctrl K</kbd></button>
+    <div class="shell-actions"><button class="of-button primary" data-action="shell-info"><i data-icon="ShieldAlert"></i>Report incident</button><button class="chrome-button" data-action="shell-info"><i data-icon="Clock3"></i>Clock in</button><button class="chrome-icon" data-action="shell-info" aria-label="Messages, 3 unread"><i data-icon="MessageSquare"></i><span class="unread">3</span></button><button class="chrome-icon" data-action="shell-info" aria-label="Notifications"><i data-icon="Bell"></i><span class="notification-dot"></span></button><button class="avatar user-avatar" data-action="shell-info" aria-label="Jordan Lee, user menu">JL</button></div>
+  </header>
+  <div class="shell-layout">
+    <aside class="shell-sidebar" aria-label="Application navigation">
+      <nav class="shell-nav">
+        <button data-action="shell-info"><i data-icon="Sun"></i><span>My Day</span></button>
+        <button data-action="shell-info"><i data-icon="LayoutDashboard"></i><span>Overview</span></button>
+        <button data-action="shell-info"><i data-icon="CalendarDays"></i><span>Today</span></button>
+        <button data-action="shell-info"><i data-icon="Calendar"></i><span>My Calendar</span></button>
+        <button data-action="shell-info"><i data-icon="ListTodo"></i><span>All Tasks</span></button>
+        <div class="nav-separator"></div>
+        <button data-action="shell-info"><i data-icon="Building2"></i><span>Sites & Locations</span><i data-icon="ChevronRight"></i></button>
+        <button data-action="shell-info"><i data-icon="Layers"></i><span>Operations</span><i data-icon="ChevronRight"></i></button>
+        <button data-action="shell-info"><i data-icon="Users"></i><span>People & HR</span><i data-icon="ChevronRight"></i></button>
+        <button data-action="shell-info"><i data-icon="ShieldCheck"></i><span>Compliance</span><i data-icon="ChevronRight"></i></button>
+        <button data-action="shell-info"><i data-icon="TriangleAlert"></i><span>Incidents</span><i data-icon="ChevronRight"></i></button>
+        <button data-action="shell-info"><i data-icon="Landmark"></i><span>Governance</span><i data-icon="ChevronRight"></i></button>
+        <button data-action="shell-info"><i data-icon="Car"></i><span>Fleet</span><i data-icon="ChevronRight"></i></button>
+        <button data-action="shell-info"><i data-icon="Wallet"></i><span>Finance</span><i data-icon="ChevronRight"></i></button>
+        <button class="nav-group-open" data-action="toggle-it" aria-expanded="true"><i data-icon="MonitorCog"></i><span>IT & Support</span><i data-icon="ChevronDown"></i></button>
+        <div id="it-subnav" class="nav-children"><button data-action="shell-info">Overview</button><button class="active" data-action="go-conversation" aria-current="page">Tickets</button><button data-action="shell-info">Service catalogue</button><button data-action="shell-info">Assets & devices</button><button data-action="shell-info">Knowledge</button></div>
+      </nav>
+      <button class="sidebar-collapse" data-action="collapse-sidebar" aria-label="Collapse sidebar"><i data-icon="ChevronLeft"></i></button>
+      <button class="sidebar-settings" data-action="shell-info"><i data-icon="Settings"></i><span>Settings</span></button>
+    </aside>
+    <main class="page-ground">
+      <nav class="breadcrumbs" aria-label="Breadcrumb"><button data-action="shell-info">Home</button><i data-icon="ChevronRight"></i><button data-action="shell-info">IT & Support</button><i data-icon="ChevronRight"></i><button data-action="shell-info">Tickets</button><i data-icon="ChevronRight"></i><span aria-current="page">IT-2481</span></nav>
+      <div class="page-stack">
+        <header class="eh-header" aria-label="Ticket header">
+          <div class="header-content">
+            <div class="header-inner">
+              <div class="header-top">
+                <div class="header-identity"><button class="header-back" data-action="leave" aria-label="Back to tickets"><i data-icon="ChevronLeft"></i></button><span class="eh-mark-ring"><i data-icon="Ticket"></i></span><div class="title-stack"><div class="title-row"><h1>Office printer offline</h1><span id="ticket-status"></span></div><p>IT-2481 · Raised by Maya Chen · Today, 9:12 am</p></div></div>
+                <div class="header-actions"><button class="header-search" data-action="find"><i data-icon="Search"></i><span>Find a ticket section…</span><kbd>/</kbd></button><button class="header-secondary" data-action="schedule"><i data-icon="CalendarDays"></i>Schedule technician</button><button class="header-primary" data-action="log-time"><i data-icon="NotebookPen"></i>Add work note</button><button class="header-glass" data-action="actions" aria-label="Ticket actions"><i data-icon="MoreHorizontal"></i></button></div>
+              </div>
+              <div class="meter-row" id="meters"></div>
+              <div class="header-filters" id="filters"></div>
+            </div>
+            <nav class="header-rail" id="main-rail" aria-label="Ticket workspace"></nav>
+          </div>
+        </header>
+        <div class="section-navigation"><nav class="tier-two" id="tier-two" role="tablist" aria-label="Conversation sections"></nav><div id="retained-draft" class="retained-draft" aria-live="polite"></div></div>
+        <div id="ticket-panel" role="tabpanel"></div>
+        <footer class="preview-footnote">Technician view · Fixture snapshot: 13 Sep 2026, 10:10 am NZST · No connection to application data</footer>
+      </div>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <dialog id="dialog" aria-labelledby="dialog-title" aria-describedby="dialog-description"></dialog>
+</div>
+<script src="icons.js"></script>
+<script src="workflow.js"></script>
+<script src="mockup.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+    "utc": "2026-09-12T22:51:25+00:00",
+    "database": "oblivion_it_support_test_it_93dca169f6234b91",
+    "tables": 835,
+    "connections": [
+        {
+            "ID": 19399,
+            "COMMAND": "Query",
+            "TIME": 0,
+            "STATE": "waiting for handler commit"
+        }
+    ],
+    "mutations_performed": false
+}

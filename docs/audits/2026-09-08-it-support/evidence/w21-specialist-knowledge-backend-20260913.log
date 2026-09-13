@@ -1,0 +1,260 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_93dca169f6234b91",
+    "database_mutations_performed": false
+}
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItKnowledgeRevisionWorkspaceTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma reviewed proposed revision replaces the publication only on approval and preserves encrypted history[39m[90m    [39m [90m598.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma stale editor cannot overwrite a newer document or append mutation audit evidence[39m[90m                          [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90meditor and revision commands reject another originating account without changing the document[39m[90m               [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlosing an original proposal Site conceals its editor and keeps its content out of history[39m[90m                   [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrestoring a publication creates a proposal and retains every immutable revision[39m[90m                             [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrelationship search reaches later canonical pages and rejects references to inaccessible documents[39m[90m          [39m [90m0.67s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItSpecialistCommandContractTest[39m
+  [31;1m⨯[39;22m[90m [39m[90mspecialist edits require a reviewed version and stale commands cannot replace newer work with dataset "prob[39m[90m…[39m [90m1.19s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mspecialist edits require a reviewed version and stale commands cannot replace newer work with dataset "chan[39m[90m…[39m [90m0.79s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mspecialist edits require a reviewed version and stale commands cannot replace newer work with dataset "majo[39m[90m…[39m [90m0.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma specialist wizard returns the actual saved canonical record and originating account with dataset "problem[39m[90m…[39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma specialist wizard returns the actual saved canonical record and originating account with dataset "change"[39m[90m [39m [90m0.83s[39m  
+  [31;1m⨯[39;22m[90m [39m[90ma specialist wizard returns the actual saved canonical record and originating account with dataset "major i[39m[90m…[39m [90m0.82s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItWorkspaceNavigationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdedicated IT workspaces render directly and legacy links retain query context[39m[90m                               [39m [90m6.59s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequesters and separately entitled knowledge authors cannot enter work or reports[39m[90m                           [39m [90m6.40s[39m  
+  [32;1m✓[39;22m[90m [39m[90man IT agent has one canonical knowledge, reports and work destination[39m[90m                                       [39m [90m0.13s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItKbTest[39m
+  [32;1m✓[39;22m[90m [39m[90man agent creates a KB article with an application-unique slug[39m[90m                                               [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents edit articles and use the governed publish lifecycle while the slug stays stable[39m[90m                     [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mKB authoring requires its explicit grant while deletion is reasoned and draft-only[39m[90m                          [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe knowledge catalogue reaches agents but never a self-service payload[39m[90m                                     [39m [90m4.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpure requesters browse only published articles; agents get the full catalogue instead[39m[90m                       [39m [90m4.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requester read is recorded while helpful feedback is one canonical vote per user[39m[90m                          [39m [90m2.92s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbrowse endpoints never touch a draft article[39m[90m                                                                [39m [90m0.67s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItKnowledgeAccessTest[39m
+  [32;1m✓[39;22m[90m [39m[90mknowledge discovery filters draft bodies and published suggestions to current approved Sites[39m[90m                [39m [90m4.46s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.16s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.18s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.15s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge mutation routes conceal an unapproved current article before validation or audience changes with[39m[90m… [39m [90m0.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge service reauthorizes the canonical audience and preserves permitted authoring[39m[90m                     [39m [90m6.48s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly the existing explicit all-Sites capability extends scoped knowledge governance[39m[90m                         [39m [90m0.21s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItKnowledgeCapabilityTest[39m
+  [32;1m✓[39;22m[90m [39m[90mfine knowledge and credential audit grants are admin-only defaults and migration is additive and idempotent[39m[90m [39m [90m0.58s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma knowledge-only author reaches scoped drafts and owner options without any ticket or provisioning rights[39m[90m   [39m [90m2.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma separate knowledge reviewer can publish and retire within current audience but cannot author or restore[39m[90m   [39m [90m2.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90mknowledge grants preserve full-audience mutation denial and capability revocation returns authorization fai[39m[90m…[39m [90m2.85s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItProblemManagementTest[39m
+  [32;1m✓[39;22m[90m [39m[90man agent creates and finds a canonical investigating problem record[39m[90m                                         [39m [90m2.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mroot cause workaround and corrective action govern known error resolution and closure[39m[90m                       [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90maffected incidents and the permanent fix change receive reciprocal typed links[39m[90m                              [39m [90m0.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe problem workspace projects the shared ticket conversation tasks approvals and timeline[39m[90m                  [39m [90m2.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mproblem management is agent only site concealed and rejects invalid linked work types[39m[90m                       [39m [90m0.85s[39m  
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItChangeManagementTest[39m
+  [32;1m✓[39;22m[90m [39m[90magents create and find canonical standard normal and emergency changes with dataset "standard"[39m[90m              [39m [90m2.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents create and find canonical standard normal and emergency changes with dataset "normal"[39m[90m                [39m [90m2.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90magents create and find canonical standard normal and emergency changes with dataset "emergency"[39m[90m             [39m [90m2.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma standard change follows assessed scheduled implemented validated reviewed and closed states[39m[90m               [39m [90m1.30s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mnormal high risk and restricted changes require approval and independent validation[39m[90m                         [39m [90m0.90s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItSpecialistCommandContractTest[22m [90m>[39m specialist edits require a reviewed version and stale…    
+[39;1m  Failed asserting that 1 is greater than 1.[39;22m
+
+  at [32mtests\Feature\It\ItSpecialistCommandContractTest.php[39m:[32m34[39m
+     30▕         ->assertUnprocessable()->assertJsonValidationErrors('expected_version');
+     31▕     $this->patch($path, ['expected_version' => $version, 'actor_user_id' => $this->commandActor->id, $field => 'Current saved investigation'])
+     32▕         ->assertRedirect()->assertSessionDoesntHaveErrors();
+     33▕     $current = (int) $record->ticket()->value('lock_version');
+  ➜  34▕     expect($current)->toBeGreaterThan($version)->and($record->fresh()->getAttribute($field))->toBe('Current saved investigation');
+     35▕     $auditCount = AuditLog::query()->count();
+     36▕     $eventCount = $record->ticket->events()->count();
+     37▕     $this->patchJson($path, ['expected_version' => $version, $field => 'Stale replacement'])
+     38▕         ->assertConflict()->assertJsonPath('code', 'stale_ticket')->assertJsonValidationErrors('expected_version');
+
+  [33m1   [39m[39;1mtests\Feature\It\ItSpecialistCommandContractTest.php[39;22m:[39;1m34[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItSpecialistCommandContractTest[22m [90m>[39m specialist edits require a reviewed version and stale…    
+[39;1m  Failed asserting that 1 is greater than 1.[39;22m
+
+  at [32mtests\Feature\It\ItSpecialistCommandContractTest.php[39m:[32m34[39m
+     30▕         ->assertUnprocessable()->assertJsonValidationErrors('expected_version');
+     31▕     $this->patch($path, ['expected_version' => $version, 'actor_user_id' => $this->commandActor->id, $field => 'Current saved investigation'])
+     32▕         ->assertRedirect()->assertSessionDoesntHaveErrors();
+     33▕     $current = (int) $record->ticket()->value('lock_version');
+  ➜  34▕     expect($current)->toBeGreaterThan($version)->and($record->fresh()->getAttribute($field))->toBe('Current saved investigation');
+     35▕     $auditCount = AuditLog::query()->count();
+     36▕     $eventCount = $record->ticket->events()->count();
+     37▕     $this->patchJson($path, ['expected_version' => $version, $field => 'Stale replacement'])
+     38▕         ->assertConflict()->assertJsonPath('code', 'stale_ticket')->assertJsonValidationErrors('expected_version');
+
+  [33m1   [39m[39;1mtests\Feature\It\ItSpecialistCommandContractTest.php[39;22m:[39;1m34[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItSpecialistCommandContractTest[22m [90m>[39m specialist edits require a reviewed version and stale…    
+[39;1m  Failed asserting that 1 is greater than 1.[39;22m
+
+  at [32mtests\Feature\It\ItSpecialistCommandContractTest.php[39m:[32m34[39m
+     30▕         ->assertUnprocessable()->assertJsonValidationErrors('expected_version');
+     31▕     $this->patch($path, ['expected_version' => $version, 'actor_user_id' => $this->commandActor->id, $field => 'Current saved investigation'])
+     32▕         ->assertRedirect()->assertSessionDoesntHaveErrors();
+     33▕     $current = (int) $record->ticket()->value('lock_version');
+  ➜  34▕     expect($current)->toBeGreaterThan($version)->and($record->fresh()->getAttribute($field))->toBe('Current saved investigation');
+     35▕     $auditCount = AuditLog::query()->count();
+     36▕     $eventCount = $record->ticket->events()->count();
+     37▕     $this->patchJson($path, ['expected_version' => $version, $field => 'Stale replacement'])
+     38▕         ->assertConflict()->assertJsonPath('code', 'stale_ticket')->assertJsonValidationErrors('expected_version');
+
+  [33m1   [39m[39;1mtests\Feature\It\ItSpecialistCommandContractTest.php[39;22m:[39;1m34[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItSpecialistCommandContractTest[22m [90m>[39m a specialist wizard returns the actual saved canonical…   
+[39;1m  Session has unexpected errors: 
+
+{
+    "default": [
+        "The impact summary field is required."
+    ]
+}
+Failed asserting that true is false.[39;22m
+
+  at [32mtests\Feature\It\ItSpecialistCommandContractTest.php[39m:[32m66[39m
+     62▕     $this->actingAs($this->commandActor)->from('/it/'.$workspace)->post('/it/'.$workspace, [
+     63▕         'wizard' => true, 'actor_user_id' => $this->commandActor->id,
+     64▕         'title' => 'Synthetic reviewed creation receipt', 'description' => 'Focused command verification.',
+     65▕         'category' => 'network', 'priority' => 'high', ...$details,
+  ➜  66▕     ])->assertRedirect('/it/'.$workspace)->assertSessionDoesntHaveErrors()
+     67▕         ->assertSessionHas('it_ticket', function ($receipt) use ($workspace, $model) {
+     68▕             $record = $model::query()->with('ticket')->firstOrFail();
+     69▕ 
+     70▕             return $receipt['id'] === $record->ticket_id
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItKnowledgeAccessTest[22m [90m>[39m knowledge mutation routes conceal an unapproved current article…    
+[39;1m  Expected response status code [404] but received 302.
+Failed asserting that 302 is identical to 404.
+
+The following errors occurred during the last request:
+
+The lock version field is required.[39;22m
+
+  at [32mtests\Feature\It\ItKnowledgeAccessTest.php[39m:[32m107[39m
+    103▕         'audience' => 'specific_sites', 'site_scope' => [$otherSite->id], 'status' => $status,
+    104▕     ]);
+    105▕     $before = $article->fresh()->getAttributes();
+    106▕ 
+  ➜ 107▕     $this->actingAs($actor)->{$method}("/it/kb/{$article->id}{$action}", $data)->assertNotFound();
+    108▕ 
+    109▕     expect($article->fresh()->getAttributes())->toBe($before)
+    110▕         ->and(AuditLog::query()->where('auditable_type', $article->getMorphClass())
+    111▕             ->where('auditable_id', $article->id)->where('action', 'like', 'it.knowledge.%')->count())->toBe(0);
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItKnowledgeAccessTest[22m [90m>[39m knowledge mutation routes conceal an unapproved current article…    
+[39;1m  Expected response status code [404] but received 302.
+Failed asserting that 302 is identical to 404.
+
+The following errors occurred during the last request:
+
+The lock version field is required.[39;22m
+
+  at [32mtests\Feature\It\ItKnowledgeAccessTest.php[39m:[32m107[39m
+    103▕         'audience' => 'specific_sites', 'site_scope' => [$otherSite->id], 'status' => $status,
+    104▕     ]);
+    105▕     $before = $article->fresh()->getAttributes();
+    106▕ 
+  ➜ 107▕     $this->actingAs($actor)->{$method}("/it/kb/{$article->id}{$action}", $data)->assertNotFound();
+    108▕ 
+    109▕     expect($article->fresh()->getAttributes())->toBe($before)
+    110▕         ->and(AuditLog::query()->where('auditable_type', $article->getMorphClass())
+    111▕             ->where('auditable_id', $article->id)->where('action', 'like', 'it.knowledge.%')->count())->toBe(0);
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItKnowledgeAccessTest[22m [90m>[39m knowledge mutation routes conceal an unapproved current article…    
+[39;1m  Expected response status code [404] but received 302.
+Failed asserting that 302 is identical to 404.
+
+The following errors occurred during the last request:
+
+The lock version field is required.[39;22m
+
+  at [32mtests\Feature\It\ItKnowledgeAccessTest.php[39m:[32m107[39m
+    103▕         'audience' => 'specific_sites', 'site_scope' => [$otherSite->id], 'status' => $status,
+    104▕     ]);
+    105▕     $before = $article->fresh()->getAttributes();
+    106▕ 
+  ➜ 107▕     $this->actingAs($actor)->{$method}("/it/kb/{$article->id}{$action}", $data)->assertNotFound();
+    108▕ 
+    109▕     expect($article->fresh()->getAttributes())->toBe($before)
+    110▕         ->and(AuditLog::query()->where('auditable_type', $article->getMorphClass())
+    111▕             ->where('auditable_id', $article->id)->where('action', 'like', 'it.knowledge.%')->count())->toBe(0);
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItChangeManagementTest[22m [90m>[39m normal high risk and restricted changes… [41;1m ModelNotFoundException [49;22m  
+[39;1m  No query results for model [App\Models\ItTicketApproval].[39;22m
+
+  at [32mvendor\laravel\framework\src\Illuminate\Database\Eloquent\Builder.php[39m:[32m786[39m
+    782▕         if (! is_null($model = $this->first($columns))) {
+    783▕             return $model;
+    784▕         }
+    785▕ 
+  ➜ 786▕         throw (new ModelNotFoundException)->setModel(get_class($this->model));
+    787▕     }
+    788▕ 
+    789▕     /**
+    790▕      * Execute the query and get the first result or call a callback.
+
+  [33m1   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\Eloquent\Builder.php[39;22m:[39;1m786[39;22m
+  [33m2   [39m[39;1mvendor\laravel\framework\src\Illuminate\Support\Traits\ForwardsCalls.php[39;22m:[39;1m23[39;22m
+
+
+  [90mTests:[39m    [31;1m8 failed[39;22m[90m,[39m[39m [39m[32;1m38 passed[39;22m[90m,[39m[39m [2m13 pending[22m[39m[90m (719 assertions)[39m
+  [90mDuration:[39m [39m680.18s[39m
+
+{"exit_code":2,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_93dca169f6234b91",
+    "database_mutations_performed": false
+}

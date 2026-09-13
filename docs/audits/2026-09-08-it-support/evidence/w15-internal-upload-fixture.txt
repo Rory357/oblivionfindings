@@ -1,0 +1,2 @@
+Synthetic internal catalogue upload for the isolated local browser verification.
+This harmless marker must remain hidden from the beneficiary and unrelated actor.

@@ -1,0 +1,2175 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/pages/it/knowledge-access.test.tsx (13 tests | 5 failed) 1864ms
+     × conceals an open reader when refreshed authorized articles remove it and does not reopen from stale selection 94ms
+     × renders a refreshed authorized publication instead of its previously selected body 99ms
+     × shows mutation controls only for articles whose current capability permits management 194ms
+     × lets a knowledge-only author read current draft content and use author actions without reviewer or ticket controls 166ms
+     × lets a knowledge-only reviewer read and publish without draft editing or author actions 151ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > conceals an open reader when refreshed authorized articles remove it and does not reopen from stale selection
+TestingLibraryElementError: Unable to find an accessible element with the role "link" and name "Read Approved guide"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground overflow-clip!"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Guides":
+  <h1
+    class="text-[22px] leading-tight font-bold tracking-tight truncate"
+  />
+
+  Name "Published guides":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search the knowledge base…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "All articles1Within your access":
+  <a
+    href="/it/knowledge"
+  />
+
+  Name "Approved guide":
+  <a
+    href="/it/knowledge?article=41"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Category":
+  <button
+    aria-controls="radix-_r_6p_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Actions for Approved guide":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Approved guide"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_6q_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "DocumentDocument typePublicationServiceReview dueActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.1fr 1fr 32px;"
+  />
+
+  Name "Approved guideNetworkGuidePublishedNot linkedNot scheduled":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.1fr 1fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Document":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Document type":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Publication":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Service":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review due":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Approved guideNetwork":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Guide":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Published":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not linked":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not scheduled":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header
+            class="eh-header text-primary-foreground overflow-clip!"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-book-open size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M12 7v14"
+                        />
+                        <path
+                          d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="text-[22px] leading-tight font-bold tracking-tight truncate"
+                        >
+                          Guides
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Systems, runbooks and support guidance · Publications, revisions and review ownership
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search the knowledge base…"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2"
+                >
+                  <a
+                    href="/it/knowledge"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="lucide lucide-arrow-up-right eh-meter-go"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"[...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:438:18
+    436|         fireEvent.click(
+    437|             screen
+    438|                 .getByRole('link', { name: 'Read Approved guide' })
+       |                  ^
+    439|                 .closest('[data-slot="card"]')!,
+    440|         );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > renders a refreshed authorized publication instead of its previously selected body
+TestingLibraryElementError: Unable to find an accessible element with the role "link" and name "Read Approved guide"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground overflow-clip!"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Guides":
+  <h1
+    class="text-[22px] leading-tight font-bold tracking-tight truncate"
+  />
+
+  Name "Published guides":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search the knowledge base…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "All articles1Within your access":
+  <a
+    href="/it/knowledge"
+  />
+
+  Name "Approved guide":
+  <a
+    href="/it/knowledge?article=41"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Category":
+  <button
+    aria-controls="radix-_r_7e_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Actions for Approved guide":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Approved guide"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_7f_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "DocumentDocument typePublicationServiceReview dueActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.1fr 1fr 32px;"
+  />
+
+  Name "Approved guideNetworkGuidePublishedNot linkedNot scheduled":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.1fr 1fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Document":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Document type":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Publication":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Service":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review due":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Approved guideNetwork":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Guide":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Published":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not linked":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not scheduled":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header
+            class="eh-header text-primary-foreground overflow-clip!"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-book-open size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M12 7v14"
+                        />
+                        <path
+                          d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="text-[22px] leading-tight font-bold tracking-tight truncate"
+                        >
+                          Guides
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Systems, runbooks and support guidance · Publications, revisions and review ownership
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search the knowledge base…"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2"
+                >
+                  <a
+                    href="/it/knowledge"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="lucide lucide-arrow-up-right eh-meter-go"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"[...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:467:18
+    465|         fireEvent.click(
+    466|             screen
+    467|                 .getByRole('link', { name: 'Read Approved guide' })
+       |                  ^
+    468|                 .closest('[data-slot="card"]')!,
+    469|         );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > shows mutation controls only for articles whose current capability permits management
+TestingLibraryElementError: Unable to find an accessible element with the role "link" and name "Read Shared readable guide"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground overflow-clip!"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Knowledge & Documentation":
+  <h1
+    class="text-[22px] leading-tight font-bold tracking-tight truncate"
+  />
+
+  Name "Documentation library":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search the knowledge base…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New KB article":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "Document type":
+  <button
+    aria-controls="radix-_r_83_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Browse records":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+    type="button"
+  />
+
+  Name "Review":
+  <button
+    aria-controls="radix-_r_84_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Owner":
+  <button
+    aria-controls="radix-_r_85_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Sort":
+  <button
+    aria-controls="radix-_r_86_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Category":
+  <button
+    aria-controls="radix-_r_87_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Publication status":
+  <button
+    aria-controls="radix-_r_88_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Actions for Approved Site guide":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Approved Site guide"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_89_"
+    type="button"
+  />
+
+  Name "Actions for Shared readable guide":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Shared readable guide"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_8b_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "All articles2Within your access":
+  <a
+    href="/it/knowledge"
+  />
+
+  Name "Published2Within your access":
+  <a
+    href="/it/knowledge?status=published"
+  />
+
+  Name "In review0Within your access":
+  <a
+    href="/it/knowledge?status=in_review"
+  />
+
+  Name "Drafts0Within your access":
+  <a
+    href="/it/knowledge?status=draft"
+  />
+
+  Name "Approved Site guide":
+  <a
+    href="/it/knowledge?article=51"
+  />
+
+  Name "Shared readable guide":
+  <a
+    href="/it/knowledge?article=52"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "DocumentDocument typePublicationReview ownerServiceReview dueActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.2fr 1.1fr 1fr 32px;"
+  />
+
+  Name "Approved Site guideNetworkGuidePublished—Not linkedNot scheduled":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.2fr 1.1fr 1fr 32px;"
+  />
+
+  Name "Shared readable guideNetworkGuidePublished—Not linkedNot scheduled":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.2fr 1.1fr 1fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Document":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Document type":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Publication":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review owner":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Service":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review due":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Approved Site guideNetwork":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Guide":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Published":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "—":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not linked":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not scheduled":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  Name "Shared readable guideNetwork":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Guide":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Published":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "—":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not linked":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not scheduled":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header
+            class="eh-header text-primary-foreground overflow-clip!"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-book-open size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M12 7v14"
+                        />
+                        <path
+                          d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="text-[22px] leading-tight font-bold tracking-tight truncate"
+                        >
+                          Knowledge & Documentation
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Systems, runbooks and support guidance · Publications, revisions and review ownership
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search the knowledge base…"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                    <button
+                      class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+                      type="button"
+                    >
+                      <svg
+                        class="lucide lucide-plus size-4"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+     ...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:518:20
+    516|         ).toBeVisible();
+    517|         fireEvent.contextMenu(
+    518|             screen.getByRole('link', { name: 'Read Shared readable gui…
+       |                    ^
+    519|         );
+    520|         expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > lets a knowledge-only author read current draft content and use author actions without reviewer or ticket controls
+TestingLibraryElementError: Unable to find an accessible element with the role "link" and name "Read Author draft"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground overflow-clip!"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Knowledge & Documentation":
+  <h1
+    class="text-[22px] leading-tight font-bold tracking-tight truncate"
+  />
+
+  Name "Documentation library":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search the knowledge base…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "New KB article":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+    type="button"
+  />
+
+  Name "Document type":
+  <button
+    aria-controls="radix-_r_8v_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Browse records":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+    type="button"
+  />
+
+  Name "Review":
+  <button
+    aria-controls="radix-_r_90_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Owner":
+  <button
+    aria-controls="radix-_r_91_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Sort":
+  <button
+    aria-controls="radix-_r_92_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Category":
+  <button
+    aria-controls="radix-_r_93_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Publication status":
+  <button
+    aria-controls="radix-_r_94_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Actions for Author draft":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Author draft"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_95_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "All articles1Within your access":
+  <a
+    href="/it/knowledge"
+  />
+
+  Name "Published0Within your access":
+  <a
+    href="/it/knowledge?status=published"
+  />
+
+  Name "In review0Within your access":
+  <a
+    href="/it/knowledge?status=in_review"
+  />
+
+  Name "Drafts1Within your access":
+  <a
+    href="/it/knowledge?status=draft"
+  />
+
+  Name "Author draft":
+  <a
+    href="/it/knowledge?article=61"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "DocumentDocument typePublicationReview ownerServiceReview dueActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.2fr 1.1fr 1fr 32px;"
+  />
+
+  Name "Author draftNetworkGuideDraft—Not linkedNot scheduled":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.2fr 1.1fr 1fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Document":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Document type":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Publication":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review owner":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Service":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review due":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Author draftNetwork":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Guide":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Draft":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "—":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not linked":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not scheduled":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header
+            class="eh-header text-primary-foreground overflow-clip!"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-book-open size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M12 7v14"
+                        />
+                        <path
+                          d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="text-[22px] leading-tight font-bold tracking-tight truncate"
+                        >
+                          Knowledge & Documentation
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Systems, runbooks and support guidance · Publications, revisions and review ownership
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search the knowledge base…"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                    <button
+                      class="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+                      type="button"
+                    >
+                      <svg
+                        class="lucide lucide-plus size-4"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+     ...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:580:18
+    578|         fireEvent.click(
+    579|             screen
+    580|                 .getByRole('link', { name: 'Read Author draft' })
+       |                  ^
+    581|                 .closest('[data-slot="card"]')!,
+    582|         );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  resources/js/pages/it/knowledge-access.test.tsx > Knowledge current audience presentation > lets a knowledge-only reviewer read and publish without draft editing or author actions
+TestingLibraryElementError: Unable to find an accessible element with the role "link" and name "Read Review-ready guide"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  <main />
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  <header
+    class="eh-header text-primary-foreground overflow-clip!"
+  />
+
+  --------------------------------------------------
+  heading:
+
+  Name "Knowledge & Documentation":
+  <h1
+    class="text-[22px] leading-tight font-bold tracking-tight truncate"
+  />
+
+  Name "Documentation library":
+  <h2
+    class="truncate text-[14px] font-[650] tracking-tight text-foreground"
+  />
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  <p
+    class="mt-[3px] text-[13px] text-primary-foreground/65"
+  />
+
+  --------------------------------------------------
+  searchbox:
+
+  Name "":
+  <input
+    class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+    placeholder="Search the knowledge base…"
+    type="search"
+    value=""
+  />
+
+  --------------------------------------------------
+  link:
+
+  Name "All articles1Within your access":
+  <a
+    href="/it/knowledge"
+  />
+
+  Name "Published0Within your access":
+  <a
+    href="/it/knowledge?status=published"
+  />
+
+  Name "In review1Within your access":
+  <a
+    href="/it/knowledge?status=in_review"
+  />
+
+  Name "Drafts0Within your access":
+  <a
+    href="/it/knowledge?status=draft"
+  />
+
+  Name "Review-ready guide":
+  <a
+    href="/it/knowledge?article=62"
+  />
+
+  --------------------------------------------------
+  radiogroup:
+
+  Name "List layout":
+  <div
+    aria-label="List layout"
+    class="inline-flex items-stretch gap-0.5 p-[2px] box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10"
+    role="radiogroup"
+  />
+
+  --------------------------------------------------
+  radio:
+
+  Name "Cards":
+  <button
+    aria-checked="false"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 text-primary-foreground/80 hover:text-primary-foreground"
+    role="radio"
+    type="button"
+  />
+
+  Name "Table":
+  <button
+    aria-checked="true"
+    class="inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 bg-primary-foreground text-primary"
+    role="radio"
+    type="button"
+  />
+
+  --------------------------------------------------
+  button:
+
+  Name "Document type":
+  <button
+    aria-controls="radix-_r_9p_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Browse records":
+  <button
+    class="inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+    type="button"
+  />
+
+  Name "Review":
+  <button
+    aria-controls="radix-_r_9q_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Owner":
+  <button
+    aria-controls="radix-_r_9r_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Sort":
+  <button
+    aria-controls="radix-_r_9s_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Category":
+  <button
+    aria-controls="radix-_r_9t_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Publication status":
+  <button
+    aria-controls="radix-_r_9u_"
+    aria-expanded="false"
+    aria-haspopup="dialog"
+    class="inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none pr-2"
+    data-slot="popover-trigger"
+    data-state="closed"
+    type="button"
+  />
+
+  Name "Actions for Review-ready guide":
+  <button
+    aria-expanded="false"
+    aria-haspopup="menu"
+    aria-label="Actions for Review-ready guide"
+    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    data-slot="dropdown-menu-trigger"
+    data-state="closed"
+    id="radix-_r_9v_"
+    type="button"
+  />
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  <div
+    role="table"
+    style="min-width: 900px;"
+  />
+
+  --------------------------------------------------
+  row:
+
+  Name "DocumentDocument typePublicationReview ownerServiceReview dueActions":
+  <div
+    class="grid h-8 items-center border-b border-border bg-muted/60"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.2fr 1.1fr 1fr 32px;"
+  />
+
+  Name "Review-ready guideNetworkGuideIn review—Not linkedNot scheduled":
+  <div
+    class="grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset hover:bg-primary/5"
+    role="row"
+    style="grid-template-columns: 1.9fr 1fr 1fr 1.2fr 1.1fr 1fr 32px;"
+  />
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Document":
+  <span
+    class="px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase"
+    role="columnheader"
+  />
+
+  Name "Document type":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Publication":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review owner":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Service":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Review due":
+  <span
+    class="flex px-3 text-[10px] font-semibold tracking-[0.06em] text-muted-foreground uppercase justify-start text-left"
+    role="columnheader"
+  />
+
+  Name "Actions":
+  <span
+    aria-label="Actions"
+    role="columnheader"
+  />
+
+  --------------------------------------------------
+  cell:
+
+  Name "Review-ready guideNetwork":
+  <span
+    class="flex min-w-0 items-center gap-2.5 px-3"
+    role="cell"
+  />
+
+  Name "Guide":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "In review":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "—":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not linked":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "Not scheduled":
+  <span
+    class="flex min-w-0 items-center px-3 text-[12.5px] justify-start text-left"
+    role="cell"
+  />
+
+  Name "":
+  <span
+    class="flex items-center justify-end pr-1.5"
+    role="cell"
+  />
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+<body
+  style=""
+>
+  <div>
+    <main>
+      <div
+        class="min-w-0"
+      >
+        <div
+          class="flex flex-col gap-5"
+        >
+          <header
+            class="eh-header text-primary-foreground overflow-clip!"
+          >
+            <div
+              class="relative z-[1] flex h-full flex-col"
+            >
+              <div
+                class="flex flex-col px-[22px] pt-[18px]"
+              >
+                <div
+                  class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+                >
+                  <div
+                    class="flex min-w-0 items-start gap-[13px]"
+                  >
+                    <span
+                      class="eh-mark-ring"
+                    >
+                      <svg
+                        class="lucide lucide-book-open size-5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M12 7v14"
+                        />
+                        <path
+                          d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
+                        />
+                      </svg>
+                    </span>
+                    <div
+                      class="flex min-w-0 flex-col"
+                    >
+                      <div
+                        class="flex flex-wrap items-center gap-2"
+                      >
+                        <h1
+                          class="text-[22px] leading-tight font-bold tracking-tight truncate"
+                        >
+                          Knowledge & Documentation
+                        </h1>
+                      </div>
+                      <p
+                        class="mt-[3px] text-[13px] text-primary-foreground/65"
+                      >
+                        Systems, runbooks and support guidance · Publications, revisions and review ownership
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end"
+                  >
+                    <div
+                      class="relative min-w-[200px] flex-1 lg:w-[250px] lg:flex-none"
+                    >
+                      <svg
+                        class="lucide lucide-search pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="11"
+                          cy="11"
+                          r="8"
+                        />
+                        <path
+                          d="m21 21-4.3-4.3"
+                        />
+                      </svg>
+                      <input
+                        class="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                        placeholder="Search the knowledge base…"
+                        type="search"
+                        value=""
+                      />
+                      <kbd
+                        aria-hidden="true"
+                        class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                      >
+                        /
+                      </kbd>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2"
+                >
+                  <a
+                    href="/it/knowledge"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="lucide lucide-arrow-up-right eh-meter-go"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ resources/js/pages/it/knowledge-access.test.tsx:651:20
+    649|         ).not.toBeInTheDocument();
+    650|         fireEvent.contextMenu(
+    651|             screen.getByRole('link', { name: 'Read Review-ready guide'…
+       |                    ^
+    652|         );
+    653|         expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  5 failed | 22 passed (27)
+   Start at  10:48:26
+   Duration  11.15s (transform 1.25s, setup 591ms, import 9.99s, tests 3.58s, environment 5.32s)
+

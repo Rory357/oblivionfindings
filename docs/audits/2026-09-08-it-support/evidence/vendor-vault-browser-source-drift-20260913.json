@@ -1,0 +1,98 @@
+[
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\It\\Enums\\ItTicketDraftPurpose.php",
+    "baseline_sha256": "dd0a0680e3d29e8ae0be7e9b5bda0ba0b047914a4f0316ce585baf5d3ba40123",
+    "current_sha256": "28b38c8be6c651150fa94f8b6f7607990d2dbe3bcaf9ef5c124bd83c25522c50",
+    "last_write_utc": "2026-09-13T04:05:04.3258070Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\It\\Services\\ItTicketBookingService.php",
+    "baseline_sha256": "aa6346cd3ce0d6f529f87437089da8bf2d68a6711cb70c63d7e364228d97bd79",
+    "current_sha256": "d6153b47b986a5eaa8ea59c18b16e8a83e1c04afc9e893a87661b17898ef8fe0",
+    "last_write_utc": "2026-09-13T04:25:14.0421750Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\It\\Services\\ItTicketDraftPayload.php",
+    "baseline_sha256": "dba1d1075aa7c144598a2111fdbe37d9efa6da262f03716d7377504dba5b6c92",
+    "current_sha256": "ffb5aefd20387b80dfae7d7d28c0f1cbdc331b8f17764678cdf547a83649ca2f",
+    "last_write_utc": "2026-09-13T04:05:06.1062732Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\It\\Services\\ItTicketWorkService.php",
+    "baseline_sha256": "e6296741e87671a53aea469328c46887aec6a931b26bacb855539f31d92633dc",
+    "current_sha256": "56e64b784944cc4d7360efdf22d096e2c311c487bc67720f3607f331f2826b26",
+    "last_write_utc": "2026-09-13T04:25:13.8896156Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\It\\Services\\ItTicketWorkTime.php",
+    "baseline_sha256": "dbba3515f71063514bfe906ff9e8c79e0a0a309c39bfd63ad97af840e043b962",
+    "current_sha256": "e2dbd03b7abf345176b229654899c6ac5e70236bdc6eceeda4227ae27b2021a8",
+    "last_write_utc": "2026-09-13T04:28:49.2553614Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Http\\Controllers\\It\\ItTicketWorkController.php",
+    "baseline_sha256": "c60a630b7e6b3af5caeb7207cea334fe5b1ef1a860bd6cf9ca43c984a259c00b",
+    "current_sha256": "89b6365a62eb3c10ebd377e7b5a3fd5b6f800fc1219ab6aefb6fe2026017ae5a",
+    "last_write_utc": "2026-09-13T04:25:14.1557487Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\it-ticket-list.tsx",
+    "baseline_sha256": "78f680df8d586ad6dce6250bccac8ee46929b0483022d3057a21d57df5e6bcf7",
+    "current_sha256": "e945964df50d5f5378e765073793ebce3a2013dbd4d1b33b98ac1dfd593e545d",
+    "last_write_utc": "2026-09-13T04:22:09.6204492Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\it-wizards.tsx",
+    "baseline_sha256": "a46698abb9609a82de2ce5a67ef86ea40225ccfeca6265e8bb0644134deaa9c0",
+    "current_sha256": "8f0439f7f966ac2e21df90c23bf9e832ae6d21f0012e1a6afae66f5df16b44ed",
+    "last_write_utc": "2026-09-13T04:22:07.0825973Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\my-tickets-list.tsx",
+    "baseline_sha256": "6dc36e8c688692ad412fd99bcd66dcb34caeea4dc0318203a0e6189b92269002",
+    "current_sha256": "e22d92e4dce31eb53d329190d860e84bd93fd8a7bdef0d566974718dc9ec135e",
+    "last_write_utc": "2026-09-13T04:22:09.6589661Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\ticket-drawer.tsx",
+    "baseline_sha256": "472c54d56a4b7354804743819b147dd592ce385353fe0a166ab6f95e4ce79688",
+    "current_sha256": "326bdfea828dec635dedec2ec075297f686ab2e3cd7305eb4c9f7a75f45f5dea",
+    "last_write_utc": "2026-09-13T04:22:09.7169657Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\ticket-work-fields.tsx",
+    "baseline_sha256": "cecac8320b8fcc35fd740ccf90c71b00ed3e9f1f14785df83a76663a023bee12",
+    "current_sha256": "fa3abee0f54627cd89b500fd1c3d7f1bb5143f8a298e9868e89b2ed12aa4721a",
+    "last_write_utc": "2026-09-13T04:26:36.8439790Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\ticket-work-workspace.tsx",
+    "baseline_sha256": "af3b584b6acb69d0ce0d2fa53e264ee7cafa8e79a16e53867b3e1d8268c8542b",
+    "current_sha256": "9798e65460ed1f3df5cd3d64cc5d70aa098a39f082c2e9436341c8bf86b9ca29",
+    "last_write_utc": "2026-09-13T04:26:36.7344136Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\ticket-workspace-header.tsx",
+    "baseline_sha256": "34df504ac3b3210e21a0b47e35a9a7a8e2e885986432a7cf17ea0d04dd957941",
+    "current_sha256": "3f235912844fd8a212db7e40a83153da30875c66641c4061695acf34dc04f073",
+    "last_write_utc": "2026-09-13T04:22:09.3553006Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\hooks\\it-ticket-draft-contract.ts",
+    "baseline_sha256": "cb5cebd1e7a2561dab73f2e9e88623e19e425491c06afce8e2f66b1dedbe46fe",
+    "current_sha256": "b10a6ddfc71a9df401681cea043badc094e3f248e91126788476185a73f1495e",
+    "last_write_utc": "2026-09-13T04:05:07.8190096Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\pages\\it\\tickets\\show.tsx",
+    "baseline_sha256": "9128128c854d7161457cb55f9e00e42f133c2f154e31a5cc81b05869220bb57f",
+    "current_sha256": "33251ffff9c0ad7299a5aa3779b9584f51bb6d0ec1756b4d5ce953b347a5a3a9",
+    "last_write_utc": "2026-09-13T04:22:09.5762571Z"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\routes\\web.php",
+    "baseline_sha256": "821d7b2573f56095e7664559785d02e9ab9eefed062b46aca6adb5671954a045",
+    "current_sha256": "8e4cb3f0fa209d39bc76b84e11e3c8f95534558917029afed9b5dac767761705",
+    "last_write_utc": "2026-09-13T04:13:06.8719161Z"
+  }
+]

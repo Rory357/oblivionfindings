@@ -1,0 +1,63 @@
+vite v7.3.6 building client environment for production...
+[plugin @laravel/vite-plugin-wayfinder] Types generated for actions, routes, form variants
+transforming...
+✓ 1920 modules transformed.
+✗ Build failed in 1m 45s
+error during build:
+[vite:react-babel] C:\Users\steph\Herd\oblivionfindings\resources\js\pages\it\index.tsx: Unexpected token (3417:22)
+
+  3415 |     title: string;
+  3416 |     blurb: string;
+> 3417 |     action?: { label: 
+       |                       ^
+file: C:/Users/steph/Herd/oblivionfindings/resources/js/pages/it/index.tsx:3417:22
+    at constructor (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:365:19)
+    at TypeScriptParserMixin.raise (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:6616:19)
+    at TypeScriptParserMixin.unexpected (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:6636:16)
+    at TypeScriptParserMixin.tsParseNonArrayType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8481:16)
+    at TypeScriptParserMixin.tsParseArrayTypeOrHigher (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8487:21)
+    at C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8543:158
+    at TypeScriptParserMixin.tsInAllowConditionalTypesContext (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8832:14)
+    at TypeScriptParserMixin.tsParseTypeOperatorOrHigher (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8543:114)
+    at TypeScriptParserMixin.tsParseUnionOrIntersectionType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8550:18)
+    at TypeScriptParserMixin.tsParseIntersectionTypeOrHigher (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8559:17)
+    at TypeScriptParserMixin.tsParseUnionOrIntersectionType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8550:18)
+    at TypeScriptParserMixin.tsParseUnionTypeOrHigher (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8562:17)
+    at TypeScriptParserMixin.tsParseNonConditionalType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8729:17)
+    at TypeScriptParserMixin.tsParseType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8704:23)
+    at C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8698:31
+    at TypeScriptParserMixin.tsInType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8814:14)
+    at TypeScriptParserMixin.tsParseTypeAnnotation (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8696:10)
+    at TypeScriptParserMixin.tsTryParseTypeAnnotation (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8666:19)
+    at TypeScriptParserMixin.tsParsePropertyOrMethodSignature (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8201:25)
+    at TypeScriptParserMixin.tsParseTypeMember (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8238:17)
+    at TypeScriptParserMixin.tsParseList (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:7895:19)
+    at TypeScriptParserMixin.tsParseObjectTypeMembers (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8247:26)
+    at TypeScriptParserMixin.tsParseTypeLiteral (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8242:25)
+    at TypeScriptParserMixin.tsParseNonArrayType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8457:106)
+    at TypeScriptParserMixin.tsParseArrayTypeOrHigher (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8487:21)
+    at C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8543:158
+    at TypeScriptParserMixin.tsInAllowConditionalTypesContext (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8832:14)
+    at TypeScriptParserMixin.tsParseTypeOperatorOrHigher (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8543:114)
+    at TypeScriptParserMixin.tsParseUnionOrIntersectionType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8550:18)
+    at TypeScriptParserMixin.tsParseIntersectionTypeOrHigher (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8559:17)
+    at TypeScriptParserMixin.tsParseUnionOrIntersectionType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8550:18)
+    at TypeScriptParserMixin.tsParseUnionTypeOrHigher (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8562:17)
+    at TypeScriptParserMixin.tsParseNonConditionalType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8729:17)
+    at TypeScriptParserMixin.tsParseType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8704:23)
+    at C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8698:31
+    at TypeScriptParserMixin.tsInType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8814:14)
+    at TypeScriptParserMixin.tsParseTypeAnnotation (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8696:10)
+    at TypeScriptParserMixin.tsTryParseTypeAnnotation (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8666:19)
+    at TypeScriptParserMixin.tsParsePropertyOrMethodSignature (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8201:25)
+    at TypeScriptParserMixin.tsParseTypeMember (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8238:17)
+    at TypeScriptParserMixin.tsParseList (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:7895:19)
+    at TypeScriptParserMixin.tsParseObjectTypeMembers (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8247:26)
+    at TypeScriptParserMixin.tsParseTypeLiteral (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8242:25)
+    at TypeScriptParserMixin.tsParseNonArrayType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8457:106)
+    at TypeScriptParserMixin.tsParseArrayTypeOrHigher (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8487:21)
+    at C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8543:158
+    at TypeScriptParserMixin.tsInAllowConditionalTypesContext (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8832:14)
+    at TypeScriptParserMixin.tsParseTypeOperatorOrHigher (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8543:114)
+    at TypeScriptParserMixin.tsParseUnionOrIntersectionType (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8550:18)
+    at TypeScriptParserMixin.tsParseIntersectionTypeOrHigher (C:\Users\steph\Herd\oblivionfindings\node_modules\@babel\parser\lib\index.js:8559:17)

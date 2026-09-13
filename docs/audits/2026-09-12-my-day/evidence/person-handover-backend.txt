@@ -1,0 +1,41 @@
+
+  [90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[31;1m⨯[39;22m[90;1m.[39;22m[31;1m⨯[39;22m
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\MyDayHandoverDigestTest[22m [90m>[39m it populates the My Day digest handover prop for the incoming wor…   
+[39;1m  Property [handover.id] does not exist.
+Failed asserting that false is true.[39;22m
+
+  at [32mtests\Feature\MyDayHandoverDigestTest.php[39m:[32m69[39m
+     65▕         ->get('/my-day')
+     66▕         ->assertOk()
+     67▕         ->assertInertia(fn (Assert $page) => $page
+     68▕             ->component('my-day/index')
+  ➜  69▕             ->where('handover.id', $handover->id)
+     70▕             ->where('handover.summary', 'Mere slept poorly and needs a calm start.')
+     71▕             ->where('handover.unread', true)
+     72▕             ->where('handover.from.name', 'Alex Taylor')
+     73▕             ->where('handover.flags.0.label', 'Morning meds still due')
+
+  [33m1   [39m[39;1mvendor\inertiajs\inertia-laravel\src\Testing\TestResponseMacros.php[39;22m:[39;1m26[39;22m
+  [33m2   [39m[39;1mvendor\laravel\framework\src\Illuminate\Macroable\Traits\Macroable.php[39;22m:[39;1m132[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\MyDayHandoverDigestTest[22m [90m>[39m it does not let a worker claim an unassigned handover for a forei…   
+[39;1m  Expected response status code [403] but received 404.
+Failed asserting that 404 is identical to 403.[39;22m
+
+  at [32mtests\Feature\MyDayHandoverDigestTest.php[39m:[32m160[39m
+    156▕     ]);
+    157▕ 
+    158▕     $this->actingAs($worker)
+    159▕         ->patch("/attendance/handover/{$handover->id}/acknowledge")
+  ➜ 160▕         ->assertForbidden();
+    161▕ 
+    162▕     $this->assertDatabaseHas('shift_handovers', [
+    163▕         'id' => $handover->id,
+    164▕         'incoming_staff_id' => null,
+
+
+  [90mTests:[39m    [31;1m2 failed[39;22m[90m,[39m[39m [39m[32;1m8 passed[39;22m[90m (62 assertions)[39m
+  [90mDuration:[39m [39m229.95s[39m
+

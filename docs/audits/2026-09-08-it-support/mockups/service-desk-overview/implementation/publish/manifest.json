@@ -1,0 +1,13 @@
+{
+  "base": "6d864fd2d29123e6047bcc6702703f809d43b1a7",
+  "files": [
+    "app/Domain/It/Presenters/ItOverviewWorkboardPresenter.php",
+    "resources/js/components/it/it-overview.tsx",
+    "resources/js/components/it/it-overview-board.tsx",
+    "resources/js/components/it/it-overview-workboard.ts",
+    "resources/js/components/it/__tests__/it-overview-board.test.tsx",
+    "tests/Feature/It/ItOverviewWorkboardTest.php",
+    "app/Http/Controllers/It/ItProvisioningController.php",
+    "resources/js/pages/it/index.tsx"
+  ]
+}

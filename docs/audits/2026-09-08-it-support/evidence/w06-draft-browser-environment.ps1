@@ -5,19 +5,24 @@ param(
     [string] $Token,
     [ValidatePattern('^[a-f0-9]{64}$')]
     [string] $ExpectedFingerprint,
+    [ValidateSet(8766, 8767)]
+    [int] $Port = 8766,
     [switch] $MailboxFixtures,
     [switch] $ApiFixtures,
     [switch] $MonitoringFixtures,
-    [switch] $CatalogueFixtures
+    [switch] $CatalogueFixtures,
+    [switch] $WorkspaceFixtures,
+    [switch] $VendorFixtures
 )
 
 $ErrorActionPreference = 'Stop'
+if ($VendorFixtures -and !$WorkspaceFixtures) { throw 'Vendor fixtures require the existing exact-file Workspace fixture scanner.' }
 $itBrowserRepo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../../..')).Path
 $itBrowserPhp = 'C:\Users\steph\.config\herd\bin\php84\php.exe'
 if ($itBrowserRepo -ine 'C:\Users\steph\Herd\oblivionfindings') { throw 'Unexpected checkout.' }
 $itBrowserTesting = Join-Path $itBrowserRepo 'storage/framework/testing'
 $itBrowserFiles = @('w06-draft-browser-environment.ps1', 'w06-draft-browser-runtime.php', 'w06-draft-browser-bootstrap.php',
-    'w06-draft-browser-router.php', 'w06-draft-browser-fixtures.php', 'w06-draft-browser-teardown.php', 'w11-mailbox-browser-fixture.php', 'w11-merge-browser-scenario.php', 'w12-delivery-browser-fixture.php', 'w13-api-browser-fixture.php', 'w14-monitoring-browser-fixture.php', 'w15-catalogue-browser-fixture.php')
+    'w06-draft-browser-router.php', 'w06-draft-browser-fixtures.php', 'w06-draft-browser-teardown.php', 'w11-mailbox-browser-fixture.php', 'w11-merge-browser-scenario.php', 'w12-delivery-browser-fixture.php', 'w13-api-browser-fixture.php', 'w14-monitoring-browser-fixture.php', 'w15-catalogue-browser-fixture.php', 'w21-workspace-browser-fixture.php', 'w23-vendor-vault-browser-fixture.php')
 $itBrowserSources = [ordered] @{}
 foreach ($itBrowserFile in $itBrowserFiles) {
     $itBrowserSources[$itBrowserFile] = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $itBrowserFile) -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -31,14 +36,16 @@ $itBrowserAssetHash = (Get-FileHash -LiteralPath (Join-Path $itBrowserRepo 'publ
 $itBrowserReview = [ordered] @{
     checkout = $itBrowserRepo; source_hashes = $itBrowserSources; migration_hashes = $itBrowserMigrations
     schema_sha256 = $itBrowserSchemaHash; asset_manifest_sha256 = $itBrowserAssetHash
-    host = '127.0.0.1'; port = 8766; database_prefix = 'oblivion_it_draft_browser_'
+    host = '127.0.0.1'; port = $Port; database_prefix = 'oblivion_it_draft_browser_'
     app_environment = 'local'; csrf_testing_bypass = $false; mail = 'array'; queue = 'sync'
-    php_upload_limits = [ordered] @{ upload_max_filesize = '16M'; post_max_size = '64M'; max_file_uploads = 20 }
+    php_upload_limits = [ordered] @{ upload_max_filesize = '20M'; post_max_size = '64M'; max_file_uploads = 20 }
     synthetic_only_retention_days = @(2, 3); existing_herd_environment_edited = $false
     mailbox_fixtures = [bool] $MailboxFixtures
     api_fixtures = [bool] $ApiFixtures
     monitoring_fixtures = [bool] $MonitoringFixtures
     catalogue_fixtures = [bool] $CatalogueFixtures
+    workspace_fixtures = [bool] $WorkspaceFixtures
+    vendor_fixtures = [bool] $VendorFixtures
 }
 $itBrowserReviewBytes = [Text.Encoding]::UTF8.GetBytes(($itBrowserReview | ConvertTo-Json -Depth 8 -Compress))
 $itBrowserSha = [Security.Cryptography.SHA256]::Create()
@@ -54,6 +61,8 @@ $itBrowserTesting = (Resolve-Path -LiteralPath $itBrowserTesting).Path
 $itBrowserRoot = Join-Path $itBrowserTesting ('it-draft-browser-' + $Token)
 $itBrowserDatabase = 'oblivion_it_draft_browser_' + $Token
 $itBrowserOwnerPath = Join-Path $itBrowserRoot 'owner.json'
+$itBrowserAddress = '127.0.0.1:' + $Port
+$itBrowserUrl = 'http://' + $itBrowserAddress
 
 function Assert-ItBrowserOwnedPath([string] $Path) {
     $itChecked = [IO.Path]::GetFullPath($Path)
@@ -80,7 +89,7 @@ function Write-ItBrowserNewJson([string] $Path, $Value) {
 Assert-ItBrowserOwnedPath $itBrowserRoot
 if ($Mode -eq 'CreateAndStart') {
     if (Test-Path -LiteralPath $itBrowserRoot) { throw 'Token directory already exists; no reset or reuse is permitted.' }
-    if (Get-NetTCPConnection -LocalPort 8766 -State Listen -ErrorAction SilentlyContinue) { throw 'Loopback port 8766 is occupied; do not stop another process.' }
+    if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) { throw "Loopback port $Port is occupied; do not stop another process." }
     if (Test-Path -LiteralPath (Join-Path $itBrowserRepo 'public/hot')) { throw 'A Vite hot file is active; wait for a stable reviewed build.' }
     New-Item -ItemType Directory -Path $itBrowserRoot | Out-Null
     foreach ($itRelative in @('storage/app/private', 'storage/app/public', 'storage/framework/cache/data', 'storage/framework/views', 'storage/framework/sessions', 'storage/logs', 'storage/bootstrap-cache')) {
@@ -88,7 +97,7 @@ if ($Mode -eq 'CreateAndStart') {
     }
     $itParent = Get-Process -Id $PID
     $itOwner = [ordered] @{
-        token = $Token; database = $itBrowserDatabase; root = $itBrowserRoot; port = 8766
+        token = $Token; database = $itBrowserDatabase; root = $itBrowserRoot; port = $Port
         source_hashes = $itBrowserSources; migration_hashes = $itBrowserMigrations; schema_sha256 = $itBrowserSchemaHash
         asset_manifest_sha256 = $itBrowserAssetHash; approval_fingerprint = $itBrowserFingerprint
         launcher_pid = $PID; launcher_start_ticks = $itParent.StartTime.ToUniversalTime().Ticks
@@ -97,12 +106,14 @@ if ($Mode -eq 'CreateAndStart') {
         api_fixtures = [bool] $ApiFixtures
         monitoring_fixtures = [bool] $MonitoringFixtures
         catalogue_fixtures = [bool] $CatalogueFixtures
+        workspace_fixtures = [bool] $WorkspaceFixtures
+    vendor_fixtures = [bool] $VendorFixtures
     }
     Write-ItBrowserNewJson $itBrowserOwnerPath $itOwner
 } else {
     if (!(Test-Path -LiteralPath $itBrowserOwnerPath -PathType Leaf)) { throw 'The exact token owner manifest is missing.' }
     $itOwner = Get-Content -LiteralPath $itBrowserOwnerPath -Raw | ConvertFrom-Json
-    if ($itOwner.token -ne $Token -or $itOwner.database -ne $itBrowserDatabase -or $itOwner.root -ine $itBrowserRoot -or $itOwner.approval_fingerprint -ne $ExpectedFingerprint) {
+    if ($itOwner.token -ne $Token -or $itOwner.database -ne $itBrowserDatabase -or $itOwner.root -ine $itBrowserRoot -or $itOwner.port -ne $Port -or $itOwner.approval_fingerprint -ne $ExpectedFingerprint) {
         throw 'Stored source/token identity differs; inspect instead of inferring a cleanup target.'
     }
     # Asset/application changes must not strand a safely stoppable environment.
@@ -135,7 +146,7 @@ if (!$itBrowserDbAccess.ContainsKey('DB_USERNAME') -or !$itBrowserDbAccess.Conta
 $itBrowserKeyBytes = [byte[]]::new(32)
 [Security.Cryptography.RandomNumberGenerator]::Fill($itBrowserKeyBytes)
 $itBrowserEnv = @{
-    IT_DRAFT_BROWSER_TOKEN = $Token; APP_ENV = 'local'; APP_DEBUG = 'false'; APP_URL = 'http://127.0.0.1:8766'
+    IT_DRAFT_BROWSER_TOKEN = $Token; APP_ENV = 'local'; APP_DEBUG = 'false'; APP_URL = $itBrowserUrl
     APP_KEY = ('base64:' + [Convert]::ToBase64String($itBrowserKeyBytes)); LARAVEL_STORAGE_PATH = (Join-Path $itBrowserRoot 'storage')
     DB_CONNECTION = 'mysql'; DB_HOST = '127.0.0.1'; DB_PORT = '3306'; DB_DATABASE = $itBrowserDatabase; DB_URL = 'null'; DB_SOCKET = ''
     DB_USERNAME = $itBrowserDbAccess['DB_USERNAME']; DB_PASSWORD = $itBrowserDbAccess['DB_PASSWORD']; DB_EMULATE_PREPARES = 'true'
@@ -148,6 +159,8 @@ $itBrowserEnv = @{
     IT_API_BROWSER_FIXTURES = $(if ($itOwner.api_fixtures) { 'true' } else { 'false' })
     IT_MONITORING_BROWSER_FIXTURES = $(if ($itOwner.monitoring_fixtures) { 'true' } else { 'false' })
     IT_CATALOGUE_BROWSER_FIXTURES = $(if ($itOwner.catalogue_fixtures) { 'true' } else { 'false' })
+    IT_WORKSPACE_BROWSER_FIXTURES = $(if ($itOwner.workspace_fixtures) { 'true' } else { 'false' })
+    IT_VENDOR_BROWSER_FIXTURES = $(if ($itOwner.vendor_fixtures) { 'true' } else { 'false' })
     TEST_TOKEN = ''; PARALLEL_PROCESS = ''; PROCESS_TOKEN = ''
 }
 foreach ($itCacheName in @('CONFIG', 'ROUTES', 'EVENTS', 'SERVICES', 'PACKAGES')) {
@@ -174,17 +187,17 @@ try {
             token = $Token; pid = $itBootstrap.Id; exit_code = $itBootstrap.ExitCode; exited_at = [DateTime]::UtcNow.ToString('o')
         })
         if ($itBootstrap.ExitCode -ne 0) { throw 'Isolated bootstrap failed; inspect its owned process logs and phase evidence, never reset automatically.' }
-        if (Get-NetTCPConnection -LocalPort 8766 -State Listen -ErrorAction SilentlyContinue) { throw 'Port became occupied during bootstrap; do not replace that listener.' }
+        if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) { throw 'Port became occupied during bootstrap; do not replace that listener.' }
         $itPublicArgument = '"' + (Join-Path $itBrowserRepo 'public') + '"'
         $itRouterArgument = '"' + (Join-Path $PSScriptRoot 'w06-draft-browser-router.php') + '"'
         # This process alone has headroom to exercise canonical 10 MB/five-file
         # validation. No shared PHP/Herd ini is modified.
-        $itServer = Start-Process -FilePath $itBrowserPhp -ArgumentList @('-d', 'upload_max_filesize=16M', '-d', 'post_max_size=64M', '-d', 'max_file_uploads=20', '-S', '127.0.0.1:8766', '-t', $itPublicArgument, $itRouterArgument) -WorkingDirectory $itBrowserRepo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $itBrowserRoot 'server-stdout.log') -RedirectStandardError (Join-Path $itBrowserRoot 'server-stderr.log')
+        $itServer = Start-Process -FilePath $itBrowserPhp -ArgumentList @('-d', 'upload_max_filesize=20M', '-d', 'post_max_size=64M', '-d', 'max_file_uploads=20', '-S', $itBrowserAddress, '-t', $itPublicArgument, $itRouterArgument) -WorkingDirectory $itBrowserRepo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $itBrowserRoot 'server-stdout.log') -RedirectStandardError (Join-Path $itBrowserRoot 'server-stderr.log')
         Write-ItBrowserNewJson (Join-Path $itBrowserRoot 'server-started.json') ([ordered] @{
             token = $Token; pid = $itServer.Id; start_ticks = $itServer.StartTime.ToUniversalTime().Ticks
-            executable = $itBrowserPhp; router = (Join-Path $PSScriptRoot 'w06-draft-browser-router.php'); url = 'http://127.0.0.1:8766'
+            executable = $itBrowserPhp; router = (Join-Path $PSScriptRoot 'w06-draft-browser-router.php'); url = $itBrowserUrl
         })
-        [ordered] @{ started = $true; token = $Token; database = $itBrowserDatabase; pid = $itServer.Id; url = 'http://127.0.0.1:8766'; root = $itBrowserRoot; browser_verified = $false } | ConvertTo-Json
+        [ordered] @{ started = $true; token = $Token; database = $itBrowserDatabase; pid = $itServer.Id; url = $itBrowserUrl; root = $itBrowserRoot; browser_verified = $false } | ConvertTo-Json
     } else {
         $itStartedPath = Join-Path $itBrowserRoot 'server-started.json'
         if (Test-Path -LiteralPath $itStartedPath) {
@@ -201,7 +214,7 @@ try {
         } elseif (!(Test-Path -LiteralPath (Join-Path $itBrowserRoot 'launch-failed.json'))) {
             throw 'No settled launch outcome is recorded; inspect before cleanup.'
         }
-        if (Get-NetTCPConnection -LocalPort 8766 -State Listen -ErrorAction SilentlyContinue) { throw 'Port still has a listener; inspect ownership before cleanup.' }
+        if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) { throw 'Port still has a listener; inspect ownership before cleanup.' }
         Write-ItBrowserNewJson (Join-Path $itBrowserRoot 'server-stopped.json') (@{ token = $Token; server_settled = $true; stopped_at = [DateTime]::UtcNow.ToString('o') })
         & $itBrowserPhp (Join-Path $PSScriptRoot 'w06-draft-browser-teardown.php') --drop-stopped-owned-schema
         if ($LASTEXITCODE -ne 0) { throw 'Exact schema removal was not confirmed; retain the token directory for recovery.' }

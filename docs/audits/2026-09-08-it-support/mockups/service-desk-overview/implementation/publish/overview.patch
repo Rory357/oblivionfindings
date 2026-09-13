@@ -1,0 +1,1729 @@
+diff --git a/app/Domain/It/Presenters/ItOverviewWorkboardPresenter.php b/app/Domain/It/Presenters/ItOverviewWorkboardPresenter.php
+new file mode 100644
+index 000000000..bf5b920e3
+--- /dev/null
++++ b/app/Domain/It/Presenters/ItOverviewWorkboardPresenter.php
+@@ -0,0 +1,158 @@
++<?php
++
++namespace App\Domain\It\Presenters;
++
++use App\Domain\It\Services\ItSlaReadService;
++use App\Domain\It\Services\ItWorkAccessService;
++use App\Models\ItTicket;
++use App\Models\User;
++
++/** Single-organisation, approved-Site/record-scoped previews; no private thread bodies. */
++final class ItOverviewWorkboardPresenter
++{
++    private const QUEUES = ['attention', 'mine', 'unassigned', 'breached', 'breaching', 'awaiting_it', 'awaiting_reply', 'waiting_requester', 'aging', 'waiting', 'unmeasured', 'all_open'];
++
++    public function __construct(private readonly ItWorkAccessService $access, private readonly ItSlaReadService $sla) {}
++
++    public function present(User $user): array
++    {
++        $ready = ItTicket::hasConversationEvidence();
++        $base = $this->access->applyViewScope(ItTicket::query(), $user)->whereIn('status', ItTicket::OPEN_STATUSES);
++        // Operational waiting views use the same stronger work boundary as the full queue.
++        $workIds = array_fill_keys($this->access->applyWorkScope(ItTicket::query(), $user)
++            ->whereIn('status', ItTicket::OPEN_STATUSES)->pluck('it_tickets.id')->all(), true);
++        $scopes = [];
++        foreach (['all', ...ItTicket::PRIORITIES] as $priority) {
++            $scopes[$priority] = ['queues' => array_fill_keys(self::QUEUES, ['total' => 0, 'candidates' => []]), 'responses' => [], 'followups' => []];
++        }
++        $unmeasured = 0;
++        $at = $this->sla->evaluatedAt();
++        $columns = ['id', 'status', 'priority', 'created_at', 'assigned_to_user_id', 'waiting_party', 'merged_into_ticket_id',
++            'first_response_due_at', 'resolution_due_at', 'first_responded_at', 'resolved_at', 'waiting_since',
++            'sla_paused_minutes', 'reopened_count', 'sla_policy_snapshot', 'first_response_breached_at', 'resolution_breached_at'];
++        if ($ready) {
++            $columns[] = 'next_response_party';
++        }
++        // Stream the full permitted set for truthful totals; retain only six IDs per preview.
++        foreach ((clone $base)->select($columns)->lazyById(250) as $ticket) {
++            $verdict = $this->sla->present($ticket)['sla'];
++            $state = $verdict['state'];
++            $first = in_array($ticket->status, ['open', 'in_progress'], true) && $ticket->first_responded_at === null;
++            $awaitingIt = $ready && $ticket->next_response_party === 'it' && ! $ticket->isMerged();
++            $aging = $ticket->created_at?->lt($at->subDays(7)) === true;
++            $priorityRank = array_search($ticket->priority, ['urgent', 'high', 'normal', 'low'], true);
++            $ageRank = $ticket->created_at?->toIso8601String() ?? '9999';
++            $clockRank = $this->clockRank($verdict['clocks']['first_response']);
++            $slaRank = min($clockRank, $this->clockRank($verdict['clocks']['resolution']));
++            $attention = in_array($state, ['breached', 'at_risk'], true);
++            $keys = ['all_open'];
++            if ($attention) {
++                $keys[] = 'attention';
++            }
++            if ($state === 'breached') {
++                $keys[] = 'breached';
++            }
++            if ($state === 'at_risk') {
++                $keys[] = 'breaching';
++            }
++            if ($state === 'unmeasured') {
++                $keys[] = 'unmeasured';
++            }
++            if ($ticket->assigned_to_user_id === $user->id) {
++                $keys[] = 'mine';
++            }
++            if ($ticket->assigned_to_user_id === null) {
++                $keys[] = 'unassigned';
++            }
++            if ($first) {
++                $keys[] = 'awaiting_reply';
++            }
++            if ($awaitingIt) {
++                $keys[] = 'awaiting_it';
++            }
++            if ($aging) {
++                $keys[] = 'aging';
++            }
++            if ($ticket->status === 'waiting') {
++                $keys[] = 'waiting';
++            }
++            if ($ticket->status === 'waiting' && $ticket->waiting_party === 'requester' && isset($workIds[$ticket->id])) {
++                $keys[] = 'waiting_requester';
++            }
++            if ($verdict['coverage'] !== 'full') {
++                $unmeasured++;
++            }
++            foreach (array_unique(['all', $ticket->priority]) as $priority) {
++                if (! isset($scopes[$priority])) {
++                    continue;
++                }
++                foreach ($keys as $key) {
++                    $queue = &$scopes[$priority]['queues'][$key];
++                    $queue['total']++;
++                    $rank = $key === 'aging' ? [$ageRank] : [...$slaRank, $priorityRank, $ageRank];
++                    if ($key === 'unassigned') {
++                        $rank = [$priorityRank, ...$slaRank, $ageRank];
++                    }
++                    $this->retain($queue['candidates'], (int) $ticket->id, $rank);
++                    unset($queue);
++                }
++                if ($first) {
++                    $this->retain($scopes[$priority]['responses'], (int) $ticket->id, [...$clockRank, $priorityRank, $ageRank]);
++                }
++                if ($aging) {
++                    $this->retain($scopes[$priority]['followups'], (int) $ticket->id, [$awaitingIt ? 0 : 1, $ageRank]);
++                }
++            }
++        }
++        $retained = [];
++        foreach ($scopes as &$scope) {
++            $response = $scope['responses'][0]['id'] ?? null;
++            $assignment = collect($scope['queues']['unassigned']['candidates'])->first(fn ($row) => $row['id'] !== $response)['id'] ?? null;
++            $followup = collect($scope['followups'])->first(fn ($row) => ! in_array($row['id'], [$response, $assignment], true))['id'] ?? null;
++            $scope['actions'] = ['response' => $response, 'assignment' => $assignment, 'follow_up' => $followup];
++            foreach ($scope['queues'] as &$queue) {
++                $queue['ids'] = array_column($queue['candidates'], 'id');
++                $retained = [...$retained, ...$queue['ids']];
++                unset($queue['candidates']);
++            }
++            unset($queue, $scope['responses'], $scope['followups']);
++            $retained = [...$retained, $response, $assignment, $followup];
++        }
++        unset($scope);
++        $tickets = (clone $base)->whereKey(array_values(array_unique(array_filter($retained))))
++            ->with(['assignee:id,name', 'site:id,name'])->get()->mapWithKeys(function (ItTicket $ticket) use ($workIds, $ready): array {
++                $canWork = isset($workIds[$ticket->id]);
++
++                return [$ticket->id => [
++                    'id' => (int) $ticket->id, 'reference' => $ticket->reference, 'lock_version' => (int) $ticket->lock_version,
++                    'title' => $ticket->title, 'priority' => $ticket->priority, 'status' => $ticket->status,
++                    'site' => $ticket->site?->name, 'assignee' => $ticket->assignee?->name,
++                    'assigned_to_user_id' => $ticket->assigned_to_user_id === null ? null : (int) $ticket->assigned_to_user_id,
++                    'age' => $ticket->created_at?->diffForHumans(short: true),
++                    'first_reply_needed' => in_array($ticket->status, ['open', 'in_progress'], true) && $ticket->first_responded_at === null,
++                    'waiting_party' => $canWork ? $ticket->waiting_party : null,
++                    'conversation' => $ready ? app(ItTicketConversationPresenter::class)->present($ticket) : null,
++                    'can_manage' => $canWork,
++                    ...$this->sla->present($ticket),
++                ]];
++            });
++
++        return ['scopes' => $scopes, 'tickets' => $tickets, 'unmeasured_total' => $unmeasured, 'evaluated_at' => $at->toIso8601String()];
++    }
++
++    private function clockRank(array $clock): array
++    {
++        return [match ($clock['state']) {
++            'breached' => 0, 'at_risk' => 1, default => 2
++        }, $clock['due_at'] ?? '9999'];
++    }
++
++    private function retain(array &$rows, int $id, array $rank): void
++    {
++        $rows[] = ['id' => $id, 'rank' => [...$rank, $id]];
++        usort($rows, fn (array $a, array $b) => $a['rank'] <=> $b['rank']);
++        if (count($rows) > 6) {
++            array_pop($rows);
++        }
++    }
++}
+diff --git a/app/Http/Controllers/It/ItProvisioningController.php b/app/Http/Controllers/It/ItProvisioningController.php
+index 2ffc72b81..8b14e66e5 100644
+--- a/app/Http/Controllers/It/ItProvisioningController.php
++++ b/app/Http/Controllers/It/ItProvisioningController.php
+@@ -1480,6 +1480,7 @@ private function overview(User $user): array
+ 
+         return [
+             'avg_first_response_mins' => $avg !== null ? (int) round((float) $avg) : null,
++            'workboard' => app(\App\Domain\It\Presenters\ItOverviewWorkboardPresenter::class)->present($user),
+             'conversation_ready' => $conversationReady,
+             'sla_lane' => $slaLane,
+             'awaiting_lane' => $awaitingLane,
+diff --git a/resources/js/components/it/__tests__/it-overview-board.test.tsx b/resources/js/components/it/__tests__/it-overview-board.test.tsx
+new file mode 100644
+index 000000000..9b5a2ad8b
+--- /dev/null
++++ b/resources/js/components/it/__tests__/it-overview-board.test.tsx
+@@ -0,0 +1,298 @@
++import { fireEvent, render, screen, within } from '@testing-library/react';
++import { expect, it, vi } from 'vitest';
++import { ItOverview } from '../it-overview';
++import {
++    overviewClockDetail,
++    overviewQueueHref,
++    overviewQueues,
++    type OverviewQueue,
++    type OverviewTicket,
++    type OverviewWorkboard,
++} from '../it-overview-workboard';
++import type { SlaClock, SlaVerdict } from '../sla-evidence';
++
++vi.mock('@inertiajs/react', () => ({
++    Link: ({ children, ...props }: React.ComponentProps<'a'>) => (
++        <a {...props}>{children}</a>
++    ),
++    router: { visit: vi.fn(), reload: vi.fn() },
++}));
++function clock(
++    state: SlaClock['state'],
++    remaining: number | null = null,
++): SlaClock {
++    return {
++        state,
++        remaining_minutes: remaining,
++        due_at: '2026-09-13T03:00:00Z',
++        completed_at: null,
++        breached_at: null,
++        ever_breached: state === 'breached',
++        reason: null,
++        policy_recorded: true,
++        paused: state === 'paused',
++        paused_minutes: null,
++    };
++}
++function ticket(
++    id: number,
++    extras: Partial<OverviewTicket> = {},
++): OverviewTicket {
++    const sla: SlaVerdict = {
++        state: 'at_risk',
++        coverage: 'full',
++        ever_breached: false,
++        evaluated_at: '2026-09-13T02:00:00Z',
++        clocks: {
++            first_response: clock('at_risk', 24),
++            resolution: clock('ok', 180),
++        },
++    };
++    return {
++        id,
++        reference: `IT-${id}`,
++        title: `Ticket ${id}`,
++        lock_version: 7,
++        priority: 'urgent',
++        status: 'open',
++        site: 'Approved site',
++        assignee: null,
++        assigned_to_user_id: null,
++        age: '8d ago',
++        first_reply_needed: true,
++        waiting_party: null,
++        conversation: {
++            last_public: null,
++            next_response_party: 'it',
++            state: 'awaiting_it',
++        },
++        can_manage: true,
++        sla,
++        ...extras,
++    };
++}
++function board(): OverviewWorkboard {
++    const records = [
++        ticket(1),
++        ticket(2),
++        ticket(3, {
++            first_reply_needed: false,
++            assignee: 'Agent',
++            assigned_to_user_id: 12,
++        }),
++        ticket(4),
++        ticket(5),
++        ticket(6),
++        ticket(7),
++    ];
++    const queues = Object.fromEntries(
++        Object.keys(overviewQueues).map((key) => [
++            key,
++            {
++                total: key === 'attention' ? 7 : 100,
++                ids: records.slice(0, 6).map((t) => t.id),
++            },
++        ]),
++    ) as Record<OverviewQueue, { total: number; ids: number[] }>;
++    const empty = Object.fromEntries(
++        Object.keys(overviewQueues).map((key) => [
++            key,
++            { total: 0, ids: [] as number[] },
++        ]),
++    ) as typeof queues;
++    return {
++        tickets: Object.fromEntries(records.map((t) => [t.id, t])),
++        scopes: {
++            all: {
++                queues,
++                actions: { response: 1, assignment: 2, follow_up: 3 },
++            },
++            low: {
++                queues: empty,
++                actions: { response: null, assignment: null, follow_up: null },
++            },
++        },
++        unmeasured_total: 3,
++        evaluated_at: '2026-09-13T02:00:00Z',
++    };
++}
++function overview(workboard = board(), ready = true) {
++    return {
++        workboard,
++        avg_first_response_mins: null,
++        conversation_ready: ready,
++        sla_lane: [],
++        awaiting_lane: [],
++        aging_lane: [],
++        awaiting_it_lane: [],
++        unassigned_by_priority: {},
++        recent_activity: [],
++    };
++}
++
++it('shows three distinct next actions and excludes their IDs from the supporting preview without pretending the preview is the full queue', () => {
++    const open = vi.fn();
++    render(
++        <ItOverview
++            overview={overview()}
++            actorId={12}
++            canManage
++            onOpenTicket={open}
++            onAssign={vi.fn()}
++        />,
++    );
++    fireEvent.click(screen.getByRole('button', { name: 'Draft first reply' }));
++    expect(open).toHaveBeenCalledWith(1);
++    fireEvent.click(screen.getByRole('button', { name: 'Review follow-up' }));
++    expect(open).toHaveBeenCalledWith(3);
++    const table = screen.getByRole('table');
++    expect(within(table).queryByText('Ticket 1')).not.toBeInTheDocument();
++    expect(within(table).queryByText('Ticket 2')).not.toBeInTheDocument();
++    expect(within(table).queryByText('Ticket 3')).not.toBeInTheDocument();
++    expect(within(table).getByText('Ticket 4')).toBeVisible();
++    expect(
++        screen.getByText('3 of 4 shown · featured actions excluded'),
++    ).toBeVisible();
++    expect(
++        within(screen.getByLabelText('Ageing follow-up action')).getByText(
++            'Resolution SLA',
++        ),
++    ).toBeVisible();
++    expect(
++        screen.getByRole('link', { name: /Browse all tickets/ }),
++    ).toHaveAttribute('href', '/it?tab=tickets&view=all_open');
++});
++
++it('keeps a proposed assignment pending until refreshed canonical data confirms the current actor, then moves keyboard focus', () => {
++    const assign = vi.fn();
++    const data = board();
++    const { rerender } = render(
++        <ItOverview
++            overview={overview(data)}
++            actorId={12}
++            canManage
++            onOpenTicket={vi.fn()}
++            onAssign={assign}
++        />,
++    );
++    fireEvent.click(
++        within(screen.getByLabelText('Assignment action')).getByRole('button', {
++            name: 'Assign to me',
++        }),
++    );
++    expect(assign).toHaveBeenCalledWith(
++        expect.objectContaining({ id: 2, lock_version: 7 }),
++    );
++    expect(screen.queryByText('Assignment saved')).not.toBeInTheDocument();
++    const updated = structuredClone(data);
++    updated.tickets[2] = {
++        ...updated.tickets[2],
++        assigned_to_user_id: 12,
++        assignee: 'Agent',
++        lock_version: 8,
++    };
++    updated.scopes.all.actions.assignment = 4;
++    // The saved assignment can become the server's ageing choice next time.
++    // Keep the confirmed assignment in one action card only.
++    updated.scopes.all.actions.follow_up = 2;
++    rerender(
++        <ItOverview
++            overview={overview(updated)}
++            actorId={12}
++            canManage
++            onOpenTicket={vi.fn()}
++            onAssign={assign}
++        />,
++    );
++    expect(screen.getByText('Assignment saved')).toBeVisible();
++    expect(
++        within(screen.getByLabelText('Ageing follow-up action')).queryByText(
++            'Ticket 2',
++        ),
++    ).not.toBeInTheDocument();
++    expect(
++        screen.getByRole('button', { name: /Remaining work/ }),
++    ).toHaveFocus();
++    fireEvent.click(screen.getByRole('button', { name: /Remaining work/ }));
++    expect(screen.getByText('3 of 100 shown')).toBeVisible();
++    fireEvent.click(screen.getByRole('button', { name: 'Show 3 more' }));
++    expect(screen.getByText('6 of 100 shown')).toBeVisible();
++});
++
++it('requires record-level management permission and does not carry successful assignment state across actors', () => {
++    const data = board();
++    data.tickets[2].can_manage = false;
++    const { rerender } = render(
++        <ItOverview
++            overview={overview(data)}
++            actorId={12}
++            onOpenTicket={vi.fn()}
++            onAssign={vi.fn()}
++        />,
++    );
++    expect(
++        within(screen.getByLabelText('Assignment action')).queryByRole(
++            'button',
++            { name: 'Assign to me' },
++        ),
++    ).not.toBeInTheDocument();
++    data.tickets[1].can_manage = false;
++    rerender(
++        <ItOverview
++            overview={overview(data)}
++            actorId={13}
++            onOpenTicket={vi.fn()}
++            onAssign={vi.fn()}
++        />,
++    );
++    expect(
++        screen.queryByRole('button', { name: 'Draft first reply' }),
++    ).not.toBeInTheDocument();
++    expect(
++        screen.getByRole('button', { name: 'View conversation' }),
++    ).toBeVisible();
++    expect(screen.queryByText('Assignment saved')).not.toBeInTheDocument();
++});
++
++it('uses the priority-specific source slice and retains honest unavailable states', () => {
++    const clear = vi.fn();
++    render(
++        <ItOverview
++            overview={overview(board(), false)}
++            priority="low"
++            onOpenTicket={vi.fn()}
++            onClearPriority={clear}
++        />,
++    );
++    expect(screen.queryByText('Ticket 1')).not.toBeInTheDocument();
++    expect(screen.getByText('No tickets in this selection')).toBeVisible();
++    expect(
++        screen.getByText(/Reply responsibility is unavailable/),
++    ).toBeVisible();
++    expect(
++        screen.getByText(/Average first response · 30d: Unavailable/),
++    ).toBeVisible();
++    fireEvent.click(screen.getByRole('button', { name: 'Clear Priority' }));
++    expect(clear).toHaveBeenCalledOnce();
++});
++
++it('preserves queue contracts and business-calendar evidence without inferring countdowns', () => {
++    expect(overviewQueueHref('breached', 'high')).toBe(
++        '/it?tab=tickets&view=breached&ticket_priority=high',
++    );
++    expect(overviewQueueHref('breaching')).toBe(
++        '/it?tab=tickets&view=breaching',
++    );
++    expect(overviewQueueHref('aging')).toBe(
++        '/it?tab=tickets&view=all_open&sort=created&dir=asc',
++    );
++    expect(overviewClockDetail(clock('breached', -32))).toBe(
++        '32 business min overdue',
++    );
++    expect(overviewClockDetail(clock('paused', -32))).toBe(
++        'Paused while waiting',
++    );
++    expect(overviewClockDetail(clock('unmeasured', -32))).toBe(
++        'Clock evidence unavailable',
++    );
++});
+diff --git a/resources/js/components/it/it-overview-board.tsx b/resources/js/components/it/it-overview-board.tsx
+new file mode 100644
+index 000000000..a7c972ec7
+--- /dev/null
++++ b/resources/js/components/it/it-overview-board.tsx
+@@ -0,0 +1,878 @@
++import {
++    EntityContextMenu,
++    EntityKebab,
++    type MenuItem,
++} from '@/components/lists/entity-menu';
++import { Button } from '@/components/ui/button';
++import { Card } from '@/components/ui/card';
++import { EmptyState } from '@/components/ui/empty-state';
++import {
++    Popover,
++    PopoverContent,
++    PopoverTrigger,
++} from '@/components/ui/popover';
++import {
++    Select,
++    SelectContent,
++    SelectItem,
++    SelectTrigger,
++    SelectValue,
++} from '@/components/ui/select';
++import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
++import {
++    Table,
++    TableBody,
++    TableCell,
++    TableHead,
++    TableHeader,
++    TableRow,
++} from '@/components/ui/table';
++import { formatDateTime } from '@/lib/datetime';
++import { cn } from '@/lib/utils';
++import { Link, router } from '@inertiajs/react';
++import {
++    ArrowRight,
++    ArrowUpRight,
++    Check,
++    ChevronDown,
++    CircleHelp,
++    Clock,
++    Eye,
++    Inbox,
++    MessageSquareText,
++    Ticket,
++    UserRound,
++} from 'lucide-react';
++import {
++    useEffect,
++    useRef,
++    useState,
++    type MouseEvent,
++    type ReactNode,
++} from 'react';
++import {
++    overviewClockDetail,
++    overviewConversation,
++    overviewQueueHref,
++    overviewQueues,
++    type OverviewQueue,
++    type OverviewTicket,
++    type OverviewWorkboard,
++} from './it-overview-workboard';
++import { SLA_LABELS, SLA_VARIANTS, type SlaClock } from './sla-evidence';
++
++const priorities: Record<string, StatusVariant> = {
++    urgent: 'critical',
++    high: 'critical',
++    normal: 'info',
++    low: 'neutral',
++};
++const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
++function ClockFact({
++    name,
++    clock,
++    compact = false,
++}: {
++    name: string;
++    clock?: SlaClock;
++    compact?: boolean;
++}) {
++    return (
++        <div className="min-w-0 space-y-1">
++            <div className="flex flex-wrap items-center gap-2">
++                <span className="text-caption">{name}</span>
++                <StatusBadge
++                    size="sm"
++                    variant={SLA_VARIANTS[clock?.state ?? 'unmeasured']}
++                >
++                    {SLA_LABELS[clock?.state ?? 'unmeasured']}
++                </StatusBadge>
++            </div>
++            <p className={compact ? 'text-caption' : 'text-sm font-medium'}>
++                {overviewClockDetail(clock)}
++            </p>
++            {clock?.ever_breached && clock.state !== 'breached' && (
++                <p className="text-caption">Earlier breach retained</p>
++            )}
++        </div>
++    );
++}
++function TicketMeta({ ticket }: { ticket: OverviewTicket }) {
++    return (
++        <div className="text-caption flex flex-wrap items-center gap-2">
++            <span>{ticket.reference ?? `IT-${ticket.id}`}</span>
++            <StatusBadge
++                size="sm"
++                variant={priorities[ticket.priority] ?? 'neutral'}
++            >
++                {label(ticket.priority)}
++            </StatusBadge>
++            {ticket.site && <span>{ticket.site}</span>}
++        </div>
++    );
++}
++
++export function ItOverviewBoard({
++    board,
++    priority,
++    conversationReady,
++    canManage,
++    actorId,
++    onOpenTicket,
++    onAssign,
++    assignmentBusy = false,
++    onClearPriority,
++    activity,
++    average,
++}: {
++    board: OverviewWorkboard;
++    priority?: string | null;
++    conversationReady: boolean;
++    canManage?: boolean;
++    actorId?: number;
++    onOpenTicket: (id: number) => void;
++    onAssign?: (ticket: OverviewTicket) => void;
++    assignmentBusy?: boolean;
++    onClearPriority?: () => void;
++    activity: ReactNode;
++    average: number | null;
++}) {
++    const [selection, setSelection] = useState<{
++        queue: OverviewQueue;
++        expanded: boolean;
++        priority?: string | null;
++    }>({ queue: 'attention', expanded: false, priority });
++    const [assignmentIntent, setAssignmentIntent] = useState<{
++        id: number;
++        actorId?: number;
++        priority?: string | null;
++    } | null>(null);
++    const [context, setContext] = useState<{
++        id: number;
++        x: number;
++        y: number;
++    } | null>(null);
++    const remainingRef = useRef<HTMLButtonElement>(null);
++    const scope = board.scopes[priority ?? 'all'];
++    const view =
++        (selection.queue === 'awaiting_it' && !conversationReady) ||
++        (selection.queue === 'waiting_requester' && !canManage)
++            ? 'attention'
++            : selection.queue;
++    const choose = (queue: OverviewQueue) =>
++        setSelection({ queue, expanded: false, priority });
++    const response = scope?.actions.response
++        ? board.tickets[scope.actions.response]
++        : undefined;
++    const intentTicket =
++        assignmentIntent &&
++        assignmentIntent.actorId === actorId &&
++        assignmentIntent.priority === priority
++            ? board.tickets[assignmentIntent.id]
++            : undefined;
++    const assigned =
++        intentTicket &&
++        actorId !== undefined &&
++        intentTicket.assigned_to_user_id === actorId &&
++        intentTicket.can_manage &&
++        intentTicket.id !== response?.id;
++    const assignment = assigned
++        ? intentTicket
++        : scope?.actions.assignment
++          ? board.tickets[scope.actions.assignment]
++          : undefined;
++    const selectedFollowup = scope?.actions.follow_up
++        ? board.tickets[scope.actions.follow_up]
++        : undefined;
++    const otherAgeing = (scope?.queues.aging.ids ?? [])
++        .map((id) => board.tickets[id])
++        .filter(
++            (ticket) =>
++                ticket &&
++                ticket.id !== response?.id &&
++                ticket.id !== assignment?.id,
++        );
++    const followup =
++        selectedFollowup &&
++        selectedFollowup.id !== assignment?.id &&
++        selectedFollowup.id !== response?.id
++            ? selectedFollowup
++            : (otherAgeing.find(
++                  (ticket) =>
++                      conversationReady &&
++                      ticket.conversation?.state === 'awaiting_it',
++              ) ?? otherAgeing[0]);
++    useEffect(() => {
++        if (assigned) remainingRef.current?.focus();
++    }, [assigned]);
++    if (!scope)
++        return (
++            <EmptyState
++                title="Overview could not be loaded"
++                description="Refresh to check the current permitted work."
++                action={
++                    <Button
++                        onClick={() => router.reload({ preserveScroll: true })}
++                    >
++                        Refresh Overview
++                    </Button>
++                }
++            />
++        );
++    const featured = [response, assignment, followup].filter(
++        (ticket): ticket is OverviewTicket => !!ticket,
++    );
++    const queue = scope.queues[view];
++    const excluded =
++        view === 'attention'
++            ? featured
++                  .filter((ticket) =>
++                      ['breached', 'at_risk'].includes(ticket.sla.state),
++                  )
++                  .map((ticket) => ticket.id)
++            : [];
++    const rows = queue.ids
++        .filter((id) => !excluded.includes(id))
++        .map((id) => board.tickets[id])
++        .filter(Boolean);
++    const total = Math.max(0, queue.total - new Set(excluded).size);
++    const expanded = selection.expanded && selection.priority === priority;
++    const shown = expanded ? rows : rows.slice(0, 3);
++    const queueKeys = (Object.keys(overviewQueues) as OverviewQueue[]).filter(
++        (key) =>
++            (key !== 'awaiting_it' || conversationReady) &&
++            (key !== 'waiting_requester' || canManage),
++    );
++    const assign = (ticket: OverviewTicket) => {
++        if (!ticket.can_manage || !onAssign || assignmentBusy) return;
++        setAssignmentIntent({ id: ticket.id, actorId, priority });
++        onAssign(ticket);
++    };
++    const actionsFor = (ticket: OverviewTicket): MenuItem[] => [
++        {
++            label: 'Quick preview',
++            icon: Eye,
++            onClick: () => onOpenTicket(ticket.id),
++        },
++        {
++            label: 'Open ticket',
++            icon: ArrowUpRight,
++            onClick: () => router.visit(`/it/tickets/${ticket.id}`),
++        },
++        ...(ticket.can_manage &&
++        ticket.assigned_to_user_id === null &&
++        onAssign &&
++        !assignmentBusy
++            ? [
++                  {
++                      label: 'Assign to me',
++                      icon: UserRound,
++                      onClick: () => assign(ticket),
++                  },
++              ]
++            : []),
++    ];
++    const openContext = (event: MouseEvent, ticket: OverviewTicket) => {
++        event.preventDefault();
++        setContext({ id: ticket.id, x: event.clientX, y: event.clientY });
++    };
++    const fullQueueLabel =
++        view === 'attention'
++            ? 'Browse all tickets'
++            : view === 'aging'
++              ? 'All open · oldest first'
++              : 'Open full queue';
++    return (
++        <section
++            className="min-w-0 space-y-5"
++            aria-label="Service Desk Overview"
++        >
++            <div className="flex flex-wrap items-center justify-between gap-2">
++                <div>
++                    <h2 className="text-section-title">What needs you now</h2>
++                    <p className="text-subtle">
++                        {priority
++                            ? `Actions for ${priority}-priority tickets.`
++                            : 'First responses, assignment and follow-up.'}
++                    </p>
++                </div>
++                <span className="text-caption">
++                    Checked {formatDateTime(board.evaluated_at)}
++                </span>
++            </div>
++            <div
++                className="grid min-w-0 gap-5 lg:grid-cols-2"
++                aria-label="Prioritised ticket actions"
++            >
++                <Card
++                    className={cn(
++                        'min-w-0 gap-4 p-5',
++                        response?.sla.clocks.first_response.state ===
++                            'breached' && 'border-l-4 border-l-status-critical',
++                    )}
++                >
++                    <div className="flex flex-wrap items-center gap-2">
++                        <MessageSquareText className="size-4" aria-hidden />
++                        <h3 className="text-sm font-medium">First response</h3>
++                        {response && (
++                            <StatusBadge
++                                size="sm"
++                                variant={
++                                    SLA_VARIANTS[
++                                        response.sla.clocks.first_response.state
++                                    ]
++                                }
++                            >
++                                {response.sla.clocks.first_response.state ===
++                                'unmeasured'
++                                    ? 'Reply needed'
++                                    : `SLA ${SLA_LABELS[response.sla.clocks.first_response.state].toLowerCase()}`}
++                            </StatusBadge>
++                        )}
++                    </div>
++                    {response ? (
++                        <>
++                            <h3 className="text-section-title break-words">
++                                {response.title}
++                            </h3>
++                            <TicketMeta ticket={response} />
++                            <p className="text-sm text-muted-foreground">
++                                No first response recorded.{' '}
++                                {response.assignee
++                                    ? `Assigned to ${response.assigned_to_user_id === actorId ? 'you' : response.assignee}.`
++                                    : 'No technician assigned yet.'}
++                            </p>
++                            <div className="grid gap-4 border-t pt-4 sm:grid-cols-2">
++                                <ClockFact
++                                    name="Response SLA"
++                                    clock={response.sla.clocks.first_response}
++                                />
++                                <ClockFact
++                                    name="Resolution SLA"
++                                    clock={response.sla.clocks.resolution}
++                                />
++                            </div>
++                            <div className="mt-auto flex flex-wrap gap-2">
++                                <Button
++                                    onClick={() => onOpenTicket(response.id)}
++                                >
++                                    {response.can_manage
++                                        ? 'Draft first reply'
++                                        : 'View conversation'}
++                                    <ArrowRight />
++                                </Button>
++                                <Button variant="ghost" asChild>
++                                    <Link href={`/it/tickets/${response.id}`}>
++                                        View ticket
++                                        <ArrowUpRight />
++                                    </Link>
++                                </Button>
++                            </div>
++                        </>
++                    ) : (
++                        <EmptyState
++                            variant="compact"
++                            icon={Inbox}
++                            title="No first replies in this selection"
++                            description="Choose a queue below to review other permitted work."
++                        />
++                    )}
++                </Card>
++                <div className="grid min-w-0 gap-5">
++                    <Card
++                        className="min-w-0 gap-3 p-4"
++                        aria-label="Assignment action"
++                    >
++                        <div className="flex items-center gap-2">
++                            <UserRound className="size-4" aria-hidden />
++                            <h3 className="text-sm font-medium">
++                                {assigned
++                                    ? 'Assigned to you'
++                                    : assignment?.priority === 'urgent'
++                                      ? 'Assign the next urgent ticket'
++                                      : 'Unassigned work'}
++                            </h3>
++                            <Popover>
++                                <PopoverTrigger asChild>
++                                    <Button
++                                        size="icon"
++                                        variant="ghost"
++                                        className="ml-auto"
++                                        aria-label="Browse unassigned tickets by priority"
++                                    >
++                                        <ChevronDown />
++                                    </Button>
++                                </PopoverTrigger>
++                                <PopoverContent
++                                    align="end"
++                                    className="w-64 space-y-1"
++                                >
++                                    <p className="text-caption mb-2">
++                                        Unassigned · full queues
++                                    </p>
++                                    {['urgent', 'high', 'normal', 'low'].map(
++                                        (pri) => (
++                                            <Button
++                                                key={pri}
++                                                variant="ghost"
++                                                className="w-full justify-between"
++                                                asChild
++                                            >
++                                                <Link
++                                                    href={overviewQueueHref(
++                                                        'unassigned',
++                                                        pri,
++                                                    )}
++                                                >
++                                                    {label(pri)}
++                                                    <span>
++                                                        {board.scopes[pri]
++                                                            ?.queues.unassigned
++                                                            .total ?? 0}
++                                                    </span>
++                                                    <ArrowUpRight />
++                                                </Link>
++                                            </Button>
++                                        ),
++                                    )}
++                                </PopoverContent>
++                            </Popover>
++                        </div>
++                        {assignment ? (
++                            <>
++                                <Button
++                                    variant="link"
++                                    className="h-auto justify-start p-0 text-left whitespace-normal"
++                                    onClick={() => onOpenTicket(assignment.id)}
++                                >
++                                    {assignment.title}
++                                    <ArrowUpRight className="shrink-0" />
++                                </Button>
++                                <TicketMeta ticket={assignment} />
++                                {!assigned && (
++                                    <ClockFact
++                                        name="Response SLA"
++                                        clock={
++                                            assignment.sla.clocks.first_response
++                                        }
++                                        compact
++                                    />
++                                )}
++                                <div className="flex flex-wrap items-center justify-between gap-2">
++                                    {assigned ? (
++                                        <>
++                                            <span
++                                                role="status"
++                                                className="flex items-center gap-1 text-sm"
++                                            >
++                                                <Check className="size-4" />
++                                                Assignment saved
++                                            </span>
++                                            <Button
++                                                ref={remainingRef}
++                                                variant="ghost"
++                                                size="sm"
++                                                onClick={() =>
++                                                    choose('unassigned')
++                                                }
++                                            >
++                                                Remaining work
++                                                <ArrowRight />
++                                            </Button>
++                                        </>
++                                    ) : assignment.can_manage && onAssign ? (
++                                        <>
++                                            <Button
++                                                variant="outline"
++                                                size="sm"
++                                                disabled={assignmentBusy}
++                                                onClick={() =>
++                                                    assign(assignment)
++                                                }
++                                            >
++                                                Assign to me
++                                            </Button>
++                                            <span className="text-caption">
++                                                Review before saving
++                                            </span>
++                                        </>
++                                    ) : (
++                                        <Button
++                                            variant="outline"
++                                            size="sm"
++                                            onClick={() =>
++                                                onOpenTicket(assignment.id)
++                                            }
++                                        >
++                                            Review ticket
++                                        </Button>
++                                    )}
++                                </div>
++                            </>
++                        ) : (
++                            <p className="text-subtle">
++                                No other unassigned tickets in this selection.
++                            </p>
++                        )}
++                    </Card>
++                    <Card
++                        className="min-w-0 gap-3 p-4"
++                        aria-label="Ageing follow-up action"
++                    >
++                        <div className="flex items-center gap-2">
++                            <Clock className="size-4" aria-hidden />
++                            <h3 className="text-sm font-medium">
++                                Move an ageing ticket forward
++                            </h3>
++                        </div>
++                        {followup ? (
++                            <>
++                                <Button
++                                    variant="link"
++                                    className="h-auto justify-start p-0 text-left whitespace-normal"
++                                    onClick={() => onOpenTicket(followup.id)}
++                                >
++                                    {followup.title}
++                                    <ArrowUpRight className="shrink-0" />
++                                </Button>
++                                <p className="text-caption">
++                                    {followup.reference ?? `IT-${followup.id}`}{' '}
++                                    · Ticket age:{' '}
++                                    {followup.age ?? 'unavailable'} ·{' '}
++                                    {overviewConversation(
++                                        followup,
++                                        conversationReady,
++                                    )}
++                                </p>
++                                <ClockFact
++                                    name="Resolution SLA"
++                                    clock={followup.sla.clocks.resolution}
++                                    compact
++                                />
++                                <div className="flex flex-wrap items-center justify-between gap-2">
++                                    <Button
++                                        variant="ghost"
++                                        size="sm"
++                                        onClick={() =>
++                                            onOpenTicket(followup.id)
++                                        }
++                                    >
++                                        Review follow-up
++                                        <ArrowRight />
++                                    </Button>
++                                    <span className="text-caption">
++                                        {followup.assigned_to_user_id ===
++                                        actorId
++                                            ? 'Assigned to you'
++                                            : (followup.assignee ??
++                                              'Unassigned')}
++                                    </span>
++                                </div>
++                            </>
++                        ) : (
++                            <p className="text-subtle">
++                                No other tickets older than seven days in this
++                                selection.
++                            </p>
++                        )}
++                    </Card>
++                </div>
++            </div>
++            <section
++                className="min-w-0 space-y-3"
++                aria-label="Supporting ticket list"
++            >
++                <div className="flex flex-wrap items-end justify-between gap-3">
++                    <div>
++                        <h2 className="text-section-title">
++                            {view === 'attention'
++                                ? 'Next in line'
++                                : overviewQueues[view]}
++                        </h2>
++                        <p className="text-subtle">
++                            {view === 'attention'
++                                ? 'Other tickets with a recorded SLA alert.'
++                                : view === 'aging'
++                                  ? 'Open for more than seven days, oldest first.'
++                                  : 'A short preview of the selected queue.'}
++                        </p>
++                    </div>
++                    <div className="flex flex-wrap items-center gap-2">
++                        <label
++                            htmlFor="overview-queue"
++                            className="text-caption"
++                        >
++                            Queue
++                        </label>
++                        <Select
++                            value={view}
++                            onValueChange={(value) =>
++                                choose(value as OverviewQueue)
++                            }
++                        >
++                            <SelectTrigger
++                                id="overview-queue"
++                                aria-label="Supporting ticket queue"
++                                className="w-52 bg-card"
++                            >
++                                <SelectValue />
++                            </SelectTrigger>
++                            <SelectContent>
++                                {queueKeys.map((key) => (
++                                    <SelectItem key={key} value={key}>
++                                        {overviewQueues[key]} (
++                                        {scope.queues[key].total})
++                                    </SelectItem>
++                                ))}
++                            </SelectContent>
++                        </Select>
++                        <Button variant="ghost" size="sm" asChild>
++                            <Link href={overviewQueueHref(view, priority)}>
++                                {fullQueueLabel}
++                                <ArrowUpRight />
++                            </Link>
++                        </Button>
++                    </div>
++                </div>
++                {shown.length ? (
++                    <>
++                        <Card className="hidden gap-0 overflow-hidden py-0 md:block">
++                            <Table>
++                                <TableHeader>
++                                    <TableRow>
++                                        <TableHead>Ticket</TableHead>
++                                        <TableHead>SLA clocks</TableHead>
++                                        <TableHead>Technician</TableHead>
++                                        <TableHead>
++                                            <span className="sr-only">
++                                                Actions
++                                            </span>
++                                        </TableHead>
++                                    </TableRow>
++                                </TableHeader>
++                                <TableBody>
++                                    {shown.map((ticket) => (
++                                        <TableRow
++                                            key={ticket.id}
++                                            onContextMenu={(event) =>
++                                                openContext(event, ticket)
++                                            }
++                                        >
++                                            <TableCell className="w-2/5 py-4 whitespace-normal">
++                                                <Button
++                                                    variant="link"
++                                                    className="h-auto justify-start p-0 text-left whitespace-normal"
++                                                    onClick={() =>
++                                                        onOpenTicket(ticket.id)
++                                                    }
++                                                >
++                                                    {ticket.title}
++                                                </Button>
++                                                <div className="mt-2">
++                                                    <TicketMeta
++                                                        ticket={ticket}
++                                                    />
++                                                </div>
++                                                <p className="text-caption mt-1">
++                                                    Ticket age:{' '}
++                                                    {ticket.age ??
++                                                        'unavailable'}{' '}
++                                                    ·{' '}
++                                                    {ticket.first_reply_needed
++                                                        ? 'First reply needed'
++                                                        : overviewConversation(
++                                                              ticket,
++                                                              conversationReady,
++                                                          )}
++                                                </p>
++                                            </TableCell>
++                                            <TableCell className="space-y-2 py-4 whitespace-normal">
++                                                <ClockFact
++                                                    name="Response"
++                                                    clock={
++                                                        ticket.sla.clocks
++                                                            .first_response
++                                                    }
++                                                    compact
++                                                />
++                                                <ClockFact
++                                                    name="Resolution"
++                                                    clock={
++                                                        ticket.sla.clocks
++                                                            .resolution
++                                                    }
++                                                    compact
++                                                />
++                                            </TableCell>
++                                            <TableCell className="whitespace-normal">
++                                                {ticket.assigned_to_user_id ===
++                                                actorId
++                                                    ? 'You'
++                                                    : (ticket.assignee ??
++                                                      'Unassigned')}
++                                            </TableCell>
++                                            <TableCell>
++                                                <EntityKebab
++                                                    actions={actionsFor(ticket)}
++                                                    label={`Actions for ${ticket.reference ?? `IT-${ticket.id}`}`}
++                                                />
++                                            </TableCell>
++                                        </TableRow>
++                                    ))}
++                                </TableBody>
++                            </Table>
++                        </Card>
++                        <ul className="space-y-3 md:hidden">
++                            {shown.map((ticket) => (
++                                <li
++                                    key={ticket.id}
++                                    onContextMenu={(event) =>
++                                        openContext(event, ticket)
++                                    }
++                                >
++                                    <Card className="gap-3 p-4">
++                                        <div className="flex items-start justify-between gap-2">
++                                            <Button
++                                                variant="link"
++                                                className="h-auto p-0 text-left whitespace-normal"
++                                                onClick={() =>
++                                                    onOpenTicket(ticket.id)
++                                                }
++                                            >
++                                                {ticket.title}
++                                            </Button>
++                                            <EntityKebab
++                                                actions={actionsFor(ticket)}
++                                                label={`Actions for ${ticket.reference ?? `IT-${ticket.id}`}`}
++                                            />
++                                        </div>
++                                        <TicketMeta ticket={ticket} />
++                                        <p className="text-caption">
++                                            Ticket age:{' '}
++                                            {ticket.age ?? 'unavailable'} ·{' '}
++                                            {ticket.assignee ?? 'Unassigned'}
++                                        </p>
++                                        <ClockFact
++                                            name="Response"
++                                            clock={
++                                                ticket.sla.clocks.first_response
++                                            }
++                                            compact
++                                        />
++                                        <ClockFact
++                                            name="Resolution"
++                                            clock={ticket.sla.clocks.resolution}
++                                            compact
++                                        />
++                                        <p className="text-caption">
++                                            {ticket.first_reply_needed
++                                                ? 'First reply needed'
++                                                : overviewConversation(
++                                                      ticket,
++                                                      conversationReady,
++                                                  )}
++                                        </p>
++                                    </Card>
++                                </li>
++                            ))}
++                        </ul>
++                    </>
++                ) : (
++                    <EmptyState
++                        variant="compact"
++                        icon={Inbox}
++                        title={
++                            queue.total > 0 && view === 'attention'
++                                ? 'The matching alerts are shown above'
++                                : 'No tickets in this selection'
++                        }
++                        description="Choose another queue to review permitted work. Missing SLA measurements still need separate review."
++                        action={
++                            priority && onClearPriority ? (
++                                <Button
++                                    variant="outline"
++                                    size="sm"
++                                    onClick={onClearPriority}
++                                >
++                                    Clear Priority
++                                </Button>
++                            ) : undefined
++                        }
++                    />
++                )}
++                <div className="text-caption flex flex-wrap items-center justify-between gap-2">
++                    <span aria-live="polite">
++                        {shown.length} of {total} shown
++                        {view === 'attention'
++                            ? ' · featured actions excluded'
++                            : ''}
++                    </span>
++                    {rows.length > 3 && (
++                        <Button
++                            variant="ghost"
++                            size="sm"
++                            onClick={() =>
++                                setSelection({
++                                    queue: view,
++                                    expanded: !expanded,
++                                    priority,
++                                })
++                            }
++                        >
++                            {expanded
++                                ? 'Show fewer'
++                                : `Show ${rows.length - 3} more`}
++                            <ChevronDown />
++                        </Button>
++                    )}
++                </div>
++            </section>
++            <div className="text-caption flex flex-wrap items-center gap-2">
++                <CircleHelp className="size-4" aria-hidden />
++                <p className="min-w-0 flex-1">
++                    Across your permitted open tickets, {board.unmeasured_total}{' '}
++                    have incomplete SLA evidence. Check watchdog freshness in
++                    the header.
++                </p>
++                <Button variant="ghost" size="sm" asChild>
++                    <Link href={overviewQueueHref('unmeasured')}>
++                        Review measurement
++                        <ArrowRight />
++                    </Link>
++                </Button>
++            </div>
++            {!conversationReady && (
++                <p role="status" className="text-subtle">
++                    Reply responsibility is unavailable. First-response history
++                    remains available.
++                </p>
++            )}
++            {activity}
++            <footer className="text-caption flex flex-wrap items-center justify-between gap-2">
++                <span>
++                    Average first response · 30d:{' '}
++                    {average === null ? 'Unavailable' : `${average} min`}
++                </span>
++                <Button variant="ghost" size="sm" asChild>
++                    <Link href="/it/reports">
++                        Service reports
++                        <ArrowUpRight />
++                    </Link>
++                </Button>
++            </footer>
++            {context && board.tickets[context.id] && (
++                <EntityContextMenu
++                    x={context.x}
++                    y={context.y}
++                    icon={Ticket}
++                    title={
++                        board.tickets[context.id].reference ??
++                        `IT-${context.id}`
++                    }
++                    items={actionsFor(board.tickets[context.id])}
++                    onClose={() => setContext(null)}
++                />
++            )}
++        </section>
++    );
++}
+diff --git a/resources/js/components/it/it-overview-workboard.ts b/resources/js/components/it/it-overview-workboard.ts
+new file mode 100644
+index 000000000..b81fd99f5
+--- /dev/null
++++ b/resources/js/components/it/it-overview-workboard.ts
+@@ -0,0 +1,92 @@
++import { formatDateTime } from '@/lib/datetime';
++import type { SlaClock, SlaVerdict } from './sla-evidence';
++import type { TicketConversation } from './ticket-conversation-summary';
++
++export const overviewQueues = {
++    attention: 'SLA attention',
++    mine: 'My work',
++    unassigned: 'Unassigned',
++    breached: 'SLA breached',
++    breaching: 'SLA at risk',
++    awaiting_it: 'Awaiting IT',
++    awaiting_reply: 'First reply needed',
++    waiting_requester: 'Waiting on requester',
++    aging: 'Ageing tickets',
++    waiting: 'All waiting work',
++    unmeasured: 'SLA unmeasured',
++    all_open: 'All open tickets',
++} as const;
++export type OverviewQueue = keyof typeof overviewQueues;
++export interface OverviewTicket {
++    id: number;
++    reference: string | null;
++    lock_version: number;
++    title: string;
++    priority: string;
++    status: string;
++    site: string | null;
++    assignee: string | null;
++    assigned_to_user_id: number | null;
++    age: string | null;
++    first_reply_needed: boolean;
++    waiting_party: string | null;
++    conversation: TicketConversation | null;
++    can_manage: boolean;
++    sla: SlaVerdict;
++}
++export interface OverviewScope {
++    queues: Record<OverviewQueue, { total: number; ids: number[] }>;
++    actions: {
++        response: number | null;
++        assignment: number | null;
++        follow_up: number | null;
++    };
++}
++export interface OverviewWorkboard {
++    scopes: Record<string, OverviewScope>;
++    tickets: Record<number, OverviewTicket>;
++    unmeasured_total: number;
++    evaluated_at: string;
++}
++export function overviewQueueHref(
++    queue: OverviewQueue,
++    priority?: string | null,
++): string {
++    const params = new URLSearchParams({
++        tab: 'tickets',
++        view: ['attention', 'aging'].includes(queue) ? 'all_open' : queue,
++    });
++    if (queue === 'aging') {
++        params.set('sort', 'created');
++        params.set('dir', 'asc');
++    }
++    if (priority) params.set('ticket_priority', priority);
++    return `/it?${params}`;
++}
++/** Business-calendar minutes come from the server; never extrapolate with the browser clock. */
++export function overviewClockDetail(clock?: SlaClock): string {
++    if (!clock || clock.state === 'unmeasured')
++        return 'Clock evidence unavailable';
++    if (clock.completed_at)
++        return `Completed ${formatDateTime(clock.completed_at)}`;
++    if (clock.paused || clock.state === 'paused') return 'Paused while waiting';
++    if (typeof clock.remaining_minutes === 'number') {
++        const minutes = Math.abs(Math.round(clock.remaining_minutes));
++        return clock.remaining_minutes < 0
++            ? `${minutes} business min overdue`
++            : `${minutes} business min remaining`;
++    }
++    return clock.due_at
++        ? `Due ${formatDateTime(clock.due_at)}`
++        : 'No deadline recorded';
++}
++export function overviewConversation(
++    ticket: OverviewTicket,
++    ready: boolean,
++): string {
++    if (!ready) return 'Public reply status unavailable';
++    if (ticket.conversation?.state === 'awaiting_it') return 'Awaiting IT';
++    if (ticket.conversation?.state === 'awaiting_requester')
++        return 'Awaiting requester';
++    return 'Next public reply not recorded';
++}
+diff --git a/resources/js/components/it/it-overview.tsx b/resources/js/components/it/it-overview.tsx
+index ef86273d0..78b3906ec 100644
+--- a/resources/js/components/it/it-overview.tsx
++++ b/resources/js/components/it/it-overview.tsx
+@@ -24,6 +24,11 @@ import {
+     XCircle,
+     type LucideIcon,
+ } from 'lucide-react';
++import { ItOverviewBoard } from './it-overview-board';
++import type {
++    OverviewTicket,
++    OverviewWorkboard,
++} from './it-overview-workboard';
+ import {
+     TicketConversationSummary,
+     type TicketConversation,
+@@ -75,6 +80,7 @@ interface ActivityRow {
+ }
+ 
+ export interface OverviewPayload {
++    workboard?: OverviewWorkboard | null;
+     conversation_ready?: boolean;
+     awaiting_it_lane?: AwaitingItLaneRow[];
+     avg_first_response_mins: number | null;
+@@ -121,7 +127,38 @@ function fmtMins(m: number | null): string {
+  * awaiting agent reply, aging, and unassigned-by-priority. Clicking a lane row
+  * quick-peeks the ticket; "View all" jumps to the matching saved view.
+  */
+-export function ItOverview({
++export function ItOverview(props: {
++    overview: OverviewPayload;
++    priority?: string | null;
++    onOpenTicket: (id: number) => void;
++    onAssign?: (ticket: OverviewTicket) => void;
++    actorId?: number;
++    canManage?: boolean;
++    assignmentBusy?: boolean;
++    onClearPriority?: () => void;
++}) {
++    if (props.overview.workboard) {
++        return (
++            <ItOverviewBoard
++                {...props}
++                board={props.overview.workboard}
++                conversationReady={props.overview.conversation_ready === true}
++                average={props.overview.avg_first_response_mins}
++                activity={
++                    <ActivityFeed
++                        rows={props.overview.recent_activity.slice(0, 3)}
++                        onOpenTicket={props.onOpenTicket}
++                        compact
++                    />
++                }
++            />
++        );
++    }
++    return <LegacyOverview {...props} />;
++}
++
++/** Retain a safe presentation for older cached payloads without the bounded workboard. */
++function LegacyOverview({
+     overview,
+     priority = null,
+     onOpenTicket,
+@@ -378,12 +415,20 @@ function activityVerb(
+ function ActivityFeed({
+     rows,
+     onOpenTicket,
++    compact = false,
+ }: {
+     rows: ActivityRow[];
+     onOpenTicket: (id: number) => void;
++    compact?: boolean;
+ }) {
+     return (
+-        <div className="rounded-2xl border border-border bg-card p-4">
++        <div
++            className={
++                compact
++                    ? 'border-t border-border pt-4'
++                    : 'rounded-2xl border border-border bg-card p-4'
++            }
++        >
+             <div className="mb-2 flex items-center gap-2">
+                 <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
+                     <Activity className="h-3.5 w-3.5" />
+@@ -396,7 +441,11 @@ function ActivityFeed({
+                     queue.
+                 </p>
+             ) : (
+-                <div className="flex flex-col">
++                <div
++                    className={
++                        compact ? 'grid gap-4 lg:grid-cols-3' : 'flex flex-col'
++                    }
++                >
+                     {rows.map((row) => {
+                         const Icon = ACTIVITY_ICON[row.type] ?? Timer;
+                         return (
+@@ -404,7 +453,7 @@ function ActivityFeed({
+                                 key={row.id}
+                                 type="button"
+                                 onClick={() => onOpenTicket(row.ticket_id)}
+-                                className="flex items-center gap-2.5 border-b border-border/55 py-2 text-left last:border-0 hover:bg-muted/40"
++                                className="flex min-w-0 items-center gap-2.5 border-b border-border/55 py-2 text-left last:border-0 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                             >
+                                 <span className="grid h-6 w-6 flex-none place-items-center rounded-md bg-muted text-muted-foreground">
+                                     <Icon className="h-3 w-3" />
+diff --git a/resources/js/pages/it/index.tsx b/resources/js/pages/it/index.tsx
+index 7918f03ea..f3bb5ac8c 100644
+--- a/resources/js/pages/it/index.tsx
++++ b/resources/js/pages/it/index.tsx
+@@ -1651,7 +1651,18 @@ export default function ItIndex({
+                 }
+                 onClose={() => setModal(null)}
+             />
+-            <TicketDrawer ticketId={peekId} onClose={() => setPeekId(null)} />
++            <TicketDrawer
++                ticketId={peekId}
++                onClose={() => {
++                    setPeekId(null);
++                    if (tab === 'overview') {
++                        router.reload({
++                            only: ['overview', 'summary'],
++                            preserveScroll: true,
++                        });
++                    }
++                }}
++            />
+ 
+             {/* KB reader (requester browse) */}
+             <Dialog
+@@ -2414,6 +2425,17 @@ export default function ItIndex({
+                                         : overviewPriority
+                                 }
+                                 onOpenTicket={(id) => setPeekId(id)}
++                                actorId={actorId}
++                                canManage={can.manage}
++                                assignmentBusy={propertyMutation.busy}
++                                onClearPriority={() => setOverviewPriority(ALL)}
++                                onAssign={(ticket) => {
++                                    if (can.manage && ticket.can_manage && actorId) {
++                                        propertyMutation.submit(ticket.id, ticket.lock_version,
++                                            {assigned_to_user_id: actorId},
++                                            {assigned_to_user_id: 'You'});
++                                    }
++                                }}
+                             />
+                         )}
+ 
+diff --git a/tests/Feature/It/ItOverviewWorkboardTest.php b/tests/Feature/It/ItOverviewWorkboardTest.php
+new file mode 100644
+index 000000000..60c4c3007
+--- /dev/null
++++ b/tests/Feature/It/ItOverviewWorkboardTest.php
+@@ -0,0 +1,111 @@
++<?php
++
++use App\Domain\It\Presenters\ItOverviewWorkboardPresenter;
++use App\Domain\It\Services\ItSlaClockService;
++use App\Models\ItSlaPolicy;
++use App\Models\ItTicket;
++use App\Models\Role;
++use App\Models\Site;
++use App\Models\User;
++use Carbon\CarbonImmutable;
++use Database\Seeders\RbacSeeder;
++use Illuminate\Support\Facades\Notification;
++
++beforeEach(function () {
++    $this->travelTo(CarbonImmutable::parse('2026-09-09T02:10:00Z'));
++    $this->seed(RbacSeeder::class);
++    $this->site = Site::factory()->create(['is_active' => true, 'archived' => false]);
++    foreach (['agent' => 'hr', 'worker' => 'support_worker'] as $key => $role) {
++        $this->{$key} = User::factory()->create(['role' => $role, 'approved_at' => now()]);
++        $this->{$key}->roles()->attach(Role::query()->where('name', $role)->firstOrFail());
++        ensureCanonicalHrStaffProfile($this->{$key}, $this->site);
++    }
++    Notification::fake();
++    $policy = (new ItSlaPolicy)->forceFill(['first_response_minutes' => 60, 'resolution_minutes' => 240]);
++    $this->snapshot = app(ItSlaClockService::class)->policySnapshot('normal', $policy, now()->subHours(2));
++});
++
++function overviewRecord($test, array $attributes = []): ItTicket
++{
++    return ItTicket::factory()->create([
++        'site_id' => $test->site->id, 'requester_user_id' => $test->worker->id,
++        'title' => 'Permitted overview ticket', 'description' => 'Private body not needed by overview',
++        'status' => 'open', 'priority' => 'normal', 'assigned_to_user_id' => null,
++        'created_at' => now()->subHours(2), 'first_responded_at' => now()->subMinutes(90),
++        'first_response_due_at' => now()->subHour(), 'resolution_due_at' => now()->addHours(2),
++        'sla_policy_snapshot' => $test->snapshot, 'sla_state' => 'ok',
++        ...$attributes,
++    ]);
++}
++
++test('overview has complete scoped totals and bounded previews for every priority without leaking other Sites or private content', function () {
++    for ($i = 0; $i < 8; $i++) {
++        overviewRecord($this, ['priority' => 'urgent']);
++    }
++    $low = overviewRecord($this, ['priority' => 'low', 'created_at' => now()->subMinute()]);
++    $hidden = overviewRecord($this, ['site_id' => Site::factory()->create()->id, 'requester_user_id' => User::factory()->create()->id,
++        'title' => 'Hidden outside Site subject', 'is_organisation_wide' => false, 'is_sensitive' => false]);
++    $board = app(ItOverviewWorkboardPresenter::class)->present($this->agent);
++    expect($board['scopes']['all']['queues']['all_open']['total'])->toBe(9)
++        ->and($board['scopes']['all']['queues']['all_open']['ids'])->toHaveCount(6)
++        ->and($board['scopes']['urgent']['queues']['all_open']['total'])->toBe(8)
++        ->and($board['scopes']['low']['queues']['all_open']['ids'])->toBe([$low->id])
++        ->and($board['tickets']->has($hidden->id))->toBeFalse()
++        ->and(json_encode($board))->not->toContain('Hidden outside Site subject', 'Private body not needed by overview');
++    $this->actingAs($this->agent)->get('/it?tab=overview')->assertOk()->assertInertia(fn ($page) => $page
++        ->where('overview.workboard.scopes.all.queues.all_open.total', 9)
++        ->where('overview.workboard.scopes.low.queues.all_open.ids.0', $low->id));
++    $this->actingAs($this->worker)->get('/it')->assertOk()->assertInertia(fn ($page) => $page->missing('overview'));
++});
++
++test('overview picks the missed first response before risk and a different urgent assignment with an evidenced ageing follow-up', function () {
++    $overdue = overviewRecord($this, ['priority' => 'urgent', 'first_responded_at' => null,
++        'created_at' => now()->subMinutes(92), 'first_response_due_at' => now()->subMinutes(32)]);
++    $risk = overviewRecord($this, ['priority' => 'urgent', 'first_responded_at' => null,
++        'created_at' => now()->subMinutes(48), 'first_response_due_at' => now()->addMinutes(12)]);
++    $vendor = overviewRecord($this, ['created_at' => now()->subDays(16), 'assigned_to_user_id' => $this->agent->id,
++        'status' => 'waiting', 'waiting_party' => 'vendor', 'next_response_party' => 'requester']);
++    $followup = overviewRecord($this, ['created_at' => now()->subDays(8), 'assigned_to_user_id' => $this->agent->id,
++        'next_response_party' => 'it', 'resolution_due_at' => now()->addMinutes(20)]);
++    $board = app(ItOverviewWorkboardPresenter::class)->present($this->agent);
++    expect($board['scopes']['all']['actions'])->toBe(['response' => $overdue->id, 'assignment' => $risk->id, 'follow_up' => $followup->id])
++        ->and($board['tickets'][$overdue->id]['sla']['clocks']['first_response']['state'])->toBe('breached')
++        ->and($board['tickets'][$risk->id]['sla']['clocks']['first_response']['state'])->toBe('at_risk')
++        ->and($board['tickets'][$followup->id]['conversation']['next_response_party'])->toBe('it')
++        ->and($board['tickets'][$followup->id]['sla']['clocks']['resolution']['due_at'])->not->toBeNull()
++        ->and($board['scopes']['all']['queues']['aging']['ids'][0])->toBe($vendor->id)
++        ->and($overdue->fresh()->sla_state)->toBe('ok');
++});
++
++test('overview keeps first reply public responsibility and operational waiting queues distinct under canonical work scope', function () {
++    $vendor = overviewRecord($this, ['status' => 'waiting', 'waiting_party' => 'vendor', 'next_response_party' => 'it']);
++    $requester = overviewRecord($this, ['status' => 'waiting', 'waiting_party' => 'requester', 'next_response_party' => 'requester']);
++    $first = overviewRecord($this, ['first_responded_at' => null, 'next_response_party' => null]);
++    $participantOnly = overviewRecord($this, ['site_id' => Site::factory()->create()->id,
++        'requester_user_id' => $this->agent->id, 'status' => 'waiting', 'waiting_party' => 'requester',
++        'next_response_party' => 'it', 'is_organisation_wide' => false, 'is_sensitive' => true]);
++    $board = app(ItOverviewWorkboardPresenter::class)->present($this->agent);
++    expect($board['scopes']['all']['queues']['awaiting_reply']['ids'])->toBe([$first->id])
++        ->and($board['scopes']['all']['queues']['awaiting_it']['total'])->toBe(2)
++        ->and($board['scopes']['all']['queues']['waiting_requester']['ids'])->toBe([$requester->id])
++        ->and($board['scopes']['all']['queues']['waiting']['total'])->toBe(3)
++        ->and($board['tickets'][$participantOnly->id]['can_manage'])->toBeFalse()
++        ->and($board['tickets'][$participantOnly->id]['waiting_party'])->toBeNull()
++        ->and($board['tickets'][$vendor->id]['conversation']['state'])->toBe('awaiting_it');
++});
++
++test('overview reflects canonical assignment and keeps missing SLA evidence separate from a healthy result', function () {
++    $ticket = overviewRecord($this, ['sla_policy_snapshot' => null, 'first_response_due_at' => null,
++        'resolution_due_at' => null, 'first_responded_at' => null]);
++    $before = app(ItOverviewWorkboardPresenter::class)->present($this->agent);
++    expect($before['scopes']['all']['queues']['unassigned']['total'])->toBe(1)
++        ->and($before['scopes']['all']['queues']['unmeasured']['total'])->toBe(1)
++        ->and($before['scopes']['all']['queues']['attention']['total'])->toBe(0)
++        ->and($before['unmeasured_total'])->toBe(1);
++    $ticket->update(['assigned_to_user_id' => $this->agent->id, 'lock_version' => 2]);
++    $after = app(ItOverviewWorkboardPresenter::class)->present($this->agent);
++    expect($after['scopes']['all']['queues']['unassigned']['total'])->toBe(0)
++        ->and($after['scopes']['all']['queues']['mine']['ids'])->toBe([$ticket->id])
++        ->and($after['tickets'][$ticket->id]['lock_version'])->toBe(2)
++        ->and($after['tickets'][$ticket->id]['sla']['state'])->toBe('unmeasured');
++});

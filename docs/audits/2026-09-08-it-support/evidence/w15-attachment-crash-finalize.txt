@@ -1,0 +1,6 @@
+{
+  "token": "03dee6c781fe4587",
+  "schema_absence_observed": true,
+  "owned_directory_removed": true,
+  "database_mutations_performed": false
+}

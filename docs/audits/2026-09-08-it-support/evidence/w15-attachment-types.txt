@@ -1,0 +1,24 @@
+resources/js/components/it/__tests__/catalogue-request-wizard.test.tsx(224,64): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/components/it/catalogue-request-wizard.tsx(211,13): error TS2531: Object is possibly 'null'.
+resources/js/components/it/catalogue-request-wizard.tsx(211,13): error TS2365: Operator '>' cannot be applied to types 'string | number | boolean | string[] | File[]' and 'number'.
+resources/js/components/it/catalogue-request-wizard.tsx(212,35): error TS18047: 'count' is possibly 'null'.
+resources/js/components/it/catalogue-request-wizard.tsx(212,35): error TS2365: Operator '+' cannot be applied to types 'string | number | boolean | string[] | File[]' and 'number'.
+resources/js/pages/my-day/components/quick-add-task.test.tsx(32,72): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/pages/my-day/components/quick-add-task.test.tsx(51,72): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/pages/my-day/components/quick-add-task.test.tsx(71,72): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.

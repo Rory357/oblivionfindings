@@ -1,0 +1,9 @@
+Improve Service Desk Overview actions and queue visibility
+
+Prioritize first replies, unassigned work and ageing follow-ups with separate
+server-calculated SLA evidence and complete permission-scoped queue totals.
+Reuse ticket drawer and confirmed property mutations; retain the existing hero.
+
+Validation: 30 UI tests and the 35-case backend group passed; current-build
+browser checked queue selection, 3-to-6 expansion and drawer close at 1280x720.
+Full TypeScript check retains three unrelated existing My Day test errors.

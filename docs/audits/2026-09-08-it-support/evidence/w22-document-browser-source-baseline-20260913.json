@@ -1,0 +1,58 @@
+[
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\It\\Services\\ItKbLifecycleService.php",
+    "Hash": "D13EE2A26CFC085328D9F4A4D42CDFF53E6704DCB5A3DFFBF2FF7C8D50707649"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\It\\Services\\ItKbRevisionService.php",
+    "Hash": "49B36B1D737AD6D2969CBA5BC3C9982879DAF0E442FF1B76A2F4B9BE9FCD8F82"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\It\\Services\\ItKnowledgeMedia.php",
+    "Hash": "9424580E93A29D164E602100944473B0417A7B639DE3C9B7A460EB10200FFC27"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\It\\Services\\ItKnowledgeFiles.php",
+    "Hash": "505433C707D8850F8706752614FA796B92B916231868A6B378664A0B07F5611A"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\It\\Services\\ItKnowledgeWorkspace.php",
+    "Hash": "4645052FF7CFD067371777B0543B441EBD8E4EE2B3A14C05518F37F91864664B"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Http\\Controllers\\It\\ItKnowledgeWorkspaceController.php",
+    "Hash": "60CAE4F424EED002F8EE039D545386B98508174E0B7149182281D057E9CB2DDB"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Http\\Controllers\\It\\ItKnowledgeFileController.php",
+    "Hash": "84302A0C07C97F0D2B822979E95DE4BF6CE754D13D5C359B731B1FCBBD94A9E6"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\pages\\it\\knowledge\\show.tsx",
+    "Hash": "FCF38B495769B4BC897A7EF04ACA270D3D556688A5BEF85A731B87841EC9B399"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\pages\\it\\knowledge\\file.tsx",
+    "Hash": "5D3C6A6857D6BB9316427EF94938A67C0DA74B41094A29C678134B3AFE560B2F"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\knowledge-diagrams.tsx",
+    "Hash": "34850D765F4B0176623F8226BC20694C8E8FCDC2E3B92BC1715177262AEA083E"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\knowledge-navigation.ts",
+    "Hash": "EA2E074E5861315BC9DF98103B80FA4791BC8A1E761808FD3B8528A4992E1CCC"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\pages\\it\\index.tsx",
+    "Hash": "4C928200F58634BE4AF8CC9D613F7DF40C7C8F85E8BBAA2CE1147D7EE29E2D57"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\it\\it-wizards.tsx",
+    "Hash": "CCD3629E41018F2D6CA6E7D5CB7A6AB3DB7CC5A2573BD9D71977F08EE561F97B"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\routes\\web.php",
+    "Hash": "9A32D88406465A98F420F488A95D0E44E12E8B7EA7DDA8A6C4BCAF2C8C1B3DB9"
+  }
+]

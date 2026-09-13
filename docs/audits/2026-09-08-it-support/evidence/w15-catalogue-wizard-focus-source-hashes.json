@@ -1,0 +1,152 @@
+{
+  "report": "w15-catalogue-wizard-browser-results.md",
+  "browser": "Build6695 bounded lifecycle journeys passed; later autofocus/disabled-step corrections awaiting current-build browser recheck",
+  "design": [
+    {
+      "path": "DESIGN.md",
+      "sha256": "96863e01d924e954255cd61f550396c2f2eea9778bbaab7e8570ef9d63279c22",
+      "matches_baseline": true
+    },
+    {
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md",
+      "sha256": "62515485265119962773e6015fefe38be94434aae468acd017c078da61b20ab5",
+      "matches_baseline": true
+    },
+    {
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md",
+      "sha256": "86259475c987d6e30001604316379eb608aea9f83e16941b6aa476a94bca6957",
+      "matches_baseline": true
+    },
+    {
+      "path": "design_styles/DESIGN_TOKENS.md",
+      "sha256": "c3ee6c8acaa22049084f819e3ad2a33f457e936e467492079f16c15e9a611d2b",
+      "matches_baseline": true
+    },
+    {
+      "path": "design_styles/LIST_STYLE_GUIDE.md",
+      "sha256": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac",
+      "matches_baseline": true
+    },
+    {
+      "path": "design_styles/LOADER_STYLE_GUIDE.md",
+      "sha256": "cc20485e6e42e0a848b8cacc8ac6124e5e5a01206d966de6ebbbdec39dbe2a91",
+      "matches_baseline": true
+    },
+    {
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md",
+      "sha256": "9295cdb1386322b8a088ae03de41bc3c75a0fbe3e8fa3331c92c704ccb15895d",
+      "matches_baseline": true
+    },
+    {
+      "path": "design_styles/oblivion-loader-01-demo.html",
+      "sha256": "748c94c030984d16c1a78f3b70855d1cf8f22461ab017e4ac8287ab9e8809cdf",
+      "matches_baseline": true
+    },
+    {
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+      "sha256": "a528a0e863a676fdbbfcb028e532ece2799e39a7345ca3c1eca619ac4491d931",
+      "matches_baseline": true
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "sha256": "aee723e21491e9be908554a6f200d73204280a63d9028ea78de6bb9049f4a477",
+      "matches_baseline": true
+    }
+  ],
+  "captured_at": "2026-09-12T20:39:59.2038786+12:00",
+  "source": [
+    {
+      "sha256": "e2f0d8bbccc16dac39107e098785268d5a57b39611771fa4eefa6e9fcfa65bf9",
+      "path": "app/Domain/It/Services/ItCatalogSubmissionService.php"
+    },
+    {
+      "sha256": "3abd5001daeac79467ffd3c42e2b1054d7709f90dab717da151d94528246e78c",
+      "path": "app/Http/Controllers/It/ItCatalogController.php"
+    },
+    {
+      "sha256": "8515a19b31ee22891de83a64884d039ad55180c41b96b711564cc477299ad349",
+      "path": "app/Http/Requests/It/RecoverCatalogSubmissionRequest.php"
+    },
+    {
+      "sha256": "cbf62bc45062b803452f29b2e530bca013021f8200b7cdfbde6f2b66a262f8b2",
+      "path": "app/Http/Requests/It/StoreCatalogRequest.php"
+    },
+    {
+      "sha256": "8591b8d17759d5618a1a7d9a458807825318e312c2bc95988c56e5edad3355cf",
+      "path": "app/Models/ItCatalogItem.php"
+    },
+    {
+      "sha256": "562a4e89698b67e0975d608502cbc96ce4b5aea9cacb1a116604cebe82a412ab",
+      "path": "app/Models/ItTicketCommandReceipt.php"
+    },
+    {
+      "sha256": "e97282b298f867d2e6dfb3e5879403fa94e4ac3457b52c97f328db1c69f82758",
+      "path": "resources/js/components/it/__tests__/catalogue-request-wizard.test.tsx"
+    },
+    {
+      "sha256": "6ac1413b23283d269423e30e1d7f5dbcd1d4b5b229dda6f4b70b246b5aa97114",
+      "path": "resources/js/components/it/__tests__/catalogue-submission-contract.test.ts"
+    },
+    {
+      "sha256": "6bcf28d7f512ac787c2346974ad279ceccf90b0144cedd669016aa8673273c75",
+      "path": "resources/js/components/it/__tests__/it-catalogue-management.test.tsx"
+    },
+    {
+      "sha256": "322dcf73605f46d287681edfe9a5d8e0217056f980f81d46b513a0dd8e0eebe9",
+      "path": "resources/js/components/it/__tests__/use-catalogue-submission.test.ts"
+    },
+    {
+      "sha256": "e46bf326aeb2393153de01539a64bbaa259262f874ed9fe705c2b9a394aa4125",
+      "path": "resources/js/components/it/catalogue-entity-picker.tsx"
+    },
+    {
+      "sha256": "1a5c599c2c26b8d78adaf38569f0ef962c02d7fab332f3c3afe3fd6f11dd00e2",
+      "path": "resources/js/components/it/catalogue-request-fields.tsx"
+    },
+    {
+      "sha256": "e6ddf1d9126afd6f12ee1936c57088b64ecfae0ccc5686b573abd49a03b704d8",
+      "path": "resources/js/components/it/catalogue-request-wizard.tsx"
+    },
+    {
+      "sha256": "41762dd1d3203dd4b6f18bcea9ae8fafc8ccc814b05d10a0ad4e8eddca471463",
+      "path": "resources/js/components/it/catalogue-submission-contract.ts"
+    },
+    {
+      "sha256": "b7e38589305eecc16fbe2da761dc75f2d6c71f91c3ac649816fc1fc9b7324d2a",
+      "path": "resources/js/components/it/it-service-catalogue.tsx"
+    },
+    {
+      "sha256": "ce69a1e8a8d9aed28acb3d5a97296e4216691f0f13834d0d1c8dd80abdde8234",
+      "path": "resources/js/components/it/use-catalogue-submission.ts"
+    },
+    {
+      "sha256": "9d95d2e18cbcc4d907be7cf383042510fa7bb8ed68f1f7bd3a4499f5cc6d69a2",
+      "path": "resources/js/components/wizard/shell.test.tsx"
+    },
+    {
+      "sha256": "23b66de1a2689dffa67f2ace03c678a954276a82641d4efabdf0a5978c8ce302",
+      "path": "resources/js/components/wizard/shell.tsx"
+    },
+    {
+      "sha256": "1c37be3e7a45c60fc099680f70e448eea257e76ad15eb67d9c2cdb8712a40428",
+      "path": "routes/web.php"
+    },
+    {
+      "sha256": "58e034b7579faf1d99805f8a597084cea8971db1eeb53a0c67bc7079cf12703e",
+      "path": "tests/Concurrency/It/ItCatalogSubmissionConcurrencyTest.php"
+    },
+    {
+      "sha256": "31c4fdaedfc277f04da92fcb0b6973f950ef9d228ea2423d1c707fa084225e36",
+      "path": "tests/Concurrency/It/README.md"
+    },
+    {
+      "sha256": "0daa3e48a33bba98b9a786376cda51cab59beea62c8713dee66a234bd21c47a6",
+      "path": "tests/Feature/It/ItServiceCatalogTest.php"
+    },
+    {
+      "sha256": "901d4febd5f570b887b1d0da0cd6031803eb356cd4adb003ea332181b50858c0",
+      "path": "tests/Support/It/catalogue-submission-concurrency-worker.php"
+    }
+  ],
+  "ui": "75720 terminal0;81tests7files8.40s;scopedlint0"
+}

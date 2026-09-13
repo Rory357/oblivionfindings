@@ -1,0 +1,5 @@
+resources/js/pages/it/knowledge-access.test.tsx 580ms
+resources/js/pages/it/problems/problems.test.tsx 40ms
+resources/js/pages/it/changes/changes.test.tsx 42ms
+resources/js/pages/it/major-incidents/major-incidents.test.tsx 44ms
+resources/js/components/it/__tests__/it-module-navigation.test.tsx 76ms (unchanged)

@@ -1,0 +1,16 @@
+{
+  "token": "8cdf02ed055d485b",
+  "inspected_paths": 5629,
+  "changed_paths": [
+    "resources\\css\\app.css",
+    "resources\\js\\components\\ui\\button.tsx",
+    "resources\\js\\pages\\my-day\\components\\day-work-list.tsx",
+    "resources\\js\\pages\\my-day\\components\\digest-panel.tsx",
+    "resources\\js\\pages\\my-day\\components\\my-day-header.tsx",
+    "resources\\js\\pages\\my-day\\components\\paperwork-panel.tsx",
+    "resources\\js\\pages\\my-day\\components\\tomorrow-panel.tsx",
+    "resources\\js\\pages\\my-day\\index.tsx"
+  ],
+  "browser_acceptance_performed": false,
+  "closed_for_user_reprioritization": true
+}

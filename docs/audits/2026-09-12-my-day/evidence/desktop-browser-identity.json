@@ -1,0 +1,11 @@
+{
+    "url": "http:\/\/127.0.0.1:8766\/my-day",
+    "database": "oblivion_findings_codex_test_myday_browser_md_ui_01a094e0",
+    "worker_id": 1,
+    "shift_id": 1,
+    "allowed_client_ids": [
+        1,
+        2
+    ],
+    "private_client_id": 3
+}

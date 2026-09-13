@@ -1,0 +1,1121 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/provisioning-lifecycle-dialogs.test.tsx (6 tests | 1 failed | 5 skipped) 1385ms
+   × reviews published instructions and recovers a lost launch response with its original command identity 1384ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/provisioning-lifecycle-dialogs.test.tsx > reviews published instructions and recovers a lost launch response with its original command identity
+TestingLibraryElementError: Unable to find role="option" and name "Reviewed joiner · Version 2"
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_d_"
+    aria-labelledby="radix-_r_c_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_b_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_c_"
+    >
+      Provisioning · Synthetic employee · EMP-51
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_d_"
+    >
+      This starts the selected published instructions for this employee and retains their original version. External accounts change only through completed, verified work. Mover work compares the last recorded provisioning context with the current HR profile.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-package h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"
+              />
+              <path
+                d="M12 22V12"
+              />
+              <polyline
+                points="3.29 7 12 12 20.71 7"
+              />
+              <path
+                d="m7.5 4.27 9 5.15"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Start workflow
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              Details and review
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors disabled:pointer-events-none bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-clipboard-list h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                height="4"
+                rx="1"
+                ry="1"
+                width="8"
+                x="8"
+                y="2"
+              />
+              <path
+                d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+              />
+              <path
+                d="M12 11h4"
+              />
+              <path
+                d="M12 16h4"
+              />
+              <path
+                d="M8 11h.01"
+              />
+              <path
+                d="M8 16h.01"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Details
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Record the action and responsibility
+            </span>
+          </span>
+        </button>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors disabled:pointer-events-none hover:bg-accent"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-muted text-muted-foreground"
+          >
+            <svg
+              class="lucide lucide-circle-check h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+              />
+              <path
+                d="m9 12 2 2 4-4"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-semibold text-muted-foreground"
+            >
+              Review
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Check the work before confirming
+            </span>
+          </span>
+        </button>
+      </aside>
+      <div
+        class="flex min-h-0 min-w-0 flex-1 flex-col"
+      >
+        <header
+          class="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5"
+          data-wizard-region="header"
+          tabindex="-1"
+        >
+          <div
+            class="text-[13px] font-semibold text-muted-foreground"
+          >
+            Step 
+            1
+             of
+             
+            2
+             ·
+             
+            <span
+              class="text-foreground"
+            >
+              Details
+            </span>
+          </div>
+          <button
+            aria-label="Close"
+            class="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+            type="button"
+          >
+            <svg
+              class="lucide lucide-x h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M18 6 6 18"
+              />
+              <path
+                d="m6 6 12 12"
+              />
+            </svg>
+          </button>
+        </header>
+        <div
+          class="h-[3px] shrink-0 bg-muted"
+          data-wizard-region="progress"
+        >
+          <div
+            class="h-full bg-primary transition-[width] duration-300"
+            style="width: 50%;"
+          />
+        </div>
+        <div
+          class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6"
+          data-wizard-region="body"
+        >
+          <div
+            class="motion-safe:animate-in motion-safe:duration-300 motion-safe:fade-in-0 motion-safe:slide-in-from-right-2"
+          >
+            <div
+              class="space-y-5"
+            >
+              <div
+                class="outline-none"
+                role="alert"
+                tabindex="-1"
+              />
+              <form
+                class="space-y-5"
+              >
+                <p
+                  class="text-sm text-muted-foreground"
+                >
+                  This starts the selected published instructions for this employee and retains their original version. External accounts change only through completed, verified work. Mover work compares the last recorded provisioning context with the current HR profile.
+                </p>
+                <fieldset
+                  class="space-y-5"
+                >
+                  <div
+                    class="space-y-2"
+                  >
+                    <div
+                      class="space-y-2"
+                    >
+                      <span
+                        class="text-sm font-medium"
+                      >
+                        Published workflow template
+                      </span>
+                      <button
+                        aria-controls="_r_h_"
+                        aria-expanded="false"
+                        aria-haspopup="dialog"
+                        aria-label="Published workflow template"
+                        class="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-secondary border border-border bg-card text-foreground h-9 px-4 py-2 has-[>svg]:px-3 w-full justify-between text-left"
+                        data-slot="popover-trigger"
+                        data-state="closed"
+                        role="combobox"
+                        type="button"
+                      >
+                        <span
+                          class="min-w-0 truncate"
+                        >
+                          Choose…
+                        </span>
+                        <svg
+                          aria-hidden="true"
+                          class="lucide lucide-chevrons-up-down ml-2 size-4 shrink-0"
+                          fill="none"
+                          height="24"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                          width="24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="m7 15 5 5 5-5"
+                          />
+                          <path
+                            d="m7 9 5-5 5 5"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    class="space-y-2"
+                  >
+                    <label
+                      class="block space-y-2 text-sm font-medium"
+                    >
+                      <span>
+                        Effective date
+                         *
+                      </span>
+                      <input
+                        class="border-input file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"
+                        data-slot="input"
+                        maxlength="255"
+                        required=""
+                        type="date"
+                        value=""
+                      />
+                    </label>
+                  </div>
+                  <div
+                    class="space-y-2"
+                  >
+                    <div
+                      class="space-y-2"
+                    >
+                      <span
+                        class="text-sm font-medium"
+                      >
+                        Workflow owner
+                      </span>
+                      <button
+                        aria-controls="_r_j_"
+                        aria-expanded="false"
+                        aria-haspopup="dialog"
+                        aria-label="Workflow owner"
+                        class="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-secondary border border-border bg-card text-foreground h-9 px-4 py-2 has-[>svg]:px-3 w-full justify-between text-left"
+                        data-slot="popover-trigger"
+                        data-state="closed"
+                        role="combobox"
+                        type="button"
+                      >
+                        <span
+                          class="min-w-0 truncate"
+                        >
+                          Choose…
+                        </span>
+                        <svg
+                          aria-hidden="true"
+                          class="lucide lucide-chevrons-up-down ml-2 size-4 shrink-0"
+                          fill="none"
+                          height="24"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                          width="24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="m7 15 5 5 5-5"
+                          />
+                          <path
+                            d="m7 9 5-5 5 5"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    class="space-y-2"
+                  >
+                    <div
+                      class="space-y-2"
+                    >
+                      <span
+                        class="text-sm font-medium"
+                      >
+                        Absence cover
+                      </span>
+                      <button
+                        aria-controls="_r_l_"
+                        aria-expanded="false"
+                        aria-haspopup="dialog"
+                        aria-label="Absence cover"
+                        class="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-secondary border border-border bg-card text-foreground h-9 px-4 py-2 has-[>svg]:px-3 w-full justify-between text-left"
+                        data-slot="popover-trigger"
+                        data-state="closed"
+                        role="combobox"
+                        type="button"
+                      >
+                        <span
+                          class="min-w-0 truncate"
+                        >
+                          Choose…
+                        </span>
+                        <svg
+                          aria-hidden="true"
+                          class="lucide lucide-chevrons-up-down ml-2 size-4 shrink-0"
+                          fill="none"
+                          height="24"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                          width="24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="m7 15 5 5 5-5"
+                          />
+                          <path
+                            d="m7 9 5-5 5 5"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    class="space-y-2"
+                  >
+                    <label
+                      class="block space-y-2 text-sm font-medium"
+                    >
+                      <span>
+                        Reason for starting this workflow
+                         *
+                      </span>
+                      <textarea
+                        class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        maxlength="5000"
+                        required=""
+                      />
+                    </label>
+                  </div>
+                </fieldset>
+              </form>
+            </div>
+          </div>
+        </div>
+        <footer
+          class="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3.5"
+          data-wizard-region="footer"
+        >
+          <div>
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-secondary border border-border bg-card text-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+              data-slot="button"
+            >
+              Close
+            </button>
+          </div>
+          <div
+            class="flex items-center gap-2.5"
+          >
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-primary text-primary-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+              data-slot="button"
+            >
+              Continue
+            </button>
+          </div>
+        </footer>
+      </div>
+    </div>
+    <button
+      class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+      type="button"
+    >
+      <svg
+        class="lucide lucide-x"
+        fill="none"
+        height="24"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M18 6 6 18"
+        />
+        <path
+          d="m6 6 12 12"
+        />
+      </svg>
+      <span
+        class="sr-only"
+      >
+        Close
+      </span>
+    </button>
+  </div>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+</body>
+
+Ignored nodes: comments, script, style
+<body
+  data-scroll-locked="1"
+  style="pointer-events: none;"
+>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+  <div
+    aria-hidden="true"
+    data-aria-hidden="true"
+  />
+  <div
+    aria-hidden="true"
+    class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80"
+    data-aria-hidden="true"
+    data-slot="dialog-overlay"
+    data-state="open"
+    style="pointer-events: auto;"
+  />
+  <div
+    aria-describedby="radix-_r_d_"
+    aria-labelledby="radix-_r_c_"
+    class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-lg overflow-hidden p-0 [&>button]:hidden"
+    data-slot="dialog-content"
+    data-state="open"
+    id="radix-_r_b_"
+    role="dialog"
+    style="max-width: min(94vw, 980px); pointer-events: auto;"
+    tabindex="-1"
+  >
+    <h2
+      class="text-lg leading-none font-semibold sr-only"
+      data-slot="dialog-title"
+      id="radix-_r_c_"
+    >
+      Provisioning · Synthetic employee · EMP-51
+    </h2>
+    <p
+      class="text-muted-foreground text-sm sr-only"
+      data-slot="dialog-description"
+      id="radix-_r_d_"
+    >
+      This starts the selected published instructions for this employee and retains their original version. External accounts change only through completed, verified work. Mover work compares the last recorded provisioning context with the current HR profile.
+    </p>
+    <div
+      class="flex min-h-0 overflow-hidden"
+    >
+      <aside
+        class="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+        data-wizard-region="rail"
+      >
+        <div
+          class="mb-3 flex items-center gap-2.5"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-package h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"
+              />
+              <path
+                d="M12 22V12"
+              />
+              <polyline
+                points="3.29 7 12 12 20.71 7"
+              />
+              <path
+                d="m7.5 4.27 9 5.15"
+              />
+            </svg>
+          </span>
+          <div>
+            <div
+              class="text-sm leading-tight font-bold"
+            >
+              Start workflow
+            </div>
+            <div
+              class="text-[11px] text-muted-foreground"
+            >
+              Details and review
+            </div>
+          </div>
+        </div>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors disabled:pointer-events-none bg-primary/10"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-primary text-primary-foreground"
+          >
+            <svg
+              class="lucide lucide-clipboard-list h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                height="4"
+                rx="1"
+                ry="1"
+                width="8"
+                x="8"
+                y="2"
+              />
+              <path
+                d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+              />
+              <path
+                d="M12 11h4"
+              />
+              <path
+                d="M12 16h4"
+              />
+              <path
+                d="M8 11h.01"
+              />
+              <path
+                d="M8 16h.01"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-bold text-foreground"
+            >
+              Details
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Record the action and responsibility
+            </span>
+          </span>
+        </button>
+        <button
+          class="flex items-center gap-2.5 rounded-md p-2 text-left transition-colors disabled:pointer-events-none hover:bg-accent"
+          type="button"
+        >
+          <span
+            class="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors bg-muted text-muted-foreground"
+          >
+            <svg
+              class="lucide lucide-circle-check h-3.5 w-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+              />
+              <path
+                d="m9 12 2 2 4-4"
+              />
+            </svg>
+          </span>
+          <span
+            class="min-w-0"
+          >
+            <span
+              class="block text-[13px] font-semibold text-muted-foreground"
+            >
+              Review
+            </span>
+            <span
+              class="block truncate text-[11px] text-muted-foreground"
+            >
+              Check the work before confirming
+            </span>
+          </span>
+        </button>
+      </aside>
+      <div
+        class="flex min-h-0 min-w-0 flex-1 flex-col"
+      >
+        <header
+          class="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5"
+          data-wizard-region="header"
+          tabindex="-1"
+        >
+          <div
+            class="text-[13px] font-semibold text-muted-foreground"
+          >
+            Step 
+            1
+             of
+             
+            2
+             ·
+             
+            <span
+              class="text-foreground"
+            >
+              Details
+            </span>
+          </div>
+          <button
+            aria-label="Close"
+            class="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+            type="button"
+          >
+            <svg
+              class="lucide lucide-x h-5 w-5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M18 6 6 18"
+              />
+              <path
+                d="m6 6 12 12"
+              />
+            </svg>
+          </button>
+        </header>
+        <div
+          class="h-[3px] shrink-0 bg-muted"
+          data-wizard-region="progress"
+        >
+          <div
+            class="h-full bg-primary transition-[width] duration-300"
+            style="width: 50%;"
+          />
+        </div>
+        <div
+          class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6"
+          data-wizard-region="body"
+        >
+          <div
+            class="motion-safe:animate-in motion-safe:duration-300 motion-safe:fade-in-0 motion-safe:slide-in-from-right-2"
+          >
+            <div
+              class="space-y-5"
+            >
+              <div
+                class="outline-none"
+                role="alert"
+                tabindex="-1"
+              />
+              <form
+                class="space-y-5"
+              >
+                <p
+                  class="text-sm text-muted-foreground"
+                >
+                  This starts the selected published instructions for this employee and retains their original version. External accounts change only through completed, verified work. Mover work compares the last recorded provisioning context with the current HR profile.
+                </p>
+                <fieldset
+                  class="space-y-5"
+                >
+                  <div
+                    class="space-y-2"
+                  >
+                    <div
+                      class="space-y-2"
+                    >
+                      <span
+                        class="text-sm font-medium"
+                      >
+                        Published workflow template
+                      </span>
+                      <button
+                        aria-controls="_r_h_"
+                        aria-expanded="false"
+                        aria-haspopup="dialog"
+                        aria-label="Published workflow template"
+                        class="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-secondary border border-border bg-card text-foreground h-9 px-4 py-2 has-[>svg]:px-3 w-full justify-between text-left"
+                        data-slot="popover-trigger"
+                        data-state="closed"
+                        role="combobox"
+                        type="button"
+                      >
+                        <span
+                          class="min-w-0 truncate"
+                        >
+                          Choose…
+                        </span>
+                        <svg
+                          aria-hidden="true"
+                          class="lucide lucide-chevrons-up-down ml-2 size-4 shrink-0"
+                          fill="none"
+                          height="24"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                          width="24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="m7 15 5 5 5-5"
+                          />
+                          <path
+                            d="m7 9 5-5 5 5"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    class="space-y-2"
+                  >
+                    <label
+                      class="block space-y-2 text-sm font-medium"
+                    >
+                      <span>
+                        Effective date
+                         *
+                      </span>
+                      <input
+                        class="border-input file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"
+                        data-slot="input"
+                        maxlength="255"
+                        required=""
+                        type="date"
+                        value=""
+                      />
+                    </label>
+                  </div>
+                  <div
+                    class="space-y-2"
+                  >
+                    <div
+                      class="space-y-2"
+                    >
+                      <span
+                        class="text-sm font-medium"
+                      >
+                        Workflow owner
+                      </span>
+                      <button
+                        aria-controls="_r_j_"
+                        aria-expanded="false"
+                        aria-haspopup="dialog"
+                        aria-label="Workflow owner"
+                        class="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-secondary border border-border bg-card text-foreground h-9 px-4 py-2 has-[>svg]:px-3 w-full justify-between text-left"
+                        data-slot="popover-trigger"
+                        data-state="closed"
+                        role="combobox"
+                        type="button"
+                      >
+                        <span
+                          class="min-w-0 truncate"
+                        >
+                          Choose…
+                        </span>
+                        <svg
+                          aria-hidden="true"
+                          class="lucide lucide-chevrons-up-down ml-2 size-4 shrink-0"
+                          fill="none"
+                          height="24"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                          width="24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="m7 15 5 5 5-5"
+                          />
+                          <path
+                            d="m7 9 5-5 5 5"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    class="space-y-2"
+                  >
+                    <div
+                      class="space-y-2"
+                    >
+                      <span
+                        class="text-sm font-medium"
+                      >
+                        Absence cover
+                      </span>
+                      <button
+                        aria-controls="_r_l_"
+                        aria-expanded="false"
+                        aria-haspopup="dialog"
+                        aria-label="Absence cover"
+                        class="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-secondary border border-border bg-card text-foreground h-9 px-4 py-2 has-[>svg]:px-3 w-full justify-between text-left"
+                        data-slot="popover-trigger"
+                        data-state="closed"
+                        role="combobox"
+                        type="button"
+                      >
+                        <span
+                          class="min-w-0 truncate"
+                        >
+                          Choose…
+                        </span>
+                        <svg
+                          aria-hidden="true"
+                          class="lucide lucide-chevrons-up-down ml-2 size-4 shrink-0"
+                          fill="none"
+                          height="24"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                          width="24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="m7 15 5 5 5-5"
+                          />
+                          <path
+                            d="m7 9 5-5 5 5"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    class="space-y-2"
+                  >
+                    <label
+                      class="block space-y-2 text-sm font-medium"
+                    >
+                      <span>
+                        Reason for starting this workflow
+                         *
+                      </span>
+                      <textarea
+                        class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        maxlength="5000"
+                        required=""
+                      />
+                    </label>
+                  </div>
+                </fieldset>
+              </form>
+            </div>
+          </div>
+        </div>
+        <footer
+          class="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3.5"
+          data-wizard-region="footer"
+        >
+          <div>
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-secondary border border-border bg-card text-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+              data-slot="button"
+            >
+              Close
+            </button>
+          </div>
+          <div
+            class="flex items-center gap-2.5"
+          >
+            <button
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive btn-soft-primary text-primary-foreground h-9 px-4 py-2 has-[>svg]:px-3"
+              data-slot="button"
+            >
+              Continue
+            </button>
+          </div>
+        </footer>
+      </div>
+    </div>
+    <button
+      class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+      type="button"
+    >
+      <svg
+        class="lucide lucide-x"
+        fill="none"
+        height="24"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M18 6 6 18"
+        />
+        <path
+          d="m6 6 12 12"
+        />
+      </svg>
+      <span
+        class="sr-only"
+      >
+        Close
+      </span>
+    </button>
+  </div>
+  <span
+    aria-hidden="true"
+    data-aria-hidden="true"
+    data-radix-focus-guard=""
+    style="outline: none; opacity: 0; position: fixed; pointer-events: none;"
+    tabindex="0"
+  />
+</body>
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ choose resources/js/components/it/__tests__/provisioning-lifecycle-dialogs.test.tsx:99:34
+     97| async function choose(label: string, name: string) {
+     98|     fireEvent.click(screen.getByRole('combobox', { name: label }));
+     99|     fireEvent.click(await screen.findByRole('option', { name }));
+       |                                  ^
+    100|     await waitFor(() =>
+    101|         expect(screen.getByRole('combobox', { name: label })).toHaveTe…
+ ❯ resources/js/components/it/__tests__/provisioning-lifecycle-dialogs.test.tsx:192:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 skipped (6)
+   Start at  17:54:52
+   Duration  4.61s (transform 317ms, setup 125ms, import 1.93s, tests 1.39s, environment 1.00s)
+

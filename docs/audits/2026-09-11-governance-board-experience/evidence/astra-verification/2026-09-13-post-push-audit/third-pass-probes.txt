@@ -1,0 +1,110 @@
+{
+    "checked_at": "2026-09-13T08:02:25+00:00",
+    "database": "oblivion_gov_review4_runtime_20260913_37384",
+    "cases": {
+        "rules_generic_proposal_still_activates": {
+            "exception": "InvalidArgumentException",
+            "message": "Profile activation rejected: resolution does not authorize voting rules or governance profile approval."
+        },
+        "strategy_generic_proposal_still_approves": {
+            "exception": "Illuminate\\Validation\\ValidationException",
+            "message": "The selected resolution does not authorize approval of this strategic plan."
+        },
+        "budget_generic_tokens_still_approve_unbound_adjustment": {
+            "exception": "Illuminate\\Validation\\ValidationException",
+            "message": "The board resolution does not authorize this specific budget adjustment subject. (and 1 more error)"
+        },
+        "quorum_calculators_disagree": {
+            "configured": 4,
+            "settings_calculator": 4,
+            "vote_calculator": 4
+        },
+        "parent_meeting_quorum_changes_open_vote": {
+            "before": {
+                "present": 0,
+                "apologies": 0,
+                "total_eligible": 4,
+                "required": 3,
+                "met": false,
+                "percentage_present": 0,
+                "resolution_mode": "meeting"
+            },
+            "after": {
+                "present": 0,
+                "apologies": 0,
+                "total_eligible": 4,
+                "required": 3,
+                "met": false,
+                "percentage_present": 0,
+                "resolution_mode": "meeting"
+            },
+            "opening_electorate_count": 4
+        },
+        "real_manifest_shape_private_paper_downloads": {
+            "shape": "content_sections.resolutions.items (actual builder schema)",
+            "source_visible": false,
+            "can_view": false,
+            "discoverable": false,
+            "http_status": 404,
+            "private_bytes": false,
+            "limit": "Manufactured published edition uses actual manifest shape and real download controller; no PDF layout claim."
+        },
+        "borrowed_private_managed_evidence_completes_action": {
+            "exception": "DomainException",
+            "message": "Evidence file 'private-action-evidence/restricted.txt' belongs to an inaccessible or restricted record."
+        },
+        "missing_action_version_bypasses_concurrency": {
+            "http_status": 422,
+            "client_saw_version": 1,
+            "final": {
+                "version_number": 2,
+                "progress_pct": 20,
+                "progress_notes": "First writer"
+            }
+        },
+        "future_policy_attestation_still_saves": {
+            "http_status": 403,
+            "effective_from": "2027-01-01",
+            "receipt_count": 0
+        },
+        "evaluation_ui_yes_answer_rejected": {
+            "actual_ui_value": "Yes",
+            "http_status": 302,
+            "response_count": 1
+        },
+        "evaluation_fractional_rating_accepted": {
+            "http_status": 422,
+            "response": null
+        },
+        "evaluation_inactive_member_can_submit": {
+            "http_status": 403,
+            "response_count": 0
+        },
+        "invalid_escalation_recipient_saved": {
+            "http_status": 422,
+            "value": null
+        },
+        "failed_reminder_suppresses_retry": {
+            "first_attempt_error": "Synthetic transport failure",
+            "retry_notifications": 1,
+            "cache_claimed": true
+        },
+        "verify_invalid_compliance_evidence_claims_provided": {
+            "exception": "DomainException",
+            "message": "Compliance evidence with future valid_from date cannot be verified."
+        },
+        "ordinary_member_admin_gate_from_audit_read": {
+            "role": "board_member",
+            "gate_permissions": {
+                "governance.meetings.manage": false,
+                "governance.actions.manage": false,
+                "governance.settings.manage": false,
+                "governance.settings.view": false,
+                "governance.audit.view": false,
+                "governance.executive.view": false,
+                "governance.performance.manage": false
+            },
+            "admin_gate": false
+        }
+    }
+}

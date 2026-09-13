@@ -1,0 +1,40 @@
+{
+  "updated_utc": "2026-09-13T08:01:18.2207204Z",
+  "scope": "Knowledge Base only",
+  "backend_applied": [
+    "tests/Feature/It/ItKnowledgeRevisionWorkspaceTest.php",
+    "tests/Unit/It/ItKnowledgeDiagramSourceTest.php",
+    "app/Http/Controllers/It/ItKnowledgeFileController.php",
+    "app/Domain/It/Services/ItKnowledgeRaster.php",
+    "app/Domain/It/Services/ItKnowledgePublishedRevisions.php",
+    "app/Domain/It/Services/ItKnowledgeMedia.php",
+    "app/Domain/It/Services/ItKnowledgeFiles.php",
+    "app/Domain/It/Services/ItKnowledgeDiagramSource.php",
+    "app/Domain/It/Services/ItKnowledgeDiagramContract.php",
+    "tests/Fixtures/it/knowledge-diagrams/validation-cases.json",
+    "tests/Fixtures/it/knowledge-diagrams/v2-template-catalogue.json",
+    "tests/Fixtures/it/knowledge-diagrams/v2-rich.json",
+    "tests/Fixtures/it/knowledge-diagrams/v2-minimal.json",
+    "tests/Fixtures/it/knowledge-diagrams/legacy-basic.json"
+  ],
+  "backend_result": {
+    "exact_schema_absent": true,
+    "source_hashes_unchanged": 2186,
+    "passed": 77,
+    "errors": 0,
+    "followup": "Both earlier object-order comparisons now pass, including multipage publication/restore and private raster replacement/history. One added unavailable-image case hit duplicate synthetic storage paths; fixture corrected and exact affected case running.",
+    "failed": 2
+  },
+  "ui_candidate": {
+    "passed": 68,
+    "files": 13,
+    "served": false,
+    "editor_followup": "11 passed after test typing correction"
+  },
+  "raster_decode_checks": 8,
+  "contract_unit_checks": 38,
+  "tags_migration_applied": false,
+  "frontend_applied": true,
+  "candidate_type_result": "Integrated source has no Knowledge or diagram errors; three pre-existing today-retirement test errors only.",
+  "candidate_lint": "No errors; six existing custom stencil/tab/button advisories in the approved editor."
+}

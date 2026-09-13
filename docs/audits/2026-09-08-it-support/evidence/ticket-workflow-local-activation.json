@@ -1,0 +1,11 @@
+{
+    "phase": "complete",
+    "applied": true,
+    "local_environment": true,
+    "loopback_mysql": true,
+    "canonical_dependencies_ready": true,
+    "owned_tables_present": 0,
+    "migration": "database/migrations/2026_09_13_120000_create_it_ticket_work_records.php",
+    "migration_sha256": "270242a355a97cbb45b789fe912f830d614ce00807a47c10b59dcf07537c9126",
+    "ready": true
+}

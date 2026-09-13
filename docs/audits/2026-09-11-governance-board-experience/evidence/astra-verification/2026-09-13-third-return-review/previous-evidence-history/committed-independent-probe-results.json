@@ -1,0 +1,338 @@
+{
+    "checked_at": "2026-09-12T23:57:13+00:00",
+    "database": "oblivion_gov_review2_runtime_20260913_39488",
+    "cases": {
+        "no_approved_profile_opens": {
+            "exception": "DomainException",
+            "message": "Voting rules not confirmed \u2014 live voting unavailable. A secretary or chair must activate an approved voting profile with governing document authority."
+        },
+        "written_disabled_opens": {
+            "exception": "DomainException",
+            "message": "Written / out-of-session voting is prohibited by active voting rules profile."
+        },
+        "written_unanimity_rule_ignored": {
+            "written_unanimity_required": false,
+            "outcome": "carried",
+            "snapshot": {
+                "for": 2,
+                "abstain": 1,
+                "against": 0,
+                "conflicts": 0,
+                "total_votes": 3,
+                "decision_snapshot": {
+                    "title": "Test Resolution",
+                    "outcome": "carried",
+                    "closed_at": "2026-09-12T23:57:13+00:00",
+                    "conflicts": [],
+                    "threshold": "simple_majority",
+                    "electorate": [
+                        {
+                            "name": "Review Chair",
+                            "role": null,
+                            "board_member_id": 1
+                        },
+                        {
+                            "name": "Review Alex Morgan",
+                            "role": null,
+                            "board_member_id": 3
+                        },
+                        {
+                            "name": "Review Finance",
+                            "role": null,
+                            "board_member_id": 4
+                        },
+                        {
+                            "name": "Review Alex Morgan",
+                            "role": null,
+                            "board_member_id": 5
+                        }
+                    ],
+                    "quorum_met": true,
+                    "vote_summary": {
+                        "for": 2,
+                        "abstain": 1,
+                        "against": 0,
+                        "conflicts": 0,
+                        "total_votes": 3
+                    },
+                    "resolution_id": 5,
+                    "quorum_details": {
+                        "met": true,
+                        "present": 3,
+                        "required": 3,
+                        "apologies": 0,
+                        "total_eligible": 4,
+                        "resolution_mode": "out_of_session",
+                        "percentage_present": 75
+                    },
+                    "quorum_required": true,
+                    "individual_votes": [
+                        {
+                            "id": 1,
+                            "vote": "for",
+                            "method": "electronic",
+                            "voted_at": "2026-09-12T23:57:13+00:00",
+                            "board_member_id": 1,
+                            "board_member_name": "Review Chair",
+                            "conflict_declared": false
+                        },
+                        {
+                            "id": 2,
+                            "vote": "for",
+                            "method": "electronic",
+                            "voted_at": "2026-09-12T23:57:13+00:00",
+                            "board_member_id": 3,
+                            "board_member_name": "Review Alex Morgan",
+                            "conflict_declared": false
+                        },
+                        {
+                            "id": 3,
+                            "vote": "abstain",
+                            "method": "electronic",
+                            "voted_at": "2026-09-12T23:57:13+00:00",
+                            "board_member_id": 4,
+                            "board_member_name": "Review Finance",
+                            "conflict_declared": false
+                        }
+                    ],
+                    "resolution_reference": "RES-HRZBOW"
+                }
+            },
+            "electorate_at_open": [
+                {
+                    "name": "Review Chair",
+                    "role": null,
+                    "board_member_id": 1
+                },
+                {
+                    "name": "Review Alex Morgan",
+                    "role": null,
+                    "board_member_id": 3
+                },
+                {
+                    "name": "Review Finance",
+                    "role": null,
+                    "board_member_id": 4
+                },
+                {
+                    "name": "Review Alex Morgan",
+                    "role": null,
+                    "board_member_id": 5
+                }
+            ],
+            "profile_id": 1
+        },
+        "unanimous_all_entitled_for": {
+            "outcome": "carried",
+            "electorate_count": 4,
+            "for": 4
+        },
+        "new_member_outside_frozen_electorate_can_vote": {
+            "exception": "DomainException",
+            "message": "Board member was not part of the electorate when voting opened."
+        },
+        "quorum_profile_ignored": {
+            "configured_mode": "fixed_count",
+            "configured_formula": "4",
+            "actual_quorum": {
+                "present": 0,
+                "apologies": 0,
+                "total_eligible": 4,
+                "required": 4,
+                "met": false,
+                "percentage_present": 0,
+                "resolution_mode": "out_of_session"
+            }
+        },
+        "draft_resolution_activates_rules": {
+            "exception": "InvalidArgumentException",
+            "message": "Profile activation rejected: approval resolution must be carried."
+        },
+        "unrelated_carried_resolution_activates_rules": {
+            "exception": "InvalidArgumentException",
+            "message": "Profile activation rejected: resolution does not authorize voting rules or governance profile approval."
+        },
+        "assigned_private_action": {
+            "parent_visible": false,
+            "action_visible": false,
+            "http_status": 403,
+            "private_title_in_feed": false
+        },
+        "attendance_status_still_grants_private_access": {
+            "before": false,
+            "after_apology": false,
+            "after_late_attendance": false
+        },
+        "unassigned_executive_committee_grants_access": {
+            "unrelated_committee_id": 2,
+            "meeting_committee_id": null,
+            "private_access": false
+        },
+        "ceo_review_detail_and_list": {
+            "detail_status": 200,
+            "detail_raw": false,
+            "list_status": 200,
+            "list_raw": false
+        },
+        "fabricated_action_evidence_in_testing": {
+            "http_status": 302,
+            "status": "open",
+            "stored": null
+        },
+        "empty_evidence_record_in_local_environment": {
+            "tested_environment": "local",
+            "http_status": 419,
+            "status": "open",
+            "stored": null,
+            "receipt": null
+        },
+        "stale_action_models_overwrite": {
+            "exception": "DomainException",
+            "message": "Action item was modified by another user. Please reload and review the latest changes."
+        },
+        "completed_action_reopens": {
+            "exception": "DomainException",
+            "message": "Evidence file 'test.pdf' does not exist or has not been uploaded."
+        },
+        "stale_minutes_approval_from_ui_payload": {
+            "reviewer_saw_version": 1,
+            "http_status": 302,
+            "approved_version": 2,
+            "status": "reviewed"
+        },
+        "stale_minutes_explicit_version_rejected": {
+            "http_status": 409,
+            "status": "reviewed"
+        },
+        "unrelated_same_amount_resolution_approves_budget": {
+            "exception": "Illuminate\\Validation\\ValidationException",
+            "message": "The board resolution does not authorize this specific budget adjustment subject. (and 1 more error)"
+        },
+        "pack_confidential_agenda_and_motion": {
+            "builder_role": "board_chair",
+            "member_can_view_meeting": true,
+            "confidential_title_in_content": true,
+            "paper_keys": [
+                "id",
+                "reference",
+                "title",
+                "exact_motion",
+                "purpose",
+                "context",
+                "recommendation",
+                "options",
+                "single_option_reason",
+                "cost_impact",
+                "risk_impact",
+                "service_user_implications",
+                "risk_equity_implications",
+                "attachments",
+                "version_number",
+                "voting_threshold",
+                "status",
+                "deadline"
+            ]
+        },
+        "private_decision_widget": {
+            "private_title_present": false
+        },
+        "policy_work_feed": {
+            "availability": {
+                "resolutions": "available",
+                "board_packs": "available",
+                "action_items": "available",
+                "policies": "available",
+                "meetings": "available"
+            },
+            "totals": {
+                "all": 3,
+                "vote": 0,
+                "read": 0,
+                "act": 2,
+                "know": 1,
+                "pending": 3,
+                "overdue": 1,
+                "blocked": 0,
+                "completed": 0
+            }
+        },
+        "calendar_implemented_and_cancelled": {
+            "implemented": {
+                "id": "governance:decision:12",
+                "source": "decisions",
+                "group": "auto",
+                "title": "[Vote deadline] Test Resolution",
+                "start": "2026-09-11T14:30:00+00:00",
+                "end": "2026-09-11T14:30:00+00:00",
+                "allDay": false,
+                "status": "completed",
+                "owner": null,
+                "room": null,
+                "ref": "RES-WLB9FB",
+                "site": null,
+                "link": "/governance/resolutions/12",
+                "editable": false,
+                "eventType": "resolution",
+                "desc": "Test resolution context providing background and rationale for the decision.",
+                "mine": false
+            },
+            "cancelled": {
+                "id": "governance:decision:13",
+                "source": "decisions",
+                "group": "auto",
+                "title": "[Vote deadline] Test Resolution",
+                "start": "2026-09-11T14:30:00+00:00",
+                "end": "2026-09-11T14:30:00+00:00",
+                "allDay": false,
+                "status": "cancelled",
+                "owner": null,
+                "room": null,
+                "ref": "RES-ZUZKWY",
+                "site": null,
+                "link": "/governance/resolutions/13",
+                "editable": false,
+                "eventType": "resolution",
+                "desc": "Test resolution context providing background and rationale for the decision.",
+                "mine": false
+            }
+        },
+        "role_http_smoke": {
+            "member": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 403,
+                "/governance/performance/1": 403
+            },
+            "chair": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 200,
+                "/governance/performance/1": 200
+            },
+            "secretary": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 403,
+                "/governance/performance/1": 403
+            },
+            "finance": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 403,
+                "/governance/performance/1": 403
+            },
+            "ceo": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 403,
+                "/governance/performance/1": 200
+            },
+            "observer": {
+                "/governance/dashboard": 200,
+                "/governance/my-work": 200,
+                "/governance/meetings/2": 403,
+                "/governance/performance/1": 403
+            }
+        }
+    }
+}

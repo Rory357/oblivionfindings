@@ -1,0 +1,68 @@
+
+ RUN  v4.1.5 C:/Users/steph/Herd/oblivionfindings
+
+ ❯ resources/js/components/it/__tests__/it-provisioning-templates.test.tsx (14 tests | 14 failed) 59ms
+   × recovers an uncertain template create without posting a duplicate or retaining private fields in storage 27ms
+   × conceals denied context and exits through refreshed permissions (footer) 6ms
+   × conceals denied context and exits through refreshed permissions (escape) 3ms
+   × keeps expired private context concealed while a recovery check is pending 2ms
+   × requires explicit cancellation of an uncertain create before another save is enabled 3ms
+   × places create validation errors on the editable workflow step 1ms
+   × reviews matching rules and task evidence then saves with the original edit version 1ms
+   × does not show success for an unconfirmed save ({"error":"Save rejected."}) 2ms
+   × does not show success for an unconfirmed save ({}) 2ms
+   × preserves a stale draft until the author confirms loading the current version 2ms
+   × keeps unsaved edits when closing is cancelled and never saves through the discard control 2ms
+   × returns invalid required details to their editable step 2ms
+   × returns a server task-field error to the workflow step without a success message 2ms
+   × distinguishes an unavailable saved team from an unassigned step during review 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > recovers an uncertain template create without posting a duplicate or retaining private fields in storage
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > conceals denied context and exits through refreshed permissions (footer)
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > conceals denied context and exits through refreshed permissions (escape)
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > keeps expired private context concealed while a recovery check is pending
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > requires explicit cancellation of an uncertain create before another save is enabled
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > places create validation errors on the editable workflow step
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > reviews matching rules and task evidence then saves with the original edit version
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > does not show success for an unconfirmed save ({"error":"Save rejected."})
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > does not show success for an unconfirmed save ({})
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > preserves a stale draft until the author confirms loading the current version
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > keeps unsaved edits when closing is cancelled and never saves through the discard control
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > returns invalid required details to their editable step
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > returns a server task-field error to the workflow step without a success message
+ FAIL  resources/js/components/it/__tests__/it-provisioning-templates.test.tsx > distinguishes an unavailable saved team from an unassigned step during review
+Error: [vitest] No "Link" export is defined on the "@inertiajs/react" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+vi.mock(import("@inertiajs/react"), async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+ ❯ resources/js/components/it/it-provisioning-templates.tsx:587:46
+    585|                                             size="sm"
+    586|                                         >
+    587|                                             <Link
+       |                                              ^
+    588|                                                 href={
+    589|                                                     '/it/provisioning/…
+ ❯ ItProvisioningTemplates resources/js/components/it/it-provisioning-templates.tsx:545:40
+ ❯ Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:20
+ ❯ renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:22
+ ❯ updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:19
+ ❯ beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:18
+ ❯ runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:874:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  14 failed | 40 passed (54)
+   Start at  17:16:21
+   Duration  16.41s (transform 2.11s, setup 882ms, import 17.59s, tests 3.67s, environment 8.60s)
+

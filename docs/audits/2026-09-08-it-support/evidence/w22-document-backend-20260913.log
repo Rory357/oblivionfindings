@@ -1,0 +1,153 @@
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_3408a575a8c841df",
+    "database_mutations_performed": false
+}
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\It\ItKnowledgeRevisionWorkspaceTest[39m
+  [32;1m✓[39;22m[90m [39m[90ma reviewed proposed revision replaces the publication only on approval and preserves encrypted history[39m[90m    [39m [90m225.54s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma stale editor cannot overwrite a newer document or append mutation audit evidence[39m[90m                          [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90meditor and revision commands reject another originating account without changing the document[39m[90m               [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlosing an original proposal Site conceals its editor and keeps its content out of history[39m[90m                   [39m [90m0.74s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mrestoring a publication creates a proposal and retains every immutable revision[39m[90m                             [39m [90m0.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrelationship search reaches later canonical pages and rejects references to inaccessible documents[39m[90m          [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrevision calendar dates are usable in editors and history without rewriting older snapshots[39m[90m                 [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlibrary pagination retains filters without reopening the selected reader[39m[90m                                    [39m [90m2.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlibrary metadata omits large document and proposal content until a permitted document is opened[39m[90m             [39m [90m1.00s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfull document pages keep native return context and deny an unapproved Site[39m[90m                                  [39m [90m4.80s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mdiagram edits retain saved source versions and reach readers only after publication[39m[90m                         [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdiagram validation rejects active content invalid geometry and forged connectors atomically[39m[90m                 [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprivate PDF versions retain history and enforce current document access on preview and originals[39m[90m            [39m [90m3.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mWord uploads have a safe text preview and legacy Word has an explicit original fallback[39m[90m                     [39m [90m4.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90munavailable malware scanning cannot expose a file or change the document draft[39m[90m                              [39m [90m0.71s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\It\ItWorkspaceNavigationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdedicated IT workspaces render directly and legacy links retain query context[39m[90m                               [39m [90m6.55s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequesters and separately entitled knowledge authors cannot enter work or reports[39m[90m                           [39m [90m6.41s[39m  
+  [32;1m✓[39;22m[90m [39m[90man IT agent has one canonical knowledge, reports and work destination[39m[90m                                       [39m [90m0.15s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItKnowledgeRevisionWorkspaceTest[22m [90m>[39m restoring a publication creates a proposal and retain…   
+[39;1m  Failed asserting that 3 is identical to 2.[39;22m
+
+  at [32mtests\Feature\It\ItKnowledgeRevisionWorkspaceTest.php[39m:[32m138[39m
+    134▕     $this->actingAs($this->author)->post("/it/knowledge/{$article->id}/restore-revision", ['actor_user_id' => $this->author->id, 'lock_version' => $article->lock_version, 'revision_id' => $original->id])->assertSessionDoesntHaveErrors();
+    135▕ 
+    136▕     expect($article->fresh()->body)->toBe('Second publication.')
+    137▕         ->and(ItKbWorkingCopy::query()->where('article_id', $article->id)->sole()->snapshot['body'])->toBe($original->snapshot['body'])
+  ➜ 138▕         ->and(ItKbRevision::query()->where('article_id', $article->id)->count())->toBe(2);
+    139▕     expect(fn () => $original->update(['event' => 'rewritten']))->toThrow(LogicException::class);
+    140▕     expect($original->fresh()->event)->toBe('published');
+    141▕ });
+    142▕
+
+  [33m1   [39m[39;1mtests\Feature\It\ItKnowledgeRevisionWorkspaceTest.php[39;22m:[39;1m138[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\It\ItKnowledgeRevisionWorkspaceTest[22m [90m>[39m diagram edits retain saved source versions and reach…    
+[39;1m  Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+     0 => Array &1 [
+         'id' => 'c72eaa2f-cf82-4388-b799-94ebce31f4c6',
+-        'title' => 'Recovery topology',
+-        'nodes' => Array &2 [
++        'edges' => Array &2 [
+             0 => Array &3 [
++                'id' => 'e078329d-768f-4543-8caa-cef3e76caf33',
++                'to' => 'aab707f9-437e-4844-9d84-cb2ec877511e',
++                'from' => 'e9db7469-7338-48f6-b59f-2e22ace843f4',
++                'label' => 'Connects',
++            ],
++        ],
++        'nodes' => Array &4 [
++            0 => Array &5 [
++                'x' => 20,
++                'y' => 40,
+                 'id' => 'e9db7469-7338-48f6-b59f-2e22ace843f4',
++                'text' => 'Revised router',
+                 'shape' => 'rectangle',
+-                'text' => 'Revised router',
+-                'x' => 20,
++            ],
++            1 => Array &6 [
++                'x' => 400,
+                 'y' => 40,
+-            ],
+-            1 => Array &4 [
+                 'id' => 'aab707f9-437e-4844-9d84-cb2ec877511e',
++                'text' => 'Service',
+                 'shape' => 'ellipse',
+-                'text' => 'Service',
+-                'x' => 400,
+-                'y' => 40,
+             ],
+         ],
+-        'edges' => Array &5 [
+-            0 => Array &6 [
+-                'id' => 'e078329d-768f-4543-8caa-cef3e76caf33',
+-                'from' => 'e9db7469-7338-48f6-b59f-2e22ace843f4',
+-                'to' => 'aab707f9-437e-4844-9d84-cb2ec877511e',
+-                'label' => 'Connects',
+-            ],
+-        ],
++        'title' => 'Recovery topology',
+     ],
+ ][39;22m
+
+  at [32mtests\Feature\It\ItKnowledgeRevisionWorkspaceTest.php[39m:[32m283[39m
+    279▕     $this->patch('/it/kb/'.$article->id, ['lock_version' => $article->fresh()->lock_version, 'diagrams' => [$diagram]])->assertSessionDoesntHaveErrors();
+    280▕     $drafts = ItKbRevision::query()->where('article_id', $article->id)->where('event', 'media_draft_saved')->orderBy('id')->get();
+    281▕     expect($drafts)->toHaveCount(2)->and($drafts[0]->snapshot['diagrams'][0]['nodes'][0]['text'])->toBe('Router');
+    282▕     $article = publishRevisionWorkspaceDocument($article, $this->author, $this->reviewer);
+  ➜ 283▕     expect($article->diagrams)->toBe([$diagram]);
+    284▕     app(ItKbLifecycleService::class)->restoreRevision($article, $this->author, $initial->id, $article->lock_version);
+    285▕     expect(ItKbWorkingCopy::query()->where('article_id', $article->id)->sole()->snapshot['diagrams'])->toBeEmpty()
+    286▕         ->and($article->fresh()->diagrams)->toBe([$diagram]);
+    287▕ });
+
+  [33m1   [39m[39;1mtests\Feature\It\ItKnowledgeRevisionWorkspaceTest.php[39;22m:[39;1m283[39;22m
+
+
+  [90mTests:[39m    [31;1m2 failed[39;22m[90m,[39m[39m [39m[32;1m16 passed[39;22m[90m (331 assertions)[39m
+  [90mDuration:[39m [39m262.42s[39m
+
+{"exit_code":1,"phase":"focused_tests_finished"}
+{
+    "isolation_checks": {
+        "environment_testing": true,
+        "database_mysql": true,
+        "database_loopback": true,
+        "dedicated_database_base": true,
+        "database_url_absent": true,
+        "config_cache_absent": true,
+        "unique_test_token": true,
+        "mail_array": true,
+        "queue_sync": true,
+        "broadcast_disabled": true,
+        "cache_array": true,
+        "session_array": true,
+        "maintenance_files_absent": true,
+        "isolated_schema_does_not_exist": true
+    },
+    "base_path": "C:\\Users\\steph\\Herd\\oblivionfindings",
+    "isolated_database_for_testcase": "oblivion_it_support_test_it_3408a575a8c841df",
+    "database_mutations_performed": false
+}

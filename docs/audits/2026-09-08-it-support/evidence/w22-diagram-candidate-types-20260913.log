@@ -1,0 +1,29 @@
+[96mresources/js/components/today-retirement.test.tsx[0m:[93m84[0m:[93m64[0m - [91merror[0m[90m TS2769: [0mNo overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+
+[7m84[0m                     screen.getByRole('link', { name: 'My Day', exact: true }),
+[7m  [0m [91m                                                               ~~~~~[0m
+
+[96mresources/js/components/today-retirement.test.tsx[0m:[93m87[0m:[93m65[0m - [91merror[0m[90m TS2769: [0mNo overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+
+[7m87[0m                     screen.queryByRole('link', { name: 'Today', exact: true }),
+[7m  [0m [91m                                                                ~~~~~[0m
+
+[96mresources/js/components/today-retirement.test.tsx[0m:[93m93[0m:[93m25[0m - [91merror[0m[90m TS2769: [0mNo overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement | null', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+
+[7m93[0m                         exact: true,
+[7m  [0m [91m                        ~~~~~[0m
+
+
+{"overlayFiles":27,"diagnostics":3,"sharedSourceChanged":false,"databaseMutations":false}

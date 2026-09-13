@@ -2,6 +2,7 @@
 
 /** Fresh schema only. No reset/drop or existing browser database writes. */
 
+use App\Domain\It\Services\ItTicketDraftService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
@@ -42,6 +43,7 @@ try {
             if (str_contains($line, '*/')) {
                 $inComment = false;
             }
+
             continue;
         }
         if ($buffer === '' && ($trimmed === '' || str_starts_with($trimmed, '--'))) {
@@ -49,6 +51,7 @@ try {
         }
         if ($buffer === '' && str_starts_with($trimmed, '/*') && ! str_contains($line, '*/')) {
             $inComment = true;
+
             continue;
         }
         w06BrowserRequire(! str_starts_with(strtoupper($trimmed), 'DELIMITER '), 'Unexpected schema delimiter; do not partially guess the import.');
@@ -97,7 +100,7 @@ try {
     $fixtures = w06BrowserCreateFixtures($context);
     $ready = ['ready' => true, 'created_at' => gmdate(DATE_ATOM), 'database' => $context['database'],
         'registry_count' => DB::table('migrations')->count(), 'fixtures' => $fixtures,
-        'drafts_enabled' => app(\App\Domain\It\Services\ItTicketDraftService::class)->enabled(),
+        'drafts_enabled' => app(ItTicketDraftService::class)->enabled(),
         'synthetic_retention_days' => [2, 3],
         'provider_configuration_checks' => [
             'mailboxes_absent' => DB::table('it_mailbox_connections')->count() === 0,
@@ -128,6 +131,16 @@ try {
         $phase = 'catalogue_fixtures';
         require_once __DIR__.'/w15-catalogue-browser-fixture.php';
         $ready['catalogue_fixtures'] = w15BrowserCreateCatalogueFixtures($context, $fixtures);
+    }
+    if ($context['workspace_fixtures'] ?? false) {
+        $phase = 'workspace_fixtures';
+        require_once __DIR__.'/w21-workspace-browser-fixture.php';
+        $ready['workspace_fixtures'] = w21BrowserCreateWorkspaceFixtures($context, $fixtures);
+    }
+    if ($context['vendor_fixtures'] ?? false) {
+        $phase = 'vendor_fixtures';
+        require_once __DIR__.'/w23-vendor-vault-browser-fixture.php';
+        $ready['vendor_fixtures'] = w23BrowserCreateVendorFixtures($context, $ready['workspace_fixtures']);
     }
     w06BrowserSaveNew($context['root'].'/ready.json', $ready);
     echo json_encode($ready, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;

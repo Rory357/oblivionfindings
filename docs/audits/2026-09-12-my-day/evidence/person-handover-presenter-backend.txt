@@ -1,0 +1,23 @@
+
+  [31;1m⨯[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m[90;1m.[39;22m
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\MyDayPersonHandoverTest[22m [90m>[39m it saves three person sections without filing other people under…    
+[39;1m  Expecting '[{"id":1,"label":"Private Cas…ail"}]' not to contain 'Private Casey task detail'.[39;22m
+
+  at [32mtests\Feature\MyDayPersonHandoverTest.php[39m:[32m57[39m
+     53▕         ->and($handover->worker_notes['people'])->toHaveCount(3)
+     54▕         ->and($handover->worker_notes['people'][1]['follow_up_needed'])->toBeTrue()
+     55▕         ->and($handover->toArray())->not->toHaveKey('worker_notes');
+     56▕     expect(DB::table('shift_handovers')->where('id', $handover->id)->value('worker_notes'))->not->toContain('James individual note');
+  ➜  57▕     expect(json_encode($handover->tasks_pending))->not->toContain('Private Casey task detail');
+     58▕     $this->get('/operations/handovers')->assertOk()->assertInertia(fn ($page) => $page
+     59▕         ->where('handovers.0.id', $handover->id)->has('handovers.0.worker_notes.people', 3));
+     60▕     $this->getJson("/attendance/shifts/{$this->shift->id}/handover-draft")
+     61▕         ->assertOk()->assertJsonCount(3, 'people')->assertJsonCount(3, 'worker_notes.people')
+
+  [33m1   [39m[39;1mtests\Feature\MyDayPersonHandoverTest.php[39;22m:[39;1m57[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m17 passed[39;22m[90m (115 assertions)[39m
+  [90mDuration:[39m [39m328.32s[39m
+

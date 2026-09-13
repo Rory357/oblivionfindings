@@ -1,0 +1,7 @@
+
+C:\Users\steph\Herd\oblivionfindings\resources\js\pages\it\knowledge\show.tsx
+  672:33  warning  Consider Card/CardHeader/CardContent from @/components/ui/card for plain rounded bordered panels. Leave custom layout surfaces as raw divs with an inline disable comment  no-restricted-syntax
+
+✖ 1 problem (0 errors, 1 warning)
+
+ESLint found too many warnings (maximum: 0).

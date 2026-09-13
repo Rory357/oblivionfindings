@@ -1,0 +1,14 @@
+[
+  {
+    "path": "resources/js/components/page/page-header.tsx",
+    "sha256": "e15b177a22105005b9e7e4af7f83662f4a7eb39768f0adba89b0c5476628c992"
+  },
+  {
+    "path": "resources/js/components/it/it-hero.tsx",
+    "sha256": "c619b7fa70580e1077508529745851cd4f8fa54bfb1280265c220d0c46eac476"
+  },
+  {
+    "path": "resources/css/app.css",
+    "sha256": "9bdd5b72256683924f1aa71846ed5e03e6bd659f7b05ea1d0f5af67a0bc9cf31"
+  }
+]

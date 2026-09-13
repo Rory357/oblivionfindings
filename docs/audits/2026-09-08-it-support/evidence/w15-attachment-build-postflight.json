@@ -1,0 +1,10 @@
+{
+  "source_files": 449,
+  "source_changed": [
+    "routes/web.php"
+  ],
+  "design_files": 10,
+  "design_changed": [],
+  "manifest_sha256": "507ea8955a48a1e578997f97b1683d2f5a89afb999861ff17eb940b54d6a4323",
+  "build_exit": 0
+}
