@@ -1,5 +1,7 @@
 # IT & Support implementation progress
 
+- **CURRENT — 13 September (late evening) — CLAUDE WORKTREE SESSION; GAP SWEEP GREEN + W18/W20 SLICES:** Continuation session in worktree `strange-bhaskara-ae2843` on branch `claude/complete-it-support-impl-940090`, sole implementer (user confirmed all Codex tasks stopped; two unrelated peer sessions active on Governance and test-repair — coordinated by message, local-main test commits 5e18045f6/cae3746ae reconciled by merge). Gap sweep: all 15 drifted vitest failures and the ItCatalogAttachmentTest provisioning-props failure repaired against current source; full vitest 354 files / 2432 tests green; `tsc --noEmit` completely clean (the 3 My Day errors fixed); production build green; VendorCommercialWorkflowTest + SharedCredentialSecurityTest 32/32 green. Shipped grant migration `2026_09_13_200000_grant_vendor_vault_permissions` (deploys skip seeders; vendors.contracts.view/manage to VendorCommercialAccess::ROLES, credentials.copy definition only). Fixed real defects found by the sweep: DialogContent `showCloseButton` prop replaces the CSS-hidden duplicate close in WizardShell; wizard service/Device selects got accessible names; "Set p4 · low priority" copy corrected. NEW W18 slice: governed reply templates (ItReplyTemplate + immutable versions, strict placeholder allowlist, ItReplyTemplateService render-blocks unresolved placeholders, Setup → Automation management UI, composer Insert-template menu for work-access actors, feature + vitest coverage). NEW W20 slice: recurrence plans (ItRecurrencePlan/ItRecurrenceRun with unique occurrence claims, bounded catch-up recording skips, `it:run-recurrence` in ItAutomationScheduleCatalog, pause/resume/terminal-retire, Setup → Automation UI, feature + vitest coverage). W18 macros/rule-dry-run and W20 proactive source cases remain open. Verification is deliberately tests-only per the user's direction this session; browser acceptance for these slices remains open.
+
 ## Current resumption — 12 September 2026
 
 - **LATEST KNOWLEDGE CHECKPOINT — 13 September,17:54 NZ — SOURCE FROZEN:** Coherent tags/templates/structured-search/inactive-links/explicit-solved-feedback/owner-review-reminders applied after exact Ticket cleanup and23 unchanged preimages.22UItests/3files passed5.86s;17PHPsyntax/16puredefinitionchecks/scopedESLint passed. TSC5 unrelated MyDay/Governance errors, noIT errors. Grouped backend queued withW15. Tags migration000004 NOT applied locally; tags UI schema-gated. Vendor owns next normal shared build afterW15 checkpoint. FullW21/W22 still incomplete; read evidence/w22-completion-followup-20260913.md for precise remaining KB-only closure. Advanced diagram mockup remains separate and unapproved for integration.
@@ -386,7 +388,7 @@ Planned → In progress → Implemented → Verified. A partial slice is never a
 
 ### W18 — Reusable replies, templates and explainable macros/rules
 
-- Status: Planned.
+- Status: In progress (13 September late: governed reply templates Implemented and locally Verified — versioned ItReplyTemplate store, strict placeholder allowlist with render-time blocking, Setup → Automation management, composer insertion for work-access actors; ItReplyTemplateTest + reply-templates vitest. Macros, rule dry run and the routing-rule editor remain open; routing explanation already exists via ItTicketRoutingPresenter).
 - Dependencies: W02–W04, W07–W09, W13, W15; link reviewed knowledge when W21 lands.
 - Scope and criteria: implementation-plan.md §6 W18; audit/scenario mappings retained below.
 - Changed files: none yet. Migrations: none yet.
@@ -406,7 +408,7 @@ Planned → In progress → Implemented → Verified. A partial slice is never a
 
 ### W20 — Recurring work, reminders and proactive support
 
-- Status: Planned.
+- Status: In progress (13 September late: recurrence plans Implemented and locally Verified — unique occurrence claims make replay/crash double-creation impossible, bounded catch-up records skips, exception dates and end-date retirement are deterministic in plan timezone, tickets route through the shared routing service with SLA stamping; `it:run-recurrence` registered in ItAutomationScheduleCatalog; ItRecurrencePlanTest + recurrence-plans vitest. Reminder/escalation surfaces and W14-sourced proactive cases remain open).
 - Dependencies: W03–W04, W13–W14, W18–W19; documentation/renewal adapters finish with W22–W23.
 - Scope and criteria: implementation-plan.md §6 W20; audit/scenario mappings retained below.
 - Changed files: none yet. Migrations: none yet.

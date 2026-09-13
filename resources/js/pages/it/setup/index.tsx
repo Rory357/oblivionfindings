@@ -14,6 +14,14 @@ import {
     type ProvisioningTemplate,
 } from '@/components/it/it-provisioning-templates';
 import {
+    ItRecurrencePlans,
+    type RecurrencePlanRow,
+} from '@/components/it/it-recurrence-plans';
+import {
+    ItReplyTemplates,
+    type ReplyTemplateRow,
+} from '@/components/it/it-reply-templates';
+import {
     ItServiceOperations,
     type AutomationDefinition,
     type AutomationRunRow,
@@ -74,6 +82,9 @@ interface Props {
     canManageApiIdentities?: boolean;
     oneTimeApiCredential?: OneTimeApiCredential | null;
     provisioningTemplates: ProvisioningTemplate[];
+    replyTemplates?: ReplyTemplateRow[];
+    replyPlaceholders?: Record<string, string>;
+    recurrencePlans?: RecurrencePlanRow[];
     operationsAudit?: OperationsAudit;
     emailDeliveries?: EmailDeliveryRow[];
     emailDeliveryFilter?: {
@@ -169,6 +180,9 @@ export default function ItSetupIndex({
     canManageApiIdentities = true,
     oneTimeApiCredential = null,
     provisioningTemplates,
+    replyTemplates = [],
+    replyPlaceholders = {},
+    recurrencePlans = [],
     operationsAudit,
     emailDeliveries = [],
     emailDeliveryFilter = null,
@@ -898,6 +912,33 @@ export default function ItSetupIndex({
                             services={services}
                             sites={sites}
                         />
+                    ) : null}
+                    {tab === 'automation' ? (
+                        <div className="space-y-8">
+                            <ItReplyTemplates
+                                templates={replyTemplates.filter((template) =>
+                                    match(
+                                        [template.name, template.body].join(
+                                            ' ',
+                                        ),
+                                    ),
+                                )}
+                                placeholders={replyPlaceholders}
+                            />
+                            <ItRecurrencePlans
+                                plans={recurrencePlans.filter((plan) =>
+                                    match(
+                                        [
+                                            plan.name,
+                                            plan.ticket_template.title,
+                                        ].join(' '),
+                                    ),
+                                )}
+                                sites={sites}
+                                services={services}
+                                agents={agents}
+                            />
+                        </div>
                     ) : null}
                     {tab === 'provisioning' ? (
                         <ItProvisioningTemplates

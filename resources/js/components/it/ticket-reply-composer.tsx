@@ -5,6 +5,7 @@ import type {
     ThreadDraftState,
     ThreadKbHint,
 } from '@/components/it/ticket-thread';
+import { TicketTemplateInsert } from '@/components/it/ticket-template-insert';
 import { TicketVersionConflict } from '@/components/it/ticket-version-conflict';
 import { TicketWorkFields } from '@/components/it/ticket-work-fields';
 import {
@@ -248,6 +249,7 @@ function AudienceComposer({
     revokedEpoch,
     onAccessRevoked,
     accessState,
+    canInternal,
     dialog,
 }: Props & {
     dialog?: {
@@ -1107,12 +1109,29 @@ function AudienceComposer({
                         />
                     </fieldset>
                     <div className="space-y-2">
-                        <label
-                            htmlFor={inputId}
-                            className="text-sm font-medium"
-                        >
-                            {isInternal ? 'Internal note' : 'Your reply'}
-                        </label>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label
+                                htmlFor={inputId}
+                                className="text-sm font-medium"
+                            >
+                                {isInternal ? 'Internal note' : 'Your reply'}
+                            </label>
+                            {canInternal && (
+                                <TicketTemplateInsert
+                                    ticketId={ticketId}
+                                    internal={isInternal}
+                                    disabled={!editable}
+                                    onInsert={(rendered) => {
+                                        setBody((current) =>
+                                            current.trim()
+                                                ? `${current}\n\n${rendered}`
+                                                : rendered,
+                                        );
+                                        setLastCommit(null);
+                                    }}
+                                />
+                            )}
+                        </div>
                         <Textarea
                             id={inputId}
                             value={body}

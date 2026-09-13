@@ -405,6 +405,42 @@ class ItServiceManagementSetupController extends Controller
             'apiIdentityViewerUserId' => $user->id,
             'canManageApiIdentities' => $canManageApiIdentities,
             'provisioningTemplates' => $provisioningTemplates,
+            'replyTemplates' => Schema::hasTable('it_reply_templates')
+                ? \App\Models\ItReplyTemplate::query()->with('owner:id,name')->withCount('versions')
+                    ->orderByDesc('is_active')->orderBy('name')->get()
+                    ->map(fn (\App\Models\ItReplyTemplate $template) => [
+                        'id' => $template->id,
+                        'name' => $template->name,
+                        'audience' => $template->audience,
+                        'body' => $template->body,
+                        'owner' => $template->owner ? ['id' => $template->owner->id, 'name' => $template->owner->name] : null,
+                        'review_due_at' => $template->review_due_at?->toDateString(),
+                        'is_active' => $template->is_active,
+                        'lock_version' => (int) $template->lock_version,
+                        'version_count' => (int) $template->versions_count,
+                        'updated_at' => $template->updated_at?->toIso8601String(),
+                    ])->values()
+                : [],
+            'replyPlaceholders' => \App\Domain\It\Services\ItReplyTemplateService::PLACEHOLDERS,
+            'recurrencePlans' => Schema::hasTable('it_recurrence_plans')
+                ? \App\Models\ItRecurrencePlan::query()->with('owner:id,name')->withCount('runs')
+                    ->orderByRaw("status = 'retired'")->orderBy('name')->get()
+                    ->map(fn (\App\Models\ItRecurrencePlan $plan) => [
+                        'id' => $plan->id,
+                        'name' => $plan->name,
+                        'cron_expression' => $plan->cron_expression,
+                        'timezone' => $plan->timezone,
+                        'starts_on' => $plan->starts_on?->toDateString(),
+                        'ends_on' => $plan->ends_on?->toDateString(),
+                        'exception_dates' => $plan->exception_dates ?? [],
+                        'owner' => $plan->owner ? ['id' => $plan->owner->id, 'name' => $plan->owner->name] : null,
+                        'ticket_template' => $plan->ticket_template,
+                        'status' => $plan->status,
+                        'next_due_at' => $plan->next_due_at?->toIso8601String(),
+                        'run_count' => (int) $plan->runs_count,
+                        'lock_version' => (int) $plan->lock_version,
+                    ])->values()
+                : [],
             'operationsAudit' => $operationsAudit,
             'emailDeliveryFilter' => $deliveryComment ? [
                 'comment_id' => $deliveryComment->id,
