@@ -252,7 +252,9 @@ describe('Canonical ticket intake assessment', () => {
         const { rerender } = render(<ItWizard {...original} />);
         startTechnician();
         choose('Who is affected?', 'A whole Site');
-        expect(screen.getByText('High', { selector: 'strong' })).toBeVisible();
+        expect(
+            screen.getByText('P2 · High', { selector: 'strong' }),
+        ).toBeVisible();
         rerender(
             <ItWizard
                 {...original}
@@ -269,9 +271,9 @@ describe('Canonical ticket intake assessment', () => {
             />,
         );
         expect(
-            screen.getByText('Urgent', { selector: 'strong' }),
+            screen.getByText('P1 · Critical', { selector: 'strong' }),
         ).toBeVisible();
-        choose('Priority decision', 'Set low priority');
+        choose('Priority decision', 'Set P4 Low priority');
         expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
         fireEvent.change(
             screen.getByLabelText(/Why change the assessed priority/),

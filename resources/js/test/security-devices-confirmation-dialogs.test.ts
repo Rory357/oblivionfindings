@@ -26,7 +26,7 @@ describe('Security & Devices governed confirmations', () => {
         for (const title of [
             'Unlink asset from device?',
             'Remove device relationship?',
-            'Delete device document?',
+            'Remove device document?',
             'Release device assignment?',
             'Decommission device?',
         ]) {

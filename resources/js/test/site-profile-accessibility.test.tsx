@@ -150,7 +150,7 @@ describe('site profile accessibility and responsive contract', () => {
         expect(
             screen.queryByRole('dialog', { name: 'Jump to a section' }),
         ).not.toBeInTheDocument();
-        expect(opener).toHaveFocus();
+        await waitFor(() => expect(opener).toHaveFocus());
     });
 
     it('keeps every Site Profile tab action at least 44px high', () => {

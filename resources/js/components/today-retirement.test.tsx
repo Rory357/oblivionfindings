@@ -81,16 +81,15 @@ describe.each(roles)(
                 );
 
                 expect(
-                    screen.getByRole('link', { name: 'My Day', exact: true }),
+                    screen.getByRole('link', { name: /^My Day$/ }),
                 ).toHaveAttribute('href', '/my-day');
                 expect(
-                    screen.queryByRole('link', { name: 'Today', exact: true }),
+                    screen.queryByRole('link', { name: /^Today$/ }),
                 ).not.toBeInTheDocument();
                 expect(document.querySelector('a[href="/today"]')).toBeNull();
                 expect(
                     !!screen.queryByRole('link', {
-                        name: 'Overview',
-                        exact: true,
+                        name: /^Overview$/,
                     }),
                 ).toBe(overview);
 

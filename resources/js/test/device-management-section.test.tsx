@@ -852,7 +852,7 @@ describe('Device Management section', () => {
             ),
         ).toBeInTheDocument();
         expect(
-            within(reviewDialog).getByText('locked: true'),
+            within(reviewDialog).getByText('Locked: Yes'),
         ).toBeInTheDocument();
         fireEvent.change(screen.getByLabelText('Decision comment'), {
             target: {

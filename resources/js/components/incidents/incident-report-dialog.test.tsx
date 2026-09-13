@@ -524,6 +524,8 @@ describe('IncidentReportDialog truthful incident intent', () => {
             ).not.toHaveLength(0),
         );
         expect(onClose).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+        openStep(/What happened/);
         expect(
             screen.getByRole('textbox', { name: 'Description' }),
         ).toHaveValue('Aroha slipped beside the dining table.');
