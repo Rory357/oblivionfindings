@@ -187,17 +187,19 @@ final class ItRecurrenceService
             : null;
         $exceptions = array_map('strval', $plan->exception_dates ?? []);
 
-        // Bounded search: exception dates and DST gaps step forward one
-        // occurrence at a time instead of looping unbounded.
+        // The cron library truncates seconds, so "advance past X" must move
+        // in whole minutes: subMinute + strict search makes `from` inclusive
+        // at minute precision without ever re-yielding the same occurrence.
         for ($step = 0; $step < 400; $step++) {
-            $candidate = CarbonImmutable::instance($cron->getNextRunDate($cursor->subSecond(), 0, true, $timezone));
+            $candidate = CarbonImmutable::instance($cron->getNextRunDate($cursor->subMinute(), 0, false, $timezone));
             if ($end !== null && $candidate->gt($end)) {
                 return null;
             }
             if (! in_array($candidate->toDateString(), $exceptions, true)) {
                 return $candidate->utc();
             }
-            $cursor = $candidate->addMinute();
+            // Exceptions are whole dates; resume from the following day.
+            $cursor = $candidate->addDay()->startOfDay();
         }
 
         return null;
