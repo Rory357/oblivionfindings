@@ -6,6 +6,7 @@ use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItLinkedContextOptions;
 use App\Domain\It\Services\ItMajorIncidentService;
 use App\Domain\It\Services\ItSlaReadService;
+use App\Domain\It\Services\ItSpecialistWorkspaceSummary;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Http\Controllers\Controller;
@@ -77,6 +78,7 @@ class ItMajorIncidentController extends Controller
             ->through(fn (ItMajorIncident $majorIncident) => $this->majorIncidentRow($majorIncident));
 
         return Inertia::render('it/major-incidents/index', [
+            'summary' => app(ItSpecialistWorkspaceSummary::class)->forWorkspace('major-incidents', $user),
             'majorIncidents' => $majorIncidents,
             'filters' => array_map(fn (string $value) => $value !== '' ? $value : null, $filters),
             'options' => ['agents' => $this->linkedOptions->agents($user)],
@@ -93,7 +95,17 @@ class ItMajorIncidentController extends Controller
         try {
             $majorIncident = $this->majorIncidentService->create($user, $data);
         } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            return redirect()->back()->withErrors(['form' => $exception->getMessage()]);
+        }
+
+        if ($request->boolean('wizard')) {
+            return redirect()->back()->with('it_ticket', [
+                'id' => (int) $majorIncident->ticket_id,
+                'specialist_id' => (int) $majorIncident->id,
+                'reference' => $majorIncident->ticket->reference,
+                'workspace' => 'major-incidents',
+                'actor_user_id' => (int) $user->id,
+            ]);
         }
 
         return redirect()->route('it.major-incidents.show', $majorIncident)
@@ -167,7 +179,7 @@ class ItMajorIncidentController extends Controller
         try {
             $this->majorIncidentService->update($majorIncident, $request->user(), $request->validated());
         } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            return redirect()->back()->withErrors(['form' => $exception->getMessage()]);
         }
 
         return redirect()->back()->with('success', 'Major incident updated.');
@@ -182,7 +194,7 @@ class ItMajorIncidentController extends Controller
         try {
             $this->majorIncidentService->postUpdate($majorIncident, $request->user(), $request->validated());
         } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            return redirect()->back()->withErrors(['form' => $exception->getMessage()]);
         }
 
         return redirect()->back()->with('success', 'Major incident update published.');
@@ -204,9 +216,11 @@ class ItMajorIncidentController extends Controller
                 (string) $data['reason'],
                 $data['resolution_code'] ?? null,
                 $data['resolution_summary'] ?? null,
+                (int) $data['expected_version'],
+                $data['next_action'] ?? null,
             );
         } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            return redirect()->back()->withErrors(['form' => $exception->getMessage()]);
         }
 
         return redirect()->back()->with('success', 'Major incident state updated.');
@@ -321,6 +335,7 @@ class ItMajorIncidentController extends Controller
     {
         return [
             'id' => $ticket->id,
+            'lock_version' => (int) $ticket->lock_version,
             'reference' => $ticket->reference,
             'title' => $ticket->title,
             'priority' => $ticket->priority,

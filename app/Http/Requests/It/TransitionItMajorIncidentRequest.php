@@ -2,24 +2,29 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\BindsItBrowserActor;
 use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class TransitionItMajorIncidentRequest extends FormRequest
 {
+    use BindsItBrowserActor;
     use ConcealsInaccessibleItWork;
 
     public function authorize(): bool
     {
         $this->workableMajorIncidentOrNotFound();
 
-        return (bool) $this->user()?->canDo('it.manage');
+        return $this->hasCurrentBrowserActor() && (bool) $this->user()?->canDo('it.manage');
     }
 
     public function rules(): array
     {
         return [
+            ...$this->browserActorRules(),
+            'expected_version' => ['required', 'integer', 'min:1'],
+            'next_action' => ['nullable', 'string', 'max:2000'],
             'workflow_state' => ['required', Rule::in(['responding', 'monitoring', 'restored', 'resolved', 'review', 'closed', 'declared'])],
             'reason' => ['required', 'string', 'max:2000'],
             'resolution_code' => ['nullable', 'required_if:workflow_state,resolved', 'string', 'max:100'],

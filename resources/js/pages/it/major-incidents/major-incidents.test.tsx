@@ -26,7 +26,7 @@ vi.mock('@inertiajs/react', () => ({
     ),
     router: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
     usePage: () => ({
-        props: { itNavigation: [] },
+        props: { itNavigation: [], auth: { user: { id: 7 } } },
         url: '/it/major-incidents',
     }),
     useForm: (initial: Record<string, unknown>) => ({
@@ -35,6 +35,11 @@ vi.mock('@inertiajs/react', () => ({
         post: vi.fn(),
         patch: vi.fn(),
         reset: vi.fn(),
+        resetAndClearErrors: vi.fn(),
+        setDefaults: vi.fn(),
+        clearErrors: vi.fn(),
+        transform: vi.fn(),
+        isDirty: false,
         processing: false,
         errors: {},
     }),
@@ -48,6 +53,7 @@ const ticket = {
     status: 'in_progress',
     workflow_state: 'responding',
     href: '/it/tickets/60',
+    lock_version: 1,
 };
 
 describe('IT major incident command workspaces', () => {
@@ -83,10 +89,9 @@ describe('IT major incident command workspaces', () => {
         expect(
             screen.getByRole('heading', { name: 'Major incidents' }),
         ).toBeVisible();
-        expect(screen.getByRole('link', { name: /IT-000060/ })).toHaveAttribute(
-            'href',
-            '/it/major-incidents/12',
-        );
+        expect(
+            screen.getByRole('link', { name: 'All-site identity outage' }),
+        ).toHaveAttribute('href', '/it/major-incidents/12');
         expect(screen.getAllByText('Update overdue')[0]).toBeVisible();
         expect(
             screen.getByRole('button', { name: /Declare major incident/i }),
@@ -161,7 +166,7 @@ describe('IT major incident command workspaces', () => {
         expect(screen.getByText('Shared work record')).toBeVisible();
         expect(
             screen.getByRole('link', {
-                name: /Open canonical ticket workspace/i,
+                name: 'Open ticket',
             }),
         ).toHaveAttribute('href', '/it/tickets/60');
     });

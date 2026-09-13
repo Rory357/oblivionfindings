@@ -1,0 +1,267 @@
+{
+  "base": "96ae8f765b2028f4b6d7cfd7f776950cc99c3159",
+  "files": {
+    "app/Domain/It/Services/ItChangeService.php": "3e5049093602c191d114cffd9ab56c189f81c68e67f8f3d60e9d72ed54c92aeb",
+    "app/Domain/It/Services/ItMajorIncidentService.php": "fe923dc0ddfc843b6eece65ebb61cb63226f5e2f964ec706a867a47a5b098fd7",
+    "app/Domain/It/Services/ItProblemService.php": "7358f0b7a78147f6123285c9895a1e4b2a70e394742f90826bdec4ecbdab849e",
+    "app/Domain/It/Services/ItSpecialistWorkspaceSummary.php": "d9305ada070cfec3f62b0aeeab994dfbdb644712cc160f2932f4454f6d004357",
+    "app/Http/Controllers/It/ItChangeController.php": "810cb8e4a7101d7b1d5b787c043c185102810d8d4093a0898b6015c19fd0d93d",
+    "app/Http/Controllers/It/ItMajorIncidentController.php": "448d6a86aff20f898f84bfbc3b954452534175002d48444533c08d5d5d1b0821",
+    "app/Http/Controllers/It/ItProblemController.php": "7d86652c3210bddb2e0bc1106cc96ea8e5682de01c2a41ba10009d3bbab83f5b",
+    "app/Http/Requests/It/StoreItChangeRequest.php": "5f9ad7c0027f663e0c18b9fe1c7488939446af6f61a08b599c14b3b1d51aba12",
+    "app/Http/Requests/It/StoreItMajorIncidentRequest.php": "fbc5dd552b7dea9e0751949af12f759e19e4b90e3bf0d2154cb4cd0e81f45997",
+    "app/Http/Requests/It/StoreItMajorIncidentUpdateRequest.php": "6b707a89b91f5aef9bf9811051afaa069bea9a74d1091ced48dcaa398b67315a",
+    "app/Http/Requests/It/StoreItProblemRequest.php": "d705505945b3ab6ea4a21c06dc4c0142b038729315c86d4456c7970a3690c781",
+    "app/Http/Requests/It/TransitionItChangeRequest.php": "90bf6167da9d2d8063ca37852a079ce3facdb6d81c42d80b6d843a6b7557f6e8",
+    "app/Http/Requests/It/TransitionItMajorIncidentRequest.php": "328c30405b827d91e10f00ed66abe18446babbc5ca5df2628ede6adfcca55951",
+    "app/Http/Requests/It/TransitionItProblemRequest.php": "6ef0d93c8b82ef8bfe21163bcd9eefbc72d695d326267b00aeb6b7886cca949f",
+    "app/Http/Requests/It/UpdateItChangeRequest.php": "4a6527615d5a9885c6083779b2558cc0e087c1911ee1270a99354546c7d3e2b7",
+    "app/Http/Requests/It/UpdateItMajorIncidentRequest.php": "cb0afeddc12d6dd606b5dfbb767cc61f90adb21ae0a22a1f913d718427d59562",
+    "app/Http/Requests/It/UpdateItProblemRequest.php": "1dd51391360d0ec8b8145c7fb260e3709b3b23a39f953b35fa2bb3bc936c070c",
+    "app/Http/Requests/It/Concerns/NormalizesItChangeWindow.php": "17828da7343946d137bc5604a176da09fda877c654e182be507683852fbb2fd9",
+    "resources/js/components/it/specialist-create-wizard.tsx": "78bb01b2fdf631f12d099a1fe8bba0a940b140f91648fb0506f026c7d13a55f7",
+    "resources/js/components/it/specialist-creation-result.tsx": "0d0eb71a38050102193a37c93f577d83b663b52e1c6839edbfd0583db0189388",
+    "resources/js/components/it/specialist-record-header.tsx": "f0be1ad07c4bf677a7993a7607067465bcfcb31fb4754b25d87b3cdb5c2aa34b",
+    "resources/js/components/it/specialist-record-list.tsx": "63950971ff58b09867675e133d7fbf45881cf5c78925bcf6469c43913c798352",
+    "resources/js/components/it/specialist-workspace-header.tsx": "ccd447bbac05d5db47c5f8c52e8b12e02257fd73dacce5413ed5e609142f5720",
+    "resources/js/components/it/use-specialist-form-defaults.ts": "7b78d07604e15bdd9c96fe56b976941817d87d5787a25c78116a823afe480b63",
+    "resources/js/components/it/__tests__/specialist-command-wizard.test.tsx": "730d9c49f7604e18e09fb1957f50726a8fd4cc8503ab955bf2255f4794913a61",
+    "resources/js/pages/it/changes/index.tsx": "03f7c5daa897ee040d4b3f0f5567d39caca785f3f7ec511d5f93c25a9450b97f",
+    "resources/js/pages/it/changes/show.tsx": "3cd417697227acdddc9109d259124428ce025f079b086118983fd8a8fd522000",
+    "resources/js/pages/it/changes/changes.test.tsx": "878a6516f81afc0fd25c5848d3d60f9a7177436ee076bf6bc6e24de2ae4286ec",
+    "resources/js/pages/it/problems/index.tsx": "c38e126a8cfe85ce861ddcc144d15b60d74faa7ca67c9c65a244281c4f5fc335",
+    "resources/js/pages/it/problems/show.tsx": "cd8351d97890e0dd7b4bca4c9f600ce691ac9b7ed2145f7daa46dc76af8952c1",
+    "resources/js/pages/it/problems/problems.test.tsx": "29fbe8f861056751a3bb2a2dcc4eb57c77063f5868dc89cda470dc92fefb2b59",
+    "resources/js/pages/it/major-incidents/index.tsx": "0e85957c984c0f0e7b2054a7a7876bfe6b255a4f13c26c68364a48e2693a9474",
+    "resources/js/pages/it/major-incidents/show.tsx": "05ebd0a7046d8fc7ac0061eaf6bcad9ac066595e98ae60ac7f423e67326ff1a9",
+    "resources/js/pages/it/major-incidents/major-incidents.test.tsx": "9fabffca2751e6e7a0ea58733aea7a8e4de636c880833d824349f6dc2218065f",
+    "tests/Feature/It/ItChangeManagementTest.php": "c8cce02774e1a1dd505c6d1689ce2c9e194ad98b6e11b59fb43c6e4a239b8be5",
+    "tests/Feature/It/ItMajorIncidentManagementTest.php": "a614b6e8ce1bf8d088f723c3ca417f24417b3901949c5116ed16112f220f5a2a",
+    "tests/Feature/It/ItProblemManagementTest.php": "e72a0ea60f404446bf9f1523ed51412cf8e9c3c7e166b7539bb391d1334349e9",
+    "tests/Feature/It/ItSpecialistCommandContractTest.php": "2e93feaf37e304eb39f1bebee3517757eb2dce8fbf82568e557084aad57b1418",
+    "resources/js/components/it/it-reports.tsx": "124259d59e87202b0552bd0b06d33c157b99029b5e134e4b346b78a76748ce10"
+  },
+  "priorBrowserComparison": [
+    {
+      "file": "app/Domain/It/Services/ItChangeService.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Domain/It/Services/ItMajorIncidentService.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Domain/It/Services/ItProblemService.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Domain/It/Services/ItSpecialistWorkspaceSummary.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Controllers/It/ItChangeController.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Controllers/It/ItMajorIncidentController.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Controllers/It/ItProblemController.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Requests/It/StoreItChangeRequest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Requests/It/StoreItMajorIncidentRequest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Requests/It/StoreItMajorIncidentUpdateRequest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Requests/It/StoreItProblemRequest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Requests/It/TransitionItChangeRequest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Requests/It/TransitionItMajorIncidentRequest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Requests/It/TransitionItProblemRequest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Requests/It/UpdateItChangeRequest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Requests/It/UpdateItMajorIncidentRequest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Requests/It/UpdateItProblemRequest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "app/Http/Requests/It/Concerns/NormalizesItChangeWindow.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/components/it/specialist-create-wizard.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/components/it/specialist-creation-result.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/components/it/specialist-record-header.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/components/it/specialist-record-list.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": false
+    },
+    {
+      "file": "resources/js/components/it/specialist-workspace-header.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/components/it/use-specialist-form-defaults.ts",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/components/it/__tests__/specialist-command-wizard.test.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/pages/it/changes/index.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/pages/it/changes/show.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/pages/it/changes/changes.test.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/pages/it/problems/index.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/pages/it/problems/show.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/pages/it/problems/problems.test.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/pages/it/major-incidents/index.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/pages/it/major-incidents/show.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/pages/it/major-incidents/major-incidents.test.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "tests/Feature/It/ItChangeManagementTest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "tests/Feature/It/ItMajorIncidentManagementTest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "tests/Feature/It/ItProblemManagementTest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "tests/Feature/It/ItSpecialistCommandContractTest.php",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    },
+    {
+      "file": "resources/js/components/it/it-reports.tsx",
+      "priorBrowserHashPresent": true,
+      "unchangedSincePriorBrowser": true
+    }
+  ],
+  "validation": {
+    "uiPassed": true,
+    "uiCases": 12,
+    "uiSuites": 4,
+    "uiExitCode": 0,
+    "phpSyntaxPassed": true,
+    "phpFiles": 22,
+    "typecheckAccepted": true,
+    "typecheckExitCode": 0,
+    "buildPassed": true,
+    "buildExitCode": 0,
+    "buildDuration": "3m46s",
+    "buildAsset": "app-YHAZvUsO.js",
+    "buildLocation": "private publication copy",
+    "routeGenerationDisabledForVerification": true,
+    "databaseTestsRerun": false,
+    "workingDatabaseMutated": false,
+    "sharedBuildMutated": false,
+    "earlierBackendAndBrowserEvidenceReusedForUnchangedFiles": true
+  },
+  "excludedActiveTasks": [
+    "Knowledge",
+    "Provisioning",
+    "Governance"
+  ],
+  "schemaChanges": false
+}

@@ -10,6 +10,7 @@ use App\Models\ItTicketEvent;
 use App\Models\User;
 use App\Services\AuditLogger;
 use DomainException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -19,12 +20,14 @@ class ItProblemService
         private readonly ItWorkTransitionService $transitionService,
         private readonly ItTicketLinkService $linkService,
         private readonly ItWorkAccessService $workAccess,
+        private readonly ItTicketVersionService $versions,
     ) {}
 
     /** @param array<string, mixed> $data */
     public function create(User $actor, array $data): ItProblem
     {
         return DB::transaction(function () use ($actor, $data): ItProblem {
+            $actor = $this->versions->currentActor($actor);
             if (! $this->workAccess->canAssignScope(
                 $actor,
                 $data['site_id'] ?? null,
@@ -83,8 +86,8 @@ class ItProblemService
     public function update(ItProblem $problem, User $actor, array $data): ItProblem
     {
         return DB::transaction(function () use ($problem, $actor, $data): ItProblem {
-            $problem = $this->lockedProblem($problem, $actor);
-            $ticket = $problem->ticket()->lockForUpdate()->firstOrFail();
+            [$problem, $actor] = $this->lockedProblem($problem, $actor, isset($data['expected_version']) ? (int) $data['expected_version'] : null);
+            $ticket = $problem->ticket;
             $this->validateLinkTargets($ticket, $data);
 
             $ticket->fill(Arr::only($data, ['title', 'description', 'category', 'priority', 'next_action']));
@@ -101,6 +104,9 @@ class ItProblemService
             $problem->updated_by_user_id = $actor->id;
             $problem->save();
             $this->syncLinks($problem, $actor, $data);
+
+            // Profile-only and relationship-only edits also invalidate older forms.
+            $this->versions->advance($ticket);
 
             ItTicketEvent::record($ticket, 'problem_updated', $actor->id, [
                 'ticket_fields' => $ticketChanged,
@@ -127,6 +133,9 @@ class ItProblemService
         string $reason,
         ?string $resolutionCode = null,
         ?string $resolutionSummary = null,
+        ?int $expectedVersion = null,
+        ?string $nextAction = null,
+        ?string $waitingParty = null,
     ): ItProblem {
         return DB::transaction(function () use (
             $problem,
@@ -135,8 +144,11 @@ class ItProblemService
             $reason,
             $resolutionCode,
             $resolutionSummary,
+            $expectedVersion,
+            $nextAction,
+            $waitingParty,
         ): ItProblem {
-            $problem = $this->lockedProblem($problem, $actor);
+            [$problem, $actor] = $this->lockedProblem($problem, $actor, $expectedVersion);
             if ($state === ItWorkflowState::KnownError
                 && (blank($problem->root_cause) || blank($problem->workaround))) {
                 throw new DomainException('Root cause and workaround are required before publishing a known error.');
@@ -153,6 +165,9 @@ class ItProblemService
                 resolutionCode: $resolutionCode,
                 resolutionSummary: $resolutionSummary,
                 source: 'problem_management',
+                expectedVersion: $expectedVersion,
+                nextAction: $nextAction,
+                waitingParty: $waitingParty,
             ));
 
             if ($state === ItWorkflowState::KnownError && $problem->known_error_at === null) {
@@ -165,19 +180,21 @@ class ItProblemService
         });
     }
 
-    private function lockedProblem(ItProblem $problem, User $actor): ItProblem
+    /** @return array{0: ItProblem, 1: User} */
+    private function lockedProblem(ItProblem $problem, User $actor, ?int $expectedVersion = null): array
     {
-        $locked = ItProblem::query()
-            ->whereKey($problem->id)
-            ->with('ticket')
-            ->lockForUpdate()
-            ->firstOrFail();
-
-        if (! $locked->ticket || ! $this->workAccess->canWork($actor, $locked->ticket)) {
-            throw new DomainException('You are not allowed to manage IT problems.');
+        // Use the canonical parent lock before the specialist profile, as ticket commands do.
+        $ticket = ItTicket::query()->whereKey($problem->ticket_id)->lockForUpdate()->firstOrFail();
+        $actor = $this->versions->currentActor($actor);
+        if (! $this->workAccess->canWork($actor, $ticket)) {
+            throw (new ModelNotFoundException)->setModel(ItProblem::class);
         }
+        $this->versions->assertCurrent($ticket, $expectedVersion);
+        $locked = ItProblem::query()->whereKey($problem->id)->where('ticket_id', $ticket->id)
+            ->lockForUpdate()->firstOrFail();
+        $locked->setRelation('ticket', $ticket);
 
-        return $locked;
+        return [$locked, $actor];
     }
 
     /** @param array<string, mixed> $data */

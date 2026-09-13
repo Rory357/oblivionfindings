@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -31,12 +32,14 @@ class ItChangeService
         private readonly ItWorkTransitionService $transitionService,
         private readonly ItTicketLinkService $linkService,
         private readonly ItWorkAccessService $workAccess,
+        private readonly ItTicketVersionService $versions,
     ) {}
 
     /** @param array<string, mixed> $data */
     public function create(User $actor, array $data): ItChange
     {
         return DB::transaction(function () use ($actor, $data): ItChange {
+            $actor = $this->versions->currentActor($actor);
             if (! $this->workAccess->canAssignScope(
                 $actor,
                 $data['site_id'] ?? null,
@@ -96,10 +99,12 @@ class ItChangeService
     public function update(ItChange $change, User $actor, array $data): ItChange
     {
         return DB::transaction(function () use ($change, $actor, $data): ItChange {
-            $change = $this->lockedChange($change, $actor);
-            $ticket = $change->ticket()->lockForUpdate()->firstOrFail();
+            [$change, $actor] = $this->lockedChange($change, $actor, isset($data['expected_version']) ? (int) $data['expected_version'] : null);
+            $ticket = $change->ticket;
 
-            $governanceFields = array_intersect(array_keys($data), ['change_type', 'risk_level', 'is_restricted']);
+            $governance = clone $change;
+            $governance->fill(Arr::only($data, ['change_type', 'risk_level', 'is_restricted']));
+            $governanceFields = array_keys($governance->getDirty());
             if ($governanceFields !== []
                 && ! in_array($ticket->workflow_state, ['draft', 'assessment'], true)) {
                 throw new DomainException('Change type, risk, and restriction can only be edited during draft or assessment.');
@@ -122,6 +127,9 @@ class ItChangeService
             $ticket->requires_approval = $change->needsApproval();
             $ticket->save();
             $this->syncLinks($change, $actor, $data);
+
+            // Profile-only and relationship-only edits also invalidate older forms.
+            $this->versions->advance($ticket);
 
             ItTicketEvent::record($ticket, 'change_updated', $actor->id, [
                 'ticket_fields' => $ticketChanged,
@@ -148,6 +156,8 @@ class ItChangeService
         string $reason,
         ?string $resolutionCode = null,
         ?string $resolutionSummary = null,
+        ?int $expectedVersion = null,
+        ?string $nextAction = null,
     ): ItChange {
         return DB::transaction(function () use (
             $change,
@@ -156,8 +166,10 @@ class ItChangeService
             $reason,
             $resolutionCode,
             $resolutionSummary,
+            $expectedVersion,
+            $nextAction,
         ): ItChange {
-            $change = $this->lockedChange($change, $actor);
+            [$change, $actor] = $this->lockedChange($change, $actor, $expectedVersion);
             $ticket = $change->ticket;
             $this->guardTransition($change, $actor, $state);
 
@@ -168,6 +180,8 @@ class ItChangeService
                 resolutionCode: $resolutionCode,
                 resolutionSummary: $resolutionSummary,
                 source: 'change_management',
+                expectedVersion: $expectedVersion,
+                nextAction: $nextAction,
             ));
 
             if ($state === ItWorkflowState::Implementing && $change->implemented_at === null) {
@@ -257,19 +271,21 @@ class ItChangeService
         }
     }
 
-    private function lockedChange(ItChange $change, User $actor): ItChange
+    /** @return array{0: ItChange, 1: User} */
+    private function lockedChange(ItChange $change, User $actor, ?int $expectedVersion = null): array
     {
-        $locked = ItChange::query()
-            ->whereKey($change->id)
-            ->with('ticket')
-            ->lockForUpdate()
-            ->firstOrFail();
-
-        if (! $locked->ticket || ! $this->workAccess->canWork($actor, $locked->ticket)) {
-            throw new DomainException('You are not allowed to manage IT changes.');
+        // Use the canonical parent lock before the specialist profile, as ticket commands do.
+        $ticket = ItTicket::query()->whereKey($change->ticket_id)->lockForUpdate()->firstOrFail();
+        $actor = $this->versions->currentActor($actor);
+        if (! $this->workAccess->canWork($actor, $ticket)) {
+            throw (new ModelNotFoundException)->setModel(ItChange::class);
         }
+        $this->versions->assertCurrent($ticket, $expectedVersion);
+        $locked = ItChange::query()->whereKey($change->id)->where('ticket_id', $ticket->id)
+            ->lockForUpdate()->firstOrFail();
+        $locked->setRelation('ticket', $ticket);
 
-        return $locked;
+        return [$locked, $actor];
     }
 
     /** @param array<string, mixed> $data */

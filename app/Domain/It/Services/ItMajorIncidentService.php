@@ -17,6 +17,7 @@ use App\Notifications\It\MajorIncidentUpdateNotification;
 use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -27,12 +28,14 @@ final class ItMajorIncidentService
         private readonly ItWorkTransitionService $transitionService,
         private readonly ItTicketLinkService $linkService,
         private readonly ItWorkAccessService $workAccess,
+        private readonly ItTicketVersionService $versions,
     ) {}
 
     /** @param array<string, mixed> $data */
     public function create(User $actor, array $data): ItMajorIncident
     {
         return DB::transaction(function () use ($actor, $data): ItMajorIncident {
+            $actor = $this->versions->currentActor($actor);
             if (! $this->workAccess->canAssignScope(
                 $actor,
                 $data['site_id'] ?? null,
@@ -95,8 +98,8 @@ final class ItMajorIncidentService
     public function update(ItMajorIncident $majorIncident, User $actor, array $data): ItMajorIncident
     {
         return DB::transaction(function () use ($majorIncident, $actor, $data): ItMajorIncident {
-            $majorIncident = $this->lockedMajorIncident($majorIncident, $actor);
-            $ticket = $majorIncident->ticket()->lockForUpdate()->firstOrFail();
+            [$majorIncident, $actor] = $this->lockedMajorIncident($majorIncident, $actor, isset($data['expected_version']) ? (int) $data['expected_version'] : null);
+            $ticket = $majorIncident->ticket;
 
             if (array_key_exists('commander_user_id', $data)) {
                 $this->guardCommandUser($ticket, $data['commander_user_id'], 'incident commander');
@@ -119,13 +122,16 @@ final class ItMajorIncidentService
                 'target_update_minutes', 'restoration_summary', 'root_cause_summary', 'review_summary',
             ]));
             $profileFields = array_keys($majorIncident->getDirty());
-            if (array_key_exists('target_update_minutes', $data)
+            if ($majorIncident->isDirty('target_update_minutes')
                 && ! in_array($ticket->workflow_state, ['restored', 'resolved', 'review', 'closed'], true)) {
                 $majorIncident->next_update_due_at = now()->addMinutes((int) $majorIncident->target_update_minutes);
             }
             $majorIncident->updated_by_user_id = $actor->id;
             $majorIncident->save();
             $this->syncLinks($majorIncident, $actor, $data);
+
+            // Profile-only and relationship-only edits also invalidate older forms.
+            $this->versions->advance($ticket);
 
             ItTicketEvent::record($ticket, 'major_incident_updated', $actor->id, [
                 'ticket_fields' => $ticketFields,
@@ -149,14 +155,19 @@ final class ItMajorIncidentService
     public function postUpdate(ItMajorIncident $majorIncident, User $actor, array $data): ItMajorIncidentUpdate
     {
         return DB::transaction(function () use ($majorIncident, $actor, $data): ItMajorIncidentUpdate {
-            $majorIncident = $this->lockedMajorIncident($majorIncident, $actor);
+            [$majorIncident, $actor] = $this->lockedMajorIncident($majorIncident, $actor, isset($data['expected_version']) ? (int) $data['expected_version'] : null);
+            // Updates are part of the canonical record version, including command notes.
+            $this->versions->advance($majorIncident->ticket);
             $update = $majorIncident->updates()->create([
                 ...Arr::only($data, ['update_kind', 'audience', 'summary', 'service_status']),
                 'published_at' => now(),
                 'author_user_id' => $actor->id,
             ]);
 
-            if (! in_array($majorIncident->ticket->workflow_state, ['restored', 'resolved', 'review', 'closed'], true)) {
+            // Internal command work does not fulfil the audience-update promise.
+            if ($update->audience !== 'internal'
+                && $update->update_kind !== 'command_note'
+                && ! in_array($majorIncident->ticket->workflow_state, ['restored', 'resolved', 'review', 'closed'], true)) {
                 $majorIncident->next_update_due_at = now()->addMinutes($majorIncident->target_update_minutes);
             }
             $majorIncident->updated_by_user_id = $actor->id;
@@ -195,9 +206,11 @@ final class ItMajorIncidentService
         string $reason,
         ?string $resolutionCode = null,
         ?string $resolutionSummary = null,
+        ?int $expectedVersion = null,
+        ?string $nextAction = null,
     ): ItMajorIncident {
-        return DB::transaction(function () use ($majorIncident, $actor, $state, $reason, $resolutionCode, $resolutionSummary): ItMajorIncident {
-            $majorIncident = $this->lockedMajorIncident($majorIncident, $actor);
+        return DB::transaction(function () use ($majorIncident, $actor, $state, $reason, $resolutionCode, $resolutionSummary, $expectedVersion, $nextAction): ItMajorIncident {
+            [$majorIncident, $actor] = $this->lockedMajorIncident($majorIncident, $actor, $expectedVersion);
             $this->guardTransition($majorIncident, $state);
 
             $this->transitionService->transition($majorIncident->ticket, new ItTransitionInput(
@@ -207,6 +220,8 @@ final class ItMajorIncidentService
                 resolutionCode: $resolutionCode,
                 resolutionSummary: $resolutionSummary,
                 source: 'major_incident_management',
+                expectedVersion: $expectedVersion,
+                nextAction: $nextAction,
             ));
 
             if (in_array($state, [ItWorkflowState::Restored, ItWorkflowState::Resolved], true)) {
@@ -229,19 +244,21 @@ final class ItMajorIncidentService
         });
     }
 
-    private function lockedMajorIncident(ItMajorIncident $majorIncident, User $actor): ItMajorIncident
+    /** @return array{0: ItMajorIncident, 1: User} */
+    private function lockedMajorIncident(ItMajorIncident $majorIncident, User $actor, ?int $expectedVersion = null): array
     {
-        $locked = ItMajorIncident::query()
-            ->whereKey($majorIncident->id)
-            ->with('ticket')
-            ->lockForUpdate()
-            ->firstOrFail();
-
-        if (! $locked->ticket || ! $this->workAccess->canWork($actor, $locked->ticket)) {
-            throw new DomainException('You are not allowed to manage major incidents.');
+        // Use the canonical parent lock before the specialist profile, as ticket commands do.
+        $ticket = ItTicket::query()->whereKey($majorIncident->ticket_id)->lockForUpdate()->firstOrFail();
+        $actor = $this->versions->currentActor($actor);
+        if (! $this->workAccess->canWork($actor, $ticket)) {
+            throw (new ModelNotFoundException)->setModel(ItMajorIncident::class);
         }
+        $this->versions->assertCurrent($ticket, $expectedVersion);
+        $locked = ItMajorIncident::query()->whereKey($majorIncident->id)->where('ticket_id', $ticket->id)
+            ->lockForUpdate()->firstOrFail();
+        $locked->setRelation('ticket', $ticket);
 
-        return $locked;
+        return [$locked, $actor];
     }
 
     private function guardCommandUser(ItTicket $ticket, mixed $userId, string $label): void

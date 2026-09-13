@@ -6,6 +6,7 @@ use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItChangeService;
 use App\Domain\It\Services\ItLinkedContextOptions;
 use App\Domain\It\Services\ItSlaReadService;
+use App\Domain\It\Services\ItSpecialistWorkspaceSummary;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\Monitoring\Services\MonitoringTechnicalSummary;
 use App\Domain\SecurityDevices\Models\Device;
@@ -74,6 +75,7 @@ class ItChangeController extends Controller
             ->through(fn (ItChange $change) => $this->changeRow($change));
 
         return Inertia::render('it/changes/index', [
+            'summary' => app(ItSpecialistWorkspaceSummary::class)->forWorkspace('changes', $user),
             'changes' => $changes,
             'filters' => array_map(fn (string $value) => $value !== '' ? $value : null, $filters),
             'can' => ['manage' => $request->user()->canDo('it.manage')],
@@ -89,7 +91,17 @@ class ItChangeController extends Controller
         try {
             $change = $this->changeService->create($user, $data);
         } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            return redirect()->back()->withErrors(['form' => $exception->getMessage()]);
+        }
+
+        if ($request->boolean('wizard')) {
+            return redirect()->back()->with('it_ticket', [
+                'id' => (int) $change->ticket_id,
+                'specialist_id' => (int) $change->id,
+                'reference' => $change->ticket->reference,
+                'workspace' => 'changes',
+                'actor_user_id' => (int) $user->id,
+            ]);
         }
 
         return redirect()->route('it.changes.show', $change)->with('success', "Change {$change->ticket->reference} opened.");
@@ -168,7 +180,7 @@ class ItChangeController extends Controller
         try {
             $this->changeService->update($change, $request->user(), $request->validated());
         } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            return redirect()->back()->withErrors(['form' => $exception->getMessage()]);
         }
 
         return redirect()->back()->with('success', 'Change updated.');
@@ -190,9 +202,11 @@ class ItChangeController extends Controller
                 (string) $data['reason'],
                 $data['resolution_code'] ?? null,
                 $data['resolution_summary'] ?? null,
+                (int) $data['expected_version'],
+                $data['next_action'] ?? null,
             );
         } catch (DomainException $exception) {
-            return redirect()->back()->with('error', $exception->getMessage());
+            return redirect()->back()->withErrors(['form' => $exception->getMessage()]);
         }
 
         return redirect()->back()->with('success', 'Change state updated.');
@@ -265,6 +279,7 @@ class ItChangeController extends Controller
     {
         return [
             'id' => $ticket->id,
+            'lock_version' => (int) $ticket->lock_version,
             'reference' => $ticket->reference,
             'title' => $ticket->title,
             'priority' => $ticket->priority,

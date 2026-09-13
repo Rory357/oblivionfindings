@@ -114,7 +114,7 @@ test('impacted services sites related incidents and the canonical Control Room a
     $alertCount = ControlRoomAlert::query()->count();
 
     $this->actingAs($this->commander)
-        ->patch("/it/major-incidents/{$majorIncident->id}", [
+        ->patch("/it/major-incidents/{$majorIncident->id}", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'),
             'service_ids' => [$service->id],
             'site_ids' => [$site->id],
             'incident_ids' => [$incident->id],
@@ -148,7 +148,7 @@ test('impacted services sites related incidents and the canonical Control Room a
 
 test('update cadence becomes overdue and audience safe communications notify affected requesters', function () {
     Notification::fake();
-    Carbon::setTestNow('2026-07-19 10:00:00');
+    Carbon::setTestNow(now()->startOfHour());
     $majorIncident = majorIncidentAtSite($this->site, [
         'target_update_minutes' => 30,
         'next_update_due_at' => now()->subMinute(),
@@ -159,7 +159,7 @@ test('update cadence becomes overdue and audience safe communications notify aff
         'requester_user_id' => $this->requester->id,
     ]);
     $this->actingAs($this->commander)
-        ->patch("/it/major-incidents/{$majorIncident->id}", ['incident_ids' => [$incident->id]])
+        ->patch("/it/major-incidents/{$majorIncident->id}", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'), 'incident_ids' => [$incident->id]])
         ->assertRedirect();
 
     $this->actingAs($this->commander)
@@ -167,7 +167,7 @@ test('update cadence becomes overdue and audience safe communications notify aff
         ->assertInertia(fn ($page) => $page->where('majorIncident.update_state', 'overdue'));
 
     $this->actingAs($this->commander)
-        ->post("/it/major-incidents/{$majorIncident->id}/updates", [
+        ->post("/it/major-incidents/{$majorIncident->id}/updates", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'),
             'update_kind' => 'command_note',
             'audience' => 'internal',
             'summary' => 'Identity vendor bridge opened with privileged diagnostics.',
@@ -176,8 +176,13 @@ test('update cadence becomes overdue and audience safe communications notify aff
         ->assertRedirect();
     Notification::assertNothingSent();
 
+    expect($majorIncident->fresh()->next_update_due_at?->equalTo(now()->subMinute()))->toBeTrue();
+    $this->actingAs($this->commander)
+        ->get("/it/major-incidents/{$majorIncident->id}")
+        ->assertInertia(fn ($page) => $page->where('majorIncident.update_state', 'overdue'));
+
     $this->actingAs($this->communicationsLead)
-        ->post("/it/major-incidents/{$majorIncident->id}/updates", [
+        ->post("/it/major-incidents/{$majorIncident->id}/updates", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'),
             'update_kind' => 'stakeholder_update',
             'audience' => 'staff',
             'summary' => 'Authentication remains unavailable. Use the emergency phone process.',
@@ -230,34 +235,34 @@ test('restoration resolution review and closure require explicit evidence', func
     ]);
 
     $this->actingAs($this->commander)
-        ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['workflow_state' => 'responding', 'reason' => 'Command structure active.'])
+        ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'), 'workflow_state' => 'responding', 'reason' => 'Command structure active.'])
         ->assertRedirect();
     $this->actingAs($this->commander)
-        ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['workflow_state' => 'restored', 'reason' => 'Try to restore without evidence.'])
+        ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'), 'workflow_state' => 'restored', 'reason' => 'Try to restore without evidence.'])
         ->assertRedirect()
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('form');
 
     $this->actingAs($this->commander)
-        ->patch("/it/major-incidents/{$majorIncident->id}", ['restoration_summary' => 'Primary authentication restored; queued sessions drained.'])
+        ->patch("/it/major-incidents/{$majorIncident->id}", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'), 'restoration_summary' => 'Primary authentication restored; queued sessions drained.'])
         ->assertRedirect();
     $this->actingAs($this->commander)
-        ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['workflow_state' => 'restored', 'reason' => 'Service availability confirmed.'])
+        ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'), 'workflow_state' => 'restored', 'reason' => 'Service availability confirmed.'])
         ->assertRedirect();
     $this->actingAs($this->commander)
-        ->post("/it/major-incidents/{$majorIncident->id}/transitions", [
+        ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'),
             'workflow_state' => 'resolved',
             'reason' => 'Try to resolve before root cause.',
             'resolution_code' => 'service_restored',
             'resolution_summary' => 'Authentication restored.',
         ])
         ->assertRedirect()
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('form');
 
     $this->actingAs($this->commander)
-        ->patch("/it/major-incidents/{$majorIncident->id}", ['root_cause_summary' => 'Expired identity-provider signing key.'])
+        ->patch("/it/major-incidents/{$majorIncident->id}", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'), 'root_cause_summary' => 'Expired identity-provider signing key.'])
         ->assertRedirect();
     $this->actingAs($this->commander)
-        ->post("/it/major-incidents/{$majorIncident->id}/transitions", [
+        ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'),
             'workflow_state' => 'resolved',
             'reason' => 'Technical resolution confirmed.',
             'resolution_code' => 'service_restored',
@@ -265,15 +270,15 @@ test('restoration resolution review and closure require explicit evidence', func
         ])
         ->assertRedirect();
     $this->actingAs($this->commander)
-        ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['workflow_state' => 'review', 'reason' => 'Try review without PIR.'])
+        ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'), 'workflow_state' => 'review', 'reason' => 'Try review without PIR.'])
         ->assertRedirect()
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('form');
     $this->actingAs($this->commander)
-        ->patch("/it/major-incidents/{$majorIncident->id}", ['review_summary' => 'Key-expiry monitoring and automated rotation are required.'])
+        ->patch("/it/major-incidents/{$majorIncident->id}", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'), 'review_summary' => 'Key-expiry monitoring and automated rotation are required.'])
         ->assertRedirect();
     foreach (['review', 'closed'] as $state) {
         $this->actingAs($this->commander)
-            ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['workflow_state' => $state, 'reason' => "Move incident to {$state}."])
+            ->post("/it/major-incidents/{$majorIncident->id}/transitions", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'), 'workflow_state' => $state, 'reason' => "Move incident to {$state}."])
             ->assertRedirect();
     }
 
@@ -282,6 +287,16 @@ test('restoration resolution review and closure require explicit evidence', func
         ->and($majorIncident->restored_at)->not->toBeNull()
         ->and($majorIncident->reviewed_at)->not->toBeNull()
         ->and($majorIncident->ticket->closed_at)->not->toBeNull();
+});
+
+test('saving an unchanged update interval does not postpone an overdue communication', function () {
+    Carbon::setTestNow(now()->startOfHour());
+    $majorIncident = majorIncidentAtSite($this->site, ['target_update_minutes' => 30, 'next_update_due_at' => now()->subMinutes(5)]);
+    $this->actingAs($this->commander)->patch("/it/major-incidents/{$majorIncident->id}", [
+        'expected_version' => (int) $majorIncident->ticket()->value('lock_version'),
+        'target_update_minutes' => 30, 'impact_summary' => 'Confirmed affected systems.',
+    ])->assertRedirect()->assertSessionDoesntHaveErrors();
+    expect($majorIncident->fresh()->next_update_due_at->equalTo(now()->subMinutes(5)))->toBeTrue();
 });
 
 test('the live workspace reuses shared ticket work and exposes communications state', function () {
@@ -317,7 +332,7 @@ test('major incident command is agent only site concealed and rejects inactive i
 
     $this->actingAs($this->requester)->get('/it/major-incidents')->assertForbidden();
     $this->actingAs($this->requester)
-        ->patch("/it/major-incidents/{$majorIncident->id}", ['severity' => 'sev4'])
+        ->patch("/it/major-incidents/{$majorIncident->id}", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'), 'severity' => 'sev4'])
         ->assertForbidden();
 
     $otherSite = Site::factory()->create();
@@ -328,7 +343,7 @@ test('major incident command is agent only site concealed and rejects inactive i
 
     $inactiveService = ItService::factory()->create(['is_active' => false]);
     $this->actingAs($this->commander)
-        ->patch("/it/major-incidents/{$majorIncident->id}", ['service_ids' => [$inactiveService->id]])
+        ->patch("/it/major-incidents/{$majorIncident->id}", ['expected_version' => (int) $majorIncident->ticket()->value('lock_version'), 'service_ids' => [$inactiveService->id]])
         ->assertRedirect()
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('form');
 });

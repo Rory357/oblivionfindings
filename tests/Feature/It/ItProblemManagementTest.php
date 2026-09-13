@@ -91,15 +91,15 @@ test('root cause workaround and corrective action govern known error resolution 
     $problem = problemAtSite($this->site);
 
     $this->actingAs($this->agent)
-        ->post("/it/problems/{$problem->id}/transitions", [
+        ->post("/it/problems/{$problem->id}/transitions", ['expected_version' => (int) $problem->ticket()->value('lock_version'),
             'workflow_state' => 'known_error',
             'reason' => 'Pattern confirmed',
         ])
         ->assertRedirect()
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('form');
 
     $this->actingAs($this->agent)
-        ->patch("/it/problems/{$problem->id}", [
+        ->patch("/it/problems/{$problem->id}", ['expected_version' => (int) $problem->ticket()->value('lock_version'),
             'root_cause' => 'Gateway certificate renewal left one node on the old chain.',
             'workaround' => 'Pin affected users to the healthy gateway node.',
             'corrective_action' => 'Replace the certificate chain and restart both nodes.',
@@ -111,7 +111,7 @@ test('root cause workaround and corrective action govern known error resolution 
         ->where('auditable_id', $problem->ticket_id)
         ->exists())->toBeTrue();
     $this->actingAs($this->agent)
-        ->post("/it/problems/{$problem->id}/transitions", [
+        ->post("/it/problems/{$problem->id}/transitions", ['expected_version' => (int) $problem->ticket()->value('lock_version'),
             'workflow_state' => 'known_error',
             'reason' => 'Root cause and workaround are verified.',
         ])
@@ -120,7 +120,7 @@ test('root cause workaround and corrective action govern known error resolution 
         ->and($problem->ticket->fresh()->workflow_state)->toBe('known_error');
 
     $this->actingAs($this->agent)
-        ->post("/it/problems/{$problem->id}/transitions", [
+        ->post("/it/problems/{$problem->id}/transitions", ['expected_version' => (int) $problem->ticket()->value('lock_version'),
             'workflow_state' => 'resolved',
             'reason' => 'Permanent correction validated.',
             'resolution_code' => 'permanent_fix',
@@ -128,7 +128,7 @@ test('root cause workaround and corrective action govern known error resolution 
         ])
         ->assertRedirect();
     $this->actingAs($this->agent)
-        ->post("/it/problems/{$problem->id}/transitions", [
+        ->post("/it/problems/{$problem->id}/transitions", ['expected_version' => (int) $problem->ticket()->value('lock_version'),
             'workflow_state' => 'closed',
             'reason' => 'Post-resolution observation period passed.',
         ])
@@ -152,7 +152,7 @@ test('affected incidents and the permanent fix change receive reciprocal typed l
     ]);
 
     $this->actingAs($this->agent)
-        ->patch("/it/problems/{$problem->id}", [
+        ->patch("/it/problems/{$problem->id}", ['expected_version' => (int) $problem->ticket()->value('lock_version'),
             'incident_ids' => [$incidentOne->id, $incidentTwo->id],
             'permanent_fix_change_id' => $change->id,
         ])
@@ -213,7 +213,7 @@ test('problem management is agent only site concealed and rejects invalid linked
 
     $this->actingAs($this->requester)->get('/it/problems')->assertForbidden();
     $this->actingAs($this->requester)
-        ->patch("/it/problems/{$problem->id}", ['root_cause' => 'Injected'])
+        ->patch("/it/problems/{$problem->id}", ['expected_version' => (int) $problem->ticket()->value('lock_version'), 'root_cause' => 'Injected'])
         ->assertForbidden();
 
     $otherSite = Site::factory()->create();
@@ -224,8 +224,8 @@ test('problem management is agent only site concealed and rejects invalid linked
 
     $serviceRequest = ItTicket::factory()->create(['site_id' => $this->site->id, 'work_type' => 'service_request']);
     $this->actingAs($this->agent)
-        ->patch("/it/problems/{$problem->id}", ['incident_ids' => [$serviceRequest->id]])
+        ->patch("/it/problems/{$problem->id}", ['expected_version' => (int) $problem->ticket()->value('lock_version'), 'incident_ids' => [$serviceRequest->id]])
         ->assertRedirect()
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('form');
     expect($problem->ticket->links()->count())->toBe(0);
 });

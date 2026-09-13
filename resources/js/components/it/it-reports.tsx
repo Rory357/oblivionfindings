@@ -213,7 +213,15 @@ function reportRequestError(cause: unknown): ReportRequestError {
     };
 }
 
-export function ItReports({ days = 30 }: { days?: number }) {
+export function ItReports({
+    days = 30,
+    from: rangeFrom,
+    to: rangeTo,
+}: {
+    days?: number;
+    from?: string;
+    to?: string;
+}) {
     const [data, setData] = useState<ReportData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<ReportRequestError | null>(null);
@@ -234,7 +242,10 @@ export function ItReports({ days = 30 }: { days?: number }) {
 
         axios
             .get<ReportData>('/it/reports/data', {
-                params: { from: fmt(from), to: fmt(to) },
+                params: {
+                    from: rangeFrom ?? fmt(from),
+                    to: rangeTo ?? fmt(to),
+                },
                 signal: controller.signal,
             })
             .then((response) => {
@@ -269,7 +280,7 @@ export function ItReports({ days = 30 }: { days?: number }) {
             });
 
         return () => controller.abort();
-    }, [days, reloadVersion]);
+    }, [days, rangeFrom, rangeTo, reloadVersion]);
 
     /** CSV download URL for a card, carrying the active window. */
     const exportUrl = (card: string) => {
@@ -279,8 +290,8 @@ export function ItReports({ days = 30 }: { days?: number }) {
         const fmt = (d: Date) => d.toISOString().slice(0, 10);
         const params = new URLSearchParams({
             card,
-            from: fmt(from),
-            to: fmt(to),
+            from: data?.range.from ?? rangeFrom ?? fmt(from),
+            to: data?.range.to ?? rangeTo ?? fmt(to),
         });
         return `/it/reports/export?${params.toString()}`;
     };
