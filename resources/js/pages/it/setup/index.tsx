@@ -22,6 +22,11 @@ import {
     type ReplyTemplateRow,
 } from '@/components/it/it-reply-templates';
 import {
+    ItTicketMacros,
+    summariseMacroAction,
+    type MacroRow,
+} from '@/components/it/it-ticket-macros';
+import {
     ItServiceOperations,
     type AutomationDefinition,
     type AutomationRunRow,
@@ -85,6 +90,7 @@ interface Props {
     replyTemplates?: ReplyTemplateRow[];
     replyPlaceholders?: Record<string, string>;
     recurrencePlans?: RecurrencePlanRow[];
+    macros?: MacroRow[];
     operationsAudit?: OperationsAudit;
     emailDeliveries?: EmailDeliveryRow[];
     emailDeliveryFilter?: {
@@ -183,6 +189,7 @@ export default function ItSetupIndex({
     replyTemplates = [],
     replyPlaceholders = {},
     recurrencePlans = [],
+    macros = [],
     operationsAudit,
     emailDeliveries = [],
     emailDeliveryFilter = null,
@@ -924,6 +931,28 @@ export default function ItSetupIndex({
                                     ),
                                 )}
                                 placeholders={replyPlaceholders}
+                            />
+                            <ItTicketMacros
+                                macros={macros.filter((macro) =>
+                                    match(
+                                        [
+                                            macro.name,
+                                            macro.description ?? '',
+                                            ...macro.actions.map((action) =>
+                                                summariseMacroAction(action, {
+                                                    agents,
+                                                    queues,
+                                                    templates: replyTemplates,
+                                                }),
+                                            ),
+                                        ].join(' '),
+                                    ),
+                                )}
+                                agents={agents}
+                                queues={queues}
+                                templates={replyTemplates.filter(
+                                    (template) => template.is_active,
+                                )}
                             />
                             <ItRecurrencePlans
                                 plans={recurrencePlans.filter((plan) =>

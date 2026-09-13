@@ -388,7 +388,7 @@ Planned → In progress → Implemented → Verified. A partial slice is never a
 
 ### W18 — Reusable replies, templates and explainable macros/rules
 
-- Status: In progress (13 September late: governed reply templates Implemented and locally Verified — versioned ItReplyTemplate store, strict placeholder allowlist with render-time blocking, Setup → Automation management, composer insertion for work-access actors; ItReplyTemplateTest + reply-templates vitest. Macros, rule dry run and the routing-rule editor remain open; routing explanation already exists via ItTicketRoutingPresenter).
+- Status: In progress (13 September late: governed reply templates Implemented and locally Verified — versioned ItReplyTemplate store, strict placeholder allowlist with render-time blocking, Setup → Automation management, composer insertion for work-access actors; ItReplyTemplateTest + reply-templates vitest. 14 September: macros Implemented and locally Verified — ItTicketMacro action allowlist (status/waiting/priority-with-reason/assign/queue/reply-template; resolve/close deliberately excluded), per-ticket preview naming every change with blockers, application through the canonical triage/interaction guards with deterministic per-action comment identities so replays can never double-post; Setup → Automation builder + TicketMacros apply control on ticket detail; ItTicketMacroTest + ticket-macros vitest. Rule dry run and the routing-rule editor remain open; routing explanation already exists via ItTicketRoutingPresenter).
 - Dependencies: W02–W04, W07–W09, W13, W15; link reviewed knowledge when W21 lands.
 - Scope and criteria: implementation-plan.md §6 W18; audit/scenario mappings retained below.
 - Changed files: none yet. Migrations: none yet.

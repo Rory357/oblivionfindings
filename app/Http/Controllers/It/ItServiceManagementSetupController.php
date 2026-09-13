@@ -422,6 +422,17 @@ class ItServiceManagementSetupController extends Controller
                     ])->values()
                 : [],
             'replyPlaceholders' => \App\Domain\It\Services\ItReplyTemplateService::PLACEHOLDERS,
+            'macros' => Schema::hasTable('it_ticket_macros')
+                ? \App\Models\ItTicketMacro::query()->orderByDesc('is_active')->orderBy('name')->get()
+                    ->map(fn (\App\Models\ItTicketMacro $macro) => [
+                        'id' => $macro->id,
+                        'name' => $macro->name,
+                        'description' => $macro->description,
+                        'actions' => $macro->actions,
+                        'is_active' => $macro->is_active,
+                        'lock_version' => (int) $macro->lock_version,
+                    ])->values()
+                : [],
             'recurrencePlans' => Schema::hasTable('it_recurrence_plans')
                 ? \App\Models\ItRecurrencePlan::query()->with('owner:id,name')->withCount('runs')
                     ->orderByRaw("status = 'retired'")->orderBy('name')->get()
