@@ -1402,7 +1402,7 @@ function CreateTicketWizard({
                                     },
                                     ...PRIORITY_OPTIONS.map((option) => ({
                                         value: option.key,
-                                        label: `Set ${option.label.toLowerCase()} priority`,
+                                        label: `Set ${option.label.replace(/^P\d+ · /, '').toLowerCase()} priority`,
                                     })),
                                 ]}
                             />

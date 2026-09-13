@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@inertiajs/react', () => ({
+    usePage: () => ({ props: { auth: { user: { id: 1 } } } }),
     router: { visit: vi.fn() },
     useForm: (initial: Record<string, unknown>) => ({
         data: initial,
@@ -45,7 +46,7 @@ describe('IT ticket Device linking', () => {
             />,
         );
 
-        expect(screen.getByText('Ticket Site')).toBeVisible();
+        expect(screen.getByText('Affected Site')).toBeVisible();
         expect(screen.getByText('Sunnyside Lodge')).toBeVisible();
         fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
