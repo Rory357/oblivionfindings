@@ -102,14 +102,15 @@ test('catalogue files use canonical private storage with original field audience
             ->assertInertia(fn ($page) => $page->has('ticket.attachments', 1)->where('ticket.attachments.0.name', 'public.txt'));
     } else {
         $this->actingAs($this->agent)->get('/it/provisioning')
-            ->assertInertia(fn ($page) => $page->has('requests.data', 1)
-                ->where('requests.data.0.id', $result->id)
-                ->where('requests.data.0.attachments', [
-                    ['id' => $public->id, 'name' => 'public.txt', 'size' => $public->size,
-                        'url' => '/it/attachments/'.$public->id, 'catalogue_field_label' => 'Supporting files', 'is_internal' => false],
-                    ['id' => $private->id, 'name' => 'private.txt', 'size' => $private->size,
-                        'url' => '/it/attachments/'.$private->id, 'catalogue_field_label' => 'IT evidence', 'is_internal' => true],
-                ]));
+            ->assertInertia(fn ($page) => $page->has('records.data', 1)
+                ->where('records.data.0.id', $result->id));
+        $this->get("/it/provisioning/tasks/{$result->id}")
+            ->assertInertia(fn ($page) => $page->where('task.attachments', [
+                ['id' => $public->id, 'name' => 'public.txt', 'size' => $public->size,
+                    'url' => '/it/attachments/'.$public->id, 'catalogue_field_label' => 'Supporting files', 'is_internal' => false],
+                ['id' => $private->id, 'name' => 'private.txt', 'size' => $private->size,
+                    'url' => '/it/attachments/'.$private->id, 'catalogue_field_label' => 'IT evidence', 'is_internal' => true],
+            ]));
         $this->actingAs($this->worker)->get("/it/provisioning/{$result->id}")
             ->assertInertia(fn ($page) => $page->has('request.attachments', 1)->where('request.attachments.0.name', 'public.txt'));
     }
@@ -125,7 +126,7 @@ test('catalogue files use canonical private storage with original field audience
     if ($outcome === 'provisioning') {
         ensureCanonicalHrStaffProfile($this->agent, Site::factory()->create());
         $this->actingAs($this->agent->fresh())->get('/it/provisioning')
-            ->assertInertia(fn ($page) => $page->has('requests.data', 0));
+            ->assertInertia(fn ($page) => $page->has('records.data', 0));
         expect($files->forResult($this->agent->fresh(), $result))->toBe([]);
         $this->get("/it/attachments/{$private->id}")->assertNotFound();
     }
