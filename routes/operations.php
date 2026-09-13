@@ -251,7 +251,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Client updates
     Route::middleware('permission:clients.update')->group(function () {
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('operations.clients.edit');
-        Route::put('/clients/{client}', [ClientController::class, 'update'])->name('operations.clients.update');
+        // whereNumber matches the GET show route above — without it, a bad
+        // GET like /operations/clients/portal-users matches this PUT pattern
+        // and renders a confusing 405 instead of a 404.
+        Route::put('/clients/{client}', [ClientController::class, 'update'])
+            ->whereNumber('client')
+            ->name('operations.clients.update');
         Route::patch('/clients/{client}/quick-update', [ClientController::class, 'quickUpdate'])->name('operations.clients.quick_update');
 
         // Archive (soft-delete) / restore — drives the index "Archive client" action

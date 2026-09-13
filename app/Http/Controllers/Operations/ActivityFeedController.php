@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\Operations\OperationsDashboardScopeService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
 class ActivityFeedController extends Controller
@@ -20,6 +22,10 @@ class ActivityFeedController extends Controller
         $filter = $request->get('filter', 'all');
         $perPage = 25;
 
+        // One window for the feed AND the header instruments: the last 7
+        // calendar days, so the meter counts/series match what the feed shows.
+        $since = now()->subDays(6)->startOfDay();
+
         $activities = collect();
 
         // Recent shifts (completed, started, cancelled)
@@ -27,7 +33,7 @@ class ActivityFeedController extends Controller
             $shifts = $this->scope->shifts($auth)
                 ->with(['client:id,first_name,last_name', 'staff:id,name'])
                 ->whereIn('status', ['completed', 'in_progress', 'cancelled'])
-                ->where('updated_at', '>=', now()->subDays(7))
+                ->where('updated_at', '>=', $since)
                 ->latest('updated_at')
                 ->limit(50)
                 ->get()
@@ -54,7 +60,7 @@ class ActivityFeedController extends Controller
             $timesheets = $this->scope->timesheets($auth)
                 ->with(['client:id,first_name,last_name', 'staff:id,name'])
                 ->whereIn('status', ['submitted', 'approved', 'rejected'])
-                ->where('updated_at', '>=', now()->subDays(7))
+                ->where('updated_at', '>=', $since)
                 ->latest('updated_at')
                 ->limit(50)
                 ->get()
@@ -74,7 +80,7 @@ class ActivityFeedController extends Controller
         // New clients
         if ($filter === 'all' || $filter === 'clients') {
             $newClients = $this->scope->clients($auth)
-                ->where('created_at', '>=', now()->subDays(7))
+                ->where('created_at', '>=', $since)
                 ->latest('created_at')
                 ->limit(20)
                 ->get()
@@ -95,6 +101,66 @@ class ActivityFeedController extends Controller
         return Inertia::render('operations/activity/Index', [
             'activities' => $sorted,
             'filter' => $filter,
+            'summary' => $this->summary($auth, $since),
         ]);
+    }
+
+    /**
+     * Header instruments for the Event Horizon band — per-stream totals,
+     * status breakdowns and per-day series over the same window as the
+     * feed, computed regardless of the active view filter so the rail
+     * counts stay honest on every tab.
+     */
+    private function summary(User $auth, Carbon $since): array
+    {
+        $days = collect(range(6, 0))
+            ->map(fn (int $i) => now()->subDays($i)->toDateString());
+
+        $shiftRows = $this->scope->shifts($auth)
+            ->whereIn('status', ['completed', 'in_progress', 'cancelled'])
+            ->where('updated_at', '>=', $since)
+            ->selectRaw('status, DATE(updated_at) as day, COUNT(*) as total')
+            ->groupBy('status', 'day')
+            ->get();
+
+        $timesheetRows = $this->scope->timesheets($auth)
+            ->whereIn('status', ['submitted', 'approved', 'rejected'])
+            ->where('updated_at', '>=', $since)
+            ->selectRaw('status, DATE(updated_at) as day, COUNT(*) as total')
+            ->groupBy('status', 'day')
+            ->get();
+
+        $clientRows = $this->scope->clients($auth)
+            ->where('created_at', '>=', $since)
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
+            ->groupBy('day')
+            ->get();
+
+        $series = fn ($rows) => $days
+            ->map(fn (string $day) => (int) $rows->where('day', $day)->sum('total'))
+            ->values()
+            ->all();
+        $byStatus = fn ($rows, string $status) => (int) $rows->where('status', $status)->sum('total');
+
+        return [
+            'shifts' => [
+                'total' => (int) $shiftRows->sum('total'),
+                'series' => $series($shiftRows),
+                'completed' => $byStatus($shiftRows, 'completed'),
+                'started' => $byStatus($shiftRows, 'in_progress'),
+                'cancelled' => $byStatus($shiftRows, 'cancelled'),
+            ],
+            'timesheets' => [
+                'total' => (int) $timesheetRows->sum('total'),
+                'series' => $series($timesheetRows),
+                'submitted' => $byStatus($timesheetRows, 'submitted'),
+                'approved' => $byStatus($timesheetRows, 'approved'),
+                'rejected' => $byStatus($timesheetRows, 'rejected'),
+            ],
+            'clients' => [
+                'total' => (int) $clientRows->sum('total'),
+                'series' => $series($clientRows),
+            ],
+        ];
     }
 }

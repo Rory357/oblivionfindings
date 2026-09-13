@@ -1,20 +1,39 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import { ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { CalendarDays, FileCheck, FileText, Plus } from 'lucide-react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import {
+    Banknote,
+    CalendarDays,
+    CheckCircle2,
+    Clock,
+    FileCheck,
+    FileEdit,
+    FileText,
+    Layers,
+    Plus,
+    Users,
+    XCircle,
+} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 
-const ANY = '__ANY__';
 const nzd = new Intl.NumberFormat('en-NZ', {
     style: 'currency',
     currency: 'NZD',
@@ -37,17 +56,38 @@ type ClaimRow = {
     submitter?: { id: number; name: string } | null;
 };
 
+type StatusSlice = { count: number; amount: number };
+
 type Props = {
     claims: {
         data: ClaimRow[];
         links?: Array<{ url: string | null; label: string; active: boolean }>;
+        last_page?: number;
+        total?: number;
     };
     clients: Array<{ id: number; first_name: string; last_name: string }>;
     filters: {
         status?: string | null;
         client_id?: string | null;
+        q?: string | null;
+    };
+    summary?: {
+        total: number;
+        total_amount: number;
+        by_status: Record<string, StatusSlice>;
     };
 };
+
+type ViewKey = 'all' | 'draft' | 'submitted' | 'approved' | 'rejected' | 'paid';
+
+const STATUS_BADGE: Record<string, { label: string; variant: StatusVariant }> =
+    {
+        draft: { label: 'Draft', variant: 'neutral' },
+        submitted: { label: 'Submitted', variant: 'info' },
+        approved: { label: 'Approved', variant: 'info' },
+        rejected: { label: 'Rejected', variant: 'critical' },
+        paid: { label: 'Paid', variant: 'success' },
+    };
 
 function formatDate(value?: string | null): string {
     if (!value) return '-';
@@ -63,188 +103,357 @@ export default function FundingClaimsIndex({
     claims,
     clients,
     filters,
+    summary,
 }: Props) {
+    const { labels } = usePage().props as any;
+    const clientPlural: string = labels?.['client.plural'] ?? 'Clients';
     const rows = claims?.data ?? [];
 
-    const updateFilters = (key: string, value: string | null) => {
-        router.get(
-            '/operations/funding/claims',
-            {
-                ...filters,
-                [key]: value,
-            },
-            {
+    const byStatus = summary?.by_status ?? {};
+    const total = summary?.total ?? 0;
+    const countOf = (status: string) => byStatus[status]?.count ?? 0;
+    const amountOf = (status: string) => byStatus[status]?.amount ?? 0;
+
+    const view: ViewKey = (
+        ['draft', 'submitted', 'approved', 'rejected', 'paid'] as const
+    ).includes(filters.status as any)
+        ? (filters.status as ViewKey)
+        : 'all';
+
+    const [q, setQ] = useState(filters.q ?? '');
+
+    const applyFilters = useCallback(
+        (overrides: { view?: ViewKey; q?: string; client_id?: string }) => {
+            const nextView = overrides.view ?? view;
+            const nextQ = overrides.q ?? filters.q ?? '';
+            const nextClient =
+                overrides.client_id ?? String(filters.client_id ?? 'all');
+            const params: Record<string, string> = {};
+            if (nextView !== 'all') params.status = nextView;
+            if (nextQ.trim() !== '') params.q = nextQ.trim();
+            if (nextClient !== 'all') params.client_id = nextClient;
+            router.get('/operations/funding/claims', params, {
                 preserveState: true,
                 replace: true,
-            },
+            });
+        },
+        [view, filters.q, filters.client_id],
+    );
+
+    useEffect(() => {
+        if ((filters.q ?? '') === q.trim()) return;
+        const t = setTimeout(() => applyFilters({ q }), 400);
+        return () => clearTimeout(t);
+    }, [q, filters.q, applyFilters]);
+
+    const railItems: PageHeaderRailItem<ViewKey>[] = [
+        { key: 'all', label: 'All claims', icon: Layers, count: total },
+        {
+            key: 'draft',
+            label: 'Drafts',
+            icon: FileEdit,
+            count: countOf('draft'),
+        },
+        {
+            key: 'submitted',
+            label: 'Submitted',
+            icon: Clock,
+            count: countOf('submitted'),
+        },
+        {
+            key: 'approved',
+            label: 'Approved',
+            icon: CheckCircle2,
+            count: countOf('approved'),
+        },
+        {
+            key: 'rejected',
+            label: 'Rejected',
+            icon: XCircle,
+            count: countOf('rejected'),
+            alert: true,
+        },
+        { key: 'paid', label: 'Paid', icon: Banknote, count: countOf('paid') },
+    ];
+
+    const currentViewLabel =
+        railItems.find((v) => v.key === view)?.label ?? 'All claims';
+    const viewTotal = view === 'all' ? total : countOf(view);
+
+    const hasNarrowing =
+        (filters.q ?? '') !== '' ||
+        String(filters.client_id ?? 'all') !== 'all';
+
+    const clientOptions = [
+        { value: 'all', label: `All ${clientPlural.toLowerCase()}` },
+        ...clients.map((c) => ({
+            value: String(c.id),
+            label: `${c.first_name} ${c.last_name}`,
+        })),
+    ];
+
+    const titleChip =
+        countOf('submitted') > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {countOf('submitted')} awaiting approval
+            </PageHeaderStatusChip>
+        ) : countOf('draft') > 0 ? (
+            <PageHeaderStatusChip variant="info">
+                {countOf('draft')} {countOf('draft') === 1 ? 'draft' : 'drafts'}
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                Up to date
+            </PageHeaderStatusChip>
         );
-    };
+
+    const header = (
+        <PageHeader
+            icon={FileCheck}
+            title="Funding claims"
+            titleChip={titleChip}
+            subline={`Claims against live service agreements · ${total} ${
+                total === 1 ? 'claim' : 'claims'
+            } · ${nzd.format(summary?.total_amount ?? 0)} claimed`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={q}
+                        onChange={setQ}
+                        placeholder={`Search claims and ${clientPlural.toLowerCase()}…`}
+                    />
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() =>
+                            router.visit('/operations/funding/claims/create')
+                        }
+                    >
+                        New claim
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Total claims"
+                        ariaLabel="View all claims"
+                        onClick={() => applyFilters({ view: 'all' })}
+                    >
+                        <PageHeaderMeterBig>{total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {nzd.format(summary?.total_amount ?? 0)} claimed
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Awaiting approval"
+                        tone={countOf('submitted') > 0 ? 'warning' : 'success'}
+                        ariaLabel="View submitted claims"
+                        onClick={() => applyFilters({ view: 'submitted' })}
+                    >
+                        <PageHeaderMeterBig>
+                            {countOf('submitted')}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {nzd.format(amountOf('submitted'))} submitted
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {total > 0 ? (
+                        <PageHeaderMeterBlock
+                            label="Paid"
+                            ariaLabel="View paid claims"
+                            onClick={() => applyFilters({ view: 'paid' })}
+                        >
+                            <PageHeaderMeterDonut
+                                percent={(countOf('paid') / total) * 100}
+                                caption={
+                                    <>
+                                        {countOf('paid')} of {total}
+                                        <br />
+                                        paid
+                                    </>
+                                }
+                            />
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label="Rejected"
+                        tone={countOf('rejected') > 0 ? 'critical' : 'success'}
+                        ariaLabel="View rejected claims"
+                        onClick={() => applyFilters({ view: 'rejected' })}
+                    >
+                        <PageHeaderMeterBig>
+                            {countOf('rejected')}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            need rework before resubmission
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    icon={Users}
+                    label={`All ${clientPlural.toLowerCase()}`}
+                    value={String(filters.client_id ?? 'all')}
+                    options={clientOptions}
+                    onChange={(v) => applyFilters({ client_id: v })}
+                />
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={view}
+                    onSelect={(key) => applyFilters({ view: key })}
+                    ariaLabel="Claim views"
+                />
+            }
+        />
+    );
 
     return (
-        <AppLayout>
-            <Head title="Funding Claims" />
-            <PageHero
-                icon={FileCheck}
-                title="Funding Claims"
-                description="Track draft, submitted, and approved claims against live service agreements."
-                stats={[
-                    { label: 'Total claims', value: rows.length },
-                    {
-                        label: 'Submitted',
-                        value: rows.filter((c) => c.status === 'submitted')
-                            .length,
-                    },
-                    {
-                        label: 'Approved',
-                        value: rows.filter((c) => c.status === 'approved')
-                            .length,
-                    },
-                    {
-                        label: 'Paid',
-                        value: rows.filter((c) => c.status === 'paid').length,
-                    },
-                ]}
-            />
-            <PageShell>
-                <div className="flex flex-wrap items-center gap-2">
-                    <Select
-                        value={filters?.status ?? ANY}
-                        onValueChange={(value) =>
-                            updateFilters(
-                                'status',
-                                value === ANY ? null : value,
-                            )
-                        }
-                    >
-                        <SelectTrigger className="h-9 w-[160px] text-xs">
-                            <SelectValue placeholder="All Statuses" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Statuses</SelectItem>
-                            {[
-                                'draft',
-                                'submitted',
-                                'approved',
-                                'rejected',
-                                'paid',
-                            ].map((status) => (
-                                <SelectItem key={status} value={status}>
-                                    {status}
-                                </SelectItem>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                { title: 'Funding', href: '/operations/funding' },
+                { title: 'Claims', href: '/operations/funding/claims' },
+            ]}
+        >
+            <Head title="Funding claims" />
+
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title={currentViewLabel}
+                        caption={`${rows.length} of ${viewTotal} shown`}
+                    />
+
+                    <div className="space-y-2">
+                        {rows.length === 0 ? (
+                            <EmptyState
+                                icon={FileText}
+                                title="No funding claims"
+                                description={
+                                    hasNarrowing || view !== 'all'
+                                        ? 'Try a different view or clear your filters.'
+                                        : 'Draft claims will appear here once a funding period is assembled.'
+                                }
+                            />
+                        ) : (
+                            rows.map((claim) => {
+                                const badge = STATUS_BADGE[claim.status] ?? {
+                                    label: claim.status,
+                                    variant: 'neutral' as StatusVariant,
+                                };
+                                return (
+                                    <Card key={claim.id}>
+                                        <CardContent className="grid gap-3 p-4 md:grid-cols-[1.4fr,1fr,0.9fr,120px] md:items-center">
+                                            <div>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Link
+                                                        href={`/operations/funding/claims/${claim.id}`}
+                                                        className="text-sm font-semibold hover:underline"
+                                                    >
+                                                        {claim.claim_reference ||
+                                                            `Claim #${claim.id}`}
+                                                    </Link>
+                                                    <StatusBadge
+                                                        variant={badge.variant}
+                                                    >
+                                                        {badge.label}
+                                                    </StatusBadge>
+                                                </div>
+                                                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                                    {claim.client && (
+                                                        <span>
+                                                            {
+                                                                claim.client
+                                                                    .first_name
+                                                            }{' '}
+                                                            {
+                                                                claim.client
+                                                                    .last_name
+                                                            }
+                                                        </span>
+                                                    )}
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <CalendarDays className="h-3 w-3" />
+                                                        {formatDate(
+                                                            claim.period_start,
+                                                        )}{' '}
+                                                        -{' '}
+                                                        {formatDate(
+                                                            claim.period_end,
+                                                        )}
+                                                    </span>
+                                                    {claim.service_agreement
+                                                        ?.title && (
+                                                        <span>
+                                                            {
+                                                                claim
+                                                                    .service_agreement
+                                                                    .title
+                                                            }
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">
+                                                {claim.items_count ?? 0} items
+                                            </p>
+                                            <p className="text-sm font-semibold text-status-success">
+                                                {nzd.format(
+                                                    claim.total_amount ?? 0,
+                                                )}
+                                            </p>
+                                            <div className="flex justify-end">
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                >
+                                                    <Link
+                                                        href={`/operations/funding/claims/${claim.id}`}
+                                                    >
+                                                        Open
+                                                    </Link>
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })
+                        )}
+                    </div>
+
+                    {(claims.last_page ?? 1) > 1 && (
+                        <div className="flex items-center justify-center gap-1">
+                            {(claims.links ?? []).map((link, i) => (
+                                <Button
+                                    key={i}
+                                    size="sm"
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
+                                    className="h-7 min-w-[28px] px-2 text-xs"
+                                    disabled={!link.url}
+                                    onClick={() =>
+                                        link.url &&
+                                        router.get(
+                                            link.url,
+                                            {},
+                                            { preserveState: true },
+                                        )
+                                    }
+                                    dangerouslySetInnerHTML={{
+                                        __html: link.label,
+                                    }}
+                                />
                             ))}
-                        </SelectContent>
-                    </Select>
-
-                    <Select
-                        value={filters?.client_id ?? ANY}
-                        onValueChange={(value) =>
-                            updateFilters(
-                                'client_id',
-                                value === ANY ? null : value,
-                            )
-                        }
-                    >
-                        <SelectTrigger className="h-9 w-[220px] text-xs">
-                            <SelectValue placeholder="All Clients" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Clients</SelectItem>
-                            {clients.map((client) => (
-                                <SelectItem
-                                    key={client.id}
-                                    value={String(client.id)}
-                                >
-                                    {client.first_name} {client.last_name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    <div className="flex-1" />
-
-                    <Button asChild size="sm">
-                        <Link href="/operations/funding/claims/create">
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            New Claim
-                        </Link>
-                    </Button>
-                </div>
-
-                <div className="mt-4 space-y-2">
-                    {rows.length === 0 && (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16">
-                                <FileText className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <h2 className="text-lg font-semibold text-muted-foreground">
-                                    No Funding Claims
-                                </h2>
-                                <p className="mt-1 text-sm text-muted-foreground/80">
-                                    Draft claims will appear here once a funding
-                                    period is assembled.
-                                </p>
-                            </CardContent>
-                        </Card>
+                        </div>
                     )}
-
-                    {rows.map((claim) => (
-                        <Card key={claim.id}>
-                            <CardContent className="grid gap-3 p-4 md:grid-cols-[1.4fr,1fr,0.9fr,120px] md:items-center">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <Link
-                                            href={`/operations/funding/claims/${claim.id}`}
-                                            className="text-sm font-semibold hover:underline"
-                                        >
-                                            {claim.claim_reference ||
-                                                `Claim #${claim.id}`}
-                                        </Link>
-                                        <Badge
-                                            variant="outline"
-                                            className="h-4 px-1.5 text-[9px] capitalize"
-                                        >
-                                            {claim.status}
-                                        </Badge>
-                                    </div>
-                                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                        {claim.client && (
-                                            <span>
-                                                {claim.client.first_name}{' '}
-                                                {claim.client.last_name}
-                                            </span>
-                                        )}
-                                        <span className="inline-flex items-center gap-1">
-                                            <CalendarDays className="h-3 w-3" />
-                                            {formatDate(
-                                                claim.period_start,
-                                            )} - {formatDate(claim.period_end)}
-                                        </span>
-                                        {claim.service_agreement?.title && (
-                                            <span>
-                                                {claim.service_agreement.title}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                    {claim.items_count ?? 0} items
-                                </p>
-                                <p className="text-sm font-semibold text-status-success dark:text-status-success">
-                                    {nzd.format(claim.total_amount ?? 0)}
-                                </p>
-                                <div className="flex justify-end">
-                                    <Button asChild size="sm" variant="outline">
-                                        <Link
-                                            href={`/operations/funding/claims/${claim.id}`}
-                                        >
-                                            Open
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
                 </div>
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

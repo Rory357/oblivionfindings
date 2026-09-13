@@ -357,6 +357,20 @@ before.
   the chip is a migration gap, not a variant — only pages with no rail
   at all (leaf record details) are exempt
   (PAGE_HEADER_STYLE_GUIDE.md §7).
+- **Wrapping rail (two-line view tabs)** (corrected 2026-09-10) — a rail
+  whose tabs wrap onto a second line because the page declares more views
+  than the viewport fits (first seen: Rostering's 10 views + Recurring).
+  The rail is ONE line, always. `PageHeaderRail` now handles overflow
+  itself (priority+): it measures its tabs against the available width
+  and collapses the trailing views into a ghost "⋯ More" pill with a
+  popover, keeping two invariants — the ACTIVE view is always a visible
+  tab (promoted out of the overflow if needed, because the flush
+  page-ground merge is the affordance), and alert counters never
+  disappear (overflowed alert counts sum onto the More pill in the fixed
+  critical pair). Do not "fix" a crowded rail per page with wrapping,
+  horizontal scrolling, or icon-only tabs — and prefer ≤ 8 declared
+  views; beyond that the overflow pill is the designed behaviour, not a
+  defect (PAGE_HEADER_STYLE_GUIDE.md §7).
 - **Sunken active-rail labels** (corrected 2026-09-06, re-verified
   2026-09-07) — the Rule 1 connected active tab is taller than its
   inactive pills, so an uncompensated label sits ~3px below their shared

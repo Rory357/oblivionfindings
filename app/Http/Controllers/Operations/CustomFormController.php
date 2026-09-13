@@ -24,7 +24,7 @@ class CustomFormController extends Controller
             ->withCount('submissions')
             ->with('creator:id,name')
             ->when($request->filled('q'), function ($query) use ($request) {
-                $search = '%' . trim((string) $request->query('q')) . '%';
+                $search = '%'.trim((string) $request->query('q')).'%';
 
                 $query->where(function ($inner) use ($search) {
                     $inner->where('name', 'like', $search)
@@ -34,6 +34,7 @@ class CustomFormController extends Controller
             })
             ->when($request->query('status') === 'active', fn ($query) => $query->where('is_active', true))
             ->when($request->query('status') === 'inactive', fn ($query) => $query->where('is_active', false))
+            ->when($request->filled('type'), fn ($query) => $query->where('form_type', $request->query('type')))
             ->orderByDesc('updated_at')
             ->paginate(20)
             ->withQueryString()
@@ -63,8 +64,17 @@ class CustomFormController extends Controller
             'filters' => [
                 'q' => $request->query('q'),
                 'status' => $request->query('status'),
+                'type' => $request->query('type'),
             ],
             'stats' => $stats,
+            // Distinct types actually in use — the header type pill's honest
+            // vocabulary.
+            'types' => (clone $scope)
+                ->whereNotNull('form_type')
+                ->distinct()
+                ->orderBy('form_type')
+                ->pluck('form_type')
+                ->values(),
         ]);
     }
 
@@ -73,7 +83,7 @@ class CustomFormController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('custom_forms.view') || $auth->canDo('custom_forms.viewAny')), 403);
 
-        $form = CustomForm::query()->findOrFail($form);
+        $form = CustomForm::query()->withCount('submissions')->findOrFail($form);
 
         return inertia('operations/forms/Show', [
             'form' => $form,
@@ -197,7 +207,7 @@ class CustomFormController extends Controller
         ]);
 
         $shift = null;
-        if (!empty($data['shift_id'])) {
+        if (! empty($data['shift_id'])) {
             $shift = Shift::query()
                 ->select(['id', 'client_id'])
                 ->findOrFail($data['shift_id']);
@@ -219,7 +229,7 @@ class CustomFormController extends Controller
             );
         }
 
-        if ($shift && !empty($data['client_id']) && (int) $shift->client_id !== (int) $data['client_id']) {
+        if ($shift && ! empty($data['client_id']) && (int) $shift->client_id !== (int) $data['client_id']) {
             throw ValidationException::withMessages([
                 'shift_id' => 'The selected shift does not match the selected client.',
             ]);
@@ -244,7 +254,7 @@ class CustomFormController extends Controller
         $errors = [];
 
         foreach (($form->schema ?? []) as $index => $field) {
-            if (!($field['required'] ?? false)) {
+            if (! ($field['required'] ?? false)) {
                 continue;
             }
 
@@ -261,7 +271,7 @@ class CustomFormController extends Controller
             }
         }
 
-        if (!empty($errors)) {
+        if (! empty($errors)) {
             throw ValidationException::withMessages($errors);
         }
     }

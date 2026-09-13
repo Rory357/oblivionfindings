@@ -3,6 +3,8 @@ import {
     AlertCircle,
     Calendar,
     CheckCircle,
+    ChevronLeft,
+    ChevronRight,
     Clock,
     Eye,
     List,
@@ -15,8 +17,23 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import PageShell from '@/components/page-shell';
-import { TabStrip } from '@/components/rostering/tab-strip';
+import { ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageHeaderViewToggle,
+    PageLayout,
+    type PageHeaderRailItem,
+} from '@/components/page';
+import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
 import AppLayout from '@/layouts/app-layout';
 import {
     cancel as cancelShift,
@@ -31,7 +48,6 @@ import {
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { CreateShiftDialog } from './components/create-shift-dialog';
-import { DonutCard } from './components/donut-card';
 import { ShiftCalendarView } from './components/shift-calendar-view';
 import {
     ShiftContextMenu,
@@ -45,7 +61,6 @@ import {
     shiftDayKey,
     type ShiftRow,
 } from './components/shift-row-types';
-import { ShiftsHero } from './components/shifts-hero';
 import { useCreateShiftLauncher } from './components/use-create-shift-launcher';
 
 type Filters = {
@@ -175,7 +190,6 @@ export default function ShiftsIndex({
     const page = usePage().props as any;
     const labels = page?.labels;
     const auth = page?.auth;
-    const userName: string | undefined = auth?.user?.name?.split(' ')?.[0];
     const canEdit = auth?.can?.shifts?.update;
     const shiftPlural = labels?.['shift.plural'] ?? 'Shifts';
 
@@ -184,6 +198,8 @@ export default function ShiftsIndex({
 
     const [tab, setTab] = useState<TabKey>('all');
     const [viewMode, setViewMode] = useState<ViewMode>('list');
+    // Header scoped search — pushes the server `q` filter, debounced.
+    const [q, setQ] = useState((filters.q as string) ?? '');
     const [dense, setDense] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [createDefaults, setCreateDefaults] = useState<{
@@ -289,6 +305,13 @@ export default function ShiftsIndex({
         );
     }
 
+    useEffect(() => {
+        if (((filters.q as string) ?? '') === q.trim()) return;
+        const timer = setTimeout(() => handleHeroFilter('q', q.trim()), 400);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [q, filters.q]);
+
     // Client-side tab + (already server-filtered) refinement
     const tabFiltered = useMemo(() => {
         const list = shifts.data ?? [];
@@ -302,102 +325,6 @@ export default function ShiftsIndex({
     }, [shifts.data, tab, todayKey]);
 
     // Donut breakdowns
-    const shiftBreakdown = useMemo(
-        () =>
-            [
-                {
-                    key: 'scheduled',
-                    label: 'Scheduled',
-                    value: Math.max(0, stats.scheduled - stats.open),
-                    color: 'var(--primary)',
-                },
-                {
-                    key: 'in_progress',
-                    label: 'In progress',
-                    value: stats.in_progress,
-                    color: 'var(--status-warning)',
-                },
-                {
-                    key: 'open',
-                    label: 'Open',
-                    value: stats.open,
-                    color: 'var(--status-critical)',
-                },
-                {
-                    key: 'completed',
-                    label: 'Completed',
-                    value: stats.completed,
-                    color: 'var(--status-success)',
-                },
-                {
-                    key: 'draft',
-                    label: 'Draft',
-                    value: stats.draft,
-                    color: 'var(--muted-foreground)',
-                },
-            ].filter((s) => s.value > 0),
-        [stats],
-    );
-
-    const openBreakdown = useMemo(() => {
-        const openShifts = (shifts.data ?? []).filter(isOpenShift);
-        const unfilledHours = openShifts.reduce((a, s) => {
-            const start = new Date(s.starts_at).getTime();
-            const end = new Date(s.ends_at).getTime();
-            if (!start || !end || end <= start) return a;
-            return a + (end - start) / 3_600_000;
-        }, 0);
-        return [
-            {
-                key: 'open',
-                label: 'Open shifts',
-                value: stats.open,
-                color: 'var(--status-critical)',
-            },
-            {
-                key: 'unfilled-hours',
-                label: 'Unfilled hours',
-                value: Math.round(unfilledHours),
-                color: 'var(--status-warning)',
-            },
-        ].filter((s) => s.value > 0);
-    }, [shifts.data, stats.open]);
-
-    const todayBreakdown = useMemo(() => {
-        const todayList = (shifts.data ?? []).filter(
-            (s) => shiftDayKey(s.starts_at) === todayKey,
-        );
-        return [
-            {
-                key: 'in_progress',
-                label: 'On now',
-                value: todayList.filter((s) => s.status === 'in_progress')
-                    .length,
-                color: 'var(--status-warning)',
-            },
-            {
-                key: 'scheduled',
-                label: 'Upcoming',
-                value: todayList.filter(
-                    (s) => s.status === 'scheduled' && s.staff,
-                ).length,
-                color: 'var(--primary)',
-            },
-            {
-                key: 'open',
-                label: 'Open',
-                value: todayList.filter(isOpenShift).length,
-                color: 'var(--status-critical)',
-            },
-            {
-                key: 'completed',
-                label: 'Completed',
-                value: todayList.filter((s) => s.status === 'completed').length,
-                color: 'var(--status-success)',
-            },
-        ].filter((s) => s.value > 0);
-    }, [shifts.data, todayKey]);
-
     function openShiftMenu(shift: ShiftRow, e: React.MouseEvent) {
         e.preventDefault();
         e.stopPropagation();
@@ -614,172 +541,239 @@ export default function ShiftsIndex({
         [broadcastedCoverIds, broadcastingCoverIds, tabFiltered],
     );
 
+    const railItems: PageHeaderRailItem<TabKey>[] = [
+        { key: 'all', label: 'All shifts', icon: List, count: stats.total },
+        {
+            key: 'open',
+            label: 'Open',
+            icon: AlertCircle,
+            count: stats.open,
+            alert: true,
+        },
+        { key: 'today', label: 'Today', icon: Clock, count: stats.today },
+        {
+            key: 'unassigned',
+            label: 'Unassigned',
+            icon: UserPlus,
+            count: stats.unassigned,
+        },
+        {
+            key: 'completed',
+            label: 'Completed',
+            icon: CheckCircle,
+            count: stats.completed,
+        },
+    ];
+    const currentViewLabel =
+        railItems.find((v) => v.key === tab)?.label ?? 'All shifts';
+
+    const titleChip =
+        stats.open > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {stats.open} open
+            </PageHeaderStatusChip>
+        ) : stats.in_progress > 0 ? (
+            <PageHeaderStatusChip variant="info">
+                {stats.in_progress} in progress
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                Fully covered
+            </PageHeaderStatusChip>
+        );
+
+    const singleStatus =
+        heroStatusFilter.length === 1 ? heroStatusFilter[0] : 'all';
+
+    const header = (
+        <PageHeader
+            icon={Calendar}
+            title={shiftPlural}
+            titleChip={titleChip}
+            subline={`${weekLabel(filters.from, filters.to)} · ${stats.sites} ${
+                stats.sites === 1 ? 'site' : 'sites'
+            } · ${stats.staff} staff · ${stats.hours}h scheduled`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={q}
+                        onChange={setQ}
+                        placeholder={`Search ${shiftPlural.toLowerCase()}…`}
+                    />
+                    {canCreate ? (
+                        <PageHeaderPrimaryButton
+                            icon={UserPlus}
+                            onClick={() => openCreate()}
+                        >
+                            Add shift
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="All shifts"
+                        ariaLabel="View all shifts"
+                        onClick={() => setTab('all')}
+                    >
+                        <PageHeaderMeterBig>{stats.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            scheduled this week
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Open"
+                        tone={stats.open > 0 ? 'warning' : 'success'}
+                        ariaLabel="View open shifts"
+                        onClick={() => setTab('open')}
+                    >
+                        <PageHeaderMeterBig>{stats.open}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            need cover this week
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Today"
+                        ariaLabel="View today's shifts"
+                        onClick={() => setTab('today')}
+                    >
+                        <PageHeaderMeterBig>{stats.today}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {stats.in_progress} in progress right now
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Unassigned"
+                        tone={stats.unassigned > 0 ? 'warning' : 'success'}
+                        ariaLabel="View unassigned shifts"
+                        onClick={() => setTab('unassigned')}
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.unassigned}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            without a staff member
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Hours"
+                        ariaLabel="View all shifts"
+                        onClick={() => setTab('all')}
+                    >
+                        <PageHeaderMeterBig>{stats.hours}h</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            across {stats.staff} staff
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterButton
+                        icon={ChevronLeft}
+                        aria-label="Previous week"
+                        onClick={() => gotoWeek(addDaysIso(filters.from, -7))}
+                    />
+                    <PageHeaderFilterButton
+                        icon={Calendar}
+                        onClick={() => gotoWeek(todayIsoDate())}
+                    >
+                        {weekLabel(filters.from, filters.to)}
+                    </PageHeaderFilterButton>
+                    <PageHeaderFilterButton
+                        icon={ChevronRight}
+                        aria-label="Next week"
+                        onClick={() => gotoWeek(addDaysIso(filters.from, 7))}
+                    />
+                    <PageHeaderFilterSelect
+                        label="All statuses"
+                        value={singleStatus}
+                        options={[
+                            { value: 'all', label: 'All statuses' },
+                            ...statusOptions,
+                        ]}
+                        onChange={(v) =>
+                            handleHeroFilter('statuses', v === 'all' ? [] : [v])
+                        }
+                    />
+                    <MultiEntityFilter
+                        label="Site"
+                        allLabel="All sites"
+                        pluralLabel="sites"
+                        items={siteItems}
+                        value={heroSiteIds}
+                        onChange={(next) => handleHeroFilter('site_ids', next)}
+                        onDark
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                    />
+                    <MultiEntityFilter
+                        label="Staff"
+                        allLabel="All staff"
+                        pluralLabel="staff"
+                        items={staffItems}
+                        value={heroUserIds}
+                        onChange={(next) => handleHeroFilter('user_ids', next)}
+                        onDark
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                    />
+                    <MultiEntityFilter
+                        label="Client"
+                        allLabel="All clients"
+                        pluralLabel="clients"
+                        items={clientItems}
+                        value={heroClientIds}
+                        onChange={(next) =>
+                            handleHeroFilter('client_ids', next)
+                        }
+                        onDark
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                    />
+                    <PageHeaderViewToggle
+                        value={viewMode}
+                        onChange={setViewMode}
+                        ariaLabel="Layout"
+                        options={[
+                            { value: 'list', label: 'List', icon: List },
+                            {
+                                value: 'calendar',
+                                label: 'Calendar',
+                                icon: Calendar,
+                            },
+                        ]}
+                    />
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={tab}
+                    onSelect={setTab}
+                    ariaLabel="Shift views"
+                />
+            }
+        />
+    );
+
     return (
         <AppLayout
-            breadcrumbs={[{ title: shiftPlural, href: shiftsIndex.url() }]}
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                { title: shiftPlural, href: shiftsIndex.url() },
+            ]}
         >
             <Head title={shiftPlural} />
-            <PageShell>
-                <ShiftsHero
-                    greetingName={userName}
-                    weekLabel={weekLabel(filters.from, filters.to)}
-                    stats={{
-                        total: stats.total,
-                        open: stats.open,
-                        today: stats.today,
-                        in_progress: stats.in_progress,
-                        hours: stats.hours,
-                        sites: stats.sites,
-                        staff: stats.staff,
-                        unassigned: stats.unassigned,
-                    }}
-                    filters={{
-                        statuses: heroStatusFilter,
-                        site_ids: heroSiteIds,
-                        user_ids: heroUserIds,
-                        client_ids: heroClientIds,
-                        q: (filters.q as string) ?? '',
-                    }}
-                    onChangeFilter={(key, value) =>
-                        handleHeroFilter(key as any, value as any)
-                    }
-                    statusOptions={statusOptions}
-                    siteItems={siteItems}
-                    staffItems={staffItems}
-                    clientItems={clientItems}
-                    canCreate={canCreate}
-                    onCreate={() => openCreate()}
-                    onPrevWeek={() => gotoWeek(addDaysIso(filters.from, -7))}
-                    onNextWeek={() => gotoWeek(addDaysIso(filters.from, 7))}
-                    weekStart={
-                        new Date(weekStartFor(filters.from) + 'T00:00:00')
-                    }
-                    onPickWeek={(d) => {
-                        const yyyy = d.getFullYear();
-                        const mm = String(d.getMonth() + 1).padStart(2, '0');
-                        const dd = String(d.getDate()).padStart(2, '0');
-                        gotoWeek(`${yyyy}-${mm}-${dd}`);
-                    }}
+            <PageLayout hero={header}>
+                <ListCaption
+                    title={currentViewLabel}
+                    caption={`${tabFiltered.length} of ${stats.total} shown`}
                 />
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <DonutCard
-                        tone="primary"
-                        title="All shifts"
-                        subtitle="This week breakdown"
-                        segments={shiftBreakdown}
-                        centerValue={stats.total}
-                        centerLabel="shifts"
-                        cta="View all shifts"
-                        active={tab === 'all'}
-                        onClick={() => setTab('all')}
-                    />
-                    <DonutCard
-                        tone="warning"
-                        title="Open shifts"
-                        subtitle="Need cover this week"
-                        segments={openBreakdown}
-                        centerValue={stats.open}
-                        centerLabel="open"
-                        cta={
-                            stats.open > 0 ? 'Find cover' : 'All shifts covered'
-                        }
-                        active={tab === 'open'}
-                        onClick={() => setTab('open')}
-                    />
-                    <DonutCard
-                        tone="success"
-                        title="Today"
-                        subtitle="What's happening now"
-                        segments={todayBreakdown}
-                        centerValue={stats.today}
-                        centerLabel="today"
-                        cta="View today's shifts"
-                        active={tab === 'today'}
-                        onClick={() => setTab('today')}
-                    />
-                </div>
 
                 <GuardrailCard
                     unstyled
                     className="overflow-hidden rounded-xl border border-border bg-card"
                 >
-                    <div className="flex items-center justify-between px-2">
-                        <TabStrip
-                            value={tab}
-                            onChange={(next) => setTab(next as TabKey)}
-                            ariaLabel="Shift views"
-                            className="border-0 bg-transparent shadow-none"
-                            items={[
-                                {
-                                    id: 'all',
-                                    label: 'All shifts',
-                                    icon: List,
-                                    tone: 'primary',
-                                    badge: stats.total,
-                                },
-                                {
-                                    id: 'open',
-                                    label: 'Open',
-                                    icon: AlertCircle,
-                                    tone: 'warning',
-                                    badge: stats.open,
-                                },
-                                {
-                                    id: 'today',
-                                    label: 'Today',
-                                    icon: Clock,
-                                    tone: 'success',
-                                    badge: stats.today,
-                                },
-                                {
-                                    id: 'unassigned',
-                                    label: 'Unassigned',
-                                    icon: UserPlus,
-                                    tone: 'info',
-                                    badge: stats.unassigned,
-                                },
-                                {
-                                    id: 'completed',
-                                    label: 'Completed',
-                                    icon: CheckCircle,
-                                    tone: 'success',
-                                    badge: stats.completed,
-                                },
-                            ]}
-                        />
-                        <div className="ml-2 hidden items-center gap-1 border-l border-border pr-2 pl-2 md:flex">
-                            <GuardrailButton
-                                unstyled
-                                type="button"
-                                onClick={() => setViewMode('list')}
-                                className={[
-                                    'inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition',
-                                    viewMode === 'list'
-                                        ? 'bg-muted text-foreground'
-                                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                                ].join(' ')}
-                                aria-label="List view"
-                            >
-                                <List className="h-4 w-4" /> List
-                            </GuardrailButton>
-                            <GuardrailButton
-                                unstyled
-                                type="button"
-                                onClick={() => setViewMode('calendar')}
-                                className={[
-                                    'inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition',
-                                    viewMode === 'calendar'
-                                        ? 'bg-muted text-foreground'
-                                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                                ].join(' ')}
-                                aria-label="Calendar view"
-                            >
-                                <Calendar className="h-4 w-4" /> Calendar
-                            </GuardrailButton>
-                        </div>
-                    </div>
-
                     <div className="bg-muted/30 px-4 py-4 md:px-5 md:py-5">
                         {viewMode === 'list' ? (
                             <ShiftListView
@@ -960,7 +954,7 @@ export default function ShiftsIndex({
                         }
                     }}
                 />
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

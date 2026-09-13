@@ -21,6 +21,8 @@ class QualificationMatchController extends Controller
 
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
+            'mandatory' => ['nullable', 'in:mandatory,optional'],
+            'client_id' => ['nullable', 'integer', 'min:1'],
         ]);
         $search = trim((string) ($filters['q'] ?? ''));
 
@@ -34,15 +36,18 @@ class QualificationMatchController extends Controller
                             ->orWhere('last_name', 'like', '%'.$search.'%'));
                 });
             })
+            ->when(($filters['mandatory'] ?? null) === 'mandatory', fn ($q) => $q->where('is_mandatory', true))
+            ->when(($filters['mandatory'] ?? null) === 'optional', fn ($q) => $q->where('is_mandatory', false))
+            ->when($filters['client_id'] ?? null, fn ($q, $clientId) => $q->where('client_id', $clientId))
             ->orderBy('client_id')
             ->paginate(20)
+            // The former match_status / matched_workers / total_workers fields
+            // were hardcoded placeholders ('unmet', 0, 0) with no backend —
+            // dropped rather than shown (DESIGN.md no-fake-data rule).
             ->through(fn (StaffQualificationRequirement $requirement) => [
                 'id' => $requirement->id,
                 'qualification_name' => $requirement->qualification_name,
                 'is_mandatory' => (bool) $requirement->is_mandatory,
-                'match_status' => 'unmet',
-                'matched_workers' => 0,
-                'total_workers' => 0,
                 'client' => $requirement->client ? [
                     'id' => $requirement->client->id,
                     'first_name' => $requirement->client->first_name,
@@ -55,7 +60,22 @@ class QualificationMatchController extends Controller
             'requirements' => $requirements,
             'filters' => [
                 'q' => $filters['q'] ?? null,
+                'mandatory' => $filters['mandatory'] ?? null,
+                'client_id' => $filters['client_id'] ?? null,
             ],
+            // Header instruments — counted over the whole visible set
+            // regardless of the active filters.
+            'stats' => [
+                'total' => $this->visibleRequirementsQuery($auth)->count(),
+                'mandatory' => $this->visibleRequirementsQuery($auth)->where('is_mandatory', true)->count(),
+                'clients' => $this->visibleRequirementsQuery($auth)->distinct()->count('client_id'),
+            ],
+            'clients' => $this->visibleRequirementsQuery($auth)
+                ->join('clients', 'clients.id', '=', 'staff_qualification_requirements.client_id')
+                ->select('clients.id', 'clients.first_name', 'clients.last_name')
+                ->distinct()
+                ->orderBy('clients.first_name')
+                ->get(),
         ]);
     }
 

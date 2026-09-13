@@ -1,15 +1,20 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import {
-    AlertTriangle,
-    CheckCircle2,
-    ShieldCheck,
-    XCircle,
-} from 'lucide-react';
+import { CheckCircle2, ShieldCheck, XCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type Shift = {
     id: number;
@@ -52,16 +57,116 @@ export default function QualificationCheckShift({
     results = [],
     allMandatoryMet,
 }: Props) {
+    const [search, setSearch] = useState('');
+
+    const title = shift.staff?.name ?? `Shift #${shift.id}`;
+    const metCount = results.filter((r) => r.met).length;
+    const mandatoryGaps = results.filter(
+        (r) => r.is_mandatory && !r.met,
+    ).length;
+
+    const sublineParts = [
+        'Qualification check',
+        shift.client
+            ? `${shift.client.first_name} ${shift.client.last_name}`
+            : 'No client',
+        `${formatDateTime(shift.starts_at)} – ${formatDateTime(shift.ends_at)}`,
+    ];
+
+    const shownResults = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return results;
+        return results.filter((r) =>
+            `${r.requirement.qualification_name} ${
+                r.requirement.description ?? ''
+            }`
+                .toLowerCase()
+                .includes(q),
+        );
+    }, [results, search]);
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref={`/operations/shifts/${shift.id}`}
+            icon={ShieldCheck}
+            title={title}
+            titleChip={
+                allMandatoryMet ? (
+                    <PageHeaderStatusChip variant="success">
+                        Mandatory requirements met
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="critical">
+                        Mandatory gaps found
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={sublineParts.join(' · ')}
+            actions={
+                <PageHeaderSearch
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search requirements…"
+                />
+            }
+            meters={
+                <>
+                    {results.length > 0 ? (
+                        <PageHeaderMeterBlock
+                            label="Requirements met"
+                            ariaLabel="Review qualification requirements"
+                            href="/operations/qualifications"
+                        >
+                            <PageHeaderMeterDonut
+                                percent={(metCount / results.length) * 100}
+                                caption={
+                                    <>
+                                        {metCount} of {results.length}
+                                        <br />
+                                        met
+                                    </>
+                                }
+                            />
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label="Mandatory gaps"
+                        tone={mandatoryGaps > 0 ? 'critical' : 'success'}
+                        ariaLabel="Review qualification requirements"
+                        href="/operations/qualifications"
+                    >
+                        <PageHeaderMeterBig>{mandatoryGaps}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {mandatoryGaps > 0
+                                ? 'must be resolved before the shift'
+                                : 'nothing outstanding'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+        />
+    );
+
     return (
-        <AppLayout>
-            <Head title={`Qualification Check #${shift.id}`} />
-            <PageHero
-                variant="compact"
-                title="Qualification Check"
-                description="Confirm assigned worker credentials against client requirements."
-                backHref={`/operations/shifts/${shift.id}`}
-            />
-            <PageShell>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                { title: 'Shifts', href: '/operations/shifts' },
+                {
+                    title: `Shift #${shift.id}`,
+                    href: `/operations/shifts/${shift.id}`,
+                },
+                {
+                    title: 'Qualification check',
+                    href: `/operations/qualifications/check-shift/${shift.id}`,
+                },
+            ]}
+        >
+            <Head title={`Qualification check · ${title}`} />
+
+            <PageLayout hero={header}>
                 <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
                     <Card>
                         <CardHeader>
@@ -95,21 +200,6 @@ export default function QualificationCheckShift({
                                     {formatDateTime(shift.ends_at)}
                                 </p>
                             </div>
-                            <Badge
-                                variant={
-                                    allMandatoryMet ? 'default' : 'destructive'
-                                }
-                                className="gap-1"
-                            >
-                                {allMandatoryMet ? (
-                                    <CheckCircle2 className="h-3 w-3" />
-                                ) : (
-                                    <AlertTriangle className="h-3 w-3" />
-                                )}
-                                {allMandatoryMet
-                                    ? 'Mandatory requirements met'
-                                    : 'Mandatory gaps found'}
-                            </Badge>
                         </CardContent>
                     </Card>
 
@@ -118,15 +208,22 @@ export default function QualificationCheckShift({
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <ShieldCheck className="h-4 w-4" />
                                 Requirements
+                                {search.trim() !== '' && (
+                                    <span className="text-xs font-normal text-muted-foreground">
+                                        {shownResults.length} of{' '}
+                                        {results.length} match
+                                    </span>
+                                )}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            {results.length === 0 && (
+                            {shownResults.length === 0 && (
                                 <div className="rounded-lg border border-dashed p-8 text-center">
                                     <ShieldCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
                                     <p className="text-sm font-medium">
-                                        No requirements configured for this
-                                        client.
+                                        {search.trim() !== ''
+                                            ? 'No requirements match your search.'
+                                            : 'No requirements configured for this client.'}
                                     </p>
                                     <Link
                                         href="/operations/qualifications"
@@ -136,7 +233,7 @@ export default function QualificationCheckShift({
                                     </Link>
                                 </div>
                             )}
-                            {results.map((result) => {
+                            {shownResults.map((result) => {
                                 const Icon = result.met
                                     ? CheckCircle2
                                     : XCircle;
@@ -161,29 +258,26 @@ export default function QualificationCheckShift({
                                                     }
                                                 </p>
                                                 <Badge
-                                                    variant={
-                                                        result.is_mandatory
-                                                            ? 'destructive'
-                                                            : 'outline'
-                                                    }
+                                                    variant="outline"
                                                     className="h-5 text-[10px]"
                                                 >
                                                     {result.is_mandatory
                                                         ? 'Mandatory'
                                                         : 'Optional'}
                                                 </Badge>
-                                                <Badge
+                                                <StatusBadge
                                                     variant={
                                                         result.met
-                                                            ? 'default'
-                                                            : 'secondary'
+                                                            ? 'success'
+                                                            : result.is_mandatory
+                                                              ? 'critical'
+                                                              : 'warning'
                                                     }
-                                                    className="h-5 text-[10px]"
                                                 >
                                                     {result.met
                                                         ? 'Met'
                                                         : 'Missing'}
-                                                </Badge>
+                                                </StatusBadge>
                                             </div>
                                             {result.requirement.description && (
                                                 <p className="mt-1 text-sm text-muted-foreground">
@@ -200,7 +294,7 @@ export default function QualificationCheckShift({
                         </CardContent>
                     </Card>
                 </div>
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

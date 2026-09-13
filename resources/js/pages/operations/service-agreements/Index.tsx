@@ -1,33 +1,42 @@
-import { OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import { ListCaption } from '@/components/lists';
+import { OPS_COLORS } from '@/components/ops-stat-card';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    AlertTriangle,
+    Banknote,
     CalendarDays,
-    DollarSign,
+    CheckCircle2,
+    Clock,
     Eye,
+    FileEdit,
     FileSignature,
     FileText,
+    Layers,
     Pencil,
     Plus,
-    Search,
+    Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef } from 'react';
-
-const ANY = '__ANY__';
+import { useCallback, useEffect, useState } from 'react';
 
 type Agreement = {
     id: number;
@@ -64,17 +73,17 @@ type ClientOption = { id: number; first_name: string; last_name: string };
 type Props = {
     agreements: {
         data: Agreement[];
-        links: any[];
+        links: { url: string | null; label: string; active: boolean }[];
         current_page: number;
         last_page: number;
         total: number;
     };
     filters: {
-        q?: string;
-        status?: string;
-        agreement_type?: string;
-        client_id?: string;
-        funding_type?: string;
+        q?: string | null;
+        status?: string | null;
+        agreement_type?: string | null;
+        client_id?: string | null;
+        funding_type?: string | null;
     };
     stats: {
         total: number;
@@ -88,19 +97,19 @@ type Props = {
     clients: ClientOption[];
 };
 
-const STATUS_VARIANTS: Record<
-    string,
-    'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-    active: 'default',
-    draft: 'outline',
-    pending_approval: 'secondary',
-    under_review: 'secondary',
-    renewed: 'default',
-    expired: 'secondary',
-    terminated: 'destructive',
-    suspended: 'destructive',
-};
+type ViewKey = 'all' | 'active' | 'pending_approval' | 'draft';
+
+const STATUS_BADGE: Record<string, { label: string; variant: StatusVariant }> =
+    {
+        active: { label: 'Active', variant: 'success' },
+        draft: { label: 'Draft', variant: 'neutral' },
+        pending_approval: { label: 'Pending approval', variant: 'warning' },
+        under_review: { label: 'Under review', variant: 'info' },
+        renewed: { label: 'Renewed', variant: 'success' },
+        expired: { label: 'Expired', variant: 'neutral' },
+        terminated: { label: 'Terminated', variant: 'critical' },
+        suspended: { label: 'Suspended', variant: 'critical' },
+    };
 
 const TYPE_LABELS: Record<string, string> = {
     whaikaha: 'Whaikaha',
@@ -153,349 +162,514 @@ export default function ServiceAgreementsIndex({
         last_page: 1,
         total: 0,
     },
-    filters = {} as any,
+    filters = {},
     stats = {} as any,
     clients = [],
 }: Props) {
-    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const { labels } = usePage().props as any;
+    const clientPlural: string = labels?.['client.plural'] ?? 'Clients';
 
-    const updateFilters = useCallback(
-        (key: string, value: string | null) => {
-            router.get(
-                '/operations/service-agreements',
-                { ...filters, [key]: value },
-                { preserveState: true, replace: true },
-            );
+    const s = {
+        total: stats?.total ?? 0,
+        active: stats?.active ?? 0,
+        pending_approval: stats?.pending_approval ?? 0,
+        expiring_soon: stats?.expiring_soon ?? 0,
+        total_budget: stats?.total_budget ?? 0,
+        total_used: stats?.total_used ?? 0,
+        draft_count: stats?.draft_count ?? 0,
+    };
+    const remaining = s.total_budget - s.total_used;
+    const utilisationPct =
+        s.total_budget > 0
+            ? Math.round((s.total_used / s.total_budget) * 100)
+            : 0;
+
+    const view: ViewKey = (
+        ['active', 'pending_approval', 'draft'] as const
+    ).includes(filters.status as any)
+        ? (filters.status as ViewKey)
+        : 'all';
+
+    const [q, setQ] = useState(filters.q ?? '');
+
+    const applyFilters = useCallback(
+        (
+            overrides: Partial<{
+                status: string;
+                q: string;
+                agreement_type: string;
+                client_id: string;
+                funding_type: string;
+            }>,
+        ) => {
+            const next = {
+                status: overrides.status ?? filters.status ?? 'all',
+                q: overrides.q ?? filters.q ?? '',
+                agreement_type:
+                    overrides.agreement_type ?? filters.agreement_type ?? 'all',
+                client_id:
+                    overrides.client_id ?? String(filters.client_id ?? 'all'),
+                funding_type:
+                    overrides.funding_type ?? filters.funding_type ?? 'all',
+            };
+            const params: Record<string, string> = {};
+            if (next.status !== 'all') params.status = next.status;
+            if (next.q.trim() !== '') params.q = next.q.trim();
+            if (next.agreement_type !== 'all')
+                params.agreement_type = next.agreement_type;
+            if (next.client_id !== 'all') params.client_id = next.client_id;
+            if (next.funding_type !== 'all')
+                params.funding_type = next.funding_type;
+            router.get('/operations/service-agreements', params, {
+                preserveState: true,
+                replace: true,
+            });
         },
         [filters],
     );
 
-    const handleSearchChange = useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            const value = e.target.value || null;
-            if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-            searchTimerRef.current = setTimeout(() => {
-                updateFilters('q', value);
-            }, 300);
-        },
-        [updateFilters],
-    );
-
     useEffect(() => {
-        return () => {
-            if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-        };
-    }, []);
+        if ((filters.q ?? '') === q.trim()) return;
+        const t = setTimeout(() => applyFilters({ q }), 400);
+        return () => clearTimeout(t);
+    }, [q, filters.q, applyFilters]);
 
-    return (
-        <AppLayout>
-            <Head title="Service Agreements" />
-            <PageHero
-                icon={FileSignature}
-                title="Service Agreements"
-                description="Manage funding agreements, budgets, and service contracts."
-                stats={[
-                    { label: 'Active', value: stats?.active ?? 0 },
-                    {
-                        label: 'Total budget',
-                        value: formatCurrency(stats?.total_budget ?? 0),
-                    },
-                    {
-                        label: 'Budget used',
-                        value: formatCurrency(stats?.total_used ?? 0),
-                    },
-                    {
-                        label: 'Expiring soon',
-                        value: stats?.expiring_soon ?? 0,
-                    },
-                ]}
-            />
-            <PageShell>
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <OpsStatCard
-                        label="Active Agreements"
-                        value={stats?.active ?? 0}
-                        icon={FileText}
-                        color="indigo"
-                    />
-                    <OpsStatCard
-                        label="Total Budget"
-                        value={formatCurrency(stats?.total_budget ?? 0)}
-                        icon={DollarSign}
-                        color="emerald"
-                    />
-                    <OpsStatCard
-                        label="Budget Used"
-                        value={formatCurrency(stats?.total_used ?? 0)}
-                        icon={DollarSign}
-                        color="blue"
-                    />
-                    <OpsStatCard
-                        label="Expiring Soon"
-                        value={stats?.expiring_soon ?? 0}
-                        icon={AlertTriangle}
-                        color={
-                            (stats?.expiring_soon ?? 0) > 0 ? 'amber' : 'slate'
-                        }
-                    />
-                </div>
+    const railItems: PageHeaderRailItem<ViewKey>[] = [
+        { key: 'all', label: 'All agreements', icon: Layers, count: s.total },
+        {
+            key: 'active',
+            label: 'Active',
+            icon: CheckCircle2,
+            count: s.active,
+        },
+        {
+            key: 'pending_approval',
+            label: 'Pending approval',
+            icon: Clock,
+            count: s.pending_approval,
+        },
+        {
+            key: 'draft',
+            label: 'Drafts',
+            icon: FileEdit,
+            count: s.draft_count,
+        },
+    ];
 
-                {/* Filters */}
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                            placeholder="Search agreements..."
-                            className="h-9 pl-8 text-sm"
-                            defaultValue={filters?.q ?? ''}
-                            onChange={handleSearchChange}
-                        />
-                    </div>
-                    <Select
-                        value={filters?.status ?? ANY}
-                        onValueChange={(v) =>
-                            updateFilters('status', v === ANY ? null : v)
-                        }
-                    >
-                        <SelectTrigger className="h-9 w-[150px] text-xs">
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Status</SelectItem>
-                            <SelectItem value="draft">Draft</SelectItem>
-                            <SelectItem value="pending_approval">
-                                Pending Approval
-                            </SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="under_review">
-                                Under Review
-                            </SelectItem>
-                            <SelectItem value="renewed">Renewed</SelectItem>
-                            <SelectItem value="expired">Expired</SelectItem>
-                            <SelectItem value="terminated">
-                                Terminated
-                            </SelectItem>
-                            <SelectItem value="suspended">Suspended</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Select
-                        value={filters?.agreement_type ?? ANY}
-                        onValueChange={(v) =>
-                            updateFilters(
-                                'agreement_type',
-                                v === ANY ? null : v,
+    const currentViewLabel =
+        (filters.status ?? 'all') !== 'all' &&
+        !railItems.some((item) => item.key === filters.status)
+            ? (STATUS_BADGE[filters.status as string]?.label ??
+              String(filters.status))
+            : (railItems.find((v) => v.key === view)?.label ??
+              'All agreements');
+
+    const hasNarrowing =
+        (filters.q ?? '') !== '' ||
+        (filters.agreement_type ?? 'all') !== 'all' ||
+        String(filters.client_id ?? 'all') !== 'all' ||
+        (filters.funding_type ?? 'all') !== 'all';
+
+    const titleChip =
+        s.pending_approval > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {s.pending_approval} pending approval
+            </PageHeaderStatusChip>
+        ) : s.expiring_soon > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {s.expiring_soon} expiring soon
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip
+                variant={s.active > 0 ? 'success' : 'neutral'}
+            >
+                {s.active} active
+            </PageHeaderStatusChip>
+        );
+
+    const statusOptions = [
+        { value: 'all', label: 'All statuses' },
+        ...Object.entries(STATUS_BADGE).map(([value, meta]) => ({
+            value,
+            label: meta.label,
+        })),
+    ];
+    const typeOptions = [
+        { value: 'all', label: 'All types' },
+        ...Object.entries(TYPE_LABELS).map(([value, label]) => ({
+            value,
+            label,
+        })),
+    ];
+    const clientOptions = [
+        { value: 'all', label: `All ${clientPlural.toLowerCase()}` },
+        ...clients.map((c) => ({
+            value: String(c.id),
+            label: `${c.first_name} ${c.last_name}`,
+        })),
+    ];
+    const fundingOptions = [
+        { value: 'all', label: 'All funding' },
+        ...FUNDING_TYPE_OPTIONS.map((ft) => ({ value: ft, label: ft })),
+    ];
+
+    const header = (
+        <PageHeader
+            icon={FileSignature}
+            title="Service agreements"
+            titleChip={titleChip}
+            subline={`Funding agreements and budgets · ${s.total} ${
+                s.total === 1 ? 'agreement' : 'agreements'
+            } · ${formatCurrency(s.total_budget)} contracted`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={q}
+                        onChange={setQ}
+                        placeholder="Search agreements…"
+                    />
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() =>
+                            router.visit(
+                                '/operations/service-agreements/create',
                             )
                         }
                     >
-                        <SelectTrigger className="h-9 w-[140px] text-xs">
-                            <SelectValue placeholder="Type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Types</SelectItem>
-                            {Object.entries(TYPE_LABELS).map(([k, v]) => (
-                                <SelectItem key={k} value={k}>
-                                    {v}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select
-                        value={filters?.client_id ?? ANY}
-                        onValueChange={(v) =>
-                            updateFilters('client_id', v === ANY ? null : v)
-                        }
+                        New agreement
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Budget utilised"
+                        tone={remaining < 0 ? 'warning' : 'brand'}
+                        ariaLabel="View all agreements"
+                        onClick={() => applyFilters({ status: 'all' })}
                     >
-                        <SelectTrigger className="h-9 w-[150px] text-xs">
-                            <SelectValue placeholder="Client" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Clients</SelectItem>
-                            {(clients ?? []).map((c) => (
-                                <SelectItem key={c.id} value={String(c.id)}>
-                                    {c.first_name} {c.last_name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select
-                        value={filters?.funding_type ?? ANY}
-                        onValueChange={(v) =>
-                            updateFilters('funding_type', v === ANY ? null : v)
-                        }
-                    >
-                        <SelectTrigger className="h-9 w-[150px] text-xs">
-                            <SelectValue placeholder="Funding Type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Funding</SelectItem>
-                            {FUNDING_TYPE_OPTIONS.map((ft) => (
-                                <SelectItem key={ft} value={ft}>
-                                    {ft}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button asChild size="sm">
-                        <Link href="/operations/service-agreements/create">
-                            <Plus className="mr-1.5 h-3.5 w-3.5" /> New
-                            Agreement
-                        </Link>
-                    </Button>
-                </div>
-
-                {/* List */}
-                <div className="mt-4 space-y-2">
-                    {(agreements?.data ?? []).length === 0 && (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16">
-                                <FileText className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <h2 className="text-lg font-semibold text-muted-foreground">
-                                    No Service Agreements
-                                </h2>
-                                <p className="mt-1 text-sm text-muted-foreground/80">
-                                    Create service agreements to track funding
-                                    and budgets.
-                                </p>
-                            </CardContent>
-                        </Card>
-                    )}
-                    {(agreements?.data ?? []).map((ag) => (
-                        <Card
-                            key={ag.id}
-                            className="transition-all hover:border-border hover:shadow-sm"
+                        <PageHeaderMeterBig>
+                            {formatCurrency(s.total_used)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBar percent={utilisationPct} />
+                        <PageHeaderMeterCaption>
+                            {remaining >= 0
+                                ? `${formatCurrency(remaining)} left of ${formatCurrency(s.total_budget)}`
+                                : `${formatCurrency(-remaining)} over ${formatCurrency(s.total_budget)}`}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {s.total > 0 ? (
+                        <PageHeaderMeterBlock
+                            label="Active"
+                            ariaLabel="View active agreements"
+                            onClick={() => applyFilters({ status: 'active' })}
                         >
-                            <CardContent className="flex items-center gap-4 p-4">
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <Link
-                                            href={`/operations/service-agreements/${ag.id}`}
-                                            className="text-sm font-semibold hover:underline"
-                                        >
-                                            {ag.title}
-                                        </Link>
-                                        <Badge
-                                            variant={
-                                                STATUS_VARIANTS[ag.status] ??
-                                                'outline'
-                                            }
-                                            className="h-4 px-1.5 text-[9px] capitalize"
-                                        >
-                                            {ag.status?.replace(/_/g, ' ')}
-                                        </Badge>
-                                        <Badge
-                                            variant="outline"
-                                            className="h-4 px-1.5 text-[9px]"
-                                        >
-                                            {TYPE_LABELS[ag.agreement_type] ??
-                                                ag.agreement_type}
-                                        </Badge>
-                                        {ag.funding_type && (
-                                            <Badge
-                                                variant="outline"
-                                                className="h-4 border-primary bg-primary/10 px-1.5 text-[9px] text-primary"
-                                            >
-                                                {FUNDING_TYPE_LABELS[
-                                                    ag.funding_type
-                                                ] ?? ag.funding_type}
-                                            </Badge>
-                                        )}
-                                        {ag.reference_number && (
-                                            <span className="text-[10px] text-muted-foreground">
-                                                #{ag.reference_number}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-                                        {ag.client && (
-                                            <span>
-                                                {ag.client.first_name}{' '}
-                                                {ag.client.last_name}
-                                            </span>
-                                        )}
-                                        {ag.funding_body && (
-                                            <span>{ag.funding_body}</span>
-                                        )}
-                                        {ag.starts_at && (
-                                            <span className="flex items-center gap-1">
-                                                <CalendarDays className="h-3 w-3" />
-                                                {formatDate(ag.starts_at)} -{' '}
-                                                {formatDate(ag.ends_at)}
-                                            </span>
-                                        )}
-                                        <span>
-                                            {ag.line_items_count ?? 0} line
-                                            items
-                                        </span>
-                                    </div>
-                                    {/* Budget bar */}
-                                    <div className="mt-2 flex items-center gap-3">
-                                        <div className="h-1.5 flex-1 rounded-full bg-muted">
-                                            <div
-                                                className="h-1.5 rounded-full transition-all"
-                                                style={{
-                                                    width: `${Math.min(100, ag.budget_utilisation_percent ?? 0)}%`,
-                                                    backgroundColor:
-                                                        (ag.budget_utilisation_percent ??
-                                                            0) > 90
-                                                            ? OPS_COLORS.danger
-                                                            : (ag.budget_utilisation_percent ??
-                                                                    0) > 70
-                                                              ? OPS_COLORS.warning
-                                                              : OPS_COLORS.success,
-                                                }}
-                                            />
-                                        </div>
-                                        <span className="text-[10px] font-medium tabular-nums">
-                                            {formatCurrency(
-                                                ag.budget_used ?? 0,
-                                            )}{' '}
-                                            /{' '}
-                                            {formatCurrency(
-                                                ag.total_budget ?? 0,
-                                            )}{' '}
-                                            (
-                                            {ag.budget_utilisation_percent ?? 0}
-                                            %)
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="flex shrink-0 gap-1">
-                                    <Button
-                                        asChild
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0"
-                                    >
-                                        <Link
-                                            href={`/operations/service-agreements/${ag.id}`}
-                                        >
-                                            <Eye className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
-                                    <Button
-                                        asChild
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0"
-                                    >
-                                        <Link
-                                            href={`/operations/service-agreements/${ag.id}/edit`}
-                                        >
-                                            <Pencil className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                            <PageHeaderMeterDonut
+                                percent={(s.active / s.total) * 100}
+                                caption={
+                                    <>
+                                        {s.active} of {s.total}
+                                        <br />
+                                        in force
+                                    </>
+                                }
+                            />
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label="Pending approval"
+                        tone={s.pending_approval > 0 ? 'warning' : 'success'}
+                        ariaLabel="View agreements pending approval"
+                        onClick={() =>
+                            applyFilters({ status: 'pending_approval' })
+                        }
+                    >
+                        <PageHeaderMeterBig>
+                            {s.pending_approval}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            waiting for sign-off
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Expiring soon"
+                        tone={s.expiring_soon > 0 ? 'warning' : 'success'}
+                        ariaLabel="View active agreements (expiring agreements are active)"
+                        onClick={() => applyFilters({ status: 'active' })}
+                    >
+                        <PageHeaderMeterBig>
+                            {s.expiring_soon}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            within the next 30 days
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Drafts"
+                        ariaLabel="View draft agreements"
+                        onClick={() => applyFilters({ status: 'draft' })}
+                    >
+                        <PageHeaderMeterBig>{s.draft_count}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            not yet submitted
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        icon={FileText}
+                        label="All statuses"
+                        value={filters.status ?? 'all'}
+                        options={statusOptions}
+                        onChange={(v) => applyFilters({ status: v })}
+                    />
+                    <PageHeaderFilterSelect
+                        icon={FileSignature}
+                        label="All types"
+                        value={filters.agreement_type ?? 'all'}
+                        options={typeOptions}
+                        onChange={(v) => applyFilters({ agreement_type: v })}
+                    />
+                    <PageHeaderFilterSelect
+                        icon={Users}
+                        label={`All ${clientPlural.toLowerCase()}`}
+                        value={String(filters.client_id ?? 'all')}
+                        options={clientOptions}
+                        onChange={(v) => applyFilters({ client_id: v })}
+                    />
+                    <PageHeaderFilterSelect
+                        icon={Banknote}
+                        label="All funding"
+                        value={filters.funding_type ?? 'all'}
+                        options={fundingOptions}
+                        onChange={(v) => applyFilters({ funding_type: v })}
+                    />
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={view}
+                    onSelect={(key) => applyFilters({ status: key })}
+                    ariaLabel="Agreement views"
+                />
+            }
+        />
+    );
 
-                {/* Pagination */}
-                {(agreements?.last_page ?? 1) > 1 && (
-                    <div className="mt-4 flex items-center justify-center gap-1">
-                        {(agreements?.links ?? []).map(
-                            (link: any, i: number) => (
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                {
+                    title: 'Service agreements',
+                    href: '/operations/service-agreements',
+                },
+            ]}
+        >
+            <Head title="Service agreements" />
+
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title={currentViewLabel}
+                        caption={`${agreements.data.length} of ${
+                            agreements.total ?? agreements.data.length
+                        } shown`}
+                    />
+
+                    <div className="space-y-2">
+                        {agreements.data.length === 0 ? (
+                            <EmptyState
+                                icon={FileText}
+                                title="No service agreements"
+                                description={
+                                    hasNarrowing || view !== 'all'
+                                        ? 'Nothing matches this view or your filters.'
+                                        : 'Create service agreements to track funding and budgets.'
+                                }
+                                action={
+                                    hasNarrowing ||
+                                    view !== 'all' ? undefined : (
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                router.visit(
+                                                    '/operations/service-agreements/create',
+                                                )
+                                            }
+                                        >
+                                            <Plus className="h-3.5 w-3.5" />
+                                            New agreement
+                                        </Button>
+                                    )
+                                }
+                            />
+                        ) : (
+                            agreements.data.map((ag) => {
+                                const badge = STATUS_BADGE[ag.status] ?? {
+                                    label: (ag.status ?? '').replace(/_/g, ' '),
+                                    variant: 'neutral' as StatusVariant,
+                                };
+                                return (
+                                    <Card
+                                        key={ag.id}
+                                        className="transition-all hover:border-border hover:shadow-sm"
+                                    >
+                                        <CardContent className="flex items-center gap-4 p-4">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Link
+                                                        href={`/operations/service-agreements/${ag.id}`}
+                                                        className="text-sm font-semibold hover:underline"
+                                                    >
+                                                        {ag.title}
+                                                    </Link>
+                                                    <StatusBadge
+                                                        variant={badge.variant}
+                                                    >
+                                                        {badge.label}
+                                                    </StatusBadge>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="h-4 px-1.5 text-[9px]"
+                                                    >
+                                                        {TYPE_LABELS[
+                                                            ag.agreement_type
+                                                        ] ?? ag.agreement_type}
+                                                    </Badge>
+                                                    {ag.funding_type && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="h-4 border-primary bg-primary/10 px-1.5 text-[9px] text-primary"
+                                                        >
+                                                            {FUNDING_TYPE_LABELS[
+                                                                ag.funding_type
+                                                            ] ??
+                                                                ag.funding_type}
+                                                        </Badge>
+                                                    )}
+                                                    {ag.reference_number && (
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            #
+                                                            {
+                                                                ag.reference_number
+                                                            }
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                                                    {ag.client && (
+                                                        <span>
+                                                            {
+                                                                ag.client
+                                                                    .first_name
+                                                            }{' '}
+                                                            {
+                                                                ag.client
+                                                                    .last_name
+                                                            }
+                                                        </span>
+                                                    )}
+                                                    {ag.funding_body && (
+                                                        <span>
+                                                            {ag.funding_body}
+                                                        </span>
+                                                    )}
+                                                    {ag.starts_at && (
+                                                        <span className="flex items-center gap-1">
+                                                            <CalendarDays className="h-3 w-3" />
+                                                            {formatDate(
+                                                                ag.starts_at,
+                                                            )}{' '}
+                                                            -{' '}
+                                                            {formatDate(
+                                                                ag.ends_at,
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                    <span>
+                                                        {ag.line_items_count ??
+                                                            0}{' '}
+                                                        line items
+                                                    </span>
+                                                </div>
+                                                {/* Budget bar */}
+                                                <div className="mt-2 flex items-center gap-3">
+                                                    <div className="h-1.5 flex-1 rounded-full bg-muted">
+                                                        <div
+                                                            className="h-1.5 rounded-full transition-all"
+                                                            style={{
+                                                                width: `${Math.min(100, ag.budget_utilisation_percent ?? 0)}%`,
+                                                                backgroundColor:
+                                                                    (ag.budget_utilisation_percent ??
+                                                                        0) > 90
+                                                                        ? OPS_COLORS.danger
+                                                                        : (ag.budget_utilisation_percent ??
+                                                                                0) >
+                                                                            70
+                                                                          ? OPS_COLORS.warning
+                                                                          : OPS_COLORS.success,
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[10px] font-medium tabular-nums">
+                                                        {formatCurrency(
+                                                            ag.budget_used ?? 0,
+                                                        )}{' '}
+                                                        /{' '}
+                                                        {formatCurrency(
+                                                            ag.total_budget ??
+                                                                0,
+                                                        )}{' '}
+                                                        (
+                                                        {ag.budget_utilisation_percent ??
+                                                            0}
+                                                        %)
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex shrink-0 gap-1">
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-7 w-7 p-0"
+                                                >
+                                                    <Link
+                                                        href={`/operations/service-agreements/${ag.id}`}
+                                                        aria-label={`View ${ag.title}`}
+                                                    >
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                    </Link>
+                                                </Button>
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-7 w-7 p-0"
+                                                >
+                                                    <Link
+                                                        href={`/operations/service-agreements/${ag.id}/edit`}
+                                                        aria-label={`Edit ${ag.title}`}
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                    </Link>
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })
+                        )}
+                    </div>
+
+                    {(agreements.last_page ?? 1) > 1 && (
+                        <div className="flex items-center justify-center gap-1">
+                            {(agreements.links ?? []).map((link, i) => (
                                 <Button
                                     key={i}
                                     size="sm"
@@ -516,11 +690,11 @@ export default function ServiceAgreementsIndex({
                                         __html: link.label,
                                     }}
                                 />
-                            ),
-                        )}
-                    </div>
-                )}
-            </PageShell>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

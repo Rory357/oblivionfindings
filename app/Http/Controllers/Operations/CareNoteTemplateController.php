@@ -16,6 +16,7 @@ class CareNoteTemplateController extends Controller
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
+            'type' => ['nullable', 'string', 'max:100'],
         ]);
         $search = trim((string) ($filters['q'] ?? ''));
 
@@ -23,6 +24,7 @@ class CareNoteTemplateController extends Controller
             ->when($search !== '', fn ($q) => $q->where('name', 'like', '%'.$search.'%'))
             ->when(($filters['status'] ?? null) === 'active', fn ($q) => $q->where('is_active', true))
             ->when(($filters['status'] ?? null) === 'inactive', fn ($q) => $q->where('is_active', false))
+            ->when($filters['type'] ?? null, fn ($q, $type) => $q->where('template_type', $type))
             ->orderBy('name')
             ->paginate(20)
             ->through(fn (CareNoteTemplate $template) => [
@@ -42,7 +44,20 @@ class CareNoteTemplateController extends Controller
             'filters' => [
                 'q' => $filters['q'] ?? null,
                 'status' => $filters['status'] ?? null,
+                'type' => $filters['type'] ?? null,
             ],
+            // Header instruments — counted over the whole set regardless of
+            // the active filters so the rail counts stay honest.
+            'stats' => [
+                'total' => CareNoteTemplate::query()->count(),
+                'active' => CareNoteTemplate::query()->where('is_active', true)->count(),
+            ],
+            'types' => CareNoteTemplate::query()
+                ->whereNotNull('template_type')
+                ->distinct()
+                ->orderBy('template_type')
+                ->pluck('template_type')
+                ->values(),
         ]);
     }
 

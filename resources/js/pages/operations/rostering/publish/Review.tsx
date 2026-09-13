@@ -1,4 +1,18 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +27,15 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { useI18n } from '@/lib/i18n';
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle2, RotateCcw } from 'lucide-react';
+import {
+    AlertTriangle,
+    CalendarDays,
+    CheckCircle2,
+    FileDiff,
+    RotateCcw,
+    ShieldCheck,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type Period = {
     id: number;
@@ -66,6 +88,8 @@ type Props = {
     shifts: ShiftRow[];
 };
 
+type ViewKey = 'blockers' | 'warnings' | 'shifts';
+
 type TFunction = (key: string, fallback?: string) => string;
 
 function formatDateTime(value: string | null | undefined, t: TFunction) {
@@ -89,6 +113,10 @@ function postPeriodAction(
         {},
         { preserveScroll: true },
     );
+}
+
+function issueTypeLabel(type: string): string {
+    return type.replace(/_/g, ' ').replace(/^\w/, (m) => m.toUpperCase());
 }
 
 function IssueList({
@@ -172,19 +200,275 @@ export default function Review({ period, summary, shifts }: Props) {
     );
     const confirmAction = isRepublish ? 'republish' : 'publish';
 
+    const [view, setView] = useState<ViewKey>(
+        hasBlocks ? 'blockers' : 'shifts',
+    );
+    const [search, setSearch] = useState('');
+    const [issueType, setIssueType] = useState('all');
+    const [publishState, setPublishState] = useState('all');
+
+    const backHref = `/operations/rostering?week=${period.week_start}&site_id=${period.site_id}`;
+
+    const matches = (haystack: string) => {
+        const q = search.trim().toLowerCase();
+        return !q || haystack.toLowerCase().includes(q);
+    };
+
+    const filterIssues = (entries: ValidationEntry[]) =>
+        entries.filter(
+            (entry) =>
+                (issueType === 'all' || entry.issue_type === issueType) &&
+                matches(
+                    `${entry.message} ${entry.client ?? ''} ${entry.staff ?? ''} ${entry.issue_type}`,
+                ),
+        );
+
+    const shownBlocks = useMemo(
+        () => filterIssues(summary.blocks),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [summary.blocks, search, issueType],
+    );
+    const shownWarnings = useMemo(
+        () => filterIssues(summary.warnings),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [summary.warnings, search, issueType],
+    );
+    const shownShifts = useMemo(
+        () =>
+            shifts.filter((shift) => {
+                const state = shift.publish_dirty_at
+                    ? 'changed'
+                    : shift.published_at
+                      ? 'published'
+                      : 'draft';
+                if (publishState !== 'all' && state !== publishState)
+                    return false;
+                return matches(
+                    `${shift.client ?? ''} ${shift.staff ?? ''} ${
+                        shift.site ?? ''
+                    } ${shift.service_context ?? ''} ${shift.status}`,
+                );
+            }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [shifts, search, publishState],
+    );
+
+    const issueTypeOptions = useMemo(
+        () => [
+            { value: 'all', label: 'All issue types' },
+            ...Array.from(
+                new Set(
+                    [...summary.blocks, ...summary.warnings].map(
+                        (entry) => entry.issue_type,
+                    ),
+                ),
+            )
+                .sort()
+                .map((type) => ({ value: type, label: issueTypeLabel(type) })),
+        ],
+        [summary.blocks, summary.warnings],
+    );
+
+    const publishStateOptions = [
+        { value: 'all', label: 'All publish states' },
+        { value: 'draft', label: t('rostering.publish.draft', 'Draft') },
+        {
+            value: 'published',
+            label: t('rostering.publish.published', 'Published'),
+        },
+        {
+            value: 'changed',
+            label: t('rostering.publish.state_changed', 'Changed'),
+        },
+    ];
+
+    const railItems: PageHeaderRailItem<ViewKey>[] = [
+        {
+            key: 'blockers',
+            label: t('rostering.publish.blockers', 'Blockers'),
+            icon: AlertTriangle,
+            count: summary.blocks.length,
+            alert: true,
+        },
+        {
+            key: 'warnings',
+            label: t('rostering.publish.warnings', 'Warnings'),
+            icon: ShieldCheck,
+            count: summary.warnings.length,
+        },
+        {
+            key: 'shifts',
+            label: t('rostering.publish.period_shifts', 'Period shifts'),
+            icon: CalendarDays,
+            count: summary.shift_count ?? shifts.length,
+        },
+    ];
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref={backHref}
+            icon={ShieldCheck}
+            title={
+                period.site_name ??
+                t('rostering.publish.selected_site', 'Selected site')
+            }
+            titleChip={
+                summary.can_publish ? (
+                    <PageHeaderStatusChip variant="success">
+                        {t(
+                            'rostering.publish.ready_to_publish',
+                            'Ready to publish',
+                        )}
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="critical">
+                        {t('rostering.publish.blocked', 'Blocked')}
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={`${t('rostering.publish.review_title', 'Publish review')} · ${t(
+                'rostering.publish.week_of',
+                'Week of',
+            )} ${period.week_start} · ${t('rostering.publish.version', 'Version')} ${period.version} · ${t(
+                'rostering.publish.last_reviewed',
+                'Last reviewed',
+            )} ${formatDateTime(period.last_validated_at, t)}`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search issues and shifts…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={RotateCcw}
+                        disabled={period.status === 'archived'}
+                        className="disabled:pointer-events-none disabled:opacity-50"
+                        onClick={() => postPeriodAction(period, 'review')}
+                    >
+                        {t('rostering.publish.rerun_review', 'Re-run review')}
+                    </PageHeaderGlassButton>
+                    {period.published_at ? (
+                        <PageHeaderGlassButton
+                            icon={FileDiff}
+                            onClick={() =>
+                                router.visit(
+                                    `/operations/rostering/periods/${period.id}/diff`,
+                                )
+                            }
+                        >
+                            {t('rostering.publish.view_diff', 'View diff')}
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    <PageHeaderPrimaryButton
+                        icon={CheckCircle2}
+                        disabled={hasBlocks || period.status === 'archived'}
+                        className="disabled:pointer-events-none disabled:opacity-50"
+                        onClick={() => postPeriodAction(period, confirmAction)}
+                        data-test="publish-review-confirm"
+                    >
+                        {isRepublish
+                            ? t('rostering.publish.republish', 'Re-publish')
+                            : t(
+                                  'rostering.publish.confirm_publish',
+                                  'Confirm publish',
+                              )}
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label={t(
+                            'rostering.publish.shifts_reviewed',
+                            'Shifts reviewed',
+                        )}
+                        ariaLabel="View period shifts"
+                        onClick={() => setView('shifts')}
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.shift_count ?? shifts.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            in this roster period
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label={t('rostering.publish.blockers', 'Blockers')}
+                        tone={hasBlocks ? 'critical' : 'success'}
+                        ariaLabel="View publish blockers"
+                        onClick={() => setView('blockers')}
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.blocks.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            must be fixed before publishing
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label={t('rostering.publish.warnings', 'Warnings')}
+                        tone={
+                            summary.warnings.length > 0 ? 'warning' : 'success'
+                        }
+                        ariaLabel="View publish warnings"
+                        onClick={() => setView('warnings')}
+                    >
+                        <PageHeaderMeterBig>
+                            {summary.warnings.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            worth checking, not blocking
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                view === 'shifts' ? (
+                    <PageHeaderFilterSelect
+                        icon={CalendarDays}
+                        label="All publish states"
+                        value={publishState}
+                        options={publishStateOptions}
+                        onChange={setPublishState}
+                    />
+                ) : (
+                    <PageHeaderFilterSelect
+                        icon={AlertTriangle}
+                        label="All issue types"
+                        value={issueType}
+                        options={issueTypeOptions}
+                        onChange={setIssueType}
+                    />
+                )
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={view}
+                    onSelect={setView}
+                    ariaLabel="Review views"
+                />
+            }
+        />
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
                 {
                     title: t('rostering.title', 'Rostering'),
-                    href: `/operations/rostering?week=${period.week_start}&site_id=${period.site_id}`,
+                    href: backHref,
                 },
                 {
                     title: t(
                         'rostering.publish.review_title',
                         'Publish review',
                     ),
-                    href: '#',
+                    href: `/operations/rostering/periods/${period.id}/review`,
                 },
             ]}
         >
@@ -195,289 +479,176 @@ export default function Review({ period, summary, shifts }: Props) {
                 )}
             />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        variant="compact"
-                        backHref={`/operations/rostering?week=${period.week_start}&site_id=${period.site_id}`}
-                        backLabel={t(
-                            'rostering.publish.back_to_roster',
-                            'Back to roster',
-                        )}
-                        title={t(
-                            'rostering.publish.review_title',
-                            'Publish review',
-                        )}
-                        description={`${period.site_name ?? t('rostering.publish.selected_site', 'Selected site')} · ${t('rostering.publish.week_of', 'Week of')} ${period.week_start} · ${t('rostering.publish.version', 'Version')} ${period.version}`}
-                        actions={
-                            <>
-                                <Badge
-                                    variant={
-                                        summary.can_publish
-                                            ? 'default'
-                                            : 'destructive'
-                                    }
-                                >
-                                    {summary.can_publish
-                                        ? t(
-                                              'rostering.publish.ready_to_publish',
-                                              'Ready to publish',
-                                          )
-                                        : t(
-                                              'rostering.publish.blocked',
-                                              'Blocked',
-                                          )}
-                                </Badge>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={period.status === 'archived'}
-                                    onClick={() =>
-                                        postPeriodAction(period, 'review')
-                                    }
-                                >
-                                    <RotateCcw className="mr-1 h-4 w-4" />
-                                    {t(
-                                        'rostering.publish.rerun_review',
-                                        'Re-run review',
-                                    )}
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    disabled={
-                                        hasBlocks ||
-                                        period.status === 'archived'
-                                    }
-                                    onClick={() =>
-                                        postPeriodAction(period, confirmAction)
-                                    }
-                                    data-test="publish-review-confirm"
-                                >
-                                    <CheckCircle2 className="mr-1 h-4 w-4" />
-                                    {isRepublish
-                                        ? t(
-                                              'rostering.publish.republish',
-                                              'Re-publish',
-                                          )
-                                        : t(
-                                              'rostering.publish.confirm_publish',
-                                              'Confirm publish',
-                                          )}
-                                </Button>
-                                {period.published_at ? (
-                                    <Link
-                                        href={`/operations/rostering/periods/${period.id}/diff`}
-                                    >
-                                        <Button size="sm" variant="outline">
-                                            {t(
-                                                'rostering.publish.view_diff',
-                                                'View diff',
-                                            )}
-                                        </Button>
-                                    </Link>
-                                ) : null}
-                            </>
-                        }
-                    />
-                }
-            >
-                <div data-test="publish-review-page">
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    {t(
-                                        'rostering.publish.shifts_reviewed',
-                                        'Shifts reviewed',
-                                    )}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-2xl font-semibold">
-                                {summary.shift_count ?? shifts.length}
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    {t(
-                                        'rostering.publish.blockers',
-                                        'Blockers',
-                                    )}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-2xl font-semibold">
-                                {summary.blocks.length}
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    {t(
-                                        'rostering.publish.warnings',
-                                        'Warnings',
-                                    )}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-2xl font-semibold">
-                                {summary.warnings.length}
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    {t(
-                                        'rostering.publish.last_reviewed',
-                                        'Last reviewed',
-                                    )}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-sm font-medium">
-                                {formatDateTime(period.last_validated_at, t)}
-                            </CardContent>
-                        </Card>
-                    </div>
+            <PageLayout hero={header}>
+                <div data-test="publish-review-page" className="space-y-4">
+                    {view === 'blockers' ? (
+                        <>
+                            <ListCaption
+                                title={t(
+                                    'rostering.publish.publish_blockers',
+                                    'Publish blockers',
+                                )}
+                                caption={`${shownBlocks.length} of ${summary.blocks.length} shown`}
+                            />
+                            <IssueList
+                                title={t(
+                                    'rostering.publish.publish_blockers',
+                                    'Publish blockers',
+                                )}
+                                entries={shownBlocks}
+                                variant="destructive"
+                                emptyLabel={t(
+                                    'rostering.publish.nothing_to_resolve',
+                                    'Nothing to resolve here.',
+                                )}
+                                fixLabel={t('rostering.publish.fix', 'Fix')}
+                                t={t}
+                            />
+                        </>
+                    ) : null}
 
-                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                        <IssueList
-                            title={t(
-                                'rostering.publish.publish_blockers',
-                                'Publish blockers',
-                            )}
-                            entries={summary.blocks}
-                            variant="destructive"
-                            emptyLabel={t(
-                                'rostering.publish.nothing_to_resolve',
-                                'Nothing to resolve here.',
-                            )}
-                            fixLabel={t('rostering.publish.fix', 'Fix')}
-                            t={t}
-                        />
-                        <IssueList
-                            title={t('rostering.publish.warnings', 'Warnings')}
-                            entries={summary.warnings}
-                            variant="outline"
-                            emptyLabel={t(
-                                'rostering.publish.nothing_to_resolve',
-                                'Nothing to resolve here.',
-                            )}
-                            fixLabel={t('rostering.publish.fix', 'Fix')}
-                            t={t}
-                        />
-                    </div>
+                    {view === 'warnings' ? (
+                        <>
+                            <ListCaption
+                                title={t(
+                                    'rostering.publish.warnings',
+                                    'Warnings',
+                                )}
+                                caption={`${shownWarnings.length} of ${summary.warnings.length} shown`}
+                            />
+                            <IssueList
+                                title={t(
+                                    'rostering.publish.warnings',
+                                    'Warnings',
+                                )}
+                                entries={shownWarnings}
+                                variant="outline"
+                                emptyLabel={t(
+                                    'rostering.publish.nothing_to_resolve',
+                                    'Nothing to resolve here.',
+                                )}
+                                fixLabel={t('rostering.publish.fix', 'Fix')}
+                                t={t}
+                            />
+                        </>
+                    ) : null}
 
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">
-                                {t(
+                    {view === 'shifts' ? (
+                        <>
+                            <ListCaption
+                                title={t(
                                     'rostering.publish.period_shifts',
                                     'Period shifts',
                                 )}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>
-                                            {t(
-                                                'rostering.publish.shift',
-                                                'Shift',
-                                            )}
-                                        </TableHead>
-                                        <TableHead>
-                                            {t(
-                                                'rostering.publish.client',
-                                                'Client',
-                                            )}
-                                        </TableHead>
-                                        <TableHead>
-                                            {t(
-                                                'rostering.publish.staff',
-                                                'Staff',
-                                            )}
-                                        </TableHead>
-                                        <TableHead>
-                                            {t(
-                                                'rostering.publish.status',
-                                                'Status',
-                                            )}
-                                        </TableHead>
-                                        <TableHead>
-                                            {t(
-                                                'rostering.publish.publish_state',
-                                                'Publish state',
-                                            )}
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {shifts.map((shift) => (
-                                        <TableRow key={shift.id}>
-                                            <TableCell>
-                                                <div className="font-medium">
-                                                    {formatDateTime(
-                                                        shift.starts_at,
-                                                        t,
+                                caption={`${shownShifts.length} of ${shifts.length} shown`}
+                            />
+                            <Card>
+                                <CardContent>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>
+                                                    {t(
+                                                        'rostering.publish.shift',
+                                                        'Shift',
                                                     )}
-                                                </div>
-                                                <div className="text-muted-foreground">
-                                                    {shift.service_context ??
-                                                        shift.site ??
-                                                        t(
-                                                            'rostering.publish.service',
-                                                            'Service',
-                                                        )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                {shift.client ??
-                                                    t(
+                                                </TableHead>
+                                                <TableHead>
+                                                    {t(
                                                         'rostering.publish.client',
                                                         'Client',
                                                     )}
-                                            </TableCell>
-                                            <TableCell>
-                                                {shift.staff ??
-                                                    t(
-                                                        'rostering.common.unassigned',
-                                                        'Unassigned',
+                                                </TableHead>
+                                                <TableHead>
+                                                    {t(
+                                                        'rostering.publish.staff',
+                                                        'Staff',
                                                     )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline">
-                                                    {shift.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {shift.publish_dirty_at ? (
-                                                    <Badge variant="destructive">
-                                                        {t(
-                                                            'rostering.publish.state_changed',
-                                                            'changed',
+                                                </TableHead>
+                                                <TableHead>
+                                                    {t(
+                                                        'rostering.publish.status',
+                                                        'Status',
+                                                    )}
+                                                </TableHead>
+                                                <TableHead>
+                                                    {t(
+                                                        'rostering.publish.publish_state',
+                                                        'Publish state',
+                                                    )}
+                                                </TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {shownShifts.map((shift) => (
+                                                <TableRow key={shift.id}>
+                                                    <TableCell>
+                                                        <div className="font-medium">
+                                                            {formatDateTime(
+                                                                shift.starts_at,
+                                                                t,
+                                                            )}
+                                                        </div>
+                                                        <div className="text-muted-foreground">
+                                                            {shift.service_context ??
+                                                                shift.site ??
+                                                                t(
+                                                                    'rostering.publish.service',
+                                                                    'Service',
+                                                                )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {shift.client ??
+                                                            t(
+                                                                'rostering.publish.client',
+                                                                'Client',
+                                                            )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {shift.staff ??
+                                                            t(
+                                                                'rostering.common.unassigned',
+                                                                'Unassigned',
+                                                            )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline">
+                                                            {shift.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {shift.publish_dirty_at ? (
+                                                            <Badge variant="destructive">
+                                                                {t(
+                                                                    'rostering.publish.state_changed',
+                                                                    'changed',
+                                                                )}
+                                                            </Badge>
+                                                        ) : shift.published_at ? (
+                                                            <Badge variant="default">
+                                                                {t(
+                                                                    'rostering.publish.published',
+                                                                    'published',
+                                                                )}
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge variant="outline">
+                                                                {t(
+                                                                    'rostering.publish.draft',
+                                                                    'draft',
+                                                                )}
+                                                            </Badge>
                                                         )}
-                                                    </Badge>
-                                                ) : shift.published_at ? (
-                                                    <Badge variant="default">
-                                                        {t(
-                                                            'rostering.publish.published',
-                                                            'published',
-                                                        )}
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="outline">
-                                                        {t(
-                                                            'rostering.publish.draft',
-                                                            'draft',
-                                                        )}
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        </>
+                    ) : null}
                 </div>
             </PageLayout>
         </AppLayout>

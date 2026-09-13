@@ -1,31 +1,34 @@
-import { DonutChart, OpsStatCard } from '@/components/ops-stat-card';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { ListCaption } from '@/components/lists';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    PageHeader,
+    PageHeaderFilterCheck,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle2,
     ExternalLink,
+    Layers,
     ListChecks,
-    Search,
-    Timer,
     UserPlus,
     Users,
+    XCircle,
 } from 'lucide-react';
-
-const ANY = '__ANY__';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type OnboardingWorkflow = {
     id: number;
@@ -44,14 +47,14 @@ type OnboardingWorkflow = {
 type Props = {
     workflows: {
         data: OnboardingWorkflow[];
-        links: any[];
+        links: { url: string | null; label: string; active: boolean }[];
         current_page: number;
         last_page: number;
         total: number;
     };
     filters: {
-        q?: string;
-        status?: string;
+        q?: string | null;
+        status?: string | null;
     };
     stats: {
         active: number;
@@ -59,16 +62,17 @@ type Props = {
         overdue_steps: number;
         avg_days: number;
     };
+    status_counts?: Record<string, number>;
 };
 
-const STATUS_VARIANTS: Record<
-    string,
-    'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-    in_progress: 'default',
-    completed: 'secondary',
-    cancelled: 'destructive',
-};
+type ViewKey = 'all' | 'in_progress' | 'completed' | 'cancelled';
+
+const STATUS_BADGE: Record<string, { label: string; variant: StatusVariant }> =
+    {
+        in_progress: { label: 'In progress', variant: 'info' },
+        completed: { label: 'Completed', variant: 'success' },
+        cancelled: { label: 'Cancelled', variant: 'neutral' },
+    };
 
 function formatDate(d: string | null): string {
     if (!d) return '-';
@@ -87,176 +91,222 @@ export default function OnboardingDashboard({
         last_page: 1,
         total: 0,
     },
-    filters = {} as any,
+    filters = {},
     stats = {} as any,
+    status_counts = {},
 }: Props) {
     const { labels } = usePage().props as any;
-    const clientLabel = labels?.['client.singular'] ?? 'Client';
-    const clientsLabel = labels?.['client.plural'] ?? 'Clients';
+    const clientLabel: string = labels?.['client.singular'] ?? 'Client';
+    const clientsLabel: string = labels?.['client.plural'] ?? 'Clients';
 
-    const updateFilters = (key: string, value: string | null) => {
-        router.get(
-            '/operations/onboarding',
-            { ...filters, [key]: value },
-            { preserveState: true, replace: true },
-        );
+    const s = {
+        active: stats?.active ?? 0,
+        completed_this_month: stats?.completed_this_month ?? 0,
+        overdue_steps: stats?.overdue_steps ?? 0,
+        avg_days: stats?.avg_days ?? 0,
     };
+    const countOf = (status: string) => status_counts?.[status] ?? 0;
+    const total =
+        countOf('in_progress') + countOf('completed') + countOf('cancelled');
 
-    // Pipeline funnel data for donut chart
-    const activeCount = stats?.active ?? 0;
-    const completedCount = stats?.completed_this_month ?? 0;
-    const overdueCount = stats?.overdue_steps ?? 0;
+    const view: ViewKey = (
+        ['in_progress', 'completed', 'cancelled'] as const
+    ).includes(filters.status as any)
+        ? (filters.status as ViewKey)
+        : 'all';
+
+    const [q, setQ] = useState(filters.q ?? '');
+    const [overdueOnly, setOverdueOnly] = useState(false);
+
+    const applyFilters = useCallback(
+        (overrides: { view?: ViewKey; q?: string }) => {
+            const nextView = overrides.view ?? view;
+            const nextQ = overrides.q ?? filters.q ?? '';
+            const params: Record<string, string> = {};
+            if (nextView !== 'all') params.status = nextView;
+            if (nextQ.trim() !== '') params.q = nextQ.trim();
+            router.get('/operations/onboarding', params, {
+                preserveState: true,
+                replace: true,
+            });
+        },
+        [view, filters.q],
+    );
+
+    useEffect(() => {
+        if ((filters.q ?? '') === q.trim()) return;
+        const t = setTimeout(() => applyFilters({ q }), 400);
+        return () => clearTimeout(t);
+    }, [q, filters.q, applyFilters]);
+
+    const shown = useMemo(() => {
+        const rows = workflows?.data ?? [];
+        return overdueOnly
+            ? rows.filter((wf) => (wf.overdue_steps ?? 0) > 0)
+            : rows;
+    }, [workflows?.data, overdueOnly]);
+
+    const railItems: PageHeaderRailItem<ViewKey>[] = [
+        { key: 'all', label: 'All workflows', icon: Layers, count: total },
+        {
+            key: 'in_progress',
+            label: 'In progress',
+            icon: UserPlus,
+            count: countOf('in_progress'),
+        },
+        {
+            key: 'completed',
+            label: 'Completed',
+            icon: CheckCircle2,
+            count: countOf('completed'),
+        },
+        {
+            key: 'cancelled',
+            label: 'Cancelled',
+            icon: XCircle,
+            count: countOf('cancelled'),
+        },
+    ];
+
+    const currentViewLabel =
+        railItems.find((v) => v.key === view)?.label ?? 'All workflows';
+    const viewTotal = view === 'all' ? total : countOf(view);
+
+    const header = (
+        <PageHeader
+            icon={UserPlus}
+            title="Onboarding"
+            titleChip={
+                s.overdue_steps > 0 ? (
+                    <PageHeaderStatusChip variant="critical">
+                        {s.overdue_steps} overdue steps
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="success">
+                        {s.active} active
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={`${clientsLabel} being onboarded · ${s.active} active workflows · avg ${s.avg_days} days to complete`}
+            actions={
+                <PageHeaderSearch
+                    value={q}
+                    onChange={setQ}
+                    placeholder={`Search ${clientsLabel.toLowerCase()}…`}
+                />
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Active"
+                        ariaLabel="View in-progress workflows"
+                        onClick={() => applyFilters({ view: 'in_progress' })}
+                    >
+                        <PageHeaderMeterBig>{s.active}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            workflows in progress
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Overdue steps"
+                        tone={s.overdue_steps > 0 ? 'critical' : 'success'}
+                        ariaLabel="View in-progress workflows with overdue steps"
+                        onClick={() => {
+                            setOverdueOnly(true);
+                            applyFilters({ view: 'in_progress' });
+                        }}
+                    >
+                        <PageHeaderMeterBig>
+                            {s.overdue_steps}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            past their due date
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="This month"
+                        ariaLabel="View completed workflows"
+                        onClick={() => applyFilters({ view: 'completed' })}
+                    >
+                        <PageHeaderMeterBig>
+                            {s.completed_this_month}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            completed · avg {s.avg_days} days
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {total > 0 ? (
+                        <PageHeaderMeterBlock
+                            label="Completed"
+                            ariaLabel="View all completed workflows"
+                            onClick={() => applyFilters({ view: 'completed' })}
+                        >
+                            <PageHeaderMeterDonut
+                                percent={(countOf('completed') / total) * 100}
+                                caption={
+                                    <>
+                                        {countOf('completed')} of {total}
+                                        <br />
+                                        all time
+                                    </>
+                                }
+                            />
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                </>
+            }
+            filters={
+                <PageHeaderFilterCheck
+                    label="Overdue only"
+                    checked={overdueOnly}
+                    onChange={setOverdueOnly}
+                />
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={view}
+                    onSelect={(key) => applyFilters({ view: key })}
+                    ariaLabel="Workflow views"
+                />
+            }
+        />
+    );
 
     return (
-        <AppLayout>
-            <Head title="Onboarding Pipeline" />
-            <PageHero
-                icon={UserPlus}
-                title="Onboarding Pipeline"
-                description={`Overview of all ${clientsLabel.toLowerCase()} currently being onboarded.`}
-                stats={[
-                    { label: 'Active', value: stats?.active ?? 0 },
-                    {
-                        label: 'Completed this month',
-                        value: stats?.completed_this_month ?? 0,
-                    },
-                    {
-                        label: 'Overdue steps',
-                        value: stats?.overdue_steps ?? 0,
-                    },
-                    { label: 'Avg days', value: stats?.avg_days ?? 0 },
-                ]}
-            />
-            <PageShell>
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <OpsStatCard
-                        label="Active Workflows"
-                        value={stats?.active ?? 0}
-                        icon={UserPlus}
-                        color="indigo"
-                    />
-                    <OpsStatCard
-                        label="Completed This Month"
-                        value={stats?.completed_this_month ?? 0}
-                        icon={CheckCircle2}
-                        color="emerald"
-                    />
-                    <OpsStatCard
-                        label="Overdue Steps"
-                        value={stats?.overdue_steps ?? 0}
-                        icon={AlertTriangle}
-                        color="red"
-                    />
-                    <OpsStatCard
-                        label="Avg Days to Complete"
-                        value={stats?.avg_days ?? 0}
-                        icon={Timer}
-                        color="blue"
-                    />
-                </div>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                { title: 'Onboarding', href: '/operations/onboarding' },
+            ]}
+        >
+            <Head title="Onboarding" />
 
-                {/* Pipeline Chart + Filters Row */}
-                <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                    {/* Pipeline Donut */}
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Pipeline Overview
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex items-center justify-center pb-4">
-                            <DonutChart
-                                segments={[
-                                    {
-                                        label: 'In Progress',
-                                        value: activeCount,
-                                        color: '#6366f1',
-                                    },
-                                    {
-                                        label: 'Completed',
-                                        value: completedCount,
-                                        color: '#10b981',
-                                    },
-                                    {
-                                        label: 'Overdue Steps',
-                                        value: overdueCount,
-                                        color: '#ef4444',
-                                    },
-                                ]}
-                                centerLabel="Total"
-                                centerValue={activeCount + completedCount}
-                                size={140}
-                            />
-                        </CardContent>
-                    </Card>
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title={currentViewLabel}
+                        caption={`${shown.length} of ${viewTotal} shown${
+                            overdueOnly ? ' · overdue only' : ''
+                        }`}
+                    />
 
-                    {/* Workflow List */}
-                    <div className="lg:col-span-2">
-                        {/* Filters */}
-                        <div className="flex flex-wrap items-center gap-2">
-                            <div className="relative flex-1">
-                                <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                                <Input
-                                    placeholder={`Search ${clientsLabel.toLowerCase()}...`}
-                                    className="h-9 pl-8 text-sm"
-                                    defaultValue={filters?.q ?? ''}
-                                    onChange={(e) =>
-                                        updateFilters(
-                                            'q',
-                                            e.target.value || null,
-                                        )
-                                    }
-                                />
-                            </div>
-                            <Select
-                                value={filters?.status ?? ANY}
-                                onValueChange={(v) =>
-                                    updateFilters(
-                                        'status',
-                                        v === ANY ? null : v,
-                                    )
+                    <div className="space-y-2">
+                        {shown.length === 0 ? (
+                            <EmptyState
+                                icon={Users}
+                                title="No onboarding workflows"
+                                description={
+                                    overdueOnly ||
+                                    view !== 'all' ||
+                                    (filters.q ?? '') !== ''
+                                        ? 'Nothing matches this view or your filters.'
+                                        : `Onboarding workflows are created automatically when a new ${clientLabel.toLowerCase()} is added.`
                                 }
-                            >
-                                <SelectTrigger className="h-9 w-[130px] text-xs">
-                                    <SelectValue placeholder="Status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={ANY}>
-                                        All Status
-                                    </SelectItem>
-                                    <SelectItem value="in_progress">
-                                        In Progress
-                                    </SelectItem>
-                                    <SelectItem value="completed">
-                                        Completed
-                                    </SelectItem>
-                                    <SelectItem value="cancelled">
-                                        Cancelled
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* List */}
-                        <div className="mt-3 space-y-2">
-                            {(workflows?.data ?? []).length === 0 && (
-                                <Card>
-                                    <CardContent className="flex flex-col items-center justify-center py-12">
-                                        <Users className="mb-3 h-10 w-10 text-muted-foreground/30" />
-                                        <h2 className="text-base font-semibold text-muted-foreground">
-                                            No Onboarding Workflows
-                                        </h2>
-                                        <p className="mt-1 text-sm text-muted-foreground/80">
-                                            Onboarding workflows are created
-                                            automatically when a new{' '}
-                                            {clientLabel.toLowerCase()} is
-                                            added.
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                            )}
-                            {(workflows?.data ?? []).map((wf) => {
+                            />
+                        ) : (
+                            shown.map((wf) => {
                                 const stepsTotal =
                                     wf.steps_total || wf.steps_count || 0;
                                 const stepsCompleted =
@@ -271,14 +321,18 @@ export default function OnboardingDashboard({
                                           )
                                         : 0;
                                 const hasOverdue = (wf.overdue_steps ?? 0) > 0;
+                                const badge = STATUS_BADGE[wf.status] ?? {
+                                    label: (wf.status ?? '').replace('_', ' '),
+                                    variant: 'neutral' as StatusVariant,
+                                };
                                 return (
                                     <Card
                                         key={wf.id}
-                                        className={`transition-all hover:border-border hover:shadow-sm ${hasOverdue ? 'border-status-critical/30 dark:border-status-critical/40' : ''}`}
+                                        className={`transition-all hover:border-border hover:shadow-sm ${hasOverdue ? 'border-status-critical/30' : ''}`}
                                     >
                                         <CardContent className="flex items-center gap-4 p-4">
                                             <div
-                                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${hasOverdue ? 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' : 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70'}`}
+                                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${hasOverdue ? 'bg-status-critical-bg text-status-critical' : 'bg-primary/10 text-primary'}`}
                                             >
                                                 {hasOverdue ? (
                                                     <AlertTriangle className="h-5 w-5" />
@@ -287,33 +341,22 @@ export default function OnboardingDashboard({
                                                 )}
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     <span className="text-sm font-semibold">
                                                         {wf.client
                                                             ? `${wf.client.first_name} ${wf.client.last_name}`
                                                             : `Workflow #${wf.id}`}
                                                     </span>
-                                                    <Badge
-                                                        variant={
-                                                            STATUS_VARIANTS[
-                                                                wf.status
-                                                            ] ?? 'outline'
-                                                        }
-                                                        className="h-4 px-1.5 text-[9px] capitalize"
+                                                    <StatusBadge
+                                                        variant={badge.variant}
                                                     >
-                                                        {wf.status?.replace(
-                                                            '_',
-                                                            ' ',
-                                                        )}
-                                                    </Badge>
+                                                        {badge.label}
+                                                    </StatusBadge>
                                                     {hasOverdue && (
-                                                        <Badge
-                                                            variant="destructive"
-                                                            className="h-4 px-1.5 text-[9px]"
-                                                        >
+                                                        <StatusBadge variant="critical">
                                                             {wf.overdue_steps}{' '}
                                                             overdue
-                                                        </Badge>
+                                                        </StatusBadge>
                                                     )}
                                                 </div>
                                                 <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
@@ -371,43 +414,38 @@ export default function OnboardingDashboard({
                                         </CardContent>
                                     </Card>
                                 );
-                            })}
-                        </div>
-
-                        {/* Pagination */}
-                        {(workflows?.last_page ?? 1) > 1 && (
-                            <div className="mt-4 flex items-center justify-center gap-1">
-                                {(workflows?.links ?? []).map(
-                                    (link: any, i: number) => (
-                                        <Button
-                                            key={i}
-                                            size="sm"
-                                            variant={
-                                                link.active
-                                                    ? 'default'
-                                                    : 'outline'
-                                            }
-                                            className="h-7 min-w-[28px] px-2 text-xs"
-                                            disabled={!link.url}
-                                            onClick={() =>
-                                                link.url &&
-                                                router.get(
-                                                    link.url,
-                                                    {},
-                                                    { preserveState: true },
-                                                )
-                                            }
-                                            dangerouslySetInnerHTML={{
-                                                __html: link.label,
-                                            }}
-                                        />
-                                    ),
-                                )}
-                            </div>
+                            })
                         )}
                     </div>
+
+                    {(workflows?.last_page ?? 1) > 1 && (
+                        <div className="flex items-center justify-center gap-1">
+                            {(workflows?.links ?? []).map((link, i) => (
+                                <Button
+                                    key={i}
+                                    size="sm"
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
+                                    className="h-7 min-w-[28px] px-2 text-xs"
+                                    disabled={!link.url}
+                                    onClick={() =>
+                                        link.url &&
+                                        router.get(
+                                            link.url,
+                                            {},
+                                            { preserveState: true },
+                                        )
+                                    }
+                                    dangerouslySetInnerHTML={{
+                                        __html: link.label,
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

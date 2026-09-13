@@ -1,6 +1,16 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Table,
@@ -13,7 +23,16 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { useI18n } from '@/lib/i18n';
 import { Head, router } from '@inertiajs/react';
-import { CheckCircle2, RotateCcw } from 'lucide-react';
+import {
+    CheckCircle2,
+    FileDiff,
+    Layers,
+    MinusCircle,
+    Pencil,
+    PlusCircle,
+    RotateCcw,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type Period = {
     id: number;
@@ -55,6 +74,8 @@ type Props = {
     changes: Change[];
 };
 
+type ViewKey = 'all' | 'changed' | 'added' | 'removed';
+
 type TFunction = (key: string, fallback?: string) => string;
 
 function formatDate(value?: string | null) {
@@ -86,6 +107,10 @@ function formatValue(value: unknown, t: TFunction) {
 export default function Diff({ period, summary, changes }: Props) {
     const { t } = useI18n();
 
+    const [view, setView] = useState<ViewKey>('all');
+    const [search, setSearch] = useState('');
+    const [fieldFilter, setFieldFilter] = useState('all');
+
     const postPeriodAction = (action: 'review' | 'republish') => {
         router.post(
             `/operations/rostering/periods/${period.id}/${action}`,
@@ -94,16 +119,165 @@ export default function Diff({ period, summary, changes }: Props) {
         );
     };
 
+    const backHref = `/operations/rostering?week=${period.week_start}&site_id=${period.site_id}`;
+
+    const fieldOptions = useMemo(
+        () => [
+            { value: 'all', label: 'All fields' },
+            ...Array.from(
+                new Set(
+                    changes.flatMap((change) =>
+                        change.changes.map((fieldChange) => fieldChange.label),
+                    ),
+                ),
+            )
+                .sort()
+                .map((label) => ({ value: label, label })),
+        ],
+        [changes],
+    );
+
+    const shownChanges = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return changes.filter((change) => {
+            if (view !== 'all' && change.type !== view) return false;
+            if (
+                fieldFilter !== 'all' &&
+                !change.changes.some(
+                    (fieldChange) => fieldChange.label === fieldFilter,
+                )
+            )
+                return false;
+            if (q) {
+                const hay = `${change.label} ${change.type} ${change.changes
+                    .map((fieldChange) => fieldChange.label)
+                    .join(' ')}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        });
+    }, [changes, view, search, fieldFilter]);
+
+    const railItems: PageHeaderRailItem<ViewKey>[] = [
+        {
+            key: 'all',
+            label: 'All changes',
+            icon: Layers,
+            count: summary.total,
+        },
+        {
+            key: 'changed',
+            label: t('rostering.publish.diff.changed', 'Changed'),
+            icon: Pencil,
+            count: summary.changed,
+        },
+        {
+            key: 'added',
+            label: t('rostering.publish.diff.added', 'Added'),
+            icon: PlusCircle,
+            count: summary.added,
+        },
+        {
+            key: 'removed',
+            label: t('rostering.publish.diff.removed', 'Removed'),
+            icon: MinusCircle,
+            count: summary.removed,
+        },
+    ];
+
+    const currentViewLabel =
+        railItems.find((v) => v.key === view)?.label ?? 'All changes';
+    const viewTotal = view === 'all' ? summary.total : (summary[view] ?? 0);
+
+    const titleChip =
+        period.status === 'changed_after_publish' ? (
+            <PageHeaderStatusChip variant="warning">
+                {summary.total} changed since publish
+            </PageHeaderStatusChip>
+        ) : period.status === 'published' ? (
+            <PageHeaderStatusChip variant="success">
+                {t('rostering.publish.published', 'Published')}
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="neutral">
+                {t(
+                    `rostering.publish.${period.status}`,
+                    period.status.replaceAll('_', ' '),
+                )}
+            </PageHeaderStatusChip>
+        );
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref={backHref}
+            icon={FileDiff}
+            title={
+                period.site_name ??
+                t('rostering.publish.selected_site', 'Selected site')
+            }
+            titleChip={titleChip}
+            subline={`${t('rostering.publish.diff_title', 'Publish diff')} · ${t(
+                'rostering.publish.week_of',
+                'Week of',
+            )} ${period.week_start} · ${t('rostering.publish.version', 'Version')} ${period.version}`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search shift changes…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={RotateCcw}
+                        disabled={period.status === 'archived'}
+                        className="disabled:pointer-events-none disabled:opacity-50"
+                        onClick={() => postPeriodAction('review')}
+                    >
+                        {t('rostering.publish.re_review', 'Re-review')}
+                    </PageHeaderGlassButton>
+                    <PageHeaderPrimaryButton
+                        icon={CheckCircle2}
+                        disabled={period.status === 'archived'}
+                        className="disabled:pointer-events-none disabled:opacity-50"
+                        onClick={() => postPeriodAction('republish')}
+                    >
+                        {t('rostering.publish.republish', 'Re-publish')}
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    icon={Pencil}
+                    label="All fields"
+                    value={fieldFilter}
+                    options={fieldOptions}
+                    onChange={setFieldFilter}
+                />
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={view}
+                    onSelect={setView}
+                    ariaLabel="Change views"
+                />
+            }
+        />
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
                 {
                     title: t('rostering.title', 'Rostering'),
-                    href: `/operations/rostering?week=${period.week_start}&site_id=${period.site_id}`,
+                    href: backHref,
                 },
                 {
                     title: t('rostering.publish.diff_title', 'Publish diff'),
-                    href: '#',
+                    href: `/operations/rostering/periods/${period.id}/diff`,
                 },
             ]}
         >
@@ -114,255 +288,164 @@ export default function Diff({ period, summary, changes }: Props) {
                 )}
             />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        variant="compact"
-                        backHref={`/operations/rostering?week=${period.week_start}&site_id=${period.site_id}`}
-                        backLabel={t(
-                            'rostering.publish.back_to_roster',
-                            'Back to roster',
-                        )}
-                        title={t(
-                            'rostering.publish.diff_title',
-                            'Publish diff',
-                        )}
-                        description={`${period.site_name ?? t('rostering.publish.selected_site', 'Selected site')} · ${t('rostering.publish.week_of', 'Week of')} ${period.week_start} · ${t('rostering.publish.version', 'Version')} ${period.version}`}
-                        actions={
-                            <>
-                                <Badge
-                                    variant={
-                                        period.status ===
-                                        'changed_after_publish'
-                                            ? 'destructive'
-                                            : 'outline'
-                                    }
-                                >
-                                    {t(
-                                        `rostering.publish.${period.status}`,
-                                        period.status.replaceAll('_', ' '),
-                                    )}
-                                </Badge>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={period.status === 'archived'}
-                                    onClick={() => postPeriodAction('review')}
-                                >
-                                    <RotateCcw className="mr-1 h-4 w-4" />
-                                    {t(
-                                        'rostering.publish.re_review',
-                                        'Re-review',
-                                    )}
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    disabled={period.status === 'archived'}
-                                    onClick={() =>
-                                        postPeriodAction('republish')
-                                    }
-                                >
-                                    <CheckCircle2 className="mr-1 h-4 w-4" />
-                                    {t(
-                                        'rostering.publish.republish',
-                                        'Re-publish',
-                                    )}
-                                </Button>
-                            </>
-                        }
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title={currentViewLabel}
+                        caption={`${shownChanges.length} of ${viewTotal} shown`}
                     />
-                }
-            >
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
+                            <CardTitle className="text-base">
                                 {t(
-                                    'rostering.publish.diff.total_changes',
-                                    'Total changes',
+                                    'rostering.publish.diff.shift_changes',
+                                    'Shift changes since publish',
                                 )}
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="text-2xl font-semibold">
-                            {summary.total}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                {t('rostering.publish.diff.changed', 'Changed')}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-2xl font-semibold">
-                            {summary.changed}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                {t('rostering.publish.diff.added', 'Added')}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-2xl font-semibold">
-                            {summary.added}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                {t('rostering.publish.diff.removed', 'Removed')}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-2xl font-semibold">
-                            {summary.removed}
+                        <CardContent>
+                            {shownChanges.length === 0 ? (
+                                <div className="rounded-md border p-4 text-sm text-muted-foreground">
+                                    {search.trim() !== '' ||
+                                    view !== 'all' ||
+                                    fieldFilter !== 'all'
+                                        ? 'No changes match this view or your filters.'
+                                        : t(
+                                              'rostering.publish.diff.no_changes',
+                                              'No roster changes were found against the current publish snapshot.',
+                                          )}
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>
+                                                {t(
+                                                    'rostering.publish.diff.shift',
+                                                    'Shift',
+                                                )}
+                                            </TableHead>
+                                            <TableHead>
+                                                {t(
+                                                    'rostering.publish.diff.change',
+                                                    'Change',
+                                                )}
+                                            </TableHead>
+                                            <TableHead>
+                                                {t(
+                                                    'rostering.publish.diff.field',
+                                                    'Field',
+                                                )}
+                                            </TableHead>
+                                            <TableHead>
+                                                {t(
+                                                    'rostering.publish.diff.before',
+                                                    'Before',
+                                                )}
+                                            </TableHead>
+                                            <TableHead>
+                                                {t(
+                                                    'rostering.publish.diff.after',
+                                                    'After',
+                                                )}
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {shownChanges.map((change) =>
+                                            change.changes.length > 0 ? (
+                                                change.changes.map(
+                                                    (fieldChange, index) => (
+                                                        <TableRow
+                                                            key={`${change.shift_id}-${fieldChange.field}`}
+                                                        >
+                                                            <TableCell>
+                                                                {index === 0 ? (
+                                                                    <div>
+                                                                        <div className="font-medium">
+                                                                            {
+                                                                                change.label
+                                                                            }
+                                                                        </div>
+                                                                        <div className="text-muted-foreground">
+                                                                            {formatDate(
+                                                                                change.starts_at,
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ) : null}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {index === 0 ? (
+                                                                    <Badge variant="outline">
+                                                                        {
+                                                                            change.type
+                                                                        }
+                                                                    </Badge>
+                                                                ) : null}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {
+                                                                    fieldChange.label
+                                                                }
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {formatValue(
+                                                                    fieldChange.before,
+                                                                    t,
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {formatValue(
+                                                                    fieldChange.after,
+                                                                    t,
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ),
+                                                )
+                                            ) : (
+                                                <TableRow
+                                                    key={`${change.shift_id}-${change.type}`}
+                                                >
+                                                    <TableCell>
+                                                        <div>
+                                                            <div className="font-medium">
+                                                                {change.label}
+                                                            </div>
+                                                            <div className="text-muted-foreground">
+                                                                {formatDate(
+                                                                    change.starts_at,
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline">
+                                                            {change.type}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell colSpan={3}>
+                                                        {change.type === 'added'
+                                                            ? t(
+                                                                  'rostering.publish.diff.new_shift',
+                                                                  'New shift',
+                                                              )
+                                                            : t(
+                                                                  'rostering.publish.diff.removed_shift',
+                                                                  'Removed shift',
+                                                              )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ),
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
-
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base">
-                            {t(
-                                'rostering.publish.diff.shift_changes',
-                                'Shift changes since publish',
-                            )}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {changes.length === 0 ? (
-                            <div className="rounded-md border p-4 text-sm text-muted-foreground">
-                                {t(
-                                    'rostering.publish.diff.no_changes',
-                                    'No roster changes were found against the current publish snapshot.',
-                                )}
-                            </div>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>
-                                            {t(
-                                                'rostering.publish.diff.shift',
-                                                'Shift',
-                                            )}
-                                        </TableHead>
-                                        <TableHead>
-                                            {t(
-                                                'rostering.publish.diff.change',
-                                                'Change',
-                                            )}
-                                        </TableHead>
-                                        <TableHead>
-                                            {t(
-                                                'rostering.publish.diff.field',
-                                                'Field',
-                                            )}
-                                        </TableHead>
-                                        <TableHead>
-                                            {t(
-                                                'rostering.publish.diff.before',
-                                                'Before',
-                                            )}
-                                        </TableHead>
-                                        <TableHead>
-                                            {t(
-                                                'rostering.publish.diff.after',
-                                                'After',
-                                            )}
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {changes.map((change) =>
-                                        change.changes.length > 0 ? (
-                                            change.changes.map(
-                                                (fieldChange, index) => (
-                                                    <TableRow
-                                                        key={`${change.shift_id}-${fieldChange.field}`}
-                                                    >
-                                                        <TableCell>
-                                                            {index === 0 ? (
-                                                                <div>
-                                                                    <div className="font-medium">
-                                                                        {
-                                                                            change.label
-                                                                        }
-                                                                    </div>
-                                                                    <div className="text-muted-foreground">
-                                                                        {formatDate(
-                                                                            change.starts_at,
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            ) : null}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {index === 0 ? (
-                                                                <Badge variant="outline">
-                                                                    {
-                                                                        change.type
-                                                                    }
-                                                                </Badge>
-                                                            ) : null}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {fieldChange.label}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {formatValue(
-                                                                fieldChange.before,
-                                                                t,
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {formatValue(
-                                                                fieldChange.after,
-                                                                t,
-                                                            )}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ),
-                                            )
-                                        ) : (
-                                            <TableRow
-                                                key={`${change.shift_id}-${change.type}`}
-                                            >
-                                                <TableCell>
-                                                    <div>
-                                                        <div className="font-medium">
-                                                            {change.label}
-                                                        </div>
-                                                        <div className="text-muted-foreground">
-                                                            {formatDate(
-                                                                change.starts_at,
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="outline">
-                                                        {change.type}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell colSpan={3}>
-                                                    {change.type === 'added'
-                                                        ? t(
-                                                              'rostering.publish.diff.new_shift',
-                                                              'New shift',
-                                                          )
-                                                        : t(
-                                                              'rostering.publish.diff.removed_shift',
-                                                              'Removed shift',
-                                                          )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ),
-                                    )}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
             </PageLayout>
         </AppLayout>
     );

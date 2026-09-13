@@ -1,5 +1,21 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { PageHero, PageLayout } from '@/components/page';
+import { ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageHeaderViewToggle,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +28,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -25,19 +42,20 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
+    Clock,
     Download,
     File,
     FileImage,
     FileSpreadsheet,
     FileText,
-    Filter,
     FolderOpen,
     FolderPlus,
     Globe,
     Grid3X3,
+    Layers,
     List,
     Pencil,
-    Search,
     Trash2,
     Upload,
 } from 'lucide-react';
@@ -174,6 +192,8 @@ type Props = {
     documents: Array<any>;
 };
 
+type ViewKey = 'all' | 'shared' | 'expiring' | 'expired';
+
 export default function ClientDocuments({
     client,
     can_edit,
@@ -184,6 +204,7 @@ export default function ClientDocuments({
     const name = `${client.first_name} ${client.last_name}`.trim();
 
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [view, setViewState] = useState<ViewKey>('all');
     const [search, setSearch] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
     const [showUpload, setShowUpload] = useState(false);
@@ -247,8 +268,22 @@ export default function ClientDocuments({
         return Array.from(set).sort();
     }, [documents, folders]);
 
+    // A rail view is a flat queue across ALL folders; folder browsing only
+    // applies on the "All documents" view.
+    const setView = (key: ViewKey) => {
+        setViewState(key);
+        setCurrentFolder(null);
+    };
+
     const filtered = useMemo(() => {
         return documents.filter((d) => {
+            if (view === 'shared' && !d.portal_visible) return false;
+            if (
+                view === 'expiring' &&
+                !(isExpiringSoon(d.expiry_date) && !isExpired(d.expiry_date))
+            )
+                return false;
+            if (view === 'expired' && !isExpired(d.expiry_date)) return false;
             if (
                 search &&
                 !(d.title ?? d.original_name ?? '')
@@ -257,20 +292,21 @@ export default function ClientDocuments({
             )
                 return false;
             if (categoryFilter && d.category !== categoryFilter) return false;
-            // Folder filtering
-            if (currentFolder !== null) {
+            // Folder filtering (All documents view only)
+            if (view === 'all' && currentFolder !== null) {
                 if ((d.folder || '') !== currentFolder) return false;
             }
             return true;
         });
-    }, [documents, search, categoryFilter, currentFolder]);
+    }, [documents, view, search, categoryFilter, currentFolder]);
 
     // Documents in the current view (root = no folder selected, shows unfiled + folder cards)
     const filesInCurrentView = useMemo(() => {
+        if (view !== 'all') return filtered;
         if (currentFolder !== null) return filtered;
         // At root level, show documents without a folder
         return filtered.filter((d) => !d.folder);
-    }, [filtered, currentFolder]);
+    }, [filtered, view, currentFolder]);
 
     // Folder counts for root view
     const folderCounts = useMemo(() => {
@@ -348,12 +384,193 @@ export default function ClientDocuments({
         );
     };
 
+    /* ---------------- Event Horizon header ---------------- */
+
+    const railItems: PageHeaderRailItem<ViewKey>[] = [
+        {
+            key: 'all',
+            label: 'All documents',
+            icon: Layers,
+            count: stats.total,
+        },
+        { key: 'shared', label: 'Shared', icon: Globe, count: stats.portal },
+        {
+            key: 'expiring',
+            label: 'Expiring soon',
+            icon: Clock,
+            count: stats.expiring,
+        },
+        {
+            key: 'expired',
+            label: 'Expired',
+            icon: AlertTriangle,
+            count: stats.expired,
+            alert: true,
+        },
+    ];
+    const currentViewLabel =
+        railItems.find((v) => v.key === view)?.label ?? 'All documents';
+
+    const titleChip =
+        stats.expired > 0 ? (
+            <PageHeaderStatusChip variant="critical">
+                {stats.expired} expired
+            </PageHeaderStatusChip>
+        ) : stats.expiring > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {stats.expiring} expiring soon
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                Up to date
+            </PageHeaderStatusChip>
+        );
+
+    const categoryOptions = [
+        { value: 'all', label: 'All categories' },
+        ...CATEGORIES.map((c) => ({ value: c.value, label: c.label })),
+    ];
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref={`/operations/clients/${client.id}`}
+            icon={FolderOpen}
+            title={name}
+            titleChip={titleChip}
+            subline={`Document library · ${stats.total} ${
+                stats.total === 1 ? 'document' : 'documents'
+            } · ${allFolders.length} ${
+                allFolders.length === 1 ? 'folder' : 'folders'
+            }`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search documents…"
+                    />
+                    {can_edit ? (
+                        <>
+                            <PageHeaderGlassButton
+                                icon={FolderPlus}
+                                onClick={() => setShowNewFolder(true)}
+                            >
+                                New folder
+                            </PageHeaderGlassButton>
+                            <PageHeaderPrimaryButton
+                                icon={Upload}
+                                onClick={() => {
+                                    uploadForm.setData(
+                                        'folder',
+                                        currentFolder ?? '',
+                                    );
+                                    setShowUpload(true);
+                                }}
+                            >
+                                Upload document
+                            </PageHeaderPrimaryButton>
+                        </>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Documents"
+                        ariaLabel="View all documents"
+                        onClick={() => setView('all')}
+                    >
+                        <PageHeaderMeterBig>{stats.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            across {allFolders.length}{' '}
+                            {allFolders.length === 1 ? 'folder' : 'folders'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {stats.total > 0 ? (
+                        <PageHeaderMeterBlock
+                            label="Shared"
+                            ariaLabel="View documents shared to the family portal"
+                            onClick={() => setView('shared')}
+                        >
+                            <PageHeaderMeterDonut
+                                percent={(stats.portal / stats.total) * 100}
+                                caption={
+                                    <>
+                                        {stats.portal} of {stats.total}
+                                        <br />
+                                        in family portal
+                                    </>
+                                }
+                            />
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label="Expiring soon"
+                        tone={stats.expiring > 0 ? 'warning' : 'success'}
+                        ariaLabel="View documents expiring soon"
+                        onClick={() => setView('expiring')}
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.expiring}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            within the next 30 days
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Expired"
+                        tone={stats.expired > 0 ? 'critical' : 'success'}
+                        ariaLabel="View expired documents"
+                        onClick={() => setView('expired')}
+                    >
+                        <PageHeaderMeterBig>{stats.expired}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            past their expiry date
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        icon={FileText}
+                        label="All categories"
+                        value={categoryFilter || 'all'}
+                        options={categoryOptions}
+                        onChange={(v) =>
+                            setCategoryFilter(v === 'all' ? '' : v)
+                        }
+                    />
+                    <PageHeaderViewToggle
+                        value={viewMode}
+                        onChange={setViewMode}
+                        ariaLabel="Layout"
+                        options={[
+                            { value: 'grid', label: 'Grid', icon: Grid3X3 },
+                            { value: 'list', label: 'List', icon: List },
+                        ]}
+                    />
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={view}
+                    onSelect={setView}
+                    ariaLabel="Document views"
+                />
+            }
+        />
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 {
                     title: labels?.['client.plural'] ?? 'Clients',
-                    href: '/clients',
+                    href: '/operations/clients',
                 },
                 { title: name, href: `/operations/clients/${client.id}` },
                 {
@@ -362,86 +579,19 @@ export default function ClientDocuments({
                 },
             ]}
         >
-            <Head title={`Documents - ${name}`} />
+            <Head title={`Documents · ${name}`} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        variant="compact"
-                        backHref={`/operations/clients/${client.id}`}
-                        title="Documents"
-                        description={`${name}'s document library`}
-                        actions={
-                            can_edit ? (
-                                <>
-                                    <Button
-                                        variant="outline"
-                                        className="gap-1.5"
-                                        size="sm"
-                                        onClick={() => setShowNewFolder(true)}
-                                    >
-                                        <FolderPlus className="h-4 w-4" />
-                                        New Folder
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        className="gap-1.5 bg-primary hover:bg-primary"
-                                        onClick={() => {
-                                            uploadForm.setData(
-                                                'folder',
-                                                currentFolder ?? '',
-                                            );
-                                            setShowUpload(true);
-                                        }}
-                                    >
-                                        <Upload className="h-4 w-4" />
-                                        Upload Document
-                                    </Button>
-                                </>
-                            ) : null
-                        }
-                    />
-                }
-            >
-                {/* Stats Bar */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
-                        <div className="text-xl font-bold text-primary">
-                            {stats.total}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-primary uppercase">
-                            Total
-                        </div>
-                    </div>
-                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
-                        <div className="text-xl font-bold text-status-info">
-                            {stats.portal}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-primary uppercase">
-                            Shared
-                        </div>
-                    </div>
-                    <div className="rounded-xl border p-3 text-center">
-                        <div
-                            className={`text-xl font-bold ${stats.expiring > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
-                        >
-                            {stats.expiring}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                            Expiring
-                        </div>
-                    </div>
-                    <div className="rounded-xl border p-3 text-center">
-                        <div
-                            className={`text-xl font-bold ${stats.expired > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
-                        >
-                            {stats.expired}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                            Expired
-                        </div>
-                    </div>
-                </div>
+            <PageLayout hero={header}>
+                <ListCaption
+                    title={
+                        view === 'all' && currentFolder
+                            ? currentFolder
+                            : currentViewLabel
+                    }
+                    caption={`${filtered.length} of ${stats.total} ${
+                        stats.total === 1 ? 'document' : 'documents'
+                    } shown`}
+                />
 
                 {/* Breadcrumb */}
                 {currentFolder && (
@@ -460,75 +610,27 @@ export default function ClientDocuments({
                     </div>
                 )}
 
-                {/* Toolbar */}
-                <Card className="flex-row flex-wrap items-center gap-2 rounded-xl bg-card/50 p-3">
-                    <div className="relative flex-1">
-                        <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                            placeholder="Search documents..."
-                            className="h-9 pl-8 text-sm"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
-                    </div>
-                    <Select
-                        value={categoryFilter || 'ALL'}
-                        onValueChange={(v) =>
-                            setCategoryFilter(v === 'ALL' ? '' : v)
-                        }
-                    >
-                        <SelectTrigger className="h-9 w-[150px] text-xs">
-                            <Filter className="mr-1 h-3 w-3" />
-                            <SelectValue placeholder="All Categories" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="ALL">All Categories</SelectItem>
-                            {CATEGORIES.map((c) => (
-                                <SelectItem key={c.value} value={c.value}>
-                                    {c.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <div className="flex rounded-lg border">
-                        <Button
-                            variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                            size="sm"
-                            className="h-9 rounded-r-none px-2.5"
-                            onClick={() => setViewMode('grid')}
-                        >
-                            <Grid3X3 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant={viewMode === 'list' ? 'default' : 'ghost'}
-                            size="sm"
-                            className="h-9 rounded-l-none px-2.5"
-                            onClick={() => setViewMode('list')}
-                        >
-                            <List className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </Card>
-
                 {/* Documents */}
                 {filesInCurrentView.length === 0 &&
-                (currentFolder !== null || visibleFolders.length === 0) ? (
-                    <Card className="border-dashed">
-                        <CardContent className="flex flex-col items-center justify-center py-16">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                                <FolderOpen className="h-8 w-8 text-primary" />
-                            </div>
-                            <p className="font-medium">No Documents</p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                {search || categoryFilter
-                                    ? 'No documents match your filters.'
-                                    : currentFolder
-                                      ? `No documents in this folder yet.`
-                                      : `Upload documents for ${client.first_name}.`}
-                            </p>
-                            {can_edit && !search && !categoryFilter && (
+                (view !== 'all' ||
+                    currentFolder !== null ||
+                    visibleFolders.length === 0) ? (
+                    <EmptyState
+                        icon={FolderOpen}
+                        title="No documents"
+                        description={
+                            search || categoryFilter || view !== 'all'
+                                ? 'No documents match this view or your filters.'
+                                : currentFolder
+                                  ? 'No documents in this folder yet.'
+                                  : `Upload documents for ${client.first_name}.`
+                        }
+                        action={
+                            can_edit &&
+                            !search &&
+                            !categoryFilter &&
+                            view === 'all' ? (
                                 <Button
-                                    className="mt-4 gap-1.5 bg-primary hover:bg-primary"
                                     size="sm"
                                     onClick={() => {
                                         uploadForm.setData(
@@ -540,14 +642,15 @@ export default function ClientDocuments({
                                 >
                                     <Upload className="h-3.5 w-3.5" /> Upload
                                 </Button>
-                            )}
-                        </CardContent>
-                    </Card>
+                            ) : undefined
+                        }
+                    />
                 ) : viewMode === 'grid' ? (
                     /* Grid View */
                     <div className="space-y-6">
-                        {/* Folder cards (only at root level) */}
-                        {currentFolder === null &&
+                        {/* Folder cards (only at root level of All documents) */}
+                        {view === 'all' &&
+                            currentFolder === null &&
                             visibleFolders.length > 0 && (
                                 <div>
                                     <div className="mb-2 flex items-center gap-2">
@@ -567,7 +670,7 @@ export default function ClientDocuments({
                                                     onClick={() =>
                                                         setCurrentFolder(folder)
                                                     }
-                                                    className="flex flex-col items-center rounded-xl border bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
+                                                    className="flex flex-col items-center rounded-xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
                                                 >
                                                     <FolderOpen className="h-10 w-10 text-status-warning" />
                                                     <span className="mt-2 text-xs font-medium">
@@ -587,7 +690,7 @@ export default function ClientDocuments({
                         {/* File cards */}
                         {filesInCurrentView.length > 0 && (
                             <div>
-                                {currentFolder === null && (
+                                {view === 'all' && currentFolder === null && (
                                     <div className="mb-2 flex items-center gap-2">
                                         <FileText className="h-4 w-4 text-primary" />
                                         <span className="text-sm font-semibold">
@@ -655,7 +758,7 @@ export default function ClientDocuments({
                                                     )}
                                                 </div>
                                                 {/* Hover actions */}
-                                                <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 rounded-b-xl bg-gradient-to-t from-white via-white to-transparent pt-6 pb-2 opacity-0 transition-opacity group-hover:opacity-100">
+                                                <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 rounded-b-xl bg-gradient-to-t from-card via-card to-transparent pt-6 pb-2 opacity-0 transition-opacity group-hover:opacity-100">
                                                     <a
                                                         href={`/operations/clients/${client.id}/documents/${d.id}/download`}
                                                         className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20"
@@ -704,8 +807,9 @@ export default function ClientDocuments({
                     /* List View */
                     <Card>
                         <CardContent className="p-0">
-                            {/* Folder rows at root level */}
-                            {currentFolder === null &&
+                            {/* Folder rows at root level of All documents */}
+                            {view === 'all' &&
+                                currentFolder === null &&
                                 visibleFolders.length > 0 && (
                                     <table className="w-full text-sm">
                                         <tbody>

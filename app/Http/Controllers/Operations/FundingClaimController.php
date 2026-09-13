@@ -26,7 +26,9 @@ class FundingClaimController extends Controller
         $data = $request->validate([
             'status' => ['nullable', 'string', 'in:draft,submitted,approved,rejected,paid'],
             'client_id' => ['nullable', 'integer', 'min:1'],
+            'q' => ['nullable', 'string', 'max:255'],
         ]);
+        $search = trim((string) ($data['q'] ?? ''));
 
         if (! empty($data['client_id'])) {
             abort_unless(
@@ -48,9 +50,25 @@ class FundingClaimController extends Controller
             ->withCount('items')
             ->when(! empty($data['status']), fn ($q) => $q->where('status', $data['status']))
             ->when(! empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
+            ->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search) {
+                $like = '%'.$search.'%';
+                $inner->where('claim_reference', 'like', $like)
+                    ->orWhereHas('client', function ($c) use ($like) {
+                        $c->where('first_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like);
+                    });
+            }))
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
+
+        // Header instruments — per-status counts and amounts over the whole
+        // accessible set regardless of the active filters, so rail counts
+        // stay honest on every tab.
+        $statusRows = $this->accessibleClaims($auth)
+            ->selectRaw('status, COUNT(*) as total, COALESCE(SUM(total_amount), 0) as amount')
+            ->groupBy('status')
+            ->get();
 
         $clients = $this->siteAccess->applyClientScope(
             Client::query(),
@@ -63,7 +81,17 @@ class FundingClaimController extends Controller
         return inertia('operations/funding/claims/Index', [
             'claims' => $claims,
             'clients' => $clients,
-            'filters' => $request->only(['status', 'client_id']),
+            'filters' => $request->only(['status', 'client_id', 'q']),
+            'summary' => [
+                'total' => (int) $statusRows->sum('total'),
+                'total_amount' => (float) $statusRows->sum('amount'),
+                'by_status' => $statusRows->mapWithKeys(fn ($row) => [
+                    $row->status => [
+                        'count' => (int) $row->total,
+                        'amount' => (float) $row->amount,
+                    ],
+                ]),
+            ],
         ]);
     }
 

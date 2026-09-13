@@ -1,4 +1,19 @@
-import { PageHero } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import {
     BroadcastDialog,
     type BroadcastShift,
@@ -15,8 +30,6 @@ import {
     type ConflictConfirmKind,
     type ConflictConfirmResult,
     ConflictDetailPanel,
-    ConflictFilterStrip,
-    ConflictHeroFooter,
     ConflictQueueList,
     ConflictScanSettingsDialog,
     ConflictToasts,
@@ -26,6 +39,7 @@ import {
     type QueueItem,
     type QueueShift,
     TYPE_META,
+    TYPE_ORDER,
     buildQueue,
     coverageRolesForAction,
     useConflictQueue,
@@ -42,17 +56,17 @@ import { useCreateShiftLauncher } from '@/pages/operations/shifts/components/use
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Building2,
     CalendarClock,
-    CalendarDays,
     CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
     Download,
-    Layers,
     LayoutGrid,
-    type LucideIcon,
     MoreHorizontal,
     RefreshCcw,
-    RefreshCw,
     Settings,
+    Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -60,17 +74,6 @@ type ReassignState = { shift: ReassignShift; item: QueueItem; done: string };
 type UnassignState = { shift: UnassignMakeOpenShift; item: QueueItem };
 type BroadcastState = { shift: BroadcastShift; item: QueueItem };
 type ConfirmState = { kind: ConflictConfirmKind; item: QueueItem };
-
-// Hero stat-tile value tints. The hero sits on the purple ops gradient, so the
-// dark on-light --status-* tokens read as muddy (and --status-info IS --primary,
-// i.e. purple-on-purple). Use the light on-gradient tints the design specifies
-// (prototype --on-critical/warning/info) so every value is legible.
-const HERO_TILE_TONE: Record<string, string> = {
-    critical: 'text-[oklch(83%_0.13_22)]',
-    warning: 'text-[oklch(89%_0.11_90)]',
-    info: 'text-[oklch(87%_0.07_250)]',
-    neutral: 'text-primary-foreground',
-};
 
 function pluralise(count: number, word: string, plural?: string) {
     return `${count} ${count === 1 ? word : (plural ?? `${word}s`)}`;
@@ -108,7 +111,6 @@ export default function RosteringConflicts(props: ConflictsProps) {
             can?: { shifts?: { manageAny?: boolean } };
         };
     };
-    const firstName = auth?.user?.name?.split(' ')?.[0] ?? 'team';
     // Write actions hit endpoints gated on shifts.manageAny; the page itself is
     // only gated on rostering.viewAny. Disable management actions for viewers
     // without manage rights (matches the rostering index) so they never 403.
@@ -650,50 +652,264 @@ export default function RosteringConflicts(props: ConflictsProps) {
 
     /* -------------------------------- render -------------------------------- */
 
-    const heroTiles: Array<{
-        label: string;
-        value: number;
-        tone: keyof typeof HERO_TILE_TONE;
-        icon: LucideIcon;
-        filter: typeof filter;
-    }> = [
-        {
-            label: 'Conflicts',
-            value: blocking,
-            tone: 'critical',
-            icon: AlertTriangle,
-            filter: 'all',
-        },
-        {
-            label: 'Coverage gaps',
-            value: counts.coverage_gap,
-            tone: 'warning',
-            icon: Layers,
-            filter: 'coverage_gap',
-        },
-        {
-            label: 'Open',
-            value: counts.open_shift,
-            tone: 'neutral',
-            icon: CalendarClock,
-            filter: 'open_shift',
-        },
-        {
-            label: 'Replacing',
-            value: counts.replacement,
-            tone: 'info',
-            icon: RefreshCw,
-            filter: 'replacement',
-        },
-    ];
+    const [search, setSearch] = useState('');
+    const searchedVisible = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return visible;
+        return visible.filter((item) =>
+            `${item.who} ${item.summary} ${TYPE_META[item.type].label}`
+                .toLowerCase()
+                .includes(q),
+        );
+    }, [visible, search]);
 
     const progressPct = seedTotal
         ? Math.round((resolvedToday / seedTotal) * 100)
         : 0;
 
+    const goToWeek = (date: Date) => {
+        router.get(
+            '/operations/rostering/conflicts',
+            { week: date.toISOString().slice(0, 10) },
+            { preserveScroll: true },
+        );
+    };
+    const shiftWeek = (days: number) => {
+        const d = new Date(weekStartDate);
+        d.setDate(d.getDate() + days);
+        goToWeek(d);
+    };
+
+    const railItems: PageHeaderRailItem<typeof filter>[] = [
+        {
+            key: 'all',
+            label: 'All conflicts',
+            icon: LayoutGrid,
+            count: open.length,
+        },
+        ...TYPE_ORDER.map((type) => ({
+            key: type as typeof filter,
+            label: TYPE_META[type].short,
+            icon: TYPE_META[type].icon,
+            count: counts[type],
+            alert: TYPE_META[type].severity === 'critical',
+        })),
+    ];
+
+    const titleChip =
+        blocking > 0 ? (
+            <PageHeaderStatusChip variant="critical">
+                {blocking} blocking
+            </PageHeaderStatusChip>
+        ) : open.length > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {open.length} open
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                All clear
+            </PageHeaderStatusChip>
+        );
+
+    const siteFilterOptions = [
+        { value: 'all', label: 'All sites' },
+        ...queue.siteOptions.map((option) => ({
+            value: String(option.id),
+            label: option.name,
+        })),
+    ];
+    const staffFilterOptions = [
+        { value: 'all', label: 'All staff' },
+        ...queue.staffOptions.map((option) => ({
+            value: String(option.id),
+            label: option.name,
+        })),
+    ];
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/operations/rostering"
+            icon={AlertTriangle}
+            title="Conflict queue"
+            titleChip={titleChip}
+            subline={`${range.startLabel} → ${rangeEndLabel} · ${pluralise(
+                queue.siteOptions.length,
+                'site',
+            )} · ${resolvedToday} resolved today`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search conflicts…"
+                    />
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <PageHeaderGlassButton
+                                icon={MoreHorizontal}
+                                aria-label="More actions"
+                            />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-60">
+                            <DropdownMenuItem onSelect={rerunScan}>
+                                <RefreshCcw className="mr-2 h-4 w-4" />
+                                Re-run conflict scan
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onSelect={acknowledgeAllTurnarounds}
+                                disabled={counts.tight_turnaround === 0}
+                            >
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                Acknowledge all turnarounds
+                                <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                                    {counts.tight_turnaround}
+                                </span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={exportReport}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Export conflict report
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onSelect={() => setScanSettingsOpen(true)}
+                            >
+                                <Settings className="mr-2 h-4 w-4" />
+                                Scan settings
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <PageHeaderPrimaryButton
+                        icon={CheckCircle2}
+                        onClick={queue.resolveNext}
+                        disabled={open.length === 0}
+                        className="disabled:pointer-events-none disabled:opacity-50"
+                    >
+                        Resolve next
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Blocking"
+                        tone={blocking > 0 ? 'critical' : 'success'}
+                        ariaLabel="View all conflicts"
+                        onClick={() => queue.setFilter('all')}
+                    >
+                        <PageHeaderMeterBig>{blocking}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            conflicts blocking the roster
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Coverage gaps"
+                        tone={counts.coverage_gap > 0 ? 'warning' : 'success'}
+                        ariaLabel="View coverage gaps"
+                        onClick={() => queue.setFilter('coverage_gap')}
+                    >
+                        <PageHeaderMeterBig>
+                            {counts.coverage_gap}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            windows below required staffing
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Open shifts"
+                        ariaLabel="View open shifts"
+                        onClick={() => queue.setFilter('open_shift')}
+                    >
+                        <PageHeaderMeterBig>
+                            {counts.open_shift}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            still need cover
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Replacing"
+                        ariaLabel="View replacements in flight"
+                        onClick={() => queue.setFilter('replacement')}
+                    >
+                        <PageHeaderMeterBig>
+                            {counts.replacement}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            replacements in flight
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Resolved today"
+                        value={`${resolvedToday}/${seedTotal}`}
+                        ariaLabel="View all conflicts"
+                        onClick={() => queue.setFilter('all')}
+                    >
+                        <PageHeaderMeterBar percent={progressPct} />
+                        <PageHeaderMeterCaption>
+                            {progressPct}% of today's queue cleared
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterButton
+                        icon={ChevronLeft}
+                        aria-label="Previous week"
+                        onClick={() => shiftWeek(-7)}
+                    />
+                    <PageHeaderFilterButton
+                        icon={CalendarClock}
+                        onClick={() => goToWeek(startOfWeek(new Date()))}
+                    >
+                        {curLab}
+                    </PageHeaderFilterButton>
+                    <PageHeaderFilterButton
+                        icon={ChevronRight}
+                        aria-label="Next week"
+                        onClick={() => shiftWeek(7)}
+                    />
+                    <PageHeaderFilterSelect
+                        icon={Building2}
+                        label="All sites"
+                        value={String(queue.siteFilterValue ?? 'all')}
+                        options={siteFilterOptions}
+                        onChange={(v) =>
+                            queue.setSiteFilterById(
+                                v === 'all' ? null : Number(v),
+                            )
+                        }
+                    />
+                    <PageHeaderFilterSelect
+                        icon={Users}
+                        label="All staff"
+                        value={String(queue.staffFilterValue ?? 'all')}
+                        options={staffFilterOptions}
+                        onChange={(v) =>
+                            queue.setStaffFilterById(
+                                v === 'all' ? null : Number(v),
+                            )
+                        }
+                    />
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={filter}
+                    onSelect={queue.setFilter}
+                    ariaLabel="Conflict views"
+                />
+            }
+        />
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
                 { title: 'Rostering', href: '/operations/rostering' },
                 {
                     title: 'Conflict queue',
@@ -702,207 +918,12 @@ export default function RosteringConflicts(props: ConflictsProps) {
             ]}
         >
             <Head title="Rostering conflict queue" />
-            <div className="space-y-4 p-4">
-                <PageHero
-                    category="ops"
-                    icon={AlertTriangle}
-                    backHref="/operations/rostering"
-                    backLabel="Back to rostering"
-                    title={
-                        <span className="block max-w-[34rem]">
-                            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
-                                <span
-                                    aria-hidden="true"
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    {/* eslint-disable no-restricted-syntax -- emerald "live" ping dot, copied verbatim from the rostering index hero per the design handoff. */}
-                                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-emerald-300/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300 ring-2 ring-emerald-300/30" />
-                                    {/* eslint-enable no-restricted-syntax */}
-                                </span>
-                                Conflict scan · live · last run 2 min ago
-                            </span>
-                            <span className="block">
-                                <span className="font-normal text-primary-foreground/80">
-                                    Kia ora {firstName},{' '}
-                                    {pluralise(blocking, 'conflict')} need you —
-                                </span>{' '}
-                                <span className="border-b-2 border-primary-foreground/40 pb-0.5 whitespace-nowrap">
-                                    {range.startLabel} → {rangeEndLabel}
-                                </span>
-                            </span>
-                        </span>
-                    }
-                    description={
-                        <span className="block max-w-[34rem]">
-                            {pluralise(
-                                counts.staff_overlap,
-                                'staff double-booking',
-                            )}
-                            ,{' '}
-                            {pluralise(
-                                counts.leave_clash,
-                                'leave clash',
-                                'leave clashes',
-                            )}{' '}
-                            and{' '}
-                            {pluralise(
-                                counts.tight_turnaround,
-                                'tight turnaround',
-                            )}{' '}
-                            to clear.{' '}
-                            {pluralise(counts.coverage_gap, 'coverage gap')} and{' '}
-                            {pluralise(counts.open_shift, 'open shift')} still
-                            need filling.
-                        </span>
-                    }
-                    meta={[
-                        { icon: CalendarDays, label: `${curLab} · Mon–Sun` },
-                        {
-                            icon: LayoutGrid,
-                            label: pluralise(queue.siteOptions.length, 'site'),
-                        },
-                        {
-                            icon: CheckCircle2,
-                            label: `${resolvedToday} resolved today`,
-                        },
-                    ]}
-                    badges={[
-                        {
-                            tone: 'warning',
-                            icon: AlertTriangle,
-                            label: `${pluralise(counts.open_shift, 'open shift')} · need cover`,
-                        },
-                        {
-                            tone: 'critical',
-                            label: pluralise(
-                                counts.coverage_gap,
-                                'coverage gap',
-                            ),
-                        },
-                        {
-                            tone: 'default',
-                            dot: true,
-                            label: `${pluralise(counts.replacement, 'replacement')} in flight`,
-                        },
-                    ]}
-                    actions={
-                        <div className="flex w-full flex-col items-stretch gap-3 md:w-auto">
-                            <div className="flex justify-end">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger
-                                        aria-label="More actions"
-                                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                                    >
-                                        <MoreHorizontal className="h-4 w-4" />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="w-60"
-                                    >
-                                        <DropdownMenuItem onSelect={rerunScan}>
-                                            <RefreshCcw className="mr-2 h-4 w-4" />
-                                            Re-run conflict scan
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onSelect={acknowledgeAllTurnarounds}
-                                            disabled={
-                                                counts.tight_turnaround === 0
-                                            }
-                                        >
-                                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                                            Acknowledge all turnarounds
-                                            <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                                                {counts.tight_turnaround}
-                                            </span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                            onSelect={exportReport}
-                                        >
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Export conflict report
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onSelect={() =>
-                                                setScanSettingsOpen(true)
-                                            }
-                                        >
-                                            <Settings className="mr-2 h-4 w-4" />
-                                            Scan settings
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                            <div className="flex flex-wrap justify-end gap-2">
-                                {heroTiles.map((tile) => {
-                                    const TileIcon = tile.icon;
-                                    return (
-                                        // eslint-disable-next-line no-restricted-syntax -- tappable hero stat tile (quick filter) on the translucent gradient; not a shadcn Button.
-                                        <button
-                                            key={tile.label}
-                                            type="button"
-                                            onClick={() =>
-                                                queue.setFilter(tile.filter)
-                                            }
-                                            className="min-w-[96px] rounded-xl border border-primary-foreground/15 bg-primary-foreground/10 px-3 py-2 text-left backdrop-blur-sm transition-colors hover:bg-primary-foreground/20"
-                                        >
-                                            <span className="flex items-center gap-2">
-                                                <TileIcon className="h-4 w-4 text-primary-foreground/70" />
-                                                <span
-                                                    className={`text-lg font-bold tabular-nums ${HERO_TILE_TONE[tile.tone]}`}
-                                                >
-                                                    {tile.value}
-                                                </span>
-                                            </span>
-                                            <span className="mt-0.5 block text-[10px] font-medium tracking-wider text-primary-foreground/60 uppercase">
-                                                {tile.label}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            <div className="flex items-center justify-end gap-2.5">
-                                <span className="text-[11px] font-medium text-primary-foreground/70 tabular-nums">
-                                    {resolvedToday} of {seedTotal} resolved
-                                </span>
-                                <span className="h-1.5 w-[168px] overflow-hidden rounded-full bg-primary-foreground/20">
-                                    {/* eslint-disable no-restricted-syntax -- light-green progress fill reads on the purple hero gradient, matching the emerald hero accent. */}
-                                    <span
-                                        className="block h-full rounded-full bg-emerald-300 transition-[width] duration-300"
-                                        style={{ width: `${progressPct}%` }}
-                                    />
-                                    {/* eslint-enable no-restricted-syntax */}
-                                </span>
-                            </div>
-                        </div>
-                    }
-                    footer={
-                        <ConflictHeroFooter
-                            weekStart={props.weekStart}
-                            staffOptions={queue.staffOptions}
-                            siteOptions={queue.siteOptions}
-                            staffFilterValue={queue.staffFilterValue}
-                            siteFilterValue={queue.siteFilterValue}
-                            onStaffFilter={queue.setStaffFilterById}
-                            onSiteFilter={queue.setSiteFilterById}
-                            onResolveNext={queue.resolveNext}
-                            resolveDisabled={open.length === 0}
-                        />
-                    }
-                />
 
-                <ConflictFilterStrip
-                    filter={filter}
-                    onFilter={queue.setFilter}
-                    counts={counts}
-                    total={open.length}
-                />
-
+            <PageLayout hero={header}>
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,540px)]">
                     <ConflictQueueList
                         filter={filter}
-                        visible={visible}
+                        visible={searchedVisible}
                         selectedId={selectedId}
                         onSelect={queue.setSelectedId}
                         allResolved={open.length === 0}
@@ -913,7 +934,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                         canManage={canManage}
                     />
                 </div>
-            </div>
+            </PageLayout>
 
             <ConflictToasts toasts={queue.toasts} />
 

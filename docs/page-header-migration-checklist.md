@@ -471,60 +471,60 @@ Auth pages (`auth/*`) never appear because they aren't rendered via
 
 ### operations (57)
 
-- [ ] `operations/activity/Index` — PageHero
-- [ ] `operations/calendar-sync/Create` — PageHero
-- [ ] `operations/calendar-sync/Index` — PageHero
-- [ ] `operations/care-plans/Create` — PageHero
-- [ ] `operations/care-plans/Edit` — PageHero
-- [ ] `operations/care-plans/Index` — PageHero
+- [x] `operations/activity/Index` — PageHero
+- ~~`operations/calendar-sync/Create` — PageHero~~ — skipped 2026-09-08 at user request: do not migrate
+- [x] `operations/calendar-sync/Index` — PageHero
+- ~~`operations/care-plans/Create` — PageHero~~ — skipped 2026-09-08: legacy full-page create form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- ~~`operations/care-plans/Edit` — PageHero~~ — skipped 2026-09-08: legacy full-page edit form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- [x] `operations/care-plans/Index` — PageHero
 - [ ] `operations/care-plans/Show` — PageHero
-- [ ] `operations/client-funds/Create` — PageHero
-- [ ] `operations/client-funds/Index` — PageHero
+- ~~`operations/client-funds/Create` — PageHero~~ — skipped 2026-09-08 at user request: do not migrate
+- ~~`operations/client-funds/Index` — PageHero~~ — migrated 2026-09-08 (Event Horizon header IS live), then struck out at user request: kept here only as a reference marker for the unused-pages list
 - [ ] `operations/client-funds/Show` — PageHero
-- [ ] `operations/clients/assignments` — PageHero
-- [ ] `operations/clients/calendar` — PageHero
-- [ ] `operations/clients/consents/Index` — PageHero
-- [ ] `operations/clients/documents` — PageHero
-- [ ] `operations/clients/incidents` — PageHero
-- [ ] `operations/clients/portal-users` — custom
-- [ ] `operations/clients/risks` — PageHero
-- [ ] `operations/clients/visit-requests` — PageHero
-- [ ] `operations/family-portal/Index` — PageHero
-- [ ] `operations/forms/Create` — PageHero
-- [ ] `operations/forms/Edit` — PageHero
-- [ ] `operations/forms/Index` — PageHero
-- [ ] `operations/forms/Show` — PageHero
-- [ ] `operations/forms/Submissions` — PageHero
-- [ ] `operations/funding/Index` — PageHero
-- [ ] `operations/funding/claims/Create` — PageHero
-- [ ] `operations/funding/claims/Index` — PageHero
-- [ ] `operations/funding/claims/Show` — PageHero
-- [ ] `operations/note-templates/Create` — PageHero
-- [ ] `operations/note-templates/Edit` — PageHero
-- [ ] `operations/note-templates/Index` — PageHero
-- [ ] `operations/notifications/Index` — PageHero
-- [ ] `operations/onboarding/Create` — PageHero
-- [ ] `operations/onboarding/Index` — PageHero
-- [ ] `operations/onboarding/Show` — PageHero
-- [ ] `operations/qualifications/CheckShift` — PageHero
-- [ ] `operations/qualifications/Index` — PageHero
-- [ ] `operations/reports/Index` — PageHero
-- [ ] `operations/reports/Shifts` — PageHero
-- [ ] `operations/reports/Show` — PageHero
-- [ ] `operations/review-queue/index` — PageHero
-- [ ] `operations/rostering/conflicts` — PageHero
-- [ ] `operations/rostering/index` — PageHero
-- [ ] `operations/rostering/publish/Diff` — PageHero
-- [ ] `operations/rostering/publish/Review` — PageHero
-- [ ] `operations/rostering/suggestions/Show` — PageHero
-- [ ] `operations/service-agreements/Create` — PageHero
-- [ ] `operations/service-agreements/Edit` — PageHero
-- [ ] `operations/service-agreements/Index` — PageHero
-- [ ] `operations/service-agreements/Show` — PageHero
-- [ ] `operations/shift-notes/Index` — custom
-- [ ] `operations/shifts/index` — custom
-- [ ] `operations/shifts/series/Index` — PageHero
-- [ ] `operations/shifts/series/Show` — PageHero
+- ~~`operations/clients/assignments` — PageHero~~ — skipped 2026-09-08 at user request: do not migrate
+- ~~`operations/clients/calendar` — PageHero~~ — skipped 2026-09-08 at user request: do not migrate
+- [x] `operations/clients/consents/Index` — PageHero
+- [x] `operations/clients/documents` — PageHero
+- [x] `operations/clients/incidents` — PageHero
+- [x] `operations/clients/portal-users` — custom
+- ~~`operations/clients/risks` — PageHero~~ — skipped 2026-09-10 at user request: do not migrate
+- ~~`operations/clients/visit-requests` — PageHero~~ — skipped 2026-09-10 at user request: do not migrate
+- [x] `operations/family-portal/Index` — PageHero
+- ~~`operations/forms/Create` — PageHero~~ — skipped 2026-09-10: legacy full-page create form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- ~~`operations/forms/Edit` — PageHero~~ — skipped 2026-09-10: legacy full-page edit form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- [x] `operations/forms/Index` — PageHero
+- [x] `operations/forms/Show` — PageHero
+- [x] `operations/forms/Submissions` — PageHero
+- [x] `operations/funding/Index` — PageHero
+- ~~`operations/funding/claims/Create` — PageHero~~ — skipped 2026-09-10: legacy full-page create form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- [x] `operations/funding/claims/Index` — PageHero
+- [x] `operations/funding/claims/Show` — PageHero
+- ~~`operations/note-templates/Create` — PageHero~~ — skipped 2026-09-10: legacy full-page create form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- ~~`operations/note-templates/Edit` — PageHero~~ — skipped 2026-09-10: legacy full-page edit form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- [x] `operations/note-templates/Index` — PageHero
+- [x] `operations/notifications/Index` — PageHero
+- ~~`operations/onboarding/Create` — PageHero~~ — skipped 2026-09-10: legacy full-page create form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- [x] `operations/onboarding/Index` — PageHero
+- [x] `operations/onboarding/Show` — PageHero
+- [x] `operations/qualifications/CheckShift` — PageHero
+- [x] `operations/qualifications/Index` — PageHero
+- [x] `operations/reports/Index` — PageHero
+- [x] `operations/reports/Shifts` — PageHero
+- [x] `operations/reports/Show` — PageHero
+- [x] `operations/review-queue/index` — PageHero
+- [x] `operations/rostering/conflicts` — PageHero
+- [x] `operations/rostering/index` — PageHero
+- [x] `operations/rostering/publish/Diff` — PageHero
+- [x] `operations/rostering/publish/Review` — PageHero
+- [x] `operations/rostering/suggestions/Show` — PageHero
+- ~~`operations/service-agreements/Create` — PageHero~~ — skipped 2026-09-10: legacy full-page create form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- ~~`operations/service-agreements/Edit` — PageHero~~ — skipped 2026-09-10: legacy full-page edit form, do not touch; its future is a WizardShell modal (DESIGN.md anti-pattern "Full-page create/edit wizards"), not a header migration
+- [x] `operations/service-agreements/Index` — PageHero
+- [x] `operations/service-agreements/Show` — PageHero
+- [x] `operations/shift-notes/Index` — custom
+- [x] `operations/shifts/index` — custom
+- [x] `operations/shifts/series/Index` — PageHero
+- [x] `operations/shifts/series/Show` — PageHero
 - [ ] `operations/shifts/show` — PageHero
 - [ ] `operations/timesheets/index` — custom
 - [ ] `operations/timesheets/payroll-adjustments` — custom

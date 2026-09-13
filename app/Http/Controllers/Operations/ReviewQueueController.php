@@ -30,6 +30,7 @@ class ReviewQueueController extends Controller
 
         $siteFilter = $request->integer('site');
         $ageFilter = $request->string('age', '')->toString(); // '24h', '7d', '30d'
+        $severityFilter = $request->string('severity', '')->toString(); // 'critical', 'warning', 'recent'
         $user = $request->user();
         $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
             $user,
@@ -98,7 +99,21 @@ class ReviewQueueController extends Controller
             ->distinct('site_id')
             ->count('site_id');
 
-        $items = $baseQuery
+        // Severity is the rail's view filter — applied to the listed items
+        // only, AFTER the stats above, so the rail counters stay honest on
+        // every tab. Buckets mirror the per-row age_severity mapping.
+        $itemsQuery = clone $baseQuery;
+        if ($severityFilter === 'critical') {
+            $itemsQuery->where('created_at', '<=', $now->copy()->subHours(48));
+        } elseif ($severityFilter === 'warning') {
+            $itemsQuery
+                ->where('created_at', '>', $now->copy()->subHours(48))
+                ->where('created_at', '<=', $now->copy()->subHours(24));
+        } elseif ($severityFilter === 'recent') {
+            $itemsQuery->where('created_at', '>', $now->copy()->subHours(24));
+        }
+
+        $items = $itemsQuery
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'client.site:id,name',
@@ -161,6 +176,7 @@ class ReviewQueueController extends Controller
             'filters' => [
                 'site' => $siteFilter,
                 'age' => $ageFilter,
+                'severity' => $severityFilter,
             ],
         ]);
     }

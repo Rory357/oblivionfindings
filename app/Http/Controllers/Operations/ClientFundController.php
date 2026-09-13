@@ -29,6 +29,8 @@ class ClientFundController extends Controller
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
             'fund_type' => ['nullable', 'string', 'max:100'],
+            'low_balance' => ['nullable', 'boolean'],
+            'review' => ['nullable', 'boolean'],
         ]);
         $search = trim((string) ($filters['q'] ?? ''));
 
@@ -37,8 +39,20 @@ class ClientFundController extends Controller
         $funds = (clone $baseQuery)
             ->with(['client:id,first_name,last_name'])
             ->withCount('transactions')
-            ->when($search !== '', fn ($q) => $q->where('fund_name', 'like', '%'.$search.'%'))
+            ->when($search !== '', fn ($q) => $q->where(function ($q2) use ($search) {
+                $like = '%'.$search.'%';
+                $q2->where('fund_name', 'like', $like)
+                    ->orWhereHas('client', function ($c) use ($like) {
+                        $c->where('first_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like);
+                    });
+            }))
             ->when($filters['fund_type'] ?? null, fn ($q, $fundType) => $q->where('fund_type', $fundType))
+            ->when(! empty($filters['low_balance']), fn ($q) => $q
+                ->whereNotNull('low_balance_threshold')
+                ->whereColumn('balance', '<=', 'low_balance_threshold'))
+            ->when(! empty($filters['review']), fn ($q) => $q
+                ->whereIn('reconciliation_status', ['review', 'mismatch']))
             ->orderByDesc('updated_at')
             ->paginate(20)
             ->through(fn (ClientFund $fund) => [
@@ -63,11 +77,19 @@ class ClientFundController extends Controller
             'filters' => [
                 'q' => $filters['q'] ?? null,
                 'fund_type' => $filters['fund_type'] ?? null,
+                'low_balance' => $filters['low_balance'] ?? null,
+                'review' => $filters['review'] ?? null,
             ],
             'stats' => [
                 'total' => (clone $baseQuery)->count(),
                 'total_balance' => (float) (clone $baseQuery)
                     ->sum('balance'),
+                'total_available' => (float) (clone $baseQuery)
+                    ->sum('available_balance'),
+                'clients' => (clone $baseQuery)
+                    ->whereNotNull('client_id')
+                    ->distinct()
+                    ->count('client_id'),
                 'low_balance_alerts' => (clone $baseQuery)
                     ->whereNotNull('low_balance_threshold')
                     ->whereColumn('balance', '<=', 'low_balance_threshold')

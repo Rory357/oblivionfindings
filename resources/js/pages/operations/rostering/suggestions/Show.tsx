@@ -1,12 +1,23 @@
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { useI18n } from '@/lib/i18n';
-import { Head, Link, router } from '@inertiajs/react';
-import { CalendarCheck, Check, Send, X } from 'lucide-react';
-import { useEffect } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { Check, Send, Wand2, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 type SuggestionRun = {
     id: number;
@@ -77,6 +88,9 @@ export default function Show({ run, suggestions }: Props) {
     const isGenerating = run.status === 'pending' || run.status === 'running';
     const canApply = !run.is_expired && run.status === 'completed';
 
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+
     useEffect(() => {
         if (!isGenerating) return;
 
@@ -87,13 +101,50 @@ export default function Show({ run, suggestions }: Props) {
         return () => window.clearInterval(interval);
     }, [isGenerating]);
 
-    const grouped = suggestions.reduce<Record<number, Suggestion[]>>(
+    const rosterHref = `/operations/rostering?week=${run.week_start}${
+        run.site ? `&site_id=${run.site.id}` : ''
+    }`;
+
+    const shownSuggestions = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return suggestions.filter((suggestion) => {
+            if (statusFilter !== 'all' && suggestion.status !== statusFilter)
+                return false;
+            if (q) {
+                const hay = `${suggestion.candidate?.name ?? ''} ${
+                    suggestion.shift?.client ?? ''
+                } ${suggestion.shift?.site ?? ''}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        });
+    }, [suggestions, search, statusFilter]);
+
+    const grouped = shownSuggestions.reduce<Record<number, Suggestion[]>>(
         (acc, suggestion) => {
             acc[suggestion.shift_id] ??= [];
             acc[suggestion.shift_id].push(suggestion);
             return acc;
         },
         {},
+    );
+
+    const statusOptions = useMemo(
+        () => [
+            { value: 'all', label: 'All statuses' },
+            ...Array.from(
+                new Set(suggestions.map((suggestion) => suggestion.status)),
+            )
+                .sort()
+                .map((status) => ({
+                    value: status,
+                    label: t(
+                        `rostering.suggestions.status.${status}`,
+                        status.replace(/_/g, ' '),
+                    ),
+                })),
+        ],
+        [suggestions, t],
     );
 
     const applyAccepted = () => {
@@ -115,16 +166,124 @@ export default function Show({ run, suggestions }: Props) {
         );
     };
 
+    const titleChip = isGenerating ? (
+        <PageHeaderStatusChip variant="info">
+            {t('rostering.suggestions.status.running', 'Generating…')}
+        </PageHeaderStatusChip>
+    ) : run.status === 'failed' ? (
+        <PageHeaderStatusChip variant="critical">
+            {t('rostering.suggestions.status.failed', 'Failed')}
+        </PageHeaderStatusChip>
+    ) : run.is_expired ? (
+        <PageHeaderStatusChip variant="warning">
+            {t('rostering.suggestions.status.expired', 'Expired')}
+        </PageHeaderStatusChip>
+    ) : (
+        <PageHeaderStatusChip variant="success">
+            {t(`rostering.suggestions.status.${run.status}`, run.status)}
+        </PageHeaderStatusChip>
+    );
+
+    const openShifts = run.totals.open_shifts ?? 0;
+    const suggestedShifts = run.totals.suggested_shifts ?? 0;
+    const suggestionCount = run.totals.suggestion_count ?? suggestions.length;
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref={rosterHref}
+            icon={Wand2}
+            title={
+                run.site?.name ??
+                t('rostering.publish.selected_site', 'Selected site')
+            }
+            titleChip={titleChip}
+            subline={`${t(
+                'rostering.suggestions.head_title',
+                'Roster suggestions',
+            )} · ${run.week_start} → ${run.week_end}${
+                run.requested_by ? ` · ${run.requested_by}` : ''
+            }`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search candidates and shifts…"
+                    />
+                    <PageHeaderPrimaryButton
+                        icon={Send}
+                        disabled={!canApply}
+                        className="disabled:pointer-events-none disabled:opacity-50"
+                        onClick={applyAccepted}
+                        data-test="suggestions-apply-accepted"
+                    >
+                        {t(
+                            'rostering.suggestions.apply_accepted',
+                            'Apply accepted',
+                        )}
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    {openShifts > 0 ? (
+                        <PageHeaderMeterBlock
+                            label="Candidate coverage"
+                            ariaLabel="Back to the roster week"
+                            href={rosterHref}
+                        >
+                            <PageHeaderMeterDonut
+                                percent={(suggestedShifts / openShifts) * 100}
+                                caption={
+                                    <>
+                                        {suggestedShifts} of {openShifts}
+                                        <br />
+                                        open shifts have candidates
+                                    </>
+                                }
+                            />
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label={t('rostering.suggestions.title', 'Suggestions')}
+                        ariaLabel="Back to the roster week"
+                        href={rosterHref}
+                    >
+                        <PageHeaderMeterBig>
+                            {suggestionCount}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            candidates ranked across {suggestedShifts}{' '}
+                            {suggestedShifts === 1 ? 'shift' : 'shifts'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    icon={Check}
+                    label="All statuses"
+                    value={statusFilter}
+                    options={statusOptions}
+                    onChange={setStatusFilter}
+                />
+            }
+        />
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
                 {
                     title: t('rostering.title', 'Rostering'),
                     href: '/operations/rostering',
                 },
                 {
                     title: t('rostering.suggestions.title', 'Suggestions'),
-                    href: '#',
+                    href: `/operations/rostering/suggestions/${run.id}`,
                 },
             ]}
         >
@@ -135,114 +294,8 @@ export default function Show({ run, suggestions }: Props) {
                 )}
             />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        category="ops"
-                        icon={CalendarCheck}
-                        title={t(
-                            'rostering.suggestions.head_title',
-                            'Roster suggestions',
-                        )}
-                        description={`${
-                            run.site?.name ??
-                            t(
-                                'rostering.publish.selected_site',
-                                'Selected site',
-                            )
-                        } · ${run.week_start} to ${run.week_end}`}
-                        actions={
-                            <>
-                                <Badge
-                                    variant={
-                                        run.is_expired
-                                            ? 'destructive'
-                                            : 'outline'
-                                    }
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground"
-                                >
-                                    {t(
-                                        `rostering.suggestions.status.${run.status}`,
-                                        run.status,
-                                    )}
-                                </Badge>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={!canApply}
-                                    onClick={applyAccepted}
-                                    data-test="suggestions-apply-accepted"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Send className="mr-1 h-4 w-4" />
-                                    {t(
-                                        'rostering.suggestions.apply_accepted',
-                                        'Apply accepted',
-                                    )}
-                                </Button>
-                                <Link
-                                    href={`/operations/rostering?week=${run.week_start}${run.site ? `&site_id=${run.site.id}` : ''}`}
-                                >
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    >
-                                        {t(
-                                            'rostering.publish.back_to_roster',
-                                            'Back to roster',
-                                        )}
-                                    </Button>
-                                </Link>
-                            </>
-                        }
-                    />
-                }
-            >
+            <PageLayout hero={header}>
                 <div className="space-y-4" data-test="roster-suggestions-page">
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    {t(
-                                        'rostering.suggestions.open_shifts',
-                                        'Open shifts',
-                                    )}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-2xl font-semibold">
-                                {run.totals.open_shifts ?? 0}
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    {t(
-                                        'rostering.suggestions.shifts_with_candidates',
-                                        'Shifts with candidates',
-                                    )}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-2xl font-semibold">
-                                {run.totals.suggested_shifts ?? 0}
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    {t(
-                                        'rostering.suggestions.title',
-                                        'Suggestions',
-                                    )}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="text-2xl font-semibold">
-                                {run.totals.suggestion_count ??
-                                    suggestions.length}
-                            </CardContent>
-                        </Card>
-                    </div>
-
                     {isGenerating ? (
                         <Card>
                             <CardHeader className="pb-2">
@@ -283,6 +336,21 @@ export default function Show({ run, suggestions }: Props) {
                                         'rostering.suggestions.failed_fallback',
                                         'Generate a fresh run before applying assignments.',
                                     )}
+                            </CardContent>
+                        </Card>
+                    ) : null}
+
+                    {!isGenerating &&
+                    run.status !== 'failed' &&
+                    Object.keys(grouped).length === 0 ? (
+                        <Card>
+                            <CardContent className="p-4 text-sm text-muted-foreground">
+                                {search.trim() !== '' || statusFilter !== 'all'
+                                    ? 'No suggestions match your search or filter.'
+                                    : t(
+                                          'rostering.suggestions.none',
+                                          'No suggestions were generated for this run.',
+                                      )}
                             </CardContent>
                         </Card>
                     ) : null}

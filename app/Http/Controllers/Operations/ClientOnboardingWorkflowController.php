@@ -74,9 +74,17 @@ class ClientOnboardingWorkflowController extends Controller
                 ->value('avg_days') ?? 0),
         ];
 
+        // Per-status counts over the whole scoped set — rail counters stay
+        // honest whatever filter is active.
+        $statusCounts = $scopedWorkflows()
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
         return inertia('operations/onboarding/Index', [
             'workflows' => $workflows,
             'stats' => $stats,
+            'status_counts' => $statusCounts,
             'filters' => [
                 'q' => $filters['q'] ?? null,
                 'status' => $filters['status'] ?? null,

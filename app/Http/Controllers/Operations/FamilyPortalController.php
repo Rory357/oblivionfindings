@@ -8,18 +8,51 @@ use App\Models\FamilyPortalSetting;
 use App\Services\Portal\PortalClientSectionAccess;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class FamilyPortalController extends Controller
 {
     public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
+    /** Maps the "sharing" filter values to family_portal_settings columns. */
+    private const SHARING_COLUMNS = [
+        'shift_schedule' => 'show_shift_schedule',
+        'respite' => 'show_respite',
+        'care_notes' => 'show_care_notes',
+        'incidents' => 'show_incidents',
+    ];
 
     public function index(Request $request)
     {
         $auth = $request->user();
         abort_unless($auth && $this->canViewPortal($auth), 403);
 
-        $clients = $this->siteAccess->applyClientScope(Client::query(), $auth, ['clients.viewAny'])
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+            'portal' => ['nullable', 'in:active,inactive'],
+            'sharing' => ['nullable', 'in:shift_schedule,respite,care_notes,incidents'],
+        ]);
+        $search = trim((string) ($filters['q'] ?? ''));
+
+        $base = fn () => $this->siteAccess->applyClientScope(Client::query(), $auth, ['clients.viewAny']);
+
+        $clients = $base()
             ->with(['familyPortalSetting'])
+            ->withCount([
+                'portalUsers as family_contacts_count' => fn ($q) => $q
+                    ->where('client_portal_users.relation', '!=', 'client'),
+            ])
+            ->when($search !== '', fn ($q) => $q->where(function ($q2) use ($search) {
+                $like = '%'.$search.'%';
+                $q2->where('first_name', 'like', $like)
+                    ->orWhere('last_name', 'like', $like);
+            }))
+            ->when(($filters['portal'] ?? null) === 'active', fn ($q) => $q->whereHas('familyPortalSetting'))
+            ->when(($filters['portal'] ?? null) === 'inactive', fn ($q) => $q->whereDoesntHave('familyPortalSetting'))
+            ->when($filters['sharing'] ?? null, fn ($q, $sharing) => $q->whereHas(
+                'familyPortalSetting',
+                fn ($s) => $s->where(self::SHARING_COLUMNS[$sharing], true),
+            ))
             ->orderBy('first_name')
             ->paginate(20)
             ->withQueryString();
@@ -32,20 +65,35 @@ class FamilyPortalController extends Controller
                 'first_name' => $client->first_name,
                 'last_name' => $client->last_name,
                 'portal_enabled' => $setting !== null,
+                // Only flags with a real settings column — no decorative
+                // always-off badges (DESIGN.md no-fake-data rule).
                 'notifications' => [
-                    'shift_updates' => $setting?->show_shift_schedule ?? false,
-                    'respite' => $setting?->show_respite ?? false,
-                    'care_notes' => $setting?->show_care_notes ?? false,
-                    'incident_alerts' => $setting?->show_incidents ?? false,
-                    'billing_updates' => false,
-                    'messages' => false,
+                    'shift_updates' => (bool) ($setting?->show_shift_schedule ?? false),
+                    'respite' => (bool) ($setting?->show_respite ?? false),
+                    'care_notes' => (bool) ($setting?->show_care_notes ?? false),
+                    'incident_alerts' => (bool) ($setting?->show_incidents ?? false),
                 ],
-                'family_contacts_count' => 0,
+                'family_contacts_count' => (int) $client->family_contacts_count,
             ];
         });
 
         return inertia('operations/family-portal/Index', [
             'clients' => $clients,
+            'filters' => [
+                'q' => $filters['q'] ?? null,
+                'portal' => $filters['portal'] ?? null,
+                'sharing' => $filters['sharing'] ?? null,
+            ],
+            // Header instruments — counted over the whole accessible set
+            // regardless of the active filters so rail counts stay honest.
+            'stats' => [
+                'total' => $base()->count(),
+                'enabled' => $base()->whereHas('familyPortalSetting')->count(),
+                'family_contacts' => DB::table('client_portal_users')
+                    ->where('relation', '!=', 'client')
+                    ->whereIn('client_id', $base()->select('clients.id'))
+                    ->count(),
+            ],
         ]);
     }
 

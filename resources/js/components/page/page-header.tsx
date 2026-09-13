@@ -26,6 +26,7 @@ import {
     Check,
     ChevronDown,
     ChevronLeft,
+    MoreHorizontal,
     Search,
     TrendingDown,
     TrendingUp,
@@ -37,6 +38,7 @@ import {
     type ReactNode,
     type Ref,
     useEffect,
+    useLayoutEffect,
     useRef,
     useState,
 } from 'react';
@@ -945,6 +947,60 @@ export interface PageHeaderRailItem<K extends string = string> {
     alert?: boolean;
 }
 
+/** Must match the rail container's `gap-1`. */
+const RAIL_GAP = 4;
+
+const railTabClass = (on: boolean) =>
+    cn(
+        'inline-flex shrink-0 items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80',
+        on
+            ? // pb-[6px] keeps the active label on the
+              // inactive pills' optical text line: their
+              // centre sits 34/2 + 6px margin = 23px above
+              // the band edge; (40 − 6)/2 + 6 = 23px here
+              // (DESIGN.md "Sunken active-rail labels").
+              'h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary'
+            : 'mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground',
+    );
+
+/** Ghost utility pills at the rail's end (⋯ More, ⌕ Find) — inactive-pill geometry. */
+const railPillClass =
+    'mb-[6px] inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80';
+
+/** Inner content of a rail tab — shared by the live row and the measurement row. */
+function RailTabInner({
+    item,
+    on,
+    decoration,
+}: {
+    item: PageHeaderRailItem;
+    on: boolean;
+    decoration?: ReactNode;
+}) {
+    const Icon = item.icon;
+    return (
+        <>
+            {Icon ? <Icon className="size-[15px]" /> : null}
+            <span>{item.label}</span>
+            {decoration}
+            {item.count != null ? (
+                <span
+                    className={cn(
+                        'inline-flex min-w-[22px] items-center justify-center rounded-[6px] px-1.5 py-0.5 text-[11px] font-bold tabular-nums',
+                        item.alert && item.count > 0
+                            ? 'bg-status-critical-bg text-status-critical'
+                            : on
+                              ? 'bg-primary/15 text-primary'
+                              : 'bg-primary-foreground/15 text-primary-foreground',
+                    )}
+                >
+                    {item.count}
+                </span>
+            ) : null}
+        </>
+    );
+}
+
 /**
  * The main view tabs on the band's bottom edge. The active tab takes the
  * page --background and sits flush with the edge — the merge with the page
@@ -957,6 +1013,15 @@ export interface PageHeaderRailItem<K extends string = string> {
  * built-in palette over these view items. On pages whose header carries
  * the scoped search input, `/` stays with the search — the built-in chip
  * opens on click and shows no kbd hint.
+ *
+ * THE RAIL NEVER WRAPS (DESIGN.md anti-pattern "Wrapping rail",
+ * 2026-09-10). A hidden measurement row mirrors every tab; when they
+ * can't all fit on one line beside the Find chip, the trailing views
+ * collapse into a ghost "⋯ More" pill with a popover. Two invariants:
+ * the ACTIVE view is always a visible tab (promoted out of the overflow
+ * if needed — the flush page-ground merge is the rail's affordance), and
+ * alert counters never disappear (overflowed alert counts sum onto the
+ * More pill in the fixed critical pair).
  */
 export function PageHeaderRail<K extends string>({
     items,
@@ -978,14 +1043,147 @@ export function PageHeaderRail<K extends string>({
     decorations?: Partial<Record<K, ReactNode>>;
 }) {
     const [viewsFindOpen, setViewsFindOpen] = useState(false);
+    const [moreOpen, setMoreOpen] = useState(false);
+    /** Keys of the tabs shown on the rail; null = everything fits. */
+    const [visibleKeys, setVisibleKeys] = useState<K[] | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const measureRef = useRef<HTMLDivElement>(null);
+
+    // Width inputs that aren't observable via the ResizeObserver deps.
+    const itemsKey = items
+        .map((it) => `${it.key} ${it.label} ${it.count ?? ''}`)
+        .join('');
+
+    useLayoutEffect(() => {
+        const container = containerRef.current;
+        const measureRow = measureRef.current;
+        if (!container || !measureRow) return;
+
+        const compute = () => {
+            const available = container.clientWidth;
+            if (available <= 0) return;
+            // Measurement row: one node per item, then More, then Find.
+            const nodes = Array.from(measureRow.children) as HTMLElement[];
+            if (nodes.length < items.length + 2) return;
+            const findW = nodes[nodes.length - 1].offsetWidth;
+            const moreW = nodes[nodes.length - 2].offsetWidth;
+            const itemW = nodes
+                .slice(0, items.length)
+                .map((el) => el.offsetWidth);
+
+            const total =
+                itemW.reduce((acc, w) => acc + w + RAIL_GAP, 0) + findW;
+            if (total <= available) {
+                setVisibleKeys(null);
+                return;
+            }
+
+            // Reserve the More pill + Find chip, each preceded by a gap.
+            const budget = available - findW - moreW - 2 * RAIL_GAP;
+            let used = 0;
+            let fit = 0;
+            while (
+                fit < items.length &&
+                used + itemW[fit] + (fit > 0 ? RAIL_GAP : 0) <= budget
+            ) {
+                used += itemW[fit] + (fit > 0 ? RAIL_GAP : 0);
+                fit += 1;
+            }
+
+            const activeIdx = Math.max(
+                0,
+                items.findIndex((it) => it.key === value),
+            );
+            let keys: K[];
+            if (activeIdx < fit) {
+                keys = items.slice(0, fit).map((it) => it.key);
+            } else {
+                // Promote the active view onto the rail — it never hides.
+                let rest = budget - itemW[activeIdx] - RAIL_GAP;
+                const kept: K[] = [];
+                for (let i = 0; i < items.length; i += 1) {
+                    if (i === activeIdx) continue;
+                    const w = itemW[i] + (kept.length > 0 ? RAIL_GAP : 0);
+                    if (w > rest) break;
+                    rest -= w;
+                    kept.push(items[i].key);
+                }
+                keys = [...kept, items[activeIdx].key];
+            }
+            setVisibleKeys((prev) =>
+                prev &&
+                prev.length === keys.length &&
+                prev.every((k, i) => k === keys[i])
+                    ? prev
+                    : keys,
+            );
+        };
+
+        compute();
+        const observer = new ResizeObserver(compute);
+        observer.observe(container);
+        // The w-max measurement row resizes when labels/fonts/counts do.
+        observer.observe(measureRow);
+        return () => observer.disconnect();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- itemsKey stands in for items
+    }, [itemsKey, value, onFind]);
+
+    const visibleItems =
+        visibleKeys == null
+            ? items
+            : visibleKeys.flatMap((key) => {
+                  const item = items.find((it) => it.key === key);
+                  return item ? [item] : [];
+              });
+    const overflowItems =
+        visibleKeys == null
+            ? []
+            : items.filter((it) => !visibleKeys.includes(it.key));
+    const overflowAlertCount = overflowItems.reduce(
+        (acc, it) => acc + (it.alert && it.count ? it.count : 0),
+        0,
+    );
+    // The measurement More pill reserves for the worst case: every alert.
+    const totalAlertCount = items.reduce(
+        (acc, it) => acc + (it.alert && it.count ? it.count : 0),
+        0,
+    );
+
+    const morePill = (count: number) => (
+        <>
+            <MoreHorizontal className="size-[15px]" />
+            <span>More</span>
+            {count > 0 ? (
+                <span className="inline-flex min-w-[22px] items-center justify-center rounded-[6px] bg-status-critical-bg px-1.5 py-0.5 text-[11px] font-bold text-status-critical tabular-nums">
+                    {count}
+                </span>
+            ) : null}
+        </>
+    );
+
+    const findChip = (
+        <>
+            <Search className="size-[15px]" />
+            <span className="hidden sm:inline">Find</span>
+            {onFind ? (
+                <kbd
+                    aria-hidden="true"
+                    className="hidden rounded-[5px] border border-primary-foreground/30 px-1 text-[10px] sm:inline"
+                >
+                    /
+                </kbd>
+            ) : null}
+        </>
+    );
+
     return (
         <div
             role="tablist"
             aria-label={ariaLabel}
-            className="flex w-full flex-wrap items-end gap-1"
+            ref={containerRef}
+            className="relative flex w-full flex-nowrap items-end gap-1"
         >
-            {items.map((it) => {
-                const Icon = it.icon;
+            {visibleItems.map((it) => {
                 const on = it.key === value;
                 return (
                     <button
@@ -999,56 +1197,114 @@ export function PageHeaderRail<K extends string>({
                                 ? (event) => onItemContextMenu(it.key, event)
                                 : undefined
                         }
-                        className={cn(
-                            'inline-flex items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80',
-                            on
-                                ? // pb-[6px] keeps the active label on the
-                                  // inactive pills' optical text line: their
-                                  // centre sits 34/2 + 6px margin = 23px above
-                                  // the band edge; (40 − 6)/2 + 6 = 23px here
-                                  // (DESIGN.md "Sunken active-rail labels").
-                                  'h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary'
-                                : 'mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground',
-                        )}
+                        className={railTabClass(on)}
                     >
-                        {Icon ? <Icon className="size-[15px]" /> : null}
-                        <span>{it.label}</span>
-                        {decorations?.[it.key]}
-                        {it.count != null ? (
-                            <span
-                                className={cn(
-                                    'inline-flex min-w-[22px] items-center justify-center rounded-[6px] px-1.5 py-0.5 text-[11px] font-bold tabular-nums',
-                                    it.alert && it.count > 0
-                                        ? 'bg-status-critical-bg text-status-critical'
-                                        : on
-                                          ? 'bg-primary/15 text-primary'
-                                          : 'bg-primary-foreground/15 text-primary-foreground',
-                                )}
-                            >
-                                {it.count}
-                            </span>
-                        ) : null}
+                        <RailTabInner
+                            item={it}
+                            on={on}
+                            decoration={decorations?.[it.key]}
+                        />
                     </button>
                 );
             })}
+            {overflowItems.length > 0 ? (
+                <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+                    <PopoverTrigger asChild>
+                        <button
+                            type="button"
+                            aria-label={`More views (${overflowItems.length})`}
+                            className={railPillClass}
+                        >
+                            {morePill(overflowAlertCount)}
+                        </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-60 p-1.5">
+                        {overflowItems.map((it) => {
+                            const Icon = it.icon;
+                            return (
+                                <button
+                                    key={it.key}
+                                    type="button"
+                                    onClick={() => {
+                                        setMoreOpen(false);
+                                        onSelect(it.key);
+                                    }}
+                                    onContextMenu={
+                                        onItemContextMenu
+                                            ? (event) =>
+                                                  onItemContextMenu(
+                                                      it.key,
+                                                      event,
+                                                  )
+                                            : undefined
+                                    }
+                                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
+                                >
+                                    {Icon ? (
+                                        <Icon className="size-4 text-muted-foreground" />
+                                    ) : null}
+                                    <span className="flex-1 truncate">
+                                        {it.label}
+                                    </span>
+                                    {it.count != null ? (
+                                        <span
+                                            className={cn(
+                                                'text-[11px] tabular-nums',
+                                                it.alert && it.count > 0
+                                                    ? 'inline-flex min-w-[22px] items-center justify-center rounded-[6px] bg-status-critical-bg px-1.5 py-0.5 font-bold text-status-critical'
+                                                    : 'font-semibold text-muted-foreground',
+                                            )}
+                                        >
+                                            {it.count}
+                                        </span>
+                                    ) : null}
+                                </button>
+                            );
+                        })}
+                    </PopoverContent>
+                </Popover>
+            ) : null}
             <button
                 type="button"
                 onClick={onFind ?? (() => setViewsFindOpen(true))}
                 title={onFind ? 'Find a section (/)' : 'Find a view'}
                 aria-label={onFind ? 'Find a section' : 'Find a view'}
-                className="mb-[6px] ml-auto inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80"
+                className={cn(railPillClass, 'ml-auto')}
             >
-                <Search className="size-[15px]" />
-                <span className="hidden sm:inline">Find</span>
-                {onFind ? (
-                    <kbd
-                        aria-hidden="true"
-                        className="hidden rounded-[5px] border border-primary-foreground/30 px-1 text-[10px] sm:inline"
-                    >
-                        /
-                    </kbd>
-                ) : null}
+                {findChip}
             </button>
+            {/* Hidden measurement row — mirrors every tab (plus the widest
+                possible More pill and the Find chip) so the overflow point
+                is computed from real widths, never guessed. */}
+            <div
+                ref={measureRef}
+                aria-hidden="true"
+                className="pointer-events-none invisible absolute bottom-0 left-0 flex w-max flex-nowrap items-end gap-1"
+            >
+                {items.map((it) => {
+                    const on = it.key === value;
+                    return (
+                        <button
+                            key={it.key}
+                            type="button"
+                            tabIndex={-1}
+                            className={railTabClass(on)}
+                        >
+                            <RailTabInner
+                                item={it}
+                                on={on}
+                                decoration={decorations?.[it.key]}
+                            />
+                        </button>
+                    );
+                })}
+                <button type="button" tabIndex={-1} className={railPillClass}>
+                    {morePill(totalAlertCount)}
+                </button>
+                <button type="button" tabIndex={-1} className={railPillClass}>
+                    {findChip}
+                </button>
+            </div>
             {onFind ? null : (
                 <RailViewsPalette
                     items={items}

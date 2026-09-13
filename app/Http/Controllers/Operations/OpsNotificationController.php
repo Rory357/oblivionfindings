@@ -13,8 +13,24 @@ class OpsNotificationController extends Controller
         $auth = $request->user();
         abort_unless($auth, 403);
 
-        $notifications = OpsNotification::query()
-            ->where('user_id', $auth->id)
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+            'type' => ['nullable', 'string', 'max:100'],
+            'read' => ['nullable', 'in:unread,read'],
+        ]);
+        $search = trim((string) ($filters['q'] ?? ''));
+
+        $base = fn () => OpsNotification::query()->where('user_id', $auth->id);
+
+        $notifications = $base()
+            ->when($filters['type'] ?? null, fn ($q, $type) => $q->forType($type))
+            ->when(($filters['read'] ?? null) === 'unread', fn ($q) => $q->where('is_read', false))
+            ->when(($filters['read'] ?? null) === 'read', fn ($q) => $q->where('is_read', true))
+            ->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search) {
+                $like = '%'.$search.'%';
+                $inner->where('title', 'like', $like)
+                    ->orWhere('body', 'like', $like);
+            }))
             ->orderByRaw('read_at IS NOT NULL')
             ->orderByDesc('created_at')
             ->paginate(20)
@@ -22,6 +38,23 @@ class OpsNotificationController extends Controller
 
         return inertia('operations/notifications/Index', [
             'notifications' => $notifications,
+            'filters' => [
+                'q' => $filters['q'] ?? null,
+                'type' => $filters['type'] ?? null,
+                'read' => $filters['read'] ?? null,
+            ],
+            // Header instruments — counted over the whole set regardless of
+            // the active filters so the rail counts stay honest.
+            'stats' => [
+                'total' => $base()->count(),
+                'unread' => $base()->where('is_read', false)->count(),
+            ],
+            'types' => $base()
+                ->whereNotNull('type')
+                ->distinct()
+                ->orderBy('type')
+                ->pluck('type')
+                ->values(),
         ]);
     }
 

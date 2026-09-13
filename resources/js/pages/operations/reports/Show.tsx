@@ -1,12 +1,16 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { FileBarChart } from 'lucide-react';
+import { CalendarRange, FileBarChart, Users } from 'lucide-react';
 import { useState } from 'react';
 import {
     Bar,
@@ -47,24 +51,89 @@ export default function ReportShow({
 }: Props) {
     const { labels } = usePage().props as any;
     const clientSingular = labels?.['client.singular'] ?? 'Client';
-    const [dateFrom, setDateFrom] = useState(filters?.date_from ?? '');
-    const [dateTo, setDateTo] = useState(filters?.date_to ?? '');
-    const [clientId, setClientId] = useState(filters?.client_id ?? '');
-    const [staffId, setStaffId] = useState(filters?.staff_id ?? '');
+    const [search, setSearch] = useState('');
     const usesClientFilter = clients.length > 0;
     const usesStaffFilter = staff.length > 0;
 
-    const handleFilter = () => {
+    const applyServer = (overrides: Partial<Record<string, string>>) => {
         router.get(
             `/operations/reports/${report_type}`,
             {
-                date_from: dateFrom,
-                date_to: dateTo,
-                client_id: usesClientFilter ? clientId || undefined : undefined,
-                staff_id: usesStaffFilter ? staffId || undefined : undefined,
+                date_from: overrides.date_from ?? filters?.date_from ?? '',
+                date_to: overrides.date_to ?? filters?.date_to ?? '',
+                client_id: usesClientFilter
+                    ? (overrides.client_id ??
+                          String(filters?.client_id ?? '')) ||
+                      undefined
+                    : undefined,
+                staff_id: usesStaffFilter
+                    ? (overrides.staff_id ?? String(filters?.staff_id ?? '')) ||
+                      undefined
+                    : undefined,
             },
-            { preserveState: true },
+            { preserveState: true, replace: true },
         );
+    };
+
+    // Period presets — raw date params stay in the URL so deep-linked
+    // custom ranges keep working and read as "Custom range".
+    const isoDate = (d: Date) => d.toISOString().split('T')[0];
+    const today = new Date();
+    const presets: Record<string, { from: string; to: string; label: string }> =
+        {
+            last7: {
+                from: isoDate(new Date(today.getTime() - 6 * 86400000)),
+                to: isoDate(today),
+                label: 'Last 7 days',
+            },
+            last30: {
+                from: isoDate(new Date(today.getTime() - 29 * 86400000)),
+                to: isoDate(today),
+                label: 'Last 30 days',
+            },
+            this_month: {
+                from: isoDate(
+                    new Date(today.getFullYear(), today.getMonth(), 1),
+                ),
+                to: isoDate(today),
+                label: 'This month',
+            },
+            last_month: {
+                from: isoDate(
+                    new Date(today.getFullYear(), today.getMonth() - 1, 1),
+                ),
+                to: isoDate(new Date(today.getFullYear(), today.getMonth(), 0)),
+                label: 'Last month',
+            },
+        };
+    const currentPreset =
+        Object.entries(presets).find(
+            ([, p]) =>
+                p.from === (filters?.date_from ?? '') &&
+                p.to === (filters?.date_to ?? ''),
+        )?.[0] ?? 'custom';
+    const periodOptions = [
+        ...Object.entries(presets).map(([value, p]) => ({
+            value,
+            label: p.label,
+        })),
+        ...(currentPreset === 'custom'
+            ? [
+                  {
+                      value: 'custom',
+                      label:
+                          filters?.date_from && filters?.date_to
+                              ? `${filters.date_from} – ${filters.date_to}`
+                              : 'All time',
+                  },
+              ]
+            : []),
+    ];
+
+    const matchesSearch = (row: any) => {
+        const q = search.trim().toLowerCase();
+        if (!q) return true;
+        return JSON.stringify(row).toLowerCase().includes(q);
     };
 
     const renderValue = (value: any): string => {
@@ -113,8 +182,10 @@ export default function ReportShow({
         );
     };
 
-    const renderTable = (items: any[], label: string) => {
-        if (!items?.length) return null;
+    const renderTable = (allItems: any[], label: string) => {
+        if (!allItems?.length) return null;
+        const items = allItems.filter(matchesSearch);
+        if (!items.length) return null;
 
         const sample = items[0];
         const columns = Object.keys(sample).filter(
@@ -363,99 +434,121 @@ export default function ReportShow({
 
     const hasData = data && Object.keys(data).length > 0;
 
-    return (
-        <AppLayout>
-            <Head title={report_meta?.name ?? 'Report'} />
-            <PageHero
-                variant="compact"
-                title={report_meta?.name ?? 'Report'}
-                description={
-                    report_meta?.description ??
-                    `Operational report for ${report_type.replace(/-/g, ' ')}.`
-                }
-                backHref="/operations/reports"
-            />
-            <PageShell>
-                {/* Filter controls */}
-                <div className="mb-4 flex flex-wrap items-center gap-2">
-                    <Input
-                        type="date"
-                        className="h-9 w-[160px] text-xs"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                    />
-                    <Input
-                        type="date"
-                        className="h-9 w-[160px] text-xs"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                    />
-                    {usesClientFilter && (
-                        <select
-                            className="h-9 rounded-md border bg-background px-3 text-xs"
-                            value={clientId ?? ''}
-                            onChange={(e) => setClientId(e.target.value)}
-                            aria-label={`${clientSingular} filter`}
-                        >
-                            <option value="">All {clientSingular}s</option>
-                            {clients.map((client) => (
-                                <option key={client.id} value={client.id}>
-                                    {client.name}
-                                </option>
-                            ))}
-                        </select>
-                    )}
-                    {usesStaffFilter && (
-                        <select
-                            className="h-9 rounded-md border bg-background px-3 text-xs"
-                            value={staffId ?? ''}
-                            onChange={(e) => setStaffId(e.target.value)}
-                            aria-label="Staff filter"
-                        >
-                            <option value="">All staff</option>
-                            {staff.map((staffMember) => (
-                                <option
-                                    key={staffMember.id}
-                                    value={staffMember.id}
-                                >
-                                    {staffMember.name}
-                                </option>
-                            ))}
-                        </select>
-                    )}
-                    <Button
-                        size="sm"
-                        variant="default"
-                        className="h-9 text-xs"
-                        onClick={handleFilter}
-                    >
-                        Apply Filters
-                    </Button>
-                </div>
+    const clientOptions = [
+        { value: 'all', label: `All ${clientSingular.toLowerCase()}s` },
+        ...clients.map((c) => ({ value: String(c.id), label: c.name })),
+    ];
+    const staffOptions = [
+        { value: 'all', label: 'All staff' },
+        ...staff.map((s) => ({ value: String(s.id), label: s.name })),
+    ];
 
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/operations/reports"
+            icon={FileBarChart}
+            title={report_meta?.name ?? 'Report'}
+            titleChip={
+                hasData ? (
+                    <PageHeaderStatusChip variant="success">
+                        Data available
+                    </PageHeaderStatusChip>
+                ) : (
+                    <PageHeaderStatusChip variant="neutral">
+                        No data
+                    </PageHeaderStatusChip>
+                )
+            }
+            subline={
+                report_meta?.description ??
+                `Operational report for ${report_type.replace(/-/g, ' ')}`
+            }
+            actions={
+                <PageHeaderSearch
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search report rows…"
+                />
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        icon={CalendarRange}
+                        label="Period"
+                        value={currentPreset}
+                        allValue="__none__"
+                        options={periodOptions}
+                        onChange={(v) => {
+                            const preset = presets[v];
+                            if (preset) {
+                                applyServer({
+                                    date_from: preset.from,
+                                    date_to: preset.to,
+                                });
+                            }
+                        }}
+                    />
+                    {usesClientFilter ? (
+                        <PageHeaderFilterSelect
+                            icon={Users}
+                            label={`All ${clientSingular.toLowerCase()}s`}
+                            value={String(filters?.client_id ?? 'all') || 'all'}
+                            options={clientOptions}
+                            onChange={(v) =>
+                                applyServer({
+                                    client_id: v === 'all' ? '' : v,
+                                })
+                            }
+                        />
+                    ) : null}
+                    {usesStaffFilter ? (
+                        <PageHeaderFilterSelect
+                            icon={Users}
+                            label="All staff"
+                            value={String(filters?.staff_id ?? 'all') || 'all'}
+                            options={staffOptions}
+                            onChange={(v) =>
+                                applyServer({
+                                    staff_id: v === 'all' ? '' : v,
+                                })
+                            }
+                        />
+                    ) : null}
+                </>
+            }
+        />
+    );
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                { title: 'Reports', href: '/operations/reports' },
+                {
+                    title: report_meta?.name ?? 'Report',
+                    href: `/operations/reports/${report_type}`,
+                },
+            ]}
+        >
+            <Head title={report_meta?.name ?? 'Report'} />
+
+            <PageLayout hero={header}>
                 {hasData ? (
-                    <>
+                    <div>
                         {renderSummaryCards()}
                         {reportChart()}
                         {renderDataSections()}
-                    </>
+                    </div>
                 ) : (
-                    <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-12">
-                            <FileBarChart className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                            <h2 className="text-lg font-semibold text-muted-foreground">
-                                No {report_meta?.name ?? 'Report'} Data
-                                Available
-                            </h2>
-                            <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground/80">
-                                Select a date range and filters to generate this
-                                report. Data will populate as operational
-                                activity is recorded.
-                            </p>
-                        </CardContent>
-                    </Card>
+                    <EmptyState
+                        icon={FileBarChart}
+                        title={`No ${report_meta?.name ?? 'report'} data available`}
+                        description="Select a date range and filters to generate this report. Data will populate as operational activity is recorded."
+                    />
                 )}
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

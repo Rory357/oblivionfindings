@@ -1,5 +1,18 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import { ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,6 +24,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,6 +34,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -29,13 +44,15 @@ import {
     Clock,
     Download,
     FileCheck,
+    Layers,
+    Pen,
     Plus,
     Shield,
     ShieldCheck,
     Upload,
     XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 const STATUS_STYLES: Record<string, { bg: string; icon: typeof CheckCircle2 }> =
     {
@@ -62,6 +79,21 @@ const STATUS_STYLES: Record<string, { bg: string; icon: typeof CheckCircle2 }> =
         },
     };
 
+const STATUS_META: Record<string, { label: string; variant: StatusVariant }> = {
+    given: { label: 'Given', variant: 'success' },
+    refused: { label: 'Refused', variant: 'critical' },
+    withdrawn: { label: 'Withdrawn', variant: 'neutral' },
+    expired: { label: 'Expired', variant: 'warning' },
+    governance_review_required: {
+        label: 'Governance review',
+        variant: 'warning',
+    },
+    informational_acknowledgement: {
+        label: 'Acknowledgement',
+        variant: 'info',
+    },
+};
+
 const CATEGORY_COLORS: Record<string, string> = {
     medical: 'bg-status-critical-bg border-status-critical/30',
     care: 'bg-primary/10 border-primary',
@@ -72,6 +104,13 @@ const CATEGORY_COLORS: Record<string, string> = {
     safeguarding: 'bg-status-warning-bg border-status-warning/30',
     essential: 'bg-status-info-bg border-status-info/30',
 };
+
+const METHOD_OPTIONS = [
+    { value: 'all', label: 'All methods' },
+    { value: 'written', label: 'Written' },
+    { value: 'verbal', label: 'Verbal' },
+    { value: 'electronic', label: 'Electronic' },
+];
 
 type Props = {
     client: { id: number; first_name: string; last_name: string };
@@ -85,6 +124,8 @@ type Props = {
     };
     consent_types: any[];
 };
+
+type ViewKey = 'all' | 'active' | 'expiring' | 'expired' | 'withdrawn';
 
 type DirectConsentFormData = {
     consent_type_id: string;
@@ -116,6 +157,10 @@ export function buildDirectConsentPayload(
     };
 }
 
+function categoryOf(c: any): string {
+    return c.consent_type?.category ?? c.category ?? 'other';
+}
+
 export default function ConsentsIndex({
     client,
     consents = [],
@@ -141,6 +186,11 @@ export default function ConsentsIndex({
     });
     const [withdrawReason, setWithdrawReason] = useState('');
     const [consentFile, setConsentFile] = useState<File | null>(null);
+
+    const [view, setView] = useState<ViewKey>('all');
+    const [search, setSearch] = useState('');
+    const [category, setCategory] = useState('all');
+    const [method, setMethod] = useState('all');
 
     const s = {
         total: stats?.total ?? 0,
@@ -184,319 +234,489 @@ export default function ConsentsIndex({
         );
     };
 
-    // Group by category
-    const grouped: Record<string, any[]> = {};
-    consents.forEach((c) => {
-        const cat = c.consent_type?.category ?? c.category ?? 'other';
-        if (!grouped[cat]) grouped[cat] = [];
-        grouped[cat].push(c);
-    });
+    const categories = useMemo(
+        () => Array.from(new Set(consents.map(categoryOf))).sort(),
+        [consents],
+    );
+
+    const shown = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return consents.filter((c) => {
+            switch (view) {
+                case 'active':
+                    if (!c.is_consumable) return false;
+                    break;
+                case 'expiring':
+                    if (!c.is_expiring_soon || c.is_expired) return false;
+                    break;
+                case 'expired':
+                    if (!c.is_expired) return false;
+                    break;
+                case 'withdrawn':
+                    if (c.status !== 'withdrawn') return false;
+                    break;
+            }
+            if (category !== 'all' && categoryOf(c) !== category) return false;
+            if (method !== 'all' && c.given_method !== method) return false;
+            if (q) {
+                const hay = `${
+                    c.consent_type?.name ?? c.consent_type_name ?? ''
+                } ${categoryOf(c)} ${c.status ?? ''} ${c.given_method ?? ''} ${
+                    c.given_notes ?? ''
+                }`.toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        });
+    }, [consents, view, search, category, method]);
+
+    const hasNarrowing =
+        search.trim() !== '' || category !== 'all' || method !== 'all';
+
+    // Group the narrowed list by category
+    const grouped = useMemo(() => {
+        const map: Record<string, any[]> = {};
+        shown.forEach((c) => {
+            const cat = categoryOf(c);
+            if (!map[cat]) map[cat] = [];
+            map[cat].push(c);
+        });
+        return map;
+    }, [shown]);
+
+    const railItems: PageHeaderRailItem<ViewKey>[] = [
+        { key: 'all', label: 'All consents', icon: Layers, count: s.total },
+        {
+            key: 'active',
+            label: 'Active',
+            icon: CheckCircle2,
+            count: s.active,
+        },
+        {
+            key: 'expiring',
+            label: 'Expiring soon',
+            icon: Clock,
+            count: s.expiring_soon,
+        },
+        {
+            key: 'expired',
+            label: 'Expired',
+            icon: AlertTriangle,
+            count: s.expired,
+            alert: true,
+        },
+        {
+            key: 'withdrawn',
+            label: 'Withdrawn',
+            icon: XCircle,
+            count: s.withdrawn,
+        },
+    ];
+
+    const currentViewLabel =
+        railItems.find((v) => v.key === view)?.label ?? 'All consents';
+
+    const titleChip =
+        s.expired > 0 ? (
+            <PageHeaderStatusChip variant="critical">
+                {s.expired} expired
+            </PageHeaderStatusChip>
+        ) : s.expiring_soon > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {s.expiring_soon} expiring soon
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                {s.active} active
+            </PageHeaderStatusChip>
+        );
+
+    const categoryOptions = [
+        { value: 'all', label: 'All categories' },
+        ...categories.map((c) => ({
+            value: c,
+            label: c.replace(/_/g, ' ').replace(/^\w/, (m) => m.toUpperCase()),
+        })),
+    ];
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref={`/operations/clients/${client.id}`}
+            icon={Shield}
+            title={name}
+            titleChip={titleChip}
+            subline={`Consent management · ${s.total} ${
+                s.total === 1 ? 'record' : 'records'
+            } · ${consent_types.length} ${
+                consent_types.length === 1 ? 'type' : 'types'
+            } configured`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search consents…"
+                    />
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() => setShowRecord(true)}
+                        disabled={!hasConsentTypes}
+                        className="disabled:pointer-events-none disabled:opacity-50"
+                    >
+                        Record consent
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Total consents"
+                        ariaLabel="View all consents"
+                        onClick={() => setView('all')}
+                    >
+                        <PageHeaderMeterBig>{s.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            across {categories.length}{' '}
+                            {categories.length === 1
+                                ? 'category'
+                                : 'categories'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {s.total > 0 ? (
+                        <PageHeaderMeterBlock
+                            label="Active"
+                            ariaLabel="View active consents"
+                            onClick={() => setView('active')}
+                        >
+                            <PageHeaderMeterDonut
+                                percent={(s.active / s.total) * 100}
+                                caption={
+                                    <>
+                                        {s.active} of {s.total}
+                                        <br />
+                                        valid
+                                    </>
+                                }
+                            />
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label="Expiring soon"
+                        tone={s.expiring_soon > 0 ? 'warning' : 'success'}
+                        ariaLabel="View consents expiring soon"
+                        onClick={() => setView('expiring')}
+                    >
+                        <PageHeaderMeterBig>
+                            {s.expiring_soon}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            renewals coming up
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Expired"
+                        tone={s.expired > 0 ? 'critical' : 'success'}
+                        ariaLabel="View expired consents"
+                        onClick={() => setView('expired')}
+                    >
+                        <PageHeaderMeterBig>{s.expired}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            need re-consent
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Withdrawn"
+                        ariaLabel="View withdrawn consents"
+                        onClick={() => setView('withdrawn')}
+                    >
+                        <PageHeaderMeterBig>{s.withdrawn}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            consent withdrawn
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        icon={FileCheck}
+                        label="All categories"
+                        value={category}
+                        options={categoryOptions}
+                        onChange={setCategory}
+                    />
+                    <PageHeaderFilterSelect
+                        icon={Pen}
+                        label="All methods"
+                        value={method}
+                        options={METHOD_OPTIONS}
+                        onChange={setMethod}
+                    />
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={view}
+                    onSelect={setView}
+                    ariaLabel="Consent views"
+                />
+            }
+        />
+    );
 
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 {
                     title: labels?.['client.plural'] ?? 'Clients',
                     href: '/operations/clients',
                 },
                 { title: name, href: `/operations/clients/${client.id}` },
-                { title: 'Consents' },
+                {
+                    title: 'Consents',
+                    href: `/operations/clients/${client.id}/consents`,
+                },
             ]}
         >
-            <Head title={`Consents - ${name}`} />
-            <PageHero
-                icon={Shield}
-                title="Consent Management"
-                description={`Manage consent records for ${name}.`}
-                backHref={`/operations/clients/${client.id}`}
-                stats={[
-                    { label: 'Total', value: s.total },
-                    { label: 'Active', value: s.active },
-                    { label: 'Expiring', value: s.expiring_soon },
-                    { label: 'Expired', value: s.expired },
-                ]}
-                actions={
-                    <Button
-                        className="gap-1.5 bg-primary hover:bg-primary"
-                        onClick={() => setShowRecord(true)}
-                        disabled={!hasConsentTypes}
-                    >
-                        <Plus className="h-4 w-4" /> Record Consent
-                    </Button>
-                }
-            />
-            <PageShell>
-                {!hasConsentTypes && (
-                    <Card className="border-status-warning/30 bg-status-warning-bg">
-                        <CardContent className="flex items-start gap-3 p-4 text-sm text-status-warning">
-                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
-                            <div>
-                                Consent types have not been configured yet, so
-                                new consent records are temporarily unavailable
-                                on this page.
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                    {[
-                        {
-                            label: 'Total',
-                            value: s.total,
-                            color: 'text-primary',
-                            bg: 'from-primary/10 to-primary/10',
-                        },
-                        {
-                            label: 'Active',
-                            value: s.active,
-                            color: 'text-status-success',
-                            bg: 'from-status-success-bg to-status-success-bg',
-                        },
-                        {
-                            label: 'Expiring',
-                            value: s.expiring_soon,
-                            color:
-                                s.expiring_soon > 0
-                                    ? 'text-status-warning'
-                                    : 'text-muted-foreground',
-                            bg: 'from-status-warning-bg to-status-warning-bg',
-                        },
-                        {
-                            label: 'Expired',
-                            value: s.expired,
-                            color:
-                                s.expired > 0
-                                    ? 'text-status-critical'
-                                    : 'text-muted-foreground',
-                            bg: 'from-status-critical-bg to-status-critical-bg',
-                        },
-                        {
-                            label: 'Withdrawn',
-                            value: s.withdrawn,
-                            color: 'text-muted-foreground',
-                            bg: 'from-muted to-muted',
-                        },
-                    ].map((st) => (
-                        <div
-                            key={st.label}
-                            className={`rounded-xl border bg-gradient-to-br ${st.bg} p-3 text-center`}
-                        >
-                            <div className={`text-xl font-bold ${st.color}`}>
-                                {st.value}
-                            </div>
-                            <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                                {st.label}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+            <Head title={`Consents · ${name}`} />
 
-                {/* Consent Cards grouped by category */}
-                {consents.length === 0 ? (
-                    <Card className="border-dashed">
-                        <CardContent className="flex flex-col items-center justify-center py-16">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                                <ShieldCheck className="h-8 w-8 text-primary" />
-                            </div>
-                            <p className="font-medium">No Consent Records</p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Record the first consent for {client.first_name}
-                                .
-                            </p>
-                            <Button
-                                className="mt-4 gap-1.5 bg-primary hover:bg-primary"
-                                size="sm"
-                                onClick={() => setShowRecord(true)}
-                                disabled={!hasConsentTypes}
-                            >
-                                <Plus className="h-3.5 w-3.5" /> Record Consent
-                            </Button>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    Object.entries(grouped).map(([cat, items]) => (
-                        <div key={cat}>
-                            <div className="mb-2 flex items-center gap-2">
-                                <FileCheck className="h-4 w-4 text-primary" />
-                                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                    {cat.replace(/_/g, ' ')}
-                                </span>
-                                <Badge
-                                    variant="secondary"
-                                    className="text-[10px]"
-                                >
-                                    {items.length}
-                                </Badge>
-                            </div>
-                            <div className="space-y-2">
-                                {items.map((c: any) => {
-                                    const displayStatus =
-                                        c.decision_state ===
-                                            'governance_review_required' ||
-                                        c.decision_state ===
-                                            'informational_acknowledgement'
-                                            ? c.decision_state
-                                            : c.is_expired
-                                              ? 'expired'
-                                              : c.status;
-                                    const style =
-                                        STATUS_STYLES[displayStatus] ??
-                                        STATUS_STYLES.given;
-                                    const StatusIcon = style.icon;
-                                    const catColor =
-                                        CATEGORY_COLORS[cat] ??
-                                        'bg-muted border-border';
-                                    return (
-                                        <Card
-                                            key={c.id}
-                                            className={`overflow-hidden border ${catColor}`}
-                                        >
-                                            <CardContent className="p-4">
-                                                <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
-                                                    <div className="flex items-start gap-3">
-                                                        <div
-                                                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${style.bg}`}
-                                                        >
-                                                            <StatusIcon className="h-4 w-4" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-semibold">
-                                                                    {c
-                                                                        .consent_type
-                                                                        ?.name ??
-                                                                        c.consent_type_name ??
-                                                                        'Consent'}
-                                                                </span>
-                                                                <Badge
-                                                                    className={`border-0 text-[10px] capitalize ${style.bg}`}
-                                                                >
-                                                                    {displayStatus.replace(
-                                                                        /_/g,
-                                                                        ' ',
-                                                                    )}
-                                                                </Badge>
-                                                                {c.capacity_assessed && (
-                                                                    <Badge className="border-0 bg-primary/10 text-[10px] text-primary">
-                                                                        Capacity
-                                                                        Assessed
-                                                                    </Badge>
-                                                                )}
-                                                                {c.is_expiring_soon &&
-                                                                    !c.is_expired && (
-                                                                        <Badge className="animate-pulse border-0 bg-status-warning-bg text-[10px] text-status-warning">
-                                                                            Expiring
-                                                                            Soon
-                                                                        </Badge>
-                                                                    )}
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    {!hasConsentTypes && (
+                        <Card className="border-status-warning/30 bg-status-warning-bg">
+                            <CardContent className="flex items-start gap-3 p-4 text-sm text-status-warning">
+                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
+                                <div>
+                                    Consent types have not been configured yet,
+                                    so new consent records are temporarily
+                                    unavailable on this page.
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    <ListCaption
+                        title={currentViewLabel}
+                        caption={`${shown.length} of ${s.total} ${
+                            s.total === 1 ? 'record' : 'records'
+                        } shown`}
+                    />
+
+                    {shown.length === 0 ? (
+                        <EmptyState
+                            icon={ShieldCheck}
+                            title="No consent records"
+                            description={
+                                hasNarrowing || view !== 'all'
+                                    ? 'Try a different view or clear your filters.'
+                                    : `Record the first consent for ${client.first_name}.`
+                            }
+                            action={
+                                hasNarrowing || view !== 'all' ? undefined : (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setShowRecord(true)}
+                                        disabled={!hasConsentTypes}
+                                    >
+                                        <Plus className="h-3.5 w-3.5" /> Record
+                                        consent
+                                    </Button>
+                                )
+                            }
+                        />
+                    ) : (
+                        Object.entries(grouped).map(([cat, items]) => (
+                            <div key={cat}>
+                                <div className="mb-2 flex items-center gap-2">
+                                    <FileCheck className="h-4 w-4 text-primary" />
+                                    <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                        {cat.replace(/_/g, ' ')}
+                                    </span>
+                                    <Badge
+                                        variant="secondary"
+                                        className="text-[10px]"
+                                    >
+                                        {items.length}
+                                    </Badge>
+                                </div>
+                                <div className="space-y-2">
+                                    {items.map((c: any) => {
+                                        const displayStatus =
+                                            c.decision_state ===
+                                                'governance_review_required' ||
+                                            c.decision_state ===
+                                                'informational_acknowledgement'
+                                                ? c.decision_state
+                                                : c.is_expired
+                                                  ? 'expired'
+                                                  : c.status;
+                                        const style =
+                                            STATUS_STYLES[displayStatus] ??
+                                            STATUS_STYLES.given;
+                                        const meta = STATUS_META[displayStatus];
+                                        const StatusIcon = style.icon;
+                                        const catColor =
+                                            CATEGORY_COLORS[cat] ??
+                                            'bg-muted border-border';
+                                        return (
+                                            <Card
+                                                key={c.id}
+                                                className={`overflow-hidden border ${catColor}`}
+                                            >
+                                                <CardContent className="p-4">
+                                                    <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
+                                                        <div className="flex items-start gap-3">
+                                                            <div
+                                                                className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${style.bg}`}
+                                                            >
+                                                                <StatusIcon className="h-4 w-4" />
                                                             </div>
-                                                            <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                                                {c.given_at && (
-                                                                    <span>
-                                                                        Given:{' '}
-                                                                        {new Date(
-                                                                            c.given_at,
-                                                                        ).toLocaleDateString(
-                                                                            'en-NZ',
-                                                                        )}
+                                                            <div>
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    <span className="text-sm font-semibold">
+                                                                        {c
+                                                                            .consent_type
+                                                                            ?.name ??
+                                                                            c.consent_type_name ??
+                                                                            'Consent'}
                                                                     </span>
-                                                                )}
-                                                                {c.given_method && (
-                                                                    <span>
-                                                                        Method:{' '}
-                                                                        {
-                                                                            c.given_method
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                                {c.expires_at && (
-                                                                    <span
-                                                                        className={
-                                                                            c.is_expired
-                                                                                ? 'font-medium text-status-critical'
-                                                                                : c.is_expiring_soon
-                                                                                  ? 'font-medium text-status-warning'
-                                                                                  : ''
+                                                                    <StatusBadge
+                                                                        variant={
+                                                                            meta?.variant ??
+                                                                            'neutral'
                                                                         }
                                                                     >
-                                                                        Expires:{' '}
-                                                                        {new Date(
-                                                                            c.expires_at,
-                                                                        ).toLocaleDateString(
-                                                                            'en-NZ',
+                                                                        {meta?.label ??
+                                                                            displayStatus.replace(
+                                                                                /_/g,
+                                                                                ' ',
+                                                                            )}
+                                                                    </StatusBadge>
+                                                                    {c.capacity_assessed && (
+                                                                        <Badge className="border-0 bg-primary/10 text-[10px] text-primary">
+                                                                            Capacity
+                                                                            assessed
+                                                                        </Badge>
+                                                                    )}
+                                                                    {c.is_expiring_soon &&
+                                                                        !c.is_expired && (
+                                                                            <StatusBadge variant="warning">
+                                                                                Expiring
+                                                                                soon
+                                                                            </StatusBadge>
                                                                         )}
-                                                                    </span>
+                                                                </div>
+                                                                <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                                                    {c.given_at && (
+                                                                        <span>
+                                                                            Given:{' '}
+                                                                            {new Date(
+                                                                                c.given_at,
+                                                                            ).toLocaleDateString(
+                                                                                'en-NZ',
+                                                                            )}
+                                                                        </span>
+                                                                    )}
+                                                                    {c.given_method && (
+                                                                        <span>
+                                                                            Method:{' '}
+                                                                            {
+                                                                                c.given_method
+                                                                            }
+                                                                        </span>
+                                                                    )}
+                                                                    {c.expires_at && (
+                                                                        <span
+                                                                            className={
+                                                                                c.is_expired
+                                                                                    ? 'font-medium text-status-critical'
+                                                                                    : c.is_expiring_soon
+                                                                                      ? 'font-medium text-status-warning'
+                                                                                      : ''
+                                                                            }
+                                                                        >
+                                                                            Expires:{' '}
+                                                                            {new Date(
+                                                                                c.expires_at,
+                                                                            ).toLocaleDateString(
+                                                                                'en-NZ',
+                                                                            )}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {c.conditions && (
+                                                                    <p className="mt-1.5 text-xs text-muted-foreground">
+                                                                        {typeof c.conditions ===
+                                                                        'string'
+                                                                            ? c.conditions
+                                                                            : JSON.stringify(
+                                                                                  c.conditions,
+                                                                              )}
+                                                                    </p>
+                                                                )}
+                                                                {c.withdrawal_reason && (
+                                                                    <p className="mt-1.5 text-xs text-status-critical">
+                                                                        Withdrawn:{' '}
+                                                                        {
+                                                                            c.withdrawal_reason
+                                                                        }
+                                                                    </p>
                                                                 )}
                                                             </div>
-                                                            {c.conditions && (
-                                                                <p className="mt-1.5 text-xs text-muted-foreground">
-                                                                    {typeof c.conditions ===
-                                                                    'string'
-                                                                        ? c.conditions
-                                                                        : JSON.stringify(
-                                                                              c.conditions,
-                                                                          )}
-                                                                </p>
-                                                            )}
-                                                            {c.withdrawal_reason && (
-                                                                <p className="mt-1.5 text-xs text-status-critical">
-                                                                    Withdrawn:{' '}
-                                                                    {
-                                                                        c.withdrawal_reason
-                                                                    }
-                                                                </p>
-                                                            )}
                                                         </div>
-                                                    </div>
-                                                    <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-                                                        {c.signed_document_download_url && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="h-10 gap-1.5 text-xs sm:h-8"
-                                                                asChild
-                                                            >
-                                                                <a
-                                                                    href={
-                                                                        c.signed_document_download_url
-                                                                    }
-                                                                >
-                                                                    <Download className="h-3.5 w-3.5" />
-                                                                    Signed
-                                                                    document
-                                                                </a>
-                                                            </Button>
-                                                        )}
-                                                        {c.status === 'given' &&
-                                                            !c.is_expired && (
+                                                        <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+                                                            {c.signed_document_download_url && (
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    className="h-10 border-status-critical/30 text-xs text-status-critical hover:bg-status-critical-bg sm:h-8"
-                                                                    onClick={() => {
-                                                                        setShowWithdraw(
-                                                                            c.id,
-                                                                        );
-                                                                        setWithdrawReason(
-                                                                            '',
-                                                                        );
-                                                                    }}
+                                                                    className="h-10 gap-1.5 text-xs sm:h-8"
+                                                                    asChild
                                                                 >
-                                                                    Withdraw
+                                                                    <a
+                                                                        href={
+                                                                            c.signed_document_download_url
+                                                                        }
+                                                                    >
+                                                                        <Download className="h-3.5 w-3.5" />
+                                                                        Signed
+                                                                        document
+                                                                    </a>
                                                                 </Button>
                                                             )}
+                                                            {c.status ===
+                                                                'given' &&
+                                                                !c.is_expired && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        className="h-10 border-status-critical/30 text-xs text-status-critical hover:bg-status-critical-bg sm:h-8"
+                                                                        onClick={() => {
+                                                                            setShowWithdraw(
+                                                                                c.id,
+                                                                            );
+                                                                            setWithdrawReason(
+                                                                                '',
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        Withdraw
+                                                                    </Button>
+                                                                )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    );
-                                })}
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    ))
-                )}
-            </PageShell>
+                        ))
+                    )}
+                </div>
+            </PageLayout>
 
             {/* Record Consent Dialog */}
             <Dialog open={showRecord} onOpenChange={setShowRecord}>

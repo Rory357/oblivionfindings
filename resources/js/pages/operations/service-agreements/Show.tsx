@@ -1,7 +1,16 @@
 import { DonutChart, OPS_COLORS } from '@/components/ops-stat-card';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -21,6 +30,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -1004,6 +1014,9 @@ export default function ServiceAgreementShow({
     const showRelatedRecords =
         showFundingRecords || relatedRecordPermissions.view_invoices;
 
+    // Header scoped search — narrows the line-items table.
+    const [lineItemSearch, setLineItemSearch] = useState('');
+
     // Line Item CRUD state
     const [lineItemDialogOpen, setLineItemDialogOpen] = useState(false);
     const [editingLineItem, setEditingLineItem] = useState<LineItem | null>(
@@ -1058,90 +1071,199 @@ export default function ServiceAgreementShow({
         },
     ];
 
-    return (
-        <AppLayout>
-            <Head title={ag.title} />
-            <PageHero
-                variant="compact"
-                title={ag.title}
-                description={
-                    ag.client
-                        ? `${ag.client.first_name} ${ag.client.last_name}`
-                        : ''
-                }
-                backHref="/operations/service-agreements"
-            />
-            <PageShell>
-                {/* Header Row */}
-                <div className="flex flex-wrap items-center gap-2">
-                    {statusBadge(ag.status)}
-                    <Badge variant="outline">
-                        {ag.agreement_type.toUpperCase()}
-                    </Badge>
-                    {ag.reference_number && (
-                        <span className="text-xs text-muted-foreground">
-                            #{ag.reference_number}
-                        </span>
-                    )}
-                    {ag.funding_body && (
-                        <span className="text-xs text-muted-foreground">
-                            {ag.funding_body}
-                        </span>
-                    )}
-                    {ag.starts_at && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <CalendarDays className="h-3 w-3" />{' '}
-                            {formatDate(ag.starts_at)} —{' '}
-                            {formatDate(ag.ends_at)}
-                        </span>
-                    )}
-                    <div className="ml-auto flex gap-2">
-                        {ag.status === 'pending_approval' ? (
-                            <>
-                                <Button
-                                    size="sm"
-                                    className="bg-status-success hover:bg-status-success"
-                                    onClick={() =>
-                                        router.post(
-                                            `/operations/service-agreements/${ag.id}/approve`,
-                                        )
-                                    }
-                                >
-                                    <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
-                                    Approve
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => setRejectDialogOpen(true)}
-                                >
-                                    <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                                    Reject
-                                </Button>
-                            </>
-                        ) : (
-                            transitions.map((t) => (
-                                <Button
-                                    key={t.toStatus}
-                                    size="sm"
-                                    variant={t.variant}
-                                    onClick={() => openTransition(t)}
-                                >
-                                    {t.icon}
-                                    {t.label}
-                                </Button>
-                            ))
-                        )}
-                        <Button asChild size="sm" variant="outline">
-                            <Link
-                                href={`/operations/service-agreements/${ag.id}/edit`}
-                            >
-                                <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
-                            </Link>
-                        </Button>
-                    </div>
-                </div>
+    const CHIP_VARIANTS: Record<string, StatusVariant> = {
+        active: 'success',
+        draft: 'neutral',
+        pending_approval: 'warning',
+        under_review: 'info',
+        renewed: 'success',
+        expired: 'neutral',
+        terminated: 'critical',
+        suspended: 'critical',
+    };
 
+    const lineItemQuery = lineItemSearch.trim().toLowerCase();
+    const visibleLineItems = lineItemQuery
+        ? (ag.line_items ?? []).filter((item) =>
+              `${item.description} ${item.category ?? ''} ${
+                  item.funding_contract_reference ?? ''
+              } ${item.item_number ?? ''}`
+                  .toLowerCase()
+                  .includes(lineItemQuery),
+          )
+        : (ag.line_items ?? []);
+
+    const scrollToLineItems = () =>
+        document
+            .getElementById('sa-line-items')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const sublineParts = [
+        ag.client ? `${ag.client.first_name} ${ag.client.last_name}` : null,
+        ag.agreement_type.toUpperCase(),
+        ag.reference_number ? `#${ag.reference_number}` : null,
+        ag.funding_body,
+        ag.starts_at
+            ? `${formatDate(ag.starts_at)} — ${formatDate(ag.ends_at)}`
+            : null,
+    ].filter((part): part is string => !!part);
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/operations/service-agreements"
+            icon={FileText}
+            title={ag.title}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={CHIP_VARIANTS[ag.status] ?? 'neutral'}
+                >
+                    {ag.status.replace(/_/g, ' ')}
+                </PageHeaderStatusChip>
+            }
+            subline={sublineParts.join(' · ')}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={lineItemSearch}
+                        onChange={setLineItemSearch}
+                        placeholder="Search line items…"
+                    />
+                    {ag.status === 'pending_approval' ? (
+                        <>
+                            <PageHeaderGlassButton
+                                icon={XCircle}
+                                onClick={() => setRejectDialogOpen(true)}
+                            >
+                                Reject
+                            </PageHeaderGlassButton>
+                            <PageHeaderPrimaryButton
+                                icon={ShieldCheck}
+                                onClick={() =>
+                                    router.post(
+                                        `/operations/service-agreements/${ag.id}/approve`,
+                                    )
+                                }
+                            >
+                                Approve
+                            </PageHeaderPrimaryButton>
+                        </>
+                    ) : (
+                        transitions.map((t) => (
+                            <PageHeaderGlassButton
+                                key={t.toStatus}
+                                onClick={() => openTransition(t)}
+                            >
+                                {t.label}
+                            </PageHeaderGlassButton>
+                        ))
+                    )}
+                    <PageHeaderGlassButton
+                        icon={Pencil}
+                        onClick={() =>
+                            router.visit(
+                                `/operations/service-agreements/${ag.id}/edit`,
+                            )
+                        }
+                    >
+                        Edit
+                    </PageHeaderGlassButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Budget utilised"
+                        tone={
+                            (ag.budget_remaining ?? 0) < 0 ? 'warning' : 'brand'
+                        }
+                        ariaLabel="View line items"
+                        onClick={scrollToLineItems}
+                    >
+                        <PageHeaderMeterBig>
+                            {formatCurrency(ag.budget_used ?? 0)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBar
+                            percent={ag.budget_utilisation_percent ?? 0}
+                        />
+                        <PageHeaderMeterCaption>
+                            {(ag.budget_remaining ?? 0) >= 0
+                                ? `${formatCurrency(ag.budget_remaining ?? 0)} left of ${formatCurrency(ag.total_budget ?? 0)}`
+                                : `${formatCurrency(-(ag.budget_remaining ?? 0))} over ${formatCurrency(ag.total_budget ?? 0)}`}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {ag.total_hours ? (
+                        <PageHeaderMeterBlock
+                            label="Hours"
+                            value={`${ag.hours_used ?? 0}/${ag.total_hours} h`}
+                            ariaLabel="View line items"
+                            onClick={scrollToLineItems}
+                        >
+                            <PageHeaderMeterBar
+                                percent={ag.hours_utilisation_percent ?? 0}
+                            />
+                            <PageHeaderMeterCaption>
+                                {ag.hours_remaining ?? 0} h remaining
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    {ag.carer_support_days_allocated ? (
+                        <PageHeaderMeterBlock
+                            label="Carer support days"
+                            value={`${ag.carer_support_days_used ?? 0}/${ag.carer_support_days_allocated}`}
+                            ariaLabel="View line items"
+                            onClick={scrollToLineItems}
+                        >
+                            <PageHeaderMeterBar
+                                percent={
+                                    ag.carer_support_utilisation_percent ?? 0
+                                }
+                            />
+                            <PageHeaderMeterCaption>
+                                {ag.carer_support_days_remaining ?? 0} days
+                                remaining
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label="Funding claims"
+                        ariaLabel="View funding claims for this agreement"
+                        href={
+                            ag.client
+                                ? `/operations/funding/claims?client_id=${ag.client.id}`
+                                : '/operations/funding/claims'
+                        }
+                    >
+                        <PageHeaderMeterBig>
+                            {ag.funding_claims_count ?? 0}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            raised against this{' '}
+                            {ag.client ? 'client' : 'agreement'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+        />
+    );
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                {
+                    title: 'Service agreements',
+                    href: '/operations/service-agreements',
+                },
+                {
+                    title: ag.title,
+                    href: `/operations/service-agreements/${ag.id}`,
+                },
+            ]}
+        >
+            <Head title={ag.title} />
+            <PageLayout hero={header}>
                 {/* Status Timeline */}
                 <div className="mt-6">
                     <StatusTimeline status={ag.status} />
@@ -1599,7 +1721,7 @@ export default function ServiceAgreementShow({
                     </Card>
 
                     {/* Line Items */}
-                    <Card className="lg:col-span-2">
+                    <Card id="sa-line-items" className="lg:col-span-2">
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
@@ -1620,13 +1742,16 @@ export default function ServiceAgreementShow({
                             </div>
                         </CardHeader>
                         <CardContent>
-                            {!ag.line_items || ag.line_items.length === 0 ? (
+                            {!visibleLineItems ||
+                            visibleLineItems.length === 0 ? (
                                 <p className="py-4 text-center text-xs text-muted-foreground">
-                                    No line items added yet.
+                                    {lineItemSearch.trim() !== ''
+                                        ? 'No line items match your search.'
+                                        : 'No line items added yet.'}
                                 </p>
                             ) : (
                                 <div className="space-y-2">
-                                    {ag.line_items.map((item) => {
+                                    {visibleLineItems.map((item) => {
                                         const itemPct =
                                             item.budget_allocated > 0
                                                 ? Math.round(
@@ -2307,7 +2432,7 @@ export default function ServiceAgreementShow({
                         </form>
                     </DialogContent>
                 </Dialog>
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

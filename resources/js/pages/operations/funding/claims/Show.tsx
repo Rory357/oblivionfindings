@@ -1,11 +1,23 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { CalendarDays, CheckCircle2, RefreshCw, Send } from 'lucide-react';
+import {
+    CalendarDays,
+    CheckCircle2,
+    FileCheck,
+    RefreshCw,
+    Send,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type ClaimItem = {
     id: number;
@@ -43,6 +55,15 @@ type Props = {
     can_retry_posting: boolean;
 };
 
+const STATUS_BADGE: Record<string, { label: string; variant: StatusVariant }> =
+    {
+        draft: { label: 'Draft', variant: 'neutral' },
+        submitted: { label: 'Submitted', variant: 'info' },
+        approved: { label: 'Approved', variant: 'info' },
+        rejected: { label: 'Rejected', variant: 'critical' },
+        paid: { label: 'Paid', variant: 'success' },
+    };
+
 function formatDate(value?: string | null): string {
     if (!value) return '-';
 
@@ -59,64 +80,112 @@ export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
         currency: 'NZD',
     });
 
-    return (
-        <AppLayout>
-            <Head title="Funding Claim" />
-            <PageHero
-                variant="compact"
-                title={claim.claim_reference || `Funding Claim #${claim.id}`}
-                description="Review the claim summary, line items, and approval state."
-                backHref="/operations/funding/claims"
-                actions={
-                    <div className="flex items-center gap-2">
-                        {claim.status === 'draft' && (
-                            <Button
-                                size="sm"
+    const [search, setSearch] = useState('');
+
+    const title = claim.claim_reference || `Funding claim #${claim.id}`;
+    const badge = STATUS_BADGE[claim.status] ?? {
+        label: claim.status,
+        variant: 'neutral' as StatusVariant,
+    };
+
+    const sublineParts = [
+        claim.client
+            ? `${claim.client.first_name} ${claim.client.last_name}`
+            : null,
+        claim.service_agreement?.title ?? null,
+        `${formatDate(claim.period_start)} – ${formatDate(claim.period_end)}`,
+        `${claim.items.length} ${claim.items.length === 1 ? 'item' : 'items'} · ${nzd.format(claim.total_amount ?? 0)}`,
+    ].filter((part): part is string => !!part);
+
+    const shownItems = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return claim.items;
+        return claim.items.filter((item) =>
+            `${item.description} ${item.funding_contract_reference ?? ''}`
+                .toLowerCase()
+                .includes(q),
+        );
+    }, [claim.items, search]);
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/operations/funding/claims"
+            icon={FileCheck}
+            title={title}
+            titleChip={
+                <PageHeaderStatusChip variant={badge.variant}>
+                    {badge.label}
+                </PageHeaderStatusChip>
+            }
+            subline={sublineParts.join(' · ')}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search claim items…"
+                    />
+                    {can_retry_posting &&
+                        claim.status === 'submitted' &&
+                        claim.gl_posting_status === 'failed' && (
+                            <PageHeaderGlassButton
+                                icon={RefreshCw}
                                 onClick={() =>
                                     router.post(
-                                        `/operations/funding/claims/${claim.id}/submit`,
+                                        `/operations/funding/claims/${claim.id}/retry-posting`,
                                     )
                                 }
                             >
-                                <Send className="mr-1.5 h-3.5 w-3.5" />
-                                Submit Claim
-                            </Button>
+                                Retry GL posting
+                            </PageHeaderGlassButton>
                         )}
-                        {can_retry_posting &&
-                            claim.status === 'submitted' &&
-                            claim.gl_posting_status === 'failed' && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                        router.post(
-                                            `/operations/funding/claims/${claim.id}/retry-posting`,
-                                        )
-                                    }
-                                >
-                                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                                    Retry GL Posting
-                                </Button>
-                            )}
-                        {claim.status === 'submitted' &&
-                            claim.gl_posting_status === 'posted' && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                        router.post(
-                                            `/operations/funding/claims/${claim.id}/approve`,
-                                        )
-                                    }
-                                >
-                                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                                    Approve Claim
-                                </Button>
-                            )}
-                    </div>
-                }
-            />
-            <PageShell>
+                    {claim.status === 'draft' && (
+                        <PageHeaderPrimaryButton
+                            icon={Send}
+                            onClick={() =>
+                                router.post(
+                                    `/operations/funding/claims/${claim.id}/submit`,
+                                )
+                            }
+                        >
+                            Submit claim
+                        </PageHeaderPrimaryButton>
+                    )}
+                    {claim.status === 'submitted' &&
+                        claim.gl_posting_status === 'posted' && (
+                            <PageHeaderPrimaryButton
+                                icon={CheckCircle2}
+                                onClick={() =>
+                                    router.post(
+                                        `/operations/funding/claims/${claim.id}/approve`,
+                                    )
+                                }
+                            >
+                                Approve claim
+                            </PageHeaderPrimaryButton>
+                        )}
+                </>
+            }
+        />
+    );
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                { title: 'Funding', href: '/operations/funding' },
+                { title: 'Claims', href: '/operations/funding/claims' },
+                {
+                    title,
+                    href: `/operations/funding/claims/${claim.id}`,
+                },
+            ]}
+        >
+            <Head title={title} />
+
+            <PageLayout hero={header}>
                 <div className="grid gap-4 md:grid-cols-3">
                     <Card>
                         <CardHeader className="pb-2">
@@ -151,13 +220,10 @@ export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <Badge
-                                variant="outline"
-                                className="h-5 px-2 text-[10px] capitalize"
-                            >
-                                {claim.status}
-                            </Badge>
-                            <p className="mt-2 text-sm font-semibold text-status-success dark:text-status-success">
+                            <StatusBadge variant={badge.variant}>
+                                {badge.label}
+                            </StatusBadge>
+                            <p className="mt-2 text-sm font-semibold text-status-success">
                                 {nzd.format(claim.total_amount ?? 0)}
                             </p>
                             <p className="mt-2 text-xs text-muted-foreground">
@@ -165,7 +231,7 @@ export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
                                 {claim.gl_posting_status.replaceAll('_', ' ')}
                             </p>
                             {claim.gl_posting_status === 'failed' && (
-                                <p className="mt-1 text-xs text-destructive">
+                                <p className="mt-1 text-xs text-status-critical">
                                     Posting failed. Retry when the finance
                                     service is available.
                                 </p>
@@ -213,49 +279,63 @@ export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
                 </Card>
 
                 <Card className="mt-4">
-                    <CardHeader>
+                    <CardHeader className="flex flex-row items-baseline justify-between">
                         <CardTitle className="text-base">Claim Items</CardTitle>
+                        {search.trim() !== '' && (
+                            <span className="text-xs text-muted-foreground">
+                                {shownItems.length} of {claim.items.length}{' '}
+                                match
+                            </span>
+                        )}
                     </CardHeader>
                     <CardContent className="space-y-2">
-                        {claim.items.map((item) => (
-                            <div
-                                key={item.id}
-                                className="grid gap-3 rounded-lg border p-4 md:grid-cols-[1.5fr,0.8fr,0.8fr,1fr]"
-                            >
-                                <div>
-                                    <p className="text-sm font-semibold">
-                                        {item.description}
-                                    </p>
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        <span className="inline-flex items-center gap-1">
-                                            <CalendarDays className="h-3 w-3" />
-                                            {formatDate(item.service_date)}
-                                        </span>
-                                        {item.funding_contract_reference && (
-                                            <span>
-                                                {' '}
-                                                •{' '}
-                                                {
-                                                    item.funding_contract_reference
-                                                }
+                        {shownItems.length === 0 ? (
+                            <div className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+                                {search.trim() !== ''
+                                    ? 'No items match your search.'
+                                    : 'No items on this claim.'}
+                            </div>
+                        ) : (
+                            shownItems.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className="grid gap-3 rounded-lg border p-4 md:grid-cols-[1.5fr,0.8fr,0.8fr,1fr]"
+                                >
+                                    <div>
+                                        <p className="text-sm font-semibold">
+                                            {item.description}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            <span className="inline-flex items-center gap-1">
+                                                <CalendarDays className="h-3 w-3" />
+                                                {formatDate(item.service_date)}
                                             </span>
-                                        )}
+                                            {item.funding_contract_reference && (
+                                                <span>
+                                                    {' '}
+                                                    •{' '}
+                                                    {
+                                                        item.funding_contract_reference
+                                                    }
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Qty {item.quantity}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {nzd.format(item.unit_price)}
+                                    </p>
+                                    <p className="text-sm font-semibold text-status-success">
+                                        {nzd.format(item.total_amount)}
                                     </p>
                                 </div>
-                                <p className="text-sm text-muted-foreground">
-                                    Qty {item.quantity}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    {nzd.format(item.unit_price)}
-                                </p>
-                                <p className="text-sm font-semibold text-status-success dark:text-status-success">
-                                    {nzd.format(item.total_amount)}
-                                </p>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </CardContent>
                 </Card>
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

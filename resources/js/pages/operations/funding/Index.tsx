@@ -1,22 +1,21 @@
+import { DonutChart, OPS_COLORS } from '@/components/ops-stat-card';
 import {
-    DonutChart,
-    OPS_COLORS,
-    OpsStatCard,
-} from '@/components/ops-stat-card';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+    PageHeader,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import {
-    AlertTriangle,
-    ArrowRight,
-    Banknote,
-    DollarSign,
-    FileText,
-    TrendingUp,
-} from 'lucide-react';
+import { ArrowRight, Banknote } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type Props = {
     stats: {
@@ -71,122 +70,148 @@ export default function FundingIndex({
         expiring_soon: 0,
     };
 
-    return (
-        <AppLayout>
-            <Head title="Funding" />
-            <PageHero
-                icon={Banknote}
-                title="Funding Dashboard"
-                description="Track budgets, utilisation, and claims across all service agreements."
-                stats={[
-                    {
-                        label: 'Total budget',
-                        value: formatCurrency(s.total_budget),
-                    },
-                    { label: 'Utilised', value: `${s.utilisation_percent}%` },
-                    {
-                        label: 'Remaining',
-                        value: formatCurrency(s.total_remaining),
-                    },
-                    { label: 'Pending claims', value: s.pending_claims },
-                ]}
-            />
-            <PageShell>
-                {/* KPIs */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <OpsStatCard
-                        label="Total Budget"
-                        value={formatCurrency(s.total_budget)}
-                        icon={DollarSign}
-                        color="indigo"
-                        subtitle={`${s.active_agreements} agreements`}
-                    />
-                    <OpsStatCard
-                        label="Utilised"
-                        value={formatCurrency(s.total_used)}
-                        icon={TrendingUp}
-                        color="blue"
-                        subtitle={`${s.utilisation_percent}% used`}
-                    />
-                    <OpsStatCard
-                        label="Remaining"
-                        value={formatCurrency(s.total_remaining)}
-                        icon={DollarSign}
-                        color="emerald"
-                        subtitle="Available budget"
-                    />
-                    <OpsStatCard
-                        label="Pending Claims"
-                        value={s.pending_claims}
-                        icon={FileText}
-                        color={s.pending_claims > 0 ? 'amber' : 'slate'}
+    const [search, setSearch] = useState('');
+
+    const totalClaims = Object.values(claims_by_status ?? {}).reduce(
+        (a, b) => a + b,
+        0,
+    );
+    const paidClaims = (claims_by_status ?? {}).paid ?? 0;
+
+    const shownAgreements = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return top_agreements ?? [];
+        return (top_agreements ?? []).filter((ag) =>
+            `${ag.title} ${ag.client_name}`.toLowerCase().includes(q),
+        );
+    }, [top_agreements, search]);
+
+    const titleChip =
+        s.expiring_soon > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {s.expiring_soon} expiring soon
+            </PageHeaderStatusChip>
+        ) : s.pending_claims > 0 ? (
+            <PageHeaderStatusChip variant="info">
+                {s.pending_claims} pending claims
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                On track
+            </PageHeaderStatusChip>
+        );
+
+    const header = (
+        <PageHeader
+            icon={Banknote}
+            title="Funding"
+            titleChip={titleChip}
+            subline={`Budgets, utilisation and claims · ${
+                s.active_agreements
+            } active ${s.active_agreements === 1 ? 'agreement' : 'agreements'}`}
+            actions={
+                <PageHeaderSearch
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search top agreements…"
+                />
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Budget utilised"
+                        tone={s.total_remaining < 0 ? 'warning' : 'brand'}
+                        ariaLabel="View service agreements and their budgets"
+                        href="/operations/service-agreements"
+                    >
+                        <PageHeaderMeterBig>
+                            {formatCurrency(s.total_used)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterBar percent={s.utilisation_percent} />
+                        <PageHeaderMeterCaption>
+                            {s.total_remaining >= 0
+                                ? `${formatCurrency(s.total_remaining)} left of ${formatCurrency(s.total_budget)}`
+                                : `${formatCurrency(-s.total_remaining)} over ${formatCurrency(s.total_budget)}`}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Agreements"
+                        ariaLabel="View active service agreements"
+                        href="/operations/service-agreements"
+                    >
+                        <PageHeaderMeterBig>
+                            {s.active_agreements}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            active with budgets tracked
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Pending claims"
+                        tone={s.pending_claims > 0 ? 'warning' : 'success'}
+                        ariaLabel="View funding claims"
                         href="/operations/funding/claims"
-                    />
-                </div>
+                    >
+                        <PageHeaderMeterBig>
+                            {s.pending_claims}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            awaiting approval
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {totalClaims > 0 ? (
+                        <PageHeaderMeterBlock
+                            label="Claims paid"
+                            ariaLabel="View funding claims by status"
+                            href="/operations/funding/claims"
+                        >
+                            <PageHeaderMeterDonut
+                                percent={(paidClaims / totalClaims) * 100}
+                                caption={
+                                    <>
+                                        {paidClaims} of {totalClaims}
+                                        <br />
+                                        paid
+                                    </>
+                                }
+                            />
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label="Expiring soon"
+                        tone={s.expiring_soon > 0 ? 'warning' : 'success'}
+                        ariaLabel="View service agreements expiring soon"
+                        href="/operations/service-agreements"
+                    >
+                        <PageHeaderMeterBig>
+                            {s.expiring_soon}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            within the next 30 days
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+        />
+    );
 
-                {/* Charts */}
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                    {/* Budget Utilisation Gauge */}
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Budget Utilisation
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex flex-col items-center gap-4">
-                                <DonutChart
-                                    segments={[
-                                        {
-                                            label: 'Used',
-                                            value: s.total_used,
-                                            color: OPS_COLORS.primary,
-                                        },
-                                        {
-                                            label: 'Remaining',
-                                            value: s.total_remaining,
-                                            color: '#e2e8f0',
-                                        },
-                                    ]}
-                                    centerValue={`${s.utilisation_percent}%`}
-                                    centerLabel="Used"
-                                    size={140}
-                                    strokeWidth={18}
-                                />
-                                <div className="flex gap-6 text-xs text-muted-foreground">
-                                    <span className="flex items-center gap-1.5">
-                                        <div
-                                            className="h-2.5 w-2.5 rounded-full"
-                                            style={{
-                                                backgroundColor:
-                                                    OPS_COLORS.primary,
-                                            }}
-                                        />
-                                        Used: {formatCurrency(s.total_used)}
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                        <div className="h-2.5 w-2.5 rounded-full bg-muted" />
-                                        Remaining:{' '}
-                                        {formatCurrency(s.total_remaining)}
-                                    </span>
-                                </div>
-                                {s.expiring_soon > 0 && (
-                                    <div className="flex items-center gap-1.5 rounded-md bg-status-warning-bg px-3 py-1.5 text-xs text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
-                                        <AlertTriangle className="h-3.5 w-3.5" />
-                                        {s.expiring_soon} agreement
-                                        {s.expiring_soon !== 1 ? 's' : ''}{' '}
-                                        expiring within 30 days
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                { title: 'Funding', href: '/operations/funding' },
+            ]}
+        >
+            <Head title="Funding" />
 
+            <PageLayout hero={header}>
+                <div className="grid gap-4 md:grid-cols-2">
                     {/* Claims by Status */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="text-sm font-medium">
-                                Claims by Status
+                                Claims by status
                             </CardTitle>
                             <Button
                                 asChild
@@ -212,9 +237,7 @@ export default function FundingIndex({
                                             CLAIM_COLORS[status] ??
                                             OPS_COLORS.muted,
                                     }))}
-                                    centerValue={Object.values(
-                                        claims_by_status ?? {},
-                                    ).reduce((a, b) => a + b, 0)}
+                                    centerValue={totalClaims}
                                     centerLabel="Claims"
                                     size={130}
                                     strokeWidth={16}
@@ -249,68 +272,78 @@ export default function FundingIndex({
                             </div>
                         </CardContent>
                     </Card>
-                </div>
 
-                {/* Top agreements by utilisation */}
-                {(top_agreements ?? []).length > 0 && (
-                    <Card className="mt-6">
+                    {/* Top agreements by utilisation */}
+                    <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium">
-                                Top Agreements by Utilisation
+                                Top agreements by utilisation
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-3">
-                                {(top_agreements ?? []).map((ag) => (
-                                    <div
-                                        key={ag.id}
-                                        className="flex items-center gap-3"
-                                    >
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <Link
-                                                    href={`/operations/service-agreements/${ag.id}`}
-                                                    className="truncate text-xs font-medium hover:underline"
-                                                >
-                                                    {ag.title}
-                                                </Link>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    {ag.client_name}
-                                                </span>
-                                            </div>
-                                            <div className="mt-1 flex items-center gap-2">
-                                                <div className="h-1.5 flex-1 rounded-full bg-muted">
-                                                    <div
-                                                        className="h-1.5 rounded-full transition-all"
-                                                        style={{
-                                                            width: `${Math.min(100, ag.utilisation_percent)}%`,
-                                                            backgroundColor:
-                                                                ag.utilisation_percent >
-                                                                90
-                                                                    ? OPS_COLORS.danger
-                                                                    : ag.utilisation_percent >
-                                                                        70
-                                                                      ? OPS_COLORS.warning
-                                                                      : OPS_COLORS.primary,
-                                                        }}
-                                                    />
+                            {shownAgreements.length === 0 ? (
+                                <div className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+                                    {search.trim() !== ''
+                                        ? 'No agreements match your search.'
+                                        : 'No agreements with budgets yet.'}
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {shownAgreements.map((ag) => (
+                                        <div
+                                            key={ag.id}
+                                            className="flex items-center gap-3"
+                                        >
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <Link
+                                                        href={`/operations/service-agreements/${ag.id}`}
+                                                        className="truncate text-xs font-medium hover:underline"
+                                                    >
+                                                        {ag.title}
+                                                    </Link>
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        {ag.client_name}
+                                                    </span>
                                                 </div>
-                                                <span className="text-[10px] text-muted-foreground tabular-nums">
-                                                    {ag.utilisation_percent}%
-                                                </span>
+                                                <div className="mt-1 flex items-center gap-2">
+                                                    <div className="h-1.5 flex-1 rounded-full bg-muted">
+                                                        <div
+                                                            className="h-1.5 rounded-full transition-all"
+                                                            style={{
+                                                                width: `${Math.min(100, ag.utilisation_percent)}%`,
+                                                                backgroundColor:
+                                                                    ag.utilisation_percent >
+                                                                    90
+                                                                        ? OPS_COLORS.danger
+                                                                        : ag.utilisation_percent >
+                                                                            70
+                                                                          ? OPS_COLORS.warning
+                                                                          : OPS_COLORS.primary,
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[10px] text-muted-foreground tabular-nums">
+                                                        {ag.utilisation_percent}
+                                                        %
+                                                    </span>
+                                                </div>
                                             </div>
+                                            <span className="shrink-0 text-xs font-medium tabular-nums">
+                                                {formatCurrency(ag.budget_used)}{' '}
+                                                /{' '}
+                                                {formatCurrency(
+                                                    ag.total_budget,
+                                                )}
+                                            </span>
                                         </div>
-                                        <span className="shrink-0 text-xs font-medium tabular-nums">
-                                            {formatCurrency(ag.budget_used)} /{' '}
-                                            {formatCurrency(ag.total_budget)}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
-                )}
-            </PageShell>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

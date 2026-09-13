@@ -1,10 +1,21 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { Repeat } from 'lucide-react';
+import { useState } from 'react';
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
 
@@ -176,9 +187,182 @@ export default function ShiftSeriesShow({
     const hasActionNeeded =
         stats.open_occurrences > 0 || stats.active_replacements > 0;
 
+    const [search, setSearch] = useState('');
+    const occurrenceMatches = (occurrence: SeriesOccurrence) => {
+        const q = search.trim().toLowerCase();
+        if (!q) return true;
+        return `${occurrence.staff?.name ?? ''} ${
+            occurrence.location ?? ''
+        } ${occurrence.status} ${occurrence.service_context?.name ?? ''}`
+            .toLowerCase()
+            .includes(q);
+    };
+    const visibleUpcoming = upcomingOccurrences.filter(occurrenceMatches);
+    const visibleRecent = recentOccurrences.filter(occurrenceMatches);
+
+    const scrollToOccurrences = () =>
+        document
+            .getElementById('series-occurrences')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const titleChip =
+        series.status === 'cancelled' ? (
+            <PageHeaderStatusChip variant="critical">
+                Cancelled
+            </PageHeaderStatusChip>
+        ) : stats.open_occurrences > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {stats.open_occurrences} open
+            </PageHeaderStatusChip>
+        ) : stats.active_replacements > 0 ? (
+            <PageHeaderStatusChip variant="info">
+                {stats.active_replacements} replacing
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                On track
+            </PageHeaderStatusChip>
+        );
+
+    const sublineParts = [
+        'Recurring series',
+        `${series.weekdays.map(weekdayLabel).join(', ')}${
+            series.starts_time && series.ends_time
+                ? ` · ${seriesTimeLabel(series.starts_time, series.ends_time)}`
+                : ''
+        }`,
+        series.service_context?.name ?? null,
+        series.staff ? series.staff.name : 'Open recurring pattern',
+    ].filter((part): part is string => !!part);
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref="/operations/shifts/series"
+            icon={Repeat}
+            title={series.client?.name ?? 'Recurring support series'}
+            titleChip={titleChip}
+            subline={sublineParts.join(' · ')}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search occurrences…"
+                    />
+                    {nextOccurrence ? (
+                        <PageHeaderGlassButton
+                            onClick={() =>
+                                router.visit(
+                                    `/operations/shifts/${nextOccurrence.id}`,
+                                )
+                            }
+                        >
+                            Open next shift
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {canManageAny && stats.remaining_occurrences > 0 ? (
+                        <PageHeaderGlassButton
+                            onClick={() => {
+                                if (
+                                    !confirm(
+                                        'Cancel all future active occurrences in this recurring series?',
+                                    )
+                                ) {
+                                    return;
+                                }
+
+                                router.patch(
+                                    `/operations/shifts/series/${series.id}/cancel-future`,
+                                    {},
+                                    { preserveScroll: true },
+                                );
+                            }}
+                        >
+                            Cancel future occurrences
+                        </PageHeaderGlassButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Occurrences"
+                        ariaLabel="View the occurrences below"
+                        onClick={scrollToOccurrences}
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.occurrences_total}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {stats.remaining_occurrences} remaining
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Open"
+                        tone={
+                            stats.open_occurrences > 0 ? 'warning' : 'success'
+                        }
+                        ariaLabel="View the occurrences below"
+                        onClick={scrollToOccurrences}
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.open_occurrences}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            need cover
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {stats.occurrences_total > 0 ? (
+                        <PageHeaderMeterBlock
+                            label="Completed"
+                            ariaLabel="View the occurrences below"
+                            onClick={scrollToOccurrences}
+                        >
+                            <PageHeaderMeterDonut
+                                percent={
+                                    (stats.completed_occurrences /
+                                        stats.occurrences_total) *
+                                    100
+                                }
+                                caption={
+                                    <>
+                                        {stats.completed_occurrences} of{' '}
+                                        {stats.occurrences_total}
+                                        <br />
+                                        done
+                                    </>
+                                }
+                            />
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label="Replacing"
+                        tone={
+                            stats.active_replacements > 0
+                                ? 'warning'
+                                : 'success'
+                        }
+                        ariaLabel="View the occurrences below"
+                        onClick={scrollToOccurrences}
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.active_replacements}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            replacement workflows active
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+        />
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
                 { title: 'Rostering', href: '/operations/rostering' },
                 {
                     title: 'Recurring series',
@@ -193,68 +377,7 @@ export default function ShiftSeriesShow({
             <Head
                 title={`Recurring series - ${series.client?.name ?? series.id}`}
             />
-            <PageShell>
-                <PageHero
-                    variant="compact"
-                    title={series.client?.name ?? 'Recurring support series'}
-                    description="Operational view of this recurring shift pattern, including open occurrences and active replacement workflows."
-                    actions={
-                        <div className="flex flex-wrap gap-2">
-                            <Button variant="outline" asChild>
-                                <Link href="/operations/shifts/series">
-                                    All series
-                                </Link>
-                            </Button>
-                            <Button variant="outline" asChild>
-                                <Link href="/operations/rostering">
-                                    Rostering
-                                </Link>
-                            </Button>
-                            {nextOccurrence ? (
-                                <>
-                                    <Button variant="outline" asChild>
-                                        <Link
-                                            href={`/operations/shifts/${nextOccurrence.id}`}
-                                        >
-                                            Open next shift
-                                        </Link>
-                                    </Button>
-                                    {canManageAny ? (
-                                        <Button asChild>
-                                            <Link
-                                                href={`/operations/shifts/${nextOccurrence.id}`}
-                                            >
-                                                Open future
-                                            </Link>
-                                        </Button>
-                                    ) : null}
-                                </>
-                            ) : null}
-                            {canManageAny && stats.remaining_occurrences > 0 ? (
-                                <Button
-                                    variant="destructive"
-                                    onClick={() => {
-                                        if (
-                                            !confirm(
-                                                'Cancel all future active occurrences in this recurring series?',
-                                            )
-                                        ) {
-                                            return;
-                                        }
-
-                                        router.patch(
-                                            `/operations/shifts/series/${series.id}/cancel-future`,
-                                            {},
-                                            { preserveScroll: true },
-                                        );
-                                    }}
-                                >
-                                    Cancel future occurrences
-                                </Button>
-                            ) : null}
-                        </div>
-                    }
-                />
+            <PageLayout hero={header}>
                 <Card className="border-border/60 bg-card/70">
                     <CardContent className="grid gap-4 p-5 lg:grid-cols-[1.1fr_0.9fr]">
                         <div className="space-y-3">
@@ -445,19 +568,21 @@ export default function ShiftSeriesShow({
                             </CardContent>
                         </Card>
 
-                        <Card>
+                        <Card id="series-occurrences">
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-base">
                                     Upcoming occurrences
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                {upcomingOccurrences.length === 0 ? (
+                                {visibleUpcoming.length === 0 ? (
                                     <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-                                        No future occurrences scheduled.
+                                        {search.trim() !== ''
+                                            ? 'No upcoming occurrences match your search.'
+                                            : 'No future occurrences scheduled.'}
                                     </div>
                                 ) : (
-                                    upcomingOccurrences.map((occurrence) => (
+                                    visibleUpcoming.map((occurrence) => (
                                         <div
                                             key={occurrence.id}
                                             className="rounded-xl border p-4"
@@ -757,13 +882,14 @@ export default function ShiftSeriesShow({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                {recentOccurrences.length === 0 ? (
+                                {visibleRecent.length === 0 ? (
                                     <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-                                        No completed or historical occurrences
-                                        yet.
+                                        {search.trim() !== ''
+                                            ? 'No recent occurrences match your search.'
+                                            : 'No completed or historical occurrences yet.'}
                                     </div>
                                 ) : (
-                                    recentOccurrences.map((occurrence) => (
+                                    visibleRecent.map((occurrence) => (
                                         <div
                                             key={occurrence.id}
                                             className="rounded-xl border p-3"
@@ -860,7 +986,7 @@ export default function ShiftSeriesShow({
                         </Card>
                     </div>
                 </div>
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

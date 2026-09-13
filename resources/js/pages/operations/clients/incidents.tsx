@@ -1,4 +1,17 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +23,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -19,6 +33,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
@@ -33,7 +48,9 @@ import {
     ExternalLink,
     Eye,
     FileEdit,
+    Flag,
     HelpCircle,
+    Layers,
     MoreVertical,
     Pill,
     Plus,
@@ -43,7 +60,7 @@ import {
     Users,
     XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 type Props = {
     client: {
@@ -65,44 +82,43 @@ const severityConfig: Record<
         bg: 'bg-status-success-bg',
         text: 'text-status-success',
         dot: 'bg-status-success',
-        border: 'border-l-emerald-500',
+        border: 'border-l-status-success',
     },
     medium: {
         bg: 'bg-status-warning-bg',
         text: 'text-status-warning',
         dot: 'bg-status-warning',
-        border: 'border-l-amber-500',
+        border: 'border-l-status-warning',
     },
     high: {
         bg: 'bg-status-critical-bg',
         text: 'text-status-critical',
         dot: 'bg-status-critical',
-        border: 'border-l-red-500',
+        border: 'border-l-status-critical',
     },
     critical: {
         bg: 'bg-status-critical-bg',
         text: 'text-status-critical',
         dot: 'bg-status-critical',
-        border: 'border-l-red-600',
+        border: 'border-l-status-critical',
     },
+};
+
+const SEVERITY_BADGE: Record<string, StatusVariant> = {
+    low: 'success',
+    medium: 'warning',
+    high: 'critical',
+    critical: 'critical',
 };
 
 const statusConfig: Record<
     string,
-    { bg: string; text: string; icon: typeof Clock }
+    { variant: StatusVariant; label: string; icon: typeof Clock }
 > = {
-    draft: { bg: 'bg-muted', text: 'text-foreground', icon: FileEdit },
-    submitted: {
-        bg: 'bg-status-info-bg',
-        text: 'text-status-info',
-        icon: Clock,
-    },
-    reviewed: { bg: 'bg-primary/10', text: 'text-primary', icon: CheckCircle2 },
-    closed: {
-        bg: 'bg-status-success-bg',
-        text: 'text-status-success',
-        icon: CheckCircle2,
-    },
+    draft: { variant: 'neutral', label: 'Draft', icon: FileEdit },
+    submitted: { variant: 'info', label: 'Submitted', icon: Clock },
+    reviewed: { variant: 'info', label: 'Reviewed', icon: CheckCircle2 },
+    closed: { variant: 'success', label: 'Closed', icon: CheckCircle2 },
 };
 
 const typeIcons: Record<string, typeof AlertTriangle> = {
@@ -129,6 +145,16 @@ const typeOptions = [
     { value: 'other', label: 'Other', icon: HelpCircle },
 ];
 
+const SEVERITY_FILTER_OPTIONS = [
+    { value: 'all', label: 'All severities' },
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+    { value: 'critical', label: 'Critical' },
+];
+
+type ViewKey = 'all' | 'drafts' | 'submitted' | 'high' | 'followup';
+
 export default function ClientIncidents({
     client,
     incidents,
@@ -138,6 +164,11 @@ export default function ClientIncidents({
     const { labels } = usePage().props as any;
     const name = `${client.first_name} ${client.last_name}`.trim();
     const [showNew, setShowNew] = useState(false);
+
+    const [view, setView] = useState<ViewKey>('all');
+    const [search, setSearch] = useState('');
+    const [typeFilter, setTypeFilter] = useState('all');
+    const [severityFilter, setSeverityFilter] = useState('all');
 
     const form = useForm({
         template_id: '',
@@ -167,11 +198,243 @@ export default function ClientIncidents({
     const awaitingReview = incidents.filter(
         (i) => i.status === 'submitted',
     ).length;
+    const followupCount = incidents.filter((i) => i.requires_followup).length;
+    const typesPresent = new Set(incidents.map((i) => i.type ?? 'other')).size;
+
+    const typeFilterOptions = useMemo(() => {
+        const known = typeOptions.map((t) => ({
+            value: t.value,
+            label: t.label,
+        }));
+        const extras = Array.from(
+            new Set(
+                incidents
+                    .map((i) => i.type)
+                    .filter(
+                        (t): t is string =>
+                            !!t && !typeOptions.some((o) => o.value === t),
+                    ),
+            ),
+        ).map((t) => ({
+            value: t,
+            label: t
+                .replace(/_/g, ' ')
+                .replace(/^\w/, (m: string) => m.toUpperCase()),
+        }));
+        return [{ value: 'all', label: 'All types' }, ...known, ...extras];
+    }, [incidents]);
+
+    const shown = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return incidents.filter((i) => {
+            switch (view) {
+                case 'drafts':
+                    if (i.status !== 'draft') return false;
+                    break;
+                case 'submitted':
+                    if (i.status !== 'submitted') return false;
+                    break;
+                case 'high':
+                    if (i.severity !== 'high' && i.severity !== 'critical')
+                        return false;
+                    break;
+                case 'followup':
+                    if (!i.requires_followup) return false;
+                    break;
+            }
+            if (typeFilter !== 'all' && i.type !== typeFilter) return false;
+            if (severityFilter !== 'all' && i.severity !== severityFilter)
+                return false;
+            if (q) {
+                const hay = `${i.type ?? ''} ${i.severity ?? ''} ${
+                    i.status ?? ''
+                } ${i.description ?? ''} ${
+                    i.reported_by?.name ?? ''
+                }`.toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        });
+    }, [incidents, view, search, typeFilter, severityFilter]);
+
+    const hasNarrowing =
+        search.trim() !== '' ||
+        typeFilter !== 'all' ||
+        severityFilter !== 'all';
+
+    const railItems: PageHeaderRailItem<ViewKey>[] = [
+        {
+            key: 'all',
+            label: 'All incidents',
+            icon: Layers,
+            count: incidents.length,
+        },
+        { key: 'drafts', label: 'Drafts', icon: FileEdit, count: draftCount },
+        {
+            key: 'submitted',
+            label: 'Awaiting review',
+            icon: Clock,
+            count: awaitingReview,
+        },
+        {
+            key: 'high',
+            label: 'High severity',
+            icon: AlertTriangle,
+            count: highCount,
+            alert: true,
+        },
+        {
+            key: 'followup',
+            label: 'Follow-up',
+            icon: Flag,
+            count: followupCount,
+        },
+    ];
+
+    const currentViewLabel =
+        railItems.find((v) => v.key === view)?.label ?? 'All incidents';
+
+    const titleChip =
+        highCount > 0 ? (
+            <PageHeaderStatusChip variant="critical">
+                {highCount} high severity
+            </PageHeaderStatusChip>
+        ) : awaitingReview > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {awaitingReview} awaiting review
+            </PageHeaderStatusChip>
+        ) : draftCount > 0 ? (
+            <PageHeaderStatusChip variant="info">
+                {draftCount} {draftCount === 1 ? 'draft' : 'drafts'}
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                Up to date
+            </PageHeaderStatusChip>
+        );
+
+    const header = (
+        <PageHeader
+            variant="profile"
+            backHref={`/operations/clients/${client.id}`}
+            icon={ShieldAlert}
+            title={name}
+            titleChip={titleChip}
+            subline={`Incident reports · ${incidents.length} recorded · ${followupCount} ${
+                followupCount === 1 ? 'needs' : 'need'
+            } follow-up`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search incidents…"
+                    />
+                    {can.create ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() => setShowNew((v) => !v)}
+                        >
+                            {showNew ? 'Cancel' : 'New incident'}
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Total incidents"
+                        ariaLabel="View all incidents"
+                        onClick={() => setView('all')}
+                    >
+                        <PageHeaderMeterBig>
+                            {incidents.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            across {typesPresent}{' '}
+                            {typesPresent === 1 ? 'type' : 'types'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="High severity"
+                        tone={highCount > 0 ? 'critical' : 'success'}
+                        ariaLabel="View high severity incidents"
+                        onClick={() => setView('high')}
+                    >
+                        <PageHeaderMeterBig>{highCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            high or critical
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Awaiting review"
+                        tone={awaitingReview > 0 ? 'warning' : 'success'}
+                        ariaLabel="View incidents awaiting review"
+                        onClick={() => setView('submitted')}
+                    >
+                        <PageHeaderMeterBig>
+                            {awaitingReview}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            submitted, not yet reviewed
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Drafts"
+                        ariaLabel="View draft incidents"
+                        onClick={() => setView('drafts')}
+                    >
+                        <PageHeaderMeterBig>{draftCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            not yet submitted
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Follow-up"
+                        tone={followupCount > 0 ? 'warning' : 'success'}
+                        ariaLabel="View incidents needing follow-up"
+                        onClick={() => setView('followup')}
+                    >
+                        <PageHeaderMeterBig>{followupCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            actions outstanding
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        icon={HelpCircle}
+                        label="All types"
+                        value={typeFilter}
+                        options={typeFilterOptions}
+                        onChange={setTypeFilter}
+                    />
+                    <PageHeaderFilterSelect
+                        icon={AlertTriangle}
+                        label="All severities"
+                        value={severityFilter}
+                        options={SEVERITY_FILTER_OPTIONS}
+                        onChange={setSeverityFilter}
+                    />
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={view}
+                    onSelect={setView}
+                    ariaLabel="Incident views"
+                />
+            }
+        />
+    );
 
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Operations', href: '/operations' },
+                { title: 'Home', href: '/dashboard' },
                 {
                     title: labels?.['client.plural'] ?? 'Clients',
                     href: '/operations/clients',
@@ -183,37 +446,9 @@ export default function ClientIncidents({
                 },
             ]}
         >
-            <Head title={`Incidents - ${name}`} />
+            <Head title={`Incidents · ${name}`} />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        icon={ShieldAlert}
-                        backHref={`/operations/clients/${client.id}`}
-                        title={`Incidents for ${name}`}
-                        description={`${incidents.length} incident${incidents.length !== 1 ? 's' : ''} recorded`}
-                        stats={[
-                            { label: 'Total', value: incidents.length },
-                            { label: 'Drafts', value: draftCount },
-                            { label: 'High severity', value: highCount },
-                            { label: 'Awaiting review', value: awaitingReview },
-                        ]}
-                        actions={
-                            can.create ? (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setShowNew((v) => !v)}
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Plus className="mr-1 h-4 w-4" />
-                                    {showNew ? 'Cancel' : 'New incident'}
-                                </Button>
-                            ) : null
-                        }
-                    />
-                }
-            >
+            <PageLayout hero={header}>
                 {/* Inline create form */}
                 {showNew && can.create && (
                     <Card>
@@ -442,9 +677,16 @@ export default function ClientIncidents({
                     </Card>
                 )}
 
+                <ListCaption
+                    title={currentViewLabel}
+                    caption={`${shown.length} of ${incidents.length} ${
+                        incidents.length === 1 ? 'incident' : 'incidents'
+                    } shown`}
+                />
+
                 {/* Incident list */}
                 <div className="space-y-2">
-                    {incidents.map((i) => {
+                    {shown.map((i) => {
                         const sev =
                             severityConfig[i.severity] ?? severityConfig.low;
                         const stat =
@@ -460,7 +702,7 @@ export default function ClientIncidents({
                         return (
                             <div
                                 key={i.id}
-                                className={`group relative cursor-pointer rounded-lg border border-l-4 bg-white transition-all hover:shadow-md ${sev.border}`}
+                                className={`group relative cursor-pointer rounded-lg border border-l-4 bg-card transition-all hover:shadow-md ${sev.border}`}
                                 onClick={() =>
                                     router.visit(`/incidents/${i.id}`)
                                 }
@@ -479,24 +721,26 @@ export default function ClientIncidents({
                                                 <span className="font-semibold capitalize">
                                                     {i.type?.replace(/_/g, ' ')}
                                                 </span>
-                                                <span className="text-muted-foreground">
-                                                    |
-                                                </span>
-                                                <Badge
-                                                    className={`${sev.bg} ${sev.text} border-0 text-[10px] font-medium`}
+                                                <StatusBadge
+                                                    variant={
+                                                        SEVERITY_BADGE[
+                                                            i.severity
+                                                        ] ?? 'neutral'
+                                                    }
+                                                    className="capitalize"
                                                 >
                                                     {i.severity}
-                                                </Badge>
-                                                <Badge
-                                                    className={`${stat.bg} ${stat.text} border-0 text-[10px] font-medium`}
+                                                </StatusBadge>
+                                                <StatusBadge
+                                                    variant={stat.variant}
                                                 >
-                                                    <StatusIcon className="mr-1 h-3 w-3" />
-                                                    {i.status}
-                                                </Badge>
+                                                    <StatusIcon className="h-3 w-3" />
+                                                    {stat.label}
+                                                </StatusBadge>
                                                 {i.is_notifiable && (
-                                                    <Badge className="border-0 bg-status-critical-bg text-[10px] text-status-critical">
+                                                    <StatusBadge variant="critical">
                                                         WorkSafe
-                                                    </Badge>
+                                                    </StatusBadge>
                                                 )}
                                                 {i.requires_followup && (
                                                     <Badge className="border-0 bg-primary/10 text-[10px] text-primary">
@@ -588,18 +832,18 @@ export default function ClientIncidents({
                         );
                     })}
 
-                    {!incidents.length && (
-                        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-                            <ShieldAlert className="h-10 w-10 text-muted-foreground" />
-                            <div className="mt-2 text-sm font-medium text-muted-foreground">
-                                No incidents recorded
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                {can.create
-                                    ? 'Create your first incident above'
-                                    : 'No incidents have been logged for this client'}
-                            </div>
-                        </div>
+                    {!shown.length && (
+                        <EmptyState
+                            icon={ShieldAlert}
+                            title="No incidents"
+                            description={
+                                hasNarrowing || view !== 'all'
+                                    ? 'No incidents match this view or your filters.'
+                                    : can.create
+                                      ? 'Create the first incident with "New incident".'
+                                      : 'No incidents have been logged for this client.'
+                            }
+                        />
                     )}
                 </div>
             </PageLayout>

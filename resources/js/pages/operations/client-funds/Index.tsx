@@ -1,29 +1,27 @@
-import { OpsStatCard } from '@/components/ops-stat-card';
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import { ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import {
-    AlertTriangle,
-    DollarSign,
-    Eye,
-    Plus,
-    Search,
-    Wallet,
-} from 'lucide-react';
-
-const ANY = '__ANY__';
+import { AlertTriangle, ClipboardCheck, Eye, Plus, Wallet } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 
 const nzd = new Intl.NumberFormat('en-NZ', {
     style: 'currency',
@@ -45,272 +43,438 @@ type ClientFund = {
 type Props = {
     funds: {
         data: ClientFund[];
-        links: any[];
+        links: { url: string | null; label: string; active: boolean }[];
         current_page: number;
         last_page: number;
         total: number;
     };
-    filters: {
-        q?: string;
-        fund_type?: string;
+    filters?: {
+        q?: string | null;
+        fund_type?: string | null;
+        low_balance?: boolean | string | null;
+        review?: boolean | string | null;
     };
-    stats: {
+    stats?: {
         total: number;
         total_balance: number;
+        total_available: number;
+        clients: number;
         low_balance_alerts: number;
+        review_required: number;
     };
+};
+
+type ViewKey = 'all' | 'low_balance' | 'review';
+
+const VIEW_PARAMS: Record<ViewKey, Record<string, string>> = {
+    all: {},
+    low_balance: { low_balance: '1' },
+    review: { review: '1' },
 };
 
 const FUND_TYPES: Record<string, string> = {
     trust: 'Trust',
-    petty_cash: 'Petty Cash',
+    petty_cash: 'Petty cash',
     personal: 'Personal',
     activity: 'Activity',
 };
 
 export default function ClientFundsIndex({
     funds = { data: [], links: [], current_page: 1, last_page: 1, total: 0 },
-    filters = {} as any,
-    stats = {} as any,
+    filters = {},
+    stats,
 }: Props) {
     const { labels, auth } = usePage().props as any;
     const canManage = Boolean(auth?.can?.client_funds?.manage);
-    const clientSingular = labels?.['client.singular'] ?? 'Client';
-    const clientPlural = labels?.['client.plural'] ?? 'Clients';
-    const updateFilters = (key: string, value: string | null) => {
-        router.get(
-            '/operations/client-funds',
-            { ...filters, [key]: value },
-            { preserveState: true, replace: true },
-        );
+    const clientSingular: string = labels?.['client.singular'] ?? 'Client';
+    const clientPlural: string = labels?.['client.plural'] ?? 'Clients';
+
+    const s = stats ?? {
+        total: 0,
+        total_balance: 0,
+        total_available: 0,
+        clients: 0,
+        low_balance_alerts: 0,
+        review_required: 0,
     };
 
-    return (
-        <AppLayout>
-            <Head title={`${clientSingular} Funds`} />
-            <PageHero
-                icon={Wallet}
-                title={`${clientSingular} Funds`}
-                description={`Manage ${clientSingular.toLowerCase()} trust funds, petty cash, and personal funds.`}
-                stats={[
-                    { label: 'Total funds', value: stats?.total ?? 0 },
-                    {
-                        label: 'Total balance',
-                        value: nzd.format(stats?.total_balance ?? 0),
-                    },
-                    {
-                        label: 'Low balance',
-                        value: stats?.low_balance_alerts ?? 0,
-                    },
-                ]}
-            />
-            <PageShell>
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <OpsStatCard
-                        label="Total Funds"
-                        value={stats?.total ?? 0}
-                        icon={Wallet}
-                        color="indigo"
-                    />
-                    <OpsStatCard
-                        label="Total Balance"
-                        value={nzd.format(stats?.total_balance ?? 0)}
-                        icon={DollarSign}
-                        color="emerald"
-                    />
-                    <OpsStatCard
-                        label="Low Balance Alerts"
-                        value={stats?.low_balance_alerts ?? 0}
-                        icon={AlertTriangle}
-                        color={
-                            stats?.low_balance_alerts > 0 ? 'amber' : 'slate'
-                        }
-                    />
-                </div>
+    const view: ViewKey = filters.low_balance
+        ? 'low_balance'
+        : filters.review
+          ? 'review'
+          : 'all';
 
-                {/* Filters */}
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                            placeholder={`Search ${clientSingular.toLowerCase()} funds...`}
-                            className="h-9 pl-8 text-sm"
-                            defaultValue={filters?.q ?? ''}
-                            onChange={(e) =>
-                                updateFilters('q', e.target.value || null)
+    const [q, setQ] = useState(filters.q ?? '');
+
+    const applyFilters = useCallback(
+        (overrides: { view?: ViewKey; q?: string; fund_type?: string }) => {
+            const nextView = overrides.view ?? view;
+            const nextQ = overrides.q ?? filters.q ?? '';
+            const nextType = overrides.fund_type ?? filters.fund_type ?? 'all';
+            const params: Record<string, string> = {
+                ...VIEW_PARAMS[nextView],
+            };
+            if (nextQ.trim() !== '') params.q = nextQ.trim();
+            if (nextType !== 'all') params.fund_type = nextType;
+            router.get('/operations/client-funds', params, {
+                preserveState: true,
+                replace: true,
+            });
+        },
+        [view, filters.q, filters.fund_type],
+    );
+
+    useEffect(() => {
+        if ((filters.q ?? '') === q.trim()) return;
+        const t = setTimeout(() => applyFilters({ q }), 400);
+        return () => clearTimeout(t);
+    }, [q, filters.q, applyFilters]);
+
+    const railItems: PageHeaderRailItem<ViewKey>[] = [
+        { key: 'all', label: 'All funds', icon: Wallet, count: s.total },
+        {
+            key: 'low_balance',
+            label: 'Low balance',
+            icon: AlertTriangle,
+            count: s.low_balance_alerts,
+            alert: true,
+        },
+        {
+            key: 'review',
+            label: 'Needs review',
+            icon: ClipboardCheck,
+            count: s.review_required,
+            alert: true,
+        },
+    ];
+
+    const currentViewLabel =
+        railItems.find((v) => v.key === view)?.label ?? 'All funds';
+
+    const hasNarrowing =
+        (filters.q ?? '') !== '' || (filters.fund_type ?? 'all') !== 'all';
+
+    const typeOptions = [
+        { value: 'all', label: 'All types' },
+        ...Object.entries(FUND_TYPES).map(([value, label]) => ({
+            value,
+            label,
+        })),
+    ];
+
+    const titleChip =
+        s.review_required > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {s.review_required} to review
+            </PageHeaderStatusChip>
+        ) : s.low_balance_alerts > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {s.low_balance_alerts} low balance
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                Reconciled
+            </PageHeaderStatusChip>
+        );
+
+    const header = (
+        <PageHeader
+            icon={Wallet}
+            title={`${clientSingular} funds`}
+            titleChip={titleChip}
+            subline={`Trust, petty cash and personal funds · ${s.total} ${
+                s.total === 1 ? 'fund' : 'funds'
+            } · ${nzd.format(s.total_balance)} held`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={q}
+                        onChange={setQ}
+                        placeholder={`Search funds and ${clientPlural.toLowerCase()}…`}
+                    />
+                    {canManage ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() =>
+                                router.visit('/operations/client-funds/create')
                             }
-                        />
-                    </div>
-                    <Select
-                        value={filters?.fund_type ?? ANY}
-                        onValueChange={(v) =>
-                            updateFilters('fund_type', v === ANY ? null : v)
-                        }
+                        >
+                            New fund
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Total funds"
+                        ariaLabel="View all funds"
+                        onClick={() => applyFilters({ view: 'all' })}
                     >
-                        <SelectTrigger className="h-9 w-[140px] text-xs">
-                            <SelectValue placeholder="Fund Type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Types</SelectItem>
-                            {Object.entries(FUND_TYPES).map(([k, v]) => (
-                                <SelectItem key={k} value={k}>
-                                    {v}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {canManage && (
-                        <Button asChild size="sm">
-                            <Link href="/operations/client-funds/create">
-                                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                New Fund
-                            </Link>
-                        </Button>
-                    )}
-                </div>
-
-                {/* List */}
-                <div className="mt-4 space-y-2">
-                    {(funds?.data ?? []).length === 0 && (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16">
-                                <Wallet className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <h2 className="text-lg font-semibold text-muted-foreground">
-                                    No {clientSingular} Funds Found
-                                </h2>
-                                <p className="mt-1 text-sm text-muted-foreground/80">
-                                    Create your first{' '}
-                                    {clientSingular.toLowerCase()} fund to get
-                                    started.
-                                </p>
-                                {canManage && (
-                                    <Button asChild size="sm" className="mt-4">
-                                        <Link href="/operations/client-funds/create">
-                                            Create Fund
-                                        </Link>
-                                    </Button>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
-                    {(funds?.data ?? []).map((fund) => {
-                        const isLow =
-                            fund.low_balance_threshold !== null &&
-                            fund.balance <= fund.low_balance_threshold;
-                        return (
-                            <Card
-                                key={fund.id}
-                                className="transition-all hover:border-border hover:shadow-sm"
-                            >
-                                <CardContent className="flex items-center gap-4 p-4">
-                                    <div
-                                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isLow ? 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning' : 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70'}`}
-                                    >
-                                        {isLow ? (
-                                            <AlertTriangle className="h-5 w-5" />
-                                        ) : (
-                                            <Wallet className="h-5 w-5" />
-                                        )}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <Link
-                                                href={`/operations/client-funds/${fund.id}`}
-                                                className="text-sm font-semibold hover:underline"
-                                            >
-                                                {fund.name}
-                                            </Link>
-                                            <Badge
-                                                variant="outline"
-                                                className="h-4 px-1.5 text-[9px]"
-                                            >
-                                                {FUND_TYPES[fund.fund_type] ??
-                                                    fund.fund_type}
-                                            </Badge>
-                                            {isLow && (
-                                                <Badge
-                                                    variant="destructive"
-                                                    className="h-4 px-1.5 text-[9px]"
-                                                >
-                                                    Low Balance
-                                                </Badge>
-                                            )}
-                                            {fund.reconciliation_status !==
-                                                'clear' && (
-                                                <Badge
-                                                    variant="secondary"
-                                                    className="h-4 px-1.5 text-[9px]"
-                                                >
-                                                    {fund.reconciliation_status ===
-                                                    'mismatch'
-                                                        ? 'Mismatch'
-                                                        : 'Review'}
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                                            {fund.client && (
-                                                <span>
-                                                    {fund.client.first_name}{' '}
-                                                    {fund.client.last_name}
-                                                </span>
-                                            )}
-                                            <span
-                                                className={`font-semibold tabular-nums ${isLow ? 'text-status-critical dark:text-status-critical' : 'text-status-success dark:text-status-success'}`}
-                                            >
-                                                {nzd.format(fund.balance)}
-                                            </span>
-                                            <span>
-                                                {fund.transaction_count}{' '}
-                                                transactions
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="flex shrink-0 gap-1">
-                                        <Button
-                                            asChild
-                                            size="sm"
-                                            variant="ghost"
-                                            className="h-7 w-7 p-0"
-                                        >
-                                            <Link
-                                                href={`/operations/client-funds/${fund.id}`}
-                                            >
-                                                <Eye className="h-3.5 w-3.5" />
-                                            </Link>
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
-                </div>
-
-                {/* Pagination */}
-                {(funds?.last_page ?? 1) > 1 && (
-                    <div className="mt-4 flex items-center justify-center gap-1">
-                        {(funds?.links ?? []).map((link: any, i: number) => (
-                            <Button
-                                key={i}
-                                size="sm"
-                                variant={link.active ? 'default' : 'outline'}
-                                className="h-7 min-w-[28px] px-2 text-xs"
-                                disabled={!link.url}
-                                onClick={() =>
-                                    link.url &&
-                                    router.get(
-                                        link.url,
-                                        {},
-                                        { preserveState: true },
-                                    )
+                        <PageHeaderMeterBig>{s.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            for {s.clients}{' '}
+                            {s.clients === 1
+                                ? clientSingular.toLowerCase()
+                                : clientPlural.toLowerCase()}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Total balance"
+                        ariaLabel="View all fund balances"
+                        onClick={() => applyFilters({ view: 'all' })}
+                    >
+                        <PageHeaderMeterBig>
+                            {nzd.format(s.total_balance)}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {nzd.format(s.total_available)} available
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {s.total > 0 ? (
+                        <PageHeaderMeterBlock
+                            label="Reconciled"
+                            ariaLabel="View funds needing reconciliation review"
+                            onClick={() => applyFilters({ view: 'review' })}
+                        >
+                            <PageHeaderMeterDonut
+                                percent={
+                                    ((s.total - s.review_required) / s.total) *
+                                    100
                                 }
-                                dangerouslySetInnerHTML={{ __html: link.label }}
+                                caption={
+                                    <>
+                                        {s.review_required} need
+                                        {s.review_required === 1 ? 's' : ''}
+                                        <br />
+                                        review
+                                    </>
+                                }
                             />
-                        ))}
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label="Low balance"
+                        tone={s.low_balance_alerts > 0 ? 'warning' : 'success'}
+                        ariaLabel="View funds with low balance"
+                        onClick={() => applyFilters({ view: 'low_balance' })}
+                    >
+                        <PageHeaderMeterBig>
+                            {s.low_balance_alerts}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            at or below their threshold
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    icon={Wallet}
+                    label="All types"
+                    value={filters.fund_type ?? 'all'}
+                    options={typeOptions}
+                    onChange={(v) => applyFilters({ fund_type: v })}
+                />
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={view}
+                    onSelect={(key) => applyFilters({ view: key })}
+                    ariaLabel="Fund views"
+                />
+            }
+        />
+    );
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                {
+                    title: `${clientSingular} funds`,
+                    href: '/operations/client-funds',
+                },
+            ]}
+        >
+            <Head title={`${clientSingular} funds`} />
+
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title={currentViewLabel}
+                        caption={`${funds.data.length} of ${funds.total} ${
+                            funds.total === 1 ? 'fund' : 'funds'
+                        } shown`}
+                    />
+
+                    <div className="space-y-2">
+                        {funds.data.length === 0 ? (
+                            <EmptyState
+                                icon={Wallet}
+                                title={`No ${clientSingular.toLowerCase()} funds found`}
+                                description={
+                                    hasNarrowing || view !== 'all'
+                                        ? 'Try a different view or clear your filters.'
+                                        : `Create your first ${clientSingular.toLowerCase()} fund to get started.`
+                                }
+                                action={
+                                    canManage &&
+                                    !hasNarrowing &&
+                                    view === 'all' ? (
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                router.visit(
+                                                    '/operations/client-funds/create',
+                                                )
+                                            }
+                                        >
+                                            <Plus className="h-3.5 w-3.5" />
+                                            New fund
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
+                        ) : (
+                            funds.data.map((fund) => {
+                                const isLow =
+                                    fund.low_balance_threshold !== null &&
+                                    fund.balance <= fund.low_balance_threshold;
+                                return (
+                                    <Card
+                                        key={fund.id}
+                                        className="transition-all hover:border-border hover:shadow-sm"
+                                    >
+                                        <CardContent className="flex items-center gap-4 p-4">
+                                            <div
+                                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                                                    isLow
+                                                        ? 'bg-status-warning-bg text-status-warning'
+                                                        : 'bg-primary/10 text-primary'
+                                                }`}
+                                            >
+                                                {isLow ? (
+                                                    <AlertTriangle className="h-5 w-5" />
+                                                ) : (
+                                                    <Wallet className="h-5 w-5" />
+                                                )}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Link
+                                                        href={`/operations/client-funds/${fund.id}`}
+                                                        className="text-sm font-semibold hover:underline"
+                                                    >
+                                                        {fund.name}
+                                                    </Link>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="h-4 px-1.5 text-[9px]"
+                                                    >
+                                                        {FUND_TYPES[
+                                                            fund.fund_type
+                                                        ] ?? fund.fund_type}
+                                                    </Badge>
+                                                    {isLow && (
+                                                        <StatusBadge variant="warning">
+                                                            Low balance
+                                                        </StatusBadge>
+                                                    )}
+                                                    {fund.reconciliation_status ===
+                                                        'review' && (
+                                                        <StatusBadge variant="warning">
+                                                            Review
+                                                        </StatusBadge>
+                                                    )}
+                                                    {fund.reconciliation_status ===
+                                                        'mismatch' && (
+                                                        <StatusBadge variant="critical">
+                                                            Mismatch
+                                                        </StatusBadge>
+                                                    )}
+                                                </div>
+                                                <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                                    {fund.client && (
+                                                        <span>
+                                                            {
+                                                                fund.client
+                                                                    .first_name
+                                                            }{' '}
+                                                            {
+                                                                fund.client
+                                                                    .last_name
+                                                            }
+                                                        </span>
+                                                    )}
+                                                    <span
+                                                        className={`font-semibold tabular-nums ${
+                                                            isLow
+                                                                ? 'text-status-critical'
+                                                                : 'text-status-success'
+                                                        }`}
+                                                    >
+                                                        {nzd.format(
+                                                            fund.balance,
+                                                        )}
+                                                    </span>
+                                                    <span>
+                                                        {fund.transaction_count}{' '}
+                                                        transactions
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex shrink-0 gap-1">
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-7 w-7 p-0"
+                                                >
+                                                    <Link
+                                                        href={`/operations/client-funds/${fund.id}`}
+                                                        aria-label={`View ${fund.name}`}
+                                                    >
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                    </Link>
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })
+                        )}
                     </div>
-                )}
-            </PageShell>
+
+                    {(funds.last_page ?? 1) > 1 && (
+                        <div className="flex items-center justify-center gap-1">
+                            {(funds.links ?? []).map((link, i) => (
+                                <Button
+                                    key={i}
+                                    size="sm"
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
+                                    className="h-7 min-w-[28px] px-2 text-xs"
+                                    disabled={!link.url}
+                                    onClick={() =>
+                                        link.url &&
+                                        router.get(
+                                            link.url,
+                                            {},
+                                            { preserveState: true },
+                                        )
+                                    }
+                                    dangerouslySetInnerHTML={{
+                                        __html: link.label,
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

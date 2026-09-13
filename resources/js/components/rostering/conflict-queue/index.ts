@@ -18,8 +18,6 @@ export {
     type ConflictConfirmResult,
 } from './conflict-confirm-dialog';
 export { ConflictDetailPanel } from './conflict-detail-panel';
-export { ConflictFilterStrip } from './conflict-filter-strip';
-export { ConflictHeroFooter } from './conflict-hero-footer';
 export { ConflictQueueList } from './conflict-queue-list';
 export {
     ConflictScanSettingsDialog,

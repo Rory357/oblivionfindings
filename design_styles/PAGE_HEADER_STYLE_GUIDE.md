@@ -319,6 +319,19 @@ connected-tab rail** (NAVIGATION_STYLE_GUIDE.md):
   Quick section-finding is part of the rail, not a separate bar — and a
   rail without the Find chip is a migration gap, not a variant. (Pages
   with no rail at all — leaf record details — are the only exemption.)
+- **One line, never two** (corrected 2026-09-10): the rail NEVER wraps.
+  Declare at most ~8 views; when the viewport can't fit what a page
+  declares, `PageHeaderRail` collapses the trailing views into a ghost
+  "⋯ More" pill (inactive-pill geometry, before the Find chip) with a
+  popover listing the hidden views. This is automatic — pages do
+  nothing. Invariants the overflow keeps: the ACTIVE view is always a
+  visible tab (it swaps out of the overflow if needed — the flush merge
+  is the affordance and never hides in a menu), and alert counters
+  never disappear (hidden alert counts sum onto the More pill in the
+  fixed critical pair). Never "solve" a crowded rail with wrapping,
+  a horizontal scroller (it clips the active tab's page-ground merge),
+  or per-page icon-only variants (DESIGN.md anti-pattern "Wrapping
+  rail").
 
 ## 8. Sub nav — individual/record pages only
 

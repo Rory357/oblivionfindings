@@ -43,9 +43,18 @@ class CarePlanController extends Controller
             'plan_type' => ['nullable', 'string'],
             'client_id' => ['nullable', 'integer'],
             'review_due' => ['nullable', 'boolean'],
+            'no_goals' => ['nullable', 'boolean'],
+            'overdue_goals' => ['nullable', 'boolean'],
         ]);
 
         $baseQuery = $this->visibleCarePlans($auth);
+
+        // An overdue goal: not completed, with a target date in the past.
+        $overdueGoal = function ($q) {
+            $q->where('status', '!=', 'completed')
+                ->whereNotNull('target_date')
+                ->where('target_date', '<', now());
+        };
 
         // Stats
         $stats = [
@@ -67,6 +76,10 @@ class CarePlanController extends Controller
                 ->whereNotNull('target_date')
                 ->where('target_date', '<', now())
                 ->count(),
+            'plans_with_overdue_goals' => (clone $baseQuery)
+                ->where('status', 'active')
+                ->whereHas('goals', $overdueGoal)
+                ->count(),
         ];
 
         // Charts
@@ -78,13 +91,22 @@ class CarePlanController extends Controller
 
         // Filtered query for listing
         $carePlans = $this->visibleCarePlans($auth)
-            ->when(! empty($data['q']), fn ($q) => $q->where('title', 'like', '%'.$data['q'].'%'))
+            ->when(! empty($data['q']), fn ($q) => $q->where(function ($q2) use ($data) {
+                $like = '%'.$data['q'].'%';
+                $q2->where('title', 'like', $like)
+                    ->orWhereHas('client', function ($c) use ($like) {
+                        $c->where('first_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like);
+                    });
+            }))
             ->when(! empty($data['status']), fn ($q) => $q->where('status', $data['status']))
             ->when(! empty($data['plan_type']), fn ($q) => $q->where('plan_type', $data['plan_type']))
             ->when(! empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
             ->when(! empty($data['review_due']), fn ($q) => $q->where('status', 'active')->where(function ($q2) {
                 $q2->whereNull('next_review_at')->orWhere('next_review_at', '<=', now());
             }))
+            ->when(! empty($data['no_goals']), fn ($q) => $q->whereDoesntHave('goals')->where('status', '!=', 'archived'))
+            ->when(! empty($data['overdue_goals']), fn ($q) => $q->where('status', 'active')->whereHas('goals', $overdueGoal))
             ->with(['client:id,first_name,last_name', 'creator:id,name'])
             ->withCount(['goals', 'goals as goals_achieved_count' => fn ($q) => $q->where('status', 'completed')])
             ->orderByDesc('updated_at')
@@ -102,6 +124,12 @@ class CarePlanController extends Controller
             'filters' => $data,
             'stats' => $stats,
             'plans_by_status' => $plans_by_status,
+            'plan_types' => $this->visibleCarePlans($auth)
+                ->whereNotNull('plan_type')
+                ->select('plan_type')
+                ->distinct()
+                ->orderBy('plan_type')
+                ->pluck('plan_type'),
         ]);
     }
 

@@ -1,4 +1,18 @@
-import { PageHero } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import {
     AnalyticsPane,
     type AnalyticsTrendPoint,
@@ -14,7 +28,6 @@ import {
     type CoverageCellState,
     CoveragePane,
     type CoverageRow,
-    DonutCard,
     EntityFilter,
     type EntityFilterOption,
     type FillBySite,
@@ -45,7 +58,6 @@ import {
     type Signal,
     SignalRail,
     SiteFilter,
-    TabStrip,
     TemplateDetailDialog,
     TemplateWizardDialog,
     TemplatesPane,
@@ -86,7 +98,6 @@ import {
     Plane,
     Repeat,
     Wand2,
-    Zap,
 } from 'lucide-react';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -533,7 +544,6 @@ export default function RosteringIndex(props: Props) {
     const { auth } = usePage().props as {
         auth?: { user?: { name?: string }; can?: any };
     };
-    const firstName = auth?.user?.name?.split(' ')?.[0] ?? 'team';
     const canViewOperationsReports = Boolean(
         auth?.can?.operations?.reports?.view || auth?.can?.reports?.viewAny,
     );
@@ -556,6 +566,8 @@ export default function RosteringIndex(props: Props) {
 
     const [tab, setTab] = useState<RosterTab>(() => initialRosterTab());
     const [pickerOpen, setPickerOpen] = useState(false);
+    // Header scoped search — narrows the week grid's staff/site rows.
+    const [gridSearch, setGridSearch] = useState('');
     const [resolveConflictShift, setResolveConflictShift] =
         useState<GridShift | null>(null);
     const [copyToDayShift, setCopyToDayShift] = useState<CopyToDayShift | null>(
@@ -2150,352 +2162,280 @@ export default function RosteringIndex(props: Props) {
         month: 'short',
     })}`;
 
-    const heroBadges: Array<{
-        label: string;
-        tone: 'default' | 'success' | 'warning' | 'critical' | 'info';
-        icon?: typeof CalendarDays;
-    }> = [];
-    if (openCount > 0) {
-        heroBadges.push({
-            label: `${openCount} open shifts · need cover`,
-            tone: 'warning' as const,
-            icon: AlertTriangle,
-        });
-    }
-    if (eligibleCounts.blocked > 0) {
-        heroBadges.push({
-            label: `${eligibleCounts.blocked} blocked candidates`,
-            tone: 'critical' as const,
-        });
-    }
-    if (props.rosterPeriod?.status === 'published') {
-        heroBadges.push({
-            label: `${curLab} published`,
-            tone: 'success' as const,
-            icon: CheckCircle2,
-        });
-    } else if (props.rosterPeriod) {
-        heroBadges.push({
-            label: `${curLab} ${props.rosterPeriod.status.replace(/_/g, ' ')}`,
-            tone: 'default' as const,
-        });
-    }
-    if (props.rosteringFeatures.auto_schedule && props.canAutoScheduleRoster) {
-        heroBadges.push({
-            label: 'Auto-schedule ready',
-            tone: 'info' as const,
-            icon: Zap,
-        });
-    }
+    /* ---------------- Event Horizon header ---------------- */
+
+    const gridQuery = gridSearch.trim().toLowerCase();
+    const filteredStaffRows = gridQuery
+        ? staffRows.filter((row) => row.name.toLowerCase().includes(gridQuery))
+        : staffRows;
+    const filteredSiteRows = gridQuery
+        ? siteRows.filter((row) => row.name.toLowerCase().includes(gridQuery))
+        : siteRows;
+
+    const railItems: PageHeaderRailItem<RosterTab>[] = tabItems.map((item) => ({
+        key: item.id as RosterTab,
+        label: item.label,
+        icon: item.icon,
+        count:
+            typeof (item as { badge?: unknown }).badge === 'number'
+                ? ((item as { badge?: number }).badge as number)
+                : undefined,
+        alert: item.id === 'open' && openCount > 0,
+    }));
+
+    const titleChip =
+        props.stats.staff_overlaps > 0 ? (
+            <PageHeaderStatusChip variant="critical">
+                {props.stats.staff_overlaps}{' '}
+                {props.stats.staff_overlaps === 1 ? 'conflict' : 'conflicts'}
+            </PageHeaderStatusChip>
+        ) : openCount > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {openCount} open {openCount === 1 ? 'shift' : 'shifts'}
+            </PageHeaderStatusChip>
+        ) : props.rosterPeriod?.status === 'published' ? (
+            <PageHeaderStatusChip variant="success" icon={CheckCircle2}>
+                {curLab} published
+            </PageHeaderStatusChip>
+        ) : props.rosterPeriod ? (
+            <PageHeaderStatusChip variant="neutral">
+                {curLab} {props.rosterPeriod.status.replace(/_/g, ' ')}
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                On track
+            </PageHeaderStatusChip>
+        );
+
+    const header = (
+        <PageHeader
+            icon={CalendarDays}
+            title="Rostering"
+            titleChip={titleChip}
+            subline={`${range.startLabel} → ${range.endLabel} · ${
+                props.sites?.length ?? 0
+            } ${(props.sites?.length ?? 0) === 1 ? 'site' : 'sites'} · ${staffRostered} staff rostered · ${
+                props.analytics?.onLeaveCount ?? 0
+            } on leave`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={gridSearch}
+                        onChange={setGridSearch}
+                        placeholder="Search staff and sites…"
+                    />
+                    <PageHeaderGlassButton
+                        icon={AlertTriangle}
+                        aria-label="Conflict queue"
+                        title="Conflict queue"
+                        onClick={() =>
+                            router.visit('/operations/rostering/conflicts')
+                        }
+                    />
+                    {props.rosteringFeatures.auto_schedule &&
+                    props.canAutoScheduleRoster ? (
+                        <PageHeaderGlassButton
+                            icon={Wand2}
+                            disabled={!props.filters.site_id}
+                            title={
+                                !props.filters.site_id
+                                    ? 'Pick a site before generating suggestions'
+                                    : undefined
+                            }
+                            className="disabled:pointer-events-none disabled:opacity-50"
+                            onClick={generateSuggestions}
+                            data-test="rostering-suggest-assignments"
+                            data-testid="rostering-suggest-assignments"
+                        >
+                            Auto-schedule
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {props.rosteringFeatures.publish &&
+                    props.canPublishRoster ? (
+                        <PageHeaderPrimaryButton
+                            icon={CheckCircle2}
+                            disabled={
+                                !props.rosterPeriod ||
+                                publishBlockCount > 0 ||
+                                props.rosterPeriod.status === 'archived'
+                            }
+                            title={
+                                !props.rosterPeriod
+                                    ? 'Pick a site to publish its week'
+                                    : publishBlockCount > 0
+                                      ? `${publishBlockCount} blocker${publishBlockCount === 1 ? '' : 's'} must be resolved`
+                                      : undefined
+                            }
+                            className="disabled:pointer-events-none disabled:opacity-50"
+                            onClick={() =>
+                                postPeriodAction(
+                                    canRepublish ? 'republish' : 'publish',
+                                )
+                            }
+                            data-test="rostering-confirm-publish"
+                            data-testid="rostering-confirm-publish"
+                        >
+                            {canRepublish ? 'Re-publish' : 'Publish week'}
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Coverage"
+                        ariaLabel="View coverage"
+                        onClick={() => handleTabChange('coverage')}
+                    >
+                        <PageHeaderMeterDonut
+                            percent={coverageRate}
+                            caption={
+                                <>
+                                    filled vs
+                                    <br />
+                                    demand
+                                </>
+                            }
+                        />
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Shifts"
+                        ariaLabel="View shifts"
+                        onClick={() => handleTabChange('shifts')}
+                    >
+                        <PageHeaderMeterBig>{total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            scheduled this week
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Open shifts"
+                        tone={openCount > 0 ? 'warning' : 'success'}
+                        ariaLabel="View open shifts"
+                        onClick={() => handleTabChange('open')}
+                    >
+                        <PageHeaderMeterBig>{openCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {eligibleCounts.blocked > 0
+                                ? `${eligibleCounts.blocked} blocked candidates`
+                                : 'need cover'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Conflicts"
+                        tone={
+                            props.stats.staff_overlaps > 0
+                                ? 'critical'
+                                : 'success'
+                        }
+                        ariaLabel="Open the conflict queue"
+                        href="/operations/rostering/conflicts"
+                    >
+                        <PageHeaderMeterBig>
+                            {props.stats.staff_overlaps}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            to resolve this week
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Timesheets"
+                        tone={
+                            props.stats.timesheets_pending > 0
+                                ? 'warning'
+                                : 'success'
+                        }
+                        ariaLabel="View pending timesheets"
+                        href="/operations/timesheets"
+                    >
+                        <PageHeaderMeterBig>
+                            {props.stats.timesheets_pending}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            waiting on approval
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterButton
+                        icon={ChevronLeft}
+                        aria-label={`Previous week (${prevLab})`}
+                        onClick={() => goWeek(-7)}
+                    />
+                    <PageHeaderFilterButton
+                        ref={todayBtnRef}
+                        icon={CalendarRange}
+                        onClick={() => setPickerOpen((v) => !v)}
+                        aria-haspopup="dialog"
+                        aria-expanded={pickerOpen}
+                    >
+                        {curLab} · {curCompactRange}
+                        <ChevronDown className="size-3" />
+                    </PageHeaderFilterButton>
+                    <PageHeaderFilterButton
+                        icon={ChevronRight}
+                        aria-label={`Next week (${nextLab})`}
+                        onClick={() => goWeek(7)}
+                    />
+                    <EntityFilter
+                        onDark
+                        label="Staff"
+                        pluralLabel="staff"
+                        allLabel="All staff"
+                        items={staffFilterItems}
+                        value={props.filters.staff_id}
+                        onChange={(next) => updateFilter({ staff_id: next })}
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                    />
+                    <EntityFilter
+                        onDark
+                        label="Client"
+                        allLabel="All clients"
+                        items={clientFilterItems}
+                        value={props.filters.client_id}
+                        onChange={(next) => updateFilter({ client_id: next })}
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                    />
+                    <SiteFilter
+                        onDark
+                        sites={props.sites ?? []}
+                        value={props.filters.site_ids ?? []}
+                        onChange={(next) => updateFilter({ site_ids: next })}
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                    />
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={tab}
+                    onSelect={(key) => handleTabChange(key)}
+                    ariaLabel="Roster views"
+                />
+            }
+        />
+    );
 
     return (
         <AppLayout
-            breadcrumbs={[{ title: 'Rostering', href: rosteringIndex.url() }]}
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                { title: 'Rostering', href: rosteringIndex.url() },
+            ]}
         >
             <Head title="Rostering" />
-            <div className="space-y-4 p-4">
-                <PageHero
-                    category="ops"
-                    icon={CalendarDays}
-                    title={
-                        <span>
-                            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
-                                <span
-                                    aria-hidden="true"
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
-                                </span>
-                                Live roster · refreshed just now
-                            </span>
-                            <span className="block">
-                                <span className="font-normal text-primary-foreground/80">
-                                    Kia ora {firstName}, your week at a glance —
-                                </span>{' '}
-                                <span className="border-b-2 border-primary-foreground/40 pb-0.5">
-                                    {range.startLabel} → {range.endLabel}
-                                </span>
-                            </span>
-                        </span>
-                    }
-                    description={
-                        <span>
-                            {total} shift{total === 1 ? '' : 's'} across{' '}
-                            {(props.sites?.length ?? 0) || 'all'} site
-                            {(props.sites?.length ?? 0) === 1 ? '' : 's'}.{' '}
-                            {openCount > 0
-                                ? `${openCount} need${openCount === 1 ? 's' : ''} cover, `
-                                : ''}
-                            {props.stats.staff_overlaps > 0
-                                ? `${props.stats.staff_overlaps} conflict${props.stats.staff_overlaps === 1 ? '' : 's'} to resolve, `
-                                : ''}
-                            and {props.stats.timesheets_pending} timesheet
-                            {props.stats.timesheets_pending === 1
-                                ? ''
-                                : 's'}{' '}
-                            waiting on you.
-                        </span>
-                    }
-                    meta={[
-                        {
-                            icon: CalendarDays,
-                            label: `${curLab} · Mon–Sun`,
-                        },
-                        {
-                            icon: LayoutGrid,
-                            label: `${props.sites?.length ?? 0} site${(props.sites?.length ?? 0) === 1 ? '' : 's'}`,
-                        },
-                        {
-                            icon: CheckCircle2,
-                            label: `${staffRostered} staff rostered · ${props.analytics?.onLeaveCount ?? 0} on leave`,
-                        },
-                    ]}
-                    badges={heroBadges}
-                    stats={[
-                        {
-                            label: 'Coverage',
-                            value: `${coverageRate}%`,
-                        },
-                        { label: 'Shifts', value: total },
-                        { label: 'Staff', value: staffRostered },
-                        {
-                            label: 'Open',
-                            value: openCount,
-                        },
-                    ]}
-                    actions={
-                        <>
-                            {props.rosteringFeatures.publish &&
-                            props.canPublishRoster ? (
-                                <Button
-                                    size="sm"
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                    disabled={
-                                        !props.rosterPeriod ||
-                                        publishBlockCount > 0 ||
-                                        props.rosterPeriod.status === 'archived'
-                                    }
-                                    title={
-                                        !props.rosterPeriod
-                                            ? 'Pick a site to publish its week'
-                                            : publishBlockCount > 0
-                                              ? `${publishBlockCount} blocker${publishBlockCount === 1 ? '' : 's'} must be resolved`
-                                              : undefined
-                                    }
-                                    onClick={() =>
-                                        postPeriodAction(
-                                            canRepublish
-                                                ? 'republish'
-                                                : 'publish',
-                                        )
-                                    }
-                                    data-test="rostering-confirm-publish"
-                                    data-testid="rostering-confirm-publish"
-                                >
-                                    <CheckCircle2 className="mr-1 h-4 w-4" />
-                                    {canRepublish
-                                        ? 'Re-publish'
-                                        : 'Publish week'}
-                                </Button>
-                            ) : null}
-                            {props.rosteringFeatures.auto_schedule &&
-                            props.canAutoScheduleRoster ? (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                                    disabled={!props.filters.site_id}
-                                    title={
-                                        !props.filters.site_id
-                                            ? 'Pick a site before generating suggestions'
-                                            : undefined
-                                    }
-                                    onClick={generateSuggestions}
-                                    data-test="rostering-suggest-assignments"
-                                    data-testid="rostering-suggest-assignments"
-                                >
-                                    <Wand2 className="mr-1 h-4 w-4" />
-                                    Auto-schedule
-                                </Button>
-                            ) : null}
-                            <Link href="/operations/rostering/conflicts">
-                                <Button
-                                    size="icon"
-                                    variant="outline"
-                                    aria-label="Conflict queue"
-                                    title="Conflict queue"
-                                    className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                                >
-                                    <AlertTriangle className="h-4 w-4" />
-                                </Button>
-                            </Link>
-                        </>
-                    }
-                    footer={
-                        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
-                                    onClick={() => goWeek(-7)}
-                                >
-                                    <ChevronLeft className="h-3.5 w-3.5" />
-                                    {prevLab}
-                                </button>
-                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
-                                <button
-                                    ref={todayBtnRef}
-                                    type="button"
-                                    className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/30"
-                                    onClick={() => setPickerOpen((v) => !v)}
-                                    aria-haspopup="dialog"
-                                    aria-expanded={pickerOpen}
-                                >
-                                    <CalendarRange className="h-3.5 w-3.5" />
-                                    {curLab} · {curCompactRange} · pick week
-                                    <ChevronDown className="h-3 w-3" />
-                                </button>
-                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
-                                    onClick={() => goWeek(7)}
-                                >
-                                    {nextLab}
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                <EntityFilter
-                                    onDark
-                                    label="Staff"
-                                    pluralLabel="staff"
-                                    allLabel="All staff"
-                                    items={staffFilterItems}
-                                    value={props.filters.staff_id}
-                                    onChange={(next) =>
-                                        updateFilter({ staff_id: next })
-                                    }
-                                />
-                                <EntityFilter
-                                    onDark
-                                    label="Client"
-                                    allLabel="All clients"
-                                    items={clientFilterItems}
-                                    value={props.filters.client_id}
-                                    onChange={(next) =>
-                                        updateFilter({ client_id: next })
-                                    }
-                                />
-                                <SiteFilter
-                                    onDark
-                                    sites={props.sites ?? []}
-                                    value={props.filters.site_ids ?? []}
-                                    onChange={(next) =>
-                                        updateFilter({ site_ids: next })
-                                    }
-                                />
-                            </div>
-                        </div>
-                    }
-                />
 
-                {/* The summary donuts are aria-pressed toggle buttons (the real
-                    tablist is the TabStrip below) — a role="tablist" here with
-                    no role="tab" children would be an axe critical
-                    (aria-required-children). */}
-                <div
-                    aria-label="Roster summary views"
-                    className="grid grid-cols-1 gap-3 lg:grid-cols-3"
-                >
-                    <DonutCard
-                        tone="primary"
-                        title="Shifts"
-                        subtitle={`${curLab} breakdown`}
-                        segments={
-                            shiftBreakdown.length > 0
-                                ? shiftBreakdown
-                                : [
-                                      {
-                                          key: 'none',
-                                          label: 'None',
-                                          value: 1,
-                                          color: 'var(--muted-foreground)',
-                                      },
-                                  ]
-                        }
-                        centerValue={total}
-                        centerLabel="shifts"
-                        accentKeys={['scheduled', 'in_progress']}
-                        active={tab === 'shifts'}
-                        cta="View shifts"
-                        onClick={() => setTab('shifts')}
-                    />
-                    <DonutCard
-                        tone="warning"
-                        title="Open shifts"
-                        subtitle="Need cover this week"
-                        segments={
-                            openBreakdown.length > 0
-                                ? openBreakdown
-                                : [
-                                      {
-                                          key: 'none',
-                                          label: 'None',
-                                          value: 1,
-                                          color: 'var(--muted-foreground)',
-                                      },
-                                  ]
-                        }
-                        centerValue={openCount}
-                        centerLabel={
-                            openCount === 1 ? 'shift open' : 'shifts open'
-                        }
-                        accentKeys={['open', 'blocked']}
-                        active={tab === 'open'}
-                        cta="View open shifts"
-                        onClick={() => setTab('open')}
-                    />
-                    <DonutCard
-                        tone="success"
-                        title="Coverage"
-                        subtitle="Filled vs. demand"
-                        segments={
-                            coverageBreakdown.length > 0
-                                ? coverageBreakdown
-                                : [
-                                      {
-                                          key: 'none',
-                                          label: 'None',
-                                          value: 1,
-                                          color: 'var(--muted-foreground)',
-                                      },
-                                  ]
-                        }
-                        centerValue={`${coverageRate}%`}
-                        centerLabel="covered"
-                        accentKeys={['covered']}
-                        active={tab === 'coverage'}
-                        cta="View coverage"
-                        onClick={() => setTab('coverage')}
-                    />
-                </div>
-
-                <TabStrip
-                    value={tab}
-                    onChange={handleTabChange}
-                    items={tabItems}
-                />
-
+            <PageLayout hero={header}>
                 <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
                     <main className="min-w-0">
                         {tab === 'shifts' ? (
                             <WeekGridPane
                                 days={days}
-                                rows={staffRows}
-                                siteRows={siteRows}
+                                rows={filteredStaffRows}
+                                siteRows={filteredSiteRows}
                                 todayKey={todayKey}
                                 canManage={props.canManageAny}
                                 onUnassign={openUnassignMakeOpenDialog}
@@ -3228,7 +3168,7 @@ export default function RosteringIndex(props: Props) {
                         canPublishWeek={props.canPublishRoster}
                     />
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

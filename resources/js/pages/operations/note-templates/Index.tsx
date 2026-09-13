@@ -1,21 +1,36 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import { ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { FileText, Hash, Pencil, Plus, Search, StickyNote } from 'lucide-react';
-
-const ANY = '__ANY__';
+import {
+    CheckCircle2,
+    FileText,
+    Hash,
+    Layers,
+    Pencil,
+    Plus,
+    StickyNote,
+    XCircle,
+} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 
 type NoteTemplate = {
     id: number;
@@ -29,16 +44,24 @@ type NoteTemplate = {
 type Props = {
     templates: {
         data: NoteTemplate[];
-        links: any[];
+        links: { url: string | null; label: string; active: boolean }[];
         current_page: number;
         last_page: number;
         total: number;
     };
     filters: {
-        q?: string;
-        status?: string;
+        q?: string | null;
+        status?: string | null;
+        type?: string | null;
     };
+    stats?: {
+        total: number;
+        active: number;
+    };
+    types?: string[];
 };
+
+type ViewKey = 'all' | 'active' | 'inactive';
 
 function formatDate(d: string | null): string {
     if (!d) return '-';
@@ -49,6 +72,10 @@ function formatDate(d: string | null): string {
     });
 }
 
+function typeLabel(type: string): string {
+    return type.replace(/_/g, ' ').replace(/^\w/, (m) => m.toUpperCase());
+}
+
 export default function NoteTemplatesIndex({
     templates = {
         data: [],
@@ -57,162 +84,290 @@ export default function NoteTemplatesIndex({
         last_page: 1,
         total: 0,
     },
-    filters = {} as any,
+    filters = {},
+    stats,
+    types = [],
 }: Props) {
-    const updateFilters = (key: string, value: string | null) => {
-        router.get(
-            '/operations/note-templates',
-            { ...filters, [key]: value },
-            { preserveState: true, replace: true },
-        );
-    };
+    const s = stats ?? { total: 0, active: 0 };
+    const inactiveCount = Math.max(0, s.total - s.active);
 
-    return (
-        <AppLayout>
-            <Head title="Note Templates" />
-            <PageHero
-                icon={FileText}
-                title="Note Templates"
-                description="Manage care note templates and custom fields."
-                stats={[
-                    { label: 'Templates', value: templates?.total ?? 0 },
-                    {
-                        label: 'Active',
-                        value: (templates?.data ?? []).filter(
-                            (t) => t.is_active,
-                        ).length,
-                    },
-                ]}
-            />
-            <PageShell>
-                {/* Filters */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                            placeholder="Search templates..."
-                            className="h-9 pl-8 text-sm"
-                            defaultValue={filters?.q ?? ''}
-                            onChange={(e) =>
-                                updateFilters('q', e.target.value || null)
-                            }
-                        />
-                    </div>
-                    <Select
-                        value={filters?.status ?? ANY}
-                        onValueChange={(v) =>
-                            updateFilters('status', v === ANY ? null : v)
+    const view: ViewKey =
+        filters.status === 'active'
+            ? 'active'
+            : filters.status === 'inactive'
+              ? 'inactive'
+              : 'all';
+
+    const [q, setQ] = useState(filters.q ?? '');
+
+    const applyFilters = useCallback(
+        (overrides: { view?: ViewKey; q?: string; type?: string }) => {
+            const nextView = overrides.view ?? view;
+            const nextQ = overrides.q ?? filters.q ?? '';
+            const nextType = overrides.type ?? filters.type ?? 'all';
+            const params: Record<string, string> = {};
+            if (nextView !== 'all') params.status = nextView;
+            if (nextQ.trim() !== '') params.q = nextQ.trim();
+            if (nextType !== 'all') params.type = nextType;
+            router.get('/operations/note-templates', params, {
+                preserveState: true,
+                replace: true,
+            });
+        },
+        [view, filters.q, filters.type],
+    );
+
+    useEffect(() => {
+        if ((filters.q ?? '') === q.trim()) return;
+        const t = setTimeout(() => applyFilters({ q }), 400);
+        return () => clearTimeout(t);
+    }, [q, filters.q, applyFilters]);
+
+    const railItems: PageHeaderRailItem<ViewKey>[] = [
+        { key: 'all', label: 'All templates', icon: Layers, count: s.total },
+        {
+            key: 'active',
+            label: 'Active',
+            icon: CheckCircle2,
+            count: s.active,
+        },
+        {
+            key: 'inactive',
+            label: 'Inactive',
+            icon: XCircle,
+            count: inactiveCount,
+        },
+    ];
+
+    const currentViewLabel =
+        railItems.find((v) => v.key === view)?.label ?? 'All templates';
+
+    const hasNarrowing =
+        (filters.q ?? '') !== '' || (filters.type ?? 'all') !== 'all';
+
+    const typeOptions = [
+        { value: 'all', label: 'All types' },
+        ...types.map((t) => ({ value: t, label: typeLabel(t) })),
+    ];
+
+    const header = (
+        <PageHeader
+            icon={StickyNote}
+            title="Note templates"
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={s.active > 0 ? 'success' : 'neutral'}
+                >
+                    {s.active} active
+                </PageHeaderStatusChip>
+            }
+            subline={`Care note templates and custom fields · ${s.total} ${
+                s.total === 1 ? 'template' : 'templates'
+            } · ${types.length} ${types.length === 1 ? 'type' : 'types'}`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={q}
+                        onChange={setQ}
+                        placeholder="Search templates…"
+                    />
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        onClick={() =>
+                            router.visit('/operations/note-templates/create')
                         }
                     >
-                        <SelectTrigger className="h-9 w-[130px] text-xs">
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Status</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Button asChild size="sm">
-                        <Link href="/operations/note-templates/create">
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            New Template
-                        </Link>
-                    </Button>
-                </div>
-
-                {/* List */}
-                <div className="mt-4 space-y-2">
-                    {(templates?.data ?? []).length === 0 && (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16">
-                                <StickyNote className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <h2 className="text-lg font-semibold text-muted-foreground">
-                                    No Note Templates
-                                </h2>
-                                <p className="mt-1 text-sm text-muted-foreground/80">
-                                    Create your first note template to
-                                    standardise care notes.
-                                </p>
-                                <Button asChild size="sm" className="mt-4">
-                                    <Link href="/operations/note-templates/create">
-                                        Create Template
-                                    </Link>
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    )}
-                    {(templates?.data ?? []).map((tpl) => (
-                        <Card
-                            key={tpl.id}
-                            className="transition-all hover:border-border hover:shadow-sm"
+                        New template
+                    </PageHeaderPrimaryButton>
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Templates"
+                        ariaLabel="View all templates"
+                        onClick={() => applyFilters({ view: 'all' })}
+                    >
+                        <PageHeaderMeterBig>{s.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            across {types.length}{' '}
+                            {types.length === 1 ? 'type' : 'types'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    {s.total > 0 ? (
+                        <PageHeaderMeterBlock
+                            label="Active"
+                            ariaLabel="View active templates"
+                            onClick={() => applyFilters({ view: 'active' })}
                         >
-                            <CardContent className="flex items-center gap-4 p-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70">
-                                    <FileText className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <Link
-                                            href={`/operations/note-templates/${tpl.id}/edit`}
-                                            className="text-sm font-semibold hover:underline"
-                                        >
-                                            {tpl.name}
-                                        </Link>
-                                        <Badge
-                                            variant={
-                                                tpl.is_active
-                                                    ? 'default'
-                                                    : 'secondary'
-                                            }
-                                            className="h-4 px-1.5 text-[9px]"
-                                        >
-                                            {tpl.is_active
-                                                ? 'Active'
-                                                : 'Inactive'}
-                                        </Badge>
-                                        <Badge
-                                            variant="outline"
-                                            className="h-4 px-1.5 text-[9px] capitalize"
-                                        >
-                                            {tpl.template_type}
-                                        </Badge>
-                                    </div>
-                                    <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                                        <span className="flex items-center gap-1">
-                                            <Hash className="h-3 w-3" />{' '}
-                                            {tpl.fields_count} fields
-                                        </span>
-                                        <span>
-                                            Created:{' '}
-                                            {formatDate(tpl.created_at)}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="flex shrink-0 gap-1">
-                                    <Button
-                                        asChild
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0"
-                                    >
-                                        <Link
-                                            href={`/operations/note-templates/${tpl.id}/edit`}
-                                        >
-                                            <Pencil className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                            <PageHeaderMeterDonut
+                                percent={(s.active / s.total) * 100}
+                                caption={
+                                    <>
+                                        {s.active} of {s.total}
+                                        <br />
+                                        in use
+                                    </>
+                                }
+                            />
+                        </PageHeaderMeterBlock>
+                    ) : null}
+                    <PageHeaderMeterBlock
+                        label="Inactive"
+                        ariaLabel="View inactive templates"
+                        onClick={() => applyFilters({ view: 'inactive' })}
+                    >
+                        <PageHeaderMeterBig>{inactiveCount}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            retired from use
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <PageHeaderFilterSelect
+                    icon={FileText}
+                    label="All types"
+                    value={filters.type ?? 'all'}
+                    options={typeOptions}
+                    onChange={(v) => applyFilters({ type: v })}
+                />
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={view}
+                    onSelect={(key) => applyFilters({ view: key })}
+                    ariaLabel="Template views"
+                />
+            }
+        />
+    );
 
-                {/* Pagination */}
-                {(templates?.last_page ?? 1) > 1 && (
-                    <div className="mt-4 flex items-center justify-center gap-1">
-                        {(templates?.links ?? []).map(
-                            (link: any, i: number) => (
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                {
+                    title: 'Note templates',
+                    href: '/operations/note-templates',
+                },
+            ]}
+        >
+            <Head title="Note templates" />
+
+            <PageLayout hero={header}>
+                <div className="flex flex-col gap-5">
+                    <ListCaption
+                        title={currentViewLabel}
+                        caption={`${templates.data.length} of ${
+                            view === 'active'
+                                ? s.active
+                                : view === 'inactive'
+                                  ? inactiveCount
+                                  : s.total
+                        } shown`}
+                    />
+
+                    <div className="space-y-2">
+                        {templates.data.length === 0 ? (
+                            <EmptyState
+                                icon={StickyNote}
+                                title="No note templates"
+                                description={
+                                    hasNarrowing || view !== 'all'
+                                        ? 'Try a different view or clear your filters.'
+                                        : 'Create your first note template to standardise care notes.'
+                                }
+                                action={
+                                    hasNarrowing ||
+                                    view !== 'all' ? undefined : (
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                router.visit(
+                                                    '/operations/note-templates/create',
+                                                )
+                                            }
+                                        >
+                                            <Plus className="h-3.5 w-3.5" />
+                                            New template
+                                        </Button>
+                                    )
+                                }
+                            />
+                        ) : (
+                            templates.data.map((tpl) => (
+                                <Card
+                                    key={tpl.id}
+                                    className="transition-all hover:border-border hover:shadow-sm"
+                                >
+                                    <CardContent className="flex items-center gap-4 p-4">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                            <FileText className="h-5 w-5" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <Link
+                                                    href={`/operations/note-templates/${tpl.id}/edit`}
+                                                    className="text-sm font-semibold hover:underline"
+                                                >
+                                                    {tpl.name}
+                                                </Link>
+                                                <StatusBadge
+                                                    variant={
+                                                        tpl.is_active
+                                                            ? 'success'
+                                                            : 'neutral'
+                                                    }
+                                                >
+                                                    {tpl.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
+                                                </StatusBadge>
+                                                <Badge
+                                                    variant="outline"
+                                                    className="h-4 px-1.5 text-[9px] capitalize"
+                                                >
+                                                    {tpl.template_type}
+                                                </Badge>
+                                            </div>
+                                            <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                                <span className="flex items-center gap-1">
+                                                    <Hash className="h-3 w-3" />{' '}
+                                                    {tpl.fields_count} fields
+                                                </span>
+                                                <span>
+                                                    Created:{' '}
+                                                    {formatDate(tpl.created_at)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex shrink-0 gap-1">
+                                            <Button
+                                                asChild
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 w-7 p-0"
+                                            >
+                                                <Link
+                                                    href={`/operations/note-templates/${tpl.id}/edit`}
+                                                    aria-label={`Edit ${tpl.name}`}
+                                                >
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))
+                        )}
+                    </div>
+
+                    {(templates.last_page ?? 1) > 1 && (
+                        <div className="flex items-center justify-center gap-1">
+                            {(templates.links ?? []).map((link, i) => (
                                 <Button
                                     key={i}
                                     size="sm"
@@ -233,11 +388,11 @@ export default function NoteTemplatesIndex({
                                         __html: link.label,
                                     }}
                                 />
-                            ),
-                        )}
-                    </div>
-                )}
-            </PageShell>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

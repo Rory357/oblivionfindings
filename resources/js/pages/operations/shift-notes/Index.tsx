@@ -1,6 +1,39 @@
-import PageShell from '@/components/page-shell';
+import { ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageHeaderViewToggle,
+    PageLayout,
+} from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    Building2,
+    CalendarDays,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    Download,
+    Flag,
+    Layers,
+    LayoutGrid,
+    List,
+    NotebookPen,
+    Plus,
+    Users,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -18,16 +51,17 @@ import {
     type Catalogue,
     type CatalogueShift,
     type Filters,
+    NOTE_TYPES,
+    type NoteType,
     type ShiftNote,
     type StatusTab,
+    TYPE_META,
     type ViewMode,
     clientName,
     matchesTab,
     noteDate,
     ymd,
 } from './components/shared';
-import { ShiftNotesHero } from './components/shift-notes-hero';
-import { Toolbar } from './components/toolbar';
 
 type Props = {
     notes: ShiftNote[];
@@ -148,8 +182,6 @@ export default function ShiftNotesIndex({
         setTab('all');
     };
 
-    const firstName = currentUser?.name?.split(' ')?.[0] ?? 'team';
-
     // ---- navigation + actions --------------------------------------------
     const goWeek = (week: Date) => {
         const target = ymd(week);
@@ -160,6 +192,12 @@ export default function ShiftNotesIndex({
             { week: target },
             { preserveState: true, preserveScroll: true },
         );
+    };
+
+    const shiftWeek = (days: number) => {
+        const next = new Date(weekStartDate);
+        next.setDate(next.getDate() + days);
+        goWeek(next);
     };
 
     const openNew = () => {
@@ -207,36 +245,297 @@ export default function ShiftNotesIndex({
         onReview: reviewNote,
     };
 
-    return (
-        <AppLayout>
-            <Head title="Shift Notes" />
-            <PageShell>
-                <ShiftNotesHero
-                    firstName={firstName}
-                    weekStart={weekStartDate}
-                    counts={heroCounts}
-                    search={search}
-                    onSearch={setSearch}
-                    filters={filters}
-                    onFilters={setFilters}
-                    catalogue={catalogue}
-                    onAddNote={openNew}
-                    onWeekChange={goWeek}
-                    onExport={onExport}
-                    canCreate={can.create}
-                />
+    /* ---------------- Event Horizon header ---------------- */
 
+    const weekLabel = weekStartDate.toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+    });
+    const weekEndLabel = new Date(
+        weekStartDate.getTime() + 6 * 86400000,
+    ).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+
+    const railItems: PageHeaderRailItem<StatusTab>[] = [
+        { key: 'all', label: 'All notes', icon: Layers, count: tabCounts.all },
+        {
+            key: 'flagged',
+            label: 'Flagged',
+            icon: Flag,
+            count: tabCounts.flagged,
+            alert: true,
+        },
+        {
+            key: 'awaiting',
+            label: 'Awaiting review',
+            icon: Clock,
+            count: tabCounts.awaiting,
+        },
+        {
+            key: 'reviewed',
+            label: 'Reviewed',
+            icon: CheckCircle2,
+            count: tabCounts.reviewed,
+        },
+    ];
+
+    const currentViewLabel =
+        railItems.find((v) => v.key === tab)?.label ?? 'All notes';
+
+    const titleChip =
+        heroCounts.flagged > 0 ? (
+            <PageHeaderStatusChip variant="critical">
+                {heroCounts.flagged} flagged
+            </PageHeaderStatusChip>
+        ) : heroCounts.awaiting > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {heroCounts.awaiting} awaiting review
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                All reviewed
+            </PageHeaderStatusChip>
+        );
+
+    const clientOptions = [
+        { value: 'all', label: 'All clients' },
+        ...catalogue.clients.map((c) => ({
+            value: String(c.id),
+            label: `${c.first_name} ${c.last_name}`,
+        })),
+    ];
+    const staffOptions = [
+        { value: 'all', label: 'All staff' },
+        ...catalogue.staff.map((s) => ({
+            value: String(s.id),
+            label: s.name,
+        })),
+    ];
+    const typeOptions = [
+        { value: 'all', label: 'All types' },
+        ...NOTE_TYPES.map((t) => ({ value: t, label: TYPE_META[t].label })),
+    ];
+
+    const header = (
+        <PageHeader
+            icon={NotebookPen}
+            title="Shift notes"
+            titleChip={titleChip}
+            subline={`${weekLabel} → ${weekEndLabel} · ${heroCounts.people} ${
+                heroCounts.people === 1 ? 'client' : 'clients'
+            } · ${heroCounts.houses} ${heroCounts.houses === 1 ? 'house' : 'houses'} · ${heroCounts.staffOnRoster} staff on roster`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Search notes, clients, staff…"
+                    />
+                    <PageHeaderGlassButton icon={Download} onClick={onExport}>
+                        Export
+                    </PageHeaderGlassButton>
+                    {can.create ? (
+                        <PageHeaderPrimaryButton icon={Plus} onClick={openNew}>
+                            Add note
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Notes this week"
+                        ariaLabel="View all notes"
+                        onClick={() => setTab('all')}
+                    >
+                        <PageHeaderMeterBig>
+                            {heroCounts.total}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            across {heroCounts.houses}{' '}
+                            {heroCounts.houses === 1 ? 'house' : 'houses'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Awaiting review"
+                        tone={heroCounts.awaiting > 0 ? 'warning' : 'success'}
+                        ariaLabel="View notes awaiting review"
+                        onClick={() => setTab('awaiting')}
+                    >
+                        <PageHeaderMeterBig>
+                            {heroCounts.awaiting}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            not yet signed off
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Flagged"
+                        tone={heroCounts.flagged > 0 ? 'critical' : 'success'}
+                        ariaLabel="View flagged notes"
+                        onClick={() => setTab('flagged')}
+                    >
+                        <PageHeaderMeterBig>
+                            {heroCounts.flagged}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            need manager attention
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Coverage gaps"
+                        tone={heroCounts.gaps > 0 ? 'warning' : 'success'}
+                        ariaLabel="View the week rail with coverage gaps"
+                        onClick={() =>
+                            document
+                                .getElementById('shift-notes-rail')
+                                ?.scrollIntoView({
+                                    behavior: 'smooth',
+                                    block: 'start',
+                                })
+                        }
+                    >
+                        <PageHeaderMeterBig>
+                            {heroCounts.gaps}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            shifts without a note yet
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Incidents"
+                        tone={heroCounts.incidents > 0 ? 'warning' : 'success'}
+                        ariaLabel="Filter to incident notes"
+                        onClick={() =>
+                            setFilters((prev) => ({
+                                ...prev,
+                                type: 'incident' as NoteType,
+                            }))
+                        }
+                    >
+                        <PageHeaderMeterBig>
+                            {heroCounts.incidents}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            incident notes this week
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterButton
+                        icon={ChevronLeft}
+                        aria-label="Previous week"
+                        onClick={() => shiftWeek(-7)}
+                    />
+                    <PageHeaderFilterButton
+                        icon={CalendarDays}
+                        onClick={() => goWeek(new Date())}
+                    >
+                        {weekLabel} → {weekEndLabel}
+                    </PageHeaderFilterButton>
+                    <PageHeaderFilterButton
+                        icon={ChevronRight}
+                        aria-label="Next week"
+                        onClick={() => shiftWeek(7)}
+                    />
+                    <PageHeaderFilterSelect
+                        icon={Users}
+                        label="All clients"
+                        value={
+                            filters.client != null
+                                ? String(filters.client)
+                                : 'all'
+                        }
+                        options={clientOptions}
+                        onChange={(v) =>
+                            setFilters((prev) => ({
+                                ...prev,
+                                client: v === 'all' ? null : Number(v),
+                            }))
+                        }
+                    />
+                    <PageHeaderFilterSelect
+                        icon={Building2}
+                        label="All staff"
+                        value={
+                            filters.staff != null
+                                ? String(filters.staff)
+                                : 'all'
+                        }
+                        options={staffOptions}
+                        onChange={(v) =>
+                            setFilters((prev) => ({
+                                ...prev,
+                                staff: v === 'all' ? null : Number(v),
+                            }))
+                        }
+                    />
+                    <PageHeaderFilterSelect
+                        icon={AlertTriangle}
+                        label="All types"
+                        value={filters.type ?? 'all'}
+                        options={typeOptions}
+                        onChange={(v) =>
+                            setFilters((prev) => ({
+                                ...prev,
+                                type: v === 'all' ? null : (v as NoteType),
+                            }))
+                        }
+                    />
+                    <PageHeaderViewToggle
+                        value={view}
+                        onChange={setView}
+                        ariaLabel="Layout"
+                        options={[
+                            {
+                                value: 'cards',
+                                label: 'Cards',
+                                icon: LayoutGrid,
+                            },
+                            { value: 'list', label: 'List', icon: List },
+                        ]}
+                    />
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={tab}
+                    onSelect={setTab}
+                    ariaLabel="Note views"
+                />
+            }
+        />
+    );
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                { title: 'Shift notes', href: '/operations/shift-notes' },
+            ]}
+        >
+            <Head title="Shift notes" />
+
+            <PageLayout hero={header}>
                 <div className="space-y-4">
-                    <Toolbar
-                        tab={tab}
-                        onTab={setTab}
-                        view={view}
-                        onView={setView}
-                        counts={tabCounts}
-                        shown={filtered.length}
-                        total={notes.length}
-                        hasFilters={hasFilters}
-                        onClearFilters={clearFilters}
+                    <ListCaption
+                        title={currentViewLabel}
+                        caption={`${filtered.length} of ${notes.length} shown`}
+                        right={
+                            hasFilters ? (
+                                <GuardrailButton
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={clearFilters}
+                                    className="text-xs text-muted-foreground"
+                                >
+                                    Clear filters
+                                </GuardrailButton>
+                            ) : undefined
+                        }
                     />
 
                     {selectedDay ? (
@@ -277,18 +576,20 @@ export default function ShiftNotesIndex({
                                 <ListView notes={filtered} {...handlers} />
                             )}
                         </main>
-                        <NoteRail
-                            weekNotes={notes}
-                            gaps={gaps}
-                            weekStart={weekStartDate}
-                            selectedDay={selectedDay}
-                            onSelectDay={setSelectedDay}
-                            onOpen={(n) => setDetailId(n.id)}
-                            onAddNoteForShift={openForShift}
-                        />
+                        <div id="shift-notes-rail" className="min-w-0">
+                            <NoteRail
+                                weekNotes={notes}
+                                gaps={gaps}
+                                weekStart={weekStartDate}
+                                selectedDay={selectedDay}
+                                onSelectDay={setSelectedDay}
+                                onOpen={(n) => setDetailId(n.id)}
+                                onAddNoteForShift={openForShift}
+                            />
+                        </div>
                     </div>
                 </div>
-            </PageShell>
+            </PageLayout>
 
             <NoteDetailDialog
                 note={detailNote}

@@ -1,16 +1,21 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { ListCaption } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderRail,
+    type PageHeaderRailItem,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageLayout,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, Link, router } from '@inertiajs/react';
@@ -18,12 +23,14 @@ import {
     AlertTriangle,
     ArrowRight,
     Building2,
+    CalendarRange,
     CheckCircle2,
     ClipboardList,
     Clock,
+    Layers,
     Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 type ReviewItem = {
     id: number;
@@ -73,8 +80,10 @@ type PageProps = {
     items: PaginatedItems;
     sites: SiteOption[];
     stats: Stats;
-    filters: { site: number | null; age: string };
+    filters: { site: number | null; age: string; severity?: string };
 };
+
+type ViewKey = 'all' | 'critical' | 'warning' | 'recent';
 
 function formatHours(hours: number): string {
     if (hours < 1) return 'just now';
@@ -95,24 +104,44 @@ const severityIcon = {
     info: ClipboardList,
 };
 
+const AGE_OPTIONS = [
+    { value: 'all', label: 'Any age' },
+    { value: '24h', label: 'Last 24 hours' },
+    { value: '7d', label: 'Last 7 days' },
+    { value: '30d', label: 'Last 30 days' },
+];
+
 export default function ReviewQueuePage({
     items,
     sites,
     stats,
     filters,
 }: PageProps) {
-    const [siteFilter, setSiteFilter] = useState<string>(
-        filters.site ? String(filters.site) : 'all',
-    );
-    const [ageFilter, setAgeFilter] = useState<string>(filters.age || 'all');
+    const [search, setSearch] = useState('');
 
-    const applyFilters = (nextSite: string, nextAge: string) => {
+    const view: ViewKey = (['critical', 'warning', 'recent'] as const).includes(
+        filters.severity as any,
+    )
+        ? (filters.severity as ViewKey)
+        : 'all';
+
+    const applyFilters = (overrides: {
+        view?: ViewKey;
+        site?: string;
+        age?: string;
+    }) => {
+        const nextView = overrides.view ?? view;
+        const nextSite =
+            overrides.site ?? (filters.site ? String(filters.site) : 'all');
+        const nextAge = overrides.age ?? (filters.age || 'all');
         const params: Record<string, string> = {};
+        if (nextView !== 'all') params.severity = nextView;
         if (nextSite !== 'all') params.site = nextSite;
         if (nextAge !== 'all') params.age = nextAge;
         router.get('/operations/review-queue', params, {
             preserveScroll: true,
             preserveState: true,
+            replace: true,
         });
     };
 
@@ -127,98 +156,199 @@ export default function ReviewQueuePage({
         );
     };
 
-    return (
-        <AppLayout>
-            <Head title="Review queue" />
-            <PageLayout>
-                <PageHero
-                    icon={AlertTriangle}
-                    title="Manager review queue"
-                    description="Every flagged daily note across all clients in your scope. Mark each one reviewed as you work through it."
-                    stats={[
-                        { label: 'Open', value: stats.total },
-                        { label: 'Critical', value: stats.critical },
-                        { label: 'Clients', value: stats.clients },
-                        { label: 'Sites', value: stats.sites },
-                    ]}
+    const shown = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return items.data;
+        return items.data.filter((item) =>
+            `${item.client_name} ${item.site_name ?? ''} ${
+                item.subject ?? ''
+            } ${item.body ?? ''} ${item.flagged_reason ?? ''} ${
+                item.author?.name ?? ''
+            }`
+                .toLowerCase()
+                .includes(q),
+        );
+    }, [items.data, search]);
+
+    const recentCount = Math.max(
+        0,
+        stats.total - stats.critical - stats.warning,
+    );
+
+    const railItems: PageHeaderRailItem<ViewKey>[] = [
+        { key: 'all', label: 'All open', icon: Layers, count: stats.total },
+        {
+            key: 'critical',
+            label: 'Open 48h+',
+            icon: AlertTriangle,
+            count: stats.critical,
+            alert: true,
+        },
+        {
+            key: 'warning',
+            label: 'Open 24–48h',
+            icon: Clock,
+            count: stats.warning,
+        },
+        {
+            key: 'recent',
+            label: 'Under 24h',
+            icon: ClipboardList,
+            count: recentCount,
+        },
+    ];
+
+    const currentViewLabel =
+        railItems.find((v) => v.key === view)?.label ?? 'All open';
+    const viewTotal =
+        view === 'critical'
+            ? stats.critical
+            : view === 'warning'
+              ? stats.warning
+              : view === 'recent'
+                ? recentCount
+                : stats.total;
+
+    const titleChip =
+        stats.critical > 0 ? (
+            <PageHeaderStatusChip variant="critical">
+                {stats.critical} open 48h+
+            </PageHeaderStatusChip>
+        ) : stats.warning > 0 ? (
+            <PageHeaderStatusChip variant="warning">
+                {stats.warning} ageing
+            </PageHeaderStatusChip>
+        ) : stats.total > 0 ? (
+            <PageHeaderStatusChip variant="info">
+                {stats.total} to review
+            </PageHeaderStatusChip>
+        ) : (
+            <PageHeaderStatusChip variant="success">
+                Inbox zero
+            </PageHeaderStatusChip>
+        );
+
+    const siteOptions = [
+        { value: 'all', label: 'All sites' },
+        ...sites.map((s) => ({ value: String(s.id), label: s.name })),
+    ];
+
+    const header = (
+        <PageHeader
+            icon={AlertTriangle}
+            title="Review queue"
+            titleChip={titleChip}
+            subline={`Flagged daily notes awaiting manager review · ${stats.clients} ${
+                stats.clients === 1 ? 'client' : 'clients'
+            } · ${stats.sites} ${stats.sites === 1 ? 'site' : 'sites'}`}
+            actions={
+                <PageHeaderSearch
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search flagged notes…"
                 />
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Open"
+                        ariaLabel="View all open items"
+                        onClick={() => applyFilters({ view: 'all' })}
+                    >
+                        <PageHeaderMeterBig>{stats.total}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            flagged notes awaiting review
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Open 48h+"
+                        tone={stats.critical > 0 ? 'critical' : 'success'}
+                        ariaLabel="View items open more than 48 hours"
+                        onClick={() => applyFilters({ view: 'critical' })}
+                    >
+                        <PageHeaderMeterBig>
+                            {stats.critical}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            waiting two days or more
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Open 24–48h"
+                        tone={stats.warning > 0 ? 'warning' : 'success'}
+                        ariaLabel="View items open 24 to 48 hours"
+                        onClick={() => applyFilters({ view: 'warning' })}
+                    >
+                        <PageHeaderMeterBig>{stats.warning}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            ageing past one day
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Clients affected"
+                        ariaLabel="View all open items"
+                        onClick={() => applyFilters({ view: 'all' })}
+                    >
+                        <PageHeaderMeterBig>{stats.clients}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            across {stats.sites}{' '}
+                            {stats.sites === 1 ? 'site' : 'sites'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterSelect
+                        icon={Building2}
+                        label="All sites"
+                        value={filters.site ? String(filters.site) : 'all'}
+                        options={siteOptions}
+                        onChange={(v) => applyFilters({ site: v })}
+                    />
+                    <PageHeaderFilterSelect
+                        icon={CalendarRange}
+                        label="Any age"
+                        value={filters.age || 'all'}
+                        options={AGE_OPTIONS}
+                        onChange={(v) => applyFilters({ age: v })}
+                    />
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={railItems}
+                    value={view}
+                    onSelect={(key) => applyFilters({ view: key })}
+                    ariaLabel="Queue views"
+                />
+            }
+        />
+    );
 
-                <div className="space-y-6">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-muted-foreground">
-                                Site
-                            </label>
-                            <Select
-                                value={siteFilter}
-                                onValueChange={(value) => {
-                                    setSiteFilter(value);
-                                    applyFilters(value, ageFilter);
-                                }}
-                            >
-                                <SelectTrigger className="min-h-11 w-56">
-                                    <SelectValue placeholder="All sites" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All sites
-                                    </SelectItem>
-                                    {sites.map((site) => (
-                                        <SelectItem
-                                            key={site.id}
-                                            value={String(site.id)}
-                                        >
-                                            {site.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-muted-foreground">
-                                Age
-                            </label>
-                            <Select
-                                value={ageFilter}
-                                onValueChange={(value) => {
-                                    setAgeFilter(value);
-                                    applyFilters(siteFilter, value);
-                                }}
-                            >
-                                <SelectTrigger className="min-h-11 w-44">
-                                    <SelectValue placeholder="Any age" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Any age</SelectItem>
-                                    <SelectItem value="24h">
-                                        Last 24 hours
-                                    </SelectItem>
-                                    <SelectItem value="7d">
-                                        Last 7 days
-                                    </SelectItem>
-                                    <SelectItem value="30d">
-                                        Last 30 days
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {(siteFilter !== 'all' || ageFilter !== 'all') && (
-                            <Button
-                                variant="ghost"
-                                onClick={() => {
-                                    setSiteFilter('all');
-                                    setAgeFilter('all');
-                                    applyFilters('all', 'all');
-                                }}
-                            >
-                                Clear filters
-                            </Button>
-                        )}
-                    </div>
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Operations', href: '/operations' },
+                {
+                    title: 'Review queue',
+                    href: '/operations/review-queue',
+                },
+            ]}
+        >
+            <Head title="Review queue" />
 
-                    {items.data.length > 0 ? (
+            <PageLayout hero={header}>
+                <div className="space-y-5">
+                    <ListCaption
+                        title={currentViewLabel}
+                        caption={`${shown.length} of ${viewTotal} shown`}
+                    />
+
+                    {shown.length > 0 ? (
                         <div className="space-y-3">
-                            {items.data.map((item) => {
+                            {shown.map((item) => {
                                 const Icon = severityIcon[item.age_severity];
                                 return (
                                     <Card
@@ -318,7 +448,11 @@ export default function ReviewQueuePage({
                         <EmptyState
                             icon={Users}
                             title="Inbox zero"
-                            description="No flagged daily notes are waiting for review across your clients."
+                            description={
+                                search.trim() !== '' || view !== 'all'
+                                    ? 'No flagged notes match this view or your search.'
+                                    : 'No flagged daily notes are waiting for review across your clients.'
+                            }
                         />
                     )}
 
